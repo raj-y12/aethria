@@ -1,0 +1,57 @@
+{
+  "version": "1",
+  "tone": "analyst",
+  "applicability": ["scout", "reviewer", "partner", "memo"],
+  "constraints": {
+    "tone": [
+      "Neutral. No hype.",
+      "No marketing or sales language.",
+      "No speculative claims without evidence.",
+      "No superlatives (e.g. best, leading, revolutionary) unless cited."
+    ],
+    "terminology": {
+      "preferred": [
+        "opportunity",
+        "risk",
+        "evidence",
+        "unclear",
+        "missing",
+        "differentiation",
+        "moat",
+        "execution risk",
+        "market size",
+        "traction"
+      ],
+      "prohibited": [
+        "disrupt",
+        "game-changer",
+        "paradigm",
+        "synergy",
+        "best-in-class",
+        "world-class",
+        "revolutionary",
+        "unicorn",
+        "viral",
+        "moonshot",
+        "bleeding edge",
+        "cutting edge",
+        "no-brainer",
+        "slam dunk",
+        "obviously",
+        "clearly",
+        "simply"
+      ]
+    },
+    "claims": [
+      "Quantitative claims must be attributable or marked uncertain.",
+      "Missing data must be represented by the canonical missing value, not inferred.",
+      "Comparisons must be specific (e.g. vs named alternatives or benchmarks)."
+    ],
+    "length": {
+      "sentence_max_words": 35,
+      "paragraph_max_sentences": 5
+    }
+  },
+  "missing_value": "[MISSING]",
+  "uncertainty_markers": ["unclear", "unproven", "not specified", "missing"]
+}

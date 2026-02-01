@@ -1,0 +1,50 @@
+/* Jelly triangle loading — Aethria (inspired by Uiverse) */
+.aethria-jelly-triangle {
+  --uib-size: 44px;
+  --uib-speed: 1.5s;
+  --uib-color: #002147;
+  position: relative;
+  height: var(--uib-size);
+  width: var(--uib-size);
+  filter: url('#aethria-jelly-ooze');
+}
+
+.aethria-jelly-dot,
+.aethria-jelly-triangle::before,
+.aethria-jelly-triangle::after {
+  content: '';
+  position: absolute;
+  width: 33%;
+  height: 33%;
+  background: var(--uib-color);
+  border-radius: 100%;
+}
+
+.aethria-jelly-dot {
+  top: 6%;
+  left: 30%;
+  animation: aethria-grow var(--uib-speed) ease infinite;
+}
+
+.aethria-jelly-triangle::before {
+  bottom: 6%;
+  right: 0;
+  animation: aethria-grow var(--uib-speed) ease calc(var(--uib-speed) * -0.666) infinite;
+}
+
+.aethria-jelly-triangle::after {
+  bottom: 6%;
+  left: 0;
+  animation: aethria-grow var(--uib-speed) ease calc(var(--uib-speed) * -0.333) infinite;
+}
+
+.aethria-jelly-traveler {
+  position: absolute;
+  top: 6%;
+  left: 30%;
+  width: 33%;
+  height: 33%;
+  background: var(--uib-color);
+  border-radius: 100%;
+  animation: aethria-triangulate var(--uib-speed) ease infinite;
+}

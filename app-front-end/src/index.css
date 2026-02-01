@@ -1,0 +1,103 @@
+/*
+ * Aethria — Institutional design system
+ * Palette: oxford #002147 (structural, dividers, active states), charcoal #2f333b, ivory #fcfcfc, mist #f2f4f8
+ * Libre Baskerville for Aethria wordmark only. All other text: Inter.
+ * No gradients, gimmicks, or decorative chrome.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: rgba(47, 51, 59, 0.12);
+  }
+
+  html {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    overflow-x: hidden;
+    background-color: #fcfcfc;
+    color: #2f333b;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-weight: 400;
+    line-height: 1.6;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Libre Baskerville reserved for Aethria wordmark only. Use .font-display explicitly.
+     All headings and body: Inter/sans. */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-weight: 500;
+    color: #2f333b;
+  }
+
+  ::selection {
+    background-color: #002147;
+    color: #fcfcfc;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #002147 transparent;
+  }
+
+  /* WebKit: oxford blue scrollbar thumb */
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #002147;
+    border-radius: 0;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 33, 71, 0.85);
+  }
+}
+
+@layer utilities {
+  .ease-smooth {
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Jelly triangle loading — Aethria */
+  @keyframes aethria-triangulate {
+    0%, 100% {
+      transform: none;
+    }
+    33.333% {
+      transform: translate(120%, 175%);
+    }
+    66.666% {
+      transform: translate(-95%, 175%);
+    }
+  }
+  @keyframes aethria-grow {
+    0%, 100% {
+      transform: scale(1.5);
+    }
+    20%, 70% {
+      transform: none;
+    }
+  }
+}

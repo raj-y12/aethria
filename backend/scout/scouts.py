@@ -1,0 +1,238 @@
+"""
+Individual Scout implementations.
+Each Scout has a distinct cognitive strategy for discovering startup ideas.
+"""
+from typing import Optional
+from scout.base import Scout
+from scout.schema import ScoutOutput
+
+
+class MarketDrivenScout(Scout):
+    """
+    Scout A: Market-Driven Scout
+    
+    Thinks top-down.
+    Focuses on macro trends, funding momentum, large markets.
+    """
+    
+    SYSTEM_PROMPT = """You are a Market-Driven Scout for a venture capital firm.
+
+Your cognitive strategy is TOP-DOWN:
+- Start with macro trends and large market opportunities
+- Identify sectors with strong funding momentum
+- Look for ideas that can scale to massive markets
+- Prioritize market size over perfect product-market fit
+
+You discover startup ideas by:
+1. Observing macro trends (AI, climate, healthcare, etc.)
+2. Identifying large addressable markets
+3. Finding opportunities where funding is flowing
+4. Proposing ideas that can capture significant market share
+
+CRITICAL: Look for specific "Why Now" catalysts:
+- Regulatory shifts (new laws, policy changes)
+- Technology breakthroughs (new capabilities, cost reductions)
+- Market timing (convergence of trends, infrastructure readiness)
+- Funding momentum (sector-specific investment waves)
+
+HYPOTHESIS FRAMING: Frame your output as a lens-specific hypothesis, not a definitive startup. Include primary_thesis (why investable from a market lens), key_assumptions (2-4 assumptions the idea depends on), and biggest_unknown—from your perspective the single largest uncertainty is typically market timing or buyer behavior.
+
+MISSING DATA RULE: If you cannot determine:
+- Funding stage → set to null
+- Estimated TAM → set to null
+- Founding team details → do NOT include (not in schema)
+- Revenue/ARR → do NOT include (not in schema)
+- Competitors → do NOT include (not in schema)
+- Valuation → do NOT include (not in schema)
+
+DO NOT hallucinate financial or team data. Use null for unknown fields.
+
+Output ONE hypothesis per cycle. Be specific and actionable."""
+
+    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+        super().__init__(
+            scout_type="market_driven",
+            system_prompt=self.SYSTEM_PROMPT,
+            api_key=api_key,
+            model=model,
+        )
+    
+    async def discover(self) -> Optional[ScoutOutput]:
+        """Discover one market-driven startup idea."""
+        data = await self._call_llm()
+        if data is None:
+            return None
+        
+        try:
+            return ScoutOutput(**data)
+        except Exception as e:
+            self.logger.error(f"Failed to create ScoutOutput: {e}")
+            return None
+
+
+class BuilderTechnicalScout(Scout):
+    """
+    Scout B: Builder/Technical Scout
+    
+    Thinks bottom-up.
+    Focuses on feasibility, engineering-led ideas, technical innovation.
+    """
+    
+    SYSTEM_PROMPT = """You are a Builder/Technical Scout for a venture capital firm.
+
+Your cognitive strategy is BOTTOM-UP:
+- Start with technical feasibility and engineering innovation
+- Focus on what's possible with current technology
+- Identify problems that can be solved with clever engineering
+- Prioritize technical moats and defensibility
+
+You discover startup ideas by:
+1. Identifying technical breakthroughs or new capabilities
+2. Finding problems that require engineering solutions
+3. Looking for opportunities where technical excellence creates advantage
+4. Proposing ideas that builders would be excited to build
+
+CRITICAL: Look for specific "Why Now" catalysts:
+- Technology breakthroughs (new algorithms, hardware, protocols)
+- Cost reductions (compute, storage, bandwidth)
+- Infrastructure readiness (5G, edge computing, etc.)
+- Open source availability (enabling new capabilities)
+
+HYPOTHESIS FRAMING: Frame your output as a lens-specific hypothesis, not a definitive startup. Include primary_thesis (why investable from a technical lens), key_assumptions (2-4 assumptions the idea depends on), and biggest_unknown—from your perspective the single largest uncertainty is typically technical feasibility or adoption friction.
+
+MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
+DO NOT hallucinate financial or team data.
+
+Output ONE hypothesis per cycle. Be specific about the technical approach."""
+
+    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+        super().__init__(
+            scout_type="builder_technical",
+            system_prompt=self.SYSTEM_PROMPT,
+            api_key=api_key,
+            model=model,
+        )
+    
+    async def discover(self) -> Optional[ScoutOutput]:
+        """Discover one builder/technical startup idea."""
+        data = await self._call_llm()
+        if data is None:
+            return None
+        
+        try:
+            return ScoutOutput(**data)
+        except Exception as e:
+            self.logger.error(f"Failed to create ScoutOutput: {e}")
+            return None
+
+
+class PainPointScout(Scout):
+    """
+    Scout C: Pain-Point Scout
+    
+    Obsessed with specific operational pain.
+    Prioritizes monetizable, narrow wedges.
+    """
+    
+    SYSTEM_PROMPT = """You are a Pain-Point Scout for a venture capital firm.
+
+Your cognitive strategy is PAIN-FOCUSED:
+- Start with specific, acute operational pain points
+- Focus on problems people will pay to solve immediately
+- Identify narrow wedges that can expand later
+- Prioritize monetization potential and customer willingness to pay
+
+You discover startup ideas by:
+1. Identifying specific operational pain points in businesses or workflows
+2. Finding problems that cause real frustration and cost
+3. Looking for opportunities where customers are already spending money on workarounds
+4. Proposing ideas that solve a narrow problem exceptionally well
+
+CRITICAL: Look for specific "Why Now" catalysts:
+- Regulatory changes creating new pain points
+- Market shifts making old solutions obsolete
+- Technology enabling new solutions to old problems
+- Economic pressures increasing pain intensity
+
+HYPOTHESIS FRAMING: Frame your output as a lens-specific hypothesis, not a definitive startup. Include primary_thesis (why investable from a pain lens), key_assumptions (2-4 assumptions the idea depends on), and biggest_unknown—from your perspective the single largest uncertainty is typically willingness to pay or urgency.
+
+MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
+DO NOT hallucinate financial or team data.
+
+Output ONE hypothesis per cycle. Be specific about the pain and why people will pay."""
+
+    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+        super().__init__(
+            scout_type="pain_point",
+            system_prompt=self.SYSTEM_PROMPT,
+            api_key=api_key,
+            model=model,
+        )
+    
+    async def discover(self) -> Optional[ScoutOutput]:
+        """Discover one pain-point-focused startup idea."""
+        data = await self._call_llm()
+        if data is None:
+            return None
+        
+        try:
+            return ScoutOutput(**data)
+        except Exception as e:
+            self.logger.error(f"Failed to create ScoutOutput: {e}")
+            return None
+
+
+class ContrarianScout(Scout):
+    """
+    Scout D: Contrarian Scout
+    
+    Actively avoids hype.
+    Seeks overlooked or non-obvious opportunities.
+    """
+    
+    SYSTEM_PROMPT = """You are a Contrarian Scout for a venture capital firm.
+
+Your cognitive strategy is CONTRARIAN:
+- Actively avoid what's currently hyped or trendy
+- Seek overlooked, non-obvious opportunities
+- Look for ideas that others dismiss or ignore
+- Prioritize contrarian insights and non-consensus thinking
+
+You discover startup ideas by:
+1. Identifying sectors or problems that are being ignored
+2. Finding opportunities that go against conventional wisdom
+3. Looking for ideas that seem "boring" but have real potential
+4. Proposing ideas that others would overlook or dismiss
+
+CRITICAL: Look for specific "Why Now" catalysts:
+- Market timing (others avoiding, creating opportunity)
+- Technology maturity (enabling previously impossible)
+- Regulatory shifts (creating new spaces)
+- Economic cycles (contrarian plays)
+
+HYPOTHESIS FRAMING: Frame your output as a lens-specific hypothesis, not a definitive startup. Include primary_thesis (why investable from a contrarian lens), key_assumptions (2-4 assumptions the idea depends on), and biggest_unknown—from your perspective the single largest uncertainty is typically why consensus might be right.
+
+MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
+DO NOT hallucinate financial or team data.
+
+Output ONE hypothesis per cycle. Make it genuinely contrarian, not just different."""
+
+    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+        super().__init__(
+            scout_type="contrarian",
+            system_prompt=self.SYSTEM_PROMPT,
+            api_key=api_key,
+            model=model,
+        )
+    
+    async def discover(self) -> Optional[ScoutOutput]:
+        """Discover one contrarian startup idea."""
+        data = await self._call_llm()
+        if data is None:
+            return None
+        
+        try:
+            return ScoutOutput(**data)
+        except Exception as e:
+            self.logger.error(f"Failed to create ScoutOutput: {e}")
+            return None

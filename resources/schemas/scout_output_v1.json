@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aethria/resources/schemas/scout_output_v1.json",
+  "title": "ScoutOutput",
+  "description": "Scout agent discovery output. Version 1.",
+  "type": "object",
+  "version": "1",
+  "required": ["version", "id", "scout_type", "name", "one_line", "sector", "problem", "solution", "target_users", "why_now", "confidence", "primary_thesis", "key_assumptions", "biggest_unknown"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "1" },
+    "id": { "type": "string", "format": "uuid" },
+    "scout_type": {
+      "type": "string",
+      "enum": ["market_driven", "builder_technical", "pain_point", "contrarian"]
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "one_line": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "sector": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "problem": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "solution": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "target_users": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "why_now": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "primary_thesis": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "key_assumptions": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 512 }, "minItems": 2, "maxItems": 4 },
+    "biggest_unknown": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "funding_stage": {
+      "type": ["string", "null"],
+      "enum": ["Pre-Seed", "Seed", "Series A", "Series B", "Series C+", "Unknown", null]
+    },
+    "est_tam": { "type": ["string", "null"], "maxLength": 256 }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "version": "1",
+  "missing_value": "[MISSING]",
+  "tone": "analyst",
+  "tone_rules": [
+    "Neutral. No hype or marketing language.",
+    "No speculative claims without evidence.",
+    "Factual. Comparable across memos for IC review."
+  ],
+  "sections": [
+    { "id": "header", "title": "Investment Memo", "required": true, "max_chars": 512, "order": 0 },
+    { "id": "company_overview", "title": "Company Overview", "required": true, "max_chars": 2048, "order": 1 },
+    { "id": "problem_opportunity", "title": "Problem & Opportunity", "required": true, "max_chars": 4096, "order": 2 },
+    { "id": "financials_traction", "title": "Financials & Traction", "required": true, "max_chars": 2048, "order": 3 },
+    { "id": "team_founders", "title": "Team & Founders", "required": false, "max_chars": 2048, "order": 4 },
+    { "id": "competition_market_position", "title": "Competition & Market Position", "required": false, "max_chars": 2048, "order": 5 },
+    { "id": "business_model_monetization", "title": "Business Model & Monetization", "required": false, "max_chars": 2048, "order": 6 },
+    { "id": "reviewer_analysis", "title": "Reviewer Analysis", "required": false, "max_chars": 4096, "order": 7 },
+    { "id": "investment_thesis", "title": "Investment Thesis", "required": false, "max_chars": 2048, "order": 8 },
+    { "id": "risk_mitigation", "title": "Risk Mitigation", "required": false, "max_chars": 2048, "order": 9 },
+    { "id": "partner_decision", "title": "Partner Decision", "required": false, "max_chars": 2048, "order": 10 },
+    { "id": "deal_structure_cap_table", "title": "Deal Structure & Cap Table", "required": false, "max_chars": 1024, "order": 11 },
+    { "id": "exit_scenarios", "title": "Exit Scenarios", "required": false, "max_chars": 1024, "order": 12 },
+    { "id": "next_steps", "title": "Next Steps", "required": true, "max_chars": 1024, "order": 13 }
+  ],
+  "red_flag_marker": "**",
+  "section_ids": ["header", "company_overview", "problem_opportunity", "financials_traction", "team_founders", "competition_market_position", "business_model_monetization", "reviewer_analysis", "investment_thesis", "risk_mitigation", "partner_decision", "deal_structure_cap_table", "exit_scenarios", "next_steps"]
+}

@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""
+Run both Scout and Reviewer engines together.
+
+This is the main entry point for running the complete AETHRIA system.
+"""
+import asyncio
+import sys
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env file from parent directory (project root)
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    # Also try loading from current directory
+    load_dotenv()
+
+# Add the backend directory to the path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import logging
+from storage import Storage
+from scout.engine import ScoutEngine
+from reviewer.engine import ReviewerEngine
+from partner.engine import PartnerEngine
+from portfolio.engine import PortfolioEngine
+
+
+async def run_system():
+    """Run both Scout and Reviewer engines in parallel."""
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    
+    logger = logging.getLogger("system")
+    
+    # Get configuration from environment
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable is required")
+    
+    storage_path = os.getenv("STORAGE_PATH", "data/startups.json")
+    scout_interval = int(os.getenv("SCOUT_INTERVAL_SECONDS", "300"))
+    reviewer_interval = int(os.getenv("REVIEWER_INTERVAL_SECONDS", "60"))
+    partner_interval = int(os.getenv("PARTNER_INTERVAL_SECONDS", "30"))
+    model = os.getenv("SCOUT_MODEL", "gpt-5-nano")  # gpt-5-nano doesn't exist, using gpt-5-nano
+    reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-5-nano")
+    use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
+    
+    # Initialize shared storage
+    storage = Storage(file_path=storage_path)
+    logger.info(f"Using storage: {storage_path}")
+    
+    # Create engines
+    scout_engine = ScoutEngine(
+        api_key=api_key,
+        storage=storage,
+        interval_seconds=scout_interval,
+        model=model,
+    )
+    
+    reviewer_engine = ReviewerEngine(
+        api_key=api_key,
+        storage=storage,
+        interval_seconds=reviewer_interval,
+        model=reviewer_model,
+    )
+    
+    partner_engine = PartnerEngine(
+        storage=storage,
+        interval_seconds=partner_interval,
+        use_llm_fallback=use_llm_fallback,
+    )
+    
+    portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
+    from portfolio.store import PortfolioStore
+    portfolio_store = PortfolioStore(data_dir=portfolio_dir)
+    portfolio_engine = PortfolioEngine(
+        discovery_storage=storage,
+        portfolio_store=portfolio_store,
+        execution_interval=10,
+        signal_interval=3600,
+        feedback_interval=86400,
+        health_interval=3600,
+    )
+    
+    logger.info("Starting AETHRIA system (Scout + Reviewer + Partner + Portfolio layers)")
+    logger.info(
+        f"Scout interval: {scout_interval}s, "
+        f"Reviewer interval: {reviewer_interval}s, "
+        f"Partner interval: {partner_interval}s"
+    )
+    logger.info(f"Partner LLM fallback: {use_llm_fallback}")
+    logger.info(f"Portfolio directory: {portfolio_dir}")
+    
+    # Run all engines in parallel
+    try:
+        await asyncio.gather(
+            scout_engine.run_forever(),
+            reviewer_engine.run_forever(),
+            partner_engine.run_forever(),
+            portfolio_engine.run_forever(),
+        )
+    except KeyboardInterrupt:
+        logger.info("Received interrupt signal, shutting down...")
+        scout_engine.stop()
+        reviewer_engine.stop()
+        partner_engine.stop()
+        portfolio_engine.stop()
+        logger.info("System stopped")
+
+
+if __name__ == "__main__":
+    asyncio.run(run_system())

@@ -1,0 +1,82 @@
+{
+  "version": "1",
+  "description": "Partner decision rules: verdict mapping, score thresholds, critical risks, contradictory scores, red flags, and LLM fallback triggers.",
+  "quality_labels": {
+    "STRONG": "Investment-grade",
+    "MEDIUM": "Promising but incomplete",
+    "WEAK": "Insufficient quality"
+  },
+  "verdict_rules": {
+    "WEAK": {
+      "decision": "NO",
+      "conviction_level": 9,
+      "next_action": "Pass - Market too crowded / Low quality",
+      "human_review_required": false
+    },
+    "STRONG": {
+      "min_avg_for_yes": 8.0,
+      "decision_yes": "YES",
+      "conviction_level_yes": 8,
+      "human_review_required_yes": true
+    },
+    "MEDIUM": {
+      "min_avg_for_maybe": 7.0,
+      "min_avg_for_borderline": 6.0,
+      "decision_maybe": "MAYBE",
+      "conviction_level_maybe": 6,
+      "conviction_level_borderline": 5,
+      "decision_borderline_no_llm": "NO",
+      "next_action_borderline": "Reject - borderline quality"
+    }
+  },
+  "score_thresholds": {
+    "min_avg_pass": 6.0,
+    "min_avg_strong_yes": 8.0,
+    "min_avg_medium_maybe": 7.0,
+    "min_avg_borderline_low": 6.0,
+    "max_avg_borderline_high": 7.0
+  },
+  "critical_risk_keywords": [
+    "regulatory",
+    "regulation",
+    "legal impossibility",
+    "execution impossibility",
+    "cannot be executed",
+    "regulatory ban",
+    "prohibited by law"
+  ],
+  "contradictory_scores": {
+    "min_gap": 4,
+    "high_threshold": 8,
+    "low_threshold": 4
+  },
+  "red_flag_keywords": [
+    "missing",
+    "red flag"
+  ],
+  "next_actions": {
+    "critical_risks": "Pass - Critical risks too high",
+    "low_scores": "Pass - Low scores",
+    "default_no": "Pass - Does not meet criteria",
+    "request_cap_table": "Request Cap Table",
+    "request_cap_table_and_review": "Request Cap Table + Technical Code Review",
+    "monitor": "Monitor market and track progress",
+    "human_review_monitor": "Human review required - monitor closely",
+    "human_review_contradictions": "Human review required - analyze contradictions"
+  },
+  "llm_fallback_triggers": {
+    "contradictory_scores": true,
+    "medium_borderline_avg": true,
+    "missing_assumptions_affecting_decision": true,
+    "missing_critical_qualitative": true
+  },
+  "missing_qualitative_keywords": ["[MISSING]", "missing", "absent", "n/a"],
+  "assumption_risk_keywords": [
+    "critical unknown",
+    "unvalidated assumption",
+    "weak assumption",
+    "could invalidate",
+    "unresolved",
+    "missing validation"
+  ]
+}

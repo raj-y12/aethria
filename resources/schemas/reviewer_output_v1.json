@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aethria/resources/schemas/reviewer_output_v1.json",
+  "title": "ReviewerOutput",
+  "description": "Reviewer agent evaluation output. Version 1.",
+  "type": "object",
+  "version": "1",
+  "required": ["version", "market_score", "product_score", "technical_score", "execution_score", "overall_summary", "key_risks", "verdict", "diligence_red_flags"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "1" },
+    "market_score": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "product_score": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "technical_score": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "execution_score": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "defensibility_score": { "type": ["integer", "null"], "minimum": 1, "maximum": 10 },
+    "overall_summary": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "key_risks": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 512 },
+      "maxItems": 20
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["STRONG", "MEDIUM", "WEAK"]
+    },
+    "diligence_red_flags": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 256 },
+      "maxItems": 10
+    },
+    "assumption_feedback": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 512 },
+      "maxItems": 10,
+      "description": "Comments on Scout assumptions; critical unknowns"
+    },
+    "reviewer_agent_id": { "type": ["string", "null"], "maxLength": 64 }
+  }
+}

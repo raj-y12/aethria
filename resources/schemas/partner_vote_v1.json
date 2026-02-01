@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aethria/resources/schemas/partner_vote_v1.json",
+  "title": "PartnerVote",
+  "description": "Partner agent decision output. Version 1.",
+  "type": "object",
+  "version": "1",
+  "required": ["version", "decision", "rationale", "next_action", "conviction_level", "human_review_required"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "1" },
+    "decision": {
+      "type": "string",
+      "enum": ["YES", "NO", "MAYBE"]
+    },
+    "rationale": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "next_action": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "conviction_level": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "human_review_required": { "type": "boolean" },
+    "partner_agent_id": { "type": ["string", "null"], "maxLength": 64 }
+  }
+}

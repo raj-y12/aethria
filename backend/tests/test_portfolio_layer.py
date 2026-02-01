@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""
+Test Portfolio Memory & Learning Layer end-to-end.
+"""
+import asyncio
+import sys
+import os
+import json
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env file
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    load_dotenv()
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import logging
+from storage import Storage
+from portfolio.store import PortfolioStore
+from portfolio.execution import ExecutionAgent
+from portfolio.signals import SignalTracker
+from portfolio.feedback import FeedbackLoop
+from portfolio.cost_control import CostController
+from portfolio.health import HealthMonitor
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+async def test_portfolio_layer():
+    """Test all portfolio layer components."""
+    print("=" * 80)
+    print("Portfolio Memory & Learning Layer - Test")
+    print("=" * 80)
+    print()
+    
+    # Initialize
+    portfolio_store = PortfolioStore(data_dir="data/portfolio_test")
+    
+    # Test 1: Add startup
+    print("Test 1: Adding startup to portfolio store...")
+    scout_output = {
+        "id": "test-startup-1",
+        "name": "Test Startup",
+        "one_line": "A test startup",
+        "sector": "Tech",
+        "problem": "Test problem",
+        "solution": "Test solution",
+        "target_users": "Test users",
+        "why_now": "Test timing",
+        "scout_type": "market_driven",
+        "confidence": 0.75,
+    }
+    startup_id = portfolio_store.add_startup(scout_output, agent_id="scout_test")
+    print(f"✓ Added startup: {startup_id}")
+    print()
+    
+    # Test 2: Add decision
+    print("Test 2: Adding partner decision...")
+    partner_output = {
+        "decision": "INVEST",
+        "confidence": 8,
+        "rationale": "Strong opportunity",
+        "next_action": "Intro founder",
+        "human_review_required": True,
+    }
+    decision_id = portfolio_store.add_decision(
+        startup_id=startup_id,
+        partner_output=partner_output,
+        agent_id="partner_test",
+    )
+    print(f"✓ Added decision: {decision_id}")
+    print()
+    
+    # Test 3: Execution Agent
+    print("Test 3: Testing Execution Agent...")
+    execution_agent = ExecutionAgent(portfolio_store, agent_id="execution_test")
+    execution_id = execution_agent.execute_decision(
+        startup_id=startup_id,
+        decision_id=decision_id,
+        decision="INVEST",
+        rationale="Strong opportunity",
+        key_risks=["Market risk"],
+        follow_up_triggers=["Q1 results"],
+    )
+    print(f"✓ Executed decision: {execution_id}")
+    
+    # Check portfolio
+    portfolio = portfolio_store.get_all_portfolio()
+    print(f"✓ Portfolio contains {len(portfolio)} companies")
+    print()
+    
+    # Test 4: Add to watchlist
+    print("Test 4: Testing watchlist...")
+    watchlist_id = portfolio_store.add_to_watchlist(
+        startup_id=startup_id,
+        decision_id=decision_id,
+        check_interval_days=7,
+        cached_summary="Test summary",
+    )
+    print(f"✓ Added to watchlist: {watchlist_id}")
+    
+    watchlist = portfolio_store.get_all_watchlist()
+    print(f"✓ Watchlist contains {len(watchlist)} companies")
+    print()
+    
+    # Test 5: Signal Tracker
+    print("Test 5: Testing Signal Tracker...")
+    signal_tracker = SignalTracker(portfolio_store, agent_id="signal_test")
+    signal_ids = signal_tracker.check_watchlist_entries()
+    print(f"✓ Signal tracker checked watchlist: {len(signal_ids)} signals")
+    print()
+    
+    # Test 6: Feedback Loop
+    print("Test 6: Testing Feedback Loop...")
+    feedback_loop = FeedbackLoop(portfolio_store)
+    metric_ids = feedback_loop.calculate_all_metrics(period_days=30)
+    print(f"✓ Calculated {len(metric_ids)} metrics")
+    
+    metrics = portfolio_store._read_file(portfolio_store.files["agent_metrics"])
+    print(f"✓ Agent metrics file contains {len(metrics)} records")
+    print()
+    
+    # Test 7: Cost Controller
+    print("Test 7: Testing Cost Controller...")
+    cost_controller = CostController(budget_file="data/portfolio_test/budgets.json")
+    
+    can_call, reason = cost_controller.can_make_call("scout", "scout_test", estimated_tokens=1000)
+    print(f"✓ Can make call: {can_call} (reason: {reason})")
+    
+    if can_call:
+        cost_controller.record_call("scout", "scout_test", tokens_used=1000)
+        print("✓ Recorded call")
+    
+    status = cost_controller.get_budget_status("scout")
+    print(f"✓ Budget status: {status}")
+    print()
+    
+    # Test 8: Health Monitor
+    print("Test 8: Testing Health Monitor...")
+    health_monitor = HealthMonitor(portfolio_store)
+    health_ids = health_monitor.check_health()
+    print(f"✓ Health check completed: {len(health_ids)} issues")
+    print()
+    
+    # Summary
+    print("=" * 80)
+    print("TEST SUMMARY")
+    print("=" * 80)
+    print(f"Startups: {len(portfolio_store.get_all_startups())}")
+    print(f"Decisions: {len(portfolio_store.get_all_decisions())}")
+    print(f"Portfolio: {len(portfolio_store.get_all_portfolio())}")
+    print(f"Watchlist: {len(portfolio_store.get_all_watchlist())}")
+    print(f"Signals: {len(portfolio_store._read_file(portfolio_store.files['signals']))}")
+    print(f"Metrics: {len(metrics)}")
+    print()
+    print("All tests passed!")
+    print("=" * 80)
+
+
+if __name__ == "__main__":
+    asyncio.run(test_portfolio_layer())

@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "description": "Reviewer evaluation rules. Align with evaluation_rubric_v1.json (v1.1) for dimensions and verdict logic.",
+  "diligence_red_flags": [
+    { "id": "missing_founding_team", "label": "Missing founding team details", "action": "Add to diligence_red_flags when founding team information is absent." },
+    { "id": "missing_revenue", "label": "Missing revenue or traction data", "action": "Add to diligence_red_flags when revenue/ARR/traction data is absent." },
+    { "id": "missing_competitors", "label": "Competitive landscape unclear", "action": "Add to diligence_red_flags when specific competitors are not identified." },
+    { "id": "missing_valuation", "label": "Missing valuation data", "action": "Add to diligence_red_flags when valuation information is absent." },
+    { "id": "critical_risk", "label": "Regulatory or execution impossibility", "action": "Score dimension 1-3; consider WEAK verdict." },
+    { "id": "contradictory_scores", "label": "Gap ≥4 between highest and lowest dimension", "action": "Flag for human review or LLM fallback." }
+  ],
+  "verdict_thresholds": {
+    "STRONG": { "min_avg": 8.0, "min_any": 7, "max_low": 0 },
+    "MEDIUM": { "min_avg": 6.0, "min_any": 5, "max_low": 1 },
+    "WEAK": { "min_avg": 0, "min_any": 0, "max_low": 999 }
+  },
+  "hypothesis_feedback_guidance": "Review Scout primary_thesis, key_assumptions, and biggest_unknown. In assumption_feedback: comment on which assumptions are well-supported or weak, and highlight critical unknowns that could invalidate the thesis. Use only information provided; do not hallucinate missing data."
+}

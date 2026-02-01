@@ -1,0 +1,111 @@
+{
+  "version": "1.1",
+  "description": "Aethria Investment Evaluation Rubric — scoring system, dimensions, verdict logic, red flags.",
+  "score_range": { "min": 1, "max": 10 },
+  "scoring_overview": {
+    "interpretation": "Scores represent risk-adjusted investment quality, not product polish.",
+    "rule_of_thumb": {
+      "5": "neutral / unproven",
+      "6_7": "promising but incomplete",
+      "8_plus": "fundable assuming pricing & ownership make sense"
+    }
+  },
+  "score_bands": [
+    { "range": [1, 3], "label": "Weak", "meaning": "High risk, failing, or structurally broken" },
+    { "range": [4, 5], "label": "Concerning", "meaning": "Unproven, material execution or validation gaps" },
+    { "range": [6, 7], "label": "Promising", "meaning": "Reasonable thesis, requires validation" },
+    { "range": [8, 10], "label": "Strong", "meaning": "Investment-grade, clear upside with managed risk" }
+  ],
+  "ui_rules": {
+    "score_display": "Show label + 1-line meaning; hide full criteria behind hover / expand.",
+    "verdict_display": "Show average score, weakest dimension, red flag count."
+  },
+  "dimensions": [
+    {
+      "id": "market_score",
+      "name": "Market",
+      "question": "Is this market worth winning, and is now the right time?",
+      "definition": "Market size, growth, timing, structure, and accessibility.",
+      "high": { "range": [8, 10], "criteria": "Large and expanding market, clear demand driver, defensible segment, strong timing tailwinds." },
+      "mid": { "range": [5, 7], "criteria": "Market exists but is moderate, crowded, or timing is unclear." },
+      "low": { "range": [1, 4], "criteria": "Small, stagnant, or unproven market; demand uncertain." }
+    },
+    {
+      "id": "product_score",
+      "name": "Product",
+      "question": "Does this solution clearly and uniquely solve a real problem?",
+      "definition": "Problem clarity, solution fit, differentiation, and user pull.",
+      "high": { "range": [8, 10], "criteria": "Clear problem-solution fit, differentiated approach, early usage or strong pull signals." },
+      "mid": { "range": [5, 7], "criteria": "Reasonable fit, but differentiation or value proposition is unclear or early." },
+      "low": { "range": [1, 4], "criteria": "Solution in search of a problem; no clear differentiation." }
+    },
+    {
+      "id": "technical_score",
+      "name": "Technical",
+      "question": "Can this be built and sustained without blowing up?",
+      "definition": "Technical feasibility, complexity, scalability, and defensibility from tech or data.",
+      "high": { "range": [8, 10], "criteria": "Feasible architecture, appropriate complexity, credible moat (data, infra, IP)." },
+      "mid": { "range": [5, 7], "criteria": "Technically feasible but execution risk or moat is unproven." },
+      "low": { "range": [1, 4], "criteria": "Unproven, fragile, or commodity implementation." }
+    },
+    {
+      "id": "execution_score",
+      "name": "Execution",
+      "question": "Can this team actually make it happen?",
+      "definition": "Founding team credibility, GTM clarity, competition, and path to scale.",
+      "high": { "range": [8, 10], "criteria": "Credible team, clear GTM, manageable competition, plausible scaling path." },
+      "mid": { "range": [5, 7], "criteria": "Team or GTM unproven; meaningful competitive or scaling risk." },
+      "low": { "range": [1, 4], "criteria": "Team mismatch, no GTM, or implausible execution path." }
+    },
+    {
+      "id": "defensibility_score",
+      "name": "Defensibility",
+      "question": "If this works, can others copy it easily?",
+      "definition": "Moat from technology, data, network effects, regulation, or switching costs.",
+      "high": { "range": [8, 10], "criteria": "Clear moat: proprietary tech, data advantage, network effects, or regulatory lock-in." },
+      "mid": { "range": [5, 7], "criteria": "Some differentiation, but replicable or limited switching cost." },
+      "low": { "range": [1, 4], "criteria": "No moat; easily copied." }
+    }
+  ],
+  "verdict_thresholds": {
+    "STRONG": {
+      "min_avg": 8.0,
+      "min_any": 7,
+      "max_exceptions": 0,
+      "critical_red_flags": 0,
+      "description": "Average score ≥ 8.0, no dimension < 7, zero critical red flags."
+    },
+    "MEDIUM": {
+      "min_avg": 6.0,
+      "min_any": 5,
+      "max_exceptions": 1,
+      "description": "Average score ≥ 6.0, no dimension < 5 (max one exception allowed), execution risk acceptable but unresolved."
+    },
+    "WEAK": {
+      "description": "Average < 6.0, OR multiple dimensions < 5, OR critical red flag present."
+    }
+  },
+  "verdict_ui_rule": "Verdict must always be explainable by numbers alone.",
+  "red_flags": [
+    { "id": "missing_founding_team", "label": "Missing founding team details", "trigger": "No team info", "action": "Add red flag" },
+    { "id": "missing_revenue", "label": "Missing revenue or traction data", "trigger": "No traction / revenue", "action": "Add red flag" },
+    { "id": "missing_competitors", "label": "Competitive landscape unclear", "trigger": "Competitive landscape absent", "action": "Add red flag" },
+    { "id": "missing_valuation", "label": "Missing valuation data", "trigger": "Valuation not provided", "action": "Add red flag" },
+    { "id": "critical_risk", "label": "Regulatory or execution impossibility", "trigger": "Regulatory or execution impossibility", "action": "Force 1–3 score; consider WEAK" },
+    { "id": "contradictory_scores", "label": "Gap ≥4 between highest and lowest dimension", "trigger": "≥4 gap between dimensions", "action": "Flag for human review" }
+  ],
+  "output_requirements": {
+    "memo_must_include": [
+      "Numeric score and score band label (e.g. Technical: 6 — Promising)",
+      "One-sentence justification per dimension",
+      "Explicit verdict rationale",
+      "Explicit list of red flags (if any)"
+    ]
+  },
+  "design_guidance": {
+    "default": "Show numbers + labels by default",
+    "hide_behind": ["hover tooltips", "expandable 'Why this score?' rows"],
+    "verdict_summary": ["average score", "weakest dimension", "red flag count"]
+  },
+  "score_dimension_ids": ["market_score", "product_score", "technical_score", "execution_score", "defensibility_score"]
+}

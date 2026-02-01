@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aethria/resources/schemas/startup_summary_v1.json",
+  "title": "StartupSummary",
+  "description": "Aggregated startup record. Scout + optional Review + optional Partner + Financials. Version 1.",
+  "type": "object",
+  "version": "1",
+  "required": ["version", "startup_id", "scout_info", "financials"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "1" },
+    "startup_id": { "type": "string", "format": "uuid" },
+    "scout_info": { "$ref": "#/$defs/scout_block" },
+    "review_info": { "$ref": "#/$defs/review_block" },
+    "partner_info": { "$ref": "#/$defs/partner_block" },
+    "financials": { "$ref": "#/$defs/financials_block" }
+  },
+  "$defs": {
+    "scout_block": {
+      "type": "object",
+      "required": ["name", "one_line", "sector", "problem", "solution", "target_users", "why_now", "scout_type", "confidence_score"],
+      "additionalProperties": false,
+      "properties": {
+        "startup_id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 256 },
+        "one_line": { "type": "string", "maxLength": 512 },
+        "sector": { "type": "string", "maxLength": 128 },
+        "problem": { "type": "string", "maxLength": 2048 },
+        "solution": { "type": "string", "maxLength": 2048 },
+        "target_users": { "type": "string", "maxLength": 1024 },
+        "why_now": { "type": "string", "maxLength": 1024 },
+        "scout_type": { "type": "string", "enum": ["market_driven", "builder_technical", "pain_point", "contrarian"] },
+        "confidence_score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "funding_stage": { "type": ["string", "null"], "enum": ["Pre-Seed", "Seed", "Series A", "Series B", "Series C+", "Unknown", null] },
+        "est_tam": { "type": ["string", "null"], "maxLength": 256 },
+        "discovered_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "review_block": {
+      "type": ["object", "null"],
+      "required": ["market_score", "product_score", "technical_score", "execution_score", "overall_summary", "key_risks", "verdict", "diligence_red_flags"],
+      "additionalProperties": false,
+      "properties": {
+        "market_score": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "product_score": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "technical_score": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "execution_score": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "defensibility_score": { "type": ["integer", "null"], "minimum": 1, "maximum": 10 },
+        "overall_summary": { "type": "string", "maxLength": 2048 },
+        "key_risks": { "type": "array", "items": { "type": "string" }, "maxItems": 20 },
+        "verdict": { "type": "string", "enum": ["STRONG", "MEDIUM", "WEAK"] },
+        "diligence_red_flags": { "type": "array", "items": { "type": "string" }, "maxItems": 10 },
+        "reviewer_agent_id": { "type": ["string", "null"] },
+        "reviewed_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "partner_block": {
+      "type": ["object", "null"],
+      "required": ["decision", "rationale", "next_action", "conviction_level", "human_review_required"],
+      "additionalProperties": false,
+      "properties": {
+        "decision": { "type": "string", "enum": ["YES", "NO", "MAYBE"] },
+        "rationale": { "type": "string", "maxLength": 1024 },
+        "next_action": { "type": "string", "maxLength": 256 },
+        "conviction_level": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "human_review_required": { "type": "boolean" },
+        "partner_agent_id": { "type": ["string", "null"] },
+        "partnered_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "financials_block": {
+      "type": "object",
+      "required": [],
+      "additionalProperties": false,
+      "properties": {
+        "traction_metrics": { "type": ["string", "null"], "maxLength": 512 },
+        "funding_history": { "type": ["string", "null"], "maxLength": 512 },
+        "valuation_est": { "type": ["string", "null"], "maxLength": 128 },
+        "ip_status": { "type": ["string", "null"], "maxLength": 256 },
+        "revenue_missing": { "type": "boolean" },
+        "funding_missing": { "type": "boolean" },
+        "valuation_missing": { "type": "boolean" }
+      }
+    }
+  }
+}
