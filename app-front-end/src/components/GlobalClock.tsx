@@ -38,7 +38,16 @@ export default function GlobalClock() {
           {formatted}
         </span>
       </div>
-      <div className="w-[4.5rem] sm:w-20" aria-hidden />
+      <button
+        type="button"
+        onClick={() => {
+          localStorage.removeItem('aethria_last_activity');
+          window.location.href = '/';
+        }}
+        className="font-sans text-[10px] sm:text-[11px] uppercase tracking-[0.12em] text-charcoal/50 hover:text-charcoal transition-colors duration-300 shrink-0"
+      >
+        Log out
+      </button>
     </div>
   );
 }

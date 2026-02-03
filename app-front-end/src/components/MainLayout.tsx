@@ -7,7 +7,6 @@ import WorkGrid from './WorkGrid';
 import InvestmentMemo from './InvestmentMemo';
 import VerdictModal from './VerdictModal';
 import LiveIntelligenceFeed from './LiveIntelligenceFeed';
-import NoiseOverlay from './NoiseOverlay';
 import GhostTransition from './GhostTransition';
 import { ContentColumn } from '../layout';
 import {
@@ -77,7 +76,6 @@ export default function MainLayout({ startups }: MainLayoutProps) {
 
   return (
     <div className="min-h-screen bg-ivory text-charcoal relative">
-      <NoiseOverlay />
       <GlobalClock />
       <SystemBar scoutCount={startups.length} />
 

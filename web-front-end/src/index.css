@@ -47,3 +47,216 @@
     display: none;
   }
 }
+
+/* SystemAccessPage — same timing as EnterSystemPage: hero 1.5s, underline 2.5s, subline 1s, status 1.2s, waitlist 1.4s */
+
+@keyframes system-access-hero-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes system-access-underline-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes system-access-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes system-access-status-pulse {
+  0%, 100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Status entrance ends at 0.65 so pulse (0.65↔1) has no visible flick */
+@keyframes system-access-status-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 0.65;
+    transform: translateY(0);
+  }
+}
+
+.system-access-hero {
+  opacity: 0;
+  animation: system-access-hero-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) 1.5s forwards;
+}
+
+/* Underline hidden on load; draws in after delay (2.5s) so it appears after "Aethria" is visible */
+/* Underline expands from center (same as EnterSystemPage) */
+.system-access-hero-underline {
+  transform: scaleX(0);
+  transform-origin: center;
+  animation: system-access-underline-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) 2.5s forwards;
+}
+
+.system-access-status {
+  opacity: 0;
+  animation:
+    system-access-status-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1.2s forwards,
+    system-access-status-pulse 3s ease-in-out 2s infinite;
+}
+
+@keyframes system-access-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Loading triangle — appears 2–3s after everything else (hero 1.5s, underline 2.5s) */
+.system-access-loader {
+  position: relative;
+  width: 40px;
+  height: 36px;
+  opacity: 0;
+  overflow: visible;
+  animation: system-access-loader-reveal 0.35s ease-out 4.5s forwards;
+}
+
+.system-access-loader-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  left: 50%;
+  top: 50%;
+  margin-left: -3px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background-color: rgba(252, 252, 252, 0.6);
+  opacity: 0.3;
+  transform: translate(0, 0);
+}
+
+/* Dots start 2–3s after content; stagger preserved */
+.system-access-loader-dot-1 {
+  animation: system-access-loader-1 2s cubic-bezier(0.33, 0, 0.67, 1) 4.5s infinite;
+}
+
+.system-access-loader-dot-2 {
+  animation: system-access-loader-2 2s cubic-bezier(0.33, 0, 0.67, 1) 4.56s infinite;
+}
+
+.system-access-loader-dot-3 {
+  animation: system-access-loader-3 2s cubic-bezier(0.33, 0, 0.67, 1) 4.62s infinite;
+}
+
+@keyframes system-access-loader-1 {
+  0%, 100% {
+    transform: translate(0, 0);
+    opacity: 0.3;
+    background-color: rgba(252, 252, 252, 0.6);
+  }
+  40% {
+    transform: translate(0, -9px);
+    opacity: 1;
+    background-color: rgba(252, 252, 252, 0.6);
+  }
+  50% {
+    transform: translate(0, -9px);
+    opacity: 1;
+    background-color: #fcfcfc;
+  }
+  65% {
+    transform: translate(0, -9px);
+    opacity: 1;
+    background-color: #fcfcfc;
+  }
+  85% {
+    transform: translate(0, 0);
+    opacity: 0.3;
+    background-color: rgba(252, 252, 252, 0.6);
+  }
+}
+
+@keyframes system-access-loader-2 {
+  0%, 100% {
+    transform: translate(0, 0);
+    opacity: 0.3;
+    background-color: rgba(252, 252, 252, 0.6);
+  }
+  40% {
+    transform: translate(-7.8px, 4.5px);
+    opacity: 1;
+    background-color: rgba(252, 252, 252, 0.6);
+  }
+  50% {
+    transform: translate(-7.8px, 4.5px);
+    opacity: 1;
+    background-color: #fcfcfc;
+  }
+  65% {
+    transform: translate(-7.8px, 4.5px);
+    opacity: 1;
+    background-color: #fcfcfc;
+  }
+  85% {
+    transform: translate(0, 0);
+    opacity: 0.3;
+    background-color: rgba(252, 252, 252, 0.6);
+  }
+}
+
+@keyframes system-access-loader-3 {
+  0%, 100% {
+    transform: translate(0, 0);
+    opacity: 0.3;
+    background-color: rgba(252, 252, 252, 0.6);
+  }
+  40% {
+    transform: translate(7.8px, 4.5px);
+    opacity: 1;
+    background-color: rgba(252, 252, 252, 0.6);
+  }
+  50% {
+    transform: translate(7.8px, 4.5px);
+    opacity: 1;
+    background-color: #fcfcfc;
+  }
+  65% {
+    transform: translate(7.8px, 4.5px);
+    opacity: 1;
+    background-color: #fcfcfc;
+  }
+  85% {
+    transform: translate(0, 0);
+    opacity: 0.3;
+    background-color: rgba(252, 252, 252, 0.6);
+  }
+}
+
+@keyframes system-access-loader-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

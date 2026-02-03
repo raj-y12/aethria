@@ -8,6 +8,7 @@ export default {
     extend: {
       colors: {
         oxford: '#002147',
+        ivory: '#fcfcfc',
         canvas: '#fcfcfc',
         mist: '#f2f4f8',
         graphite: '#2f333b',

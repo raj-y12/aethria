@@ -1,45 +1,75 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { tokens } from '../design-system/tokens';
+import { fetchSettings } from '../api/settings';
+import type { AgentConfig } from '../api/settings';
 
 interface SystemBarProps {
   scoutCount?: number;
   /** Override nav link (e.g. { href: '/', label: 'Home' } on Settings page) */
   navLink?: { href: string; label: string };
+  /** Optional: pass agent config from parent (e.g. SettingsPage). If omitted, fetches from API. */
+  agentConfig?: AgentConfig | null;
 }
 
-const PROCESS_MESSAGES = [
-  'Continuous capital allocation scan',
-  'System active — no escalation required',
-  'Evaluating inbound intelligence',
-] as const;
+function getStatus(ac: AgentConfig | null): string {
+  if (!ac) return 'Active';
+  const { scouts_enabled, reviewers_enabled, partners_enabled } = ac;
+  const anyOn = scouts_enabled || reviewers_enabled || partners_enabled;
+  if (!anyOn) return 'Agents off';
+  return 'Active';
+}
+
+function getProcessMessage(ac: AgentConfig | null): string {
+  if (!ac) return 'System active';
+  const { scouts_enabled, reviewers_enabled, partners_enabled } = ac;
+  const anyOn = scouts_enabled || reviewers_enabled || partners_enabled;
+  if (!anyOn) return 'Agents disabled in settings';
+  if (partners_enabled && (reviewers_enabled || scouts_enabled))
+    return 'Capital allocation active';
+  if (reviewers_enabled && scouts_enabled) return 'Evaluating inbound intelligence';
+  if (reviewers_enabled) return 'Evaluating pipeline';
+  if (scouts_enabled) return 'Scanning for opportunities';
+  if (partners_enabled) return 'Partner layer active';
+  return 'System active';
+}
 
 /**
  * Instrumentation: status, scout count, process signal. Full-width. Restrained.
+ * Status reflects agent config (scouts/reviewers/partners enabled).
  */
 export default function SystemBar({
   scoutCount = 0,
   navLink,
+  agentConfig: agentConfigProp,
 }: SystemBarProps) {
   const link = navLink ?? { href: '/settings', label: 'Settings' };
-  const [status, setStatus] = useState<'Active' | 'Scanning'>('Active');
-  const [processIndex, setProcessIndex] = useState(0);
+  const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(
+    agentConfigProp ?? null
+  );
 
   useEffect(() => {
-    const t = setInterval(
-      () => setStatus((s) => (s === 'Active' ? 'Scanning' : 'Active')),
-      5000
-    );
-    return () => clearInterval(t);
-  }, []);
+    if (agentConfigProp != null) {
+      setAgentConfig(agentConfigProp);
+      return;
+    }
+    let cancelled = false;
+    const load = () =>
+      fetchSettings()
+        .then((s) => {
+          if (!cancelled) setAgentConfig(s.agent_config);
+        })
+        .catch(() => {
+          if (!cancelled) setAgentConfig(null);
+        });
+    load();
+    const t = setInterval(load, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [agentConfigProp]);
 
-  useEffect(() => {
-    const t = setInterval(
-      () => setProcessIndex((i) => (i + 1) % PROCESS_MESSAGES.length),
-      12000
-    );
-    return () => clearInterval(t);
-  }, []);
+  const status = getStatus(agentConfig);
+  const processMessage = getProcessMessage(agentConfig);
 
   return (
     <div className="fixed top-[3.25rem] left-0 right-0 z-50 border-b border-ivory/[0.12] bg-oxford">
@@ -63,18 +93,9 @@ export default function SystemBar({
         </div>
         <div className="flex items-center gap-3 sm:gap-6 min-w-0 flex-1 xs:flex-initial justify-end">
           <div className="min-w-0 overflow-hidden max-w-[50vw] sm:max-w-none">
-            <AnimatePresence mode="wait">
-              <motion.span
-                key={processIndex}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
-                className="block font-sans text-[11px] text-ivory/70 truncate"
-              >
-                {PROCESS_MESSAGES[processIndex]}
-              </motion.span>
-            </AnimatePresence>
+            <span className="block font-sans text-[11px] text-ivory/70 truncate">
+              {processMessage}
+            </span>
           </div>
           <span className="w-px h-3.5 bg-ivory/25 shrink-0" aria-hidden />
           <a

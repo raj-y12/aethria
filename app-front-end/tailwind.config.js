@@ -22,7 +22,7 @@ export default {
         ivory: '#fcfcfc',
         bone: '#f2f4f8',
         mist: '#f2f4f8',
-        /* Legacy (HomePage, LoadingAnimation — preserved) */
+        /* Legacy (EnterSystemPage, LoadingAnimation — preserved) */
         canvas: '#fcfcfc',
         graphite: '#2f333b',
         heritage: '#F9F8F6',

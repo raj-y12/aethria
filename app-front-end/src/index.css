@@ -80,24 +80,4 @@
     display: none;
   }
 
-  /* Jelly triangle loading — Aethria */
-  @keyframes aethria-triangulate {
-    0%, 100% {
-      transform: none;
-    }
-    33.333% {
-      transform: translate(120%, 175%);
-    }
-    66.666% {
-      transform: translate(-95%, 175%);
-    }
-  }
-  @keyframes aethria-grow {
-    0%, 100% {
-      transform: scale(1.5);
-    }
-    20%, 70% {
-      transform: none;
-    }
-  }
 }

@@ -1,14 +1,26 @@
-import './LoadingAnimation.css';
+import { motion } from 'framer-motion';
 
 interface LoadingAnimationProps {
   message?: string;
   fullScreen?: boolean;
 }
 
+/** Easing: deliberate, no bounce. Instrument-grade. */
+const EASE = [0.33, 0, 0.67, 1] as const;
+
+/** Triangle vertices (relative to center). Scaled for larger points. */
+const VERTICES = [
+  { x: 0, y: -18 },
+  { x: -15.6, y: 9 },
+  { x: 15.6, y: 9 },
+] as const;
+
+const POINT_SIZE = 10;
+
 /**
- * Jelly triangle loading — inspired by Uiverse, adapted for Aethria.
- * Three oxford-blue dots in a triangle; a traveler orbits between them.
- * Gooey filter blends motion. Institutional, restrained.
+ * System calibration — finite sequence, institutional.
+ * Three points converge from center, align, lock. Oxford blue at completion.
+ * No loop, no gooey, no playfulness. Calibration, not animation.
  */
 export default function LoadingAnimation({
   message = 'Loading',
@@ -20,31 +32,43 @@ export default function LoadingAnimation({
 
   return (
     <div className={containerClass}>
-      {/* SVG filter for jelly/ooze effect */}
-      <svg className="absolute w-0 h-0" aria-hidden>
-        <defs>
-          <filter id="aethria-jelly-ooze" colorInterpolationFilters="sRGB">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
-            <feColorMatrix
-              in="blur"
-              mode="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8"
-              result="thresh"
-            />
-            <feComposite in="SourceGraphic" in2="thresh" operator="atop" />
-          </filter>
-        </defs>
-      </svg>
-
-      <div className="aethria-jelly-triangle">
-        <span className="aethria-jelly-dot" />
-        <span className="aethria-jelly-traveler" />
+      <div className="relative w-[56px] h-[48px]">
+        {VERTICES.map((v, i) => (
+          <motion.div
+            key={i}
+            className="absolute top-1/2 left-1/2 rounded-full bg-charcoal"
+            style={{
+              width: POINT_SIZE,
+              height: POINT_SIZE,
+              marginLeft: -POINT_SIZE / 2,
+              marginTop: -POINT_SIZE / 2,
+            }}
+            initial={{ x: 0, y: 0, opacity: 0.25 }}
+            animate={{
+              x: v.x,
+              y: v.y,
+              opacity: 1,
+              backgroundColor: 'rgb(0, 33, 71)',
+            }}
+            transition={{
+              x: { delay: 0.4 + i * 0.06, duration: 0.55, ease: EASE },
+              y: { delay: 0.4 + i * 0.06, duration: 0.55, ease: EASE },
+              opacity: { delay: 0.4 + i * 0.06, duration: 0.55, ease: EASE },
+              backgroundColor: { delay: 1.05, duration: 0.2, ease: EASE },
+            }}
+          />
+        ))}
       </div>
 
       {message && (
-        <p className="font-sans text-[10px] uppercase tracking-[0.2em] text-oxford/50 mt-8">
+        <motion.p
+          className="font-sans text-[10px] uppercase tracking-[0.2em] text-charcoal/40 mt-8"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.0, duration: 0.25, ease: EASE }}
+        >
           {message}
-        </p>
+        </motion.p>
       )}
     </div>
   );

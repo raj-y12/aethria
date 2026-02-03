@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import HomePage from './components/HomePage';
+import EnterSystemPage from './components/EnterSystemPage';
 import MainLayout from './components/MainLayout';
 import LoadingAnimation from './components/LoadingAnimation';
 import WaitingListPage from './waitingList/WaitingListPage';
@@ -14,7 +14,7 @@ const STORAGE_KEY = 'aethria_last_activity';
 /** Poll interval to refetch startups when a decision has been made on the backend. */
 const STARTUPS_POLL_MS = 12 * 1000;
 
-function shouldResume(): boolean {
+function hasValidSession(): boolean {
   if (typeof window === 'undefined') return false;
   const last = localStorage.getItem(STORAGE_KEY);
   if (!last) return false;
@@ -25,25 +25,13 @@ function shouldResume(): boolean {
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function App() {
-  const [showWorkGrid, setShowWorkGrid] = useState(shouldResume);
-  const [isLoading, setIsLoading] = useState(shouldResume);
+  const sessionValid = hasValidSession();
+  const [hasEntered, setHasEntered] = useState(sessionValid);
+  const [isLoading, setIsLoading] = useState(sessionValid);
   const [startups, setStartups] = useState<Startup[]>([]);
 
   useEffect(() => {
-    if (!showWorkGrid || !isLoading || startups.length > 0) return;
-    const load = async () => {
-      const [data] = await Promise.all([
-        fetchStartups().catch(() => []),
-        delay(MIN_LOADING_MS),
-      ]);
-      setStartups(data);
-      setIsLoading(false);
-    };
-    void load();
-  }, [showWorkGrid, isLoading, startups.length]);
-
-  useEffect(() => {
-    if (!showWorkGrid || isLoading) return;
+    if (!hasEntered || isLoading) return;
     const refresh = () => {
       fetchStartups()
         .then((data) => setStartups(data))
@@ -51,13 +39,10 @@ function App() {
     };
     const id = setInterval(refresh, STARTUPS_POLL_MS);
     return () => clearInterval(id);
-  }, [showWorkGrid, isLoading]);
+  }, [hasEntered, isLoading]);
 
-  const handleEnter = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, Date.now().toString());
-    setIsLoading(true);
-    setStartups([]);
-
+  useEffect(() => {
+    if (!hasEntered || !isLoading) return;
     const load = async () => {
       const [data] = await Promise.all([
         fetchStartups().catch(() => []),
@@ -65,7 +50,21 @@ function App() {
       ]);
       setStartups(data);
       setIsLoading(false);
-      setShowWorkGrid(true);
+    };
+    void load();
+  }, [hasEntered, isLoading]);
+
+  const handleEnter = useCallback(() => {
+    localStorage.setItem(STORAGE_KEY, Date.now().toString());
+    setHasEntered(true);
+    setStartups([]);
+
+    const load = async () => {
+      const [data] = await Promise.all([
+        fetchStartups().catch(() => []),
+        delay(0),
+      ]);
+      setStartups(data);
     };
 
     void load();
@@ -73,10 +72,10 @@ function App() {
 
   useIdleTimeout({
     timeoutMs: IDLE_MS,
-    enabled: showWorkGrid && !isLoading,
+    enabled: hasEntered && !isLoading,
     onIdle: useCallback(() => {
       localStorage.removeItem(STORAGE_KEY);
-      setShowWorkGrid(false);
+      setHasEntered(false);
       setStartups([]);
     }, []),
     onActivity: useCallback((now: number) => {
@@ -96,16 +95,16 @@ function App() {
     return <WaitingListPage />;
   }
 
-  if (isSettingsRoute) {
-    return <SettingsPage />;
-  }
-
   if (isLoading) {
     return <LoadingAnimation message="Loading Intelligence Data" />;
   }
 
-  if (!showWorkGrid) {
-    return <HomePage onEnter={handleEnter} />;
+  if (!hasEntered) {
+    return <EnterSystemPage onEnter={handleEnter} />;
+  }
+
+  if (isSettingsRoute) {
+    return <SettingsPage />;
   }
 
   return <MainLayout startups={startups} />;

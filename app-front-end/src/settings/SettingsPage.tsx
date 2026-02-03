@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import GlobalClock from '../components/GlobalClock';
 import SystemBar from '../components/SystemBar';
-import NoiseOverlay from '../components/NoiseOverlay';
+import GhostTransition from '../components/GhostTransition';
 import { ContentColumn } from '../layout';
 import {
   fetchSettings,
@@ -79,7 +79,6 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen w-full flex flex-col bg-ivory text-charcoal">
-        <NoiseOverlay />
         <GlobalClock />
         <SystemBar scoutCount={0} navLink={{ href: '/', label: 'Home' }} />
         <main className="flex-1 pt-24 lg:pt-28 flex items-center justify-center">
@@ -94,7 +93,6 @@ export default function SettingsPage() {
   if (!settings) {
     return (
       <div className="min-h-screen w-full flex flex-col bg-ivory text-charcoal">
-        <NoiseOverlay />
         <GlobalClock />
         <SystemBar scoutCount={0} navLink={{ href: '/', label: 'Home' }} />
         <main className="flex-1 pt-24 lg:pt-28 flex items-center justify-center">
@@ -131,10 +129,10 @@ export default function SettingsPage() {
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-300 focus-visible:ring-1 focus-visible:ring-oxford/30 focus-visible:ring-offset-1 ${
+        className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-300 focus-visible:ring-1 focus-visible:ring-oxford/30 focus-visible:ring-offset-1 ${
           checked
-            ? 'border-oxford/30 bg-oxford'
-            : 'border-charcoal/20 bg-charcoal/10 hover:bg-charcoal/15'
+            ? 'bg-oxford'
+            : 'bg-charcoal/10 hover:bg-charcoal/15'
         }`}
         style={{ transitionTimingFunction: tokens.motion.easeCss }}
       >
@@ -151,13 +149,17 @@ export default function SettingsPage() {
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-ivory text-charcoal">
-      <NoiseOverlay />
       <GlobalClock />
-      <SystemBar scoutCount={0} navLink={{ href: '/', label: 'Home' }} />
+      <SystemBar
+        scoutCount={0}
+        navLink={{ href: '/', label: 'Home' }}
+        agentConfig={settings.agent_config}
+      />
 
       <main className="flex-1 min-h-0 pt-24 lg:pt-28 overflow-y-auto">
         <ContentColumn variant="panel" className="pb-16 sm:pb-12">
-          <div className="pb-4 sm:pb-6 border-b border-oxford/[0.08]">
+          <GhostTransition>
+            <div className="pb-4 sm:pb-6 border-b border-oxford/[0.08]">
             <p className="font-sans text-[10px] uppercase tracking-[0.14em] text-charcoal/50 mb-1">
               Control plane
             </p>
@@ -381,6 +383,7 @@ export default function SettingsPage() {
               </p>
             )}
           </div>
+          </GhostTransition>
         </ContentColumn>
       </main>
     </div>
