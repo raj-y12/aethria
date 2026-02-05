@@ -1,7 +1,5 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 interface WaitlistBody {
   name: string;
   email: string;
@@ -11,13 +9,15 @@ interface WaitlistBody {
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.RESEND_API_KEY) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
       return Response.json(
         { detail: 'Email service not configured' },
         { status: 503 }
       );
     }
 
+    const resend = new Resend(apiKey);
     const body = (await request.json()) as WaitlistBody;
     const { name, email, role, firm } = body;
 
