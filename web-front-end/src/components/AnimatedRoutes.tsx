@@ -6,7 +6,7 @@ import HomePage from '../HomePage';
 import RequestAccessPage from '../RequestAccessPage';
 
 const DURATION = 0.3;
-const EASE = [0.16, 1, 0.3, 1];
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 export default function AnimatedRoutes() {
   const location = useLocation();
