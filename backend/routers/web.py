@@ -7,7 +7,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 import resend
 
 # Load .env from project root (parent of backend/)
@@ -19,9 +19,10 @@ router = APIRouter(prefix="/api", tags=["web"])
 
 class WaitlistRequest(BaseModel):
     name: str
-    email: str
+    email: EmailStr
     role: str
     firm: str
+    linkedin: str
 
 
 @router.post("/waitlist")
@@ -33,6 +34,7 @@ def submit_waitlist(req: WaitlistRequest):
         raise HTTPException(status_code=503, detail="Email service not configured")
 
     resend.api_key = api_key
+    linkedin_line = f'<li>LinkedIn: <a href="{req.linkedin}">{req.linkedin}</a></li>'
     html = (
         f"<p><strong>New early access signup</strong></p>"
         f"<ul>"
@@ -40,6 +42,7 @@ def submit_waitlist(req: WaitlistRequest):
         f"<li>Email: {req.email}</li>"
         f"<li>Role: {req.role}</li>"
         f"<li>Firm: {req.firm}</li>"
+        f"{linkedin_line}"
         f"</ul>"
     )
     try:

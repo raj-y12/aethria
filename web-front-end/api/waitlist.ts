@@ -5,6 +5,7 @@ interface WaitlistBody {
   email: string;
   role: string;
   firm: string;
+  linkedin: string;
 }
 
 export async function POST(request: Request) {
@@ -19,17 +20,26 @@ export async function POST(request: Request) {
 
     const resend = new Resend(apiKey);
     const body = (await request.json()) as WaitlistBody;
-    const { name, email, role, firm } = body;
+    const { name, email, role, firm, linkedin } = body;
 
-    if (!name?.trim() || !email?.trim() || !role?.trim() || !firm?.trim()) {
+    if (!name?.trim() || !email?.trim() || !role?.trim() || !firm?.trim() || !linkedin?.trim()) {
       return Response.json(
-        { detail: 'Name, email, role, and firm are required' },
+        { detail: 'Name, email, role, firm, and LinkedIn are required' },
+        { status: 400 }
+      );
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return Response.json(
+        { detail: 'Please enter a valid email address' },
         { status: 400 }
       );
     }
 
     const notifyTo =
       process.env.AETHRIA_WAITLIST_NOTIFY_EMAIL ?? 'delivered@resend.dev';
+    const linkedinLine = `<li>LinkedIn: <a href="${linkedin.trim()}">${linkedin.trim()}</a></li>`;
     const html = `
       <p><strong>New early access signup</strong></p>
       <ul>
@@ -37,6 +47,7 @@ export async function POST(request: Request) {
         <li>Email: ${email.trim()}</li>
         <li>Role: ${role.trim()}</li>
         <li>Firm: ${firm.trim()}</li>
+        ${linkedinLine}
       </ul>
     `;
 
