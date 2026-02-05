@@ -11,7 +11,7 @@ export default function HomePage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col relative"
+      className="min-h-[100dvh] h-[100dvh] flex flex-col relative"
       style={{ backgroundColor: PAPER }}
     >
       <GrainOverlay />
@@ -63,7 +63,7 @@ export default function HomePage() {
 
       {/* CTA: left edge aligned with Blue Hero Block (25%); clear separation from main */}
       <div
-        className="relative z-10 mt-auto flex-shrink-0 px-6 sm:px-8 lg:px-12 pb-8 sm:pb-10 md:pb-8 pt-10 sm:pt-12 md:pt-6 md:pl-[25%] md:pr-0"
+        className="relative z-10 mt-auto flex-shrink-0 px-6 sm:px-8 lg:px-12 pt-10 sm:pt-12 md:pt-6 md:pl-[25%] md:pr-0 pb-[max(2rem,calc(2rem+env(safe-area-inset-bottom,0px)))] sm:pb-[max(2.5rem,calc(2.5rem+env(safe-area-inset-bottom,0px)))] md:pb-[max(2rem,calc(2rem+env(safe-area-inset-bottom,0px)))]"
         style={{ color: OXFORD, backgroundColor: PAPER }}
       >
         <Link

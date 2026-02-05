@@ -38,7 +38,7 @@ export default function SystemAccessPage({
 
   return (
     <div
-      className="min-h-screen w-full min-w-0 flex items-center justify-center overflow-hidden bg-oxford relative"
+      className="min-h-[100dvh] h-[100dvh] w-full min-w-0 flex items-center justify-center overflow-hidden bg-oxford relative"
       style={{
         transform: exiting ? 'translateY(-100%)' : 'translateY(0)',
         transition: `transform ${EXIT_DURATION_MS}ms cubic-bezier(0.85, 0, 0.15, 1)`,

@@ -16,11 +16,13 @@
 
   html {
     scroll-behavior: smooth;
+    background-color: #F2F0EA;
   }
 
   body {
     background-color: #F2F0EA;
     color: #2f333b;
+    overscroll-behavior: none;
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

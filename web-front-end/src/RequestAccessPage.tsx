@@ -78,7 +78,7 @@ export default function RequestAccessPage() {
 
   return (
     <div
-      className="min-h-[100dvh] h-screen overflow-hidden flex flex-col relative"
+      className="min-h-[100dvh] h-[100dvh] overflow-hidden flex flex-col relative"
       style={{ backgroundColor: PAPER }}
     >
       <GrainOverlay opacity={0.02} />
@@ -267,7 +267,7 @@ export default function RequestAccessPage() {
       </main>
 
       {/* Footer — compact */}
-      <footer className="shrink-0 z-20 flex items-center justify-between px-4 py-2.5 md:px-6 md:py-3">
+      <footer className="shrink-0 z-20 flex items-center justify-between px-4 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] md:px-6 md:pt-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
         <span
           className="font-sans text-[10px] md:text-[11px] tracking-wide opacity-70 transition-opacity duration-300 hover:opacity-100"
           style={{ color: OXFORD }}
