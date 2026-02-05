@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sun -> #fcfcfc, favicon square crop centered on the A, circular mask."""
+"""Sun -> #fcfcfc; favicon = square crop centered on A, rounded-corner mask."""
 import os
 from PIL import Image, ImageDraw
 
@@ -7,13 +7,16 @@ LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "web-front-end", "publ
 OUT_FAVICON = os.path.join(os.path.dirname(__file__), "..", "web-front-end", "public", "favicon.png")
 
 # Sun/cream -> ivory
-CREAM_RGB = (0xF7, 0xF2, 0xE3)  # approximate cream
-IVORY_RGB = (0xFC, 0xFC, 0xFC)  # #fcfcfc
-CREAM_TOLERANCE = 35  # match cream and near-cream
+CREAM_RGB = (0xF7, 0xF2, 0xE3)
+IVORY_RGB = (0xFC, 0xFC, 0xFC)
+CREAM_TOLERANCE = 35
 
-# Background (ignore when finding content center)
 BG_RGB = (0x00, 0x21, 0x47)
 BG_TOLERANCE = 5
+
+# Zoom: crop square as fraction of image (higher = less cropped, more context)
+ZOOM_FRAC = 0.88
+ROUND_RADIUS = 72  # rounded corner radius on 512px image
 
 
 def is_cream(r, g, b):
@@ -29,7 +32,7 @@ def main():
     w, h = img.size
     px = img.load()
 
-    # 1. Change sun (cream) to #fcfcfc
+    # 1. Sun -> #fcfcfc
     for y in range(h):
         for x in range(w):
             r, g, b, a = px[x, y]
@@ -37,7 +40,7 @@ def main():
                 px[x, y] = (*IVORY_RGB, a)
     img.save(LOGO_PATH, "PNG")
 
-    # 2. Find content center (non-background pixels) so A is in the middle
+    # 2. Content center (A)
     x_min, y_min, x_max, y_max = w, h, 0, 0
     for y in range(h):
         for x in range(w):
@@ -50,24 +53,27 @@ def main():
     cx = (x_min + x_max) // 2
     cy = (y_min + y_max) // 2
 
-    # 3. Square crop centered on content (A)
-    side = min(w, h)
-    left = cx - side // 2
-    top = cy - side // 2
-    left = max(0, min(left, w - side))
-    top = max(0, min(top, h - side))
-    box = (left, top, left + side, top + side)
+    # 3. Square crop, zoomed in (tighter on emblem for clarity)
+    base_side = min(w, h)
+    crop_side = int(base_side * ZOOM_FRAC)
+    crop_side = max(crop_side, 32)
+    left = cx - crop_side // 2
+    top = cy - crop_side // 2
+    left = max(0, min(left, w - crop_side))
+    top = max(0, min(top, h - crop_side))
+    box = (left, top, left + crop_side, top + crop_side)
     square = img.crop(box)
-
-    # 4. Circular mask
-    mask = Image.new("L", (side, side), 0)
+    # Resize to 512 for sharp favicon at 32px
+    square = square.resize((512, 512), Image.Resampling.LANCZOS)
+    # Rounded-rectangle mask (square with rounded corners, transparent outside)
+    mask = Image.new("L", (512, 512), 0)
     draw = ImageDraw.Draw(mask)
-    draw.ellipse((0, 0, side - 1, side - 1), fill=255)
+    draw.rounded_rectangle((0, 0, 511, 511), radius=ROUND_RADIUS, fill=255)
     square.putalpha(mask)
 
     os.makedirs(os.path.dirname(OUT_FAVICON), exist_ok=True)
     square.save(OUT_FAVICON, "PNG")
-    print("Sun -> #fcfcfc in logo.png; favicon square centered on A, circular mask saved.")
+    print("Favicon: square with rounded corners (A centered), 512px.")
 
 
 if __name__ == "__main__":

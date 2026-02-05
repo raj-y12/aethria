@@ -1,0 +1,124 @@
+{
+  "productOverview": {
+    "name": "Aethria",
+    "tagline": "Intelligent investment discovery and evaluation system",
+    "mission": "Automate early-stage startup scouting, produce concise investment memos, and score startups against customizable VC rubrics.",
+    "phase": "Phase 1 — MVP",
+    "launchGoal": "Demo to 3–5 VC contacts with single-command run and clear scout → memo → score → decision flow.",
+    "techStack": ["React", "TypeScript", "Vite", "FastAPI", "Python agents", "OpenAI", "JSON file storage"],
+    "source": "docs/README.md, run.py, app-front-end/src/components/EnterSystemPage.tsx"
+  },
+  "personas": [
+    {
+      "name": "Emma",
+      "role": "VC Analyst",
+      "description": "VC analyst at an early-stage fund; triages inbound startup ideas and prepares memos for partners.",
+      "pains": ["Time wasted on initial triage", "Inconsistent scoring across analysts", "No single place for scout → review → decision and memo export"],
+      "needs": ["Automatic scouting and review", "Configurable rubric", "Simple memo view and export"],
+      "exampleUserStory": "As Emma, I want the system to surface scored startups with verdicts and memos so that I can focus on the best leads and share memos with partners."
+    },
+    {
+      "name": "Partner (GP)",
+      "role": "Partner",
+      "description": "Partner at a small fund; wants clear YES/NO/MAYBE with rationale and next action.",
+      "pains": [],
+      "needs": ["Clear decision and next_action", "Optional human_review_required for edge cases"],
+      "exampleUserStory": "As a partner, I want a clear decision and next action so that I know what to do."
+    }
+  ],
+  "userJourney": [
+    { "step": 1, "name": "Land / Enter", "description": "User sees Aethria and Enter System; session stored in localStorage", "component": "EnterSystemPage.tsx", "routeOrEndpoint": null },
+    { "step": 2, "name": "Loading", "description": "Loading Intelligence Data for ≥2s while startups fetched", "component": "LoadingAnimation.tsx, App.tsx", "routeOrEndpoint": null },
+    { "step": 3, "name": "Main feed", "description": "Work grid of startups; global clock, system bar", "component": "MainLayout.tsx, WorkGrid.tsx, SystemBar.tsx", "routeOrEndpoint": "GET /api/startups" },
+    { "step": 4, "name": "Select startup", "description": "Click card → memo or verdict modal", "component": "MainLayout.tsx, InvestmentMemo.tsx, VerdictModal.tsx", "routeOrEndpoint": null },
+    { "step": 5, "name": "View memo", "description": "Full memo (markdown) from API", "component": "InvestmentMemo.tsx", "routeOrEndpoint": "GET /api/startups/{id}/memo" },
+    { "step": 6, "name": "View verdict", "description": "Partner decision, rationale, next action", "component": "VerdictModal.tsx", "routeOrEndpoint": null },
+    { "step": 7, "name": "Settings", "description": "Toggle scouts/reviewers/partners; cost budget; portfolio", "component": "SettingsPage.tsx", "routeOrEndpoint": "GET/PATCH /api/settings" },
+    { "step": 8, "name": "Idle timeout", "description": "After 20 min idle, session cleared and user returned to Enter", "component": "App.tsx", "routeOrEndpoint": null }
+  ],
+  "features": [
+    { "id": "scout", "name": "Automatic Scouting Agent", "status": "implemented", "priority": "P0", "files": ["backend/scout/base.py", "backend/scout/scouts.py", "backend/scout/engine.py", "backend/storage.py"] },
+    { "id": "reviewer", "name": "Reviewer Layer", "status": "implemented", "priority": "P0", "files": ["backend/reviewer/base.py", "backend/reviewer/reviewer.py", "backend/reviewer/engine.py", "backend/reviewer/schema.py"] },
+    { "id": "partner", "name": "Partner Decision Layer", "status": "implemented", "priority": "P0", "files": ["backend/partner/decision.py", "backend/partner/engine.py", "resources/partner_rules.json"] },
+    { "id": "memo", "name": "Investment Memo", "status": "implemented", "priority": "P0", "files": ["backend/memo_generator.py", "backend/api.py"] },
+    { "id": "single-run", "name": "Single-Run Dev Experience", "status": "implemented", "priority": "P0", "files": ["run.py"] },
+    { "id": "api-startups", "name": "Startup List API", "status": "implemented", "priority": "P0", "files": ["backend/api.py", "app-front-end/src/api/startups.ts"] },
+    { "id": "settings", "name": "Settings API & UI", "status": "implemented", "priority": "P1", "files": ["backend/api.py", "backend/settings_loader.py", "app-front-end/src/settings/SettingsPage.tsx"] },
+    { "id": "frontend", "name": "Responsive Frontend + Enter + Feed", "status": "implemented", "priority": "P1", "files": ["app-front-end/src/App.tsx", "app-front-end/src/components/EnterSystemPage.tsx", "app-front-end/src/components/MainLayout.tsx"] },
+    { "id": "portfolio", "name": "Portfolio Layer", "status": "implemented", "priority": "P1", "files": ["backend/portfolio/engine.py", "backend/portfolio/store.py"] }
+  ],
+  "mvpBacklog": [
+    { "id": "B1", "priority": "P0", "userStory": "As a dev, I run python run.py and get backend + frontend + agents.", "acceptanceCriteria": "All three start; logs show [Backend]/[Frontend]/[Agents].", "storyPoints": 1, "hoursRange": "0–2", "status": "done" },
+    { "id": "B2", "priority": "P0", "userStory": "As Emma, I see a list of startups after entering.", "acceptanceCriteria": "GET /api/startups returns data; feed shows cards.", "storyPoints": 1, "hoursRange": "0–2", "status": "done" },
+    { "id": "B3", "priority": "P0", "userStory": "As Emma, I open a startup and see its memo.", "acceptanceCriteria": "GET /api/startups/:id/memo returns markdown; modal shows memo.", "storyPoints": 2, "hoursRange": "2–4", "status": "done" },
+    { "id": "B4", "priority": "P0", "userStory": "As Emma, scouts and reviewers run automatically and new startups appear.", "acceptanceCriteria": "Agents run on interval; new discoveries get reviewed and decided; feed updates on poll.", "storyPoints": 2, "hoursRange": "2–4", "status": "done" },
+    { "id": "B5", "priority": "P1", "userStory": "As Emma, I change settings and agents respect them.", "acceptanceCriteria": "PATCH /api/settings; scouts/reviewers/partners toggles; engines read via settings_loader.", "storyPoints": 2, "hoursRange": "2–4", "status": "done" },
+    { "id": "B6", "priority": "P1", "userStory": "As a partner, I see verdict and next action for each startup.", "acceptanceCriteria": "Verdict modal shows decision, rationale, next_action, human_review_required.", "storyPoints": 1, "hoursRange": "0–2", "status": "done" },
+    { "id": "B7", "priority": "P2", "userStory": "As a dev, I have one E2E test: scout → review → partner → memo.", "acceptanceCriteria": "Single test or script that runs pipeline and asserts memo content.", "storyPoints": 5, "hoursRange": "8–16", "status": "pending" },
+    { "id": "B8", "priority": "P2", "userStory": "As a PM, we have a short about and success/error copy for demos.", "acceptanceCriteria": "Microcopy doc or constants used in UI.", "storyPoints": 1, "hoursRange": "1–2", "status": "pending" }
+  ],
+  "roadmap": [
+    { "week": 0, "sprint": "Setup", "deliverables": ["Env doc (.env.example)", "Confirm OPENAI_API_KEY", "run.py green"], "qa": "Run full stack once", "riskMitigation": "If no key: document stub/mock for demo" },
+    { "week": 1, "sprint": "Stabilize", "deliverables": ["No new features", "Fix flaky tests", "Log noise"], "qa": "test_scouts + test_end_to_end + test_partner_flow pass", "riskMitigation": null },
+    { "week": 2, "sprint": "Frontend polish", "deliverables": ["Enter + loading + feed responsive", "Memo/verdict accessible"], "qa": "Manual pass desktop + one mobile size", "riskMitigation": null },
+    { "week": 3, "sprint": "Settings & control", "deliverables": ["Settings page and PATCH validated", "Agents respect toggles"], "qa": "Toggle scouts off, confirm no new discoveries", "riskMitigation": null },
+    { "week": 4, "sprint": "Memo & export", "deliverables": ["Memo API stable", "Optional copy memo or download in UI"], "qa": "Memo matches backend generator output", "riskMitigation": null },
+    { "week": 5, "sprint": "E2E & docs", "deliverables": ["One E2E test (scout → memo)", "PRD and runbook updated"], "qa": "E2E green; runbook runnable by new dev", "riskMitigation": null },
+    { "week": 6, "sprint": "Demo prep", "deliverables": ["About blurb", "Success/error microcopy", "Demo script"], "qa": "Internal dry run", "riskMitigation": null },
+    { "week": "7–8", "sprint": "Launch", "deliverables": ["Demo to 3–5 VC contacts", "Collect feedback"], "qa": "Demo checklist; feedback log", "riskMitigation": "If API key limits: reduce scout/reviewer frequency" }
+  ],
+  "metrics": [
+    { "metric": "Memos viewed", "targetFirst30Days": "≥20", "months2to3": "Track trend", "measurement": "Count memo API calls or frontend memo opens" },
+    { "metric": "Startups with decision", "targetFirst30Days": "≥10", "months2to3": "Grow with usage", "measurement": "Count from storage or GET /api/startups" },
+    { "metric": "Successful demos", "targetFirst30Days": "3–5", "months2to3": null, "measurement": "Manual count / CRM" }
+  ],
+  "techInventory": [
+    { "feature": "Single entrypoint", "location": "run.py" },
+    { "feature": "Scout base and LLM call", "location": "backend/scout/base.py" },
+    { "feature": "Four scout types", "location": "backend/scout/scouts.py, backend/scout/engine.py" },
+    { "feature": "Reviewer rubric and rules", "location": "backend/reviewer/base.py, resources/reviewer_rules.json, resources/rubrics/evaluation_rubric_v1.json" },
+    { "feature": "Partner rule-based decision", "location": "backend/partner/decision.py, resources/partner_rules.json" },
+    { "feature": "Storage thread-safe", "location": "backend/storage.py" },
+    { "feature": "Startup model", "location": "backend/models.py" },
+    { "feature": "Memo generator", "location": "backend/memo_generator.py" },
+    { "feature": "Settings loader", "location": "backend/settings_loader.py, backend/api.py" },
+    { "feature": "Frontend startups and memo API", "location": "app-front-end/src/api/startups.ts, vite.config.ts" },
+    { "feature": "Enter and session", "location": "app-front-end/src/App.tsx" },
+    { "feature": "Design tokens", "location": "app-front-end/src/design-system/tokens.ts" }
+  ],
+  "apiEndpoints": [
+    { "method": "GET", "path": "/api/startups", "purpose": "List all startups (frontend shape)", "outputs": "200, array of { id, scout, review?, partner?, timestamps }" },
+    { "method": "GET", "path": "/api/startups/{startup_id}/memo", "purpose": "Full investment memo (markdown)", "outputs": "200 { memo: string } or 404" },
+    { "method": "GET", "path": "/health", "purpose": "Health check", "outputs": "200 { status: \"ok\" }" },
+    { "method": "GET", "path": "/api/settings", "purpose": "Get control-plane settings", "outputs": "200 { cost_budget, agent_config, portfolio }" },
+    { "method": "PATCH", "path": "/api/settings", "purpose": "Update settings (partial)", "outputs": "200 merged settings or 422 validation errors" }
+  ],
+  "dataModel": {
+    "discoveryStorage": "data/startups.json (or STORAGE_PATH)",
+    "entities": ["Startup (startup_id, scout_info, review_info, partner_info, financials, created_at, updated_at)", "ScoutInfo", "ReviewInfo", "PartnerInfo", "Financials"],
+    "portfolioStorage": "data/portfolio/ (startups.json, decisions.json, portfolio.json, rejections.json, watchlist.json, signals.json, agent_metrics.json)"
+  },
+  "gaps": [
+    { "gap": "No .env.example", "detail": "New devs may not know OPENAI_API_KEY, STORAGE_PATH, etc.", "owner": "Backend", "priority": "P0", "etaDays": 1 },
+    { "gap": "No auth on API", "detail": "All endpoints open when served.", "owner": "Backend", "priority": "P1", "etaDays": null },
+    { "gap": "No GDPR/data retention", "detail": "PII and retention not implemented.", "owner": "Product/legal", "priority": "P1", "etaDays": null },
+    { "gap": "Single JSON storage at scale", "detail": "May slow with 1000s of entries; Postgres planned.", "owner": "Backend", "priority": "P2", "etaDays": null },
+    { "gap": "No Crunchbase/PitchBook/AngelList", "detail": "No ingest from external sources.", "owner": "Backend", "priority": "P2", "etaDays": null },
+    { "gap": "No CI config", "detail": "No GitHub Actions or other CI.", "owner": "DevOps", "priority": "P2", "etaDays": 1 },
+    { "gap": "Scout hypothesis fields not persisted", "detail": "primary_thesis, key_assumptions, biggest_unknown from Scouts not on ScoutInfo/adapter; Reviewer lacks them.", "owner": "Backend", "priority": "P2", "etaDays": null },
+    { "gap": "Team/competitor/business-model input", "detail": "Scout does not collect team, competitors, monetization; memos often [MISSING] for those sections.", "owner": "Backend", "priority": "P2", "etaDays": null }
+  ],
+  "architectureSummary": {
+    "pipeline": "Scout → Reviewer → Partner → Portfolio",
+    "defaultStoragePath": "data/startups.json",
+    "wipeScript": "backend/scripts/wipe_startups.py [--path data/startups.json] [--dry-run]"
+  },
+  "nextStepsChecklist": [
+    "Add .env.example with OPENAI_API_KEY, STORAGE_PATH, SETTINGS_PATH, SCOUT_MODEL, REVIEWER_MODEL, PARTNER_USE_LLM, PORTFOLIO_DIR.",
+    "Confirm run.py works for a new clone (Python 3.8+, npm install in app-front-end).",
+    "Add one integration test that runs Scout → Reviewer → Partner and asserts memo content.",
+    "Document demo runbook (start run.py, open http://localhost:3000, Enter, wait for feed).",
+    "Add optional E2E test (Playwright/Cypress) for Enter → feed → open memo.",
+    "Plan auth and GDPR/data retention before any non-demo deployment."
+  ]
+}

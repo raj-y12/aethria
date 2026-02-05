@@ -1,5 +1,9 @@
 # AETHRIA DealFlow OS – Audit Report
 
+Implementation audit: storage, models, adapters, memo generator, wipe script. For product requirements, API, roadmap, and ops summary see **[AETHRIA_PRD_AND_ARTIFACTS.md](AETHRIA_PRD_AND_ARTIFACTS.md)**.
+
+---
+
 ## 1. Scope
 
 - **Adapters**: ScoutOutput/ReviewerOutput/PartnerOutput → Pydantic (ScoutInfo, ReviewInfo, PartnerInfo).

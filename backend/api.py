@@ -1,6 +1,8 @@
 """
-FastAPI server for Aethria app-front-end.
-Serves GET /api/startups from Storage, GET/PATCH /settings from settings file.
+FastAPI server for Aethria.
+Serves app-front-end: GET /api/startups, GET/PATCH /settings.
+Serves web-front-end: POST /api/waitlist (early access signup).
+Single API for both frontends when running on a domain.
 """
 import json
 import os
@@ -10,18 +12,31 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from storage import Storage
+from routers.web import router as web_router
 from settings_loader import DEFAULT_SETTINGS, get_settings_path, load_settings
 from memo_generator import MemoGenerator
 
 app = FastAPI(title="Aethria API")
 
+# CORS: localhost for dev; extend with ALLOWED_ORIGINS (comma-separated) for production domain
+_cors_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+]
+_extra = os.getenv("ALLOWED_ORIGINS", "")
+if _extra:
+    _cors_origins.extend(o.strip() for o in _extra.split(",") if o.strip())
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "PATCH"],
+    allow_methods=["GET", "PATCH", "POST"],
     allow_headers=["*"],
 )
+
+app.include_router(web_router)
 
 
 def _save_settings(data: dict) -> None:

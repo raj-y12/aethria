@@ -19,12 +19,17 @@
   }
 
   body {
-    background-color: #fcfcfc;
+    background-color: #F2F0EA;
     color: #2f333b;
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  input, textarea {
+    color: #002147;
+    font-weight: 500;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -259,4 +264,53 @@
   to {
     opacity: 1;
   }
+}
+
+/* Subtle page transition — fade + slight move */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition-enter {
+  animation: page-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* SystemAccessPage — status text subtle "thinking" pulse (40% ↔ 100%) */
+@keyframes system-init-status-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.system-init-status {
+  animation: system-init-status-pulse 3.5s ease-in-out infinite;
+}
+
+/* Underline beneath "A" only: width 0% → 100% left-to-right, 1.2s ease-in-out */
+@keyframes system-init-underline-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.system-init-underline {
+  transform-origin: left;
+  animation: system-init-underline-in 1.2s ease-in-out forwards;
+}
+
+.system-init-underline-a {
+  width: 100%;
 }

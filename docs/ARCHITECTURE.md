@@ -60,7 +60,7 @@ AETHRIA is an autonomous DealFlow OS for venture capital firms. It operates as a
 - Uses `gpt-5-nano` by default (cost-efficient)
 - No retries, no chaining
 
-**Storage:** Writes to `Storage` → `data/discoveries.json`
+**Storage:** Writes to `Storage` → `data/startups.json` (or `STORAGE_PATH`)
 
 ---
 
@@ -171,7 +171,7 @@ AETHRIA is an autonomous DealFlow OS for venture capital firms. It operates as a
 
 **Purpose:** Central storage for Scout/Reviewer/Partner pipeline.
 
-**File:** `data/discoveries.json`
+**File:** `data/startups.json` (or `STORAGE_PATH`)
 
 **Schema:**
 ```json
@@ -275,7 +275,7 @@ python run_system.py
 
 **Environment Variables:**
 - `OPENAI_API_KEY`: Required
-- `STORAGE_PATH`: Optional (default: `data/discoveries.json`)
+- `STORAGE_PATH`: Optional (default: `data/startups.json`)
 - `SCOUT_INTERVAL_SECONDS`: Optional (default: 300)
 - `REVIEWER_INTERVAL_SECONDS`: Optional (default: 60)
 - `PARTNER_INTERVAL_SECONDS`: Optional (default: 30)

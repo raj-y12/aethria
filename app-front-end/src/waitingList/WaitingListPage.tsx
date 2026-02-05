@@ -61,9 +61,11 @@ export default function WaitingListPage() {
                 </div>
                 <button
                   type="submit"
-                  className="mt-4 font-body text-charcoal text-[12px] uppercase tracking-[0.18em] hover:text-oxford transition-colors duration-300"
+                  className="group mt-4 font-body text-charcoal text-[12px] uppercase tracking-[0.18em] hover:text-oxford transition-colors duration-300"
                 >
-                  Request access
+                  <span className="relative inline-block after:content-[''] after:absolute after:left-0 after:bottom-0 after:w-full after:h-px after:bg-current after:origin-left after:scale-x-0 after:transition-transform after:duration-300 group-hover:after:scale-x-100">
+                    Request access
+                  </span>
                 </button>
               </form>
             ) : (
