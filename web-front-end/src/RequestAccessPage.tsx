@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import GrainOverlay from './components/GrainOverlay';
 import CustomCursor from './components/CustomCursor';
 
 const OXFORD = '#002147';
 const PAPER = '#F2F0EA';
+const PROCESSING_DURATION_MS = 1200;
 // Use external backend when VITE_API_URL is set (local dev with run.py); otherwise use Vercel serverless /api/waitlist
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 const WAITLIST_URL = API_BASE ? `${API_BASE.replace(/\/$/, '')}/api/waitlist` : '/api/waitlist';
 
 export default function RequestAccessPage() {
   const [submitted, setSubmitted] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitHover, setSubmitHover] = useState(false);
@@ -18,6 +20,15 @@ export default function RequestAccessPage() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
   const [firm, setFirm] = useState('');
+
+  useEffect(() => {
+    if (!processing) return;
+    const t = setTimeout(() => {
+      setProcessing(false);
+      setSubmitted(true);
+    }, PROCESSING_DURATION_MS);
+    return () => clearTimeout(t);
+  }, [processing]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +55,8 @@ export default function RequestAccessPage() {
               `Request failed (${res.status}). Please try again.`;
         throw new Error(msg);
       }
-      setSubmitted(true);
+      setLoading(false);
+      setProcessing(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
@@ -72,7 +84,7 @@ export default function RequestAccessPage() {
         <Link
           data-cursor-expand
           to="/home"
-          className="font-mono text-[10px] uppercase tracking-widest opacity-60 transition-opacity duration-300 hover:opacity-100"
+          className="font-mono text-[10px] uppercase tracking-widest opacity-70 transition-opacity duration-300 hover:opacity-100"
           style={{ color: OXFORD }}
         >
           Home
@@ -83,10 +95,10 @@ export default function RequestAccessPage() {
       <main className="flex-1 flex flex-col lg:flex-row px-6 sm:px-8 lg:px-12 py-10 sm:py-14 lg:py-16 lg:pt-14 gap-10 lg:gap-16 max-w-5xl lg:max-w-none mx-auto w-full">
         {/* Left column: metadata — on mobile stacks above "Request access" title */}
         <aside className="order-1 lg:order-none lg:w-[25%] lg:min-w-[25%] flex flex-col justify-center pt-4 lg:pt-0">
-          <p className="font-mono text-[10px] uppercase tracking-widest" style={{ color: OXFORD }}>
+          <p className="font-mono text-[10px] uppercase tracking-widest opacity-70" style={{ color: OXFORD }}>
             REGISTRY / 2026
           </p>
-          <p className="font-mono text-[10px] uppercase tracking-widest mt-3" style={{ color: OXFORD }}>
+          <p className="font-mono text-[10px] uppercase tracking-widest mt-3 opacity-70" style={{ color: OXFORD }}>
             EARLY ACCESS
           </p>
         </aside>
@@ -99,6 +111,7 @@ export default function RequestAccessPage() {
                 Request access
               </h1>
 
+              <div className={processing ? 'opacity-50 transition-opacity duration-300' : undefined}>
               <form onSubmit={handleSubmit} className="flex flex-col">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 sm:gap-x-12 gap-y-8 sm:gap-y-10">
                   <div className="flex flex-col">
@@ -111,7 +124,7 @@ export default function RequestAccessPage() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder=""
-                      className="w-full bg-transparent font-sans text-lg font-medium py-3 outline-none border-0 border-b border-[rgba(0,33,71,0.1)] focus:border-[#002147] transition-[border-color] duration-[150ms]"
+                      className="w-full bg-transparent font-sans text-lg font-medium py-3 outline-none border-0 border-b focus:border-[#002147] transition-[border-color] duration-[150ms]"
                       style={{ color: OXFORD }}
                       required
                     />
@@ -126,7 +139,7 @@ export default function RequestAccessPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder=""
-                      className="w-full bg-transparent font-sans text-lg font-medium py-3 outline-none border-0 border-b border-[rgba(0,33,71,0.1)] focus:border-[#002147] transition-[border-color] duration-[150ms]"
+                      className="w-full bg-transparent font-sans text-lg font-medium py-3 outline-none border-0 border-b focus:border-[#002147] transition-[border-color] duration-[150ms]"
                       style={{ color: OXFORD }}
                       required
                     />
@@ -141,7 +154,7 @@ export default function RequestAccessPage() {
                       value={role}
                       onChange={(e) => setRole(e.target.value)}
                       placeholder=""
-                      className="w-full bg-transparent font-sans text-lg font-medium py-3 outline-none border-0 border-b border-[rgba(0,33,71,0.1)] focus:border-[#002147] transition-[border-color] duration-[150ms]"
+                      className="w-full bg-transparent font-sans text-lg font-medium py-3 outline-none border-0 border-b focus:border-[#002147] transition-[border-color] duration-[150ms]"
                       style={{ color: OXFORD }}
                       required
                     />
@@ -156,7 +169,7 @@ export default function RequestAccessPage() {
                       value={firm}
                       onChange={(e) => setFirm(e.target.value)}
                       placeholder=""
-                      className="w-full bg-transparent font-sans text-lg font-medium py-3 outline-none border-0 border-b border-[rgba(0,33,71,0.1)] focus:border-[#002147] transition-[border-color] duration-[150ms]"
+                      className="w-full bg-transparent font-sans text-lg font-medium py-3 outline-none border-0 border-b focus:border-[#002147] transition-[border-color] duration-[150ms]"
                       style={{ color: OXFORD }}
                       required
                     />
@@ -175,28 +188,31 @@ export default function RequestAccessPage() {
                 <button
                   type="submit"
                   data-cursor-expand
-                  disabled={loading}
+                  disabled={loading || processing}
                   className="mt-10 sm:mt-12 w-full flex items-center justify-center py-4 sm:py-5 rounded-none font-mono text-[10px] uppercase tracking-widest text-white transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
                   style={{ backgroundColor: OXFORD }}
                   onMouseEnter={() => setSubmitHover(true)}
                   onMouseLeave={() => setSubmitHover(false)}
                 >
                   <span className="flex items-center justify-center">
-                    <span>{loading ? 'SUBMITTING…' : 'SUBMIT APPLICATION'}</span>
+                    <span>
+                      {loading ? 'SUBMITTING…' : processing ? 'PROCESSING ENTRY' : 'SUBMIT APPLICATION'}
+                    </span>
                     <span
                       className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap"
-                      style={{ width: submitHover ? '1.25em' : '0.5em' }}
+                      style={{ width: loading || processing || submitHover ? '1.25em' : '0.5em' }}
                     >
                       {'\u00A0—'}
                     </span>
                   </span>
                 </button>
               </form>
+              </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center text-center py-16 sm:py-24">
+            <div className="request-access-success-reveal flex flex-col text-left py-16 sm:py-24">
               <p
-                className="font-display font-normal text-3xl leading-snug max-w-[20ch] mb-8"
+                className="font-display font-normal text-3xl leading-snug max-w-[20ch] mb-8 sm:mb-10"
                 style={{ color: OXFORD }}
               >
                 Application Received. Registry entry pending review.
@@ -204,10 +220,10 @@ export default function RequestAccessPage() {
               <Link
                 to="/home"
                 data-cursor-expand
-                className="font-mono text-[10px] uppercase tracking-widest hover:opacity-80 transition-opacity inline-block"
+                className="font-mono text-[10px] uppercase tracking-widest opacity-70 hover:opacity-100 transition-opacity inline-block"
                 style={{ color: OXFORD }}
               >
-                Back to home
+                BACK TO HOME
               </Link>
             </div>
           )}
@@ -216,10 +232,10 @@ export default function RequestAccessPage() {
 
       {/* Footer */}
       <footer className="group sticky bottom-0 z-20 flex items-center justify-between px-6 sm:px-8 lg:px-12 py-4 bg-[#F2F0EA]/95 backdrop-blur-sm">
-        <span className="font-sans text-[11px] tracking-wide opacity-60 transition-opacity duration-300 group-hover:opacity-100" style={{ color: OXFORD }}>
+        <span className="font-sans text-[11px] tracking-wide opacity-70 transition-opacity duration-300 group-hover:opacity-100" style={{ color: OXFORD }}>
           © Aethria
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-widest opacity-60 transition-opacity duration-300 group-hover:opacity-100" style={{ color: OXFORD }}>
+        <span className="font-mono text-[10px] uppercase tracking-widest opacity-70 transition-opacity duration-300 group-hover:opacity-100" style={{ color: OXFORD }}>
           Investment intelligence
         </span>
       </footer>

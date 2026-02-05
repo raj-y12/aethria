@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     `;
 
     const { data, error } = await resend.emails.send({
-      from: 'Aethria <hello@mail.aethria.co>',
+      from: 'Aethria <early_access@mail.aethria.co>',
       to: [notifyTo],
       subject: `Early access request: ${name.trim()} (${firm.trim()})`,
       html,

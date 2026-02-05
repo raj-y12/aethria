@@ -11,7 +11,7 @@
 
 @layer base {
   * {
-    border-color: #2f333b;
+    border-color: rgba(0, 33, 71, 0.1);
   }
 
   html {
@@ -134,6 +134,23 @@
   to {
     opacity: 1;
   }
+}
+
+/* RequestAccessPage — success message reveal: blur-in + fade-in (executive “emerging on paper”) */
+@keyframes request-access-success-reveal {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.request-access-success-reveal {
+  opacity: 0;
+  animation: request-access-success-reveal 0.8s ease-out forwards;
 }
 
 /* Loading triangle — appears 2–3s after everything else (hero 1.5s, underline 2.5s) */

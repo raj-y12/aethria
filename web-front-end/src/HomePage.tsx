@@ -27,7 +27,7 @@ export default function HomePage() {
           Aethria
         </Link>
         <span
-          className="font-mono text-[10px] uppercase tracking-widest opacity-60 hidden md:inline transition-opacity duration-300 hover:opacity-100"
+          className="font-mono text-[10px] uppercase tracking-widest opacity-70 hidden md:inline transition-opacity duration-300 hover:opacity-100"
           style={{ color: OXFORD }}
         >
           Investment Intelligence
@@ -42,15 +42,18 @@ export default function HomePage() {
           className="order-1 md:order-2 flex items-center justify-center md:justify-start w-full md:flex-1 min-h-[50vh] md:min-h-0 aspect-auto p-10 sm:p-14 md:p-16 lg:p-20 xl:p-24 shrink-0 rounded-none"
           style={{ backgroundColor: OXFORD }}
         >
-          <h1 className="font-display font-normal text-ivory text-5xl sm:text-6xl lg:text-7xl leading-tight max-w-[16ch] md:max-w-[18ch]">
-            Decision intelligence for capital allocation.
+          <h1
+            className="font-display font-normal text-4xl sm:text-[2.85rem] lg:text-[3.5625rem] xl:text-[4.275rem] max-w-[18ch] md:max-w-[20ch]"
+            style={{ color: PAPER, lineHeight: 1.05 }}
+          >
+            Intelligent investment discovery and evaluation system.
           </h1>
         </div>
 
         {/* Description: below monolith on mobile (generous padding); left 25% on desktop */}
         <section className="order-2 md:order-1 flex md:w-[25%] flex-col justify-center px-6 lg:px-12 pr-4 py-12 sm:py-16 md:py-0 shrink-0">
           <p
-            className="font-sans text-[15px] max-w-[26ch]"
+            className="font-sans text-[15px] max-w-[26ch] opacity-70"
             style={{ color: OXFORD, lineHeight: 1.85 }}
           >
             Aethria supports institutional allocators with clarity and rigour. Join the waiting list for early access to the platform.
@@ -66,7 +69,7 @@ export default function HomePage() {
         <Link
           to="/request-access"
           data-cursor-expand
-          className="inline-flex items-baseline font-mono text-[10px] uppercase tracking-widest transition-all duration-200 group"
+          className="inline-flex items-baseline font-mono text-[10px] uppercase tracking-widest opacity-70 hover:opacity-100 transition-all duration-200 group"
           style={{ color: OXFORD }}
           onMouseEnter={() => setCtaHover(true)}
           onMouseLeave={() => setCtaHover(false)}
