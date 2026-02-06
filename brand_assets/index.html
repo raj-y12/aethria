@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Aethria — LinkedIn Banner Moods</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Libre Baskerville for logo & tagline -->
+    <link
+      rel="preconnect"
+      href="https://fonts.googleapis.com"
+    />
+    <link
+      rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400&family=Space+Mono:wght@400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --oxford: #002147;
+        --warm-paper: #f5f2e9;
+        --cream: #f5f2e9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+
+      body {
+        min-height: 100vh;
+        background-color: var(--warm-paper);
+        color: var(--oxford);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+        overflow-y: auto;
+        position: relative;
+      }
+
+      .page {
+        position: relative;
+        z-index: 1;
+        max-width: 1800px;
+        margin: 0 auto;
+        padding: 32px 20px 80px;
+        display: flex;
+        flex-direction: column;
+        gap: 40px;
+      }
+
+      .intro {
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.7;
+      }
+
+      .title {
+        margin-top: 8px;
+        font-family: 'Libre Baskerville', serif;
+        font-weight: 400;
+        font-size: 28px;
+        letter-spacing: -0.02em;
+      }
+
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .section-label {
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        opacity: 0.6;
+      }
+
+      .gallery {
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        margin-top: 16px;
+      }
+
+      .banner-card {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+      }
+
+      .banner-meta {
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        opacity: 0.6;
+      }
+
+      .frame {
+        margin: 0 auto;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        box-shadow: 0 0 0 1px rgba(0, 33, 71, 0.06);
+      }
+
+      /* Banner dimensions — 1584 x 396 */
+      .frame-banner {
+        width: 1584px;
+        height: 396px;
+      }
+
+      /* Per-banner grain overlay, baked into each design */
+      .frame-banner::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        opacity: 0.04;
+        will-change: transform;
+        transform: translateZ(0);
+      }
+
+      /* Global grain overlay (for on-page ambience; hidden during export) */
+      .grain-overlay {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        opacity: 0.04;
+        will-change: transform;
+        transform: translateZ(0);
+      }
+
+      /* Underlined A (reusable) */
+      .underlined-a {
+        position: relative;
+        display: inline-block;
+        font-family: 'Libre Baskerville', serif;
+        font-weight: 400;
+      }
+
+      .underlined-a::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        width: 1ch; /* width of the "A" character box */
+        height: 3px;
+        background-color: currentColor;
+        bottom: -4px; /* 4px below baseline */
+      }
+
+      /* Suite A — Blueprint */
+      .banner-blueprint {
+        background-color: var(--warm-paper);
+        color: var(--oxford);
+      }
+
+      .banner-blueprint-invert {
+        background-color: var(--oxford);
+        color: var(--cream);
+      }
+
+      .blueprint-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        padding: 56px 80px;
+      }
+
+      .blueprint-line {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        left: 33%;
+        background-color: currentColor;
+        opacity: 0.5;
+      }
+
+      .blueprint-logo {
+        position: absolute;
+        right: 80px;
+        bottom: 56px;
+        font-size: 64px;
+        letter-spacing: -0.06em;
+        font-family: 'Libre Baskerville', serif;
+      }
+
+      /* Suite B — Metadata */
+      .banner-metadata {
+        background-color: var(--warm-paper);
+        color: var(--oxford);
+      }
+
+      .banner-metadata-invert {
+        background-color: var(--oxford);
+        color: var(--cream);
+      }
+
+      .metadata-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        padding: 40px 40px 40px 64px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: flex-end;
+        text-align: right;
+      }
+
+      .metadata-label {
+        font-family: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+          'Courier New', monospace;
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+      }
+
+      /* Suite C — Seal */
+      .banner-seal {
+        background-color: var(--warm-paper);
+        color: var(--oxford);
+      }
+
+      .banner-seal-invert {
+        background-color: var(--oxford);
+        color: var(--cream);
+      }
+
+      .seal-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .seal-a {
+        font-size: 120px;
+        letter-spacing: 0;
+      }
+
+      /* Legacy LinkedIn profile & success layouts */
+      .asset-gallery {
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        margin-top: 16px;
+      }
+
+      .frame-square {
+        width: 1000px;
+        height: 1000px;
+        position: relative;
+      }
+
+      .frame-square-warm {
+        background-color: var(--warm-paper);
+        color: var(--oxford);
+      }
+
+      .frame-square-invert {
+        background-color: var(--oxford);
+        color: var(--cream);
+      }
+
+      .frame-success {
+        width: 1200px;
+        height: 627px;
+        background-color: var(--warm-paper);
+        position: relative;
+      }
+
+      .frame-square::before,
+      .frame-success::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        opacity: 0.04;
+        will-change: transform;
+        transform: translateZ(0);
+      }
+
+      .profile-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .profile-wordmark {
+        font-family: 'Libre Baskerville', serif;
+        font-weight: 400;
+        font-size: 170px;
+        letter-spacing: -0.06em;
+      }
+
+      .success-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .success-copy {
+        max-width: 720px;
+        padding: 0 80px;
+        color: var(--oxford);
+      }
+
+      .success-heading {
+        margin: 0 0 12px;
+        font-family: 'Libre Baskerville', serif;
+        font-weight: 400;
+        font-size: 40px;
+        line-height: 1.2;
+      }
+
+      .success-subcopy {
+        margin: 0;
+        font-family: 'Libre Baskerville', serif;
+        font-weight: 400;
+        font-size: 28px;
+        line-height: 1.3;
+      }
+
+      /* Download button */
+      .download-button {
+        margin-left: 8px;
+        padding: 6px 10px;
+        border: 1px solid rgba(0, 33, 71, 0.35);
+        background-color: transparent;
+        border-radius: 999px;
+        font-family: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+          'Courier New', monospace;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: inherit;
+        cursor: pointer;
+        opacity: 0.8;
+        transition: opacity 150ms ease, background-color 150ms ease, transform 150ms ease;
+      }
+
+      .download-button:hover {
+        opacity: 1;
+        background-color: rgba(0, 33, 71, 0.04);
+        transform: translateY(-0.5px);
+      }
+
+      .download-button:active {
+        transform: translateY(0);
+      }
+
+      /* Scale banners on smaller viewports so the fixed export size remains intact */
+      @media (max-width: 1700px) {
+        .frame-banner {
+          transform: scale(0.85);
+          transform-origin: top left;
+        }
+      }
+
+      @media (max-width: 1400px) {
+        .frame-banner {
+          transform: scale(0.75);
+        }
+      }
+
+      @media (max-width: 1100px) {
+        .frame-banner {
+          transform: scale(0.6);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grain-overlay" aria-hidden="true"></div>
+    <main class="page">
+      <header>
+        <div class="intro">AETHRIA / LINKEDIN BANNER MOODS</div>
+        <div class="title">High-fidelity banner system for profile branding.</div>
+      </header>
+
+      <!-- Profile Pictures -->
+      <section class="section" aria-label="LinkedIn profile pictures">
+        <div class="section-label">Profile Pictures — 1000 × 1000 px</div>
+        <div class="asset-gallery">
+          <article class="banner-card">
+            <div class="banner-meta">
+              Standard — Paper / Oxford
+              <button class="download-button" data-download="profile-standard">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-square frame-square-warm"
+              id="profile-standard"
+              data-width="1000"
+              data-height="1000"
+            >
+              <div class="profile-inner">
+                <div class="profile-wordmark">
+                  <span class="underlined-a">A</span>ethria
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="banner-card">
+            <div class="banner-meta">
+              Inverted — Oxford / Cream
+              <button class="download-button" data-download="profile-inverted">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-square frame-square-invert"
+              id="profile-inverted"
+              data-width="1000"
+              data-height="1000"
+            >
+              <div class="profile-inner">
+                <div class="profile-wordmark">
+                  <span class="underlined-a">A</span>ethria
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-label="Banner mood gallery">
+        <div class="section-label">LinkedIn banners — 1584 × 396 px</div>
+        <div class="gallery">
+          <!-- Suite A — Blueprint (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite A — Blueprint / Paper
+              <button class="download-button" data-download="banner-blueprint">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-blueprint"
+              id="banner-blueprint"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="blueprint-inner">
+                <div class="blueprint-line"></div>
+                <div class="blueprint-logo">
+                  <span class="underlined-a">A</span>ethria
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite A — Blueprint (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite A — Blueprint / Oxford
+              <button class="download-button" data-download="banner-blueprint-invert">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-blueprint-invert"
+              id="banner-blueprint-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="blueprint-inner">
+                <div class="blueprint-line"></div>
+                <div class="blueprint-logo">
+                  <span class="underlined-a">A</span>ethria
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite B — Metadata (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite B — Metadata / Paper
+              <button class="download-button" data-download="banner-metadata">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-metadata"
+              id="banner-metadata"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="metadata-inner">
+                <div class="metadata-label">REGISTRY // 2026</div>
+                <div class="metadata-label">AETHRIA // SYSTEM</div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite B — Metadata (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite B — Metadata / Oxford
+              <button class="download-button" data-download="banner-metadata-invert">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-metadata-invert"
+              id="banner-metadata-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="metadata-inner">
+                <div class="metadata-label">REGISTRY // 2026</div>
+                <div class="metadata-label">AETHRIA // SYSTEM</div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite C — Seal (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite C — Seal / Paper
+              <button class="download-button" data-download="banner-seal">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-seal"
+              id="banner-seal"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="seal-inner">
+                <span class="underlined-a seal-a">A</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite C — Seal (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite C — Seal / Oxford
+              <button class="download-button" data-download="banner-seal-invert">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-seal-invert"
+              id="banner-seal-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="seal-inner">
+                <span class="underlined-a seal-a">A</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+    <script>
+      // Minimal local html-to-image-style implementation (toPng only),
+      // so downloads work without any external CDN.
+      (function () {
+        function nodeToPng(node, options) {
+          options = options || {};
+          var width = options.width || node.offsetWidth || 300;
+          var height = options.height || node.offsetHeight || 150;
+          var pixelRatio = options.pixelRatio || 1;
+
+          // Clone node into a wrapper so we don't mutate the live DOM.
+          var clone = node.cloneNode(true);
+          var wrapper = document.createElement('div');
+          wrapper.appendChild(clone);
+
+          var serialized = new XMLSerializer().serializeToString(wrapper);
+
+          var svgWidth = width * pixelRatio;
+          var svgHeight = height * pixelRatio;
+
+          var svg =
+            '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+            svgWidth +
+            '" height="' +
+            svgHeight +
+            '">' +
+            '<foreignObject x="0" y="0" width="100%" height="100%">' +
+            '<div xmlns="http://www.w3.org/1999/xhtml" style="width:' +
+            width +
+            'px;height:' +
+            height +
+            'px;transform:scale(' +
+            pixelRatio +
+            ');transform-origin: top left;">' +
+            serialized +
+            '</div>' +
+            '</foreignObject>' +
+            '</svg>';
+
+          return new Promise(function (resolve, reject) {
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            var blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+            var url = URL.createObjectURL(blob);
+
+            img.onload = function () {
+              try {
+                var canvas = document.createElement('canvas');
+                canvas.width = svgWidth;
+                canvas.height = svgHeight;
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+                resolve(canvas.toDataURL('image/png'));
+              } catch (err) {
+                URL.revokeObjectURL(url);
+                reject(err);
+              }
+            };
+
+            img.onerror = function (e) {
+              URL.revokeObjectURL(url);
+              reject(e);
+            };
+
+            img.src = url;
+          });
+        }
+
+        window.htmlToImage = {
+          toPng: function (node, options) {
+            return nodeToPng(node, options || {});
+          },
+        };
+      })();
+
+      (function () {
+        function waitForFonts() {
+          if (document.fonts && document.fonts.ready) {
+            return document.fonts.ready.catch(function (err) {
+              console.warn('Font loading issue, proceeding anyway:', err);
+            });
+          }
+          return Promise.resolve();
+        }
+
+        function downloadAsset(id, filename, width, height) {
+          var node = document.getElementById(id);
+          if (!node) {
+            console.error('Download target not found for id:', id);
+            return;
+          }
+
+          var lib = window.htmlToImage;
+          if (!lib || !lib.toPng) {
+            console.error('html-to-image implementation not available on window.htmlToImage');
+            return;
+          }
+
+          var grain = document.querySelector('.grain-overlay');
+          var previousVisibility = grain ? grain.style.visibility : '';
+
+          waitForFonts()
+            .then(function () {
+              if (grain) grain.style.visibility = 'hidden';
+              try {
+                return lib.toPng(node, {
+                  pixelRatio: 3, // high-res / "scale: 3"
+                  width: width,
+                  height: height,
+                  cacheBust: true,
+                  style: {
+                    width: width + 'px',
+                    height: height + 'px',
+                    transform: 'none',
+                  },
+                });
+              } catch (error) {
+                console.error('Synchronous html-to-image error (possible tainted canvas/CORS):', error);
+                throw error;
+              }
+            })
+            .then(function (dataUrl) {
+              if (!dataUrl) return;
+              var link = document.createElement('a');
+              link.download = filename;
+              link.href = dataUrl;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            })
+            .catch(function (error) {
+              console.error('Could not generate image (tainted canvas or CORS?):', error);
+            })
+            .finally(function () {
+              if (grain) grain.style.visibility = previousVisibility || '';
+            });
+        }
+
+        document.addEventListener('click', function (event) {
+          var target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          var downloadId = target.getAttribute('data-download');
+          if (!downloadId) return;
+
+          event.preventDefault();
+
+          var node = document.getElementById(downloadId);
+          if (!node) return;
+
+          var widthAttr = node.getAttribute('data-width');
+          var heightAttr = node.getAttribute('data-height');
+          var width = widthAttr ? parseInt(widthAttr, 10) : 1584;
+          var height = heightAttr ? parseInt(heightAttr, 10) : 396;
+          var filename = downloadId + '.png';
+
+          downloadAsset(downloadId, filename, width, height);
+        });
+      })();
+    </script>
+  </body>
+</html>
