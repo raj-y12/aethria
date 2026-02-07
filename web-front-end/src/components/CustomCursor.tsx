@@ -36,10 +36,10 @@ export default function CustomCursor() {
       style={{
         left: pos.x,
         top: pos.y,
-        width: expanded ? 40 : 8,
-        height: expanded ? 40 : 8,
-        marginLeft: expanded ? -20 : -4,
-        marginTop: expanded ? -20 : -4,
+        width: expanded ? 24 : 8,
+        height: expanded ? 24 : 8,
+        marginLeft: expanded ? -12 : -4,
+        marginTop: expanded ? -12 : -4,
         backgroundColor: OXFORD,
         mixBlendMode: 'difference',
       }}

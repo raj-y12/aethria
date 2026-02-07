@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import GrainOverlay from './components/GrainOverlay';
 import CustomCursor from './components/CustomCursor';
@@ -7,8 +6,6 @@ const OXFORD = '#002147';
 const PAPER = '#F2F0EA';
 
 export default function HomePage() {
-  const [ctaHover, setCtaHover] = useState(false);
-
   return (
     <div
       className="min-h-[100dvh] h-[100dvh] flex flex-col relative"
@@ -27,7 +24,7 @@ export default function HomePage() {
           Aethria
         </Link>
         <span
-          className="font-mono text-[10px] uppercase tracking-widest opacity-70 hidden md:inline transition-opacity duration-300 hover:opacity-100"
+          className="font-mono text-[10px] uppercase tracking-[0.1em] opacity-70 hidden md:inline transition-opacity duration-300 hover:opacity-100"
           style={{ color: OXFORD }}
         >
           Investment Intelligence
@@ -61,33 +58,35 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* CTA: left edge aligned with Blue Hero Block (25%); clear separation from main */}
+      {/* CTA: bottom left — REQUEST ACCESS (aligned with blue block on desktop) */}
       <div
-        className="relative z-10 mt-auto flex-shrink-0 px-6 sm:px-8 lg:px-12 pt-10 sm:pt-12 md:pt-6 md:pl-[25%] md:pr-0 pb-[max(2rem,calc(2rem+env(safe-area-inset-bottom,0px)))] sm:pb-[max(2.5rem,calc(2.5rem+env(safe-area-inset-bottom,0px)))] md:pb-[max(2rem,calc(2rem+env(safe-area-inset-bottom,0px)))]"
-        style={{ color: OXFORD, backgroundColor: PAPER }}
+        className="flex-shrink-0 px-6 sm:px-8 lg:px-12 pt-10 sm:pt-12 md:pt-6 md:pl-[25%] md:pr-0 pb-4 md:pb-6"
+        style={{ backgroundColor: PAPER }}
       >
         <Link
           to="/request-access"
           data-cursor-expand
-          className="inline-flex items-baseline font-mono text-[10px] uppercase tracking-widest opacity-70 hover:opacity-100 transition-all duration-200 group"
-          style={{ color: OXFORD }}
-          onMouseEnter={() => setCtaHover(true)}
-          onMouseLeave={() => setCtaHover(false)}
+          className="font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center bg-transparent text-[#002147] border py-3 px-6 md:py-2 md:px-4 border-[#002147] md:border-[#002147]/20 hover:bg-[#002147] hover:text-[#F5F2E9] hover:border-[#002147]"
         >
-          <span className={ctaHover ? 'translate-x-0.5 inline-block transition-transform duration-200' : 'inline-block transition-transform duration-200'}>
-            REQUEST ACCESS
-          </span>
-          <span
-            className="inline-block overflow-hidden origin-left ml-1 flex-shrink-0 whitespace-nowrap"
-            style={{
-              width: ctaHover ? '1em' : '0.5em',
-              transition: 'width 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          >
-            {'\u00A0—'}
-          </span>
+          REQUEST ACCESS
         </Link>
       </div>
+
+      {/* Footer: mobile only — © Aethria (left), Investment intelligence (right), like form page */}
+      <footer
+        className="flex md:hidden shrink-0 z-20 flex items-center justify-between px-4 sm:px-6 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))]"
+        style={{ color: OXFORD, backgroundColor: PAPER }}
+      >
+        <span className="font-sans text-[10px] tracking-wide opacity-70" style={{ color: OXFORD }}>
+          © Aethria
+        </span>
+        <span
+          className="font-mono text-[10px] uppercase tracking-[0.1em] opacity-70"
+          style={{ color: OXFORD }}
+        >
+          Investment intelligence
+        </span>
+      </footer>
     </div>
   );
 }

@@ -44,7 +44,7 @@ export default function RequestAccessPage() {
       setError('Please enter a valid email address.');
       return;
     }
-    if (!name.trim() || !role.trim() || !firm.trim() || !linkedin.trim()) return;
+    if (!name.trim() || !role.trim() || !firm.trim()) return;
     setLoading(true);
     try {
       const res = await fetch(WAITLIST_URL, {
@@ -55,7 +55,7 @@ export default function RequestAccessPage() {
           email: trimmedEmail,
           role: role.trim(),
           firm: firm.trim(),
-          linkedin: linkedin.trim(),
+          linkedin: linkedin.trim() || undefined,
         }),
       });
       if (!res.ok) {
@@ -140,7 +140,7 @@ export default function RequestAccessPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 md:gap-x-12 gap-y-5 md:gap-y-6">
                       <div className="flex flex-col">
                         <label htmlFor="waitlist-name" className={`${labelClass} mb-0.5`} style={{ color: OXFORD }}>
-                          NAME
+                          NAME *
                         </label>
                         <input
                           id="waitlist-name"
@@ -154,7 +154,7 @@ export default function RequestAccessPage() {
                       </div>
                       <div className="flex flex-col">
                         <label htmlFor="waitlist-email" className={`${labelClass} mb-0.5`} style={{ color: OXFORD }}>
-                          EMAIL
+                          EMAIL *
                         </label>
                         <input
                           id="waitlist-email"
@@ -168,7 +168,7 @@ export default function RequestAccessPage() {
                       </div>
                       <div className="flex flex-col">
                         <label htmlFor="waitlist-role" className={`${labelClass} mb-0.5`} style={{ color: OXFORD }}>
-                          ROLE
+                          ROLE *
                         </label>
                         <input
                           id="waitlist-role"
@@ -182,7 +182,7 @@ export default function RequestAccessPage() {
                       </div>
                       <div className="flex flex-col">
                         <label htmlFor="waitlist-firm" className={`${labelClass} mb-0.5`} style={{ color: OXFORD }}>
-                          FIRM
+                          FIRM *
                         </label>
                         <input
                           id="waitlist-firm"
@@ -196,7 +196,7 @@ export default function RequestAccessPage() {
                       </div>
                       <div className="flex flex-col md:col-span-2">
                         <label htmlFor="waitlist-linkedin" className={`${labelClass} mb-0.5`} style={{ color: OXFORD }}>
-                          LINKEDIN
+                          LINKEDIN <span className="opacity-60 font-normal">(optional)</span>
                         </label>
                         <input
                           id="waitlist-linkedin"
@@ -204,9 +204,8 @@ export default function RequestAccessPage() {
                           value={linkedin}
                           onChange={(e) => setLinkedin(e.target.value)}
                           placeholder="https://linkedin.com/in/..."
-                          className={inputClass}
+                          className={`${inputClass} placeholder:font-mono placeholder:text-[10px]`}
                           style={{ color: OXFORD }}
-                          required
                         />
                       </div>
                     </div>

@@ -5,7 +5,7 @@ interface WaitlistBody {
   email: string;
   role: string;
   firm: string;
-  linkedin: string;
+  linkedin?: string;
 }
 
 export async function POST(request: Request) {
@@ -22,9 +22,9 @@ export async function POST(request: Request) {
     const body = (await request.json()) as WaitlistBody;
     const { name, email, role, firm, linkedin } = body;
 
-    if (!name?.trim() || !email?.trim() || !role?.trim() || !firm?.trim() || !linkedin?.trim()) {
+    if (!name?.trim() || !email?.trim() || !role?.trim() || !firm?.trim()) {
       return Response.json(
-        { detail: 'Name, email, role, firm, and LinkedIn are required' },
+        { detail: 'Name, email, role, and firm are required' },
         { status: 400 }
       );
     }
@@ -39,7 +39,9 @@ export async function POST(request: Request) {
 
     const notifyTo =
       process.env.AETHRIA_WAITLIST_NOTIFY_EMAIL ?? 'delivered@resend.dev';
-    const linkedinLine = `<li>LinkedIn: <a href="${linkedin.trim()}">${linkedin.trim()}</a></li>`;
+    const linkedinLine = linkedin?.trim()
+      ? `<li>LinkedIn: <a href="${linkedin.trim()}">${linkedin.trim()}</a></li>`
+      : '';
     const html = `
       <p><strong>New early access signup</strong></p>
       <ul>
