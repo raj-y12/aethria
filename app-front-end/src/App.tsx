@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from 'react';
 import EnterSystemPage from './components/EnterSystemPage';
 import MainLayout from './components/MainLayout';
 import LoadingAnimation from './components/LoadingAnimation';
-import WaitingListPage from './waitingList/WaitingListPage';
 import SettingsPage from './settings/SettingsPage';
 import { fetchStartups } from './api/startups';
 import { useIdleTimeout } from './hooks';
@@ -83,17 +82,9 @@ function App() {
     }, []),
   });
 
-  const isWaitingListRoute =
-    typeof window !== 'undefined' &&
-    window.location.pathname.startsWith('/waiting-list');
-
   const isSettingsRoute =
     typeof window !== 'undefined' &&
     window.location.pathname.startsWith('/settings');
-
-  if (isWaitingListRoute) {
-    return <WaitingListPage />;
-  }
 
   if (isLoading) {
     return <LoadingAnimation message="Loading Intelligence Data" />;

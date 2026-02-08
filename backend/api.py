@@ -1,8 +1,7 @@
 """
 FastAPI server for Aethria.
 Serves app-front-end: GET /api/startups, GET/PATCH /settings.
-Serves web-front-end: POST /api/waitlist (early access signup).
-Single API for both frontends when running on a domain.
+(Web-front-end waitlist uses Vercel serverless /api/waitlist.)
 """
 import json
 import os
@@ -12,7 +11,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from storage import Storage
-from routers.web import router as web_router
 from settings_loader import DEFAULT_SETTINGS, get_settings_path, load_settings
 from memo_generator import MemoGenerator
 
@@ -32,12 +30,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "PATCH", "POST"],
+    allow_methods=["GET", "PATCH"],
     allow_headers=["*"],
 )
-
-app.include_router(web_router)
-
 
 def _save_settings(data: dict) -> None:
     path = get_settings_path()
