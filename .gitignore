@@ -1,2 +1,4 @@
 .DS_Store
 .env
+scripts/
+unused_components/
