@@ -85,10 +85,10 @@ export default function LiveIntelligenceFeed({ startups }: LiveIntelligenceFeedP
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: tokens.motion.duration.short, delay: i * 0.02, ease: tokens.motion.ease }}
-              className="flex items-baseline gap-2 sm:gap-3 py-2 sm:py-2.5 border-b border-oxford/[0.06] font-sans text-[11px] sm:text-[12px]"
+              className="flex items-baseline gap-2 sm:gap-3 py-2 sm:py-2.5 border-b font-mono text-[10px] sm:text-[11px]"
             >
-              <span className="shrink-0 tabular-nums text-charcoal/50">{e.timestamp}</span>
-              <span className="text-charcoal min-w-0 truncate">{e.message}</span>
+              <span className="shrink-0 tabular-nums text-oxford/60 uppercase tracking-[0.22em]">{e.timestamp}</span>
+              <span className="text-oxford/80 min-w-0 truncate">{e.message}</span>
             </motion.div>
           ))}
         </AnimatePresence>

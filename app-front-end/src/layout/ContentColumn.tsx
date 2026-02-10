@@ -19,10 +19,10 @@ export default function ContentColumn({
     variant === 'reading'
       ? 'max-w-[42rem]'
       : variant === 'panel'
-        ? 'max-w-[96%] lg:max-w-7xl xl:max-w-[90rem]'
+        ? 'max-w-[1800px]'
         : 'max-w-[80%]';
   return (
-    <div className={`w-full min-w-0 ${maxW} mx-auto px-4 xs:px-6 sm:px-8 lg:px-12 ${className}`}>
+    <div className={`w-full min-w-0 ${maxW} mx-auto px-5 sm:px-8 lg:px-10 ${className}`}>
       {children}
     </div>
   );

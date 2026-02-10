@@ -56,7 +56,8 @@ export default function EnterSystemPage({ onEnter }: EnterSystemPageProps) {
                 </motion.h1>
 
                 <motion.p
-                  className="font-sans text-[10px] sm:text-[11px] text-ivory/80 uppercase tracking-[0.28em] mb-10 sm:mb-12"
+                  className="font-mono text-[10px] text-ivory/80 uppercase mb-10 sm:mb-12"
+                  style={{ letterSpacing: '0.22em' }}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 1.0, duration: 0.5, ease: EASE }}
@@ -66,7 +67,8 @@ export default function EnterSystemPage({ onEnter }: EnterSystemPageProps) {
 
                 <motion.button
                   onClick={handleEnter}
-                  className="font-sans text-[10px] sm:text-[11px] uppercase tracking-[0.28em] text-ivory/80 hover:bg-ivory hover:text-oxford border border-ivory/40 px-5 py-2.5 transition-colors duration-300 w-fit"
+                  className="font-mono text-[10px] uppercase text-ivory/80 hover:bg-paper hover:text-oxford border border-ivory/40 px-5 py-2.5 transition-colors duration-300 w-fit rounded-none"
+                  style={{ letterSpacing: '0.22em' }}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 1.2, duration: 0.5, ease: EASE }}
@@ -80,7 +82,8 @@ export default function EnterSystemPage({ onEnter }: EnterSystemPageProps) {
       </div>
       <footer className="w-full py-4 flex justify-center">
         <motion.p
-          className="font-sans text-[8px] sm:text-[9px] text-ivory/50 uppercase tracking-[0.2em]"
+          className="font-mono text-[10px] text-ivory/60 uppercase"
+          style={{ letterSpacing: '0.22em' }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.4, duration: 0.5, ease: EASE }}

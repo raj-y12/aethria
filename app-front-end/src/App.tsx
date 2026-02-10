@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import EnterSystemPage from './components/EnterSystemPage';
 import MainLayout from './components/MainLayout';
 import LoadingAnimation from './components/LoadingAnimation';
+import GrainOverlay from './components/GrainOverlay';
 import SettingsPage from './settings/SettingsPage';
 import { fetchStartups } from './api/startups';
 import { useIdleTimeout } from './hooks';
@@ -87,18 +88,38 @@ function App() {
     window.location.pathname.startsWith('/settings');
 
   if (isLoading) {
-    return <LoadingAnimation message="Loading Intelligence Data" />;
+    return (
+      <>
+        <GrainOverlay opacity={0.02} />
+        <LoadingAnimation />
+      </>
+    );
   }
 
   if (!hasEntered) {
-    return <EnterSystemPage onEnter={handleEnter} />;
+    return (
+      <>
+        <GrainOverlay opacity={0.02} />
+        <EnterSystemPage onEnter={handleEnter} />
+      </>
+    );
   }
 
   if (isSettingsRoute) {
-    return <SettingsPage />;
+    return (
+      <>
+        <GrainOverlay opacity={0.02} />
+        <SettingsPage />
+      </>
+    );
   }
 
-  return <MainLayout startups={startups} />;
+  return (
+    <>
+      <GrainOverlay opacity={0.02} />
+      <MainLayout startups={startups} />
+    </>
+  );
 }
 
 export default App;

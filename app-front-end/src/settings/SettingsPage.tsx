@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import GlobalClock from '../components/GlobalClock';
 import SystemBar from '../components/SystemBar';
+import AppFooter from '../components/AppFooter';
 import GhostTransition from '../components/GhostTransition';
-import { ContentColumn } from '../layout';
 import {
   fetchSettings,
   patchSettings,
@@ -78,35 +77,35 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full flex flex-col bg-ivory text-charcoal">
-        <GlobalClock />
-        <SystemBar scoutCount={0} navLink={{ href: '/', label: 'Home' }} />
-        <main className="flex-1 pt-24 lg:pt-28 flex items-center justify-center">
-          <p className="font-sans text-[13px] text-charcoal/60">
+      <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
+        <SystemBar scoutCount={0} />
+        <main className="flex-1 min-h-0 pt-24 flex items-center justify-center">
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60">
             Loading settings…
           </p>
         </main>
+        <AppFooter navLink={{ href: '/', label: 'Home' }} />
       </div>
     );
   }
 
   if (!settings) {
     return (
-      <div className="min-h-screen w-full flex flex-col bg-ivory text-charcoal">
-        <GlobalClock />
-        <SystemBar scoutCount={0} navLink={{ href: '/', label: 'Home' }} />
-        <main className="flex-1 pt-24 lg:pt-28 flex items-center justify-center">
-          <p className="font-sans text-[13px] text-charcoal/60">
+      <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
+        <SystemBar scoutCount={0} />
+        <main className="flex-1 min-h-0 pt-24 flex items-center justify-center">
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60">
             Failed to load settings.
           </p>
         </main>
+        <AppFooter navLink={{ href: '/', label: 'Home' }} />
       </div>
     );
   }
 
   const inputCls =
-    'w-full min-w-0 sm:max-w-[12rem] border-b border-charcoal/[0.12] pb-1 bg-transparent font-sans text-[14px] text-charcoal outline-none focus:border-charcoal/30';
-  const labelCls = 'block font-sans text-[12px] text-charcoal/70 mb-1';
+    'w-full min-w-0 sm:max-w-[12rem] border-0 border-b border-oxford/[0.15] bg-transparent font-sans text-[14px] text-oxford placeholder:text-oxford/40 outline-none py-2 focus:border-oxford transition-colors duration-150 rounded-none';
+  const labelCls = 'block font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 mb-1.5';
 
   const Toggle = ({
     id,
@@ -119,8 +118,8 @@ export default function SettingsPage() {
     onChange: (v: boolean) => void;
     label: string;
   }) => (
-    <div className="flex items-center justify-between gap-4">
-      <label htmlFor={id} className="font-sans text-[14px] text-charcoal">
+    <div className="flex items-center justify-between gap-4 py-1">
+      <label htmlFor={id} className="font-sans text-[14px] text-oxford">
         {label}
       </label>
       <button
@@ -129,16 +128,16 @@ export default function SettingsPage() {
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-300 focus-visible:ring-1 focus-visible:ring-oxford/30 focus-visible:ring-offset-1 ${
+        className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-300 focus-visible:ring-1 focus-visible:ring-oxford/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper ${
           checked
             ? 'bg-oxford'
-            : 'bg-charcoal/10 hover:bg-charcoal/15'
+            : 'bg-transparent border border-oxford/[0.2] hover:border-oxford/30'
         }`}
         style={{ transitionTimingFunction: tokens.motion.easeCss }}
       >
         <span
           className={`pointer-events-none block h-4 w-4 rounded-full shadow-sm transition-transform duration-300 ${
-            checked ? 'translate-x-5 bg-ivory' : 'translate-x-0.5 bg-charcoal/40'
+            checked ? 'translate-x-5 bg-ivory' : 'translate-x-0.5 bg-oxford/50'
           }`}
           style={{ transitionTimingFunction: tokens.motion.easeCss }}
           aria-hidden
@@ -148,42 +147,37 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="h-screen w-full flex flex-col overflow-hidden bg-ivory text-charcoal">
-      <GlobalClock />
-      <SystemBar
-        scoutCount={0}
-        navLink={{ href: '/', label: 'Home' }}
-        agentConfig={settings.agent_config}
-      />
+    <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
+      <SystemBar scoutCount={0} agentConfig={settings.agent_config} />
 
-      <main className="flex-1 min-h-0 pt-24 lg:pt-28 overflow-y-auto">
-        <ContentColumn variant="panel" className="pb-16 sm:pb-12">
+      <main className="flex-1 min-h-0 pt-24 overflow-y-auto">
+        <div className="w-full max-w-[1800px] mx-auto px-6 sm:px-8 lg:px-12 py-8 lg:py-10 pb-16">
           <GhostTransition>
-            <div className="pb-4 sm:pb-6 border-b border-oxford/[0.08]">
-            <p className="font-sans text-[10px] uppercase tracking-[0.14em] text-charcoal/50 mb-1">
-              Control plane
-            </p>
-            <h1 className="font-sans text-[1.25rem] font-medium text-charcoal tracking-tight mb-2">
-              Settings
-            </h1>
-          </div>
-
-          {validationErrors.length > 0 && (
-            <div className="mt-4 pb-4 border-b border-charcoal/[0.08]">
-              <p className="font-sans text-[11px] uppercase tracking-[0.12em] text-charcoal/60 mb-2">
-                Validation errors
+            <div className="pb-6 border-b border-oxford/[0.06]">
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60">
+                Control plane
               </p>
-              <ul className="font-sans text-[13px] text-charcoal/80 space-y-1">
-                {validationErrors.map((e, i) => (
-                  <li key={i}>{e}</li>
-                ))}
-              </ul>
+              <h1 className="font-sans font-semibold text-[28px] text-oxford tracking-tight mt-1" style={{ letterSpacing: '-0.02em' }}>
+                Settings
+              </h1>
             </div>
-          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10 lg:gap-12 pt-6 sm:pt-8">
+            {validationErrors.length > 0 && (
+              <div className="mt-6 pb-6 border-b border-oxford/[0.06]">
+                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-alert-crimson mb-2">
+                  Validation errors
+                </p>
+                <ul className="font-sans text-[13px] text-alert-crimson space-y-1">
+                  {validationErrors.map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10 lg:gap-12 pt-8 lg:pt-10">
             <section className="space-y-5">
-              <h2 className="font-sans text-[11px] uppercase tracking-[0.12em] text-charcoal/60 mb-4">
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 mb-4">
                 Cost & budget controls
               </h2>
               {[
@@ -244,7 +238,7 @@ export default function SettingsPage() {
             </section>
 
             <section className="space-y-5">
-              <h2 className="font-sans text-[11px] uppercase tracking-[0.12em] text-charcoal/60 mb-4">
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 mb-4">
                 Agent configuration
               </h2>
               {[
@@ -322,7 +316,7 @@ export default function SettingsPage() {
             </section>
 
             <section className="space-y-5">
-              <h2 className="font-sans text-[11px] uppercase tracking-[0.12em] text-charcoal/60 mb-4">
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 mb-4">
                 Portfolio behaviour
               </h2>
               <Toggle
@@ -368,24 +362,26 @@ export default function SettingsPage() {
             </section>
           </div>
 
-          <div className="pt-8">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="font-sans text-[11px] uppercase tracking-[0.12em] text-charcoal/60 hover:bg-oxford hover:text-ivory hover:border-oxford border border-charcoal/[0.2] px-5 py-2.5 disabled:opacity-50 transition-colors duration-300"
-            >
-              {saving ? 'Saving…' : 'Save settings'}
-            </button>
-            {saveSuccess && (
-              <p className="mt-3 font-sans text-[12px] text-charcoal/60" role="status" aria-live="polite">
-                Settings saved.
-              </p>
-            )}
-          </div>
+            <div className="pt-10 border-t border-oxford/[0.06] mt-10">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="inline-flex items-center justify-center py-3 px-5 font-mono text-[10px] uppercase tracking-[0.2em] text-ivory bg-oxford rounded-none transition-opacity duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+              >
+                {saving ? 'Saving…' : 'Save settings'}
+              </button>
+              {saveSuccess && (
+                <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60" role="status" aria-live="polite">
+                  Settings saved.
+                </p>
+              )}
+            </div>
           </GhostTransition>
-        </ContentColumn>
+        </div>
       </main>
+
+      <AppFooter navLink={{ href: '/', label: 'Home' }} />
     </div>
   );
 }

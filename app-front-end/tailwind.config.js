@@ -16,26 +16,25 @@ export default {
     },
     extend: {
       colors: {
-        /* Locked palette — no new colors */
         oxford: '#002147',
+        paper: '#F2F0EA',
         charcoal: '#2f333b',
         ivory: '#fcfcfc',
         bone: '#f2f4f8',
         mist: '#f2f4f8',
-        /* Legacy (EnterSystemPage, LoadingAnimation — preserved) */
         canvas: '#fcfcfc',
         graphite: '#2f333b',
         heritage: '#F9F8F6',
         silver: '#D1D5DB',
         gold: '#B89F6F',
         'alert-crimson': '#E5484D',
-        /* Loading: system calibration — dark field */
         'slate-dark': '#0f1218',
       },
       fontFamily: {
         display: ['"Libre Baskerville"', 'Georgia', 'serif'],
-        body: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        body: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['"Space Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       borderRadius: { DEFAULT: '0', none: '0' },
       boxShadow: { DEFAULT: 'none', none: 'none' },

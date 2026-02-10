@@ -1,11 +1,11 @@
 /*
- * Aethria — Institutional design system
- * Palette: oxford #002147 (structural, dividers, active states), charcoal #2f333b, ivory #fcfcfc, mist #f2f4f8
- * Libre Baskerville for Aethria wordmark only. All other text: Inter.
- * No gradients, gimmicks, or decorative chrome.
+ * Aethria — High-fidelity institutional design (brand_assets + web-front-end).
+ * Palette: oxford #002147, paper #F2F0EA (canvas), charcoal #2f333b, ivory #fcfcfc.
+ * Display: Libre Baskerville (wordmark/hero only). Body/UI: Inter. Metadata/labels: Space Mono.
+ * Frames: 1px rgba(0,33,71,0.06). No rounded corners.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -13,7 +13,7 @@
 
 @layer base {
   * {
-    border-color: rgba(47, 51, 59, 0.12);
+    border-color: rgba(0, 33, 71, 0.06);
   }
 
   html {
@@ -25,20 +25,18 @@
 
   body {
     overflow-x: hidden;
-    background-color: #fcfcfc;
-    color: #2f333b;
+    background-color: #F2F0EA;
+    color: #002147;
     font-family: Inter, system-ui, -apple-system, sans-serif;
     font-weight: 400;
     line-height: 1.6;
     text-rendering: optimizeLegibility;
   }
 
-  /* Libre Baskerville reserved for Aethria wordmark only. Use .font-display explicitly.
-     All headings and body: Inter/sans. */
   h1, h2, h3, h4, h5, h6 {
     font-family: Inter, system-ui, -apple-system, sans-serif;
     font-weight: 500;
-    color: #2f333b;
+    color: #002147;
   }
 
   ::selection {

@@ -27,8 +27,8 @@ export default function LoadingAnimation({
   fullScreen = true,
 }: LoadingAnimationProps) {
   const containerClass = fullScreen
-    ? 'fixed inset-0 bg-ivory z-[200] flex flex-col items-center justify-center overflow-hidden'
-    : 'flex flex-col items-center justify-center py-12 overflow-hidden bg-ivory';
+    ? 'fixed inset-0 bg-paper z-[200] flex flex-col items-center justify-center overflow-hidden'
+    : 'flex flex-col items-center justify-center py-12 overflow-hidden bg-paper';
 
   return (
     <div className={containerClass}>
@@ -36,7 +36,7 @@ export default function LoadingAnimation({
         {VERTICES.map((v, i) => (
           <motion.div
             key={i}
-            className="absolute top-1/2 left-1/2 rounded-full bg-charcoal"
+            className="absolute top-1/2 left-1/2 rounded-full bg-oxford"
             style={{
               width: POINT_SIZE,
               height: POINT_SIZE,
@@ -62,7 +62,8 @@ export default function LoadingAnimation({
 
       {message && (
         <motion.p
-          className="font-sans text-[10px] uppercase tracking-[0.2em] text-charcoal/40 mt-8"
+          className="font-mono text-[10px] uppercase text-oxford/60 mt-8"
+          style={{ letterSpacing: '0.22em' }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.0, duration: 0.25, ease: EASE }}
