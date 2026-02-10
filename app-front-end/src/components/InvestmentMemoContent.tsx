@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import type { Startup } from '../types/startup';
 import {
   getScoreBand,
@@ -5,6 +6,62 @@ import {
   DECISION_LABELS,
   SCORE_DIMENSIONS,
 } from '../design-system/semantics';
+
+const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ';
+const SCRAMBLE_TICKS = 6;
+const STAGGER_MS = 28;
+
+function randomChar(): string {
+  return SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+}
+
+function useScrambleText(
+  target: string,
+  key?: string
+): { displayText: string; isComplete: boolean } {
+  const [displayText, setDisplayText] = useState(() =>
+    target.length ? target.split('').map(() => randomChar()).join('') : target
+  );
+  const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    if (!target.length) {
+      setDisplayText(target);
+      setIsComplete(true);
+      return () => {};
+    }
+    setIsComplete(false);
+    setDisplayText(target.split('').map(() => randomChar()).join(''));
+    const len = target.length;
+    let resolved = 0;
+    let scrambleTicks = 0;
+
+    const id = setInterval(() => {
+      if (scrambleTicks < SCRAMBLE_TICKS) {
+        scrambleTicks++;
+        setDisplayText(
+          target.split('').map(() => randomChar()).join('')
+        );
+      } else {
+        resolved++;
+        setDisplayText(
+          target
+            .split('')
+            .map((c, i) => (i < resolved ? c : randomChar()))
+            .join('')
+        );
+        if (resolved >= len) {
+          setDisplayText(target);
+          setIsComplete(true);
+        }
+      }
+    }, STAGGER_MS);
+
+    return () => clearInterval(id);
+  }, [target, key]);
+
+  return { displayText, isComplete };
+}
 
 function buildJudgmentSummary(startup: Startup): string {
   const r = startup.review;
@@ -56,6 +113,9 @@ export default function InvestmentMemoContent({
   const judgmentSummary = hasPartner ? buildJudgmentSummary(startup) : null;
   const scoreJustification = hasReview ? buildScoreJustification(startup) : null;
 
+  const companyName = startup.scout.name ?? '';
+  const { displayText: nameScrambleText } = useScrambleText(companyName, startup.id);
+
   const primaryRisks = startup.review?.diligence_red_flags ?? [];
   const secondaryRisks = (startup.review?.key_risks ?? []).filter(
     (r) => !primaryRisks.some((p) => r.includes(p) || p.includes(r))
@@ -75,7 +135,7 @@ export default function InvestmentMemoContent({
         className="font-sans font-semibold text-lg lg:text-xl text-oxford tracking-tight mb-1"
         style={{ letterSpacing: '-0.02em' }}
       >
-        {startup.scout.name}
+        {nameScrambleText}
       </h1>
       <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-6">
         {startup.scout.sector || '—'}
