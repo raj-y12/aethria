@@ -17,7 +17,8 @@ Autonomous DealFlow OS for venture capital — AI-powered pipeline: Scout → Re
 
 - **No ESLint config**: Both frontends declare `npm run lint` but have no `eslint.config.js` file. ESLint 9.x will error. This is a pre-existing repo gap.
 - **`python` vs `python3`**: The environment has `python3` but no `python` symlink. Always use `python3`.
-- **Backend tests require `OPENAI_API_KEY`**: All 4 tests in `backend/tests/` are integration tests that call the OpenAI API. They cannot run without the key. Use `python3 -m pytest tests/ -v` from `backend/`.
+- **Backend tests require `OPENAI_API_KEY`**: All 4 tests in `backend/tests/` are integration tests that call the OpenAI API. They cannot run without the key.
+- **pytest asyncio mode**: Tests are async but lack `@pytest.mark.asyncio` decorators. Run with: `python3 -m pytest tests/ -v -o asyncio_mode=auto` from `backend/`.
 - **No database**: Storage uses flat JSON files (`data/startups.json`, `data/settings.json`, `data/portfolio/`). The `data/` dir is gitignored and created on demand.
 - **TypeScript checks**: Run `npx tsc --noEmit` in either frontend directory. Both pass cleanly.
 - **Builds**: `npx vite build` or `npm run build` in either frontend directory.
