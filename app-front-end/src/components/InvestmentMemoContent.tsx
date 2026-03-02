@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { jsPDF } from 'jspdf';
 import type { Startup } from '../types/startup';
 import {
@@ -47,9 +47,6 @@ function addPDFSection(
 function buildMemoPDF(startup: Startup): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   let y = PDF_MARGIN;
-  const pageW = doc.internal.pageSize.getWidth();
-  const maxW = pageW - PDF_MARGIN * 2;
-  const pageH = doc.internal.pageSize.getHeight();
 
   doc.setFontSize(PDF_FONT_SIZE_SMALL);
   doc.setTextColor(80, 80, 100);
