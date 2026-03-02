@@ -17,6 +17,10 @@ export interface AgentConfig {
   partners_enabled: boolean;
   max_agents_per_run: number;
   confidence_threshold: number | string;
+  // Scout-specific config
+  scout_region: string; // "europe" | "global"
+  scout_serp_enabled: boolean;
+  scout_serp_daily_budget: number;
 }
 
 export interface Portfolio {

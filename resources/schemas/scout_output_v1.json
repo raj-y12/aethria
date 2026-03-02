@@ -5,7 +5,7 @@
   "description": "Scout agent discovery output. Version 1.",
   "type": "object",
   "version": "1",
-  "required": ["version", "id", "scout_type", "name", "one_line", "sector", "problem", "solution", "target_users", "why_now", "confidence", "primary_thesis", "key_assumptions", "biggest_unknown"],
+  "required": ["version", "id", "scout_type", "name", "one_line", "sector", "problem", "solution", "target_users", "why_now", "confidence", "primary_thesis", "key_assumptions", "biggest_unknown", "references"],
   "additionalProperties": false,
   "properties": {
     "version": { "const": "1" },
@@ -29,6 +29,13 @@
       "type": ["string", "null"],
       "enum": ["Pre-Seed", "Seed", "Series A", "Series B", "Series C+", "Unknown", null]
     },
-    "est_tam": { "type": ["string", "null"], "maxLength": 256 }
+    "est_tam": { "type": ["string", "null"], "maxLength": 256 },
+    "references": {
+      "description": "Required. References that PROVE the company exists: company website URL, news article, Crunchbase, LinkedIn, press release. 'General domain knowledge' is rejected.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+      "minItems": 1,
+      "maxItems": 8
+    }
   }
 }

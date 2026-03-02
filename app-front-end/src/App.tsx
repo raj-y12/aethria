@@ -16,6 +16,12 @@ const STARTUPS_POLL_MS = 12 * 1000;
 
 function hasValidSession(): boolean {
   if (typeof window === 'undefined') return false;
+  // When opened from /private-access, force fresh login every time
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('forceLogin') === '1') {
+    localStorage.removeItem(STORAGE_KEY);
+    return false;
+  }
   const last = localStorage.getItem(STORAGE_KEY);
   if (!last) return false;
   const lastActivity = parseInt(last, 10);

@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI
 
 from scout.schema import ScoutOutput, validate_scout_output, generate_id
+from serp_client import maybe_enrich_references
 
 
 logger = logging.getLogger(__name__)
@@ -71,29 +72,35 @@ class Scout(ABC):
                     {
                         "role": "user",
                         "content": (
-                            "Propose one startup idea as a HYPOTHESIS, not a definitive conclusion. "
+                            "Find one REAL VC-BACKABLE STARTUP (Seed to Series C, typically private, technology-driven), "
+                            "not a hypothetical idea and not a mega-cap incumbent like Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, or their cloud brands. "
                             "Output ONLY valid JSON matching the ScoutOutput schema "
                             "(resources/schemas/scout_output_v1.json). Exact shape:\n\n"
                             "{\n"
-                            '  "id": "uuid",\n'
-                            f'  "scout_type": "{self.scout_type}",\n'
-                            '  "name": "string",\n'
-                            '  "one_line": "string",\n'
-                            '  "sector": "string",\n'
-                            '  "problem": "string",\n'
-                            '  "solution": "string",\n'
-                            '  "target_users": "string",\n'
-                            '  "why_now": "string",\n'
-                            '  "confidence": number between 0 and 1,\n'
-                            '  "primary_thesis": "string (concise: why this idea is investable from your lens)",\n'
-                            '  "key_assumptions": ["string", "string", ...],  // exactly 2-4 assumptions the idea depends on\n'
-                            '  "biggest_unknown": "string (single largest unresolved risk or uncertainty)",\n'
-                            '  "funding_stage": "Pre-Seed" | "Seed" | "Series A" | "Series B" | "Series C+" | "Unknown" | null,\n'
-                            '  "est_tam": "string" | null\n'
+                            '  \"id\": \"uuid\",\\n'
+                            f'  \"scout_type\": \"{self.scout_type}\",\\n'
+                            '  \"name\": \"string (actual startup/company name)\",\\n'
+                            '  \"one_line\": \"string\",\\n'
+                            '  \"sector\": \"string\",\\n'
+                            '  \"problem\": \"string\",\\n'
+                            '  \"solution\": \"string\",\\n'
+                            '  \"target_users\": \"string\",\\n'
+                            '  \"why_now\": \"string\",\\n'
+                            '  \"confidence\": number between 0 and 1,\\n'
+                            '  \"primary_thesis\": \"string (concise: why investable from your lens)\",\\n'
+                            '  \"key_assumptions\": [\"string\", \"string\", ...],  // exactly 2-4 assumptions\\n'
+                            '  \"biggest_unknown\": \"string (single largest risk or uncertainty)\",\\n'
+                            '  \"funding_stage\": \"Pre-Seed\" | \"Seed\" | \"Series A\" | \"Series B\" | \"Series C+\" | \"Unknown\" | null,\\n'
+                            '  \"est_tam\": \"string\" | null,\\n'
+                            '  \"references\": [\"string\", ...] // REQUIRED: 1-8 sources that PROVE the company exists\\n'
                             "}\n\n"
-                            "REQUIRED: Include primary_thesis, key_assumptions (2-4 items), and biggest_unknown. "
-                            "Do NOT make up financial data, team information, or competitors; use null for funding_stage/est_tam if unknown. "
-                            "Do not include any text before or after the JSON. Output only the JSON object."
+                            "CRITICAL - references must PROVE the company exists: company website URL, funding/news article, Crunchbase, LinkedIn, or press release. "
+                            "Each reference must be a concrete, verifiable source (e.g. \"Startup X - https://startupx.com\", \"Startup X raised $10M - TechCrunch 2024\"). "
+                            "Do NOT use \"General domain knowledge\" or \"no specific external sources\"—those are rejected. "
+                            "Avoid giant public companies and hyperscalers (Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, etc.). "
+                            "If you cannot find a suitable VC-scale startup with verifiable sources, return nothing. "
+                            "Do NOT invent company names or make up sources. Use null for funding_stage/est_tam if unknown. "
+                            "Output only the JSON object, no text before or after."
                         ),
                     },
                 ],
@@ -114,6 +121,8 @@ class Scout(ABC):
             
             # Ensure scout_type matches
             data["scout_type"] = self.scout_type
+            # Optionally enrich references using SERP (guarded + rate-limited)
+            data = maybe_enrich_references(data)
             
             return data
             

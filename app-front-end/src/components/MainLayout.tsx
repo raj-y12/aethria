@@ -17,7 +17,7 @@ import {
   useMediaQuery,
 } from '../hooks';
 import type { Startup } from '../types/startup';
-import InvestmentMemoContent from './InvestmentMemoContent';
+import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './InvestmentMemoContent';
 
 interface MainLayoutProps {
   startups: Startup[];
@@ -33,6 +33,7 @@ export default function MainLayout({ startups }: MainLayoutProps) {
   const restoreRefJudgements = useRef<HTMLElement | null>(null);
   const judgementsToggleRef = useRef<HTMLButtonElement | null>(null);
   const judgementsPanelRef = useRef<HTMLDivElement | null>(null);
+  const memoContentRef = useRef<InvestmentMemoContentHandle | null>(null);
 
   const verdictOpen = !!(
     selectedStartup &&
@@ -156,17 +157,26 @@ export default function MainLayout({ startups }: MainLayoutProps) {
                   <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50">
                     Memo
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleCloseMemo}
-                    className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50 hover:text-oxford transition-colors"
-                    aria-label="Close memo"
-                  >
-                    Close
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => memoContentRef.current?.downloadPDF()}
+                      className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50 hover:text-oxford transition-colors"
+                    >
+                      Download PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCloseMemo}
+                      className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50 hover:text-oxford transition-colors"
+                      aria-label="Close memo"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
                 <div className="flex-1 min-h-0 flex flex-col px-6 sm:px-8 py-6">
-                  <InvestmentMemoContent startup={selectedStartup} embedded />
+                  <InvestmentMemoContent ref={memoContentRef} startup={selectedStartup} embedded />
                 </div>
               </>
             ) : (

@@ -15,6 +15,7 @@ import fcntl
 import os
 
 from models import Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
+from reference_validation import is_generic_reference
 
 
 logger = logging.getLogger(__name__)
@@ -135,16 +136,20 @@ class Storage:
         )
 
         def updater(data: List[dict]) -> List[dict]:
+            new_name = (startup.scout_info.name or "").strip().lower()
             for existing in data:
+                # Duplicate by startup_id
                 if existing.get("startup_id") == startup.startup_id:
                     self.logger.warning(f"Startup {startup.startup_id} already exists; skipping add")
                     return data
+                # Duplicate by company name (case-insensitive)
                 es = existing.get("scout_info") or {}
-                if (es.get("name") == startup.scout_info.name and
-                        es.get("sector") == startup.scout_info.sector):
+                existing_name = str(es.get("name") or "").strip().lower()
+                if existing_name and existing_name == new_name:
                     self.logger.info(
-                        f"Possible duplicate: same name and sector as {startup.scout_info.name}"
+                        f"Duplicate company name detected in storage; skipping add: {startup.scout_info.name}"
                     )
+                    return data
             data.append(startup.to_dict())
             return data
 
@@ -335,6 +340,36 @@ class Storage:
         """
         self._atomic_update(lambda _: [])
         self.logger.info("Storage reset to empty")
+
+    def remove_startups_without_references(self) -> int:
+        """
+        Remove startups that have no valid references.
+        Valid = at least one non-generic reference (URL, news, Crunchbase, etc.)
+        that proves the company exists. Generic placeholders like
+        "General domain knowledge; no specific external sources" are treated as invalid.
+        Returns the number of startups removed.
+        """
+        removed: List[str] = []
+
+        def updater(data: List[dict]) -> List[dict]:
+            kept: List[dict] = []
+            for item in data:
+                scout = (item or {}).get("scout_info") or {}
+                refs = scout.get("references")
+                if not refs or not isinstance(refs, list):
+                    removed.append(item.get("startup_id") or "?")
+                    continue
+                valid = [r for r in refs if isinstance(r, str) and r.strip() and not is_generic_reference(r)]
+                if not valid:
+                    removed.append(item.get("startup_id") or "?")
+                else:
+                    kept.append(item)
+            return kept
+
+        self._atomic_update(updater)
+        if removed:
+            self.logger.info(f"Removed {len(removed)} startup(s) without valid references: {removed}")
+        return len(removed)
 
     def exists(self, startup_id: str) -> bool:
         """Return True if startup_id exists in storage."""

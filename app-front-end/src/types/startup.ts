@@ -11,6 +11,7 @@ export interface Scout {
   confidence: number;
   funding_stage?: string;
   est_tam?: string;
+   references?: string[];
 }
 
 export interface Review {

@@ -54,6 +54,7 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
         confidence_score=scout_output.get("confidence", 0.5),
         funding_stage=scout_output.get("funding_stage"),
         est_tam=scout_output.get("est_tam"),
+        references=scout_output.get("references") or None,
         discovered_at=discovered,
     )
 

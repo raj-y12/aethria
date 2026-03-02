@@ -75,6 +75,18 @@ def _validate_settings(body: dict) -> list[str]:
                     errors.append("agent_config.confidence_threshold must be a number or string")
                 elif isinstance(v, (int, float)) and (v < 0 or v > 1):
                     errors.append("agent_config.confidence_threshold must be between 0 and 1 when numeric")
+            # Scout-specific config
+            if "scout_region" in ac:
+                if not isinstance(ac["scout_region"], str):
+                    errors.append("agent_config.scout_region must be a string")
+                elif ac["scout_region"] not in ("europe", "global"):
+                    errors.append("agent_config.scout_region must be one of: europe, global")
+            if "scout_serp_enabled" in ac and not isinstance(ac["scout_serp_enabled"], bool):
+                errors.append("agent_config.scout_serp_enabled must be a boolean")
+            if "scout_serp_daily_budget" in ac:
+                v = ac["scout_serp_daily_budget"]
+                if not isinstance(v, (int, float)) or v < 0:
+                    errors.append("agent_config.scout_serp_daily_budget must be a non-negative number")
     pf = body.get("portfolio")
     if pf is not None:
         if not isinstance(pf, dict):
@@ -127,6 +139,7 @@ def _backend_to_frontend(raw: dict) -> dict:
             "confidence": scout.get("confidence_score", 0.5),
             "funding_stage": scout.get("funding_stage"),
             "est_tam": scout.get("est_tam"),
+            "references": scout.get("references") or [],
         },
         "timestamps": timestamps,
     }

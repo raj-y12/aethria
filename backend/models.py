@@ -23,6 +23,9 @@ class ScoutInfo(BaseModel):
     confidence_score: float = Field(ge=0.0, le=1.0)
     funding_stage: Optional[Literal["Pre-Seed", "Seed", "Series A", "Series B", "Series C+", "Unknown"]] = None
     est_tam: Optional[str] = None  # Total Addressable Market estimate
+    # High-level references / source notes for how this opportunity was discovered.
+    # E.g. reports, trends, example companies, or general domain knowledge notes.
+    references: Optional[List[str]] = None
     discovered_at: datetime = Field(default_factory=datetime.now)
 
 

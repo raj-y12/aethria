@@ -2,17 +2,32 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 
+const LOGIN_USERNAME = 'raj';
+const LOGIN_PASSWORD = '#Mukesh123';
+
 interface EnterSystemPageProps {
   onEnter: () => void;
 }
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
+const inputCls =
+  'w-full max-w-[16rem] bg-transparent border-0 border-b border-ivory/40 font-mono text-[13px] text-ivory placeholder:text-ivory/40 py-2.5 outline-none focus:border-ivory transition-colors duration-200 rounded-none';
+
 export default function EnterSystemPage({ onEnter }: EnterSystemPageProps) {
   const [isExiting, setIsExiting] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
-  const handleEnter = () => {
-    setIsExiting(true);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (username.trim() === LOGIN_USERNAME && password === LOGIN_PASSWORD) {
+      setIsExiting(true);
+    } else {
+      setError('Invalid username or password.');
+    }
   };
 
   const handleExitComplete = () => {
@@ -56,7 +71,7 @@ export default function EnterSystemPage({ onEnter }: EnterSystemPageProps) {
                 </motion.h1>
 
                 <motion.p
-                  className="font-mono text-[10px] text-ivory/80 uppercase mb-10 sm:mb-12"
+                  className="font-mono text-[10px] text-ivory/80 uppercase mb-8 sm:mb-10"
                   style={{ letterSpacing: '0.22em' }}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -65,16 +80,46 @@ export default function EnterSystemPage({ onEnter }: EnterSystemPageProps) {
                   Intelligent investment discovery and evaluation system
                 </motion.p>
 
-                <motion.button
-                  onClick={handleEnter}
-                  className="font-mono text-[10px] uppercase text-ivory/80 hover:bg-paper hover:text-oxford border border-ivory/40 px-5 py-2.5 transition-colors duration-300 w-fit rounded-none"
-                  style={{ letterSpacing: '0.22em' }}
+                <motion.form
+                  onSubmit={handleSubmit}
+                  className="flex flex-col items-center gap-4 w-full"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 1.2, duration: 0.5, ease: EASE }}
                 >
-                  Enter System
-                </motion.button>
+                  <label className="sr-only" htmlFor="login-username">Username</label>
+                  <input
+                    id="login-username"
+                    type="text"
+                    autoComplete="username"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className={inputCls}
+                  />
+                  <label className="sr-only" htmlFor="login-password">Password</label>
+                  <input
+                    id="login-password"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={inputCls}
+                  />
+                  {error && (
+                    <p className="font-mono text-[10px] text-ivory/80 uppercase" style={{ letterSpacing: '0.12em' }}>
+                      {error}
+                    </p>
+                  )}
+                  <button
+                    type="submit"
+                    className="font-mono text-[10px] uppercase text-ivory/80 hover:bg-paper hover:text-oxford border border-ivory/40 px-5 py-2.5 transition-colors duration-300 w-fit rounded-none mt-1"
+                    style={{ letterSpacing: '0.22em' }}
+                  >
+                    Log in
+                  </button>
+                </motion.form>
               </motion.div>
             )}
           </AnimatePresence>
