@@ -87,6 +87,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('cost');
@@ -102,9 +103,15 @@ export default function SettingsPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError(null);
     fetchSettings()
-      .then((data) => { if (!cancelled) setSettings(data); })
-      .catch(() => { if (!cancelled) setSettings(null); })
+      .then((data) => { if (!cancelled) { setSettings(data); setLoadError(null); } })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setSettings(null);
+          setLoadError(e instanceof Error ? e.message : 'Failed to load settings');
+        }
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -152,8 +159,16 @@ export default function SettingsPage() {
     return (
       <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
         <SystemBar scoutCount={0} />
-        <main className="flex-1 min-h-0 pt-24 flex items-center justify-center">
+        <main className="flex-1 min-h-0 pt-24 flex flex-col items-center justify-center gap-3 px-6">
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60">Failed to load settings.</p>
+          {loadError && (
+            <p className="font-mono text-[10px] text-oxford/70 max-w-md text-center">
+              {loadError}
+            </p>
+          )}
+          <p className="font-mono text-[10px] text-oxford/50 max-w-md text-center">
+            Set VITE_API_URL in the app build to your backend URL. On Render, set ALLOWED_ORIGINS to this app’s URL (e.g. https://your-app.vercel.app).
+          </p>
         </main>
         <AppFooter navLink={{ href: '/', label: 'Home' }} />
       </div>
