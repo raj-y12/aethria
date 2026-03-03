@@ -1,19 +1,32 @@
 import { useState, useEffect } from 'react';
+import { checkHealth } from '../api/health';
 
 interface SystemBarProps {
   scoutCount?: number;
   agentConfig?: unknown;
 }
 
+const HEALTH_POLL_MS = 15_000;
+
 /**
- * Status strip: wordmark and time only. Settings / Log out live in the footer.
+ * Status strip: wordmark, agents-online indicator, and time. Settings / Log out live in the footer.
  */
 export default function SystemBar(_props: SystemBarProps) {
   const [time, setTime] = useState(new Date());
+  const [agentsOnline, setAgentsOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const poll = () => {
+      checkHealth().then(setAgentsOnline);
+    };
+    poll();
+    const id = setInterval(poll, HEALTH_POLL_MS);
+    return () => clearInterval(id);
   }, []);
 
   const formatted = time.toLocaleTimeString('en-GB', {
@@ -37,12 +50,32 @@ export default function SystemBar(_props: SystemBarProps) {
         Aethria
       </a>
 
-      <span
-        className="font-mono text-[10px] tabular-nums text-ivory/80"
-        aria-live="polite"
-      >
-        {formatted}
-      </span>
+      <div className="flex items-center gap-3">
+        <span
+          className="flex items-center gap-1.5 font-mono text-[10px] text-ivory/60"
+          title={agentsOnline === true ? 'Agents online' : agentsOnline === false ? 'Agents offline' : 'Checking…'}
+          aria-label={agentsOnline === true ? 'Agents online' : agentsOnline === false ? 'Agents offline' : 'Checking status'}
+        >
+          <span
+            className={`inline-block h-2 w-2 rounded-full shrink-0 transition-colors ${
+              agentsOnline === true
+                ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]'
+                : agentsOnline === false
+                  ? 'bg-ivory/30'
+                  : 'bg-amber-400/80 animate-pulse'
+            }`}
+          />
+          <span className="hidden sm:inline">
+            {agentsOnline === true ? 'Agents' : agentsOnline === false ? 'Offline' : '…'}
+          </span>
+        </span>
+        <span
+          className="font-mono text-[10px] tabular-nums text-ivory/80"
+          aria-live="polite"
+        >
+          {formatted}
+        </span>
+      </div>
     </header>
   );
 }
