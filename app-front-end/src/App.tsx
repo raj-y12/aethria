@@ -35,13 +35,18 @@ function App() {
   const [hasEntered, setHasEntered] = useState(sessionValid);
   const [isLoading, setIsLoading] = useState(sessionValid);
   const [startups, setStartups] = useState<Startup[]>([]);
+  const [startupsError, setStartupsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasEntered || isLoading) return;
+    setStartupsError(null);
     const refresh = () => {
       fetchStartups()
-        .then((data) => setStartups(data))
-        .catch(() => {});
+        .then((data) => {
+          setStartups(data);
+          setStartupsError(null);
+        })
+        .catch((err) => setStartupsError(err instanceof Error ? err.message : 'Failed to load'));
     };
     const id = setInterval(refresh, STARTUPS_POLL_MS);
     return () => clearInterval(id);
@@ -49,9 +54,13 @@ function App() {
 
   useEffect(() => {
     if (!hasEntered || !isLoading) return;
+    setStartupsError(null);
     const load = async () => {
       const [data] = await Promise.all([
-        fetchStartups().catch(() => []),
+        fetchStartups().catch((e: unknown) => {
+          setStartupsError(e instanceof Error ? e.message : 'Failed to load startups');
+          return [] as Startup[];
+        }),
         delay(MIN_LOADING_MS),
       ]);
       setStartups(data);
@@ -123,7 +132,7 @@ function App() {
   return (
     <>
       <GrainOverlay opacity={0.02} />
-      <MainLayout startups={startups} />
+      <MainLayout startups={startups} startupsError={startupsError} />
     </>
   );
 }

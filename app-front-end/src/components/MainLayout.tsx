@@ -21,9 +21,10 @@ import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './Inves
 
 interface MainLayoutProps {
   startups: Startup[];
+  startupsError?: string | null;
 }
 
-export default function MainLayout({ startups }: MainLayoutProps) {
+export default function MainLayout({ startups, startupsError }: MainLayoutProps) {
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
   const [showVerdict, setShowVerdict] = useState(false);
   const [showJudgements, setShowJudgements] = useState(false);
@@ -85,6 +86,11 @@ export default function MainLayout({ startups }: MainLayoutProps) {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-paper">
       <SystemBar scoutCount={startups.length} />
+      {startupsError && (
+        <div className="flex-none px-6 py-2 bg-amber-100 text-amber-900 font-mono text-[10px] uppercase tracking-wider">
+          {startupsError} — Check API URL (VITE_API_URL) and backend CORS (ALLOWED_ORIGINS).
+        </div>
+      )}
 
       {/* Paper canvas. Fixed height so only WorkGrid scrolls. On lg+: list left, memo panel right. */}
       <main className="flex-1 pt-24 flex flex-col min-h-0 overflow-hidden">
