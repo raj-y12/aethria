@@ -1,0 +1,130 @@
+"""
+MetaAgent — the main orchestrator for self-optimisation cycles.
+Reads signal, decides mutations, applies them, and writes reports.
+"""
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+from datetime import datetime, timedelta
+
+from meta_agent.analyser import MetaAnalyser
+from meta_agent.mutator import PromptMutator, _atomic_write, _read_json_list, _append_to_json_list
+from meta_agent.reweighter import ScoutReweighter
+from meta_agent.calibrator import ThresholdCalibrator
+
+logger = logging.getLogger(__name__)
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_REPORTS_PATH = _BACKEND_DIR / "data" / "meta" / "meta_reports.json"
+_CYCLE_COUNTER_PATH = _BACKEND_DIR / "data" / "meta" / ".cycle_counter"
+
+
+class MetaAgent:
+    """Orchestrates the full Meta-Agent optimisation cycle."""
+
+    def __init__(self, scout_engine=None, reviewer_engine=None):
+        self.scout_engine = scout_engine
+        self.reviewer_engine = reviewer_engine
+        self.logger = logging.getLogger("meta.agent")
+        self.min_reviews = int(os.getenv("META_AGENT_MIN_REVIEWS", "20"))
+        self.min_decisions = int(os.getenv("META_AGENT_MIN_DECISIONS", "10"))
+        self.interval = int(os.getenv("META_AGENT_INTERVAL_SECONDS", "86400"))
+        self.enabled = os.getenv("META_AGENT_ENABLED", "true").lower() == "true"
+        self._no_action_reasons: List[str] = []
+
+    def _increment_cycle(self) -> int:
+        _CYCLE_COUNTER_PATH.parent.mkdir(parents=True, exist_ok=True)
+        cycle = 0
+        if _CYCLE_COUNTER_PATH.exists():
+            try:
+                cycle = int(_CYCLE_COUNTER_PATH.read_text().strip())
+            except (ValueError, IOError):
+                cycle = 0
+        cycle += 1
+        _CYCLE_COUNTER_PATH.write_text(str(cycle))
+        return cycle
+
+    async def run_cycle(self) -> Optional[Dict]:
+        """Execute one full Meta-Agent optimisation cycle."""
+        if not self.enabled:
+            self.logger.info("[MetaAgent] Disabled via META_AGENT_ENABLED=false")
+            return None
+
+        cycle_number = self._increment_cycle()
+        self._no_action_reasons = []
+        self.logger.info(f"[MetaAgent] Starting cycle {cycle_number}")
+
+        # 1. Analyse
+        analyser = MetaAnalyser()
+        signal = analyser.analyse()
+
+        # 2. Check data sufficiency
+        sufficiency = signal.get("data_sufficiency", {})
+        total_reviews = sufficiency.get("total_reviews", 0)
+        total_decisions = sufficiency.get("total_decisions", 0)
+
+        mutations = []
+        weight_updates = []
+        calibrations = []
+
+        if total_reviews < self.min_reviews or total_decisions < self.min_decisions:
+            self.logger.info(
+                f"[MetaAgent] Insufficient data for cycle {cycle_number}: "
+                f"{total_reviews} reviews (min {self.min_reviews}), "
+                f"{total_decisions} decisions (min {self.min_decisions})"
+            )
+            self._no_action_reasons.append(
+                f"Insufficient data: {total_reviews} reviews (need {self.min_reviews}), "
+                f"{total_decisions} decisions (need {self.min_decisions})"
+            )
+        else:
+            # 3. Decide mutations
+            mutator = PromptMutator(signal, cycle_number)
+            mutation_targets = mutator.decide()
+
+            reweighter = ScoutReweighter(signal, cycle_number)
+            weight_updates = reweighter.decide()
+
+            calibrator = ThresholdCalibrator(signal, cycle_number)
+            calibrations = calibrator.decide()
+
+            # 4. Apply
+            if mutation_targets:
+                mutations = mutator.apply(mutation_targets, self.scout_engine, self.reviewer_engine)
+            else:
+                self._no_action_reasons.append("No prompt mutations needed")
+
+            if weight_updates:
+                ScoutReweighter.apply(weight_updates)
+            else:
+                self._no_action_reasons.append("Scout weights stable")
+
+            if calibrations:
+                ThresholdCalibrator.apply(calibrations, cycle_number)
+            else:
+                self._no_action_reasons.append("No calibration changes needed")
+
+        # 5. Write cycle report
+        now = datetime.now()
+        report = {
+            "cycle_number": cycle_number,
+            "ran_at": now.isoformat(),
+            "signal_summary": signal,
+            "mutations_applied": mutations,
+            "weight_updates": weight_updates,
+            "calibration_changes": calibrations,
+            "no_action_reasons": self._no_action_reasons,
+            "next_cycle_at": (now + timedelta(seconds=self.interval)).isoformat(),
+        }
+        _append_to_json_list(_REPORTS_PATH, report)
+
+        self.logger.info(
+            f"[MetaAgent] Cycle {cycle_number} complete. "
+            f"{len(mutations)} mutations, "
+            f"{len(weight_updates)} reweightings, "
+            f"{len(calibrations)} calibrations."
+        )
+
+        return report
