@@ -42,11 +42,11 @@ export default function HomePage() {
       <GrainOverlay />
       <CustomCursor />
 
-      <header className="flex items-center justify-between page-margin-x pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-8 pb-4 md:pb-6 shrink-0">
+      <header className="flex items-center justify-between page-margin-x pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-8 pb-4 md:pb-6 shrink-0 z-20">
         <Link
           data-cursor-expand
           to="/"
-          className="font-display font-normal text-[17px] hover:opacity-80 transition-opacity text-left flex-1 md:flex-none"
+          className="font-display font-normal text-[17px] hover:opacity-80 transition-opacity text-left flex-1 md:flex-none min-h-[44px] flex items-center"
           style={{ color: 'var(--color-oxford)' }}
         >
           Aethria
