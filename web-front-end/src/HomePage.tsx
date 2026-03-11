@@ -1,90 +1,204 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import GrainOverlay from './components/GrainOverlay';
 import CustomCursor from './components/CustomCursor';
 
-const OXFORD = '#002147';
-const PAPER = '#F2F0EA';
+const pipelineColumns = [
+  { label: 'SCOUT', body: 'Four parallel agents discovering opportunity signals.' },
+  { label: 'REVIEWER', body: 'Three reviewer perspectives evaluate each hypothesis independently.' },
+  { label: 'PARTNER', body: 'Rule-based decision engine with LLM fallback for edge cases.' },
+  { label: 'PORTFOLIO', body: 'Execution, signals and portfolio memory layer.' },
+];
 
 export default function HomePage() {
+  const pipelineRef = useRef<HTMLElement>(null);
+  const [pipelineInView, setPipelineInView] = useState(false);
+  const signalRef = useRef<HTMLElement>(null);
+  const [signalInView, setSignalInView] = useState(false);
+  const closingRef = useRef<HTMLElement>(null);
+  const [closingInView, setClosingInView] = useState(false);
+
+  useEffect(() => {
+    const obs = new IntersectionObserver(([entry]) => entry.isIntersecting && setPipelineInView(true), { threshold: 0.15 });
+    const el = pipelineRef.current;
+    if (el) obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([entry]) => entry.isIntersecting && setSignalInView(true), { threshold: 0.15 });
+    const el = signalRef.current;
+    if (el) obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([entry]) => entry.isIntersecting && setClosingInView(true), { threshold: 0.15 });
+    const el = closingRef.current;
+    if (el) obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   return (
-    <div
-      className="min-h-[100dvh] h-[100dvh] flex flex-col relative"
-      style={{ backgroundColor: PAPER }}
-    >
+    <div className="min-h-[100dvh] flex flex-col relative" style={{ backgroundColor: 'var(--color-paper)' }}>
       <GrainOverlay />
       <CustomCursor />
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 sm:px-8 lg:px-12 pt-6 sm:pt-8 pb-4 md:pb-6">
+
+      <header className={`flex items-center justify-between page-margin-x pt-6 sm:pt-8 pb-4 md:pb-6 shrink-0`}>
         <Link
           data-cursor-expand
           to="/"
           className="font-display font-normal text-[17px] hover:opacity-80 transition-opacity md:block text-center md:text-left flex-1 md:flex-none"
-          style={{ color: OXFORD }}
+          style={{ color: 'var(--color-oxford)' }}
         >
           Aethria
         </Link>
         <span
           className="font-mono text-[10px] uppercase tracking-[0.1em] opacity-70 hidden md:inline transition-opacity duration-300 hover:opacity-100"
-          style={{ color: OXFORD }}
+          style={{ color: 'var(--color-oxford)' }}
         >
           Investment Intelligence
         </span>
       </header>
 
-      {/* Main: monolith first in DOM for mobile; desktop order swaps so description left (25%), monolith right (75% full-bleed) */}
-      <main className="flex-1 flex flex-col md:flex-row min-h-0">
-        {/* Monolith: full-width on mobile (aspect-ratio auto); 25%–100% on desktop; zero rounded corners */}
+      <main className="flex-1 flex flex-col md:flex-row md:items-center min-h-0 shrink-0">
+        {/* Left column first in DOM for mobile (top); desktop 25% */}
+        <section className="home-hero-left page-margin-x order-1 flex md:w-[25%] flex-col justify-center py-12 sm:py-16 md:py-0 shrink-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.15em] opacity-50 mb-2" style={{ color: 'var(--color-oxford)' }}>
+            REGISTRY / 2026 · EARLY ACCESS
+          </p>
+          <p className="font-sans text-[15px] max-w-[26ch] md:max-w-none opacity-70" style={{ color: 'var(--color-oxford)', lineHeight: 1.85 }}>
+            Autonomous deal intelligence for venture capital.
+          </p>
+          <Link
+            to="/request-access"
+            data-cursor-expand
+            className="font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center w-fit h-10 px-6 bg-transparent border border-[var(--color-oxford)] md:border-[rgba(0,33,71,0.2)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] hover:border-[var(--color-oxford)] mt-8"
+            style={{ color: 'var(--color-oxford)' }}
+          >
+            REQUEST ACCESS
+          </Link>
+        </section>
+
+        {/* Monolith — vertical light line on left, starting at bottom left */}
         <div
           data-cursor-expand
-          className="order-1 md:order-2 flex items-center justify-center md:justify-start w-full md:flex-1 min-h-[50vh] md:min-h-0 aspect-auto p-10 sm:p-14 md:p-16 lg:p-20 xl:p-24 shrink-0 rounded-none"
-          style={{ backgroundColor: OXFORD }}
+          className="order-2 relative flex items-center justify-center w-full md:flex-1 min-h-[280px] md:min-h-[70vh] aspect-auto p-10 sm:p-14 md:p-16 lg:p-20 xl:p-24 shrink-0 rounded-none"
+          style={{ backgroundColor: 'var(--color-oxford)' }}
         >
+          <div
+            className="absolute left-0 bottom-0 top-0 w-px pointer-events-none"
+            style={{ backgroundColor: 'rgba(242, 240, 234, 0.12)' }}
+            aria-hidden
+          />
           <h1
-            className="font-display font-normal text-4xl sm:text-[2.85rem] lg:text-[3.5625rem] xl:text-[4.275rem] max-w-[18ch] md:max-w-[20ch]"
-            style={{ color: PAPER, lineHeight: 1.05 }}
+            className="font-display font-normal text-[28px] sm:text-[2.85rem] lg:text-[3.5625rem] xl:text-[4.275rem] max-w-[18ch] md:max-w-[20ch] relative z-[1]"
+            style={{ color: 'var(--color-paper)', lineHeight: 1.05 }}
           >
             Intelligent investment discovery and evaluation system.
           </h1>
         </div>
-
-        {/* Description: below monolith on mobile (generous padding); left 25% on desktop */}
-        <section className="order-2 md:order-1 flex md:w-[25%] flex-col justify-center px-6 lg:px-12 pr-4 py-12 sm:py-16 md:py-0 shrink-0">
-          <p
-            className="font-sans text-[15px] max-w-[26ch] opacity-70"
-            style={{ color: OXFORD, lineHeight: 1.85 }}
-          >
-            Aethria supports institutional allocators with clarity and rigour. Join the waiting list for early access to the platform.
-          </p>
-        </section>
       </main>
 
-      {/* CTA: bottom left — REQUEST ACCESS (aligned with blue block on desktop) */}
-      <div
-        className="flex-shrink-0 px-6 sm:px-8 lg:px-12 pt-10 sm:pt-12 md:pt-6 md:pl-[25%] md:pr-0 pb-4 md:pb-6"
-        style={{ backgroundColor: PAPER }}
+      {/* Pipeline strip */}
+      <section
+        ref={pipelineRef}
+        className="w-full page-margin-x border-t flex flex-col md:flex-row"
+        style={{
+          paddingTop: 'var(--section-padding-y)',
+          paddingBottom: 'var(--section-padding-y)',
+          backgroundColor: 'var(--color-paper)',
+          borderTopColor: 'rgba(0, 33, 71, 0.08)',
+          opacity: pipelineInView ? 1 : 0,
+          transform: pipelineInView ? 'translateY(0)' : 'translateY(16px)',
+          transition: 'opacity 500ms ease, transform 500ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
       >
+        {pipelineColumns.map((col, i) => (
+          <div
+            key={col.label}
+            className="home-pipeline-column flex-1 flex flex-col border-t border-[rgba(0,33,71,0.08)] first:border-t-0 pt-6 first:pt-0 md:border-t-0 md:pt-0 md:border-r md:last:border-r-0 min-w-0"
+            style={{
+              opacity: pipelineInView ? 1 : 0,
+              transform: pipelineInView ? 'translateY(0)' : 'translateY(16px)',
+              transition: 'opacity 500ms ease, transform 500ms cubic-bezier(0.16, 1, 0.3, 1)',
+              transitionDelay: pipelineInView ? `${i * 80}ms` : '0ms',
+            }}
+          >
+            <div className="md:px-6 lg:px-8">
+              <p className="font-mono text-[10px] uppercase tracking-[0.15em]" style={{ color: 'rgba(0, 33, 71, 0.45)' }}>
+                {col.label}
+              </p>
+              <div className="w-4 h-px mt-3 mb-4" style={{ backgroundColor: 'rgba(0, 33, 71, 0.12)' }} />
+              <p className="font-sans text-[13px] leading-[1.6]" style={{ color: 'rgba(0, 33, 71, 0.6)' }}>
+                {col.body}
+              </p>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* Signal strip */}
+      <section
+        ref={signalRef}
+        className="home-signal-strip w-full flex flex-col md:flex-row items-center justify-center gap-0 md:gap-2"
+        style={{
+          minHeight: 52,
+          backgroundColor: 'var(--color-oxford)',
+          opacity: signalInView ? 1 : 0,
+          transform: signalInView ? 'translateY(0)' : 'translateY(16px)',
+          transition: 'opacity 500ms ease, transform 500ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        <p
+          className="home-signal-text font-mono text-[10px] uppercase tracking-[0.18em] text-center px-4"
+          style={{ color: 'var(--color-paper)', opacity: 0.65 }}
+        >
+          SCOUT AGENTS
+          <span style={{ opacity: 0.25 }}>  ·  </span>
+          REVIEWER PERSPECTIVES
+          <br className="md:hidden" />
+          <span style={{ opacity: 0.25 }}>  ·  </span>
+          AUTONOMOUS DECISION ENGINE
+          <span style={{ opacity: 0.25 }}>  ·  </span>
+          SELF-OPTIMISATION
+        </p>
+      </section>
+
+      {/* Closing statement */}
+      <section
+        ref={closingRef}
+        className="home-closing w-full page-margin-x py-20"
+        style={{
+          backgroundColor: 'var(--color-paper)',
+          opacity: closingInView ? 1 : 0,
+          transform: closingInView ? 'translateY(0)' : 'translateY(16px)',
+          transition: 'opacity 500ms ease, transform 500ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        <h2 className="font-display font-normal text-[32px] max-w-full md:max-w-[520px]" style={{ color: 'var(--color-oxford)', opacity: 0.88 }}>
+          Built for the speed of modern venture.
+        </h2>
+        <p className="font-sans text-[14px] mt-6 max-w-[440px] leading-[1.7]" style={{ color: 'rgba(0, 33, 71, 0.55)' }}>
+          Aethria runs continuously — discovering, evaluating and deciding on opportunities while your team focuses on conviction.
+        </p>
         <Link
           to="/request-access"
           data-cursor-expand
-          className="font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center bg-transparent text-[#002147] border py-3 px-6 md:py-2 md:px-4 border-[#002147] md:border-[#002147]/20 hover:bg-[#002147] hover:text-[#F5F2E9] hover:border-[#002147]"
+          className="font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center w-full md:w-fit h-10 px-6 bg-transparent border border-[var(--color-oxford)] md:border-[rgba(0,33,71,0.2)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] hover:border-[var(--color-oxford)] mt-8"
+          style={{ color: 'var(--color-oxford)' }}
         >
           REQUEST ACCESS
         </Link>
-      </div>
+      </section>
 
-      {/* Footer: mobile only — © Aethria (left), Investment intelligence (right), like form page */}
       <footer
-        className="flex md:hidden shrink-0 z-20 flex items-center justify-between px-4 sm:px-6 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))]"
-        style={{ color: OXFORD, backgroundColor: PAPER }}
+        className="home-footer-mobile w-full flex items-center justify-between page-margin-x py-7 shrink-0"
+        style={{ color: 'var(--color-oxford)', backgroundColor: 'var(--color-paper)' }}
       >
-        <span className="font-sans text-[10px] tracking-wide opacity-70" style={{ color: OXFORD }}>
+        <span className="font-sans text-[12px]" style={{ color: 'var(--color-oxford)', opacity: 0.35 }}>
           © Aethria
         </span>
-        <span
-          className="font-mono text-[10px] uppercase tracking-[0.1em] opacity-70"
-          style={{ color: OXFORD }}
-        >
-          Investment intelligence
+        <span className="font-mono text-[9px] uppercase tracking-[0.15em]" style={{ color: 'var(--color-oxford)', opacity: 0.3 }}>
+          INVESTMENT INTELLIGENCE
         </span>
       </footer>
     </div>

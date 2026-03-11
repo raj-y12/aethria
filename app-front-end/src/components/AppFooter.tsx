@@ -18,7 +18,12 @@ function handleLogout() {
 export default function AppFooter({ navLink }: AppFooterProps) {
   return (
     <footer
-      className="flex-none flex items-center justify-between h-14 px-6 sm:px-8 lg:px-12 bg-paper"
+      className="flex-none flex items-center justify-between h-14 bg-paper"
+      style={{
+        paddingLeft: 'max(24px, env(safe-area-inset-left))',
+        paddingRight: 'max(24px, env(safe-area-inset-right))',
+        paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+      }}
       role="contentinfo"
       aria-label="Footer"
     >

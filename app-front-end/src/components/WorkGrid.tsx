@@ -69,7 +69,8 @@ export default function WorkGrid({ startups, onStartupClick, selectedId }: WorkG
               if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStartupClick(startup); }
             }}
           >
-            <div className="flex flex-col lg:grid lg:grid-cols-[3fr_2fr] lg:items-start gap-3 sm:gap-4 py-4 sm:py-5 lg:py-6">
+            {/* Single column on mobile/tablet; two columns (60/40) only from lg up */}
+            <div className="flex flex-col gap-3 sm:gap-4 py-4 sm:py-5 lg:grid lg:grid-cols-[3fr_2fr] lg:items-start lg:gap-4 lg:py-6">
               <div className="min-w-0 overflow-hidden">
                 <div className="flex items-center gap-2">
                   {isSelected && (
@@ -113,8 +114,8 @@ export default function WorkGrid({ startups, onStartupClick, selectedId }: WorkG
                   )}
                 </div>
               </div>
-              {/* Right side: verdict badge or escalation badge — 60/40 split on lg via grid fr units */}
-              <div className="lg:text-right pt-3 lg:pt-0 border-t border-oxford/[0.06] lg:border-t-0 flex flex-col items-start lg:items-end gap-1.5 min-w-0">
+              {/* Right side: verdict badge — full-width row on mobile, right-aligned column on lg */}
+              <div className="pt-3 border-t border-oxford/[0.06] flex flex-col items-start gap-1.5 min-w-0 lg:pt-0 lg:border-t-0 lg:text-right lg:items-end">
                 {isEsc ? (
                   <span
                     className="inline-flex items-center justify-center py-2 px-3 font-mono text-[10px] uppercase tracking-[0.2em] text-paper rounded-none"

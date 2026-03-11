@@ -6,7 +6,6 @@ import SystemBar from './SystemBar';
 import AppFooter from './AppFooter';
 import WorkGrid from './WorkGrid';
 import InvestmentMemo from './InvestmentMemo';
-import VerdictModal from './VerdictModal';
 import LiveIntelligenceFeed from './LiveIntelligenceFeed';
 import GhostTransition from './GhostTransition';
 import SystemIntelligence from './SystemIntelligence';
@@ -39,7 +38,6 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
     calibrationState,
   } = data;
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
-  const [showVerdict, setShowVerdict] = useState(false);
   const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>('system');
 
   const isDesktop = useMediaQuery('(min-width: 1024px)');
@@ -47,28 +45,20 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   const judgementsPanelRef = useRef<HTMLDivElement | null>(null);
   const memoContentRef = useRef<InvestmentMemoContentHandle | null>(null);
 
-  const verdictOpen = !!(
-    selectedStartup &&
-    showVerdict &&
-    selectedStartup.partner
-  );
-  const memoOpen = !!(selectedStartup && !showVerdict);
-  const verdictOrMemoOpen = verdictOpen || memoOpen;
+  const memoOpen = !!selectedStartup;
+  const verdictOrMemoOpen = memoOpen;
   const judgementsAsOverlay = rightPanel === 'feed' && !isDesktop;
   const anyOverlayOpen = verdictOrMemoOpen || judgementsAsOverlay;
   const useModal = selectedStartup && !isDesktop;
 
   const handleStartupClick = useCallback((startup: Startup) => {
     restoreRefVerdictMemo.current = document.activeElement as HTMLElement | null;
-    // Selecting a company always focuses the memo view and hides other right-panel modes
     setRightPanel('memo');
     setSelectedStartup(startup);
-    setShowVerdict(!!startup.partner?.decision);
   }, []);
 
   const handleCloseMemo = useCallback(() => {
     setSelectedStartup(null);
-    setShowVerdict(false);
     setRightPanel(null);
   }, []);
 
@@ -77,11 +67,10 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   }, []);
 
   const handleEscape = useCallback(() => {
-    if (verdictOpen) handleCloseMemo();
-    else if (memoOpen) handleCloseMemo();
+    if (memoOpen) handleCloseMemo();
     else if (rightPanel === 'feed') handleCloseJudgements();
     else if (rightPanel === 'system') setRightPanel(null);
-  }, [verdictOpen, memoOpen, rightPanel, handleCloseMemo, handleCloseJudgements]);
+  }, [memoOpen, rightPanel, handleCloseMemo, handleCloseJudgements]);
 
   useScrollLock(anyOverlayOpen);
   useEscapeKey(handleEscape, anyOverlayOpen);
@@ -92,7 +81,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   const resolvedCount = startups.filter((s) => s.partner?.decision != null).length;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-paper">
+    <div className="min-h-[100dvh] flex flex-col overflow-hidden bg-paper">
       <SystemBar
         scoutCount={startups.length}
         rightPanel={rightPanel}
@@ -106,9 +95,19 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
         </div>
       )}
 
-      {/* Paper canvas. Fixed height so only WorkGrid scrolls. On lg+: list and panel resize together (60/40). */}
-      <main className="flex-1 pt-24 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden px-6 sm:px-8 lg:px-12 pb-3 lg:pb-4 gap-6 lg:gap-10">
+      {/* Paper canvas. Fixed height so only WorkGrid scrolls. Safe area for notched devices. */}
+      <main
+        className="flex-1 flex flex-col min-h-0 overflow-hidden"
+        style={{ paddingTop: 'calc(56px + max(24px, env(safe-area-inset-top)))' }}
+      >
+        <div
+          className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden pb-3 lg:pb-4 gap-6 lg:gap-10"
+          style={{
+            paddingLeft: 'max(24px, env(safe-area-inset-left))',
+            paddingRight: 'max(24px, env(safe-area-inset-right))',
+            paddingTop: '24px',
+          }}
+        >
           <div className="flex flex-col min-w-0 min-h-0">
             {/* System health (same style as Settings page) */}
             <section className="flex-none py-4 border-b border-oxford/[0.06]">
@@ -288,6 +287,10 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
               right: 0,
               bottom: 0,
               backgroundColor: '#F2F0EA',
+              paddingTop: 'env(safe-area-inset-top)',
+              paddingBottom: 'env(safe-area-inset-bottom)',
+              paddingLeft: 'env(safe-area-inset-left)',
+              paddingRight: 'env(safe-area-inset-right)',
             }}
             onClick={handleCloseJudgements}
             aria-hidden="true"
@@ -299,8 +302,15 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
-            className="fixed top-0 right-0 w-full max-w-full sm:w-[380px] lg:w-[400px] h-full z-[10000] flex flex-col bg-paper"
-            style={{ borderLeft: tokens.frameBorder, minHeight: '100dvh' }}
+            className="fixed top-0 right-0 w-full max-w-full sm:w-[380px] lg:w-[400px] z-[10000] flex flex-col bg-paper"
+            style={{
+              borderLeft: tokens.frameBorder,
+              minHeight: '100dvh',
+              height: '100dvh',
+              paddingTop: 'env(safe-area-inset-top)',
+              paddingBottom: 'env(safe-area-inset-bottom)',
+              paddingRight: 'env(safe-area-inset-right)',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex-none p-4 sm:p-5 flex items-center justify-between border-b border-oxford/[0.06]">
@@ -324,19 +334,9 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
         document.body
       )}
 
-      {/* Modals only on small viewports; on desktop the right panel shows the memo. */}
+      {/* Memo modal on small viewports; on desktop the right panel shows the memo. */}
       <AnimatePresence initial={false}>
-        {useModal && selectedStartup && showVerdict && selectedStartup.partner && (
-          <VerdictModal
-            key="verdict"
-            partner={selectedStartup.partner}
-            startupName={selectedStartup.scout.name}
-            qualityVerdict={selectedStartup.review?.verdict}
-            onClose={handleCloseMemo}
-            onViewMemo={() => setShowVerdict(false)}
-          />
-        )}
-        {useModal && selectedStartup && !showVerdict && (
+        {useModal && selectedStartup && (
           <InvestmentMemo
             key="memo"
             startup={selectedStartup}

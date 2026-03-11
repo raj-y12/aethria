@@ -35,6 +35,10 @@ export default function InvestmentMemo({ startup, onClose }: InvestmentMemoProps
         right: 0,
         bottom: 0,
         backgroundColor: '#F2F0EA',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
       }}
       onClick={onClose}
       role="dialog"

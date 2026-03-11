@@ -46,16 +46,19 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
   );
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center relative bg-paper" style={{ backgroundColor: PAPER }}>
-      {/* Centered column */}
-      <div className="w-full max-w-[380px] flex flex-col items-center px-6 flex-1 justify-center">
-        {/* 1. Wordmark block — wrapper inline-block so underline matches wordmark width */}
+    <div
+      className="w-full flex flex-col items-center justify-center relative bg-paper min-h-[100dvh]"
+      style={{ backgroundColor: PAPER }}
+    >
+      {/* Centered column — padding bottom so fixed footer doesn't overlap on small screens */}
+      <div className="w-full max-w-[380px] flex flex-col items-center px-4 sm:px-6 flex-1 justify-center pb-28 sm:pb-0">
+        {/* 1. Wordmark block — wrapper inline-block so underline matches wordmark width; responsive size on mobile */}
         <div className="inline-flex flex-col items-center">
           <motion.h1
             className="font-display text-oxford"
             style={{
               fontFamily: tokens.font.display,
-              fontSize: '48px',
+              fontSize: 'clamp(2rem, 10vw, 48px)',
               fontWeight: 400,
               lineHeight: 1,
             }}
@@ -109,14 +112,14 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onKeyDown={(e) => handleKeyDown(e, 'username')}
-              className="w-full bg-transparent outline-none"
+              className="w-full bg-transparent outline-none min-h-[44px] touch-manipulation"
               style={{
                 height: '44px',
                 border: 'none',
                 borderBottom: '1px solid rgba(0, 33, 71, 0.15)',
                 padding: '0 0 10px 0',
                 fontFamily: 'Inter, system-ui, sans-serif',
-                fontSize: '14px',
+                fontSize: '16px',
                 fontWeight: 400,
                 color: 'rgba(0, 33, 71, 0.9)',
                 transition: 'border-color 200ms ease',
@@ -143,14 +146,14 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => handleKeyDown(e, 'password')}
-              className="w-full bg-transparent outline-none"
+              className="w-full bg-transparent outline-none min-h-[44px] touch-manipulation"
               style={{
                 height: '44px',
                 border: 'none',
                 borderBottom: '1px solid rgba(0, 33, 71, 0.15)',
                 padding: '0 0 10px 0',
                 fontFamily: 'Inter, system-ui, sans-serif',
-                fontSize: '14px',
+                fontSize: '16px',
                 fontWeight: 400,
                 color: 'rgba(0, 33, 71, 0.9)',
                 transition: 'border-color 200ms ease',
@@ -164,11 +167,11 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
             />
           </motion.div>
 
-          {/* Placeholder: Inter 14px, oxford 30% — scoped to this section */}
+          {/* Placeholder: Space Mono 14px, oxford 30% — scoped to this section */}
           <style>{`
             [data-login-page] input::placeholder {
               color: rgba(0, 33, 71, 0.3);
-              font-family: Inter, system-ui, sans-serif;
+              font-family: ${tokens.font.mono};
               font-size: 14px;
               font-weight: 400;
             }
@@ -243,10 +246,10 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
         </div>
       </div>
 
-      {/* 5. Footer — fixed to viewport bottom */}
+      {/* 5. Footer — fixed to viewport bottom; safe-area for notched devices */}
       <motion.footer
-        className="fixed left-0 right-0 flex justify-center"
-        style={{ bottom: '32px' }}
+        className="fixed left-0 right-0 flex justify-center px-4 text-center"
+        style={{ bottom: 'max(32px, env(safe-area-inset-bottom))' }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.9, duration: 0.3 }}

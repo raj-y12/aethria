@@ -16,6 +16,7 @@ export default {
       fontFamily: {
         display: ['"Libre Baskerville"', 'serif'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['"Space Mono"', 'monospace'],
       },
       borderRadius: {
         DEFAULT: '0',
