@@ -396,7 +396,7 @@ function MetaAgentTab({ reports, weights, calibration }: {
 
 /* ─── MAIN COMPONENT ─── */
 export default function SystemIntelligence(props: SystemIntelligenceProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('signals');
+  const [activeTab, setActiveTab] = useState<Tab>('meta');
 
   return (
     <div className="h-full flex flex-col min-h-0">

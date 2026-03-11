@@ -18,6 +18,7 @@ const PAPER_INACTIVE = 'rgba(242,240,234,0.4)';
  */
 export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem, onClose }: SystemBarProps) {
   const [time, setTime] = useState(new Date());
+  const displayName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('authUser') : null;
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -89,13 +90,24 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
             System
           </button>
         </div>
-        <span
-          className="tabular-nums font-mono text-[10px] leading-none ml-auto"
-          style={{ color: PAPER_INACTIVE, letterSpacing: '0.05em' }}
-          aria-live="polite"
-        >
-          {formatted}
-        </span>
+        <div className="flex items-center ml-auto gap-4">
+          {displayName && (
+            <span
+              className="font-mono text-[11px] leading-none"
+              style={{ color: PAPER, letterSpacing: '0.06em', opacity: 0.9 }}
+              aria-label={`Signed in as ${displayName}`}
+            >
+              {displayName}
+            </span>
+          )}
+          <span
+            className="tabular-nums font-mono text-[10px] leading-none"
+            style={{ color: PAPER_INACTIVE, letterSpacing: '0.05em' }}
+            aria-live="polite"
+          >
+            {formatted}
+          </span>
+        </div>
       </div>
     </header>
   );

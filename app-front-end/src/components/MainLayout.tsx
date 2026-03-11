@@ -40,7 +40,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   } = data;
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
   const [showVerdict, setShowVerdict] = useState(false);
-  const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>(null);
+  const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>('system');
 
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const restoreRefVerdictMemo = useRef<HTMLElement | null>(null);

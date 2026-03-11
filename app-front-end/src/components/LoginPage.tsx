@@ -25,6 +25,8 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
     if (username.trim() === VALID_USERNAME && password === VALID_PASSWORD) {
       setLoading(true);
       sessionStorage.setItem('auth', 'true');
+      const name = username.trim();
+      sessionStorage.setItem('authUser', name.charAt(0).toUpperCase() + name.slice(1).toLowerCase());
       onSuccess();
       return;
     }

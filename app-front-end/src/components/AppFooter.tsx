@@ -6,6 +6,8 @@ const STORAGE_KEY = 'aethria_last_activity';
 
 function handleLogout() {
   localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem('auth');
+  sessionStorage.removeItem('authUser');
   window.location.reload();
 }
 

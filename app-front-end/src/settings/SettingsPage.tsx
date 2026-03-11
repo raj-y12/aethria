@@ -9,10 +9,12 @@ type TabId = 'cost' | 'agent' | 'portfolio';
 const inputCls =
   'w-full min-w-0 max-w-[11rem] border-0 border-b bg-transparent font-sans text-[14px] text-oxford placeholder:text-oxford/40 py-2 outline-none rounded-none transition-colors duration-150';
 const inputBorder = 'border-oxford/[0.08] focus:border-oxford';
-const labelCls = 'block font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-2';
+const labelCls = 'block font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/70 mb-1.5';
+const hintCls = 'block font-sans text-[10px] text-oxford/45 mt-1 mb-0.5 leading-relaxed';
 const selectCls = inputCls + ' border-oxford/[0.08] focus:border-oxford cursor-pointer appearance-none pr-8 max-w-full';
 const toggleLabelCls = 'font-sans text-[14px] text-oxford';
-const groupHeadingCls = 'font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/50 mb-3';
+const groupHeadingCls = 'font-mono text-[12px] uppercase tracking-[0.16em] text-oxford/60 mb-2';
+const sectionIntroCls = 'font-sans text-[11px] text-oxford/50 mb-3 max-w-xl leading-relaxed';
 
 const TOGGLE_TRACK = 'h-6 w-11 shrink-0 rounded-full border cursor-pointer inline-flex items-center';
 const TOGGLE_KNOB = 'h-4 w-4 rounded-full shadow-sm pointer-events-none block';
@@ -22,10 +24,14 @@ function Toggle({
   checked,
   onChange,
   label,
-}: { id: string; checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  hint,
+}: { id: string; checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-2 min-h-[2.75rem]">
-      <label htmlFor={id} className={toggleLabelCls}>{label}</label>
+    <div className="flex items-start justify-between gap-4 py-2 min-h-[2.75rem]">
+      <div className="min-w-0">
+        <label htmlFor={id} className={toggleLabelCls}>{label}</label>
+        {hint && <p className={hintCls}>{hint}</p>}
+      </div>
       <button
         id={id}
         type="button"
@@ -33,12 +39,12 @@ function Toggle({
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`relative ${TOGGLE_TRACK} transition-colors duration-300 focus-visible:ring-1 focus-visible:ring-oxford/30 focus-visible:ring-offset-2 focus-visible:ring-offset-paper ${
-          checked ? 'bg-oxford border border-oxford' : 'bg-oxford/30 border-0'
+          checked ? 'bg-oxford border border-oxford' : 'bg-oxford/[0.06] border border-oxford/[0.12]'
         }`}
         style={{ transitionTimingFunction: tokens.motion.easeCss }}
       >
         <span
-          className={`${TOGGLE_KNOB} ${checked ? 'translate-x-5 bg-ivory' : 'translate-x-1 bg-oxford/50'}`}
+          className={`${TOGGLE_KNOB} ${checked ? 'translate-x-5 bg-ivory' : 'translate-x-1 bg-oxford/35'}`}
           style={{
             transition: `transform ${tokens.motion.duration.short}s ${tokens.motion.easeCss}, background-color 0.2s ${tokens.motion.easeCss}`,
           }}
@@ -52,6 +58,7 @@ function Toggle({
 function Field({
   id,
   label,
+  hint,
   value,
   onChange,
   type = 'number',
@@ -60,6 +67,7 @@ function Field({
 }: {
   id: string;
   label: string;
+  hint?: string;
   value: number | string;
   onChange: (v: number | string) => void;
   type?: 'number' | 'text';
@@ -69,6 +77,7 @@ function Field({
   return (
     <div className="py-1">
       <label htmlFor={id} className={labelCls}>{label}</label>
+      {hint && <p className={hintCls}>{hint}</p>}
       <input
         id={id}
         type={type}
@@ -92,9 +101,9 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>('cost');
 
   const tabs: { id: TabId; label: string }[] = [
-    { id: 'cost', label: 'Cost & budget' },
-    { id: 'agent', label: 'Agent configuration' },
-    { id: 'portfolio', label: 'Portfolio behaviour' },
+    { id: 'cost', label: 'Usage & limits' },
+    { id: 'agent', label: 'Agents & discovery' },
+    { id: 'portfolio', label: 'Portfolio' },
   ];
 
   useEffect(() => {
@@ -222,22 +231,31 @@ export default function SettingsPage() {
               {activeTab === 'cost' && (
                 <>
                   <section>
-                    <h3 className={groupHeadingCls}>Limits</h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-1">
-                      <Field id="max_tokens" label="Max tokens per run" value={settings.cost_budget.max_tokens_per_run} onChange={(v) => setCost('max_tokens_per_run', Number(v))} min={0} />
-                      <Field id="daily_ceiling" label="Daily cost ceiling" value={settings.cost_budget.daily_cost_ceiling} onChange={(v) => setCost('daily_cost_ceiling', Number(v))} min={0} step={0.01} />
-                      <Field id="weekly_ceiling" label="Weekly cost ceiling" value={settings.cost_budget.weekly_cost_ceiling} onChange={(v) => setCost('weekly_cost_ceiling', Number(v))} min={0} step={0.01} />
+                    <h3 className={groupHeadingCls}>Spending limits</h3>
+                    <p className={sectionIntroCls}>
+                      Cap how much the pipeline can spend so you don’t exceed your API budget.
+                    </p>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-4">
+                      <Field id="max_tokens" label="Token limit per run" hint="Max tokens used in a single pipeline run." value={settings.cost_budget.max_tokens_per_run} onChange={(v) => setCost('max_tokens_per_run', Number(v))} min={0} />
+                      <Field id="daily_ceiling" label="Daily cap (USD)" hint="Max API cost per day." value={settings.cost_budget.daily_cost_ceiling} onChange={(v) => setCost('daily_cost_ceiling', Number(v))} min={0} step={0.01} />
+                      <Field id="weekly_ceiling" label="Weekly cap (USD)" hint="Max API cost per week." value={settings.cost_budget.weekly_cost_ceiling} onChange={(v) => setCost('weekly_cost_ceiling', Number(v))} min={0} step={0.01} />
                     </div>
                   </section>
                   <section>
-                    <h3 className={groupHeadingCls}>Throttle</h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-1">
-                      <Field id="cooldown" label="Cooldown (seconds)" value={settings.cost_budget.cooldown_seconds} onChange={(v) => setCost('cooldown_seconds', Number(v))} min={0} />
+                    <h3 className={groupHeadingCls}>Rate limiting</h3>
+                    <p className={sectionIntroCls}>
+                      After a limit is hit, the system pauses before continuing.
+                    </p>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-4">
+                      <Field id="cooldown" label="Cooldown (seconds)" hint="How long to wait after hitting a limit." value={settings.cost_budget.cooldown_seconds} onChange={(v) => setCost('cooldown_seconds', Number(v))} min={0} />
                     </div>
                   </section>
                   {settings.system_health && settings.system_health.budget_status.length > 0 && (
                     <section>
-                      <h3 className={groupHeadingCls}>Agent budgets</h3>
+                      <h3 className={groupHeadingCls}>Current usage</h3>
+                      <p className={sectionIntroCls}>
+                        How much each agent has used today (calls and tokens).
+                      </p>
                       <div className="space-y-4">
                         {settings.system_health.budget_status.map((b: AgentBudgetStatus) => {
                           const callsPct = b.daily_calls_limit > 0 ? (b.daily_calls_used / b.daily_calls_limit) : 0;
@@ -295,33 +313,44 @@ export default function SettingsPage() {
               {activeTab === 'agent' && (
                 <>
                   <section>
-                    <h3 className={groupHeadingCls}>Pipeline</h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-1">
-                      <Toggle id="scouts_enabled" checked={settings.agent_config.scouts_enabled} onChange={(v) => setAgent('scouts_enabled', v)} label="Scouts enabled" />
-                      <Toggle id="reviewers_enabled" checked={settings.agent_config.reviewers_enabled} onChange={(v) => setAgent('reviewers_enabled', v)} label="Reviewers enabled" />
-                      <Toggle id="partners_enabled" checked={settings.agent_config.partners_enabled} onChange={(v) => setAgent('partners_enabled', v)} label="Partners enabled" />
+                    <h3 className={groupHeadingCls}>Pipeline stages</h3>
+                    <p className={sectionIntroCls}>
+                      Turn each stage on or off. Scouts find companies, Reviewers score them, Partners decide invest or pass.
+                    </p>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-2">
+                      <Toggle id="scouts_enabled" checked={settings.agent_config.scouts_enabled} onChange={(v) => setAgent('scouts_enabled', v)} label="Run scouts" hint="Discover new companies." />
+                      <Toggle id="reviewers_enabled" checked={settings.agent_config.reviewers_enabled} onChange={(v) => setAgent('reviewers_enabled', v)} label="Run reviewers" hint="Score and filter companies." />
+                      <Toggle id="partners_enabled" checked={settings.agent_config.partners_enabled} onChange={(v) => setAgent('partners_enabled', v)} label="Run partners" hint="Make invest / pass decisions." />
                     </div>
                   </section>
                   <section>
-                    <h3 className={groupHeadingCls}>Scouting</h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-1">
+                    <h3 className={groupHeadingCls}>Discovery</h3>
+                    <p className={sectionIntroCls}>
+                      Where and how the system looks for new companies.
+                    </p>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-4">
                       <div className="py-1">
-                        <label htmlFor="scout_region" className={labelCls}>Scout region</label>
+                        <label htmlFor="scout_region" className={labelCls}>Region</label>
+                        <p className={hintCls}>Where to search for companies.</p>
                         <select id="scout_region" value={settings.agent_config.scout_region} onChange={(e) => setAgent('scout_region', e.target.value)} className={selectCls}>
                           <option value="europe">Europe</option>
                           <option value="global">Global</option>
                         </select>
                       </div>
-                      <Toggle id="scout_serp_enabled" checked={settings.agent_config.scout_serp_enabled} onChange={(v) => setAgent('scout_serp_enabled', v)} label="SERP scouting" />
-                      <Field id="scout_serp_budget" label="SERP daily budget" value={settings.agent_config.scout_serp_daily_budget} onChange={(v) => setAgent('scout_serp_daily_budget', Number(v))} min={0} />
+                      <Toggle id="scout_serp_enabled" checked={settings.agent_config.scout_serp_enabled} onChange={(v) => setAgent('scout_serp_enabled', v)} label="Use web search (SERP)" hint="Use search results for discovery." />
+                      <Field id="scout_serp_budget" label="SERP daily budget" hint="Max search API calls per day." value={settings.agent_config.scout_serp_daily_budget} onChange={(v) => setAgent('scout_serp_daily_budget', Number(v))} min={0} />
                     </div>
                   </section>
                   <section>
-                    <h3 className={groupHeadingCls}>Run</h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-1">
-                      <Field id="max_agents" label="Max agents per run" value={settings.agent_config.max_agents_per_run} onChange={(v) => setAgent('max_agents_per_run', Number(v))} min={1} />
+                    <h3 className={groupHeadingCls}>Per run</h3>
+                    <p className={sectionIntroCls}>
+                      How many companies to process in one run and when to output a decision.
+                    </p>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-4">
+                      <Field id="max_agents" label="Companies per run" hint="Max companies processed in one pipeline run." value={settings.agent_config.max_agents_per_run} onChange={(v) => setAgent('max_agents_per_run', Number(v))} min={1} />
                       <div className="py-1">
                         <label htmlFor="confidence_threshold" className={labelCls}>Confidence threshold</label>
+                        <p className={hintCls}>Only output a decision when confidence is at least this (0–1).</p>
                         <input
                           id="confidence_threshold"
                           type="text"
@@ -339,7 +368,10 @@ export default function SettingsPage() {
                   {settings.meta_agent && (
                     <section>
                       <h3 className={groupHeadingCls}>Meta-agent</h3>
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-10 gap-y-1">
+                      <p className={sectionIntroCls}>
+                        Adjusts pipeline config over time (e.g. scout weights, confidence). Enable and set how often it runs.
+                      </p>
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-4">
                         <Toggle
                           id="meta_enabled"
                           checked={settings.meta_agent.enabled}
@@ -348,11 +380,13 @@ export default function SettingsPage() {
                               s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), enabled: v } } : s
                             )
                           }
-                          label="Meta-Agent enabled"
+                          label="Enable meta-agent"
+                          hint="Let the system tune its own settings."
                         />
                         <Field
                           id="meta_interval"
-                          label="Cycle interval (seconds)"
+                          label="Run every (seconds)"
+                          hint="How often the meta-agent runs a cycle."
                           value={settings.meta_agent.interval_seconds}
                           onChange={(v) =>
                             setSettings((s) =>
@@ -364,6 +398,7 @@ export default function SettingsPage() {
                         <Field
                           id="meta_min_reviews"
                           label="Min reviews before acting"
+                          hint="Wait for at least this many reviews before changing config."
                           value={settings.meta_agent.min_reviews}
                           onChange={(v) =>
                             setSettings((s) =>
@@ -375,6 +410,7 @@ export default function SettingsPage() {
                         <Field
                           id="meta_min_decisions"
                           label="Min decisions before acting"
+                          hint="Wait for at least this many decisions before changing config."
                           value={settings.meta_agent.min_decisions}
                           onChange={(v) =>
                             setSettings((s) =>
@@ -385,7 +421,8 @@ export default function SettingsPage() {
                         />
                         <Field
                           id="meta_cooldown"
-                          label="Mutation cooldown (cycles)"
+                          label="Cooldown (cycles)"
+                          hint="Minimum cycles between config changes."
                           value={settings.meta_agent.mutation_cooldown_cycles}
                           onChange={(v) =>
                             setSettings((s) =>
@@ -411,25 +448,33 @@ export default function SettingsPage() {
                 <>
                   <section>
                     <h3 className={groupHeadingCls}>Watchlist</h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-1">
-                      <Toggle id="auto_watchlist" checked={settings.portfolio.auto_watchlist} onChange={(v) => setPortfolio('auto_watchlist', v)} label="Auto-watchlist" />
+                    <p className={sectionIntroCls}>
+                      Automatically add companies to the watchlist when signals suggest interest.
+                    </p>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-2">
+                      <Toggle id="auto_watchlist" checked={settings.portfolio.auto_watchlist} onChange={(v) => setPortfolio('auto_watchlist', v)} label="Auto-add to watchlist" hint="Add companies based on signal strength." />
                     </div>
                   </section>
                   <section>
-                    <h3 className={groupHeadingCls}>Frequency & output</h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-1">
+                    <h3 className={groupHeadingCls}>Updates & memos</h3>
+                    <p className={sectionIntroCls}>
+                      How often to scan for new signals and how much detail to show in company memos.
+                    </p>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-4">
                       <div className="py-1">
-                        <label htmlFor="signal_scan" className={labelCls}>Signal scan</label>
+                        <label htmlFor="signal_scan" className={labelCls}>Scan for new signals</label>
+                        <p className={hintCls}>How often to check for new signals.</p>
                         <select id="signal_scan" value={settings.portfolio.signal_scan_frequency} onChange={(e) => setPortfolio('signal_scan_frequency', e.target.value)} className={selectCls}>
                           <option value="hourly">Hourly</option>
-                          <option value="every_6h">Every 6h</option>
+                          <option value="every_6h">Every 6 hours</option>
                           <option value="daily">Daily</option>
                         </select>
                       </div>
                       <div className="py-1">
-                        <label htmlFor="memo_verbosity" className={labelCls}>Memo verbosity</label>
+                        <label htmlFor="memo_verbosity" className={labelCls}>Memo detail</label>
+                        <p className={hintCls}>Amount of detail in company investment memos.</p>
                         <select id="memo_verbosity" value={settings.portfolio.memo_verbosity} onChange={(e) => setPortfolio('memo_verbosity', e.target.value)} className={selectCls}>
-                          <option value="minimal">Minimal</option>
+                          <option value="minimal">Brief</option>
                           <option value="standard">Standard</option>
                           <option value="full">Full</option>
                         </select>
