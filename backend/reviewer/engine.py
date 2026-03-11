@@ -72,10 +72,36 @@ class ReviewerEngine:
         self.logger = logging.getLogger("reviewer.engine")
         self.running = False
     
+    def _compute_consensus(self, results: list) -> dict:
+        """
+        Compute consensus verdict, disagreement flag, and score variance from multiple reviewer results.
+        """
+        verdicts = [r.get("verdict", "MEDIUM") for r in results]
+        from collections import Counter
+        verdict_counts = Counter(verdicts)
+        consensus_verdict = verdict_counts.most_common(1)[0][0]
+        reviewer_disagreement = len(set(verdicts)) > 1
+
+        score_fields = ["market_score", "product_score", "technical_score", "execution_score"]
+        score_variance = {}
+        for field in score_fields:
+            values = [r.get(field, 0) for r in results]
+            if len(values) > 1:
+                mean = sum(values) / len(values)
+                variance = sum((v - mean) ** 2 for v in values) / len(values)
+                score_variance[field] = round(variance, 2)
+
+        return {
+            "consensus_verdict": consensus_verdict,
+            "reviewer_disagreement": reviewer_disagreement,
+            "score_variance": score_variance,
+        }
+
     async def run_cycle(self) -> int:
         """
         Run one review cycle.
         Processes up to batch_size unreviewed entries.
+        Runs all 3 reviewer personas in parallel for each startup.
         
         Returns:
             Number of entries reviewed in this cycle
@@ -130,7 +156,6 @@ class ReviewerEngine:
                 "why_now": startup.scout_info.why_now,
                 "confidence": startup.scout_info.confidence_score,
             }
-            # Scout hypothesis fields: default to None for backward compatibility
             scout_output["primary_thesis"] = getattr(
                 startup.scout_info, "primary_thesis", None
             )
@@ -143,15 +168,42 @@ class ReviewerEngine:
             
             try:
                 self.logger.info(
-                    f"Reviewing entry {entry_id}: {scout_output.get('name', 'Unknown')}"
+                    f"Reviewing entry {entry_id}: {scout_output.get('name', 'Unknown')} "
+                    f"with 3 reviewer personas"
                 )
                 
-                # Review the discovery
-                review_output = await self.reviewer.review(scout_output)
+                # Run all 3 reviewers in parallel
+                default_task = self.reviewer.review(scout_output)
+                skeptical_task = self.skeptical_reviewer.review(scout_output)
+                opportunist_task = self.opportunist_reviewer.review(scout_output)
                 
-                if review_output is None:
-                    self.logger.warning(f"Review failed for entry {entry_id}")
+                results = await asyncio.gather(
+                    default_task, skeptical_task, opportunist_task,
+                    return_exceptions=True,
+                )
+                
+                # Collect successful results
+                reviewer_types = ["default", "skeptical", "opportunist"]
+                successful_results = []
+                for i, res in enumerate(results):
+                    if isinstance(res, Exception):
+                        self.logger.warning(
+                            f"{reviewer_types[i]} reviewer failed for {entry_id}: {res}"
+                        )
+                    elif res is not None:
+                        res["reviewer_type"] = reviewer_types[i]
+                        successful_results.append(res)
+                
+                if not successful_results:
+                    self.logger.warning(f"All reviewers failed for entry {entry_id}")
                     continue
+                
+                # Use the default reviewer's output as primary (backward compat)
+                default_results = [r for r in successful_results if r.get("reviewer_type") == "default"]
+                if default_results:
+                    review_output = default_results[0]
+                else:
+                    review_output = successful_results[0]
                 
                 # Record token usage if cost controller exists
                 if self.cost_controller:
@@ -159,10 +211,42 @@ class ReviewerEngine:
                         "reviewer", self.agent_id, self.reviewer._last_token_usage
                     )
                 
-                # Convert to ReviewInfo and save
+                # Compute consensus across all successful results
+                consensus = self._compute_consensus(successful_results)
+                
+                # Build SingleReview list for storage
+                from models import SingleReview
+                single_reviews = []
+                for r in successful_results:
+                    single_reviews.append(SingleReview(
+                        reviewer_type=r.get("reviewer_type", "default"),
+                        market_score=r.get("market_score", 5),
+                        product_score=r.get("product_score", 5),
+                        technical_score=r.get("technical_score", 5),
+                        execution_score=r.get("execution_score", 5),
+                        defensibility_score=r.get("defensibility_score"),
+                        overall_summary=r.get("overall_summary", ""),
+                        key_risks=r.get("key_risks", []),
+                        verdict=r.get("verdict", "MEDIUM"),
+                        diligence_red_flags=r.get("diligence_red_flags", []),
+                        assumption_feedback=r.get("assumption_feedback", []),
+                        team_analysis=r.get("team_analysis") or None,
+                        competition_analysis=r.get("competition_analysis") or None,
+                        business_model_analysis=r.get("business_model_analysis") or None,
+                        investment_thesis=r.get("investment_thesis") or None,
+                        risk_mitigation=r.get("risk_mitigation") or None,
+                        score_reasoning=r.get("score_reasoning") or None,
+                    ))
+                
+                # Convert to ReviewInfo and save (primary fields from default reviewer)
                 from adapters import reviewer_output_to_review_info
                 review_info = reviewer_output_to_review_info(review_output)
                 review_info.reviewer_agent_id = self.agent_id
+                review_info.reviews = single_reviews
+                review_info.consensus_verdict = consensus["consensus_verdict"]
+                review_info.reviewer_disagreement = consensus["reviewer_disagreement"]
+                review_info.score_variance = consensus["score_variance"]
+                
                 success = self.storage.add_review(entry_id, review_info)
                 
                 if success:
@@ -177,7 +261,9 @@ class ReviewerEngine:
                     
                     self.logger.info(
                         f"Reviewed entry {entry_id}: {verdict} "
-                        f"(avg score: {avg_score:.1f}/10)"
+                        f"(avg score: {avg_score:.1f}/10, "
+                        f"consensus: {consensus['consensus_verdict']}, "
+                        f"disagreement: {consensus['reviewer_disagreement']})"
                     )
                     
                     # Record negative assumption feedback in deal memory

@@ -27,14 +27,16 @@ class FeedbackLoop:
     - Signal accuracy (for Reviewers)
     """
     
-    def __init__(self, portfolio_store: PortfolioStore):
+    def __init__(self, portfolio_store: PortfolioStore, discovery_storage=None):
         """
         Initialize Feedback Loop.
         
         Args:
             portfolio_store: PortfolioStore instance
+            discovery_storage: Optional Storage instance for reading reviewed startups
         """
         self.store = portfolio_store
+        self.discovery_storage = discovery_storage
         self.logger = logging.getLogger("feedback.loop")
     
     def calculate_all_metrics(
@@ -71,6 +73,9 @@ class FeedbackLoop:
         # Reviewer metrics
         reviewer_metrics = self._calculate_reviewer_metrics(period_start, period_end)
         metric_ids.extend(reviewer_metrics)
+        
+        # Verdict distribution and calibration
+        self._calculate_verdict_distribution()
         
         return metric_ids
     
@@ -219,6 +224,79 @@ class FeedbackLoop:
         # For now, return empty list
         return []
     
+    def _calculate_verdict_distribution(self) -> None:
+        """
+        Calculate STRONG/MEDIUM/WEAK verdict distribution from last 50 reviewed startups.
+        Writes verdict_distribution and calibration_warning to agent_metrics.
+        """
+        if not self.discovery_storage:
+            return
+        try:
+            reviewed = self.discovery_storage.get_startups_with_review(limit=50)
+            if not reviewed:
+                return
+            
+            counts = {"STRONG": 0, "MEDIUM": 0, "WEAK": 0}
+            for s in reviewed:
+                verdict = s.review_info.verdict if s.review_info else None
+                if verdict in counts:
+                    counts[verdict] += 1
+            
+            total = sum(counts.values())
+            if total == 0:
+                return
+            
+            calibration_warning = None
+            weak_pct = counts["WEAK"] / total
+            strong_pct = counts["STRONG"] / total
+            if weak_pct > 0.80:
+                calibration_warning = "Too strict or scout quality degraded (>80% WEAK)"
+            elif strong_pct > 0.60:
+                calibration_warning = "Too lenient (>60% STRONG)"
+            
+            now = datetime.now()
+            self.store.add_agent_metric(
+                agent_id="reviewer_calibration",
+                agent_type="reviewer",
+                metric_name="verdict_distribution",
+                metric_value=total,
+                period_start=now.isoformat(),
+                period_end=now.isoformat(),
+                sample_size=total,
+            )
+            
+            import json
+            metrics_file = self.store.files["agent_metrics"]
+            metrics = self.store._read_file(metrics_file)
+            
+            dist_record = {
+                "id": "verdict_distribution",
+                "verdict_distribution": counts,
+                "calibration_warning": calibration_warning,
+                "calculated_at": now.isoformat(),
+                "sample_size": total,
+            }
+            
+            found = False
+            for i, m in enumerate(metrics):
+                if m.get("id") == "verdict_distribution":
+                    metrics[i] = dist_record
+                    found = True
+                    break
+            if not found:
+                metrics.append(dist_record)
+            
+            self.store._write_file(metrics_file, metrics)
+            
+            if calibration_warning:
+                self.logger.warning(f"Calibration: {calibration_warning}")
+            self.logger.info(
+                f"Verdict distribution (last {total}): "
+                f"STRONG={counts['STRONG']}, MEDIUM={counts['MEDIUM']}, WEAK={counts['WEAK']}"
+            )
+        except Exception as e:
+            self.logger.error(f"Error calculating verdict distribution: {e}", exc_info=True)
+
     def _in_period(self, timestamp_str: str, period_start: datetime, period_end: datetime) -> bool:
         """Check if timestamp is in period."""
         if not timestamp_str:

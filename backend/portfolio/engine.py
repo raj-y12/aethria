@@ -20,6 +20,7 @@ from portfolio.feedback import FeedbackLoop
 from portfolio.cost_control import CostController
 from portfolio.health import HealthMonitor
 from portfolio.rejection import RejectionAnalyzer
+from analytics.clustering import ClusterAnalyzer
 from storage import Storage
 
 
@@ -74,6 +75,7 @@ class PortfolioEngine:
         )
         self.cost_controller = CostController()
         self.health_monitor = HealthMonitor(self.portfolio_store, discovery_storage=self.discovery_storage)
+        self.cluster_analyzer = ClusterAnalyzer()
         
         # Intervals
         self.execution_interval = execution_interval
@@ -124,15 +126,21 @@ class PortfolioEngine:
             processed_count = 0
             
             for entry in all_entries:
-                startup_data = entry.get("scout")
-                review_data = entry.get("review")
-                partner_data = entry.get("partner")
+                startup_data = entry.get("scout_info") or entry.get("scout")
+                review_data = entry.get("review_info") or entry.get("review")
+                partner_data = entry.get("partner_info") or entry.get("partner")
                 
                 # Only process entries with Partner decisions
                 if not partner_data:
                     continue
                 
-                startup_id = startup_data.get("id") if startup_data else entry.get("id")
+                # Check for human resolution override
+                human_resolution = entry.get("human_resolution")
+                if human_resolution and human_resolution.get("decision"):
+                    partner_data = dict(partner_data)
+                    partner_data["decision"] = human_resolution["decision"]
+                
+                startup_id = startup_data.get("id") if startup_data else entry.get("startup_id", entry.get("id"))
                 
                 # Check if already processed (exists in portfolio store)
                 existing_startup = self.portfolio_store.get_startup(startup_id)
@@ -248,13 +256,19 @@ class PortfolioEngine:
             self.logger.error(f"Error in feedback cycle: {e}", exc_info=True)
     
     async def _run_health(self):
-        """Run Health Monitor."""
+        """Run Health Monitor and cluster analysis."""
         try:
             health_ids = self.health_monitor.check_health()
             if health_ids:
                 self.logger.info(f"Detected {len(health_ids)} health issues")
         except Exception as e:
             self.logger.error(f"Error in health cycle: {e}", exc_info=True)
+
+        try:
+            all_startups = self.discovery_storage.get_all()
+            self.cluster_analyzer.analyze(all_startups)
+        except Exception as e:
+            self.logger.error(f"Error in cluster analysis: {e}", exc_info=True)
     
     async def run_forever(self):
         """Run Portfolio Engine continuously."""

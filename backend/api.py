@@ -204,19 +204,83 @@ def get_startup_memo(startup_id: str):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    storage = _get_storage()
+    all_startups = storage.get_all_startups(skip_invalid=True)
+    pending = sum(
+        1 for s in all_startups
+        if s.partner_info and s.partner_info.human_review_required and s.human_resolution is None
+    )
+    return {"status": "ok", "pending_escalations": pending}
+
+
+@app.get("/api/escalations")
+def get_escalations():
+    """Return startups requiring human review that haven't been resolved."""
+    storage = _get_storage()
+    all_startups = storage.get_all_startups(skip_invalid=True)
+    escalations = []
+    for s in all_startups:
+        if s.partner_info and s.partner_info.human_review_required:
+            if s.human_resolution is None:
+                escalations.append(_backend_to_frontend(s.to_dict()))
+    return escalations
+
+
+@app.post("/api/escalations/{startup_id}/resolve")
+def resolve_escalation(startup_id: str, body: dict):
+    """Resolve a human review escalation."""
+    decision = body.get("decision")
+    notes = body.get("notes", "")
+    if decision not in ("YES", "NO", "MAYBE"):
+        raise HTTPException(status_code=422, detail="decision must be YES, NO, or MAYBE")
+    storage = _get_storage()
+    startup = storage.get_startup(startup_id)
+    if not startup:
+        raise HTTPException(status_code=404, detail="Startup not found")
+    from datetime import datetime
+    resolution = {
+        "decision": decision,
+        "notes": notes,
+        "resolved_at": datetime.now().isoformat(),
+    }
+
+    def updater(data):
+        for i, item in enumerate(data):
+            if item.get("startup_id") == startup_id:
+                item["human_resolution"] = resolution
+                return data
+        return data
+
+    storage._atomic_update(updater)
+    return {"status": "ok", "resolution": resolution}
 
 
 @app.get("/api/settings")
 def get_settings():
-    """Return current settings (control plane) with budget status."""
+    """Return current settings (control plane) with budget status and system health."""
     from portfolio.cost_control import CostController
+    from portfolio.store import PortfolioStore
     settings = load_settings()
     try:
         cc = CostController()
         settings["budget_status"] = cc.get_all_budget_status()
     except Exception:
         settings["budget_status"] = {}
+    
+    # Read calibration data from agent_metrics
+    try:
+        store = PortfolioStore()
+        metrics = store._read_file(store.files["agent_metrics"])
+        system_health = {}
+        for m in metrics:
+            if m.get("id") == "verdict_distribution":
+                system_health["verdict_distribution"] = m.get("verdict_distribution")
+                system_health["calibration_warning"] = m.get("calibration_warning")
+                break
+        settings["system_health"] = system_health
+    except Exception:
+        settings["system_health"] = {}
+    
     return settings
 
 

@@ -10,6 +10,7 @@ from datetime import datetime
 import difflib
 
 from portfolio.store import PortfolioStore
+from utils.feed_fetcher import FeedFetcher
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ class SignalTracker:
         """
         self.store = portfolio_store
         self.agent_id = agent_id
+        self.feed_fetcher = FeedFetcher()
         self.logger = logging.getLogger("signals.tracker")
     
     def check_watchlist_entries(self) -> List[str]:
@@ -62,7 +64,14 @@ class SignalTracker:
             except Exception as e:
                 self.logger.error(f"Error checking entry {entry.get('id')}: {e}")
                 continue
-        
+
+        # Also check against external feeds
+        try:
+            feed_signal_ids = self.check_watchlist_with_feeds()
+            signal_ids.extend(feed_signal_ids)
+        except Exception as e:
+            self.logger.error(f"Error checking feeds: {e}")
+
         return signal_ids
     
     def _check_entry(self, watchlist_entry: Dict[str, Any]) -> Optional[str]:
@@ -201,3 +210,74 @@ class SignalTracker:
             }
         
         return None
+
+    def check_watchlist_with_feeds(self) -> List[str]:
+        """
+        Check watchlist entries against external feed items.
+
+        Returns:
+            List of signal IDs created from feed matches
+        """
+        watchlist = self.store.get_all_watchlist()
+        if not watchlist:
+            return []
+
+        try:
+            feed_items = self.feed_fetcher.fetch_all()
+        except Exception as e:
+            self.logger.warning(f"Failed to fetch feeds: {e}")
+            return []
+
+        if not feed_items:
+            return []
+
+        signal_ids = []
+        for entry in watchlist:
+            startup_id = entry.get("startup_id")
+            startup = self.store.get_startup(startup_id)
+            if not startup:
+                continue
+
+            name = startup.get("name", "")
+            sector = startup.get("sector", "")
+            matches = self._match_feed_items(name, sector, feed_items)
+
+            for match in matches:
+                try:
+                    signal_id = self.store.add_signal(
+                        startup_id=startup_id,
+                        signal_type=match.get("signal_type", "neutral"),
+                        strength=0.5,
+                        description=f"Feed match: {match.get('title', '')} ({match.get('source', '')})",
+                        agent_id=self.agent_id,
+                    )
+                    signal_ids.append(signal_id)
+                except Exception as e:
+                    self.logger.error(f"Error adding feed signal for {startup_id}: {e}")
+
+        return signal_ids
+
+    def _match_feed_items(self, startup_name: str, sector: str, feed_items: List[Dict]) -> List[Dict]:
+        """Match feed items against a startup by keyword overlap."""
+        keywords = set()
+        for word in startup_name.lower().split():
+            if len(word) > 2:
+                keywords.add(word)
+        for word in sector.lower().split():
+            if len(word) > 2:
+                keywords.add(word)
+        keywords -= {"the", "and", "for", "with", "inc", "ltd", "corp"}
+
+        matches = []
+        for item in feed_items:
+            text = (item.get("title", "") + " " + item.get("description", "")).lower()
+            overlap = sum(1 for kw in keywords if kw in text)
+            if overlap >= 2:
+                signal_type = "press_mention"
+                source = item.get("source", "")
+                if "github" in source.lower():
+                    signal_type = "github_activity"
+                elif "product" in source.lower():
+                    signal_type = "product_launch"
+                matches.append({**item, "signal_type": signal_type})
+        return matches

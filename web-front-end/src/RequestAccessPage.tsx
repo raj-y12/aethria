@@ -21,6 +21,7 @@ export default function RequestAccessPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitHover, setSubmitHover] = useState(false);
+  const [position, setPosition] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
@@ -66,6 +67,10 @@ export default function RequestAccessPage() {
             : (data.detail as { message?: string })?.message ||
               `Request failed (${res.status}). Please try again.`;
         throw new Error(msg);
+      }
+      const resData = await res.json().catch(() => ({}));
+      if (resData.position) {
+        setPosition(resData.position);
       }
       setLoading(false);
       setProcessing(true);
@@ -251,6 +256,14 @@ export default function RequestAccessPage() {
                 >
                   Application Received. Registry entry pending review.
                 </p>
+                {position && (
+                  <p
+                    className="font-mono text-sm mb-6 md:mb-8"
+                    style={{ color: OXFORD, opacity: 0.7 }}
+                  >
+                    You're #{position} on the waitlist.
+                  </p>
+                )}
                 <Link
                   to="/home"
                   data-cursor-expand
