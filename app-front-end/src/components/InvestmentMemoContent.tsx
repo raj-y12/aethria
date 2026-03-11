@@ -150,6 +150,11 @@ export default function InvestmentMemoContent({
             <p className="font-sans text-[13px] text-oxford leading-relaxed">
               {judgmentSummary}
             </p>
+            {startup.partner?.llm_fallback_reason && (
+              <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/40 mt-2">
+                LLM-assisted · {startup.partner.llm_fallback_reason}
+              </p>
+            )}
           </section>
         )}
 
@@ -264,6 +269,54 @@ export default function InvestmentMemoContent({
           </section>
         )}
 
+        {startup.review?.reviewer_disagreement && startup.review?.reviews && startup.review.reviews.length > 1 && (
+          <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
+              Reviewer divergence
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left font-sans text-[13px]">
+                <thead>
+                  <tr className="border-b border-oxford/[0.06]">
+                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 pr-4">Reviewer</th>
+                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 px-2 text-center">Mkt</th>
+                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 px-2 text-center">Prd</th>
+                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 px-2 text-center">Tch</th>
+                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 px-2 text-center">Exe</th>
+                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 pl-2 text-center">Verdict</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {startup.review.reviews.map((r, i) => (
+                    <tr key={i} className="border-b border-oxford/[0.06]">
+                      <td className="font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/60 py-2 pr-4">{r.reviewer_type.replace('Reviewer', '')}</td>
+                      <td className="text-oxford/70 py-2 px-2 text-center tabular-nums">{r.market_score}</td>
+                      <td className="text-oxford/70 py-2 px-2 text-center tabular-nums">{r.product_score}</td>
+                      <td className="text-oxford/70 py-2 px-2 text-center tabular-nums">{r.technical_score}</td>
+                      <td className="text-oxford/70 py-2 px-2 text-center tabular-nums">{r.execution_score}</td>
+                      <td className="font-mono text-[10px] uppercase text-oxford/70 py-2 pl-2 text-center">{r.verdict}</td>
+                    </tr>
+                  ))}
+                  {startup.review.score_variance && (
+                    <tr>
+                      <td className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/40 py-2 pr-4">Variance</td>
+                      {['market_score', 'product_score', 'technical_score', 'execution_score'].map((dim) => {
+                        const v = startup.review?.score_variance?.[dim] ?? 0;
+                        return (
+                          <td key={dim} className={`py-2 px-2 text-center tabular-nums font-mono text-[10px] ${v > 1.5 ? 'text-oxford' : 'text-oxford/40'}`}>
+                            {v.toFixed(1)}
+                          </td>
+                        );
+                      })}
+                      <td />
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
         {(primaryRisks.length > 0 || secondaryRisks.length > 0) && (
           <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
             <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
@@ -354,10 +407,32 @@ export default function InvestmentMemoContent({
                   <span className="uppercase tracking-wide">Next</span> · {startup.partner!.next_action}
                 </p>
               )}
+              {startup.partner?.portfolio_context_at_decision && (
+                <div className="mt-4 pt-3 border-t border-oxford/[0.06]">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 mb-2">Portfolio context at decision</p>
+                  <p className="font-sans text-[12px] text-oxford/60">
+                    Portfolio size: {startup.partner.portfolio_context_at_decision.total_portfolio_size} companies
+                    {startup.partner.portfolio_context_at_decision.sector_counts[startup.scout.sector] != null && (
+                      <> · {startup.partner.portfolio_context_at_decision.sector_counts[startup.scout.sector]} in {startup.scout.sector}</>
+                    )}
+                    {startup.partner?.rationale?.toLowerCase().includes('concentration') && (
+                      <> · sector concentration flagged</>
+                    )}
+                  </p>
+                </div>
+              )}
             </div>
           </section>
         )}
       </div>
+
+        <div className="mt-4 pt-2">
+          <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-oxford/25">
+            {startup.scout.prompt_version && <>scout {startup.scout.prompt_version}</>}
+            {startup.scout.prompt_version && startup.partner?.prompt_version && <> · </>}
+            {startup.partner?.prompt_version && <>partner {startup.partner.prompt_version}</>}
+          </p>
+        </div>
 
       {onClose && (
         <div className="flex-none pt-6 mt-4 border-t border-oxford/[0.06]">
