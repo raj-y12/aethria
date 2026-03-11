@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { jsPDF } from 'jspdf';
 import type { Startup } from '../types/startup';
 import {
   getScoreBand,
@@ -6,6 +7,144 @@ import {
   DECISION_LABELS,
   SCORE_DIMENSIONS,
 } from '../design-system/semantics';
+
+const PDF_MARGIN = 20;
+const PDF_LINE_HEIGHT = 5;
+const PDF_FONT_SIZE_TITLE = 16;
+const PDF_FONT_SIZE_HEADING = 11;
+const PDF_FONT_SIZE_BODY = 10;
+const PDF_FONT_SIZE_SMALL = 9;
+
+function addPDFSection(
+  doc: jsPDF,
+  opts: { title?: string; lines: string[]; startY: number }
+): number {
+  let y = opts.startY;
+  const pageH = doc.internal.pageSize.getHeight();
+  const maxW = doc.internal.pageSize.getWidth() - PDF_MARGIN * 2;
+  if (opts.title) {
+    doc.setFontSize(PDF_FONT_SIZE_HEADING);
+    doc.setTextColor(80, 80, 100);
+    doc.text(opts.title, PDF_MARGIN, y);
+    y += PDF_LINE_HEIGHT;
+  }
+  doc.setFontSize(PDF_FONT_SIZE_BODY);
+  doc.setTextColor(0, 33, 71);
+  for (const line of opts.lines) {
+    const split = doc.splitTextToSize(line, maxW);
+    for (const s of split) {
+      if (y > pageH - 20) {
+        doc.addPage();
+        y = PDF_MARGIN;
+      }
+      doc.text(s, PDF_MARGIN, y);
+      y += PDF_LINE_HEIGHT;
+    }
+  }
+  return y + PDF_LINE_HEIGHT;
+}
+
+function buildMemoPDF(startup: Startup): jsPDF {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  let y = PDF_MARGIN;
+
+  doc.setFontSize(PDF_FONT_SIZE_SMALL);
+  doc.setTextColor(80, 80, 100);
+  doc.text('Investment memo', PDF_MARGIN, y);
+  y += PDF_LINE_HEIGHT;
+  doc.setFontSize(PDF_FONT_SIZE_TITLE);
+  doc.setTextColor(0, 33, 71);
+  doc.text(startup.scout.name ?? '—', PDF_MARGIN, y);
+  y += PDF_LINE_HEIGHT + 2;
+  doc.setFontSize(PDF_FONT_SIZE_SMALL);
+  doc.setTextColor(80, 80, 100);
+  doc.text(startup.scout.sector ?? '—', PDF_MARGIN, y);
+  y += PDF_LINE_HEIGHT * 2;
+
+  const judgmentSummary = startup.partner
+    ? (() => {
+        const p = startup.partner!;
+        const r = startup.review;
+        const decisionLabel = DECISION_LABELS[p.decision] ?? p.decision;
+        const quality = r?.verdict ? QUALITY_LABELS[r.verdict] ?? r.verdict : '';
+        const rationale = p.rationale ?? '';
+        return rationale ? `${decisionLabel}. ${rationale}` : `${decisionLabel}. Quality: ${quality}.`;
+      })()
+    : '';
+  if (judgmentSummary) {
+    y = addPDFSection(doc, {
+      title: 'Investment judgment',
+      lines: [judgmentSummary],
+      startY: y,
+    });
+  }
+
+  const overviewLines: string[] = [];
+  if (startup.scout.problem) overviewLines.push(`Problem: ${startup.scout.problem}`);
+  if (startup.scout.solution) overviewLines.push(`Solution: ${startup.scout.solution}`);
+  if (startup.scout.target_users) overviewLines.push(`Target: ${startup.scout.target_users}`);
+  if (startup.scout.why_now) overviewLines.push(`Why now: ${startup.scout.why_now}`);
+  if (overviewLines.length) {
+    y = addPDFSection(doc, { title: 'Overview', lines: overviewLines, startY: y });
+  }
+
+  if (startup.review) {
+    const primary = SCORE_DIMENSIONS.slice(0, 2);
+    const lines = primary
+      .map(({ id, name }) => {
+        const score = startup.review?.[id as keyof typeof startup.review];
+        if (score == null || typeof score !== 'number') return null;
+        const band = getScoreBand(score);
+        return `${name}: ${score}/10 (${band.label})`;
+      })
+      .filter(Boolean) as string[];
+    if (lines.length) y = addPDFSection(doc, { title: 'Primary drivers', lines, startY: y });
+
+    const supporting = SCORE_DIMENSIONS.slice(2);
+    const lines2 = supporting
+      .map(({ id, name }) => {
+        const score = startup.review?.[id as keyof typeof startup.review];
+        if (score == null || typeof score !== 'number') return null;
+        const band = getScoreBand(score);
+        return `${name}: ${score}/10 (${band.label})`;
+      })
+      .filter(Boolean) as string[];
+    if (lines2.length) y = addPDFSection(doc, { title: 'Supporting analysis', lines: lines2, startY: y });
+  }
+
+  const primaryRisks = startup.review?.diligence_red_flags ?? [];
+  const secondaryRisks = (startup.review?.key_risks ?? []).filter(
+    (r) => !primaryRisks.some((p) => r.includes(p) || p.includes(r))
+  );
+  if (primaryRisks.length || secondaryRisks.length) {
+    const riskLines = [
+      ...(primaryRisks.length ? ['Primary: ' + primaryRisks.join('; ')] : []),
+      ...(secondaryRisks.length ? ['Secondary: ' + secondaryRisks.join('; ')] : []),
+    ];
+    y = addPDFSection(doc, { title: 'Risks', lines: riskLines, startY: y });
+  }
+
+  if (startup.review?.overall_summary) {
+    y = addPDFSection(doc, {
+      title: 'Summary',
+      lines: [startup.review.overall_summary],
+      startY: y,
+    });
+  }
+
+  if (startup.partner) {
+    const p = startup.partner;
+    const decisionLine = `Investment decision: ${p.decision} (${DECISION_LABELS[p.decision] ?? p.decision})`;
+    const qualityLine =
+      startup.review?.verdict != null
+        ? `Quality: ${startup.review.verdict} (${QUALITY_LABELS[startup.review.verdict] ?? startup.review.verdict})`
+        : '';
+    const lines = [decisionLine, ...(qualityLine ? [qualityLine] : []), ...(p.rationale ? [p.rationale] : [])];
+    y = addPDFSection(doc, { title: 'Decision', lines, startY: y });
+  }
+
+  return doc;
+}
 
 const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ';
 const SCRAMBLE_TICKS = 6;
@@ -100,14 +239,20 @@ export interface InvestmentMemoContentProps {
   embedded?: boolean;
 }
 
+export interface InvestmentMemoContentHandle {
+  downloadPDF: () => void;
+}
+
+const actionBtnCls = 'font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 hover:text-oxford active:opacity-80 transition-colors min-h-[44px] flex items-center px-2';
+
 /**
  * Memo body only. Used in full-screen modal and in the right-side panel.
+ * When embedded, ref can be used to call downloadPDF() from the parent (e.g. panel header).
  */
-export default function InvestmentMemoContent({
-  startup,
-  onClose,
-  embedded = false,
-}: InvestmentMemoContentProps) {
+const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, InvestmentMemoContentProps>(function InvestmentMemoContent(
+  { startup, onClose, embedded = false },
+  ref
+) {
   const hasReview = startup.review != null;
   const hasPartner = startup.partner != null;
   const judgmentSummary = hasPartner ? buildJudgmentSummary(startup) : null;
@@ -125,8 +270,27 @@ export default function InvestmentMemoContent({
     ? 'flex flex-col h-full min-h-0'
     : 'flex flex-col';
 
+  const handleDownloadPDF = useCallback(() => {
+    const doc = buildMemoPDF(startup);
+    const safeName = (startup.scout.name ?? 'memo').replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 60);
+    doc.save(`${safeName}-investment-memo.pdf`);
+  }, [startup]);
+
+  useImperativeHandle(ref, () => ({ downloadPDF: handleDownloadPDF }), [handleDownloadPDF]);
+
   return (
     <div className={wrapperCls}>
+      {onClose && (
+        <div className="flex-none flex items-center justify-end gap-2 pb-4 border-b border-oxford/[0.06]">
+          <button type="button" onClick={handleDownloadPDF} className={actionBtnCls}>
+            Download PDF
+          </button>
+          <button type="button" onClick={onClose} className={actionBtnCls}>
+            Close
+          </button>
+        </div>
+      )}
+      <div className="flex-1 min-h-0 flex flex-col bg-paper">
       <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-1">
         Investment memo
       </p>
@@ -150,11 +314,6 @@ export default function InvestmentMemoContent({
             <p className="font-sans text-[13px] text-oxford leading-relaxed">
               {judgmentSummary}
             </p>
-            {startup.partner?.llm_fallback_reason && (
-              <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/40 mt-2">
-                LLM-assisted · {startup.partner.llm_fallback_reason}
-              </p>
-            )}
           </section>
         )}
 
@@ -269,54 +428,6 @@ export default function InvestmentMemoContent({
           </section>
         )}
 
-        {startup.review?.reviewer_disagreement && startup.review?.reviews && startup.review.reviews.length > 1 && (
-          <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
-              Reviewer divergence
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left font-sans text-[13px]">
-                <thead>
-                  <tr className="border-b border-oxford/[0.06]">
-                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 pr-4">Reviewer</th>
-                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 px-2 text-center">Mkt</th>
-                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 px-2 text-center">Prd</th>
-                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 px-2 text-center">Tch</th>
-                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 px-2 text-center">Exe</th>
-                    <th className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 py-2 pl-2 text-center">Verdict</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {startup.review.reviews.map((r, i) => (
-                    <tr key={i} className="border-b border-oxford/[0.06]">
-                      <td className="font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/60 py-2 pr-4">{r.reviewer_type.replace('Reviewer', '')}</td>
-                      <td className="text-oxford/70 py-2 px-2 text-center tabular-nums">{r.market_score}</td>
-                      <td className="text-oxford/70 py-2 px-2 text-center tabular-nums">{r.product_score}</td>
-                      <td className="text-oxford/70 py-2 px-2 text-center tabular-nums">{r.technical_score}</td>
-                      <td className="text-oxford/70 py-2 px-2 text-center tabular-nums">{r.execution_score}</td>
-                      <td className="font-mono text-[10px] uppercase text-oxford/70 py-2 pl-2 text-center">{r.verdict}</td>
-                    </tr>
-                  ))}
-                  {startup.review.score_variance && (
-                    <tr>
-                      <td className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/40 py-2 pr-4">Variance</td>
-                      {['market_score', 'product_score', 'technical_score', 'execution_score'].map((dim) => {
-                        const v = startup.review?.score_variance?.[dim] ?? 0;
-                        return (
-                          <td key={dim} className={`py-2 px-2 text-center tabular-nums font-mono text-[10px] ${v > 1.5 ? 'text-oxford' : 'text-oxford/40'}`}>
-                            {v.toFixed(1)}
-                          </td>
-                        );
-                      })}
-                      <td />
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
         {(primaryRisks.length > 0 || secondaryRisks.length > 0) && (
           <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
             <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
@@ -368,6 +479,22 @@ export default function InvestmentMemoContent({
           </section>
         )}
 
+        {startup.scout.references && startup.scout.references.length > 0 && (
+          <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
+              References
+            </h2>
+            <ul className="space-y-1 font-sans text-[13px] text-oxford/80 leading-relaxed">
+              {startup.scout.references.map((ref, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="text-oxford/40">·</span>
+                  <span>{ref}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {hasPartner && (
           <section className="pt-6 border-t border-oxford/[0.06]">
             <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
@@ -407,44 +534,13 @@ export default function InvestmentMemoContent({
                   <span className="uppercase tracking-wide">Next</span> · {startup.partner!.next_action}
                 </p>
               )}
-              {startup.partner?.portfolio_context_at_decision && (
-                <div className="mt-4 pt-3 border-t border-oxford/[0.06]">
-                  <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 mb-2">Portfolio context at decision</p>
-                  <p className="font-sans text-[12px] text-oxford/60">
-                    Portfolio size: {startup.partner.portfolio_context_at_decision.total_portfolio_size} companies
-                    {startup.partner.portfolio_context_at_decision.sector_counts[startup.scout.sector] != null && (
-                      <> · {startup.partner.portfolio_context_at_decision.sector_counts[startup.scout.sector]} in {startup.scout.sector}</>
-                    )}
-                    {startup.partner?.rationale?.toLowerCase().includes('concentration') && (
-                      <> · sector concentration flagged</>
-                    )}
-                  </p>
-                </div>
-              )}
             </div>
           </section>
         )}
       </div>
-
-        <div className="mt-4 pt-2">
-          <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-oxford/25">
-            {startup.scout.prompt_version && <>scout {startup.scout.prompt_version}</>}
-            {startup.scout.prompt_version && startup.partner?.prompt_version && <> · </>}
-            {startup.partner?.prompt_version && <>partner {startup.partner.prompt_version}</>}
-          </p>
-        </div>
-
-      {onClose && (
-        <div className="flex-none pt-6 mt-4 border-t border-oxford/[0.06]">
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-[44px] px-4 font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 hover:text-oxford active:opacity-80 transition-colors duration-300 rounded-none"
-          >
-            Close
-          </button>
-        </div>
-      )}
+      </div>
     </div>
   );
-}
+});
+
+export default InvestmentMemoContent;

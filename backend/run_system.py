@@ -31,6 +31,49 @@ from portfolio.cost_control import CostController
 from memory import DealMemory
 
 
+class ColorFormatter(logging.Formatter):
+    """
+    Color-coded logs by subsystem for terminal readability.
+
+    Examples:
+    - scout.engine      → cyan
+    - reviewer.engine   → magenta
+    - partner.engine    → yellow
+    - portfolio.engine  → green
+    - storage           → blue
+    - system / default  → dim white
+    """
+
+    RESET = "\033[0m"
+    COLORS = {
+        "scout.engine": "\033[38;5;45m",      # bright cyan
+        "reviewer.engine": "\033[38;5;207m",  # magenta
+        "partner.engine": "\033[38;5;220m",   # yellow
+        "portfolio.engine": "\033[38;5;40m",  # green
+        "storage": "\033[38;5;33m",           # blue
+        "serp": "\033[38;5;208m",             # orange
+        "system": "\033[38;5;250m",           # grey
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        name = record.name
+        # Map child loggers like scout.engine.http to parent color
+        color = None
+        for key, val in self.COLORS.items():
+            if name == key or name.startswith(f"{key}."):
+                color = val
+                break
+        if color is None:
+            color = self.COLORS.get("system", "")
+
+        original_name = record.name
+        try:
+            record.name = f"{color}{original_name}{self.RESET}"
+            return super().format(record)
+        finally:
+            record.name = original_name
+
+
 async def run_system():
     """Run both Scout and Reviewer engines in parallel."""
     # Configure logging
@@ -39,6 +82,15 @@ async def run_system():
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    # Apply color formatter to all root handlers
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers:
+        handler.setFormatter(
+            ColorFormatter(
+                fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+        )
     
     logger = logging.getLogger("system")
     
@@ -58,6 +110,10 @@ async def run_system():
     # Initialize shared storage
     storage = Storage(file_path=storage_path)
     logger.info(f"Using storage: {storage_path}")
+    # Remove startups without references (references are mandatory)
+    n_removed = storage.remove_startups_without_references()
+    if n_removed:
+        logger.info(f"Cleaned {n_removed} startup(s) without references from database")
     
     # Create shared cost controller
     cost_controller = CostController()

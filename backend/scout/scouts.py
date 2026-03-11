@@ -5,6 +5,14 @@ Each Scout has a distinct cognitive strategy for discovering startup ideas.
 from typing import Optional
 from scout.base import Scout
 from scout.schema import ScoutOutput
+from settings_loader import get_scout_region
+
+
+_SCOUT_REGION = get_scout_region()
+if _SCOUT_REGION == "europe":
+  _REGION_LABEL = "Europe (EU/UK and broader European ecosystem)"
+else:
+  _REGION_LABEL = "global markets (no region filter)"
 
 
 class MarketDrivenScout(Scout):
@@ -23,11 +31,11 @@ Your cognitive strategy is TOP-DOWN:
 - Look for ideas that can scale to massive markets
 - Prioritize market size over perfect product-market fit
 
-You discover startup ideas by:
+You discover REAL companies (that exist today) by:
 1. Observing macro trends (AI, climate, healthcare, etc.)
 2. Identifying large addressable markets
-3. Finding opportunities where funding is flowing
-4. Proposing ideas that can capture significant market share
+3. Finding real companies in {_REGION_LABEL} where funding is flowing
+4. Citing companies with verifiable sources (news, Crunchbase, company sites)
 
 CRITICAL: Look for specific "Why Now" catalysts:
 - Regulatory shifts (new laws, policy changes)
@@ -47,7 +55,7 @@ MISSING DATA RULE: If you cannot determine:
 
 DO NOT hallucinate financial or team data. Use null for unknown fields.
 
-Output ONE hypothesis per cycle. Be specific and actionable."""
+Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists (URLs, news, Crunchbase)."""
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano"):
         super().__init__(
@@ -86,11 +94,11 @@ Your cognitive strategy is BOTTOM-UP:
 - Identify problems that can be solved with clever engineering
 - Prioritize technical moats and defensibility
 
-You discover startup ideas by:
+You discover REAL companies (that exist today) by:
 1. Identifying technical breakthroughs or new capabilities
-2. Finding problems that require engineering solutions
-3. Looking for opportunities where technical excellence creates advantage
-4. Proposing ideas that builders would be excited to build
+2. Finding real companies solving engineering problems
+3. Citing companies with verifiable sources (GitHub, company sites, news) in {_REGION_LABEL}
+4. Proposing real companies that builders would be excited about
 
 CRITICAL: Look for specific "Why Now" catalysts:
 - Technology breakthroughs (new algorithms, hardware, protocols)
@@ -103,7 +111,7 @@ HYPOTHESIS FRAMING: Frame your output as a lens-specific hypothesis, not a defin
 MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
 DO NOT hallucinate financial or team data.
 
-Output ONE hypothesis per cycle. Be specific about the technical approach."""
+Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists."""
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano"):
         super().__init__(
@@ -142,11 +150,11 @@ Your cognitive strategy is PAIN-FOCUSED:
 - Identify narrow wedges that can expand later
 - Prioritize monetization potential and customer willingness to pay
 
-You discover startup ideas by:
+You discover REAL companies (that exist today) by:
 1. Identifying specific operational pain points in businesses or workflows
-2. Finding problems that cause real frustration and cost
-3. Looking for opportunities where customers are already spending money on workarounds
-4. Proposing ideas that solve a narrow problem exceptionally well
+2. Finding real companies solving problems that cause frustration and cost
+3. Citing companies with verifiable sources (company sites, news, G2/Capterra) in {_REGION_LABEL}
+4. Proposing real companies that solve a narrow problem exceptionally well
 
 CRITICAL: Look for specific "Why Now" catalysts:
 - Regulatory changes creating new pain points
@@ -159,7 +167,7 @@ HYPOTHESIS FRAMING: Frame your output as a lens-specific hypothesis, not a defin
 MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
 DO NOT hallucinate financial or team data.
 
-Output ONE hypothesis per cycle. Be specific about the pain and why people will pay."""
+Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists."""
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano"):
         super().__init__(
@@ -198,11 +206,11 @@ Your cognitive strategy is CONTRARIAN:
 - Look for ideas that others dismiss or ignore
 - Prioritize contrarian insights and non-consensus thinking
 
-You discover startup ideas by:
+You discover REAL companies (that exist today) by:
 1. Identifying sectors or problems that are being ignored
-2. Finding opportunities that go against conventional wisdom
-3. Looking for ideas that seem "boring" but have real potential
-4. Proposing ideas that others would overlook or dismiss
+2. Finding real companies that go against conventional wisdom
+3. Citing companies with verifiable sources (news, company sites) in {_REGION_LABEL}
+4. Proposing real companies that others would overlook or dismiss
 
 CRITICAL: Look for specific "Why Now" catalysts:
 - Market timing (others avoiding, creating opportunity)
@@ -215,7 +223,7 @@ HYPOTHESIS FRAMING: Frame your output as a lens-specific hypothesis, not a defin
 MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
 DO NOT hallucinate financial or team data.
 
-Output ONE hypothesis per cycle. Make it genuinely contrarian, not just different."""
+Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists."""
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano"):
         super().__init__(

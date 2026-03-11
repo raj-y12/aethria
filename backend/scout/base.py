@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI
 
 from scout.schema import ScoutOutput, validate_scout_output, generate_id
-from utils.prompt_version import hash_prompt
+from serp_client import maybe_enrich_references
 
 
 logger = logging.getLogger(__name__)
@@ -44,56 +44,6 @@ class Scout(ABC):
         self.logger = logging.getLogger(f"scout.{scout_type}")
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.model = model
-        self._dynamic_context = ""
-        self._last_token_usage = 0
-        self.agent_name = self._get_agent_name()
-        self._load_prompt_from_library()
-    
-    def set_dynamic_context(self, context: str):
-        """Set dynamic context to prepend to user message in LLM calls."""
-        self._dynamic_context = context
-
-    def _get_agent_name(self) -> str:
-        """Map scout_type to agent name for prompt library lookup."""
-        mapping = {
-            "market_driven": "MarketDrivenScout",
-            "builder_technical": "BuilderTechnicalScout",
-            "pain_point": "PainPointScout",
-            "contrarian": "ContrarianScout",
-        }
-        return mapping.get(self.scout_type, self.scout_type)
-
-    def _load_prompt_from_library(self) -> None:
-        """Load latest prompt from data/meta/prompt_library.json if available."""
-        try:
-            from pathlib import Path
-            lib_path = Path(__file__).resolve().parent.parent / "data" / "meta" / "prompt_library.json"
-            if not lib_path.exists():
-                return
-            import json as _json
-            with open(lib_path, "r") as f:
-                library = _json.load(f)
-            if not isinstance(library, dict):
-                return
-            # Find latest entry for this agent
-            latest_key = None
-            latest_time = ""
-            for key, entry in library.items():
-                if key.startswith(self.agent_name + ":"):
-                    created = entry.get("created_at", "")
-                    if created > latest_time:
-                        latest_time = created
-                        latest_key = key
-            if latest_key and library[latest_key].get("prompt"):
-                self.system_prompt = library[latest_key]["prompt"]
-                self.logger.info(f"Loaded prompt from library: {latest_key}")
-        except Exception as e:
-            self.logger.debug(f"Could not load prompt from library: {e}")
-
-    def set_prompt(self, new_prompt: str) -> None:
-        """Set a new system prompt (called by MetaAgent). Updates hash."""
-        self.system_prompt = new_prompt
-        self.logger.info(f"Prompt updated for {self.agent_name} ({hash_prompt(new_prompt)})")
     
     @abstractmethod
     async def discover(self) -> Optional[ScoutOutput]:
@@ -115,48 +65,48 @@ class Scout(ABC):
             Parsed JSON dict if successful, None if failed.
         """
         try:
-            base_user_content = (
-                "Propose one startup idea as a HYPOTHESIS, not a definitive conclusion. "
-                "Output ONLY valid JSON matching the ScoutOutput schema "
-                "(resources/schemas/scout_output_v1.json). Exact shape:\n\n"
-                "{\n"
-                '  "id": "uuid",\n'
-                f'  "scout_type": "{self.scout_type}",\n'
-                '  "name": "string",\n'
-                '  "one_line": "string",\n'
-                '  "sector": "string",\n'
-                '  "problem": "string",\n'
-                '  "solution": "string",\n'
-                '  "target_users": "string",\n'
-                '  "why_now": "string",\n'
-                '  "confidence": number between 0 and 1,\n'
-                '  "primary_thesis": "string (concise: why this idea is investable from your lens)",\n'
-                '  "key_assumptions": ["string", "string", ...],  // exactly 2-4 assumptions the idea depends on\n'
-                '  "biggest_unknown": "string (single largest unresolved risk or uncertainty)",\n'
-                '  "funding_stage": "Pre-Seed" | "Seed" | "Series A" | "Series B" | "Series C+" | "Unknown" | null,\n'
-                '  "est_tam": "string" | null\n'
-                "}\n\n"
-                "REQUIRED: Include primary_thesis, key_assumptions (2-4 items), and biggest_unknown. "
-                "Do NOT make up financial data, team information, or competitors; use null for funding_stage/est_tam if unknown. "
-                "Do not include any text before or after the JSON. Output only the JSON object."
-            )
-            if self._dynamic_context:
-                base_user_content = self._dynamic_context + "\n\n" + base_user_content
-
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": base_user_content},
+                    {
+                        "role": "user",
+                        "content": (
+                            "Find one REAL VC-BACKABLE STARTUP (Seed to Series C, typically private, technology-driven), "
+                            "not a hypothetical idea and not a mega-cap incumbent like Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, or their cloud brands. "
+                            "Output ONLY valid JSON matching the ScoutOutput schema "
+                            "(resources/schemas/scout_output_v1.json). Exact shape:\n\n"
+                            "{\n"
+                            '  \"id\": \"uuid\",\\n'
+                            f'  \"scout_type\": \"{self.scout_type}\",\\n'
+                            '  \"name\": \"string (actual startup/company name)\",\\n'
+                            '  \"one_line\": \"string\",\\n'
+                            '  \"sector\": \"string\",\\n'
+                            '  \"problem\": \"string\",\\n'
+                            '  \"solution\": \"string\",\\n'
+                            '  \"target_users\": \"string\",\\n'
+                            '  \"why_now\": \"string\",\\n'
+                            '  \"confidence\": number between 0 and 1,\\n'
+                            '  \"primary_thesis\": \"string (concise: why investable from your lens)\",\\n'
+                            '  \"key_assumptions\": [\"string\", \"string\", ...],  // exactly 2-4 assumptions\\n'
+                            '  \"biggest_unknown\": \"string (single largest risk or uncertainty)\",\\n'
+                            '  \"funding_stage\": \"Pre-Seed\" | \"Seed\" | \"Series A\" | \"Series B\" | \"Series C+\" | \"Unknown\" | null,\\n'
+                            '  \"est_tam\": \"string\" | null,\\n'
+                            '  \"references\": [\"string\", ...] // REQUIRED: 1-8 sources that PROVE the company exists\\n'
+                            "}\n\n"
+                            "CRITICAL - references must PROVE the company exists: company website URL, funding/news article, Crunchbase, LinkedIn, or press release. "
+                            "Each reference must be a concrete, verifiable source (e.g. \"Startup X - https://startupx.com\", \"Startup X raised $10M - TechCrunch 2024\"). "
+                            "Do NOT use \"General domain knowledge\" or \"no specific external sources\"—those are rejected. "
+                            "Avoid giant public companies and hyperscalers (Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, etc.). "
+                            "If you cannot find a suitable VC-scale startup with verifiable sources, return nothing. "
+                            "Do NOT invent company names or make up sources. Use null for funding_stage/est_tam if unknown. "
+                            "Output only the JSON object, no text before or after."
+                        ),
+                    },
                 ],
                 response_format={"type": "json_object"},
             )
             
-            if hasattr(response, 'usage') and response.usage:
-                self._last_token_usage = getattr(response.usage, 'total_tokens', 0) or 0
-            else:
-                self._last_token_usage = 0
-
             content = response.choices[0].message.content
             if not content:
                 self.logger.error("Empty response from LLM")
@@ -171,6 +121,8 @@ class Scout(ABC):
             
             # Ensure scout_type matches
             data["scout_type"] = self.scout_type
+            # Optionally enrich references using SERP (guarded + rate-limited)
+            data = maybe_enrich_references(data)
             
             return data
             
@@ -206,7 +158,6 @@ class Scout(ABC):
             
             # Validate against schema
             validated = validate_scout_output(data)
-            validated["prompt_version"] = hash_prompt(self.system_prompt)
             return validated
             
         except ValueError as e:

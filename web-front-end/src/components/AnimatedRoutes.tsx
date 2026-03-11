@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import SystemAccessPage from './SystemAccessPage';
@@ -10,6 +10,20 @@ const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 const PAPER = '#F2F0EA';
 const OXFORD = '#002147';
 
+// Private routes: any file in src/private/*.tsx is exposed at /<filename-lowercase>.
+// Delete the file to remove that route at build time.
+const privateModules = import.meta.glob<{ default: React.ComponentType }>('../private/*.tsx');
+const privateRoutes: Record<string, React.LazyExoticComponent<React.ComponentType>> = {};
+for (const key of Object.keys(privateModules)) {
+  const segment = key.replace(/^\.\.\/private\//, '').replace(/\.tsx$/, '').toLowerCase();
+  if (segment) {
+    const path = '/' + segment;
+    privateRoutes[path] = lazy(privateModules[key] as () => Promise<{ default: React.ComponentType }>);
+  }
+}
+
+const PUBLIC_PATHS = ['/', '/home', '/request-access'];
+
 export default function AnimatedRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -19,12 +33,20 @@ export default function AnimatedRoutes() {
   if (pathname === '/') element = <SystemAccessPage />;
   else if (pathname === '/home') element = <HomePage />;
   else if (pathname === '/request-access') element = <RequestAccessPage />;
+  else if (privateRoutes[pathname]) {
+    const PrivateComponent = privateRoutes[pathname];
+    element = (
+      <Suspense fallback={<div style={{ minHeight: '100dvh', background: PAPER }} />}>
+        <PrivateComponent />
+      </Suspense>
+    );
+  }
 
   useEffect(() => {
-    if (pathname !== '/' && pathname !== '/home' && pathname !== '/request-access') {
+    if (!element && !PUBLIC_PATHS.includes(pathname)) {
       navigate('/', { replace: true });
     }
-  }, [pathname, navigate]);
+  }, [pathname, navigate, element]);
 
   useEffect(() => {
     const themeColor = pathname === '/' ? OXFORD : PAPER;

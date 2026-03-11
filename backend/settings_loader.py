@@ -20,6 +20,12 @@ DEFAULT_SETTINGS = {
         "partners_enabled": True,
         "max_agents_per_run": 10,
         "confidence_threshold": 0.5,
+        # Scout-specific config
+        # Region focus for discovery. "europe" by default; UI can switch later.
+        "scout_region": "europe",  # options: "europe", "global"
+        # Optional SERP usage for discovery; conservative defaults to protect quota.
+        "scout_serp_enabled": False,
+        "scout_serp_daily_budget": 5,
     },
     "portfolio": {
         "auto_watchlist": True,
@@ -66,13 +72,30 @@ def is_partners_enabled() -> bool:
     return load_settings().get("agent_config", {}).get("partners_enabled", True)
 
 
-def get_meta_agent_settings() -> dict:
-    """Return Meta-Agent configuration from environment."""
-    return {
-        "interval_seconds": int(os.getenv("META_AGENT_INTERVAL_SECONDS", "86400")),
-        "model": os.getenv("META_AGENT_MODEL", "gpt-5-nano"),
-        "enabled": os.getenv("META_AGENT_ENABLED", "true").lower() == "true",
-        "min_reviews": int(os.getenv("META_AGENT_MIN_REVIEWS", "20")),
-        "min_decisions": int(os.getenv("META_AGENT_MIN_DECISIONS", "10")),
-        "mutation_cooldown_cycles": int(os.getenv("META_AGENT_MUTATION_COOLDOWN_CYCLES", "3")),
-    }
+def get_scout_region() -> str:
+    """
+    Return the current scout region focus.
+    Values: "europe" (default) or "global".
+    """
+    region = load_settings().get("agent_config", {}).get("scout_region", "europe")
+    if region not in ("europe", "global"):
+        return "europe"
+    return region
+
+
+def is_scout_serp_enabled() -> bool:
+    """Whether Scouts are allowed to use SERP (guarded + rate-limited)."""
+    return bool(load_settings().get("agent_config", {}).get("scout_serp_enabled", False))
+
+
+def get_scout_serp_daily_budget() -> int:
+    """
+    Max SERP queries per day across all Scouts.
+    Conservative default (5/day) to keep well under 250/month.
+    """
+    raw = load_settings().get("agent_config", {}).get("scout_serp_daily_budget", 5)
+    try:
+        n = int(raw)
+    except Exception:
+        return 5
+    return max(0, n)

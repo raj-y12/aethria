@@ -2,7 +2,10 @@
  * Settings API. Control plane only. No auto-save; explicit PATCH.
  */
 
-const API_BASE = typeof window !== 'undefined' ? '' : 'http://localhost:8000';
+const API_BASE =
+  typeof window !== 'undefined'
+    ? (import.meta.env.VITE_API_URL ?? '')
+    : 'http://localhost:8000';
 
 export interface CostBudget {
   max_tokens_per_run: number;
@@ -17,6 +20,10 @@ export interface AgentConfig {
   partners_enabled: boolean;
   max_agents_per_run: number;
   confidence_threshold: number | string;
+  // Scout-specific config
+  scout_region: string; // "europe" | "global"
+  scout_serp_enabled: boolean;
+  scout_serp_daily_budget: number;
 }
 
 export interface Portfolio {

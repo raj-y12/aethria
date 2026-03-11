@@ -30,7 +30,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "PATCH", "POST"],
+    allow_methods=["GET", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -75,6 +75,18 @@ def _validate_settings(body: dict) -> list[str]:
                     errors.append("agent_config.confidence_threshold must be a number or string")
                 elif isinstance(v, (int, float)) and (v < 0 or v > 1):
                     errors.append("agent_config.confidence_threshold must be between 0 and 1 when numeric")
+            # Scout-specific config
+            if "scout_region" in ac:
+                if not isinstance(ac["scout_region"], str):
+                    errors.append("agent_config.scout_region must be a string")
+                elif ac["scout_region"] not in ("europe", "global"):
+                    errors.append("agent_config.scout_region must be one of: europe, global")
+            if "scout_serp_enabled" in ac and not isinstance(ac["scout_serp_enabled"], bool):
+                errors.append("agent_config.scout_serp_enabled must be a boolean")
+            if "scout_serp_daily_budget" in ac:
+                v = ac["scout_serp_daily_budget"]
+                if not isinstance(v, (int, float)) or v < 0:
+                    errors.append("agent_config.scout_serp_daily_budget must be a non-negative number")
     pf = body.get("portfolio")
     if pf is not None:
         if not isinstance(pf, dict):
@@ -112,31 +124,28 @@ def _backend_to_frontend(raw: dict) -> dict:
     if partner and partner.get("partnered_at"):
         timestamps["partnered_at"] = _to_iso(partner["partnered_at"])
 
-    scout_block = {
-        "id": sid,
-        "scout_type": scout.get("scout_type", "market_driven"),
-        "name": scout.get("name", ""),
-        "one_line": scout.get("one_line", ""),
-        "sector": scout.get("sector", ""),
-        "problem": scout.get("problem"),
-        "solution": scout.get("solution"),
-        "target_users": scout.get("target_users"),
-        "why_now": scout.get("why_now", ""),
-        "confidence": scout.get("confidence_score", 0.5),
-        "funding_stage": scout.get("funding_stage"),
-        "est_tam": scout.get("est_tam"),
-    }
-    if scout.get("prompt_version"):
-        scout_block["prompt_version"] = scout["prompt_version"]
-
     out = {
         "id": sid,
-        "scout": scout_block,
+        "scout": {
+            "id": sid,
+            "scout_type": scout.get("scout_type", "market_driven"),
+            "name": scout.get("name", ""),
+            "one_line": scout.get("one_line", ""),
+            "sector": scout.get("sector", ""),
+            "problem": scout.get("problem"),
+            "solution": scout.get("solution"),
+            "target_users": scout.get("target_users"),
+            "why_now": scout.get("why_now", ""),
+            "confidence": scout.get("confidence_score", 0.5),
+            "funding_stage": scout.get("funding_stage"),
+            "est_tam": scout.get("est_tam"),
+            "references": scout.get("references") or [],
+        },
         "timestamps": timestamps,
     }
 
     if review:
-        review_block = {
+        out["review"] = {
             "market_score": review.get("market_score"),
             "product_score": review.get("product_score"),
             "technical_score": review.get("technical_score"),
@@ -154,23 +163,17 @@ def _backend_to_frontend(raw: dict) -> dict:
             "investment_thesis": review.get("investment_thesis") or None,
             "risk_mitigation": review.get("risk_mitigation") or None,
         }
-        if review.get("prompt_version"):
-            review_block["prompt_version"] = review["prompt_version"]
-        out["review"] = review_block
     else:
         out["review"] = None
 
     if partner:
-        partner_block = {
+        out["partner"] = {
             "decision": partner.get("decision", "NO"),
             "confidence": partner.get("conviction_level"),
             "rationale": partner.get("rationale"),
             "next_action": partner.get("next_action"),
             "human_review_required": partner.get("human_review_required", False),
         }
-        if partner.get("prompt_version"):
-            partner_block["prompt_version"] = partner["prompt_version"]
-        out["partner"] = partner_block
     else:
         out["partner"] = None
 
@@ -204,90 +207,13 @@ def get_startup_memo(startup_id: str):
 
 @app.get("/health")
 def health():
-    storage = _get_storage()
-    all_startups = storage.get_all_startups(skip_invalid=True)
-    pending = sum(
-        1 for s in all_startups
-        if s.partner_info and s.partner_info.human_review_required and s.human_resolution is None
-    )
-    return {"status": "ok", "pending_escalations": pending}
-
-
-@app.get("/api/escalations")
-def get_escalations():
-    """Return startups requiring human review that haven't been resolved."""
-    storage = _get_storage()
-    all_startups = storage.get_all_startups(skip_invalid=True)
-    escalations = []
-    for s in all_startups:
-        if s.partner_info and s.partner_info.human_review_required:
-            if s.human_resolution is None:
-                escalations.append(_backend_to_frontend(s.to_dict()))
-    return escalations
-
-
-@app.post("/api/escalations/{startup_id}/resolve")
-def resolve_escalation(startup_id: str, body: dict):
-    """Resolve a human review escalation."""
-    decision = body.get("decision")
-    notes = body.get("notes", "")
-    if decision not in ("YES", "NO", "MAYBE"):
-        raise HTTPException(status_code=422, detail="decision must be YES, NO, or MAYBE")
-    storage = _get_storage()
-    startup = storage.get_startup(startup_id)
-    if not startup:
-        raise HTTPException(status_code=404, detail="Startup not found")
-    from datetime import datetime
-    resolution = {
-        "decision": decision,
-        "notes": notes,
-        "resolved_at": datetime.now().isoformat(),
-    }
-
-    def updater(data):
-        for i, item in enumerate(data):
-            if item.get("startup_id") == startup_id:
-                item["human_resolution"] = resolution
-                return data
-        return data
-
-    storage._atomic_update(updater)
-    return {"status": "ok", "resolution": resolution}
+    return {"status": "ok"}
 
 
 @app.get("/api/settings")
 def get_settings():
-    """Return current settings (control plane) with budget status and system health."""
-    from portfolio.cost_control import CostController
-    from portfolio.store import PortfolioStore
-    settings = load_settings()
-    try:
-        cc = CostController()
-        settings["budget_status"] = cc.get_all_budget_status()
-    except Exception:
-        settings["budget_status"] = {}
-    
-    # Read calibration data from agent_metrics
-    try:
-        store = PortfolioStore()
-        metrics = store._read_file(store.files["agent_metrics"])
-        system_health = {}
-        for m in metrics:
-            if m.get("id") == "verdict_distribution":
-                system_health["verdict_distribution"] = m.get("verdict_distribution")
-                system_health["calibration_warning"] = m.get("calibration_warning")
-                break
-        settings["system_health"] = system_health
-    except Exception:
-        settings["system_health"] = {}
-    
-    try:
-        from settings_loader import get_meta_agent_settings
-        settings["meta_agent"] = get_meta_agent_settings()
-    except Exception:
-        settings["meta_agent"] = {}
-
-    return settings
+    """Return current settings (control plane)."""
+    return load_settings()
 
 
 @app.patch("/api/settings")
@@ -305,183 +231,3 @@ def patch_settings(body: dict):
                 current[section][k] = v
     _save_settings(current)
     return current
-
-
-@app.get("/api/analytics/watchlist")
-def get_watchlist_analytics():
-    """Return watchlist age statistics."""
-    from portfolio.store import PortfolioStore
-    from datetime import datetime
-    store = PortfolioStore()
-    watchlist = store.get_all_watchlist()
-    if not watchlist:
-        return {"total": 0, "stale": 0, "avg_days": 0.0}
-    now = datetime.now()
-    days_list = []
-    stale = 0
-    for entry in watchlist:
-        added = entry.get("added_at")
-        if added:
-            d = (now - datetime.fromisoformat(added)).days
-            days_list.append(d)
-            if entry.get("stale_warning"):
-                stale += 1
-    return {
-        "total": len(watchlist),
-        "stale": stale,
-        "avg_days": sum(days_list) / len(days_list) if days_list else 0.0,
-    }
-
-
-@app.get("/api/signals")
-def get_signals():
-    """Return recent signals (last 50)."""
-    from portfolio.store import PortfolioStore
-    store = PortfolioStore()
-    signals = store._read_file(store.files["signals"])
-    signals.sort(key=lambda s: s.get("detected_at", ""), reverse=True)
-    return signals[:50]
-
-
-@app.get("/api/analytics/rejections")
-def get_rejection_analytics():
-    """Return rejection pattern analytics."""
-    from portfolio.rejection import RejectionAnalyzer
-    analyzer = RejectionAnalyzer()
-    return analyzer.get_patterns()
-
-
-@app.get("/api/analytics/concentration")
-def get_concentration_analytics():
-    """Return sector concentration and theme cluster data."""
-    from analytics.clustering import ClusterAnalyzer
-    analyzer = ClusterAnalyzer()
-    return analyzer._read()
-
-
-@app.get("/api/meta/reports")
-def get_meta_reports():
-    """Return last 10 Meta-Agent cycle reports."""
-    import json
-    from pathlib import Path
-    path = Path(__file__).resolve().parent / "data" / "meta" / "meta_reports.json"
-    if not path.exists():
-        return []
-    try:
-        with open(path, "r") as f:
-            reports = json.load(f)
-        if not isinstance(reports, list):
-            return []
-        return reports[-10:]
-    except (json.JSONDecodeError, IOError):
-        return []
-
-
-@app.get("/api/meta/prompt-library")
-def get_prompt_library():
-    """Return versioned history of all prompt variants."""
-    import json
-    from pathlib import Path
-    path = Path(__file__).resolve().parent / "data" / "meta" / "prompt_library.json"
-    if not path.exists():
-        return {}
-    try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        return {}
-
-
-@app.get("/api/meta/weights")
-def get_scout_weights():
-    """Return current scout type run weights."""
-    from meta_agent.reweighter import load_weights
-    return load_weights()
-
-
-@app.get("/api/meta/calibration")
-def get_calibration_state():
-    """Return current calibration state and active overrides."""
-    from meta_agent.calibrator import load_calibration_state
-    return load_calibration_state()
-
-
-@app.post("/api/meta/trigger")
-async def trigger_meta_cycle():
-    """Manually trigger a Meta-Agent cycle (development/oversight use)."""
-    from meta_agent.agent import MetaAgent
-    agent = MetaAgent()
-    try:
-        report = await agent.run_cycle()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Meta-Agent cycle failed: {e}")
-    return {"status": "triggered", "cycle_number": report.get("cycle_number") if report else 0}
-
-
-@app.post("/api/waitlist")
-def add_to_waitlist(body: dict):
-    """Add a new entry to the waitlist."""
-    import json
-    from pathlib import Path
-    from datetime import datetime
-
-    name = body.get("name", "").strip()
-    email = body.get("email", "").strip()
-    role = body.get("role", "").strip()
-    firm = body.get("firm", "").strip()
-    linkedin = body.get("linkedin", "").strip()
-
-    if not name or not email:
-        raise HTTPException(status_code=422, detail="name and email are required")
-
-    waitlist_path = Path(__file__).resolve().parent / "data" / "waitlist.json"
-    waitlist_path.parent.mkdir(parents=True, exist_ok=True)
-
-    entries = []
-    if waitlist_path.exists():
-        try:
-            with open(waitlist_path, "r") as f:
-                entries = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            entries = []
-
-    for e in entries:
-        if e.get("email", "").lower() == email.lower():
-            position = entries.index(e) + 1
-            return {"status": "already_registered", "position": position}
-
-    entry = {
-        "name": name,
-        "email": email,
-        "role": role,
-        "firm": firm,
-        "linkedin": linkedin,
-        "submitted_at": body.get("submitted_at", datetime.now().isoformat()),
-    }
-    entries.append(entry)
-
-    import os
-    temp_path = waitlist_path.with_suffix(".tmp")
-    with open(temp_path, "w") as f:
-        json.dump(entries, f, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-    temp_path.replace(waitlist_path)
-
-    return {"status": "ok", "position": len(entries)}
-
-
-@app.get("/api/waitlist")
-def get_waitlist():
-    """Return full waitlist."""
-    import json
-    from pathlib import Path
-    waitlist_path = Path(__file__).resolve().parent / "data" / "waitlist.json"
-    if not waitlist_path.exists():
-        return {"count": 0, "entries": []}
-    try:
-        with open(waitlist_path, "r") as f:
-            entries = json.load(f)
-        return {"count": len(entries), "entries": entries}
-    except (json.JSONDecodeError, IOError):
-        return {"count": 0, "entries": []}

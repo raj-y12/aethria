@@ -5,15 +5,23 @@ import LoadingAnimation from './components/LoadingAnimation';
 import GrainOverlay from './components/GrainOverlay';
 import SettingsPage from './settings/SettingsPage';
 import { fetchStartups } from './api/startups';
-import { useIdleTimeout, useSystemData } from './hooks';
+import { useIdleTimeout } from './hooks';
 import type { Startup } from './types/startup';
 
 const MIN_LOADING_MS = 2000;
 const IDLE_MS = 20 * 60 * 1000;
 const STORAGE_KEY = 'aethria_last_activity';
+/** Poll interval to refetch startups when a decision has been made on the backend. */
+const STARTUPS_POLL_MS = 12 * 1000;
 
 function hasValidSession(): boolean {
   if (typeof window === 'undefined') return false;
+  // When opened from /private-access, force fresh login every time
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('forceLogin') === '1') {
+    localStorage.removeItem(STORAGE_KEY);
+    return false;
+  }
   const last = localStorage.getItem(STORAGE_KEY);
   if (!last) return false;
   const lastActivity = parseInt(last, 10);
@@ -22,35 +30,37 @@ function hasValidSession(): boolean {
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-function SystemLayout() {
-  const sys = useSystemData();
-  return (
-    <MainLayout
-      startups={sys.startups}
-      signals={sys.signals}
-      escalations={sys.escalations}
-      metaReports={sys.metaReports}
-      rejectionAnalytics={sys.rejectionAnalytics}
-      watchlistAnalytics={sys.watchlistAnalytics}
-      concentrationAnalytics={sys.concentrationAnalytics}
-      scoutWeights={sys.scoutWeights}
-      calibrationState={sys.calibrationState}
-      pendingEscalationCount={sys.pendingEscalationCount}
-    />
-  );
-}
-
 function App() {
   const sessionValid = hasValidSession();
   const [hasEntered, setHasEntered] = useState(sessionValid);
   const [isLoading, setIsLoading] = useState(sessionValid);
-  const [, setStartups] = useState<Startup[]>([]);
+  const [startups, setStartups] = useState<Startup[]>([]);
+  const [startupsError, setStartupsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!hasEntered || isLoading) return;
+    setStartupsError(null);
+    const refresh = () => {
+      fetchStartups()
+        .then((data) => {
+          setStartups(data);
+          setStartupsError(null);
+        })
+        .catch((err) => setStartupsError(err instanceof Error ? err.message : 'Failed to load'));
+    };
+    const id = setInterval(refresh, STARTUPS_POLL_MS);
+    return () => clearInterval(id);
+  }, [hasEntered, isLoading]);
 
   useEffect(() => {
     if (!hasEntered || !isLoading) return;
+    setStartupsError(null);
     const load = async () => {
       const [data] = await Promise.all([
-        fetchStartups().catch(() => []),
+        fetchStartups().catch((e: unknown) => {
+          setStartupsError(e instanceof Error ? e.message : 'Failed to load startups');
+          return [] as Startup[];
+        }),
         delay(MIN_LOADING_MS),
       ]);
       setStartups(data);
@@ -122,7 +132,7 @@ function App() {
   return (
     <>
       <GrainOverlay opacity={0.02} />
-      <SystemLayout />
+      <MainLayout startups={startups} startupsError={startupsError} />
     </>
   );
 }
