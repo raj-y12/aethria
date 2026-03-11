@@ -5,14 +5,12 @@ import LoadingAnimation from './components/LoadingAnimation';
 import GrainOverlay from './components/GrainOverlay';
 import SettingsPage from './settings/SettingsPage';
 import { fetchStartups } from './api/startups';
-import { useIdleTimeout } from './hooks';
+import { useIdleTimeout, useSystemData } from './hooks';
 import type { Startup } from './types/startup';
 
 const MIN_LOADING_MS = 2000;
 const IDLE_MS = 20 * 60 * 1000;
 const STORAGE_KEY = 'aethria_last_activity';
-/** Poll interval to refetch startups when a decision has been made on the backend. */
-const STARTUPS_POLL_MS = 12 * 1000;
 
 function hasValidSession(): boolean {
   if (typeof window === 'undefined') return false;
@@ -24,22 +22,29 @@ function hasValidSession(): boolean {
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+function SystemLayout() {
+  const sys = useSystemData();
+  return (
+    <MainLayout
+      startups={sys.startups}
+      signals={sys.signals}
+      escalations={sys.escalations}
+      metaReports={sys.metaReports}
+      rejectionAnalytics={sys.rejectionAnalytics}
+      watchlistAnalytics={sys.watchlistAnalytics}
+      concentrationAnalytics={sys.concentrationAnalytics}
+      scoutWeights={sys.scoutWeights}
+      calibrationState={sys.calibrationState}
+      pendingEscalationCount={sys.pendingEscalationCount}
+    />
+  );
+}
+
 function App() {
   const sessionValid = hasValidSession();
   const [hasEntered, setHasEntered] = useState(sessionValid);
   const [isLoading, setIsLoading] = useState(sessionValid);
-  const [startups, setStartups] = useState<Startup[]>([]);
-
-  useEffect(() => {
-    if (!hasEntered || isLoading) return;
-    const refresh = () => {
-      fetchStartups()
-        .then((data) => setStartups(data))
-        .catch(() => {});
-    };
-    const id = setInterval(refresh, STARTUPS_POLL_MS);
-    return () => clearInterval(id);
-  }, [hasEntered, isLoading]);
+  const [, setStartups] = useState<Startup[]>([]);
 
   useEffect(() => {
     if (!hasEntered || !isLoading) return;
@@ -117,7 +122,7 @@ function App() {
   return (
     <>
       <GrainOverlay opacity={0.02} />
-      <MainLayout startups={startups} />
+      <SystemLayout />
     </>
   );
 }

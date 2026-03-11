@@ -8,6 +8,7 @@ import WorkGrid from './WorkGrid';
 import InvestmentMemo from './InvestmentMemo';
 import VerdictModal from './VerdictModal';
 import LiveIntelligenceFeed from './LiveIntelligenceFeed';
+import SystemIntelligence from './SystemIntelligence';
 import GhostTransition from './GhostTransition';
 import {
   useScrollLock,
@@ -16,17 +17,41 @@ import {
   useFocusTrap,
   useMediaQuery,
 } from '../hooks';
-import type { Startup } from '../types/startup';
+import type {
+  Startup, SignalItem, EscalationItem, MetaCycleReport,
+  RejectionAnalytics, WatchlistAnalytics, ConcentrationAnalytics,
+  ScoutWeights, CalibrationState,
+} from '../types/startup';
 import InvestmentMemoContent from './InvestmentMemoContent';
 
 interface MainLayoutProps {
   startups: Startup[];
+  signals?: SignalItem[];
+  escalations?: EscalationItem[];
+  metaReports?: MetaCycleReport[];
+  rejectionAnalytics?: RejectionAnalytics;
+  watchlistAnalytics?: WatchlistAnalytics;
+  concentrationAnalytics?: ConcentrationAnalytics;
+  scoutWeights?: ScoutWeights;
+  calibrationState?: CalibrationState;
+  pendingEscalationCount?: number;
 }
 
-export default function MainLayout({ startups }: MainLayoutProps) {
+export default function MainLayout({
+  startups,
+  signals,
+  escalations,
+  metaReports,
+  rejectionAnalytics,
+  watchlistAnalytics,
+  concentrationAnalytics,
+  scoutWeights,
+  calibrationState,
+}: MainLayoutProps) {
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
   const [showVerdict, setShowVerdict] = useState(false);
   const [showJudgements, setShowJudgements] = useState(false);
+  const [showSystem, setShowSystem] = useState(false);
 
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const restoreRefVerdictMemo = useRef<HTMLElement | null>(null);
@@ -71,6 +96,7 @@ export default function MainLayout({ startups }: MainLayoutProps) {
       restoreRefJudgements.current = judgementsToggleRef.current;
     }
     setShowJudgements((v) => !v);
+    setShowSystem(false);
   }, [showJudgements]);
 
   useScrollLock(anyOverlayOpen);
@@ -99,16 +125,25 @@ export default function MainLayout({ startups }: MainLayoutProps) {
                   {startups.length} companies · {resolvedCount} decided
                 </p>
               </div>
-              <button
-                ref={judgementsToggleRef}
-                type="button"
-                onClick={handleToggleJudgements}
-                className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 hover:text-oxford transition-colors"
-                aria-pressed={showJudgements}
-                aria-expanded={showJudgements}
-              >
-                {showJudgements ? 'Hide' : 'Show'} judgements
-              </button>
+              <div className="flex gap-4">
+                <button
+                  ref={judgementsToggleRef}
+                  type="button"
+                  onClick={handleToggleJudgements}
+                  className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 hover:text-oxford transition-colors"
+                  aria-pressed={showJudgements}
+                  aria-expanded={showJudgements}
+                >
+                  {showJudgements ? 'Hide' : 'Show'} judgements
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowSystem((v) => !v); setShowJudgements(false); }}
+                  className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 hover:text-oxford transition-colors"
+                >
+                  {showSystem ? 'Hide' : ''} System
+                </button>
+              </div>
             </div>
 
             {/* WorkGrid: only this area scrolls */}
@@ -129,9 +164,28 @@ export default function MainLayout({ startups }: MainLayoutProps) {
           <aside
             className="hidden lg:flex flex-col min-w-0 flex-1 min-h-0 border border-oxford/[0.06] bg-paper overflow-hidden"
             aria-live="polite"
-            aria-label={showJudgements ? 'Judgements' : selectedStartup ? 'Investment memo' : 'Detail'}
+            aria-label={showSystem ? 'System' : showJudgements ? 'Judgements' : selectedStartup ? 'Investment memo' : 'Detail'}
           >
-            {showJudgements ? (
+            {showSystem ? (
+              <>
+                <div className="flex-none flex items-center justify-between px-6 py-4 border-b border-oxford/[0.06]">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50">System</span>
+                  <button type="button" onClick={() => setShowSystem(false)} className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50 hover:text-oxford transition-colors">Close</button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <SystemIntelligence
+                    signals={signals ?? []}
+                    escalations={escalations ?? []}
+                    rejectionAnalytics={rejectionAnalytics ?? { most_common_red_flags: [], rejection_by_sector: {}, avg_scores_at_rejection: {}, most_common_fail_dimensions: [] }}
+                    watchlistAnalytics={watchlistAnalytics ?? { total: 0, stale: 0, avg_days: 0 }}
+                    concentrationAnalytics={concentrationAnalytics ?? { by_sector: {}, most_concentrated_sector: '', most_concentrated_theme: '', last_updated: '' }}
+                    metaReports={metaReports ?? []}
+                    scoutWeights={scoutWeights ?? { MarketDrivenScout: 0.25, BuilderTechnicalScout: 0.25, PainPointScout: 0.25, ContrarianScout: 0.25 }}
+                    calibrationState={calibrationState ?? { confidence_threshold_override: null, reviewer_weak_threshold_override: null, reviewer_strong_threshold_override: null, last_calibrated_at: null, last_calibrated_cycle: 0, calibration_history: [] }}
+                  />
+                </div>
+              </>
+            ) : showJudgements ? (
               <>
                 <div className="flex-none flex items-center justify-between px-6 py-4 border-b border-oxford/[0.06]">
                   <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50">
@@ -147,7 +201,7 @@ export default function MainLayout({ startups }: MainLayoutProps) {
                   </button>
                 </div>
                 <div className="flex-1 min-h-0 overflow-hidden">
-                  <LiveIntelligenceFeed startups={startups} />
+                  <LiveIntelligenceFeed startups={startups} signals={signals} metaReports={metaReports} />
                 </div>
               </>
             ) : selectedStartup ? (
@@ -172,7 +226,7 @@ export default function MainLayout({ startups }: MainLayoutProps) {
             ) : (
               <div className="flex-1 flex items-center justify-center p-8">
                 <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/40">
-                  Select a company or show judgements
+                  Select a company, show judgements, or open system
                 </p>
               </div>
             )}
@@ -229,7 +283,7 @@ export default function MainLayout({ startups }: MainLayoutProps) {
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-hidden">
-              <LiveIntelligenceFeed startups={startups} />
+              <LiveIntelligenceFeed startups={startups} signals={signals} metaReports={metaReports} />
             </div>
           </motion.div>
         </AnimatePresence>,
