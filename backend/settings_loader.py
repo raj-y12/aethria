@@ -99,3 +99,33 @@ def get_scout_serp_daily_budget() -> int:
     except Exception:
         return 5
     return max(0, n)
+
+
+def get_meta_agent_settings() -> dict:
+    """
+    Return Meta-Agent configuration derived from environment variables.
+
+    This surfaces the same knobs used by the Meta-Agent backend so the
+    front-end control plane can display them:
+    - META_AGENT_ENABLED
+    - META_AGENT_INTERVAL_SECONDS
+    - META_AGENT_MIN_REVIEWS
+    - META_AGENT_MIN_DECISIONS
+    - META_AGENT_MUTATION_COOLDOWN_CYCLES
+    """
+    def _as_int(env_var: str, default: str) -> int:
+        raw = os.getenv(env_var, default)
+        try:
+            return int(str(raw))
+        except Exception:
+            return int(default)
+
+    enabled = os.getenv("META_AGENT_ENABLED", "true").lower() == "true"
+
+    return {
+        "enabled": enabled,
+        "interval_seconds": _as_int("META_AGENT_INTERVAL_SECONDS", "86400"),
+        "min_reviews": _as_int("META_AGENT_MIN_REVIEWS", "20"),
+        "min_decisions": _as_int("META_AGENT_MIN_DECISIONS", "10"),
+        "mutation_cooldown_cycles": _as_int("META_AGENT_MUTATION_COOLDOWN_CYCLES", "3"),
+    }

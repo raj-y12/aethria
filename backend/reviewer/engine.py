@@ -194,7 +194,7 @@ class ReviewerEngine:
                 )
                 
                 # Collect successful results
-                reviewer_types = ["default", "skeptical", "opportunist"]
+                reviewer_types = ["DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer"]
                 successful_results = []
                 for i, res in enumerate(results):
                     if isinstance(res, Exception):
@@ -228,9 +228,16 @@ class ReviewerEngine:
                 # Build SingleReview list for storage
                 from models import SingleReview
                 single_reviews = []
+                type_map = {
+                    "default": "DefaultReviewer",
+                    "skeptical": "SkepticalReviewer",
+                    "opportunist": "OpportunistReviewer",
+                }
                 for r in successful_results:
+                    raw_type = r.get("reviewer_type", "default")
+                    reviewer_label = type_map.get(raw_type, "DefaultReviewer")
                     single_reviews.append(SingleReview(
-                        reviewer_type=r.get("reviewer_type", "default"),
+                        reviewer_type=reviewer_label,
                         market_score=r.get("market_score", 5),
                         product_score=r.get("product_score", 5),
                         technical_score=r.get("technical_score", 5),
@@ -247,6 +254,7 @@ class ReviewerEngine:
                         investment_thesis=r.get("investment_thesis") or None,
                         risk_mitigation=r.get("risk_mitigation") or None,
                         score_reasoning=r.get("score_reasoning") or None,
+                        prompt_version=r.get("prompt_version"),
                     ))
                 
                 # Convert to ReviewInfo and save (primary fields from default reviewer)

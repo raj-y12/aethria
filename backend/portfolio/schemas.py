@@ -27,7 +27,7 @@ class DecisionRecord(TypedDict):
     """Decision record in decisions.json"""
     id: str  # Stable UUID
     startup_id: str  # References StartupRecord.id
-    # Canonical Partner decision vocabulary (legacy INVEST/WATCH/PASS is mapped upstream)
+    # Canonical Partner decision vocabulary
     decision: Literal["YES", "MAYBE", "NO"]
     confidence: int  # 1-10
     rationale: str

@@ -11,7 +11,7 @@ class PartnerOutput(TypedDict, total=False):
     Strict schema for Partner investment decisions (legacy - use PartnerInfo from models.py).
     Supports assumption_risks for hypothesis-aware decisions.
     """
-    decision: Literal["YES", "NO", "MAYBE", "INVEST", "WATCH", "PASS"]  # INVEST/WATCH/PASS map to YES/MAYBE/NO
+    decision: Literal["YES", "NO", "MAYBE"]
     confidence: int  # 1-10 (legacy - maps to conviction_level)
     conviction_level: int  # 1-10 (canonical)
     rationale: str
@@ -22,15 +22,13 @@ class PartnerOutput(TypedDict, total=False):
 
 
 # Canonical decisions per /resources/partner_rules.json
-VALID_DECISIONS_CANONICAL = ["YES", "NO", "MAYBE"]
-VALID_DECISIONS_LEGACY = ["INVEST", "WATCH", "PASS"]
-VALID_DECISIONS = VALID_DECISIONS_CANONICAL + VALID_DECISIONS_LEGACY
+VALID_DECISIONS = ["YES", "NO", "MAYBE"]
 
 
 def validate_partner_output(data: dict) -> PartnerOutput:
     """
     Validate that a dictionary matches the PartnerOutput schema.
-    Ensures decision is YES/NO/MAYBE or legacy INVEST/WATCH/PASS.
+    Ensures decision is YES/NO/MAYBE.
     conviction_level (or confidence) must be 1-10.
     assumption_risks defaults to [] if missing.
     Raises ValueError if validation fails.

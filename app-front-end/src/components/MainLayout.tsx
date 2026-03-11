@@ -9,6 +9,7 @@ import InvestmentMemo from './InvestmentMemo';
 import VerdictModal from './VerdictModal';
 import LiveIntelligenceFeed from './LiveIntelligenceFeed';
 import GhostTransition from './GhostTransition';
+import SystemIntelligence from './SystemIntelligence';
 import {
   useScrollLock,
   useEscapeKey,
@@ -17,22 +18,32 @@ import {
   useMediaQuery,
 } from '../hooks';
 import type { Startup } from '../types/startup';
+import type { SystemData } from '../hooks/useSystemData';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './InvestmentMemoContent';
 
 interface MainLayoutProps {
-  startups: Startup[];
+  data: SystemData;
   startupsError?: string | null;
 }
 
-export default function MainLayout({ startups, startupsError }: MainLayoutProps) {
+export default function MainLayout({ data, startupsError }: MainLayoutProps) {
+  const {
+    startups,
+    escalations,
+    signals,
+    metaReports,
+    rejectionAnalytics,
+    watchlistAnalytics,
+    concentrationAnalytics,
+    scoutWeights,
+    calibrationState,
+  } = data;
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
   const [showVerdict, setShowVerdict] = useState(false);
-  const [showJudgements, setShowJudgements] = useState(false);
+  const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>(null);
 
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const restoreRefVerdictMemo = useRef<HTMLElement | null>(null);
-  const restoreRefJudgements = useRef<HTMLElement | null>(null);
-  const judgementsToggleRef = useRef<HTMLButtonElement | null>(null);
   const judgementsPanelRef = useRef<HTMLDivElement | null>(null);
   const memoContentRef = useRef<InvestmentMemoContentHandle | null>(null);
 
@@ -43,12 +54,14 @@ export default function MainLayout({ startups, startupsError }: MainLayoutProps)
   );
   const memoOpen = !!(selectedStartup && !showVerdict);
   const verdictOrMemoOpen = verdictOpen || memoOpen;
-  const judgementsAsOverlay = showJudgements && !isDesktop;
+  const judgementsAsOverlay = rightPanel === 'feed' && !isDesktop;
   const anyOverlayOpen = verdictOrMemoOpen || judgementsAsOverlay;
   const useModal = selectedStartup && !isDesktop;
 
   const handleStartupClick = useCallback((startup: Startup) => {
     restoreRefVerdictMemo.current = document.activeElement as HTMLElement | null;
+    // Selecting a company always focuses the memo view and hides other right-panel modes
+    setRightPanel('memo');
     setSelectedStartup(startup);
     setShowVerdict(!!startup.partner?.decision);
   }, []);
@@ -56,70 +69,93 @@ export default function MainLayout({ startups, startupsError }: MainLayoutProps)
   const handleCloseMemo = useCallback(() => {
     setSelectedStartup(null);
     setShowVerdict(false);
+    setRightPanel(null);
   }, []);
 
   const handleCloseJudgements = useCallback(() => {
-    setShowJudgements(false);
+    setRightPanel((panel) => (panel === 'feed' ? null : panel));
   }, []);
 
   const handleEscape = useCallback(() => {
     if (verdictOpen) handleCloseMemo();
     else if (memoOpen) handleCloseMemo();
-    else if (showJudgements) handleCloseJudgements();
-  }, [verdictOpen, memoOpen, showJudgements, handleCloseMemo, handleCloseJudgements]);
-
-  const handleToggleJudgements = useCallback(() => {
-    if (!showJudgements) {
-      restoreRefJudgements.current = judgementsToggleRef.current;
-    }
-    setShowJudgements((v) => !v);
-  }, [showJudgements]);
+    else if (rightPanel === 'feed') handleCloseJudgements();
+    else if (rightPanel === 'system') setRightPanel(null);
+  }, [verdictOpen, memoOpen, rightPanel, handleCloseMemo, handleCloseJudgements]);
 
   useScrollLock(anyOverlayOpen);
   useEscapeKey(handleEscape, anyOverlayOpen);
   useRestoreFocus(verdictOrMemoOpen, restoreRefVerdictMemo, !judgementsAsOverlay);
-  useRestoreFocus(judgementsAsOverlay, restoreRefJudgements, !verdictOrMemoOpen);
+  useRestoreFocus(judgementsAsOverlay, { current: null }, !verdictOrMemoOpen);
   useFocusTrap(judgementsAsOverlay, judgementsPanelRef);
 
   const resolvedCount = startups.filter((s) => s.partner?.decision != null).length;
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-paper">
-      <SystemBar scoutCount={startups.length} />
+      <SystemBar
+        scoutCount={startups.length}
+        rightPanel={rightPanel}
+        onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
+        onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
+        onClose={() => setRightPanel(null)}
+      />
       {startupsError && (
         <div className="flex-none px-6 py-2 bg-amber-100 text-amber-900 font-mono text-[10px] uppercase tracking-wider">
           {startupsError} — Check API URL (VITE_API_URL) and backend CORS (ALLOWED_ORIGINS).
         </div>
       )}
 
-      {/* Paper canvas. Fixed height so only WorkGrid scrolls. On lg+: list left, memo panel right. */}
+      {/* Paper canvas. Fixed height so only WorkGrid scrolls. On lg+: list and panel resize together (60/40). */}
       <main className="flex-1 pt-24 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden px-6 sm:px-8 lg:px-12 pt-6 lg:pt-8 pb-3 lg:pb-4 gap-6 lg:gap-10">
-          <div className="flex flex-col min-w-0 min-h-0 lg:max-w-[56rem] flex-1 lg:flex-initial">
-            {/* Fixed header: Evaluations + count + Show judgements (not in scroll area) */}
-            <div className="flex-none flex flex-wrap items-baseline justify-between gap-4 pt-4 lg:pt-2 pb-5 lg:pb-4 bg-paper shrink-0">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60">
-                  Evaluations
-                </p>
-                <p className="font-mono text-[10px] uppercase tracking-[0.22em] mt-0.5 tabular-nums text-oxford/50">
-                  {startups.length} companies · {resolvedCount} decided
-                </p>
-              </div>
-              <button
-                ref={judgementsToggleRef}
-                type="button"
-                onClick={handleToggleJudgements}
-                className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 hover:text-oxford transition-colors"
-                aria-pressed={showJudgements}
-                aria-expanded={showJudgements}
-              >
-                {showJudgements ? 'Hide' : 'Show'} judgements
-              </button>
-            </div>
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden px-6 sm:px-8 lg:px-12 pb-3 lg:pb-4 gap-6 lg:gap-10">
+          <div className="flex flex-col min-w-0 min-h-0">
+            {/* System health (same style as Settings page) */}
+            <section className="flex-none py-4 border-b border-oxford/[0.06]">
+              <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-2">
+                System health
+              </h2>
+              {data.settings?.system_health ? (
+                <div className="space-y-1">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] tabular-nums text-oxford/50">
+                    {startups.length} companies · {resolvedCount} decided
+                  </p>
+                  {data.settings.system_health.pending_escalations > 0 && (
+                    <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-oxford escalation-pulse" aria-hidden />
+                      <span>
+                        {data.settings.system_health.pending_escalations}{' '}
+                        {data.settings.system_health.pending_escalations === 1 ? 'escalation' : 'escalations'} awaiting review
+                      </span>
+                    </p>
+                  )}
+                  {data.settings.system_health.calibration_warning && (
+                    <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/70">
+                      • Calibration: {data.settings.system_health.calibration_warning}
+                    </p>
+                  )}
+                  {data.settings.system_health.queue_depths && (
+                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/50">
+                      Unreviewed {data.settings.system_health.queue_depths.unreviewed} · Undecided{' '}
+                      {data.settings.system_health.queue_depths.undecided} · Watchlist{' '}
+                      {data.settings.system_health.queue_depths.watchlist}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] tabular-nums text-oxford/50">
+                    {startups.length} companies · {resolvedCount} decided
+                  </p>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/40">
+                    System health metrics are not available yet.
+                  </p>
+                </div>
+              )}
+            </section>
 
-            {/* WorkGrid: only this area scrolls */}
-            <div className="flex-1 min-h-0 overflow-y-auto w-full max-w-4xl rounded-none border border-oxford/[0.06] bg-paper shrink-0">
+            {/* WorkGrid: only this area scrolls; fills column so both columns resize together */}
+            <div className="flex-1 min-h-0 overflow-y-auto w-full min-w-0 rounded-none border border-oxford/[0.06] bg-paper">
               <div className="px-6 sm:px-8 lg:px-10 pt-2 pb-6 lg:pb-8">
                 <GhostTransition>
                   <WorkGrid
@@ -132,13 +168,49 @@ export default function MainLayout({ startups, startupsError }: MainLayoutProps)
             </div>
           </div>
 
-          {/* Right panel on desktop: Judgements (when toggled) or Memo (when company selected) or empty. */}
+          {/* Right panel on desktop: Judgements, System Intelligence, Memo, or empty. */}
           <aside
-            className="hidden lg:flex flex-col min-w-0 flex-1 min-h-0 border border-oxford/[0.06] bg-paper overflow-hidden"
+            className="hidden lg:flex flex-col min-w-0 min-h-0 border border-oxford/[0.06] bg-paper overflow-hidden"
             aria-live="polite"
-            aria-label={showJudgements ? 'Judgements' : selectedStartup ? 'Investment memo' : 'Detail'}
+            aria-label={
+              rightPanel === 'system'
+                ? 'System intelligence'
+                : rightPanel === 'feed'
+                ? 'Judgements'
+                : selectedStartup
+                ? 'Investment memo'
+                : 'Detail'
+            }
           >
-            {showJudgements ? (
+            {rightPanel === 'system' ? (
+              <>
+                <div className="flex-none flex items-center justify-between px-6 py-4 border-b border-oxford/[0.06]">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50">
+                    System
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setRightPanel(null)}
+                    className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50 hover:text-oxford transition-colors"
+                    aria-label="Hide system intelligence"
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <SystemIntelligence
+                    signals={signals}
+                    escalations={escalations}
+                    rejectionAnalytics={rejectionAnalytics}
+                    watchlistAnalytics={watchlistAnalytics}
+                    concentrationAnalytics={concentrationAnalytics}
+                    metaReports={metaReports}
+                    scoutWeights={scoutWeights}
+                    calibrationState={calibrationState}
+                  />
+                </div>
+              </>
+            ) : rightPanel === 'feed' ? (
               <>
                 <div className="flex-none flex items-center justify-between px-6 py-4 border-b border-oxford/[0.06]">
                   <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50">

@@ -17,6 +17,7 @@ from scout.scouts import (
 from scout.schema import ScoutOutput
 from storage import Storage
 from settings_loader import is_scouts_enabled
+from utils.prompt_version import hash_prompt
 
 
 logger = logging.getLogger(__name__)
@@ -159,6 +160,14 @@ class ScoutEngine:
                             f"{result['name']}"
                         )
                         continue
+
+                # Stamp prompt_version so downstream storage can persist which prompt produced this discovery
+                try:
+                    result = dict(result)
+                    result["prompt_version"] = hash_prompt(getattr(scout, "system_prompt", ""))
+                except Exception:
+                    # If hashing fails, leave prompt_version unset
+                    result = dict(result)
 
                 discoveries.append(result)
                 self.logger.info(

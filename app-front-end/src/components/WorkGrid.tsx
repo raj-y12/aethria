@@ -32,9 +32,12 @@ export default function WorkGrid({ startups, onStartupClick, selectedId }: WorkG
 
   if (startups.length === 0) {
     return (
-      <div className="w-full py-20 flex flex-col items-center justify-center border-b border-oxford/[0.06]">
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-center text-oxford/60">
-          No evaluations yet. The system is idle.
+      <div className="w-full h-full min-h-[12rem] flex flex-col items-center justify-center border-b border-oxford/[0.06]">
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-center text-oxford/50">
+          SCOUTS RUNNING
+        </p>
+        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-center text-oxford/30">
+          FIRST DISCOVERIES EXPECTED IN ~5 MINUTES
         </p>
       </div>
     );
@@ -66,8 +69,8 @@ export default function WorkGrid({ startups, onStartupClick, selectedId }: WorkG
               if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStartupClick(startup); }
             }}
           >
-            <div className="flex flex-col lg:flex-row lg:items-start gap-3 sm:gap-4 py-4 sm:py-5 lg:py-6">
-              <div className="flex-1 min-w-0 overflow-hidden">
+            <div className="flex flex-col lg:grid lg:grid-cols-[3fr_2fr] lg:items-start gap-3 sm:gap-4 py-4 sm:py-5 lg:py-6">
+              <div className="min-w-0 overflow-hidden">
                 <div className="flex items-center gap-2">
                   {isSelected && (
                     <motion.span
@@ -110,29 +113,29 @@ export default function WorkGrid({ startups, onStartupClick, selectedId }: WorkG
                   )}
                 </div>
               </div>
-              {/* Right side: verdict badge or escalation badge */}
-              {isEsc ? (
-                <div className="shrink-0 lg:w-40 lg:text-right pt-3 lg:pt-0 border-t border-oxford/[0.06] lg:border-t-0 flex flex-col items-start lg:items-end gap-1.5">
+              {/* Right side: verdict badge or escalation badge — 60/40 split on lg via grid fr units */}
+              <div className="lg:text-right pt-3 lg:pt-0 border-t border-oxford/[0.06] lg:border-t-0 flex flex-col items-start lg:items-end gap-1.5 min-w-0">
+                {isEsc ? (
                   <span
                     className="inline-flex items-center justify-center py-2 px-3 font-mono text-[10px] uppercase tracking-[0.2em] text-paper rounded-none"
                     style={{ backgroundColor: '#002147' }}
                   >
                     awaiting review
                   </span>
-                </div>
-              ) : hasVerdict && verdictTime ? (
-                <div className="shrink-0 lg:w-40 lg:text-right pt-3 lg:pt-0 border-t border-oxford/[0.06] lg:border-t-0 flex flex-col items-start lg:items-end gap-1.5">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50 tabular-nums">
-                    {formatVerdictTime(verdictTime)}
-                  </span>
-                  <span
-                    className="inline-flex items-center justify-center py-2 px-3 font-mono text-[10px] uppercase tracking-[0.2em] text-ivory rounded-none"
-                    style={{ backgroundColor: '#002147' }}
-                  >
-                    {DECISION_LABELS[startup.partner!.decision] ?? startup.partner!.decision}
-                  </span>
-                </div>
-              ) : null}
+                ) : hasVerdict && verdictTime ? (
+                  <>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50 tabular-nums">
+                      {formatVerdictTime(verdictTime)}
+                    </span>
+                    <span
+                      className="inline-flex items-center justify-center py-2 px-3 font-mono text-[10px] uppercase tracking-[0.2em] text-ivory rounded-none"
+                      style={{ backgroundColor: '#002147' }}
+                    >
+                      {DECISION_LABELS[startup.partner!.decision] ?? startup.partner!.decision}
+                    </span>
+                  </>
+                ) : null}
+              </div>
             </div>
           </motion.div>
         );

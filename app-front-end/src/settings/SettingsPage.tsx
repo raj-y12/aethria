@@ -1,8 +1,7 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import SystemBar from '../components/SystemBar';
 import AppFooter from '../components/AppFooter';
-import GhostTransition from '../components/GhostTransition';
-import { fetchSettings, patchSettings, type Settings } from '../api/settings';
+import { fetchSettings, patchSettings, type AgentBudgetStatus, type Settings } from '../api/settings';
 import { tokens } from '../design-system/tokens';
 
 type TabId = 'cost' | 'agent' | 'portfolio';
@@ -91,9 +90,6 @@ export default function SettingsPage() {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('cost');
-  const [underline, setUnderline] = useState({ left: 0, width: 0 });
-  const navRef = useRef<HTMLDivElement>(null);
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'cost', label: 'Cost & budget' },
@@ -115,15 +111,6 @@ export default function SettingsPage() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
-
-  useLayoutEffect(() => {
-    const nav = navRef.current;
-    const index = tabs.findIndex((t) => t.id === activeTab);
-    const tab = tabRefs.current[index];
-    if (nav && tab) {
-      setUnderline({ left: tab.offsetLeft, width: tab.offsetWidth });
-    }
-  }, [activeTab]);
 
   const handleSave = async () => {
     if (!settings) return;
@@ -178,47 +165,60 @@ export default function SettingsPage() {
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
       <SystemBar scoutCount={0} agentConfig={settings.agent_config} />
-      <main className="flex-1 min-h-0 pt-24 flex flex-col">
-        <div className="flex-1 min-h-0 flex flex-col max-w-[1800px] mx-auto w-full px-6 sm:px-8 lg:px-12">
-          <GhostTransition className="flex flex-col flex-1 min-h-0">
-            <header className="flex-none pt-2 pb-6 border-b border-oxford/[0.06]">
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60">Control plane</p>
-              <h1 className="font-sans font-semibold text-2xl text-oxford tracking-tight mt-1" style={{ letterSpacing: '-0.02em' }}>Settings</h1>
-            </header>
+      <main className="flex-1 min-h-0 pt-24 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden border border-oxford/[0.06] bg-paper mx-6 sm:mx-8 lg:mx-12">
+          {/* Header: same language as System panel (label + action) */}
+          <div className="flex-none flex items-center justify-between px-4 sm:px-6 py-4 border-b border-oxford/[0.06]">
+            <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50">
+              Settings
+            </span>
+            <div className="flex items-center gap-3">
+              {saveSuccess && (
+                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50" role="status" aria-live="polite">
+                  Saved
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50 hover:text-oxford transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+
+          {/* Tab bar: same as SystemIntelligence */}
+          <nav className="flex-none flex gap-0 border-b border-oxford/[0.06] px-4" aria-label="Settings categories">
+            {tabs.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                className={`py-3 px-3 font-mono text-[9px] uppercase tracking-[0.16em] transition-colors border-b-2 ${
+                  activeTab === id
+                    ? 'text-oxford border-oxford'
+                    : 'text-oxford/40 border-transparent hover:text-oxford/60'
+                }`}
+                style={{ transitionTimingFunction: tokens.motion.easeCss }}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Content: scrollable like System panel */}
+          <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar p-4 sm:p-6">
             {validationErrors.length > 0 && (
-              <div className="flex-none py-4 border-b border-oxford/[0.06]">
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/70 mb-2">Validation errors</p>
-                <ul className="font-sans text-[14px] text-oxford/80 space-y-1">
+              <div className="mb-4 pb-4 border-b border-oxford/[0.06]">
+                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/70 mb-2">Validation errors</p>
+                <ul className="font-sans text-[13px] text-oxford/80 space-y-1">
                   {validationErrors.map((e, i) => <li key={i}>{e}</li>)}
                 </ul>
               </div>
             )}
-            <nav ref={navRef} className="flex-none flex relative border-b border-oxford/[0.06]" aria-label="Settings categories">
-              {tabs.map(({ id, label }, i) => (
-                <button
-                  key={id}
-                  ref={(el) => { tabRefs.current[i] = el; }}
-                  type="button"
-                  onClick={() => setActiveTab(id)}
-                  className={`px-4 py-3 font-mono text-[11px] uppercase tracking-[0.16em] transition-colors duration-200 ${
-                    activeTab === id ? 'text-oxford' : 'text-oxford/50 hover:text-oxford/70'
-                  }`}
-                  style={{ transitionTimingFunction: tokens.motion.easeCss }}
-                >
-                  {label}
-                </button>
-              ))}
-              <span
-                className="absolute bottom-0 left-0 h-0.5 bg-oxford"
-                style={{
-                  width: underline.width,
-                  transform: `translateX(${underline.left}px)`,
-                  transition: `transform ${tokens.motion.duration.short}s ${tokens.motion.easeCss}, width ${tokens.motion.duration.short}s ${tokens.motion.easeCss}`,
-                }}
-                aria-hidden
-              />
-            </nav>
-            <div className="flex-1 min-h-0 py-6 space-y-8">
+            <div className="space-y-8">
               {activeTab === 'cost' && (
                 <>
                   <section>
@@ -235,6 +235,61 @@ export default function SettingsPage() {
                       <Field id="cooldown" label="Cooldown (seconds)" value={settings.cost_budget.cooldown_seconds} onChange={(v) => setCost('cooldown_seconds', Number(v))} min={0} />
                     </div>
                   </section>
+                  {settings.system_health && settings.system_health.budget_status.length > 0 && (
+                    <section>
+                      <h3 className={groupHeadingCls}>Agent budgets</h3>
+                      <div className="space-y-4">
+                        {settings.system_health.budget_status.map((b: AgentBudgetStatus) => {
+                          const callsPct = b.daily_calls_limit > 0 ? (b.daily_calls_used / b.daily_calls_limit) : 0;
+                          const tokensPct = b.daily_tokens_limit > 0 ? (b.daily_tokens_used / b.daily_tokens_limit) : 0;
+                          const highCalls = callsPct > 0.8;
+                          const highTokens = tokensPct > 0.8;
+                          const callsWidth = `${Math.min(100, Math.max(0, callsPct * 100))}%`;
+                          const tokensWidth = `${Math.min(100, Math.max(0, tokensPct * 100))}%`;
+                          return (
+                            <div key={b.agent_id} className="border border-oxford/[0.06] p-3 space-y-2">
+                              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/70">
+                                {b.agent_id}
+                              </p>
+                              <div>
+                                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 mb-1">
+                                  Calls {b.daily_calls_used}/{b.daily_calls_limit}
+                                </p>
+                                <div className="w-full h-1.5 bg-oxford/[0.08]">
+                                  <div
+                                    className="h-full"
+                                    style={{
+                                      width: callsWidth,
+                                      backgroundColor: highCalls ? 'rgba(0,33,71,0.4)' : 'rgba(0,33,71,0.2)',
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 mb-1">
+                                  Tokens {b.daily_tokens_used}/{b.daily_tokens_limit}
+                                </p>
+                                <div className="w-full h-1.5 bg-oxford/[0.08]">
+                                  <div
+                                    className="h-full"
+                                    style={{
+                                      width: tokensWidth,
+                                      backgroundColor: highTokens ? 'rgba(0,33,71,0.4)' : 'rgba(0,33,71,0.2)',
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              {b.in_cooldown && (
+                                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/70 escalation-pulse">
+                                  In cooldown until {b.cooldown_until ?? '—'}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
                 </>
               )}
               {activeTab === 'agent' && (
@@ -281,6 +336,75 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   </section>
+                  {settings.meta_agent && (
+                    <section>
+                      <h3 className={groupHeadingCls}>Meta-agent</h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-10 gap-y-1">
+                        <Toggle
+                          id="meta_enabled"
+                          checked={settings.meta_agent.enabled}
+                          onChange={(v) =>
+                            setSettings((s) =>
+                              s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), enabled: v } } : s
+                            )
+                          }
+                          label="Meta-Agent enabled"
+                        />
+                        <Field
+                          id="meta_interval"
+                          label="Cycle interval (seconds)"
+                          value={settings.meta_agent.interval_seconds}
+                          onChange={(v) =>
+                            setSettings((s) =>
+                              s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), interval_seconds: Number(v) } } : s
+                            )
+                          }
+                          min={0}
+                        />
+                        <Field
+                          id="meta_min_reviews"
+                          label="Min reviews before acting"
+                          value={settings.meta_agent.min_reviews}
+                          onChange={(v) =>
+                            setSettings((s) =>
+                              s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), min_reviews: Number(v) } } : s
+                            )
+                          }
+                          min={0}
+                        />
+                        <Field
+                          id="meta_min_decisions"
+                          label="Min decisions before acting"
+                          value={settings.meta_agent.min_decisions}
+                          onChange={(v) =>
+                            setSettings((s) =>
+                              s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), min_decisions: Number(v) } } : s
+                            )
+                          }
+                          min={0}
+                        />
+                        <Field
+                          id="meta_cooldown"
+                          label="Mutation cooldown (cycles)"
+                          value={settings.meta_agent.mutation_cooldown_cycles}
+                          onChange={(v) =>
+                            setSettings((s) =>
+                              s
+                                ? {
+                                    ...s,
+                                    meta_agent: {
+                                      ...(s.meta_agent ?? settings.meta_agent!),
+                                      mutation_cooldown_cycles: Number(v),
+                                    },
+                                  }
+                                : s
+                            )
+                          }
+                          min={0}
+                        />
+                      </div>
+                    </section>
+                  )}
                 </>
               )}
               {activeTab === 'portfolio' && (
@@ -315,22 +439,7 @@ export default function SettingsPage() {
                 </>
               )}
             </div>
-            <footer className="flex-none pt-5 pb-2 border-t border-oxford/[0.06] flex items-center justify-between gap-4">
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="min-h-[44px] py-2.5 px-5 font-mono text-[11px] uppercase tracking-[0.16em] text-ivory bg-oxford rounded-none disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity duration-200"
-              >
-                {saving ? 'Saving…' : 'Save settings'}
-              </button>
-              {saveSuccess && (
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/50" role="status" aria-live="polite">
-                  Settings saved.
-                </p>
-              )}
-            </footer>
-          </GhostTransition>
+          </div>
         </div>
       </main>
       <AppFooter navLink={{ href: '/', label: 'Home' }} />

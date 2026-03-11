@@ -56,6 +56,7 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
         est_tam=scout_output.get("est_tam"),
         references=scout_output.get("references") or None,
         discovered_at=discovered,
+        prompt_version=scout_output.get("prompt_version"),
     )
 
 
@@ -93,6 +94,7 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
         investment_thesis=reviewer_output.get("investment_thesis") or None,
         risk_mitigation=reviewer_output.get("risk_mitigation") or None,
         score_reasoning=reviewer_output.get("score_reasoning") or None,
+        prompt_version=reviewer_output.get("prompt_version"),
     )
 
 
@@ -129,4 +131,5 @@ def partner_output_to_partner_info(partner_output: Dict[str, Any]) -> PartnerInf
         human_review_required=partner_output.get("human_review_required", False),
         partner_agent_id=partner_output.get("partner_agent_id"),
         partnered_at=partnered,
+        prompt_version=partner_output.get("prompt_version"),
     )

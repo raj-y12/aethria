@@ -63,20 +63,16 @@ class ExecutionAgent:
         Returns:
             Record ID of the created record
         """
-        # Normalize legacy vocabulary (INVEST/WATCH/PASS) to canonical YES/NO/MAYBE
-        legacy_map = {"INVEST": "YES", "WATCH": "MAYBE", "PASS": "NO"}
-        normalized = legacy_map.get(decision, decision)
-
-        if normalized == "YES":
+        if decision == "YES":
             return self._add_to_portfolio(
                 startup_id, decision_id, key_risks, follow_up_triggers or []
             )
-        elif normalized == "NO":
+        elif decision == "NO":
             return self._add_to_rejections(
                 startup_id, decision_id, rationale, key_risks,
                 review_output=review_output, scout_type=scout_type,
             )
-        elif normalized == "MAYBE":
+        elif decision == "MAYBE":
             return self._add_to_watchlist(startup_id, decision_id, rationale)
         else:
             raise ValueError(f"Unknown decision type: {decision}")

@@ -105,15 +105,8 @@ class FeedbackLoop:
         metric_ids = []
         
         for agent_id, agent_decisions in by_agent.items():
-            # Normalize legacy vocabulary to canonical YES/NO/MAYBE
-            def _normalize(decision: str) -> str:
-                legacy_map = {"INVEST": "YES", "WATCH": "MAYBE", "PASS": "NO"}
-                return legacy_map.get(decision, decision)
-
-            normalized = [_normalize(d.get("decision", "")) for d in agent_decisions]
-
             # Acceptance rate: YES / total
-            yes_count = sum(1 for d in normalized if d == "YES")
+            yes_count = sum(1 for d in agent_decisions if d.get("decision") == "YES")
             total_count = len(agent_decisions)
             acceptance_rate = yes_count / total_count if total_count > 0 else 0.0
             

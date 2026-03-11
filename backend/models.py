@@ -27,6 +27,34 @@ class ScoutInfo(BaseModel):
     # E.g. reports, trends, example companies, or general domain knowledge notes.
     references: Optional[List[str]] = None
     discovered_at: datetime = Field(default_factory=datetime.now)
+    # Hash of the system prompt used by the Scout when this discovery was created.
+    prompt_version: Optional[str] = None
+
+
+class SingleReview(BaseModel):
+    """
+    Per-reviewer evaluation snapshot.
+    Used by ReviewerEngine for multi-persona consensus and surfaced to the memo.
+    """
+    reviewer_type: Literal["DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer"]
+    market_score: int = Field(ge=1, le=10)
+    product_score: int = Field(ge=1, le=10)
+    technical_score: int = Field(ge=1, le=10)
+    execution_score: int = Field(ge=1, le=10)
+    defensibility_score: Optional[int] = Field(default=None, ge=1, le=10)
+    overall_summary: str
+    key_risks: List[str]
+    verdict: Literal["STRONG", "MEDIUM", "WEAK"]
+    diligence_red_flags: List[str] = Field(default_factory=list)
+    assumption_feedback: List[str] = Field(default_factory=list)
+    team_analysis: Optional[List[str]] = None
+    competition_analysis: Optional[List[str]] = None
+    business_model_analysis: Optional[List[str]] = None
+    investment_thesis: Optional[List[str]] = None
+    risk_mitigation: Optional[List[str]] = None
+    score_reasoning: Optional[Dict[str, str]] = None
+    # Optional hash of the prompt used by this reviewer instance.
+    prompt_version: Optional[str] = None
 
 
 class ReviewInfo(BaseModel):
@@ -50,6 +78,11 @@ class ReviewInfo(BaseModel):
     investment_thesis: Optional[List[str]] = None  # Bullet points why to invest + core assumptions
     risk_mitigation: Optional[List[str]] = None  # Actionable strategies per diligence_red_flags
     score_reasoning: Optional[Dict[str, str]] = None  # Per-dimension concise reasoning, e.g. {"market_score": "...", "product_score": "..."}
+    # Multi-reviewer fields (Meta-Agent aware)
+    reviews: Optional[List[SingleReview]] = None
+    consensus_verdict: Optional[Literal["STRONG", "MEDIUM", "WEAK"]] = None
+    reviewer_disagreement: Optional[bool] = None
+    score_variance: Optional[Dict[str, float]] = None
 
 
 class PartnerInfo(BaseModel):
@@ -61,6 +94,11 @@ class PartnerInfo(BaseModel):
     human_review_required: bool = False
     partner_agent_id: Optional[str] = None
     partnered_at: datetime = Field(default_factory=datetime.now)
+    # Optional LLM fallback metadata and portfolio/memo snapshots
+    llm_fallback_reason: Optional[str] = None
+    memo_at_decision: Optional[str] = None
+    portfolio_context_at_decision: Optional[Dict[str, Any]] = None
+    prompt_version: Optional[str] = None
 
 
 class Financials(BaseModel):

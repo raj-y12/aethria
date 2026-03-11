@@ -617,10 +617,258 @@
         "https://www.crunchbase.com/organization/pachama",
         "https://www.linkedin.com/company/pachama/"
       ],
-      "discovered_at": "2026-03-02T22:27:06.416885"
+      "discovered_at": "2026-03-02T22:27:06.416885",
+      "prompt_version": null
     },
-    "review_info": null,
-    "partner_info": null,
+    "review_info": {
+      "market_score": 8,
+      "product_score": 7,
+      "technical_score": 7,
+      "execution_score": 5,
+      "defensibility_score": 6,
+      "overall_summary": "Pachama targets a large, growing forest carbon market with a credible demand driver: corporate buyers seeking high-integrity offsets. The solution principle\u2014tech-enabled verification combined with a marketplace\u2014addresses a real pain point and aligns with favorable data/AI maturation and regulatory focus. However, execution risk remains material given missing founder details and the competitive, data-intensive nature of verification platforms, which could impact go-to-market tempo and moat strength.",
+      "key_risks": [
+        "Data quality and verification at scale: risk that automated satellite/drone analytics fail to meet stringent credibility standards.",
+        "Competitive landscape unclear: multiple players offer data, verification, or marketplace capabilities; differentiation may erode margins.",
+        "Regulatory and standards risk: credits must be accepted by registries and regulators to realize ongoing demand.",
+        "Missing founding team details and traction data hinder due diligence and assessment of GTM capability.",
+        "Monetization and unit economics at scale are unproven; reliance on both developers and buyers increases complexity."
+      ],
+      "verdict": "MEDIUM",
+      "diligence_red_flags": [
+        "Missing founding team details",
+        "Missing revenue or traction data",
+        "Competitive landscape unclear"
+      ],
+      "assumption_feedback": [
+        "Assumption: There is material, enforceable demand from corporates for credible forest offsets; supported by reasoning on demand growth but no traction data provided.",
+        "Assumption: Satellite imagery and AI can deliver credible verifications at scale cost-effectively; no cost or performance metrics provided.",
+        "Critical unknown: Pace of buyer/developer adoption, acceptance by registries/standards bodies, and the platform's ability to monetize effectively.",
+        "Assumption: End-to-end platform will achieve network effects between buyers and developers; requires evidence of early pilots or partnerships."
+      ],
+      "reviewer_agent_id": "reviewer_v1",
+      "reviewed_at": "2026-03-11T19:22:50.708685",
+      "team_analysis": [
+        "[MISSING: founder names, roles, experience]"
+      ],
+      "competition_analysis": [
+        "No explicit competitors provided; potential peers include other verification/data providers and carbon marketplaces (not specified in materials).",
+        "Pachama differentiates via integrated platform (verification + marketplace), but competitive moat and partnerships are not clearly defined."
+      ],
+      "business_model_analysis": [
+        "[MISSING]"
+      ],
+      "investment_thesis": [
+        "Potentially compelling if the data layer proves credible and scalable, enabling a trusted marketplace with strong network effects.",
+        "Tailwinds from corporate demand and improving data/AI capabilities could drive adoption and price continuity for credits.",
+        "Key risks include team visibility, traction evidence, regulatory acceptance, and a competitive, fast-moving environment."
+      ],
+      "risk_mitigation": [
+        "Diligence on founding team: verify identities, track records, and capacity to lead a GTM-focused, capital-intensive data platform.",
+        "Demand validation: secure pilot agreements with corporates and developers to establish early revenue and usage metrics.",
+        "Competitive mapping: identify direct competitors and define defensible data assets, partnerships with registries, or exclusive data sources.",
+        "Regulatory alignment: engage with standards bodies early and pursue third-party validations to bolster credit credibility."
+      ],
+      "score_reasoning": {
+        "market_score": "Market is large and expanding with positive timing from demand growth and data-enabled verification.",
+        "product_score": "Clear problem-solution alignment with credible verification and marketplace; traction details are missing.",
+        "technical_score": "Feasible but complex data pipeline; potential data-driven moat if data quality is superior.",
+        "execution_score": "Low due to missing team details and uncertain GTM; execution risk remains manageable but unproven.",
+        "defensibility_score": "Data and network effects offer some moat; risk of replication and data source dependence exists."
+      },
+      "reviews": [
+        {
+          "reviewer_type": "DefaultReviewer",
+          "market_score": 8,
+          "product_score": 7,
+          "technical_score": 7,
+          "execution_score": 5,
+          "defensibility_score": 6,
+          "overall_summary": "Pachama targets a large, growing forest carbon market with a credible demand driver: corporate buyers seeking high-integrity offsets. The solution principle\u2014tech-enabled verification combined with a marketplace\u2014addresses a real pain point and aligns with favorable data/AI maturation and regulatory focus. However, execution risk remains material given missing founder details and the competitive, data-intensive nature of verification platforms, which could impact go-to-market tempo and moat strength.",
+          "key_risks": [
+            "Data quality and verification at scale: risk that automated satellite/drone analytics fail to meet stringent credibility standards.",
+            "Competitive landscape unclear: multiple players offer data, verification, or marketplace capabilities; differentiation may erode margins.",
+            "Regulatory and standards risk: credits must be accepted by registries and regulators to realize ongoing demand.",
+            "Missing founding team details and traction data hinder due diligence and assessment of GTM capability.",
+            "Monetization and unit economics at scale are unproven; reliance on both developers and buyers increases complexity."
+          ],
+          "verdict": "MEDIUM",
+          "diligence_red_flags": [
+            "Missing founding team details",
+            "Missing revenue or traction data",
+            "Competitive landscape unclear"
+          ],
+          "assumption_feedback": [
+            "Assumption: There is material, enforceable demand from corporates for credible forest offsets; supported by reasoning on demand growth but no traction data provided.",
+            "Assumption: Satellite imagery and AI can deliver credible verifications at scale cost-effectively; no cost or performance metrics provided.",
+            "Critical unknown: Pace of buyer/developer adoption, acceptance by registries/standards bodies, and the platform's ability to monetize effectively.",
+            "Assumption: End-to-end platform will achieve network effects between buyers and developers; requires evidence of early pilots or partnerships."
+          ],
+          "team_analysis": [
+            "[MISSING: founder names, roles, experience]"
+          ],
+          "competition_analysis": [
+            "No explicit competitors provided; potential peers include other verification/data providers and carbon marketplaces (not specified in materials).",
+            "Pachama differentiates via integrated platform (verification + marketplace), but competitive moat and partnerships are not clearly defined."
+          ],
+          "business_model_analysis": [
+            "[MISSING]"
+          ],
+          "investment_thesis": [
+            "Potentially compelling if the data layer proves credible and scalable, enabling a trusted marketplace with strong network effects.",
+            "Tailwinds from corporate demand and improving data/AI capabilities could drive adoption and price continuity for credits.",
+            "Key risks include team visibility, traction evidence, regulatory acceptance, and a competitive, fast-moving environment."
+          ],
+          "risk_mitigation": [
+            "Diligence on founding team: verify identities, track records, and capacity to lead a GTM-focused, capital-intensive data platform.",
+            "Demand validation: secure pilot agreements with corporates and developers to establish early revenue and usage metrics.",
+            "Competitive mapping: identify direct competitors and define defensible data assets, partnerships with registries, or exclusive data sources.",
+            "Regulatory alignment: engage with standards bodies early and pursue third-party validations to bolster credit credibility."
+          ],
+          "score_reasoning": {
+            "market_score": "Market is large and expanding with positive timing from demand growth and data-enabled verification.",
+            "product_score": "Clear problem-solution alignment with credible verification and marketplace; traction details are missing.",
+            "technical_score": "Feasible but complex data pipeline; potential data-driven moat if data quality is superior.",
+            "execution_score": "Low due to missing team details and uncertain GTM; execution risk remains manageable but unproven.",
+            "defensibility_score": "Data and network effects offer some moat; risk of replication and data source dependence exists."
+          },
+          "prompt_version": null
+        },
+        {
+          "reviewer_type": "DefaultReviewer",
+          "market_score": 7,
+          "product_score": 7,
+          "technical_score": 7,
+          "execution_score": 4,
+          "defensibility_score": 6,
+          "overall_summary": "Pachama\u2019s concept targets a sizable and growing climate tech market by offering a data-driven forest carbon measurement platform and marketplace, addressing trust and verification frictions that plague credits today. The combination of satellite imagery, drones, and AI for verification suggests a clear problem-solution fit with potential pull from buyers seeking credible offsets. However, execution risk is high given missing team details, uncertain traction, and an underdefined competitive landscape; regulatory risk and unit economics remain critical unknowns that could materially impact viability.",
+          "key_risks": [
+            "Missing founding team details",
+            "Missing revenue or traction data",
+            "Competitive landscape unclear",
+            "Missing valuation data",
+            "Regulatory or execution impossibility"
+          ],
+          "verdict": "MEDIUM",
+          "diligence_red_flags": [
+            "Missing founding team details",
+            "Missing revenue or traction data",
+            "Competitive landscape unclear",
+            "Missing valuation data",
+            "Regulatory or execution impossibility"
+          ],
+          "assumption_feedback": [
+            "Scout assumptions lack explicit evidence on market size, pricing, and unit economics; no validation of cost per tonne or margins.",
+            "Key assumptions around data accuracy, verification reliability, and regulatory acceptance are unproven with evidence provided.",
+            "Critical unknowns: whether buyers will pay a premium for credible credits; scalability of verification across diverse geographies; timelines and costs of data access; regulatory changes impacting offset markets."
+          ],
+          "team_analysis": [
+            "[MISSING: founder names, roles, experience]"
+          ],
+          "competition_analysis": [
+            "[MISSING: competitive landscape details; no data on incumbents or competitors; need clarity on differentiation and moat.]"
+          ],
+          "business_model_analysis": [
+            "[MISSING]"
+          ],
+          "investment_thesis": [
+            "Investable thesis hinges on a defensible data-driven moat and a credible marketplace that can de-risk forest credits for buyers.",
+            "Opportunity exists if unit economics and pricing are favorable and regulatory risk can be managed."
+          ],
+          "risk_mitigation": [
+            "Obtain and publish a detailed team bios page with relevant forest carbon, data science, and marketplace experience.",
+            "Develop a clear traction plan with pilot customers and measurable metrics (e.g., verified tonnes, cost per verification, and marketplace take rate).",
+            "Produce a robust competitive landscape assessment and a quantified moat (data rights, exclusive partnerships, or regulatory alignments).",
+            "Clarify valuation expectations and provide early-stage monetization plan and unit economics model."
+          ],
+          "score_reasoning": {
+            "market_score": "Rationale: forest carbon markets are large and growing with regulatory attention, but lacking explicit TAM/segmentation data; timing seems favorable, yet market structure and price volatility risk persist.",
+            "product_score": "Rationale: solution concept clearly targets credible measurement and verification, with a plausible differentiation via satellite/drones/ML; early pull signals not provided.",
+            "technical_score": "Rationale: technically feasible data pipeline and ML-enabled verification; moat depends on data access and model accuracy; integration across geographies adds risk.",
+            "execution_score": "Rationale: missing founding team details and traction data create high execution uncertainty; recommended to surface team capabilities before advancing.",
+            "defensibility_score": "Rationale: data-driven verification and network effects could create some defensibility, but the moat is not proven and could be replicated with enough data access and partnerships."
+          },
+          "prompt_version": null
+        },
+        {
+          "reviewer_type": "DefaultReviewer",
+          "market_score": 8,
+          "product_score": 7,
+          "technical_score": 7,
+          "execution_score": 7,
+          "defensibility_score": 7,
+          "overall_summary": "The company targets a large, growing forest carbon market with strong demand for credible offsets and a platform that could streamline verification using satellite imagery, drones, and AI. The timing appears favorable given satellite/data maturity and regulatory focus on offset quality, and the marketplace approach could reduce friction between buyers and developers. However, execution risk remains notable due to missing team details and lack of traction data, and the competitive landscape is not defined in the brief, leaving questions about differentiation and scalability.",
+          "key_risks": [
+            "Missing founding team details",
+            "Missing revenue or traction data",
+            "Competitive landscape unclear",
+            "Missing valuation data",
+            "Regulatory or execution impossibility"
+          ],
+          "verdict": "MEDIUM",
+          "diligence_red_flags": [
+            "Missing founding team details",
+            "Missing revenue or traction data",
+            "Competitive landscape unclear",
+            "Missing valuation data",
+            "Regulatory or execution impossibility"
+          ],
+          "assumption_feedback": [
+            "[MISSING: explicit scout hypotheses (primary_thesis, key_assumptions, biggest_unknown) not provided]"
+          ],
+          "team_analysis": [
+            "[MISSING: founder names, roles, experience]"
+          ],
+          "competition_analysis": [
+            "[MISSING: explicit competitive landscape not provided]"
+          ],
+          "business_model_analysis": [
+            "[MISSING]"
+          ],
+          "investment_thesis": [
+            "- Large, growing forest carbon market with corporate demand; credible verification is a bottleneck that this solution aims to solve.",
+            "- Tech-enabled verification plus a marketplace could unlock network effects between buyers, developers, and registries.",
+            "- If a data moat (satellite + ML + drone-integrated verification) can be established, there is potential for defensible differentiation and scalable growth."
+          ],
+          "risk_mitigation": [
+            "Obtain founder bios/track record to assess execution capability and domain credibility.",
+            "Secure early traction signals (pilots, LOIs, or pilot contracts) to de-risk product-market fit.",
+            "Develop a competitive landscape map and quantify differentiation versus potential incumbents.",
+            "Clarify valuation and ownership structure; set milestone-based funding to align incentives.",
+            "Engage with relevant regulatory/standards bodies early to ensure compatibility with offset quality standards and registries."
+          ],
+          "score_reasoning": {
+            "market_score": "Large and expanding market driven by corporate demand for credible forest offsets; favorable timing due to data maturity and regulatory focus.",
+            "product_score": "Clear problem-solution fit with a differentiated data-enabled verification approach, but differentiation vs. incumbents and real pull signals require validation.",
+            "technical_score": "Feasible architecture leveraging existing satellite/drones/ML; execution complexity is non-trivial but manageable with strong data partnerships and scalable pipelines.",
+            "execution_score": "Strong market upside, but missing team/traction data introduces execution risk; early pilots could mitigate but are not documented.",
+            "defensibility_score": "Moat from data quality, verification credibility, and potential network effects; risk of replication by well-funded entrants remains."
+          },
+          "prompt_version": null
+        }
+      ],
+      "consensus_verdict": "MEDIUM",
+      "reviewer_disagreement": false,
+      "score_variance": {
+        "market_score": 0.22,
+        "product_score": 0.0,
+        "technical_score": 0.0,
+        "execution_score": 1.56
+      }
+    },
+    "partner_info": {
+      "decision": "NO",
+      "rationale": "Critical risks identified (regulatory or execution impossibility). Average score: 6.8/10. Risk too high for investment.",
+      "next_action": "Pass - Critical risks too high",
+      "conviction_level": 5,
+      "human_review_required": false,
+      "partner_agent_id": "partner_v1",
+      "partnered_at": "2026-03-11T19:23:08.027855",
+      "llm_fallback_reason": null,
+      "memo_at_decision": null,
+      "portfolio_context_at_decision": null,
+      "prompt_version": null
+    },
     "financials": {
       "traction_metrics": null,
       "funding_history": null,
@@ -632,7 +880,7 @@
     },
     "version": 1,
     "created_at": "2026-03-02T22:27:06.416955",
-    "updated_at": "2026-03-02T22:27:06.416958"
+    "updated_at": "2026-03-11T19:23:08.028439"
   },
   {
     "startup_id": "d2f5e7a8-4a9b-4a6f-9d3a-2f8cda1e0b5c",
@@ -657,10 +905,254 @@
         "Hightouch for B2B SaaS Companies - https://hightouch.com/solutions/saas",
         "The Composable CDP for first-party data in Europe | Hightouch - https://hightouch.com/blog/composable-cdp-europe-gdpr"
       ],
-      "discovered_at": "2026-03-02T22:31:05.652205"
+      "discovered_at": "2026-03-02T22:31:05.652205",
+      "prompt_version": null
     },
-    "review_info": null,
-    "partner_info": null,
+    "review_info": {
+      "market_score": 8,
+      "product_score": 7,
+      "technical_score": 7,
+      "execution_score": 5,
+      "defensibility_score": 6,
+      "overall_summary": "Hightouch addresses a clear and growing need in data activation by pushing warehouse insights into business tools with governance and real-time sync, a problem many data teams face. The solution aligns with macro tailwinds around data warehouses and operational data, but the absence of disclosed traction data, founding team details, and competitive landscape leaves meaningful execution risk. The opportunity is promising but requires due diligence to validate team capability, monetization, and defensibility before committing further.",
+      "key_risks": [
+        "Missing founding team details",
+        "Missing revenue or traction data",
+        "Competitive landscape unclear",
+        "Missing valuation data"
+      ],
+      "verdict": "MEDIUM",
+      "diligence_red_flags": [
+        "Missing founding team details",
+        "Missing revenue or traction data",
+        "Competitive landscape unclear",
+        "Missing valuation data"
+      ],
+      "assumption_feedback": [
+        "Assumptions not provided in prompt; unable to assess support for primary thesis. Critical unknowns include expected ROI from data activation, time-to-value for customers, connectivity depth to target SaaS tools, and pricing/monetization strategy."
+      ],
+      "reviewer_agent_id": "reviewer_v1",
+      "reviewed_at": "2026-03-11T19:26:06.502276",
+      "team_analysis": [
+        "[MISSING: founder names, roles, experience]"
+      ],
+      "competition_analysis": [
+        "[MISSING: competitive landscape data]"
+      ],
+      "business_model_analysis": [
+        "[MISSING]"
+      ],
+      "investment_thesis": [
+        "- Large and growing market in data infrastructure and data activation.",
+        "- Real-time activation with governance is a defensible product focus for mid-market to enterprise data teams.",
+        "- Key risks include lack of public traction data, undisclosed team credibility, and unclear monetization terms."
+      ],
+      "risk_mitigation": [
+        "- Provide complete founder bios, track record, and relevant domain experience.",
+        "- Share traction metrics (customers, ARR, growth rate) and use-cases to validate demand.",
+        "- Deliver a competitive landscape map and clear differentiators vs. peers.",
+        "- disclose pricing, packaging, and unit economics; align on valuation expectations."
+      ],
+      "score_reasoning": {
+        "market_score": "Large and expanding market with tailwinds from data warehouses and demand for real-time, governed data activation.",
+        "product_score": "Clear problem-solution fit and governance-enabled activation; differentiation hinges on connectors, templates, and governance features, but explicit early usage signals are not provided.",
+        "technical_score": "Feasible multi-tool activation architecture with governance; execution risk due to connector breadth and performance, but no fundamental infeasibility evident.",
+        "execution_score": "Significant missing data on founding team and traction; execution risk elevated until team credibility and GTM plan are shown.",
+        "defensibility_score": "Moat potential via governance, templates, and data activation capabilities; risk of replication with standard connectors and APIs."
+      },
+      "reviews": [
+        {
+          "reviewer_type": "DefaultReviewer",
+          "market_score": 8,
+          "product_score": 7,
+          "technical_score": 7,
+          "execution_score": 5,
+          "defensibility_score": 6,
+          "overall_summary": "Hightouch addresses a clear and growing need in data activation by pushing warehouse insights into business tools with governance and real-time sync, a problem many data teams face. The solution aligns with macro tailwinds around data warehouses and operational data, but the absence of disclosed traction data, founding team details, and competitive landscape leaves meaningful execution risk. The opportunity is promising but requires due diligence to validate team capability, monetization, and defensibility before committing further.",
+          "key_risks": [
+            "Missing founding team details",
+            "Missing revenue or traction data",
+            "Competitive landscape unclear",
+            "Missing valuation data"
+          ],
+          "verdict": "MEDIUM",
+          "diligence_red_flags": [
+            "Missing founding team details",
+            "Missing revenue or traction data",
+            "Competitive landscape unclear",
+            "Missing valuation data"
+          ],
+          "assumption_feedback": [
+            "Assumptions not provided in prompt; unable to assess support for primary thesis. Critical unknowns include expected ROI from data activation, time-to-value for customers, connectivity depth to target SaaS tools, and pricing/monetization strategy."
+          ],
+          "team_analysis": [
+            "[MISSING: founder names, roles, experience]"
+          ],
+          "competition_analysis": [
+            "[MISSING: competitive landscape data]"
+          ],
+          "business_model_analysis": [
+            "[MISSING]"
+          ],
+          "investment_thesis": [
+            "- Large and growing market in data infrastructure and data activation.",
+            "- Real-time activation with governance is a defensible product focus for mid-market to enterprise data teams.",
+            "- Key risks include lack of public traction data, undisclosed team credibility, and unclear monetization terms."
+          ],
+          "risk_mitigation": [
+            "- Provide complete founder bios, track record, and relevant domain experience.",
+            "- Share traction metrics (customers, ARR, growth rate) and use-cases to validate demand.",
+            "- Deliver a competitive landscape map and clear differentiators vs. peers.",
+            "- disclose pricing, packaging, and unit economics; align on valuation expectations."
+          ],
+          "score_reasoning": {
+            "market_score": "Large and expanding market with tailwinds from data warehouses and demand for real-time, governed data activation.",
+            "product_score": "Clear problem-solution fit and governance-enabled activation; differentiation hinges on connectors, templates, and governance features, but explicit early usage signals are not provided.",
+            "technical_score": "Feasible multi-tool activation architecture with governance; execution risk due to connector breadth and performance, but no fundamental infeasibility evident.",
+            "execution_score": "Significant missing data on founding team and traction; execution risk elevated until team credibility and GTM plan are shown.",
+            "defensibility_score": "Moat potential via governance, templates, and data activation capabilities; risk of replication with standard connectors and APIs."
+          },
+          "prompt_version": null
+        },
+        {
+          "reviewer_type": "DefaultReviewer",
+          "market_score": 7,
+          "product_score": 7,
+          "technical_score": 7,
+          "execution_score": 5,
+          "defensibility_score": 7,
+          "overall_summary": "The proposition targets a real pain in data activation from warehouses to business apps with governance and real-time sync, aligning with current demand for timely, governed data across tools. The concept is practical and leverages a known category (reverse ETL) with potential differentiation from governance templates and templates; however, there is insufficient evidence on market size, traction, or a credible moat. Execution and defensibility risk remain non-trivial due to missing team details, limited traction data, and an unclear competitive landscape.",
+          "key_risks": [
+            "Missing founding team details",
+            "Missing revenue or traction data",
+            "Competitive landscape unclear",
+            "Missing valuation data",
+            "TAM and pricing evidence not provided"
+          ],
+          "verdict": "MEDIUM",
+          "diligence_red_flags": [
+            "Missing founding team details",
+            "Missing revenue or traction data",
+            "Competitive landscape unclear",
+            "Missing valuation data"
+          ],
+          "assumption_feedback": [
+            "Assumes a large, addressable market for reverse ETL with real-time activation; no TAM/regulatory or growth metrics provided.",
+            "Assumes governance templates and real-time syncing create significant differentiation; moat validation is absent.",
+            "Assumes enterprise/mid-market willingness to adopt a data activation layer; no pricing, CAC, or LTV data available.",
+            "Assumes connectors breadth and reliability across tools; no data on connector coverage or coverage quality."
+          ],
+          "team_analysis": [
+            "[MISSING: founder names, roles, experience]"
+          ],
+          "competition_analysis": [
+            "Competitive landscape unclear; no explicit differentiation strategy or moat details provided."
+          ],
+          "business_model_analysis": [
+            "[MISSING]"
+          ],
+          "investment_thesis": [
+            "- Strong market tailwinds in data infrastructure and real-time data activation across enterprise SaaS tooling.",
+            "- Core assumptions require evidence on pricing, unit economics, and connector breadth; without this, yield is uncertain.",
+            "- Execution risk hinges on the team and ability to rapidly build and maintain a broad connector network; incumbent scaling could threaten defensibility."
+          ],
+          "risk_mitigation": [
+            "- Obtain founder bios and prior relevant experience; secure references to assess execution capability.",
+            "- Obtain current revenue/traction metrics (ARR, ACV, pilots) and a concrete pilot plan with milestones.",
+            "- Conduct a competitive landscape map and moat analysis; quantify potential differentiators (templates, governance, data quality).",
+            "- Provide valuation framework or range; align with market comps and expected exit scenarios.",
+            "- Validate TAM with customer interviews and early sales opportunities; run minimal viable GTM experiments."
+          ],
+          "score_reasoning": {
+            "market_score": "Market appears large and growing with demand for real-time activation across SaaS; TAM evidence is not provided.",
+            "product_score": "Clear problem-solution alignment; differentiation and moat unproven due to lack of moat evidence and traction data.",
+            "technical_score": "Feasible multi-tool integration with real-time syncing; moat and long-term scalability require validation.",
+            "execution_score": "No team or traction data provided; high uncertainty about ability to execute and scale GTM.",
+            "defensibility_score": "Potential moat from data/connectors and governance, but easy replication risk exists without demonstrated barriers."
+          },
+          "prompt_version": null
+        },
+        {
+          "reviewer_type": "DefaultReviewer",
+          "market_score": 9,
+          "product_score": 8,
+          "technical_score": 7,
+          "execution_score": 7,
+          "defensibility_score": 6,
+          "overall_summary": "This opportunity sits in a large, growing market with strong demand for real-time data activation across business tools. The problem is well-defined and the solution aligns with enterprise needs for governance and automation, suggesting a solid product-market fit. However, execution risk remains due to incomplete team details and an under-specified go-to-market and competitive landscape.",
+          "key_risks": [
+            "Missing founding team details",
+            "Missing revenue or traction data",
+            "Competitive landscape unclear",
+            "Missing valuation data"
+          ],
+          "verdict": "MEDIUM",
+          "diligence_red_flags": [
+            "Missing founding team details",
+            "Missing revenue or traction data",
+            "Competitive landscape unclear",
+            "Missing valuation data"
+          ],
+          "assumption_feedback": [
+            "No explicit scout hypothesis fields were provided; the assessment relies on market narrative and problem-solution clarity.",
+            "Strengths: market fundamentals (data warehouses, real-time decisioning, governance) and a clear activation use-case across CRM/Marketing tools.",
+            "Weaknesses/unknowns: pricing model and unit economics, GTM strategy, breadth and depth of integrations, regulatory/compliance considerations, and evidence of customer pull or pilot results."
+          ],
+          "team_analysis": [
+            "[MISSING: founders names, roles, experience]"
+          ],
+          "competition_analysis": [
+            "Competitive landscape in reverse ETL is not detailed in provided materials; differentiation appears to rely on governance templates and real-time sync.",
+            "Need explicit moat narrative and profiling of key incumbents or alternatives to validate defensibility against replication or platform risk.",
+            "Potential adjacent opportunities include broader data activation and governance automation; assess risk of feature parity with peers."
+          ],
+          "business_model_analysis": [
+            "[MISSING]"
+          ],
+          "investment_thesis": [
+            "Tailwinds from data activation create a large TAM; enterprise-grade features and templates could enable high ARR and sticky adoption.",
+            "Platform approach may yield network effects if a rich library of templates and governance rules develops across tools.",
+            "Critical unknowns: pricing, unit economics, exact GTM motion, integration coverage breadth, and data quality/synchronization reliability at scale."
+          ],
+          "risk_mitigation": [
+            "Missing founding team details: request founder resumes, roles, track record, and a concrete 100-day plan; schedule founder diligence calls.",
+            "Missing revenue or traction data: request current MRR/ARR, growth metrics, and at least 2\u20133 customer logos or pilot results.",
+            "Competitive landscape unclear: develop a competitive map, identify 3\u20135 direct competitors, and articulate clear differentiators and pricing.",
+            "Missing valuation data: obtain target valuation or recent round details; run scenarios to assess upside/downside.",
+            "Regulatory or execution impossibility: perform API coverage audit, data governance/compliance review, and plan for security and privacy controls."
+          ],
+          "score_reasoning": {
+            "market_score": "Large, expanding market driven by more data warehouses, real-time decisioning needs, and governance requirements; timing is favorable.",
+            "product_score": "Clear problem-solution fit with governance and real-time activation; differentiation relies on templates and governance features, which is plausible but needs stronger differentiation signals.",
+            "technical_score": "Feasible to architect with multi-tool integrations; execution risk is moderate due to integration surface and real-time constraints; moat is not guaranteed.",
+            "execution_score": "Strong market rationale but team data missing; early-stage benefit of doubt applied; execution risk remains due to GTM and integration complexity.",
+            "defensibility_score": "Some moat through data workflows and governance positioning, but high potential for replication; need concrete IP/data advantages or network effects."
+          },
+          "prompt_version": null
+        }
+      ],
+      "consensus_verdict": "MEDIUM",
+      "reviewer_disagreement": false,
+      "score_variance": {
+        "market_score": 0.67,
+        "product_score": 0.22,
+        "technical_score": 0.0,
+        "execution_score": 0.89
+      }
+    },
+    "partner_info": {
+      "decision": "MAYBE",
+      "rationale": "The market signal is strong for data activation with governance and real-time sync, and Hightouch's product direction aligns with macro trends. However, the memo is missing critical due diligence data: disclosed traction (customers, ARR, growth), founding team bios/experience, exact pricing/packaging and unit economics, valuation, founding deal structure, and a clear competitive landscape. Execution risk remains elevated until team credentials, GTM plan, and monetization terms are validated. Without these, a final yes is premature. If proceeding, structure diligence to de-risk: confirm deep founder experience, obtain 12-24 month ARR and customer cohort data, detail connectors and latency benchmarks, map competitors and defensibility moat, confirm pricing, margins, and unit economics, provide cap table and valuation expectations, and outline exit scenarios and potential strategics.",
+      "next_action": "1) Provide founder bios/track records and current team capacity. 2) Deliver traction metrics: number of customers, ARR, growth rate, ARR by segment (mid-market vs enterprise). 3) Share pricing/packaging, ARR churn, gross margin, and LTV/CAC proxy. 4) Supply a competitive landscape map and differentiation. 5) Detail product connectors depth, governance features, SLA/latency for real-time activation. 6) Share deal structure: proposed valuation range, cap table, previous financing, option pool. 7) Outline GTM plan and initial marquee logos. 8) Present exit scenarios and potential acquirers. 9) Schedule partner diligence session and set a tight decision deadline.",
+      "conviction_level": 5,
+      "human_review_required": true,
+      "partner_agent_id": "partner_v1",
+      "partnered_at": "2026-03-11T19:27:19.940326",
+      "llm_fallback_reason": null,
+      "memo_at_decision": null,
+      "portfolio_context_at_decision": null,
+      "prompt_version": null
+    },
     "financials": {
       "traction_metrics": null,
       "funding_history": null,
@@ -672,7 +1164,7 @@
     },
     "version": 1,
     "created_at": "2026-03-02T22:31:05.652312",
-    "updated_at": "2026-03-02T22:31:05.652315"
+    "updated_at": "2026-03-11T19:27:19.946890"
   },
   {
     "startup_id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
@@ -899,5 +1391,119 @@
     "version": 1,
     "created_at": "2026-03-02T22:41:36.207000",
     "updated_at": "2026-03-02T22:41:36.207001"
+  },
+  {
+    "startup_id": "e05f1d2b-9c1a-4f7b-8d2e-3f6a9b2c1d0e",
+    "scout_info": {
+      "startup_id": "e05f1d2b-9c1a-4f7b-8d2e-3f6a9b2c1d0e",
+      "name": "Mistral AI",
+      "one_line": "France-based startup building open-weight, high-performance large language models to democratize access to advanced AI.",
+      "sector": "Artificial Intelligence / ML",
+      "problem": "Closed, proprietary LLMs create vendor lock-in, high costs, and accessibility barriers for researchers and smaller teams.",
+      "solution": "Open-weight, high-performance LLMs with optimized training pipelines and tooling, plus an ecosystem of transparent weights and support to enable widespread adoption.",
+      "target_users": "AI researchers, developers, startups, and enterprises needing customizable LLMs without vendor lock.",
+      "why_now": "Momentum around open-weight LLMs; European AI initiatives and funding support; demonstrated capability to release competitive 7B+ models; improving open-source tooling and hardware ecosystems.",
+      "scout_type": "builder_technical",
+      "confidence_score": 0.65,
+      "funding_stage": "Seed",
+      "est_tam": null,
+      "references": [
+        "https://mistral.ai",
+        "https://www.crunchbase.com/organization/mistral-ai"
+      ],
+      "discovered_at": "2026-03-11T19:26:21.132445",
+      "prompt_version": null
+    },
+    "review_info": null,
+    "partner_info": null,
+    "financials": {
+      "traction_metrics": null,
+      "funding_history": null,
+      "valuation_est": null,
+      "ip_status": null,
+      "revenue_missing": false,
+      "funding_missing": false,
+      "valuation_missing": false
+    },
+    "version": 1,
+    "created_at": "2026-03-11T19:26:21.132577",
+    "updated_at": "2026-03-11T19:26:21.132579"
+  },
+  {
+    "startup_id": "7f8a9b0c-12d3-4e56-89ab-cdef01234567",
+    "scout_info": {
+      "startup_id": "7f8a9b0c-12d3-4e56-89ab-cdef01234567",
+      "name": "Spendesk",
+      "one_line": "All-in-one spend management platform that gives teams control over company expenses with centralized approvals, virtual cards, and real-time visibility.",
+      "sector": "Fintech / Spend management",
+      "problem": "Siloed, unmanaged corporate spending across departments leads to rogue purchases, lengthy expense processes, and a lack of real-time visibility.",
+      "solution": "Unified platform combining virtual cards, automated approvals, centralized reconciliation, and spend analytics to govern and optimize company spending.",
+      "target_users": "Finance teams, procurement leads, and department managers in SMBs to mid-market companies",
+      "why_now": "The shift to distributed teams and widespread cloud adoption creates more corporate spending and card usage; organizations need real-time spend governance, tighter control, and cost optimization to navigate economic pressures.",
+      "scout_type": "pain_point",
+      "confidence_score": 0.62,
+      "funding_stage": null,
+      "est_tam": null,
+      "references": [
+        "https://www.spendesk.com",
+        "https://www.crunchbase.com/organization/spendesk",
+        "https://www.linkedin.com/company/spendesk/"
+      ],
+      "discovered_at": "2026-03-11T19:26:21.137446",
+      "prompt_version": null
+    },
+    "review_info": null,
+    "partner_info": null,
+    "financials": {
+      "traction_metrics": null,
+      "funding_history": null,
+      "valuation_est": null,
+      "ip_status": null,
+      "revenue_missing": false,
+      "funding_missing": false,
+      "valuation_missing": false
+    },
+    "version": 1,
+    "created_at": "2026-03-11T19:26:21.137496",
+    "updated_at": "2026-03-11T19:26:21.137497"
+  },
+  {
+    "startup_id": "9a6d2f4b-7f3e-4b8f-9a9d-1b4f6a5e2e12",
+    "scout_info": {
+      "startup_id": "9a6d2f4b-7f3e-4b8f-9a9d-1b4f6a5e2e12",
+      "name": "Owlstone Medical",
+      "one_line": "Breath Biopsy-based AI-enabled diagnostics for non-invasive disease detection.",
+      "sector": "HealthTech / Diagnostics",
+      "problem": "Current disease detection relies on invasive, slow, or blood-based tests with limited early detection capability.",
+      "solution": "Breath Biopsy platform that uses proprietary sensors and AI to detect disease signatures non-invasively from exhaled breath.",
+      "target_users": "Hospitals, diagnostic labs, pharma researchers, and clinical trial providers",
+      "why_now": "Sensor tech and AI have matured; demand for non-invasive screening is rising; regulatory and payer ecosystems are beginning to value easier, lower-cost diagnostics.",
+      "scout_type": "contrarian",
+      "confidence_score": 0.62,
+      "funding_stage": null,
+      "est_tam": null,
+      "references": [
+        "https://www.owlstonemedical.com",
+        "https://www.owlstonemedical.com/technology/breath-biopsy",
+        "https://www.crunchbase.com/organization/owlstone-medical",
+        "https://www.linkedin.com/company/owlstone-medical/"
+      ],
+      "discovered_at": "2026-03-11T19:26:21.140646",
+      "prompt_version": null
+    },
+    "review_info": null,
+    "partner_info": null,
+    "financials": {
+      "traction_metrics": null,
+      "funding_history": null,
+      "valuation_est": null,
+      "ip_status": null,
+      "revenue_missing": false,
+      "funding_missing": false,
+      "valuation_missing": false
+    },
+    "version": 1,
+    "created_at": "2026-03-11T19:26:21.140701",
+    "updated_at": "2026-03-11T19:26:21.140703"
   }
 ]

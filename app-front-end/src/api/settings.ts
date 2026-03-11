@@ -40,9 +40,25 @@ export interface MetaAgentSettings {
   mutation_cooldown_cycles: number;
 }
 
+export interface AgentBudgetStatus {
+  agent_id: string;
+  daily_calls_used: number;
+  daily_calls_limit: number;
+  daily_tokens_used: number;
+  daily_tokens_limit: number;
+  in_cooldown: boolean;
+  cooldown_until: string | null;
+}
+
 export interface SystemHealth {
-  calibration_warning?: string | null;
-  verdict_distribution?: Record<string, number>;
+  calibration_warning: string | null;
+  pending_escalations: number;
+  queue_depths: {
+    unreviewed: number;
+    undecided: number;
+    watchlist: number;
+  };
+  budget_status: AgentBudgetStatus[];
 }
 
 export interface Settings {
@@ -51,7 +67,6 @@ export interface Settings {
   portfolio: Portfolio;
   meta_agent?: MetaAgentSettings;
   system_health?: SystemHealth;
-  budget_status?: Record<string, { calls_used: number; calls_limit: number; tokens_used: number; tokens_limit: number }>;
 }
 
 export interface ValidationError {
@@ -60,11 +75,18 @@ export interface ValidationError {
 }
 
 export async function fetchSettings(): Promise<Settings> {
-  const res = await fetch(`${API_BASE}/api/settings`, {
-    headers: { Accept: 'application/json' },
-  });
-  if (!res.ok) throw new Error(`Settings API error: ${res.status}`);
-  return res.json();
+  const [settings, systemHealth] = await Promise.all([
+    fetch(`${API_BASE}/api/settings`, {
+      headers: { Accept: 'application/json' },
+    }).then((r) => {
+      if (!r.ok) throw new Error(`Settings API error: ${r.status}`);
+      return r.json();
+    }),
+    fetch(`${API_BASE}/api/analytics/system-health`, {
+      headers: { Accept: 'application/json' },
+    }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`System health API error: ${r.status}`)))),
+  ]);
+  return { ...(settings as Settings), system_health: systemHealth as SystemHealth };
 }
 
 export async function patchSettings(

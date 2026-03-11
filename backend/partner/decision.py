@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from openai import OpenAI
 from partner.schema import PartnerOutput, validate_partner_output
+from utils.prompt_version import hash_prompt
 
 
 logger = logging.getLogger(__name__)
@@ -122,7 +123,7 @@ class PartnerDecisionEngine:
             context_memo: Optional pre-decision memo text for LLM context
         Returns:
             PartnerOutput with decision, conviction_level, rationale, next_action,
-            human_review_required, assumption_risks. Legacy INVEST/WATCH/PASS mapped to YES/MAYBE/NO.
+            human_review_required, assumption_risks.
         """
         rules = self._get_rules()
         verdict_rules = rules.get("verdict_rules", {})
@@ -322,7 +323,7 @@ class PartnerDecisionEngine:
             result["memo_at_decision"] = context_memo or None
             return result
 
-        # Rule 6: MEDIUM verdict, borderline score → LLM or PASS
+        # Rule 6: MEDIUM verdict, borderline score → LLM or NO
         if verdict == "MEDIUM" and min_avg_borderline_low <= avg_score < max_avg_borderline_high:
             llm_triggers = rules.get("llm_fallback_triggers", {})
             use_llm = self.use_llm_fallback and llm_triggers.get("medium_borderline_avg", True)
@@ -342,7 +343,7 @@ class PartnerDecisionEngine:
                 confidence=medium_rule.get("conviction_level_borderline", 5) + conviction_adjust,
                 rationale=(
                     f"Quality: {label}, but average score ({avg_score:.1f}/10) below threshold. "
-                    f"Borderline case, defaulting to PASS."
+                    f"Borderline case, defaulting to NO."
                 ),
                 next_action=medium_rule.get("next_action_borderline", "Reject - borderline quality"),
                 human_review_required=False,
@@ -487,13 +488,11 @@ class PartnerDecisionEngine:
     ) -> Dict[str, Any]:
         """
         Build a decision dict conforming to PartnerOutput.
-        Maps legacy INVEST/WATCH/PASS to YES/MAYBE/NO. Clamps conviction to 1-10.
+        Clamps conviction to 1-10.
         """
-        decision_map = {"INVEST": "YES", "WATCH": "MAYBE", "PASS": "NO"}
-        mapped = decision_map.get(decision, decision)
         conviction = max(1, min(10, confidence))
         return {
-            "decision": mapped,
+            "decision": decision,
             "conviction_level": conviction,
             "rationale": rationale,
             "next_action": next_action,
@@ -561,6 +560,8 @@ class PartnerDecisionEngine:
                     assumption_risks=assumption_risks,
                 )
             result["llm_fallback_reason"] = trigger_reason
+            # No real LLM call occurred; mark prompt_version explicitly as None
+            result["prompt_version"] = None
             return result
 
         score_reasoning = review_output.get("score_reasoning") or {}
@@ -671,6 +672,7 @@ Output ONLY valid JSON: {{"decision": "YES"|"NO"|"MAYBE", "rationale": "...", "n
                 assumption_risks=assumption_risks,
             )
             result["llm_fallback_reason"] = trigger_reason
+            result["prompt_version"] = hash_prompt(prompt)
             return result
 
         except Exception as e:
@@ -688,4 +690,5 @@ Output ONLY valid JSON: {{"decision": "YES"|"NO"|"MAYBE", "rationale": "...", "n
                 assumption_risks=assumption_risks,
             )
             result["llm_fallback_reason"] = trigger_reason
+            result["prompt_version"] = hash_prompt(prompt)
             return result

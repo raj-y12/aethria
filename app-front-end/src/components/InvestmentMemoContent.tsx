@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { jsPDF } from 'jspdf';
-import type { Startup } from '../types/startup';
+import type { SingleReview, Startup } from '../types/startup';
 import {
   getScoreBand,
   QUALITY_LABELS,
@@ -349,6 +349,81 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           </div>
         </section>
 
+        {hasReview && startup.review?.reviewer_disagreement && Array.isArray(startup.review.reviews) && startup.review.reviews.length > 0 && (
+          <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
+              Reviewer divergence
+            </h2>
+            <div className="overflow-x-auto no-scrollbar border border-oxford/[0.06]">
+              <table className="w-full border-collapse text-left">
+                <thead className="bg-ivory/60">
+                  <tr>
+                    <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/60">
+                      Reviewer
+                    </th>
+                    {SCORE_DIMENSIONS.map(({ id, name }) => (
+                      <th
+                        key={id}
+                        className="px-3 py-2 font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50"
+                      >
+                        {name}
+                      </th>
+                    ))}
+                    <th className="px-3 py-2 font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50">
+                      Verdict
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {startup.review.reviews.map((rev: SingleReview, idx) => (
+                    <tr key={rev.reviewer_type + idx} className="border-t border-oxford/[0.06]">
+                      <td className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/70 whitespace-nowrap">
+                        {rev.reviewer_type.replace('Reviewer', '')}
+                      </td>
+                      {SCORE_DIMENSIONS.map(({ id }) => {
+                        const score = (rev as any)[id] as number | undefined;
+                        return (
+                          <td
+                            key={id}
+                            className="px-3 py-2 font-sans text-[12px] text-oxford/75 tabular-nums text-center"
+                          >
+                            {score != null ? score.toFixed(0) : '—'}
+                          </td>
+                        );
+                      })}
+                      <td className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/70 whitespace-nowrap">
+                        {rev.verdict}
+                      </td>
+                    </tr>
+                  ))}
+                  {startup.review.score_variance && (
+                    <tr className="border-t border-oxford/[0.08] bg-ivory/40">
+                      <td className="px-3 py-2 font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/60">
+                        Variance
+                      </td>
+                      {SCORE_DIMENSIONS.map(({ id }) => {
+                        const v = startup.review?.score_variance?.[id] ?? 0;
+                        const high = v > 1.5;
+                        return (
+                          <td
+                            key={id}
+                            className={`px-3 py-2 font-mono text-[10px] tabular-nums text-right ${
+                              high ? 'text-oxford' : 'text-oxford/40'
+                            }`}
+                          >
+                            {v ? v.toFixed(2) : '—'}
+                          </td>
+                        );
+                      })}
+                      <td />
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
         {hasReview && (
           <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
             <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
@@ -534,9 +609,42 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <span className="uppercase tracking-wide">Next</span> · {startup.partner!.next_action}
                 </p>
               )}
+              {startup.partner!.portfolio_context_at_decision && (
+                <div className="mt-4 border-t border-oxford/[0.06] pt-3">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/60 mb-1">
+                    Portfolio context at decision
+                  </p>
+                  <p className="font-sans text-[12px] text-oxford/70">
+                    Total portfolio size at decision:{' '}
+                    {startup.partner!.portfolio_context_at_decision.total_portfolio_size}
+                  </p>
+                  {startup.scout.sector && (
+                    <p className="font-sans text-[12px] text-oxford/70">
+                      Sector peers in portfolio:{' '}
+                      {startup.partner!.portfolio_context_at_decision.sector_counts[startup.scout.sector] ?? 0}
+                    </p>
+                  )}
+                  {startup.partner!.rationale &&
+                    startup.partner!.rationale.toLowerCase().includes('concentration') && (
+                      <p className="font-sans text-[12px] text-oxford/60 italic mt-1">
+                        Sector concentration risk was explicitly considered in this decision.
+                      </p>
+                    )}
+                </div>
+              )}
+              {startup.partner!.llm_fallback_reason && (
+                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/40 mt-3">
+                  LLM-assisted · {startup.partner!.llm_fallback_reason}
+                </p>
+              )}
             </div>
           </section>
         )}
+        <section className="mt-6 pt-4 border-t border-oxford/[0.04]">
+          <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-oxford/25">
+            Scout {startup.scout.prompt_version ?? '—'} · Partner {startup.partner?.prompt_version ?? '—'}
+          </p>
+        </section>
       </div>
       </div>
     </div>

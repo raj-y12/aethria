@@ -18,6 +18,7 @@ from storage import Storage
 logger = logging.getLogger(__name__)
 
 # Legacy decision mapping for Partner
+# Legacy vocabulary intentionally retained for migration only
 PARTNER_DECISION_MAP = {"INVEST": "YES", "WATCH": "MAYBE", "PASS": "NO"}
 
 

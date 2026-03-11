@@ -118,7 +118,12 @@ function EscalationCard({ escalation, onResolved }: { escalation: EscalationItem
 
   return (
     <div className="py-4 border-b border-oxford/[0.06] border-l-2 border-l-oxford pl-4">
-      <p className="font-sans text-[14px] font-semibold text-oxford">{escalation.scout?.name ?? escalation.id}</p>
+      <p className="font-sans text-[14px] font-semibold text-oxford">
+        {escalation.startup_name ?? escalation.scout?.name ?? escalation.id}
+      </p>
+      <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/40 mt-0.5">
+        {escalation.startup_id ?? escalation.id}
+      </p>
       <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 mt-1">
         {escalation.scout?.sector ?? ''} · Conviction {escalation.partner?.confidence ?? '—'}/10
       </p>
@@ -200,18 +205,26 @@ function AnalyticsTab({ rejection, watchlist, concentration }: {
       {/* Watchlist Health */}
       <section className="py-6">
         <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 mb-3">Watchlist health</h3>
-        <div className="flex gap-6">
-          {[
-            { label: 'Total', value: watchlist.total },
-            { label: 'Stale', value: watchlist.stale },
-            { label: 'Avg days', value: Math.round(watchlist.avg_days) },
-          ].map((s) => (
-            <div key={s.label} className="text-center">
-              <p className="font-display text-[24px] text-oxford tabular-nums">{s.value}</p>
-              <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50">{s.label}</p>
-            </div>
-          ))}
-        </div>
+        {watchlist.total === 0 ? (
+          <div className="py-4 flex items-center justify-center">
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/30 text-center">
+              NO WATCHLIST ENTRIES
+            </p>
+          </div>
+        ) : (
+          <div className="flex gap-6">
+            {[
+              { label: 'Total', value: watchlist.total },
+              { label: 'Stale', value: watchlist.stale },
+              { label: 'Avg days', value: Math.round(watchlist.avg_days) },
+            ].map((s) => (
+              <div key={s.label} className="text-center">
+                <p className="font-sans text-[24px] text-oxford tabular-nums">{s.value}</p>
+                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="border-t border-oxford/[0.10]" />
@@ -337,7 +350,7 @@ function MetaAgentTab({ reports, weights, calibration }: {
                 { label: 'Calibrations', value: latest.calibration_changes.length },
               ].map((s) => (
                 <div key={s.label} className="text-center">
-                  <p className="font-display text-[24px] text-oxford tabular-nums">{s.value}</p>
+                  <p className="font-sans text-[24px] text-oxford tabular-nums">{s.value}</p>
                   <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50">{s.label}</p>
                 </div>
               ))}

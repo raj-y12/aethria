@@ -1,40 +1,27 @@
 import { useState, useEffect } from 'react';
-import { fetchSettings } from '../api/settings';
+import { tokens } from '../design-system/tokens';
 
 interface SystemBarProps {
   scoutCount?: number;
   agentConfig?: unknown;
+  rightPanel?: 'memo' | 'feed' | 'system' | null;
+  onShowFeed?: () => void;
+  onShowSystem?: () => void;
+  onClose?: () => void;
 }
 
-const AGENT_STATUS_POLL_MS = 15_000;
-
-/** True if at least one agent layer (scouts, reviewers, partners) is enabled in settings. */
-function agentsOnFromSettings(ac: { scouts_enabled?: boolean; reviewers_enabled?: boolean; partners_enabled?: boolean } | undefined): boolean {
-  if (!ac) return false;
-  return !!(ac.scouts_enabled || ac.reviewers_enabled || ac.partners_enabled);
-}
+const PAPER = 'rgba(242,240,234,1)';
+const PAPER_INACTIVE = 'rgba(242,240,234,0.4)';
 
 /**
- * Status strip: wordmark, agents on/off indicator (from settings), and time. Settings / Log out live in the footer.
+ * Status strip: wordmark, JUDGEMENTS / SYSTEM toggles, and clock. Settings / Log out live in the footer.
  */
-export default function SystemBar(_props: SystemBarProps) {
+export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem, onClose }: SystemBarProps) {
   const [time, setTime] = useState(new Date());
-  const [agentsOn, setAgentsOn] = useState<boolean | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
-    const poll = () => {
-      fetchSettings()
-        .then((s) => setAgentsOn(agentsOnFromSettings(s.agent_config)))
-        .catch(() => setAgentsOn(null));
-    };
-    poll();
-    const id = setInterval(poll, AGENT_STATUS_POLL_MS);
-    return () => clearInterval(id);
   }, []);
 
   const formatted = time.toLocaleTimeString('en-GB', {
@@ -52,33 +39,59 @@ export default function SystemBar(_props: SystemBarProps) {
     >
       <a
         href="/"
-        className="font-display font-bold text-[15px] text-ivory hover:opacity-90 transition-opacity tracking-tight"
+        className="font-display font-medium text-[15px] text-ivory hover:opacity-90 transition-opacity tracking-tight flex items-center self-center"
         aria-label="Aethria"
       >
         Aethria
       </a>
 
-      <div className="flex items-center gap-3">
+      {/* JUDGEMENTS / SYSTEM toggles (32px gap) + 48px + clock flush right */}
+      <div className="flex items-center min-h-[2.5rem]" style={{ gap: '48px' }}>
+        <div className="flex items-center" style={{ gap: '32px' }}>
+          <button
+            type="button"
+            onClick={rightPanel === 'feed' ? onClose : onShowFeed}
+            style={{
+              fontFamily: tokens.font.mono,
+              fontSize: '10px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              color: rightPanel === 'feed' ? PAPER : PAPER_INACTIVE,
+              background: 'none',
+              border: 'none',
+              borderBottom: rightPanel === 'feed' ? `1px solid ${PAPER}` : '1px solid transparent',
+              paddingBottom: rightPanel === 'feed' ? '3px' : 0,
+              cursor: 'pointer',
+              transition: `color 0.2s ${tokens.motion.easeCss}, border-color 0.2s ${tokens.motion.easeCss}, padding 0.2s ${tokens.motion.easeCss}`,
+            }}
+            aria-pressed={rightPanel === 'feed'}
+          >
+            Judgements
+          </button>
+          <button
+            type="button"
+            onClick={rightPanel === 'system' ? onClose : onShowSystem}
+            style={{
+              fontFamily: tokens.font.mono,
+              fontSize: '10px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              color: rightPanel === 'system' ? PAPER : PAPER_INACTIVE,
+              background: 'none',
+              border: 'none',
+              borderBottom: rightPanel === 'system' ? `1px solid ${PAPER}` : '1px solid transparent',
+              paddingBottom: rightPanel === 'system' ? '3px' : 0,
+              cursor: 'pointer',
+              transition: `color 0.2s ${tokens.motion.easeCss}, border-color 0.2s ${tokens.motion.easeCss}, padding 0.2s ${tokens.motion.easeCss}`,
+            }}
+            aria-pressed={rightPanel === 'system'}
+          >
+            System
+          </button>
+        </div>
         <span
-          className="flex items-center gap-1.5 font-mono text-[10px] text-ivory/60"
-          title={agentsOn === true ? 'Agents on' : agentsOn === false ? 'Agents off' : 'Checking…'}
-          aria-label={agentsOn === true ? 'Agents on' : agentsOn === false ? 'Agents off' : 'Checking status'}
-        >
-          <span
-            className={`inline-block h-2 w-2 rounded-full shrink-0 transition-colors ${
-              agentsOn === true
-                ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]'
-                : agentsOn === false
-                  ? 'bg-ivory/30'
-                  : 'bg-amber-400/80 animate-pulse'
-            }`}
-          />
-          <span className="hidden sm:inline">
-            {agentsOn === true ? 'On' : agentsOn === false ? 'Off' : '…'}
-          </span>
-        </span>
-        <span
-          className="font-mono text-[10px] tabular-nums text-ivory/80"
+          className="tabular-nums font-mono text-[10px] leading-none ml-auto"
+          style={{ color: PAPER_INACTIVE, letterSpacing: '0.05em' }}
           aria-live="polite"
         >
           {formatted}

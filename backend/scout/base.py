@@ -8,6 +8,7 @@ import json
 import logging
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from openai import OpenAI
 
 from scout.schema import ScoutOutput, validate_scout_output, generate_id
@@ -44,6 +45,11 @@ class Scout(ABC):
         self.logger = logging.getLogger(f"scout.{scout_type}")
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.model = model
+        # Token usage for cost controller integration
+        self._last_token_usage: int = 0
+        # Meta-Agent integration: map to agent name and load any mutated prompt
+        self.agent_name = self._get_agent_name()
+        self._load_prompt_from_library()
     
     @abstractmethod
     async def discover(self) -> Optional[ScoutOutput]:
@@ -55,6 +61,62 @@ class Scout(ABC):
             Must emit valid JSON matching the strict schema.
         """
         pass
+    
+    def _get_agent_name(self) -> str:
+        """
+        Map scout_type to Meta-Agent agent name for prompt library lookup.
+        """
+        mapping = {
+            "market_driven": "MarketDrivenScout",
+            "builder_technical": "BuilderTechnicalScout",
+            "pain_point": "PainPointScout",
+            "contrarian": "ContrarianScout",
+        }
+        return mapping.get(self.scout_type, self.scout_type)
+
+    def _load_prompt_from_library(self) -> None:
+        """
+        Load latest prompt for this Scout from data/meta/prompt_library.json if available.
+        """
+        try:
+            lib_path = Path(__file__).resolve().parent.parent / "data" / "meta" / "prompt_library.json"
+            if not lib_path.exists():
+                return
+            with open(lib_path, "r", encoding="utf-8") as f:
+                library = json.load(f)
+            if not isinstance(library, dict):
+                return
+            latest_key = None
+            latest_time = ""
+            for key, entry in library.items():
+                if key.startswith(self.agent_name + ":"):
+                    created = entry.get("created_at", "")
+                    if created > latest_time:
+                        latest_time = created
+                        latest_key = key
+            if latest_key and library[latest_key].get("prompt"):
+                self.system_prompt = library[latest_key]["prompt"]
+                self.logger.info(f"Loaded prompt from library: {latest_key}")
+        except Exception as e:
+            # Library is optional; log at debug level to avoid noise.
+            self.logger.debug(f"Could not load prompt from library: {e}")
+
+    def set_prompt(self, new_prompt: str) -> None:
+        """
+        Set a new system prompt (called by Meta-Agent).
+        """
+        self.system_prompt = new_prompt
+        self.logger.info(f"Prompt updated for {self.agent_name}")
+
+    def set_dynamic_context(self, context: dict | None) -> None:
+        """
+        Attach dynamic context from DealMemory before discovery cycles.
+
+        Engines may pass in a dict of aggregate signals (e.g. oversaturated
+        sectors, failed assumptions). The base implementation just stores it
+        so subclasses or the prompt can consult it when building requests.
+        """
+        self.dynamic_context = context or {}
     
     def _call_llm_sync(self) -> Optional[dict]:
         """
@@ -107,6 +169,16 @@ class Scout(ABC):
                 response_format={"type": "json_object"},
             )
             
+            # Track token usage if available
+            try:
+                if hasattr(response, "usage") and response.usage:
+                    total = getattr(response.usage, "total_tokens", None)
+                    if isinstance(total, int):
+                        self._last_token_usage = total
+            except Exception:
+                # Non-fatal; cost accounting is best-effort
+                self._last_token_usage = 0
+
             content = response.choices[0].message.content
             if not content:
                 self.logger.error("Empty response from LLM")

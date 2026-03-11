@@ -167,10 +167,38 @@ class PartnerEngine:
                 self.logger.info(
                     f"Making decision for entry {entry_id}: {company_name}"
                 )
+
+                # Enforce cost/budget limits before invoking PartnerDecisionEngine
+                if self.cost_controller:
+                    allowed, reason = self.cost_controller.check_budget(
+                        "partner", "partner", estimated_tokens=0
+                    )
+                    if not allowed:
+                        self.logger.warning(
+                            f"Partner budget denied for entry {entry_id}: {reason}"
+                        )
+                        continue
                 
                 # Make decision (hypothesis-aware; uses assumption_feedback, Scout hypothesis, and memo)
                 decision = self.decision_engine.decide(scout_output, review_output, context_memo=context_memo)
                 validate_partner_output(decision)
+
+                # Record usage in CostController (0 tokens for rule path, actual tokens for LLM fallback)
+                if self.cost_controller:
+                    tokens_used = 0
+                    if decision.get("llm_fallback_reason"):
+                        usage = getattr(self.decision_engine, "_last_token_usage", None)
+                        if isinstance(usage, dict):
+                            total = usage.get("total_tokens")
+                            if isinstance(total, int):
+                                tokens_used = total
+                            else:
+                                prompt_tokens = usage.get("prompt_tokens", 0) or 0
+                                completion_tokens = usage.get("completion_tokens", 0) or 0
+                                tokens_used = int(prompt_tokens) + int(completion_tokens)
+                    self.cost_controller.record_usage(
+                        "partner", "partner", tokens_used=tokens_used
+                    )
 
                 # Convert to PartnerInfo and save
                 from adapters import partner_output_to_partner_info
