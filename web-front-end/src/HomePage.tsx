@@ -46,7 +46,7 @@ export default function HomePage() {
         <Link
           data-cursor-expand
           to="/"
-          className="font-display font-normal text-[17px] hover:opacity-80 transition-opacity md:block text-center md:text-left flex-1 md:flex-none"
+          className="font-display font-normal text-[17px] hover:opacity-80 transition-opacity text-left flex-1 md:flex-none"
           style={{ color: 'var(--color-oxford)' }}
         >
           Aethria
@@ -190,14 +190,11 @@ export default function HomePage() {
         </Link>
       </section>
 
-      <footer
-        className="home-footer-mobile w-full flex items-center justify-between page-margin-x py-6 md:py-7 shrink-0 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-7"
-        style={{ color: 'var(--color-oxford)', backgroundColor: 'var(--color-paper)' }}
-      >
-        <span className="font-sans text-[12px]" style={{ color: 'var(--color-oxford)', opacity: 0.35 }}>
+      <footer className="shrink-0 z-20 flex items-center justify-between page-margin-x pt-2.5 pb-[max(1rem,env(safe-area-inset-bottom))] md:pt-3 md:pb-3" style={{ color: 'var(--color-oxford)', backgroundColor: 'var(--color-paper)' }}>
+        <span className="font-sans text-[10px] md:text-[11px] tracking-wide opacity-70" style={{ color: 'var(--color-oxford)' }}>
           © Aethria
         </span>
-        <span className="font-mono text-[9px] uppercase tracking-[0.15em]" style={{ color: 'var(--color-oxford)', opacity: 0.3 }}>
+        <span className="font-mono text-[9px] uppercase tracking-[0.15em] opacity-70" style={{ color: 'var(--color-oxford)' }}>
           INVESTMENT INTELLIGENCE
         </span>
       </footer>
