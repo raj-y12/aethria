@@ -203,7 +203,8 @@ class PortfolioStore:
         record: DecisionRecord = {
             "id": decision_id,
             "startup_id": startup_id,
-            "decision": partner_output.get("decision", "PASS"),
+            # PartnerOutput already uses canonical YES/NO/MAYBE. Default to NO for safety.
+            "decision": partner_output.get("decision", "NO"),
             "confidence": partner_output.get("confidence", 0),
             "rationale": partner_output.get("rationale", ""),
             "next_action": partner_output.get("next_action", ""),

@@ -105,10 +105,17 @@ class FeedbackLoop:
         metric_ids = []
         
         for agent_id, agent_decisions in by_agent.items():
-            # Acceptance rate
-            invest_count = sum(1 for d in agent_decisions if d.get("decision") == "INVEST")
+            # Normalize legacy vocabulary to canonical YES/NO/MAYBE
+            def _normalize(decision: str) -> str:
+                legacy_map = {"INVEST": "YES", "WATCH": "MAYBE", "PASS": "NO"}
+                return legacy_map.get(decision, decision)
+
+            normalized = [_normalize(d.get("decision", "")) for d in agent_decisions]
+
+            # Acceptance rate: YES / total
+            yes_count = sum(1 for d in normalized if d == "YES")
             total_count = len(agent_decisions)
-            acceptance_rate = invest_count / total_count if total_count > 0 else 0.0
+            acceptance_rate = yes_count / total_count if total_count > 0 else 0.0
             
             metric_id = self.store.add_agent_metric(
                 agent_id=agent_id,
@@ -122,12 +129,12 @@ class FeedbackLoop:
             metric_ids.append(metric_id)
             
             # Decision distribution
-            watch_count = sum(1 for d in agent_decisions if d.get("decision") == "WATCH")
-            pass_count = sum(1 for d in agent_decisions if d.get("decision") == "PASS")
+            maybe_count = sum(1 for d in normalized if d == "MAYBE")
+            no_count = sum(1 for d in normalized if d == "NO")
             
             self.logger.info(
-                f"Partner {agent_id}: {invest_count} INVEST, {watch_count} WATCH, "
-                f"{pass_count} PASS (acceptance_rate: {acceptance_rate:.2%})"
+                f"Partner {agent_id}: {yes_count} YES, {maybe_count} MAYBE, "
+                f"{no_count} NO (acceptance_rate: {acceptance_rate:.2%})"
             )
         
         return metric_ids

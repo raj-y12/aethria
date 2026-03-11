@@ -105,7 +105,8 @@ async def test_complete_flow():
     print("=" * 80)
     
     all_entries = storage.get_all()
-    decisions_summary = {"INVEST": 0, "WATCH": 0, "PASS": 0}
+    # Canonical Partner decisions: YES / NO / MAYBE
+    decisions_summary = {"YES": 0, "MAYBE": 0, "NO": 0}
     
     for entry in all_entries:
         scout = entry.get("scout", {})
@@ -148,9 +149,9 @@ async def test_complete_flow():
     print("=" * 80)
     print("DECISION SUMMARY")
     print("=" * 80)
-    print(f"INVEST: {decisions_summary.get('INVEST', 0)}")
-    print(f"WATCH: {decisions_summary.get('WATCH', 0)}")
-    print(f"PASS: {decisions_summary.get('PASS', 0)}")
+    print(f"YES: {decisions_summary.get('YES', 0)}")
+    print(f"MAYBE: {decisions_summary.get('MAYBE', 0)}")
+    print(f"NO: {decisions_summary.get('NO', 0)}")
     print()
     print("=" * 80)
     print("Test complete!")

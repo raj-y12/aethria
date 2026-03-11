@@ -18,10 +18,10 @@ class ExecutionAgent:
     """
     Execution Agent routes Partner decisions to appropriate stores.
     
-    Routes:
-    - INVEST → portfolio.json
-    - PASS → rejections.json
-    - WATCH → watchlist.json
+    Routes (canonical Partner decisions):
+    - YES   → portfolio.json
+    - NO    → rejections.json
+    - MAYBE → watchlist.json
     """
     
     def __init__(self, portfolio_store: PortfolioStore, agent_id: str = "execution_v1", rejection_analyzer=None):
@@ -55,7 +55,7 @@ class ExecutionAgent:
         Args:
             startup_id: Startup record ID
             decision_id: Decision record ID
-            decision: "INVEST", "WATCH", or "PASS"
+            decision: canonical Partner decision: "YES", "NO", or "MAYBE"
             rationale: Decision rationale
             key_risks: List of key risk strings
             follow_up_triggers: Optional list of follow-up triggers
@@ -63,16 +63,20 @@ class ExecutionAgent:
         Returns:
             Record ID of the created record
         """
-        if decision == "INVEST":
+        # Normalize legacy vocabulary (INVEST/WATCH/PASS) to canonical YES/NO/MAYBE
+        legacy_map = {"INVEST": "YES", "WATCH": "MAYBE", "PASS": "NO"}
+        normalized = legacy_map.get(decision, decision)
+
+        if normalized == "YES":
             return self._add_to_portfolio(
                 startup_id, decision_id, key_risks, follow_up_triggers or []
             )
-        elif decision == "PASS":
+        elif normalized == "NO":
             return self._add_to_rejections(
                 startup_id, decision_id, rationale, key_risks,
                 review_output=review_output, scout_type=scout_type,
             )
-        elif decision == "WATCH":
+        elif normalized == "MAYBE":
             return self._add_to_watchlist(startup_id, decision_id, rationale)
         else:
             raise ValueError(f"Unknown decision type: {decision}")

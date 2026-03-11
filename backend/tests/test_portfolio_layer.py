@@ -64,7 +64,7 @@ async def test_portfolio_layer():
     # Test 2: Add decision
     print("Test 2: Adding partner decision...")
     partner_output = {
-        "decision": "INVEST",
+        "decision": "YES",
         "confidence": 8,
         "rationale": "Strong opportunity",
         "next_action": "Intro founder",
@@ -84,7 +84,7 @@ async def test_portfolio_layer():
     execution_id = execution_agent.execute_decision(
         startup_id=startup_id,
         decision_id=decision_id,
-        decision="INVEST",
+        decision="YES",
         rationale="Strong opportunity",
         key_risks=["Market risk"],
         follow_up_triggers=["Q1 results"],

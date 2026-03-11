@@ -162,8 +162,8 @@ class PortfolioEngine:
                         agent_id="partner_v1",
                     )
                     
-                    # Execute decision
-                    decision = partner_data.get("decision", "PASS")
+                    # Execute decision (canonical YES/NO/MAYBE; default to NO for safety)
+                    decision = partner_data.get("decision", "NO")
                     rationale = partner_data.get("rationale", "")
                     key_risks = review_data.get("key_risks", []) if review_data else []
                     scout_type = startup_data.get("scout_type", "") if startup_data else ""
