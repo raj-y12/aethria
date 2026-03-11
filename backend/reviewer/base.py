@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI
 
 from reviewer.schema import ReviewerOutput, validate_reviewer_output
+from utils.prompt_version import hash_prompt
 
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,7 @@ class Reviewer(ABC):
         self.logger = logging.getLogger("reviewer")
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.model = model
+        self._last_token_usage = 0
         reviewer_rules, rubric = _load_reviewer_resources()
         self.SYSTEM_PROMPT = _build_system_prompt(reviewer_rules, rubric)
     
@@ -263,6 +265,11 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 max_completion_tokens=8192,
             )
             
+            if hasattr(response, 'usage') and response.usage:
+                self._last_token_usage = getattr(response.usage, 'total_tokens', 0) or 0
+            else:
+                self._last_token_usage = 0
+
             content = response.choices[0].message.content
             if not content:
                 self.logger.error("Empty response from LLM")
@@ -283,6 +290,8 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     data[field] = []
             if "score_reasoning" not in data or not isinstance(data.get("score_reasoning"), dict):
                 data["score_reasoning"] = {}
+            
+            data["prompt_version"] = hash_prompt(self.SYSTEM_PROMPT)
             
             return data
             

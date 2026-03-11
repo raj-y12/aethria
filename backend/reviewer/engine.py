@@ -9,8 +9,10 @@ from typing import List, Optional
 from datetime import datetime
 
 from reviewer.reviewer import DefaultReviewer
+from reviewer.skeptical import SkepticalReviewer
+from reviewer.opportunist import OpportunistReviewer
 from storage import Storage
-from settings_loader import is_reviewers_enabled
+from settings_loader import is_reviewers_enabled, load_settings
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +37,8 @@ class ReviewerEngine:
         interval_seconds: int = 60,  # 1 minute default (faster than Scouts)
         model: str = "gpt-5-nano",
         batch_size: int = 1,  # Process one at a time for now
+        cost_controller=None,
+        deal_memory=None,
     ):
         """
         Initialize the Reviewer engine.
@@ -45,6 +49,8 @@ class ReviewerEngine:
             interval_seconds: Time between review cycles
             model: OpenAI model to use (default: gpt-5-nano)
             batch_size: Number of entries to process per cycle
+            cost_controller: Optional CostController instance for budget enforcement
+            deal_memory: Optional DealMemory instance for cross-agent learning
         """
         self.api_key = api_key
         self.storage = storage
@@ -52,9 +58,16 @@ class ReviewerEngine:
         self.model = model
         self.batch_size = batch_size
         self.agent_id = "reviewer_v1"  # Default agent ID
+        self.cost_controller = cost_controller
+        self.deal_memory = deal_memory
+        self.backpressure_threshold = int(
+            os.getenv("REVIEWER_BACKPRESSURE_THRESHOLD", "10")
+        )
         
-        # Initialize Reviewer
+        # Initialize Reviewers (default + persona reviewers)
         self.reviewer = DefaultReviewer(api_key, model=model)
+        self.skeptical_reviewer = SkepticalReviewer(api_key, model=model)
+        self.opportunist_reviewer = OpportunistReviewer(api_key, model=model)
         
         self.logger = logging.getLogger("reviewer.engine")
         self.running = False
@@ -69,6 +82,13 @@ class ReviewerEngine:
         """
         self.logger.info(f"Starting review cycle at {datetime.now().isoformat()}")
         
+        # Check budget before reviewing
+        if self.cost_controller:
+            allowed, reason = self.cost_controller.check_budget("reviewer", "reviewer_engine")
+            if not allowed:
+                self.logger.warning(f"Reviewer budget denied: {reason}")
+                return 0
+        
         # Get unreviewed startups
         unreviewed_startups = self.storage.get_unreviewed(limit=self.batch_size)
         
@@ -76,12 +96,28 @@ class ReviewerEngine:
             self.logger.info("No unreviewed entries found")
             return 0
         
+        # Sort by confidence_score descending (highest confidence first)
+        unreviewed_startups.sort(
+            key=lambda s: s.scout_info.confidence_score, reverse=True
+        )
+        
         self.logger.info(f"Found {len(unreviewed_startups)} unreviewed entries")
+        
+        # Load confidence threshold from settings
+        settings = load_settings()
+        confidence_threshold = settings.get("agent_config", {}).get("confidence_threshold", 0.5)
         
         reviewed_count = 0
         
         # Process each startup
         for startup in unreviewed_startups:
+            confidence_score = startup.scout_info.confidence_score
+            if confidence_score < confidence_threshold:
+                self.logger.info(
+                    f"Below confidence threshold ({confidence_score:.2f} < {confidence_threshold}), "
+                    f"skipping {startup.scout_info.name}"
+                )
+                continue
             entry_id = startup.startup_id
             scout_output: dict = {
                 "id": entry_id,
@@ -117,6 +153,12 @@ class ReviewerEngine:
                     self.logger.warning(f"Review failed for entry {entry_id}")
                     continue
                 
+                # Record token usage if cost controller exists
+                if self.cost_controller:
+                    self.cost_controller.record_usage(
+                        "reviewer", self.agent_id, self.reviewer._last_token_usage
+                    )
+                
                 # Convert to ReviewInfo and save
                 from adapters import reviewer_output_to_review_info
                 review_info = reviewer_output_to_review_info(review_output)
@@ -137,6 +179,29 @@ class ReviewerEngine:
                         f"Reviewed entry {entry_id}: {verdict} "
                         f"(avg score: {avg_score:.1f}/10)"
                     )
+                    
+                    # Record negative assumption feedback in deal memory
+                    if self.deal_memory:
+                        try:
+                            negative_keywords = (
+                                "weak", "unvalidated", "critical unknown",
+                                "could invalidate",
+                            )
+                            assumption_feedback = review_output.get(
+                                "assumption_feedback", []
+                            ) or []
+                            negative_items = [
+                                item for item in assumption_feedback
+                                if any(kw in item.lower() for kw in negative_keywords)
+                            ]
+                            if negative_items:
+                                self.deal_memory.record_failed_assumptions(
+                                    negative_items
+                                )
+                        except Exception as e:
+                            self.logger.error(
+                                f"Failed to record failed assumptions: {e}"
+                            )
                 else:
                     self.logger.error(f"Failed to save review for entry {entry_id}")
                     
@@ -173,6 +238,18 @@ class ReviewerEngine:
                     if self.running:
                         await asyncio.sleep(self.interval_seconds)
                     continue
+
+                # Backpressure: skip cycle if too many undecided startups
+                undecided_count = self.storage.count_undecided()
+                if undecided_count > self.backpressure_threshold:
+                    self.logger.warning(
+                        f"Backpressure: {undecided_count} undecided startups "
+                        f"exceeds threshold ({self.backpressure_threshold}), skipping review cycle"
+                    )
+                    if self.running:
+                        await asyncio.sleep(self.interval_seconds)
+                    continue
+
                 cycle_count += 1
                 self.logger.info(f"=== Review Cycle #{cycle_count} ===")
                 

@@ -14,6 +14,7 @@ from collections import defaultdict
 from uuid import uuid4
 
 from portfolio.store import PortfolioStore
+from analytics.clustering import ClusterAnalyzer
 
 
 logger = logging.getLogger(__name__)
@@ -24,14 +25,17 @@ class HealthMonitor:
     Monitors system health and detects drift.
     """
     
-    def __init__(self, portfolio_store: PortfolioStore):
+    def __init__(self, portfolio_store: PortfolioStore, discovery_storage=None):
         """
         Initialize Health Monitor.
         
         Args:
             portfolio_store: PortfolioStore instance
+            discovery_storage: Optional Storage instance for queue depth checks
         """
         self.store = portfolio_store
+        self.discovery_storage = discovery_storage
+        self.cluster_analyzer = ClusterAnalyzer()
         self.logger = logging.getLogger("health.monitor")
         self.health_records = []  # In-memory cache
     
@@ -59,6 +63,14 @@ class HealthMonitor:
         if bloat_id:
             record_ids.append(bloat_id)
         
+        # Check queue depths
+        queue_id = self._check_queue_depths()
+        if queue_id:
+            record_ids.append(queue_id)
+
+        # Run cluster analysis
+        self._run_cluster_analysis()
+
         return record_ids
     
     def _check_duplicates(self) -> Optional[str]:
@@ -115,6 +127,38 @@ class HealthMonitor:
         
         return None
     
+    def _check_queue_depths(self) -> Optional[str]:
+        """Check queue depths from discovery storage for backpressure awareness."""
+        if not self.discovery_storage:
+            return None
+        try:
+            unreviewed = self.discovery_storage.count_unreviewed()
+            undecided = self.discovery_storage.count_undecided()
+            watchlist_count = len(self.store.get_all_watchlist()) if hasattr(self.store, 'get_all_watchlist') else 0
+            self.logger.info(
+                f"Queue depths - unreviewed: {unreviewed}, undecided: {undecided}, watchlist: {watchlist_count}"
+            )
+            if unreviewed > 20 or undecided > 20:
+                self.logger.warning(
+                    f"High queue depth detected - unreviewed: {unreviewed}, undecided: {undecided}"
+                )
+        except Exception as e:
+            self.logger.warning(f"Could not check queue depths: {e}")
+        return None
+
+    def _run_cluster_analysis(self) -> None:
+        """Run sector clustering analysis on discovery storage data."""
+        if not self.discovery_storage:
+            return
+        try:
+            all_startups = self.discovery_storage.get_all()
+            result = self.cluster_analyzer.analyze(all_startups)
+            oversaturated = self.cluster_analyzer.get_oversaturated_sectors()
+            if oversaturated:
+                self.logger.warning(f"Oversaturated sectors: {oversaturated}")
+        except Exception as e:
+            self.logger.warning(f"Cluster analysis failed: {e}")
+
     def _check_memory_bloat(self) -> Optional[str]:
         """Check for memory bloat in JSON files."""
         file_sizes = {}

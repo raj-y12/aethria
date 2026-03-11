@@ -27,6 +27,8 @@ from scout.engine import ScoutEngine
 from reviewer.engine import ReviewerEngine
 from partner.engine import PartnerEngine
 from portfolio.engine import PortfolioEngine
+from portfolio.cost_control import CostController
+from memory import DealMemory
 
 
 async def run_system():
@@ -57,12 +59,20 @@ async def run_system():
     storage = Storage(file_path=storage_path)
     logger.info(f"Using storage: {storage_path}")
     
+    # Create shared cost controller
+    cost_controller = CostController()
+    
+    # Create shared deal memory
+    deal_memory = DealMemory()
+    
     # Create engines
     scout_engine = ScoutEngine(
         api_key=api_key,
         storage=storage,
         interval_seconds=scout_interval,
         model=model,
+        cost_controller=cost_controller,
+        deal_memory=deal_memory,
     )
     
     reviewer_engine = ReviewerEngine(
@@ -70,12 +80,16 @@ async def run_system():
         storage=storage,
         interval_seconds=reviewer_interval,
         model=reviewer_model,
+        cost_controller=cost_controller,
+        deal_memory=deal_memory,
     )
     
     partner_engine = PartnerEngine(
         storage=storage,
         interval_seconds=partner_interval,
         use_llm_fallback=use_llm_fallback,
+        cost_controller=cost_controller,
+        deal_memory=deal_memory,
     )
     
     portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")

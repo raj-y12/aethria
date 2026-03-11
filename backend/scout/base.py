@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI
 
 from scout.schema import ScoutOutput, validate_scout_output, generate_id
+from utils.prompt_version import hash_prompt
 
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,12 @@ class Scout(ABC):
         self.logger = logging.getLogger(f"scout.{scout_type}")
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.model = model
+        self._dynamic_context = ""
+    
+    def set_dynamic_context(self, context: str):
+        """Set dynamic context to prepend to user message in LLM calls."""
+        self._dynamic_context = context
+        self._last_token_usage = 0
     
     @abstractmethod
     async def discover(self) -> Optional[ScoutOutput]:
@@ -64,42 +71,48 @@ class Scout(ABC):
             Parsed JSON dict if successful, None if failed.
         """
         try:
+            base_user_content = (
+                "Propose one startup idea as a HYPOTHESIS, not a definitive conclusion. "
+                "Output ONLY valid JSON matching the ScoutOutput schema "
+                "(resources/schemas/scout_output_v1.json). Exact shape:\n\n"
+                "{\n"
+                '  "id": "uuid",\n'
+                f'  "scout_type": "{self.scout_type}",\n'
+                '  "name": "string",\n'
+                '  "one_line": "string",\n'
+                '  "sector": "string",\n'
+                '  "problem": "string",\n'
+                '  "solution": "string",\n'
+                '  "target_users": "string",\n'
+                '  "why_now": "string",\n'
+                '  "confidence": number between 0 and 1,\n'
+                '  "primary_thesis": "string (concise: why this idea is investable from your lens)",\n'
+                '  "key_assumptions": ["string", "string", ...],  // exactly 2-4 assumptions the idea depends on\n'
+                '  "biggest_unknown": "string (single largest unresolved risk or uncertainty)",\n'
+                '  "funding_stage": "Pre-Seed" | "Seed" | "Series A" | "Series B" | "Series C+" | "Unknown" | null,\n'
+                '  "est_tam": "string" | null\n'
+                "}\n\n"
+                "REQUIRED: Include primary_thesis, key_assumptions (2-4 items), and biggest_unknown. "
+                "Do NOT make up financial data, team information, or competitors; use null for funding_stage/est_tam if unknown. "
+                "Do not include any text before or after the JSON. Output only the JSON object."
+            )
+            if self._dynamic_context:
+                base_user_content = self._dynamic_context + "\n\n" + base_user_content
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self.system_prompt},
-                    {
-                        "role": "user",
-                        "content": (
-                            "Propose one startup idea as a HYPOTHESIS, not a definitive conclusion. "
-                            "Output ONLY valid JSON matching the ScoutOutput schema "
-                            "(resources/schemas/scout_output_v1.json). Exact shape:\n\n"
-                            "{\n"
-                            '  "id": "uuid",\n'
-                            f'  "scout_type": "{self.scout_type}",\n'
-                            '  "name": "string",\n'
-                            '  "one_line": "string",\n'
-                            '  "sector": "string",\n'
-                            '  "problem": "string",\n'
-                            '  "solution": "string",\n'
-                            '  "target_users": "string",\n'
-                            '  "why_now": "string",\n'
-                            '  "confidence": number between 0 and 1,\n'
-                            '  "primary_thesis": "string (concise: why this idea is investable from your lens)",\n'
-                            '  "key_assumptions": ["string", "string", ...],  // exactly 2-4 assumptions the idea depends on\n'
-                            '  "biggest_unknown": "string (single largest unresolved risk or uncertainty)",\n'
-                            '  "funding_stage": "Pre-Seed" | "Seed" | "Series A" | "Series B" | "Series C+" | "Unknown" | null,\n'
-                            '  "est_tam": "string" | null\n'
-                            "}\n\n"
-                            "REQUIRED: Include primary_thesis, key_assumptions (2-4 items), and biggest_unknown. "
-                            "Do NOT make up financial data, team information, or competitors; use null for funding_stage/est_tam if unknown. "
-                            "Do not include any text before or after the JSON. Output only the JSON object."
-                        ),
-                    },
+                    {"role": "user", "content": base_user_content},
                 ],
                 response_format={"type": "json_object"},
             )
             
+            if hasattr(response, 'usage') and response.usage:
+                self._last_token_usage = getattr(response.usage, 'total_tokens', 0) or 0
+            else:
+                self._last_token_usage = 0
+
             content = response.choices[0].message.content
             if not content:
                 self.logger.error("Empty response from LLM")
@@ -149,6 +162,7 @@ class Scout(ABC):
             
             # Validate against schema
             validated = validate_scout_output(data)
+            validated["prompt_version"] = hash_prompt(self.system_prompt)
             return validated
             
         except ValueError as e:

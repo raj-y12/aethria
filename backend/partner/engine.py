@@ -12,6 +12,8 @@ from partner.decision import PartnerDecisionEngine
 from partner.schema import validate_partner_output
 from storage import Storage
 from settings_loader import is_partners_enabled
+from portfolio.store import PortfolioStore
+from memo_generator import MemoGenerator
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +37,9 @@ class PartnerEngine:
         interval_seconds: int = 30,  # 30 seconds default (fast processing)
         use_llm_fallback: bool = True,
         agent_id: str = "partner_v1",
+        cost_controller=None,
+        portfolio_store: PortfolioStore = None,
+        deal_memory=None,
     ):
         """
         Initialize the Partner engine.
@@ -44,11 +49,21 @@ class PartnerEngine:
             interval_seconds: Time between decision cycles
             use_llm_fallback: Whether to use LLM for edge cases
             agent_id: Agent identifier for performance tracking
+            cost_controller: Optional CostController instance for budget enforcement
+            portfolio_store: Optional PortfolioStore for portfolio awareness
+            deal_memory: Optional DealMemory instance for cross-agent learning
         """
         self.storage = storage
         self.interval_seconds = interval_seconds
         self.agent_id = agent_id
-        self.decision_engine = PartnerDecisionEngine(use_llm_fallback=use_llm_fallback)
+        self.cost_controller = cost_controller
+        self.deal_memory = deal_memory
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        self.decision_engine = PartnerDecisionEngine(
+            use_llm_fallback=use_llm_fallback,
+            api_key=api_key,
+            portfolio_store=portfolio_store,
+        )
         
         self.logger = logging.getLogger("partner.engine")
         self.running = False
@@ -59,20 +74,27 @@ class PartnerEngine:
         Includes Scout hypothesis (primary_thesis, key_assumptions, biggest_unknown) and
         Reviewer assumption_feedback for hypothesis-aware decisions. Defaults missing
         fields for backward compatibility with older Reviewer/Scout outputs.
+        Generates a pre-decision memo for each startup for LLM context.
         
         Args:
             limit: Optional limit on number of entries
         
         Returns:
-            List of entries ready for partner decision (scout + review dicts)
+            List of entries ready for partner decision (scout + review dicts + memo)
         """
         undecided_startups = self.storage.get_undecided(limit=limit)
+        memo_gen = MemoGenerator()
         result: List[Dict[str, Any]] = []
         for startup in undecided_startups:
             if startup.review_info is None:
                 continue
             scout_info = startup.scout_info
             review_info = startup.review_info
+            try:
+                memo = memo_gen.generate_memo(startup, for_display=False)
+            except Exception as e:
+                self.logger.warning(f"Memo generation failed for {startup.startup_id}: {e}")
+                memo = ""
             result.append({
                 "id": startup.startup_id,
                 "scout": {
@@ -88,6 +110,7 @@ class PartnerEngine:
                     "primary_thesis": getattr(scout_info, "primary_thesis", None),
                     "key_assumptions": getattr(scout_info, "key_assumptions", None),
                     "biggest_unknown": getattr(scout_info, "biggest_unknown", None),
+                    "funding_stage": getattr(scout_info, "funding_stage", None),
                 },
                 "review": {
                     "market_score": review_info.market_score,
@@ -103,7 +126,11 @@ class PartnerEngine:
                     "business_model_analysis": getattr(review_info, "business_model_analysis", None) or [],
                     "investment_thesis": getattr(review_info, "investment_thesis", None) or [],
                     "risk_mitigation": getattr(review_info, "risk_mitigation", None) or [],
+                    "score_reasoning": getattr(review_info, "score_reasoning", None) or {},
+                    "reviewer_disagreement": getattr(review_info, "reviewer_disagreement", False),
+                    "score_variance": getattr(review_info, "score_variance", None),
                 },
+                "memo": memo,
             })
         return result
     
@@ -133,6 +160,7 @@ class PartnerEngine:
             entry_id = entry["id"]
             scout_output = entry["scout"]
             review_output = entry["review"]
+            context_memo = entry.get("memo", "")
             
             try:
                 company_name = scout_output.get("name", "Unknown")
@@ -140,8 +168,8 @@ class PartnerEngine:
                     f"Making decision for entry {entry_id}: {company_name}"
                 )
                 
-                # Make decision (hypothesis-aware; uses assumption_feedback and Scout hypothesis)
-                decision = self.decision_engine.decide(scout_output, review_output)
+                # Make decision (hypothesis-aware; uses assumption_feedback, Scout hypothesis, and memo)
+                decision = self.decision_engine.decide(scout_output, review_output, context_memo=context_memo)
                 validate_partner_output(decision)
 
                 # Convert to PartnerInfo and save
@@ -163,6 +191,17 @@ class PartnerEngine:
                         self.logger.info(
                             f"Entry {entry_id} assumption_risks: {assumption_risks}"
                         )
+                    
+                    # Record successful thesis in deal memory on YES decisions
+                    if self.deal_memory and decision_type == "YES":
+                        try:
+                            self.deal_memory.record_successful_thesis(
+                                scout_output.get("primary_thesis", "")
+                            )
+                        except Exception as e:
+                            self.logger.error(
+                                f"Failed to record successful thesis: {e}"
+                            )
                 else:
                     self.logger.error(f"Failed to save decision for entry {entry_id}")
                     

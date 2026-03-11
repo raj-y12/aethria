@@ -30,7 +30,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "PATCH"],
+    allow_methods=["GET", "PATCH", "POST"],
     allow_headers=["*"],
 )
 
@@ -112,27 +112,31 @@ def _backend_to_frontend(raw: dict) -> dict:
     if partner and partner.get("partnered_at"):
         timestamps["partnered_at"] = _to_iso(partner["partnered_at"])
 
+    scout_block = {
+        "id": sid,
+        "scout_type": scout.get("scout_type", "market_driven"),
+        "name": scout.get("name", ""),
+        "one_line": scout.get("one_line", ""),
+        "sector": scout.get("sector", ""),
+        "problem": scout.get("problem"),
+        "solution": scout.get("solution"),
+        "target_users": scout.get("target_users"),
+        "why_now": scout.get("why_now", ""),
+        "confidence": scout.get("confidence_score", 0.5),
+        "funding_stage": scout.get("funding_stage"),
+        "est_tam": scout.get("est_tam"),
+    }
+    if scout.get("prompt_version"):
+        scout_block["prompt_version"] = scout["prompt_version"]
+
     out = {
         "id": sid,
-        "scout": {
-            "id": sid,
-            "scout_type": scout.get("scout_type", "market_driven"),
-            "name": scout.get("name", ""),
-            "one_line": scout.get("one_line", ""),
-            "sector": scout.get("sector", ""),
-            "problem": scout.get("problem"),
-            "solution": scout.get("solution"),
-            "target_users": scout.get("target_users"),
-            "why_now": scout.get("why_now", ""),
-            "confidence": scout.get("confidence_score", 0.5),
-            "funding_stage": scout.get("funding_stage"),
-            "est_tam": scout.get("est_tam"),
-        },
+        "scout": scout_block,
         "timestamps": timestamps,
     }
 
     if review:
-        out["review"] = {
+        review_block = {
             "market_score": review.get("market_score"),
             "product_score": review.get("product_score"),
             "technical_score": review.get("technical_score"),
@@ -150,17 +154,23 @@ def _backend_to_frontend(raw: dict) -> dict:
             "investment_thesis": review.get("investment_thesis") or None,
             "risk_mitigation": review.get("risk_mitigation") or None,
         }
+        if review.get("prompt_version"):
+            review_block["prompt_version"] = review["prompt_version"]
+        out["review"] = review_block
     else:
         out["review"] = None
 
     if partner:
-        out["partner"] = {
+        partner_block = {
             "decision": partner.get("decision", "NO"),
             "confidence": partner.get("conviction_level"),
             "rationale": partner.get("rationale"),
             "next_action": partner.get("next_action"),
             "human_review_required": partner.get("human_review_required", False),
         }
+        if partner.get("prompt_version"):
+            partner_block["prompt_version"] = partner["prompt_version"]
+        out["partner"] = partner_block
     else:
         out["partner"] = None
 
@@ -199,8 +209,15 @@ def health():
 
 @app.get("/api/settings")
 def get_settings():
-    """Return current settings (control plane)."""
-    return load_settings()
+    """Return current settings (control plane) with budget status."""
+    from portfolio.cost_control import CostController
+    settings = load_settings()
+    try:
+        cc = CostController()
+        settings["budget_status"] = cc.get_all_budget_status()
+    except Exception:
+        settings["budget_status"] = {}
+    return settings
 
 
 @app.patch("/api/settings")
@@ -218,3 +235,124 @@ def patch_settings(body: dict):
                 current[section][k] = v
     _save_settings(current)
     return current
+
+
+@app.get("/api/analytics/watchlist")
+def get_watchlist_analytics():
+    """Return watchlist age statistics."""
+    from portfolio.store import PortfolioStore
+    from datetime import datetime
+    store = PortfolioStore()
+    watchlist = store.get_all_watchlist()
+    if not watchlist:
+        return {"total": 0, "stale": 0, "avg_days": 0.0}
+    now = datetime.now()
+    days_list = []
+    stale = 0
+    for entry in watchlist:
+        added = entry.get("added_at")
+        if added:
+            d = (now - datetime.fromisoformat(added)).days
+            days_list.append(d)
+            if entry.get("stale_warning"):
+                stale += 1
+    return {
+        "total": len(watchlist),
+        "stale": stale,
+        "avg_days": sum(days_list) / len(days_list) if days_list else 0.0,
+    }
+
+
+@app.get("/api/signals")
+def get_signals():
+    """Return recent signals (last 50)."""
+    from portfolio.store import PortfolioStore
+    store = PortfolioStore()
+    signals = store._read_file(store.files["signals"])
+    signals.sort(key=lambda s: s.get("detected_at", ""), reverse=True)
+    return signals[:50]
+
+
+@app.get("/api/analytics/rejections")
+def get_rejection_analytics():
+    """Return rejection pattern analytics."""
+    from portfolio.rejection import RejectionAnalyzer
+    analyzer = RejectionAnalyzer()
+    return analyzer.get_patterns()
+
+
+@app.get("/api/analytics/concentration")
+def get_concentration_analytics():
+    """Return sector concentration and theme cluster data."""
+    from analytics.clustering import ClusterAnalyzer
+    analyzer = ClusterAnalyzer()
+    return analyzer._read()
+
+
+@app.post("/api/waitlist")
+def add_to_waitlist(body: dict):
+    """Add a new entry to the waitlist."""
+    import json
+    from pathlib import Path
+    from datetime import datetime
+
+    name = body.get("name", "").strip()
+    email = body.get("email", "").strip()
+    role = body.get("role", "").strip()
+    firm = body.get("firm", "").strip()
+    linkedin = body.get("linkedin", "").strip()
+
+    if not name or not email:
+        raise HTTPException(status_code=422, detail="name and email are required")
+
+    waitlist_path = Path(__file__).resolve().parent / "data" / "waitlist.json"
+    waitlist_path.parent.mkdir(parents=True, exist_ok=True)
+
+    entries = []
+    if waitlist_path.exists():
+        try:
+            with open(waitlist_path, "r") as f:
+                entries = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            entries = []
+
+    for e in entries:
+        if e.get("email", "").lower() == email.lower():
+            position = entries.index(e) + 1
+            return {"status": "already_registered", "position": position}
+
+    entry = {
+        "name": name,
+        "email": email,
+        "role": role,
+        "firm": firm,
+        "linkedin": linkedin,
+        "submitted_at": body.get("submitted_at", datetime.now().isoformat()),
+    }
+    entries.append(entry)
+
+    import os
+    temp_path = waitlist_path.with_suffix(".tmp")
+    with open(temp_path, "w") as f:
+        json.dump(entries, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    temp_path.replace(waitlist_path)
+
+    return {"status": "ok", "position": len(entries)}
+
+
+@app.get("/api/waitlist")
+def get_waitlist():
+    """Return full waitlist."""
+    import json
+    from pathlib import Path
+    waitlist_path = Path(__file__).resolve().parent / "data" / "waitlist.json"
+    if not waitlist_path.exists():
+        return {"count": 0, "entries": []}
+    try:
+        with open(waitlist_path, "r") as f:
+            entries = json.load(f)
+        return {"count": len(entries), "entries": entries}
+    except (json.JSONDecodeError, IOError):
+        return {"count": 0, "entries": []}

@@ -23,7 +23,32 @@ class ScoutInfo(BaseModel):
     confidence_score: float = Field(ge=0.0, le=1.0)
     funding_stage: Optional[Literal["Pre-Seed", "Seed", "Series A", "Series B", "Series C+", "Unknown"]] = None
     est_tam: Optional[str] = None  # Total Addressable Market estimate
+    prompt_version: Optional[str] = None
     discovered_at: datetime = Field(default_factory=datetime.now)
+
+
+class SingleReview(BaseModel):
+    """A single reviewer's evaluation."""
+    reviewer_type: str = "default"  # "default", "skeptical", "opportunist"
+    market_score: int = Field(ge=1, le=10)
+    product_score: int = Field(ge=1, le=10)
+    technical_score: int = Field(ge=1, le=10)
+    execution_score: int = Field(ge=1, le=10)
+    defensibility_score: Optional[int] = Field(default=None, ge=1, le=10)
+    overall_summary: str = ""
+    key_risks: List[str] = Field(default_factory=list)
+    verdict: Literal["STRONG", "MEDIUM", "WEAK"] = "MEDIUM"
+    diligence_red_flags: List[str] = Field(default_factory=list)
+    assumption_feedback: List[str] = Field(default_factory=list)
+    team_analysis: Optional[List[str]] = None
+    competition_analysis: Optional[List[str]] = None
+    business_model_analysis: Optional[List[str]] = None
+    investment_thesis: Optional[List[str]] = None
+    risk_mitigation: Optional[List[str]] = None
+    score_reasoning: Optional[Dict[str, str]] = None
+    prompt_version: Optional[str] = None
+    reviewer_agent_id: Optional[str] = None
+    reviewed_at: datetime = Field(default_factory=datetime.now)
 
 
 class ReviewInfo(BaseModel):
@@ -47,6 +72,12 @@ class ReviewInfo(BaseModel):
     investment_thesis: Optional[List[str]] = None  # Bullet points why to invest + core assumptions
     risk_mitigation: Optional[List[str]] = None  # Actionable strategies per diligence_red_flags
     score_reasoning: Optional[Dict[str, str]] = None  # Per-dimension concise reasoning, e.g. {"market_score": "...", "product_score": "..."}
+    prompt_version: Optional[str] = None
+    # Multi-reviewer fields (additive, backward compatible)
+    reviews: List[SingleReview] = Field(default_factory=list)
+    consensus_verdict: Optional[Literal["STRONG", "MEDIUM", "WEAK"]] = None
+    reviewer_disagreement: bool = False
+    score_variance: Optional[Dict[str, float]] = None
 
 
 class PartnerInfo(BaseModel):
@@ -56,6 +87,10 @@ class PartnerInfo(BaseModel):
     next_action: str  # e.g., "Request Cap Table", "Technical Code Review", "Pass - Market too crowded"
     conviction_level: int = Field(ge=1, le=10)  # 1-10 conviction
     human_review_required: bool = False
+    prompt_version: Optional[str] = None
+    llm_fallback_reason: Optional[str] = None
+    memo_at_decision: Optional[str] = None
+    portfolio_context_at_decision: Optional[Dict[str, Any]] = None
     partner_agent_id: Optional[str] = None
     partnered_at: datetime = Field(default_factory=datetime.now)
 
@@ -93,6 +128,9 @@ class Startup(BaseModel):
     
     # Financials (can be populated at any stage)
     financials: Financials = Field(default_factory=Financials)
+    
+    # Human resolution (optional)
+    human_resolution: Optional[Dict[str, Any]] = None
     
     # Metadata
     version: int = 1

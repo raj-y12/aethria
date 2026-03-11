@@ -39,6 +39,8 @@ class ScoutEngine:
         storage: Optional[Storage] = None,
         interval_seconds: int = 300,  # 5 minutes default
         model: str = "gpt-5-nano",
+        cost_controller=None,
+        deal_memory=None,
     ):
         """
         Initialize the Scout engine.
@@ -48,11 +50,15 @@ class ScoutEngine:
             storage: Optional Storage instance for persistence
             interval_seconds: Time between discovery cycles
             model: OpenAI model to use (default: gpt-5-nano for cost efficiency)
+            cost_controller: Optional CostController instance for budget enforcement
+            deal_memory: Optional DealMemory instance for cross-agent learning
         """
         self.api_key = api_key
         self.storage = storage
         self.interval_seconds = interval_seconds
         self.model = model
+        self.cost_controller = cost_controller
+        self.deal_memory = deal_memory
         
         # Initialize all Scouts
         self.scouts: List[Scout] = [
@@ -62,6 +68,9 @@ class ScoutEngine:
             ContrarianScout(api_key, model=model),
         ]
         
+        self.backpressure_threshold = int(
+            os.getenv("SCOUT_BACKPRESSURE_THRESHOLD", "10")
+        )
         self.logger = logging.getLogger("scout.engine")
         self.running = False
     
@@ -73,6 +82,19 @@ class ScoutEngine:
             List of valid ScoutOutputs (may be empty if all Scouts fail)
         """
         self.logger.info(f"Starting discovery cycle at {datetime.now().isoformat()}")
+        
+        # Check budget before running scouts
+        if self.cost_controller:
+            allowed, reason = self.cost_controller.check_budget("scout", "scout_engine")
+            if not allowed:
+                self.logger.warning(f"Scout budget denied: {reason}")
+                return []
+        
+        # Set dynamic context from deal memory for each scout
+        if self.deal_memory:
+            memory_context = self.deal_memory.get_memory_context_for_scout()
+            for scout in self.scouts:
+                scout.set_dynamic_context(memory_context)
         
         # Run all Scouts in parallel
         tasks = [scout._discover_with_validation() for scout in self.scouts]
@@ -90,11 +112,27 @@ class ScoutEngine:
             elif result is None:
                 self.logger.warning(f"[{scout.scout_type}] Discovery returned None")
             else:
+                # Check for duplicate thesis via deal memory
+                if self.deal_memory:
+                    thesis = result.get("primary_thesis", "")
+                    if self.deal_memory.is_duplicate_thesis(thesis):
+                        self.logger.info(
+                            f"[{scout.scout_type}] Skipping duplicate thesis: "
+                            f"{result['name']}"
+                        )
+                        continue
+
                 discoveries.append(result)
                 self.logger.info(
                     f"[{scout.scout_type}] Discovered: {result['name']} "
                     f"(confidence: {result['confidence']:.2f})"
                 )
+                
+                # Record token usage if cost controller exists
+                if self.cost_controller:
+                    self.cost_controller.record_usage(
+                        "scout", scout.scout_type, scout._last_token_usage
+                    )
                 
                 # Persist to storage if available
                 if self.storage:
@@ -104,6 +142,16 @@ class ScoutEngine:
                         self.logger.error(
                             f"Failed to persist discovery {result.get('id')}: {e}"
                         )
+                
+                # Record scout discovery in deal memory
+                if self.deal_memory:
+                    try:
+                        self.deal_memory.record_scout_discovery(
+                            result.get("sector", ""),
+                            result.get("primary_thesis", ""),
+                        )
+                    except Exception as e:
+                        self.logger.error(f"Failed to record in deal memory: {e}")
         
         self.logger.info(
             f"Cycle complete: {len(discoveries)}/{len(self.scouts)} discoveries successful"
@@ -131,6 +179,18 @@ class ScoutEngine:
                     if self.running:
                         await asyncio.sleep(self.interval_seconds)
                     continue
+                # Backpressure: skip cycle if too many unreviewed startups
+                if self.storage:
+                    unreviewed_count = self.storage.count_unreviewed()
+                    if unreviewed_count > self.backpressure_threshold:
+                        self.logger.warning(
+                            f"Backpressure: {unreviewed_count} unreviewed startups "
+                            f"exceeds threshold ({self.backpressure_threshold}), skipping scout cycle"
+                        )
+                        if self.running:
+                            await asyncio.sleep(self.interval_seconds)
+                        continue
+
                 cycle_count += 1
                 self.logger.info(f"=== Discovery Cycle #{cycle_count} ===")
                 
