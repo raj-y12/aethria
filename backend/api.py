@@ -407,20 +407,12 @@ def get_calibration_state():
 
 
 @app.post("/api/meta/trigger")
-def trigger_meta_cycle():
+async def trigger_meta_cycle():
     """Manually trigger a Meta-Agent cycle (development/oversight use)."""
-    import asyncio
     from meta_agent.agent import MetaAgent
     agent = MetaAgent()
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(asyncio.run, agent.run_cycle())
-                report = future.result(timeout=120)
-        else:
-            report = asyncio.run(agent.run_cycle())
+        report = await agent.run_cycle()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Meta-Agent cycle failed: {e}")
     return {"status": "triggered", "cycle_number": report.get("cycle_number") if report else 0}
