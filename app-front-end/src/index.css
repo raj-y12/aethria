@@ -78,4 +78,21 @@
     display: none;
   }
 
+  .escalation-pulse {
+    animation: aethria-pulse 2s ease-in-out infinite;
+  }
+  .confidence-bar-track {
+    width: 40px;
+    height: 2px;
+    background-color: rgba(0, 33, 71, 0.08);
+  }
+  .confidence-bar-fill {
+    height: 2px;
+    background-color: rgba(0, 33, 71, 0.30);
+  }
+}
+
+@keyframes aethria-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
