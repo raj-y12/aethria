@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
-import EnterSystemPage from './components/EnterSystemPage';
 import MainLayout from './components/MainLayout';
 import LoadingAnimation from './components/LoadingAnimation';
 import GrainOverlay from './components/GrainOverlay';
+import LoginPage from './components/LoginPage';
 import SettingsPage from './settings/SettingsPage';
 import { useIdleTimeout } from './hooks';
 import { useSystemData } from './hooks/useSystemData';
@@ -10,9 +10,14 @@ import { useSystemData } from './hooks/useSystemData';
 const MIN_LOADING_MS = 2000;
 const IDLE_MS = 20 * 60 * 1000;
 const STORAGE_KEY = 'aethria_last_activity';
+
+function hasAuth(): boolean {
+  if (typeof window === 'undefined') return false;
+  return sessionStorage.getItem('auth') === 'true';
+}
+
 function hasValidSession(): boolean {
   if (typeof window === 'undefined') return false;
-  // When opened from /private-access, force fresh login every time
   const params = new URLSearchParams(window.location.search);
   if (params.get('forceLogin') === '1') {
     localStorage.removeItem(STORAGE_KEY);
@@ -24,31 +29,31 @@ function hasValidSession(): boolean {
   return !isNaN(lastActivity) && Date.now() - lastActivity < IDLE_MS;
 }
 
-const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
 function App() {
+  const [auth, setAuth] = useState(() => hasAuth());
   const sessionValid = hasValidSession();
-  const [hasEntered, setHasEntered] = useState(sessionValid);
-  const [isLoading, setIsLoading] = useState(sessionValid);
-  // System-wide data (startups, escalations, signals, analytics, meta, settings)
+  const [hasEntered, setHasEntered] = useState(() => sessionValid || hasAuth());
+  const [isLoading, setIsLoading] = useState(() => sessionValid || hasAuth());
   const systemData = useSystemData();
 
   if (hasEntered && isLoading) {
-    // Initial loading state: give the loader at least MIN_LOADING_MS
     setTimeout(() => setIsLoading(false), MIN_LOADING_MS);
   }
 
-  const handleEnter = useCallback(() => {
+  const handleLoginSuccess = useCallback(() => {
     localStorage.setItem(STORAGE_KEY, Date.now().toString());
+    setAuth(true);
     setHasEntered(true);
     setIsLoading(true);
   }, []);
 
   useIdleTimeout({
     timeoutMs: IDLE_MS,
-    enabled: hasEntered && !isLoading,
+    enabled: auth && hasEntered && !isLoading,
     onIdle: useCallback(() => {
+      sessionStorage.removeItem('auth');
       localStorage.removeItem(STORAGE_KEY);
+      setAuth(false);
       setHasEntered(false);
     }, []),
     onActivity: useCallback((now: number) => {
@@ -60,20 +65,20 @@ function App() {
     typeof window !== 'undefined' &&
     window.location.pathname.startsWith('/settings');
 
+  if (!auth) {
+    return (
+      <>
+        <GrainOverlay opacity={0.02} />
+        <LoginPage onSuccess={handleLoginSuccess} />
+      </>
+    );
+  }
+
   if (isLoading) {
     return (
       <>
         <GrainOverlay opacity={0.02} />
         <LoadingAnimation />
-      </>
-    );
-  }
-
-  if (!hasEntered) {
-    return (
-      <>
-        <GrainOverlay opacity={0.02} />
-        <EnterSystemPage onEnter={handleEnter} />
       </>
     );
   }
