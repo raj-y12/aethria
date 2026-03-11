@@ -90,6 +90,44 @@ class ScoutEngine:
                 self.logger.warning(f"Scout budget denied: {reason}")
                 return []
         
+        # Load scout weights for weighted selection
+        import random
+        try:
+            from meta_agent.reweighter import load_weights
+            weights = load_weights()
+            scout_type_to_name = {
+                "market_driven": "MarketDrivenScout",
+                "builder_technical": "BuilderTechnicalScout",
+                "pain_point": "PainPointScout",
+                "contrarian": "ContrarianScout",
+            }
+            weight_list = [weights.get(scout_type_to_name.get(s.scout_type, ""), 0.25) for s in self.scouts]
+            # Select scouts with weighted probability, minimum 2
+            num_to_run = max(2, len(self.scouts))  # default: run all 4
+            selected_indices = set()
+            if any(w != 0.25 for w in weight_list):
+                # Weighted selection: pick scouts_per_cycle with replacement, then deduplicate
+                scouts_per_cycle = 4
+                choices = random.choices(range(len(self.scouts)), weights=weight_list, k=scouts_per_cycle * 2)
+                selected_indices = set()
+                for c in choices:
+                    selected_indices.add(c)
+                    if len(selected_indices) >= scouts_per_cycle:
+                        break
+                # Ensure minimum 2
+                if len(selected_indices) < 2:
+                    all_indices = list(range(len(self.scouts)))
+                    random.shuffle(all_indices)
+                    for idx in all_indices:
+                        selected_indices.add(idx)
+                        if len(selected_indices) >= 2:
+                            break
+                selected_scouts = [self.scouts[i] for i in selected_indices]
+            else:
+                selected_scouts = self.scouts
+        except ImportError:
+            selected_scouts = self.scouts
+
         # Set dynamic context from deal memory for each scout
         if self.deal_memory:
             memory_context = self.deal_memory.get_memory_context_for_scout()
@@ -97,13 +135,13 @@ class ScoutEngine:
                 scout.set_dynamic_context(memory_context)
         
         # Run all Scouts in parallel
-        tasks = [scout._discover_with_validation() for scout in self.scouts]
+        tasks = [scout._discover_with_validation() for scout in selected_scouts]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         # Collect valid outputs
         discoveries: List[ScoutOutput] = []
         for i, result in enumerate(results):
-            scout = self.scouts[i]
+            scout = selected_scouts[i]
             
             if isinstance(result, Exception):
                 self.logger.error(

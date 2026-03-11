@@ -19,6 +19,6 @@ Your additional lens:
 - Your role is to find the next breakout opportunity before consensus forms"""
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+        self.reviewer_type = "opportunist"
         super().__init__(api_key, model=model)
         self.SYSTEM_PROMPT = self.SYSTEM_PROMPT + self.OPPORTUNIST_ADDENDUM
-        self.reviewer_type = "opportunist"

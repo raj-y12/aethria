@@ -64,3 +64,15 @@ def is_reviewers_enabled() -> bool:
 
 def is_partners_enabled() -> bool:
     return load_settings().get("agent_config", {}).get("partners_enabled", True)
+
+
+def get_meta_agent_settings() -> dict:
+    """Return Meta-Agent configuration from environment."""
+    return {
+        "interval_seconds": int(os.getenv("META_AGENT_INTERVAL_SECONDS", "86400")),
+        "model": os.getenv("META_AGENT_MODEL", "gpt-5-nano"),
+        "enabled": os.getenv("META_AGENT_ENABLED", "true").lower() == "true",
+        "min_reviews": int(os.getenv("META_AGENT_MIN_REVIEWS", "20")),
+        "min_decisions": int(os.getenv("META_AGENT_MIN_DECISIONS", "10")),
+        "mutation_cooldown_cycles": int(os.getenv("META_AGENT_MUTATION_COOLDOWN_CYCLES", "3")),
+    }

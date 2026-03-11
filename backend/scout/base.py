@@ -45,11 +45,55 @@ class Scout(ABC):
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.model = model
         self._dynamic_context = ""
+        self._last_token_usage = 0
+        self.agent_name = self._get_agent_name()
+        self._load_prompt_from_library()
     
     def set_dynamic_context(self, context: str):
         """Set dynamic context to prepend to user message in LLM calls."""
         self._dynamic_context = context
-        self._last_token_usage = 0
+
+    def _get_agent_name(self) -> str:
+        """Map scout_type to agent name for prompt library lookup."""
+        mapping = {
+            "market_driven": "MarketDrivenScout",
+            "builder_technical": "BuilderTechnicalScout",
+            "pain_point": "PainPointScout",
+            "contrarian": "ContrarianScout",
+        }
+        return mapping.get(self.scout_type, self.scout_type)
+
+    def _load_prompt_from_library(self) -> None:
+        """Load latest prompt from data/meta/prompt_library.json if available."""
+        try:
+            from pathlib import Path
+            lib_path = Path(__file__).resolve().parent.parent / "data" / "meta" / "prompt_library.json"
+            if not lib_path.exists():
+                return
+            import json as _json
+            with open(lib_path, "r") as f:
+                library = _json.load(f)
+            if not isinstance(library, dict):
+                return
+            # Find latest entry for this agent
+            latest_key = None
+            latest_time = ""
+            for key, entry in library.items():
+                if key.startswith(self.agent_name + ":"):
+                    created = entry.get("created_at", "")
+                    if created > latest_time:
+                        latest_time = created
+                        latest_key = key
+            if latest_key and library[latest_key].get("prompt"):
+                self.system_prompt = library[latest_key]["prompt"]
+                self.logger.info(f"Loaded prompt from library: {latest_key}")
+        except Exception as e:
+            self.logger.debug(f"Could not load prompt from library: {e}")
+
+    def set_prompt(self, new_prompt: str) -> None:
+        """Set a new system prompt (called by MetaAgent). Updates hash."""
+        self.system_prompt = new_prompt
+        self.logger.info(f"Prompt updated for {self.agent_name} ({hash_prompt(new_prompt)})")
     
     @abstractmethod
     async def discover(self) -> Optional[ScoutOutput]:

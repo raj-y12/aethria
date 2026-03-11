@@ -20,6 +20,6 @@ Your additional lens:
 - Your role is to protect the firm from bad investments"""
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+        self.reviewer_type = "skeptical"
         super().__init__(api_key, model=model)
         self.SYSTEM_PROMPT = self.SYSTEM_PROMPT + self.SKEPTICAL_ADDENDUM
-        self.reviewer_type = "skeptical"

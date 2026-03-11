@@ -104,7 +104,16 @@ async def run_system():
         health_interval=3600,
     )
     
-    logger.info("Starting AETHRIA system (Scout + Reviewer + Partner + Portfolio layers)")
+    # Create Meta-Agent
+    from meta_agent.agent import MetaAgent
+    from meta_agent.engine import MetaAgentEngine
+    meta_agent = MetaAgent(
+        scout_engine=scout_engine,
+        reviewer_engine=reviewer_engine,
+    )
+    meta_agent_engine = MetaAgentEngine(meta_agent)
+
+    logger.info("Starting AETHRIA system (Scout + Reviewer + Partner + Portfolio + Meta-Agent layers)")
     logger.info(
         f"Scout interval: {scout_interval}s, "
         f"Reviewer interval: {reviewer_interval}s, "
@@ -120,6 +129,7 @@ async def run_system():
             reviewer_engine.run_forever(),
             partner_engine.run_forever(),
             portfolio_engine.run_forever(),
+            meta_agent_engine.run_forever(),
         )
     except KeyboardInterrupt:
         logger.info("Received interrupt signal, shutting down...")
@@ -127,6 +137,7 @@ async def run_system():
         reviewer_engine.stop()
         partner_engine.stop()
         portfolio_engine.stop()
+        meta_agent_engine.stop()
         logger.info("System stopped")
 
 

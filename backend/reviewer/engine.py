@@ -133,6 +133,17 @@ class ReviewerEngine:
         settings = load_settings()
         confidence_threshold = settings.get("agent_config", {}).get("confidence_threshold", 0.5)
         
+        # Apply calibration override if present
+        try:
+            from meta_agent.calibrator import load_calibration_state
+            cal_state = load_calibration_state()
+            ct_override = cal_state.get("confidence_threshold_override")
+            if ct_override is not None:
+                confidence_threshold = ct_override
+                self.logger.debug(f"Using calibration override: confidence_threshold={ct_override}")
+        except ImportError:
+            pass
+
         reviewed_count = 0
         
         # Process each startup

@@ -161,6 +161,47 @@ class Reviewer(ABC):
         self._last_token_usage = 0
         reviewer_rules, rubric = _load_reviewer_resources()
         self.SYSTEM_PROMPT = _build_system_prompt(reviewer_rules, rubric)
+        self.reviewer_type = getattr(self, 'reviewer_type', 'default')
+        self.agent_name = self._get_agent_name()
+        self._load_prompt_from_library()
+
+    def _get_agent_name(self) -> str:
+        """Map reviewer_type to agent name for prompt library lookup."""
+        mapping = {
+            "default": "DefaultReviewer",
+            "skeptical": "SkepticalReviewer",
+            "opportunist": "OpportunistReviewer",
+        }
+        return mapping.get(self.reviewer_type, "DefaultReviewer")
+
+    def _load_prompt_from_library(self) -> None:
+        """Load latest prompt from data/meta/prompt_library.json if available."""
+        try:
+            lib_path = Path(__file__).resolve().parent.parent / "data" / "meta" / "prompt_library.json"
+            if not lib_path.exists():
+                return
+            with open(lib_path, "r") as f:
+                library = json.load(f)
+            if not isinstance(library, dict):
+                return
+            latest_key = None
+            latest_time = ""
+            for key, entry in library.items():
+                if key.startswith(self.agent_name + ":"):
+                    created = entry.get("created_at", "")
+                    if created > latest_time:
+                        latest_time = created
+                        latest_key = key
+            if latest_key and library[latest_key].get("prompt"):
+                self.SYSTEM_PROMPT = library[latest_key]["prompt"]
+                self.logger.info(f"Loaded prompt from library: {latest_key}")
+        except Exception as e:
+            self.logger.debug(f"Could not load prompt from library: {e}")
+
+    def set_prompt(self, new_prompt: str) -> None:
+        """Set a new system prompt (called by MetaAgent)."""
+        self.SYSTEM_PROMPT = new_prompt
+        self.logger.info(f"Prompt updated for {self.agent_name} ({hash_prompt(new_prompt)})")
     
     async def review(self, scout_output: dict) -> Optional[ReviewerOutput]:
         """

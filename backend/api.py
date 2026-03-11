@@ -281,6 +281,12 @@ def get_settings():
     except Exception:
         settings["system_health"] = {}
     
+    try:
+        from settings_loader import get_meta_agent_settings
+        settings["meta_agent"] = get_meta_agent_settings()
+    except Exception:
+        settings["meta_agent"] = {}
+
     return settings
 
 
@@ -351,6 +357,73 @@ def get_concentration_analytics():
     from analytics.clustering import ClusterAnalyzer
     analyzer = ClusterAnalyzer()
     return analyzer._read()
+
+
+@app.get("/api/meta/reports")
+def get_meta_reports():
+    """Return last 10 Meta-Agent cycle reports."""
+    import json
+    from pathlib import Path
+    path = Path(__file__).resolve().parent / "data" / "meta" / "meta_reports.json"
+    if not path.exists():
+        return []
+    try:
+        with open(path, "r") as f:
+            reports = json.load(f)
+        if not isinstance(reports, list):
+            return []
+        return reports[-10:]
+    except (json.JSONDecodeError, IOError):
+        return []
+
+
+@app.get("/api/meta/prompt-library")
+def get_prompt_library():
+    """Return versioned history of all prompt variants."""
+    import json
+    from pathlib import Path
+    path = Path(__file__).resolve().parent / "data" / "meta" / "prompt_library.json"
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
+@app.get("/api/meta/weights")
+def get_scout_weights():
+    """Return current scout type run weights."""
+    from meta_agent.reweighter import load_weights
+    return load_weights()
+
+
+@app.get("/api/meta/calibration")
+def get_calibration_state():
+    """Return current calibration state and active overrides."""
+    from meta_agent.calibrator import load_calibration_state
+    return load_calibration_state()
+
+
+@app.post("/api/meta/trigger")
+def trigger_meta_cycle():
+    """Manually trigger a Meta-Agent cycle (development/oversight use)."""
+    import asyncio
+    from meta_agent.agent import MetaAgent
+    agent = MetaAgent()
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, agent.run_cycle())
+                report = future.result(timeout=120)
+        else:
+            report = asyncio.run(agent.run_cycle())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Meta-Agent cycle failed: {e}")
+    return {"status": "triggered", "cycle_number": report.get("cycle_number") if report else 0}
 
 
 @app.post("/api/waitlist")

@@ -13,8 +13,8 @@ class DefaultReviewer(Reviewer):
     """
     
     def __init__(self, api_key: str, model: str = "gpt-5-nano"):
-        super().__init__(api_key, model=model)
         self.reviewer_type = "default"
+        super().__init__(api_key, model=model)
 
     async def review(self, scout_output: dict) -> Optional[ReviewerOutput]:
         """Review a Scout discovery using the base implementation."""
