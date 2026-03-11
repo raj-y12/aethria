@@ -25,10 +25,26 @@ export interface Portfolio {
   memo_verbosity: string;
 }
 
+export interface MetaAgentSettings {
+  enabled: boolean;
+  interval_seconds: number;
+  min_reviews: number;
+  min_decisions: number;
+  mutation_cooldown_cycles: number;
+}
+
+export interface SystemHealth {
+  calibration_warning?: string | null;
+  verdict_distribution?: Record<string, number>;
+}
+
 export interface Settings {
   cost_budget: CostBudget;
   agent_config: AgentConfig;
   portfolio: Portfolio;
+  meta_agent?: MetaAgentSettings;
+  system_health?: SystemHealth;
+  budget_status?: Record<string, { calls_used: number; calls_limit: number; tokens_used: number; tokens_limit: number }>;
 }
 
 export interface ValidationError {
