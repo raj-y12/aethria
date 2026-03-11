@@ -38,11 +38,11 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-[100dvh] flex flex-col relative" style={{ backgroundColor: 'var(--color-paper)' }}>
+    <div className="min-h-[100dvh] flex flex-col relative overflow-x-hidden w-full" style={{ backgroundColor: 'var(--color-paper)' }}>
       <GrainOverlay />
       <CustomCursor />
 
-      <header className={`flex items-center justify-between page-margin-x pt-6 sm:pt-8 pb-4 md:pb-6 shrink-0`}>
+      <header className="flex items-center justify-between page-margin-x pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-8 pb-4 md:pb-6 shrink-0">
         <Link
           data-cursor-expand
           to="/"
@@ -59,9 +59,9 @@ export default function HomePage() {
         </span>
       </header>
 
-      <main className="flex-1 flex flex-col md:flex-row md:items-center min-h-0 shrink-0">
+      <main className="flex-1 flex flex-col md:flex-row md:items-center min-h-0 shrink-0 min-w-0">
         {/* Left column first in DOM for mobile (top); desktop 25% */}
-        <section className="home-hero-left page-margin-x order-1 flex md:w-[25%] flex-col justify-center py-12 sm:py-16 md:py-0 shrink-0">
+        <section className="home-hero-left page-margin-x order-1 flex md:w-[25%] flex-col justify-center py-8 sm:py-16 md:py-0 shrink-0">
           <p className="font-mono text-[10px] uppercase tracking-[0.15em] opacity-50 mb-2" style={{ color: 'var(--color-oxford)' }}>
             REGISTRY / 2026 · EARLY ACCESS
           </p>
@@ -71,7 +71,7 @@ export default function HomePage() {
           <Link
             to="/request-access"
             data-cursor-expand
-            className="font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center w-fit h-10 px-6 bg-transparent border border-[var(--color-oxford)] md:border-[rgba(0,33,71,0.2)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] hover:border-[var(--color-oxford)] mt-8"
+            className="font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center w-full md:w-fit min-h-[44px] h-10 px-6 bg-transparent border border-[var(--color-oxford)] md:border-[rgba(0,33,71,0.2)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] hover:border-[var(--color-oxford)] mt-8"
             style={{ color: 'var(--color-oxford)' }}
           >
             REQUEST ACCESS
@@ -81,7 +81,7 @@ export default function HomePage() {
         {/* Monolith — vertical light line on left, starting at bottom left */}
         <div
           data-cursor-expand
-          className="order-2 relative flex items-center justify-center w-full md:flex-1 min-h-[280px] md:min-h-[70vh] aspect-auto p-10 sm:p-14 md:p-16 lg:p-20 xl:p-24 shrink-0 rounded-none"
+          className="order-2 relative flex items-center justify-center w-full md:flex-1 min-h-[280px] md:min-h-[70vh] aspect-auto p-6 sm:p-10 md:p-16 lg:p-20 xl:p-24 shrink-0 rounded-none"
           style={{ backgroundColor: 'var(--color-oxford)' }}
         >
           <div
@@ -101,7 +101,7 @@ export default function HomePage() {
       {/* Pipeline strip */}
       <section
         ref={pipelineRef}
-        className="w-full page-margin-x border-t flex flex-col md:flex-row"
+        className="w-full page-margin-x border-t flex flex-col md:flex-row min-w-0"
         style={{
           paddingTop: 'var(--section-padding-y)',
           paddingBottom: 'var(--section-padding-y)',
@@ -183,7 +183,7 @@ export default function HomePage() {
         <Link
           to="/request-access"
           data-cursor-expand
-          className="font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center w-full md:w-fit h-10 px-6 bg-transparent border border-[var(--color-oxford)] md:border-[rgba(0,33,71,0.2)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] hover:border-[var(--color-oxford)] mt-8"
+          className="font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center w-full md:w-fit min-h-[44px] h-10 px-6 bg-transparent border border-[var(--color-oxford)] md:border-[rgba(0,33,71,0.2)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] hover:border-[var(--color-oxford)] mt-8"
           style={{ color: 'var(--color-oxford)' }}
         >
           REQUEST ACCESS
@@ -191,7 +191,7 @@ export default function HomePage() {
       </section>
 
       <footer
-        className="home-footer-mobile w-full flex items-center justify-between page-margin-x py-7 shrink-0"
+        className="home-footer-mobile w-full flex items-center justify-between page-margin-x py-6 md:py-7 shrink-0 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-7"
         style={{ color: 'var(--color-oxford)', backgroundColor: 'var(--color-paper)' }}
       >
         <span className="font-sans text-[12px]" style={{ color: 'var(--color-oxford)', opacity: 0.35 }}>

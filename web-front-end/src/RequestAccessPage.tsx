@@ -102,17 +102,17 @@ export default function RequestAccessPage() {
 
   return (
     <div
-      className="min-h-[100dvh] h-[100dvh] overflow-auto flex flex-col relative"
+      className="min-h-[100dvh] h-[100dvh] overflow-auto overflow-x-hidden flex flex-col relative w-full"
       style={{ backgroundColor: 'var(--color-paper)' }}
     >
       <GrainOverlay opacity={0.02} />
       <CustomCursor />
 
-      <header className="flex items-center justify-between page-margin-x pt-6 sm:pt-8 pb-4 md:pb-6 shrink-0 z-20">
+      <header className="flex items-center justify-between page-margin-x pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-8 pb-4 md:pb-6 shrink-0 z-20">
         <Link
           data-cursor-expand
           to="/"
-          className="font-display font-normal text-[17px] hover:opacity-80 transition-opacity md:block text-center md:text-left flex-1 md:flex-none"
+          className="font-display font-normal text-[17px] hover:opacity-80 transition-opacity md:block text-center md:text-left flex-1 md:flex-none min-h-[44px] flex items-center"
           style={{ color: 'var(--color-oxford)' }}
         >
           Aethria
@@ -120,7 +120,7 @@ export default function RequestAccessPage() {
         <Link
           data-cursor-expand
           to="/home"
-          className="font-mono text-[10px] uppercase tracking-[0.1em] opacity-70 hidden md:inline transition-opacity duration-300 hover:opacity-100"
+          className="font-mono text-[10px] uppercase tracking-[0.1em] opacity-70 inline-flex items-center min-h-[44px] transition-opacity duration-300 hover:opacity-100"
           style={{ color: 'var(--color-oxford)' }}
         >
           Home
@@ -270,7 +270,7 @@ export default function RequestAccessPage() {
         </div>
       </main>
 
-      <footer className="shrink-0 z-20 flex items-center justify-between page-margin-x pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] md:pt-3 md:pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+      <footer className="shrink-0 z-20 flex items-center justify-between page-margin-x pt-2.5 pb-[max(1rem,env(safe-area-inset-bottom))] md:pt-3 md:pb-3">
         <span className="font-sans text-[10px] md:text-[11px] tracking-wide opacity-70" style={{ color: 'var(--color-oxford)' }}>
           © Aethria
         </span>

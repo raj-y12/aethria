@@ -24,6 +24,12 @@
 
   --section-padding-y: 80px;
   --section-padding-y-mobile: 56px;
+
+  /* iPhone safe areas (used with viewport-fit=cover) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
 
 @media (max-width: 768px) {
@@ -38,6 +44,14 @@
   padding-right: var(--page-margin-x);
 }
 
+/* iPhone: horizontal padding respects notch/safe area in landscape */
+@media (max-width: 768px) {
+  .page-margin-x {
+    padding-left: max(var(--page-margin-x-mobile), var(--safe-left));
+    padding-right: max(var(--page-margin-x-mobile), var(--safe-right));
+  }
+}
+
 @layer base {
   * {
     border-color: rgba(0, 33, 71, 0.1);
@@ -46,16 +60,36 @@
   html {
     scroll-behavior: smooth;
     background-color: var(--color-paper);
+    overflow-x: hidden;
   }
 
   body {
     background-color: var(--color-paper);
     color: var(--color-charcoal);
     overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+  }
+
+  /* iPhone: root fills viewport so 100dvh works in Safari */
+  #root {
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+  }
+
+  /* Prevent horizontal overflow from long words */
+  .page-margin-x,
+  .home-hero-left,
+  .home-pipeline-column,
+  .home-closing {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
   }
 
   input, textarea {
@@ -80,6 +114,13 @@
 
   *::-webkit-scrollbar {
     display: none;
+  }
+
+  /* iPhone: remove tap highlight, improve touch targets */
+  a,
+  button {
+    -webkit-tap-highlight-color: transparent;
+    tap-highlight-color: transparent;
   }
 
   input:-webkit-autofill,
@@ -143,6 +184,17 @@
   border-bottom-color: rgba(0, 33, 71, 0.55);
 }
 
+@media (max-width: 768px) {
+  .form-input-aethria {
+    font-size: 16px; /* prevents iOS zoom on focus */
+    min-height: 44px;
+    padding-top: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 0;
+  }
+}
+
 .form-label-aethria {
   font-family: var(--font-mono);
   font-size: 9px;
@@ -161,18 +213,19 @@
 @media (max-width: 768px) {
   .home-hero-left {
     width: 100%;
-    padding-left: var(--page-margin-x-mobile);
-    padding-right: var(--page-margin-x-mobile);
     text-align: center;
   }
   .home-pipeline-column {
     width: 100%;
-    padding: 20px var(--page-margin-x-mobile);
+    padding: 20px 0;
+  }
+  .home-pipeline-column .font-sans {
+    font-size: 14px;
   }
   .home-signal-strip {
     min-height: auto;
     height: auto;
-    padding: 16px 0;
+    padding: 16px var(--page-margin-x-mobile);
   }
   .home-signal-text {
     font-size: 9px;
@@ -181,36 +234,38 @@
     line-height: 1.6;
   }
   .home-closing {
-    padding-left: var(--page-margin-x-mobile);
-    padding-right: var(--page-margin-x-mobile);
+    padding-top: 56px;
+    padding-bottom: 56px;
   }
-  .home-closing .btn-aethria {
-    width: 100%;
+  .home-closing h2 {
+    font-size: 26px;
+    line-height: 1.2;
+  }
+  .home-closing .font-sans {
+    font-size: 14px;
   }
   .home-footer-mobile {
     flex-direction: column;
     align-items: center;
     text-align: center;
     gap: 8px;
-    padding-bottom: 40px;
+    padding-bottom: max(40px, env(safe-area-inset-bottom));
   }
 }
 
 /* RequestAccessPage mobile */
 @media (max-width: 768px) {
-  .request-registry-label {
-    display: none;
-  }
   .request-form-grid {
     grid-template-columns: 1fr;
     gap: 16px;
   }
   .request-submit-btn {
     width: 100%;
+    min-height: 44px;
   }
   .request-content-area {
-    padding-top: 48px;
-    padding-bottom: 48px;
+    padding-top: 32px;
+    padding-bottom: 32px;
   }
 }
 
