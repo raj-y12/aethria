@@ -68,7 +68,8 @@
     "contradictory_scores": true,
     "medium_borderline_avg": true,
     "missing_assumptions_affecting_decision": true,
-    "missing_critical_qualitative": true
+    "missing_critical_qualitative": true,
+    "reviewer_disagreement": true
   },
   "missing_qualitative_keywords": ["[MISSING]", "missing", "absent", "n/a"],
   "assumption_risk_keywords": [

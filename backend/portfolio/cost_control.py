@@ -170,6 +170,31 @@ class CostController:
             f"({budget['calls_today']} calls, {budget['tokens_today']} tokens today)"
         )
     
+    def check_budget(
+        self,
+        agent_type: str,
+        agent_id: str,
+        estimated_tokens: int = 0,
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Simpler budget check wrapper around can_make_call.
+        
+        Returns:
+            (allowed, reason_if_denied)
+        """
+        return self.can_make_call(agent_type, agent_id, estimated_tokens)
+
+    def record_usage(
+        self,
+        agent_type: str,
+        agent_id: str,
+        tokens_used: int = 0,
+    ):
+        """
+        Simpler usage recording wrapper around record_call.
+        """
+        self.record_call(agent_type, agent_id, tokens_used)
+
     def get_budget_status(self, agent_type: str) -> Dict[str, Any]:
         """Get current budget status for agent type."""
         self._reset_daily_budgets()
@@ -187,3 +212,11 @@ class CostController:
             "tokens_limit": default["tokens"],
             "last_reset": budget.get("last_reset_date"),
         }
+
+    def get_all_budget_status(self) -> Dict[str, Any]:
+        """Return budget status for all agent types."""
+        self._reset_daily_budgets()
+        result: Dict[str, Any] = {}
+        for agent_type in self.default_budgets:
+            result[agent_type] = self.get_budget_status(agent_type)
+        return result

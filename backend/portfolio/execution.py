@@ -24,16 +24,18 @@ class ExecutionAgent:
     - WATCH → watchlist.json
     """
     
-    def __init__(self, portfolio_store: PortfolioStore, agent_id: str = "execution_v1"):
+    def __init__(self, portfolio_store: PortfolioStore, agent_id: str = "execution_v1", rejection_analyzer=None):
         """
         Initialize Execution Agent.
         
         Args:
             portfolio_store: PortfolioStore instance
             agent_id: Agent identifier
+            rejection_analyzer: Optional RejectionAnalyzer for learning from rejections
         """
         self.store = portfolio_store
         self.agent_id = agent_id
+        self.rejection_analyzer = rejection_analyzer
         self.logger = logging.getLogger("execution.agent")
     
     def execute_decision(
@@ -44,6 +46,8 @@ class ExecutionAgent:
         rationale: str,
         key_risks: list,
         follow_up_triggers: Optional[list] = None,
+        review_output: Optional[dict] = None,
+        scout_type: str = "",
     ) -> str:
         """
         Execute a Partner decision by routing to appropriate store.
@@ -64,7 +68,10 @@ class ExecutionAgent:
                 startup_id, decision_id, key_risks, follow_up_triggers or []
             )
         elif decision == "PASS":
-            return self._add_to_rejections(startup_id, decision_id, rationale, key_risks)
+            return self._add_to_rejections(
+                startup_id, decision_id, rationale, key_risks,
+                review_output=review_output, scout_type=scout_type,
+            )
         elif decision == "WATCH":
             return self._add_to_watchlist(startup_id, decision_id, rationale)
         else:
@@ -97,9 +104,10 @@ class ExecutionAgent:
         decision_id: str,
         rationale: str,
         key_risks: list,
+        review_output: Optional[dict] = None,
+        scout_type: str = "",
     ) -> str:
         """Add rejected company."""
-        # Determine reason code from rationale
         reason_code = self._extract_reason_code(rationale, key_risks)
         
         rejection_id = self.store.add_rejection(
@@ -115,6 +123,28 @@ class ExecutionAgent:
             f"Added startup {startup_id} to rejections (rejection_id: {rejection_id}, "
             f"reason: {reason_code})"
         )
+        
+        # Analyze rejection patterns
+        if self.rejection_analyzer and review_output:
+            try:
+                dimension_scores = {
+                    "market_score": review_output.get("market_score", 0),
+                    "product_score": review_output.get("product_score", 0),
+                    "technical_score": review_output.get("technical_score", 0),
+                    "execution_score": review_output.get("execution_score", 0),
+                }
+                avg_score = sum(dimension_scores.values()) / max(len(dimension_scores), 1)
+                self.rejection_analyzer.analyze_rejection(
+                    sector=review_output.get("sector", "Unknown"),
+                    avg_score=avg_score,
+                    verdict=review_output.get("verdict", "WEAK"),
+                    diligence_red_flags=review_output.get("diligence_red_flags", []),
+                    dimension_scores=dimension_scores,
+                    scout_type=scout_type,
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to analyze rejection: {e}")
+        
         return rejection_id
     
     def _add_to_watchlist(

@@ -19,6 +19,8 @@ from portfolio.signals import SignalTracker
 from portfolio.feedback import FeedbackLoop
 from portfolio.cost_control import CostController
 from portfolio.health import HealthMonitor
+from portfolio.rejection import RejectionAnalyzer
+from analytics.clustering import ClusterAnalyzer
 from storage import Storage
 
 
@@ -63,11 +65,17 @@ class PortfolioEngine:
         self.portfolio_store = portfolio_store
         
         # Initialize components
-        self.execution_agent = ExecutionAgent(self.portfolio_store)
+        self.rejection_analyzer = RejectionAnalyzer(data_dir=str(self.portfolio_store.data_dir))
+        self.execution_agent = ExecutionAgent(
+            self.portfolio_store, rejection_analyzer=self.rejection_analyzer,
+        )
         self.signal_tracker = SignalTracker(self.portfolio_store)
-        self.feedback_loop = FeedbackLoop(self.portfolio_store)
+        self.feedback_loop = FeedbackLoop(
+            self.portfolio_store, discovery_storage=discovery_storage,
+        )
         self.cost_controller = CostController()
-        self.health_monitor = HealthMonitor(self.portfolio_store)
+        self.health_monitor = HealthMonitor(self.portfolio_store, discovery_storage=self.discovery_storage)
+        self.cluster_analyzer = ClusterAnalyzer()
         
         # Intervals
         self.execution_interval = execution_interval
@@ -96,6 +104,7 @@ class PortfolioEngine:
         # Signal Tracker: Check watchlist
         if (now - self.last_signal).total_seconds() >= self.signal_interval:
             await self._run_signals()
+            await self._run_watchlist_review()
             self.last_signal = now
         
         # Feedback Loop: Calculate metrics
@@ -117,15 +126,21 @@ class PortfolioEngine:
             processed_count = 0
             
             for entry in all_entries:
-                startup_data = entry.get("scout")
-                review_data = entry.get("review")
-                partner_data = entry.get("partner")
+                startup_data = entry.get("scout_info") or entry.get("scout")
+                review_data = entry.get("review_info") or entry.get("review")
+                partner_data = entry.get("partner_info") or entry.get("partner")
                 
                 # Only process entries with Partner decisions
                 if not partner_data:
                     continue
                 
-                startup_id = startup_data.get("id") if startup_data else entry.get("id")
+                # Check for human resolution override
+                human_resolution = entry.get("human_resolution")
+                if human_resolution and human_resolution.get("decision"):
+                    partner_data = dict(partner_data)
+                    partner_data["decision"] = human_resolution["decision"]
+                
+                startup_id = startup_data.get("id") if startup_data else entry.get("startup_id", entry.get("id"))
                 
                 # Check if already processed (exists in portfolio store)
                 existing_startup = self.portfolio_store.get_startup(startup_id)
@@ -151,6 +166,7 @@ class PortfolioEngine:
                     decision = partner_data.get("decision", "PASS")
                     rationale = partner_data.get("rationale", "")
                     key_risks = review_data.get("key_risks", []) if review_data else []
+                    scout_type = startup_data.get("scout_type", "") if startup_data else ""
                     
                     self.execution_agent.execute_decision(
                         startup_id=startup_id,
@@ -158,6 +174,8 @@ class PortfolioEngine:
                         decision=decision,
                         rationale=rationale,
                         key_risks=key_risks,
+                        review_output=review_data,
+                        scout_type=scout_type,
                     )
                     
                     processed_count += 1
@@ -177,6 +195,57 @@ class PortfolioEngine:
         except Exception as e:
             self.logger.error(f"Error in signal cycle: {e}", exc_info=True)
     
+    async def _run_watchlist_review(self):
+        """Review watchlist entries for staleness and decay."""
+        try:
+            watchlist = self.portfolio_store.get_all_watchlist()
+            if not watchlist:
+                return
+
+            now = datetime.now()
+            signals = self.portfolio_store._read_file(self.portfolio_store.files["signals"])
+            signal_startup_ids = {s.get("startup_id") for s in signals}
+
+            for entry in watchlist:
+                startup_id = entry.get("startup_id")
+                added_at_str = entry.get("added_at")
+                if not added_at_str:
+                    continue
+                added_at = datetime.fromisoformat(added_at_str)
+                days = (now - added_at).days
+
+                has_signals = startup_id in signal_startup_ids
+
+                if days < 30:
+                    continue
+                elif days <= 60 and not has_signals:
+                    entry["stale_warning"] = True
+                    entry["days_on_watchlist"] = days
+                    self.portfolio_store._append_record("watchlist", entry)
+                    self.logger.info(f"Watchlist stale warning: {startup_id} ({days} days, no signals)")
+                elif days > 60 and not has_signals:
+                    self.logger.warning(f"Watchlist decay: {startup_id} ({days} days, no signals) - escalating")
+
+                    def updater(data):
+                        for i, item in enumerate(data):
+                            if item.get("startup_id") == startup_id:
+                                pi = item.get("partner_info") or {}
+                                pi["human_review_required"] = True
+                                item["partner_info"] = pi
+                                return data
+                        return data
+
+                    self.discovery_storage._atomic_update(updater)
+                    self.portfolio_store.add_signal(
+                        startup_id=startup_id,
+                        signal_type="negative",
+                        strength=0.3,
+                        description=f"Watchlist decay: {days}+ days, no signals detected. Escalated to human review.",
+                        agent_id="watchlist_reviewer_v1",
+                    )
+        except Exception as e:
+            self.logger.error(f"Error in watchlist review: {e}", exc_info=True)
+
     async def _run_feedback(self):
         """Run Feedback Loop to calculate metrics."""
         try:
@@ -187,13 +256,19 @@ class PortfolioEngine:
             self.logger.error(f"Error in feedback cycle: {e}", exc_info=True)
     
     async def _run_health(self):
-        """Run Health Monitor."""
+        """Run Health Monitor and cluster analysis."""
         try:
             health_ids = self.health_monitor.check_health()
             if health_ids:
                 self.logger.info(f"Detected {len(health_ids)} health issues")
         except Exception as e:
             self.logger.error(f"Error in health cycle: {e}", exc_info=True)
+
+        try:
+            all_startups = self.discovery_storage.get_all()
+            self.cluster_analyzer.analyze(all_startups)
+        except Exception as e:
+            self.logger.error(f"Error in cluster analysis: {e}", exc_info=True)
     
     async def run_forever(self):
         """Run Portfolio Engine continuously."""

@@ -67,7 +67,35 @@ export async function POST(request: Request) {
       );
     }
 
-    return Response.json({ ok: true, id: data?.id }, { status: 200 });
+    // Persist to backend waitlist
+    let position: number | undefined;
+    const backendUrl = process.env.VITE_API_URL;
+    if (backendUrl) {
+      try {
+        const backendRes = await fetch(
+          `${backendUrl.replace(/\/$/, '')}/api/waitlist`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: name.trim(),
+              email: email.trim(),
+              role: role.trim(),
+              firm: firm.trim(),
+              linkedin: linkedin?.trim() || '',
+            }),
+          },
+        );
+        if (backendRes.ok) {
+          const backendData = await backendRes.json();
+          position = backendData.position;
+        }
+      } catch (backendErr) {
+        console.error('Failed to persist to backend waitlist:', backendErr);
+      }
+    }
+
+    return Response.json({ ok: true, id: data?.id, position }, { status: 200 });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Something went wrong';
