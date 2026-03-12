@@ -123,7 +123,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
   }, [startups, signals, metaReports]);
 
   return (
-    <div className="h-full overflow-y-auto no-scrollbar">
+    <div className="h-full overflow-y-auto">
       <div className="p-3 sm:p-4 space-y-0">
         <AnimatePresence mode="popLayout">
           {entries.map((e, i) => (

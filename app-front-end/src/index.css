@@ -46,23 +46,25 @@
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: #002147 transparent;
+    /* Match WorkGrid border: rgba(0,33,71,0.06) */
+    scrollbar-color: rgba(0, 33, 71, 0.06) transparent;
   }
 
   /* WebKit: oxford blue scrollbar thumb */
   *::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 2px;
+    height: 2px;
   }
   *::-webkit-scrollbar-track {
     background: transparent;
   }
   *::-webkit-scrollbar-thumb {
-    background: #002147;
+    /* Same as WorkGrid border: border-oxford/[0.06] */
+    background: rgba(0, 33, 71, 0.06);
     border-radius: 0;
   }
   *::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 33, 71, 0.85);
+    background: rgba(0, 33, 71, 0.12);
   }
 }
 
