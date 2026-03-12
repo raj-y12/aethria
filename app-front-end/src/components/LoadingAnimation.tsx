@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 
 interface LoadingAnimationProps {
-  message?: string;
   fullScreen?: boolean;
 }
 
@@ -18,12 +17,11 @@ const VERTICES = [
 const POINT_SIZE = 10;
 
 /**
- * System calibration — finite sequence, institutional.
- * Three points converge from center, align, lock. Oxford blue at completion.
- * No loop, no gooey, no playfulness. Calibration, not animation.
+ * System calibration — continuous sequence, institutional.
+ * Three points orbit between center and vertices, oxford blue at peaks.
+ * No gooey, no bounce. Calibration, not playfulness.
  */
 export default function LoadingAnimation({
-  message = 'Loading',
   fullScreen = true,
 }: LoadingAnimationProps) {
   const containerClass = fullScreen
@@ -43,34 +41,27 @@ export default function LoadingAnimation({
               marginLeft: -POINT_SIZE / 2,
               marginTop: -POINT_SIZE / 2,
             }}
-            initial={{ x: 0, y: 0, opacity: 0.25 }}
+            initial={{ x: 0, y: 0, opacity: 0.25, backgroundColor: 'rgba(0, 33, 71, 0.25)' }}
             animate={{
-              x: v.x,
-              y: v.y,
-              opacity: 1,
-              backgroundColor: 'rgb(0, 33, 71)',
+              x: [0, v.x, 0],
+              y: [0, v.y, 0],
+              opacity: [0.25, 1, 0.25],
+              backgroundColor: [
+                'rgba(0, 33, 71, 0.25)',
+                'rgb(0, 33, 71)',
+                'rgba(0, 33, 71, 0.25)',
+              ],
             }}
             transition={{
-              x: { delay: 0.4 + i * 0.06, duration: 0.55, ease: EASE },
-              y: { delay: 0.4 + i * 0.06, duration: 0.55, ease: EASE },
-              opacity: { delay: 0.4 + i * 0.06, duration: 0.55, ease: EASE },
-              backgroundColor: { delay: 1.05, duration: 0.2, ease: EASE },
+              duration: 1.2,
+              ease: EASE,
+              repeat: Infinity,
+              repeatDelay: 0.1,
+              delay: 0.25 + i * 0.12,
             }}
           />
         ))}
       </div>
-
-      {message && (
-        <motion.p
-          className="font-mono text-[10px] uppercase text-oxford/60 mt-8"
-          style={{ letterSpacing: '0.22em' }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.0, duration: 0.25, ease: EASE }}
-        >
-          {message}
-        </motion.p>
-      )}
     </div>
   );
 }

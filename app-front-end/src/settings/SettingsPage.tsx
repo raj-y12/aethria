@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import SystemBar from '../components/SystemBar';
-import AppFooter from '../components/AppFooter';
 import { fetchSettings, patchSettings, type AgentBudgetStatus, type Settings } from '../api/settings';
 import { tokens } from '../design-system/tokens';
 
@@ -143,19 +142,18 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
-        <SystemBar scoutCount={0} />
-        <main className="flex-1 min-h-0 pt-24 flex items-center justify-center">
+        <SystemBar scoutCount={0} navLink={{ href: '/', label: 'Home' }} />
+        <main className="flex-1 min-h-0 flex items-center justify-center pl-[13rem] pr-6 pt-6">
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60">Loading settings…</p>
         </main>
-        <AppFooter navLink={{ href: '/', label: 'Home' }} />
       </div>
     );
   }
   if (!settings) {
     return (
       <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
-        <SystemBar scoutCount={0} />
-        <main className="flex-1 min-h-0 pt-24 flex flex-col items-center justify-center gap-3 px-6">
+        <SystemBar scoutCount={0} navLink={{ href: '/', label: 'Home' }} />
+        <main className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 pl-[13rem] pr-6 pt-6">
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60">Failed to load settings.</p>
           {loadError && (
             <p className="font-mono text-[10px] text-oxford/70 max-w-md text-center">
@@ -166,16 +164,23 @@ export default function SettingsPage() {
             Set VITE_API_URL in the app build to your backend URL. On Render, set ALLOWED_ORIGINS to this app’s URL (e.g. https://your-app.vercel.app).
           </p>
         </main>
-        <AppFooter navLink={{ href: '/', label: 'Home' }} />
       </div>
     );
   }
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
-      <SystemBar scoutCount={0} agentConfig={settings.agent_config} />
-      <main className="flex-1 min-h-0 pt-24 flex flex-col overflow-hidden">
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden border border-oxford/[0.06] bg-paper mx-6 sm:mx-8 lg:mx-12">
+      <SystemBar scoutCount={0} agentConfig={settings.agent_config} navLink={{ href: '/', label: 'Home' }} />
+      <main className="flex-1 min-h-0 flex flex-col overflow-hidden pl-[13rem] pr-6 pt-6">
+        <header className="flex-none mb-4">
+          <h1
+            className="text-2xl text-oxford tracking-tight"
+            style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em' }}
+          >
+            Aethria
+          </h1>
+        </header>
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden border border-oxford/[0.06] bg-paper">
           {/* Header: same language as System panel (label + action) */}
           <div className="flex-none flex items-center justify-between px-4 sm:px-6 py-4 border-b border-oxford/[0.06]">
             <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50">
@@ -218,7 +223,7 @@ export default function SettingsPage() {
           </nav>
 
           {/* Content: scrollable like System panel */}
-          <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar p-4 sm:p-6">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
             {validationErrors.length > 0 && (
               <div className="mb-4 pb-4 border-b border-oxford/[0.06]">
                 <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/70 mb-2">Validation errors</p>
@@ -487,7 +492,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </main>
-      <AppFooter navLink={{ href: '/', label: 'Home' }} />
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import SystemBar from './SystemBar';
-import AppFooter from './AppFooter';
 import WorkGrid from './WorkGrid';
 import InvestmentMemo from './InvestmentMemo';
 import LiveIntelligenceFeed from './LiveIntelligenceFeed';
@@ -79,6 +78,11 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   useFocusTrap(judgementsAsOverlay, judgementsPanelRef);
 
   const resolvedCount = startups.filter((s) => s.partner?.decision != null).length;
+  const queueDepths = data.settings?.system_health?.queue_depths;
+  const unreviewed = queueDepths?.unreviewed ?? 0;
+  const undecided = queueDepths?.undecided ?? 0;
+  const watchlist = queueDepths?.watchlist ?? 0;
+  const pendingEscalations = data.settings?.system_health?.pending_escalations ?? 0;
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-paper">
@@ -88,6 +92,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
         onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
         onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
         onClose={() => setRightPanel(null)}
+        navLink={{ href: '/settings', label: 'Settings' }}
       />
       {startupsError && (
         <div className="flex-none px-6 py-2 bg-amber-100 text-amber-900 font-mono text-[10px] uppercase tracking-wider">
@@ -95,52 +100,82 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
         </div>
       )}
 
-      {/* Paper canvas. Fixed height so only WorkGrid scrolls. Gap below SystemBar matches its offset. */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden pt-[5.5rem]">
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden px-6 sm:px-8 lg:px-12 pb-3 lg:pb-4 gap-4 lg:gap-4">
+      {/* Paper canvas. Fixed height so only WorkGrid scrolls. Content is offset to clear vertical SystemBar. */}
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden pl-[13rem] pr-6 pt-6">
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden pb-3 lg:pb-4 gap-4 lg:gap-4">
           <div className="flex flex-col min-w-0 min-h-0">
-            {/* System health (same style as Settings page); 4px-equivalent gap above and below */}
-            <section className="flex-none py-4 mb-4 border-b border-oxford/[0.06]">
-              <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-2">
-                System health
-              </h2>
-              {data.settings?.system_health ? (
-                <div className="space-y-1">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] tabular-nums text-oxford/50">
-                    {startups.length} companies · {resolvedCount} decided
-                  </p>
-                  {data.settings.system_health.pending_escalations > 0 && (
-                    <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-oxford escalation-pulse" aria-hidden />
-                      <span>
-                        {data.settings.system_health.pending_escalations}{' '}
-                        {data.settings.system_health.pending_escalations === 1 ? 'escalation' : 'escalations'} awaiting review
-                      </span>
-                    </p>
-                  )}
-                  {data.settings.system_health.calibration_warning && (
-                    <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/70">
-                      • Calibration: {data.settings.system_health.calibration_warning}
-                    </p>
-                  )}
-                  {data.settings.system_health.queue_depths && (
-                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/50">
-                      Unreviewed {data.settings.system_health.queue_depths.unreviewed} · Undecided{' '}
-                      {data.settings.system_health.queue_depths.undecided} · Watchlist{' '}
-                      {data.settings.system_health.queue_depths.watchlist}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] tabular-nums text-oxford/50">
-                    {startups.length} companies · {resolvedCount} decided
-                  </p>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/40">
-                    System health metrics are not available yet.
-                  </p>
-                </div>
-              )}
+            {/* Title above status strip */}
+            <header className="flex-none mb-4">
+              <h1
+                className="text-2xl text-oxford tracking-tight"
+                style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em' }}
+              >
+                Aethria
+              </h1>
+            </header>
+
+            {/* Status strip: single-line summary of pipeline + queues + escalations */}
+            <section className="flex-none h-11 mb-4 border-b border-[rgba(0,33,71,0.07)] flex items-center py-[6px]">
+              <div className="w-full flex items-center text-[10px] font-mono uppercase" style={{ letterSpacing: '0.08em' }}>
+                {/* Pipeline counts (left) */}
+                <span className="text-oxford/55 text-[11px]">
+                  {startups.length} companies · {resolvedCount} decided
+                </span>
+
+                {/* Separator */}
+                <span
+                  className="mx-[12px]"
+                  style={{
+                    width: '3px',
+                    height: '3px',
+                    borderRadius: '9999px',
+                    backgroundColor: 'rgba(0,33,71,0.30)',
+                  }}
+                  aria-hidden
+                />
+
+                {/* Queue depths (middle) */}
+                <span className="text-oxford/35">
+                  Unreviewed {unreviewed} · Undecided {undecided} · Watchlist {watchlist}
+                </span>
+
+                {/* Separator */}
+                <span
+                  className="mx-[12px]"
+                  style={{
+                    width: '3px',
+                    height: '3px',
+                    borderRadius: '9999px',
+                    backgroundColor: 'rgba(0,33,71,0.30)',
+                  }}
+                  aria-hidden
+                />
+
+                {/* Escalations (right) */}
+                <span className="flex items-center gap-2">
+                  <span
+                    className={pendingEscalations > 0 ? 'escalation-dot-active' : ''}
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor:
+                        pendingEscalations > 0 ? 'var(--color-accent)' : 'rgba(0,33,71,0.25)',
+                    }}
+                    aria-hidden
+                  />
+                  <span
+                    style={{
+                      color:
+                        pendingEscalations > 0
+                          ? 'rgba(125, 43, 58, 0.85)'
+                          : 'rgba(0, 33, 71, 0.3)',
+                    }}
+                  >
+                    {pendingEscalations} escalations awaiting review
+                  </span>
+                </span>
+              </div>
             </section>
 
             {/* WorkGrid: only this area scrolls; fills column so both columns resize together */}
@@ -256,8 +291,6 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
           </aside>
         </div>
       </main>
-
-      <AppFooter navLink={{ href: '/settings', label: 'Settings' }} />
 
       {/* Judgements as slide-over only on mobile; on desktop they appear in the right panel. */}
       {judgementsAsOverlay && typeof document !== 'undefined' && createPortal(
