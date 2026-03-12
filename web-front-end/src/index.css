@@ -107,15 +107,6 @@
     color: #ffffff;
   }
 
-  * {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  *::-webkit-scrollbar {
-    display: none;
-  }
-
   /* iPhone: remove tap highlight, improve touch targets */
   a,
   button {
