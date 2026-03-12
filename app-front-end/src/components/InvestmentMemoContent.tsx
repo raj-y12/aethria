@@ -305,7 +305,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         {startup.scout.sector || '—'}
       </p>
 
-      <div className={`flex-1 min-h-0 overflow-y-auto no-scrollbar ${embedded ? 'pr-1' : ''}`}>
+      <div className={`flex-1 min-h-0 overflow-y-auto ${embedded ? 'pr-1' : ''}`}>
         {judgmentSummary && (
           <section className="mb-6 p-4 border border-oxford/[0.06] bg-paper">
             <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-2">

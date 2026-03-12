@@ -418,7 +418,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar p-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
