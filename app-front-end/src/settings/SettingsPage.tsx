@@ -226,11 +226,11 @@ export default function SettingsPage() {
           <AnimatePresence>
             {mobileMenuOpen && (
               <motion.section
-                initial={{ y: -8, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -8, opacity: 0 }}
-                transition={{ duration: 0.2, ease: tokens.motion.ease }}
-                className="px-4 pb-3 border-b border-oxford/[0.06] font-mono text-[10px] uppercase bg-oxford"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.18, ease: tokens.motion.ease }}
+                className="px-4 pb-0 border-b border-oxford/[0.06] font-mono text-[10px] uppercase bg-oxford overflow-hidden"
                 style={{ letterSpacing: '0.12em', color: 'rgba(242,240,234,0.7)' }}
               >
                 <div className="flex flex-col items-start gap-3 py-3">
