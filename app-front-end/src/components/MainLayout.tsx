@@ -85,6 +85,17 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   const watchlist = queueDepths?.watchlist ?? 0;
   const pendingEscalations = data.settings?.system_health?.pending_escalations ?? 0;
 
+  const displayName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('authUser') : null;
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('aethria_last_activity');
+      sessionStorage.removeItem('auth');
+      sessionStorage.removeItem('authUser');
+    } finally {
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-paper">
       {/* Mobile / tablet top nav — desktop keeps the vertical SystemBar only */}
@@ -107,16 +118,87 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
           </header>
           {mobileMenuOpen && (
             <section
-              className="px-4 pb-3 border-b border-oxford/[0.06] space-y-1 font-mono text-[10px] uppercase bg-oxford"
+              className="px-4 pb-3 border-b border-oxford/[0.06] font-mono text-[10px] uppercase bg-oxford"
               style={{ letterSpacing: '0.12em', color: 'rgba(242,240,234,0.7)' }}
             >
-              <p>
-                {startups.length} companies · {resolvedCount} decided
-              </p>
-              <p>
-                Unreviewed {unreviewed} · Undecided {undecided} · Watchlist {watchlist}
-              </p>
-              <p>Escalations {pendingEscalations}</p>
+              <div className="flex flex-col items-center gap-3 py-3">
+                {/* Mode toggles: Judgements / System */}
+                <div className="flex items-center gap-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRightPanel((panel) => (panel === 'feed' ? null : 'feed'));
+                      setMobileMenuOpen(false);
+                    }}
+                    className="transition-transform duration-200 hover:-translate-y-[1px] hover:opacity-80"
+                    style={{
+                      fontFamily: tokens.font.mono,
+                      fontSize: '10px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      color: rightPanel === 'feed' ? 'rgba(242,240,234,1)' : 'rgba(242,240,234,0.5)',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: rightPanel === 'feed' ? '1px solid rgba(242,240,234,1)' : '1px solid transparent',
+                      paddingBottom: rightPanel === 'feed' ? '3px' : 0,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Judgements
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRightPanel((panel) => (panel === 'system' ? null : 'system'));
+                      setMobileMenuOpen(false);
+                    }}
+                    className="transition-transform duration-200 hover:-translate-y-[1px] hover:opacity-80"
+                    style={{
+                      fontFamily: tokens.font.mono,
+                      fontSize: '10px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      color: rightPanel === 'system' ? 'rgba(242,240,234,1)' : 'rgba(242,240,234,0.5)',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: rightPanel === 'system' ? '1px solid rgba(242,240,234,1)' : '1px solid transparent',
+                      paddingBottom: rightPanel === 'system' ? '3px' : 0,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    System
+                  </button>
+                </div>
+
+                {/* Settings / username / logout */}
+                <div className="flex flex-col items-center gap-1 mt-2">
+                  <a
+                    href="/settings"
+                    className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/70 hover:text-ivory transition-colors"
+                  >
+                    Settings
+                  </a>
+                  {displayName && (
+                    <span
+                      style={{
+                        fontFamily: tokens.font.body,
+                        fontSize: '11px',
+                        fontWeight: 400,
+                        color: 'rgba(242, 240, 234, 0.6)',
+                      }}
+                    >
+                      {displayName}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/50 hover:text-ivory/80 transition-colors"
+                  >
+                    Log out
+                  </button>
+                </div>
+              </div>
             </section>
           )}
         </>
