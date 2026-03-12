@@ -102,6 +102,18 @@
     background: rgba(0, 33, 71, 0.85);
   }
 
+  /* Hide top-level window scrollbars (html/body) while keeping scroll behavior */
+  html,
+  body {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge legacy */
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+
   /* iPhone: root fills viewport so 100dvh works in Safari */
   #root {
     min-height: 100dvh;
