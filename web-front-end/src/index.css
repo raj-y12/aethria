@@ -75,14 +75,23 @@
     min-height: -webkit-fill-available;
   }
 
-  /* Hide default scrollbars but keep scrolling behavior */
+  /* Subtle custom scrollbar: skinny, track matches background, thumb oxford */
   body {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE/Edge legacy */
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: var(--color-oxford) var(--color-paper);
+    -ms-overflow-style: auto; /* IE/Edge legacy */
   }
 
   body::-webkit-scrollbar {
-    display: none; /* Chrome/Safari */
+    width: 4px;
+  }
+
+  body::-webkit-scrollbar-thumb {
+    background-color: var(--color-oxford);
+  }
+
+  body::-webkit-scrollbar-track {
+    background-color: var(--color-paper);
   }
 
   /* iPhone: root fills viewport so 100dvh works in Safari */
