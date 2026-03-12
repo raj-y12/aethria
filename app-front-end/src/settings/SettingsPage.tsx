@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import SystemBar from '../components/SystemBar';
 import { fetchSettings, patchSettings, type AgentBudgetStatus, type Settings } from '../api/settings';
 import { tokens } from '../design-system/tokens';
+import { useMediaQuery } from '../hooks';
 
 type TabId = 'cost' | 'agent' | 'portfolio';
 
@@ -99,6 +101,19 @@ export default function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('cost');
 
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const displayName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('authUser') : null;
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('aethria_last_activity');
+      sessionStorage.removeItem('auth');
+      sessionStorage.removeItem('authUser');
+    } finally {
+      window.location.href = '/';
+    }
+  };
+
   const tabs: { id: TabId; label: string }[] = [
     { id: 'cost', label: 'Usage & limits' },
     { id: 'agent', label: 'Agents & discovery' },
@@ -142,8 +157,18 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
+        {!isDesktop && (
+          <header className="flex items-center justify-between px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-oxford/[0.06] bg-oxford">
+            <span
+              className="text-[18px] tracking-tight"
+              style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em', color: '#F2F0EA' }}
+            >
+              Aethria
+            </span>
+          </header>
+        )}
         <SystemBar scoutCount={0} navLink={{ href: '/', label: 'Home' }} />
-        <main className="flex-1 min-h-0 flex items-center justify-center pl-[13rem] pr-6 pt-6">
+        <main className="flex-1 min-h-0 flex items-center justify-center px-4 pt-4 lg:pl-[13rem] lg:pr-6 lg:pt-6">
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60">Loading settings…</p>
         </main>
       </div>
@@ -152,8 +177,18 @@ export default function SettingsPage() {
   if (!settings) {
     return (
       <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
+        {!isDesktop && (
+          <header className="flex items-center justify-between px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-oxford/[0.06] bg-oxford">
+            <span
+              className="text-[18px] tracking-tight"
+              style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em', color: '#F2F0EA' }}
+            >
+              Aethria
+            </span>
+          </header>
+        )}
         <SystemBar scoutCount={0} navLink={{ href: '/', label: 'Home' }} />
-        <main className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 pl-[13rem] pr-6 pt-6">
+        <main className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 px-4 pt-4 lg:pl-[13rem] lg:pr-6 lg:pt-6">
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60">Failed to load settings.</p>
           {loadError && (
             <p className="font-mono text-[10px] text-oxford/70 max-w-md text-center">
@@ -170,9 +205,80 @@ export default function SettingsPage() {
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
+      {/* Mobile / tablet top nav — desktop keeps the vertical SystemBar only */}
+      {!isDesktop && (
+        <>
+          <header className="flex items-center justify-between px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-oxford/[0.06] bg-oxford">
+            <span
+              className="text-[18px] tracking-tight"
+              style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em', color: '#F2F0EA' }}
+            >
+              Aethria
+            </span>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              className="font-mono text-[10px] uppercase tracking-[0.18em] text-ivory/70"
+            >
+              Menu
+            </button>
+          </header>
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <motion.section
+                initial={{ y: -8, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -8, opacity: 0 }}
+                transition={{ duration: 0.2, ease: tokens.motion.ease }}
+                className="px-4 pb-3 border-b border-oxford/[0.06] font-mono text-[10px] uppercase bg-oxford"
+                style={{ letterSpacing: '0.12em', color: 'rgba(242,240,234,0.7)' }}
+              >
+                <div className="flex flex-col items-start gap-3 py-3">
+                  {/* Nav links */}
+                  <div className="flex flex-col items-start gap-1">
+                    <a
+                      href="/"
+                      className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/70 hover:text-ivory transition-colors"
+                    >
+                      Overview
+                    </a>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory">
+                      Settings
+                    </span>
+                  </div>
+
+                  {/* Username / logout */}
+                  <div className="flex flex-col items-start gap-1 mt-3">
+                    {displayName && (
+                      <span
+                        style={{
+                          fontFamily: tokens.font.body,
+                          fontSize: '11px',
+                          fontWeight: 400,
+                          color: 'rgba(242, 240, 234, 0.6)',
+                        }}
+                      >
+                        {displayName}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/50 hover:text-ivory/80 transition-colors"
+                    >
+                      Log out
+                    </button>
+                  </div>
+                </div>
+              </motion.section>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+
       <SystemBar scoutCount={0} agentConfig={settings.agent_config} navLink={{ href: '/', label: 'Home' }} />
-      <main className="flex-1 min-h-0 flex flex-col overflow-hidden pl-[13rem] pr-6 pt-6">
-        <header className="flex-none mb-4">
+      <main className="flex-1 min-h-0 flex flex-col overflow-hidden px-4 pt-4 lg:pl-[13rem] lg:pr-6 lg:pt-6">
+        <header className="flex-none mb-4 hidden lg:block">
           <h1
             className="text-2xl text-oxford tracking-tight"
             style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em' }}

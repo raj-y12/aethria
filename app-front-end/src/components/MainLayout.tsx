@@ -117,12 +117,17 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
               Menu
             </button>
           </header>
-          {mobileMenuOpen && (
-            <section
-              className="px-4 pb-3 border-b border-oxford/[0.06] font-mono text-[10px] uppercase bg-oxford"
-              style={{ letterSpacing: '0.12em', color: 'rgba(242,240,234,0.7)' }}
-            >
-              <div className="flex flex-col items-start gap-3 py-3">
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <motion.section
+                initial={{ y: -8, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -8, opacity: 0 }}
+                transition={{ duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
+                className="px-4 pb-3 border-b border-oxford/[0.06] font-mono text-[10px] uppercase bg-oxford"
+                style={{ letterSpacing: '0.12em', color: 'rgba(242,240,234,0.7)' }}
+              >
+                <div className="flex flex-col items-start gap-3 py-3">
                 {/* Mode toggles: Judgements / System */}
                 <div className="flex flex-col items-start gap-1">
                   <button
@@ -199,9 +204,9 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                     Log out
                   </button>
                 </div>
-              </div>
-            </section>
-          )}
+              </motion.section>
+            )}
+          </AnimatePresence>
         </>
       )}
 
