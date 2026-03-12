@@ -300,6 +300,42 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
             {/* WorkGrid: only this area scrolls; fills column so both columns resize together */}
             <div className="flex-1 min-h-0 overflow-y-auto w-full min-w-0 rounded-none border border-oxford/[0.06] bg-paper">
               <div className="px-4 sm:px-6 lg:px-10 pt-2 pb-6 lg:pb-8">
+                {/* On mobile/tablet, stack System and Judgements above the companies list in this column */}
+                {!isDesktop && (
+                  <>
+                    <section className="mb-6">
+                      <div className="flex items-center justify-between pb-2 border-b border-oxford/[0.06]">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50">
+                          System
+                        </span>
+                      </div>
+                      <div className="pt-3">
+                        <SystemIntelligence
+                          signals={signals}
+                          escalations={escalations}
+                          rejectionAnalytics={rejectionAnalytics}
+                          watchlistAnalytics={watchlistAnalytics}
+                          concentrationAnalytics={concentrationAnalytics}
+                          metaReports={metaReports}
+                          scoutWeights={scoutWeights}
+                          calibrationState={calibrationState}
+                        />
+                      </div>
+                    </section>
+
+                    <section className="mb-6">
+                      <div className="flex items-center justify-between pb-2 border-b border-oxford/[0.06]">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50">
+                          Judgements
+                        </span>
+                      </div>
+                      <div className="pt-3">
+                        <LiveIntelligenceFeed startups={startups} />
+                      </div>
+                    </section>
+                  </>
+                )}
+
                 <GhostTransition>
                   <WorkGrid
                     startups={startups}
