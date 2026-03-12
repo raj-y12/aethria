@@ -94,12 +94,12 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
             className="w-full flex items-center justify-center"
             style={{
               height: '2rem',
-              border: '1px solid rgba(0,33,71,0.06)',
+              border: '1px solid rgba(242,240,234,0.3)',
             }}
           >
             <span
               className="font-mono text-[10px] uppercase"
-              style={{ letterSpacing: '0.16em', color: 'rgba(0,33,71,0.7)' }}
+              style={{ letterSpacing: '0.16em', color: 'rgba(242,240,234,0.85)' }}
             >
               {displayName}
             </span>
