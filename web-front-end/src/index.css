@@ -75,6 +75,16 @@
     min-height: -webkit-fill-available;
   }
 
+  /* Hide default scrollbars but keep scrolling behavior */
+  body {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge legacy */
+  }
+
+  body::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+
   /* iPhone: root fills viewport so 100dvh works in Safari */
   #root {
     min-height: 100dvh;
