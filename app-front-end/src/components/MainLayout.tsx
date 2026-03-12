@@ -81,7 +81,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   const resolvedCount = startups.filter((s) => s.partner?.decision != null).length;
 
   return (
-    <div className="min-h-[100dvh] flex flex-col overflow-hidden bg-paper">
+    <div className="h-screen flex flex-col overflow-hidden bg-paper">
       <SystemBar
         scoutCount={startups.length}
         rightPanel={rightPanel}
@@ -95,19 +95,9 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
         </div>
       )}
 
-      {/* Paper canvas. Fixed height so only WorkGrid scrolls. Safe area for notched devices. */}
-      <main
-        className="flex-1 flex flex-col min-h-0 overflow-hidden"
-        style={{ paddingTop: 'calc(56px + max(24px, env(safe-area-inset-top)))' }}
-      >
-        <div
-          className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden pb-3 lg:pb-4 gap-6 lg:gap-10"
-          style={{
-            paddingLeft: 'max(24px, env(safe-area-inset-left))',
-            paddingRight: 'max(24px, env(safe-area-inset-right))',
-            paddingTop: '24px',
-          }}
-        >
+      {/* Paper canvas. Fixed height so only WorkGrid scrolls. On lg+: list and panel resize together (60/40). */}
+      <main className="flex-1 pt-24 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden px-6 sm:px-8 lg:px-12 pb-3 lg:pb-4 gap-6 lg:gap-10">
           <div className="flex flex-col min-w-0 min-h-0">
             {/* System health (same style as Settings page) */}
             <section className="flex-none py-4 border-b border-oxford/[0.06]">

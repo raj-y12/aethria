@@ -69,10 +69,17 @@ export default function HomePage() {
           <Link
             to="/request-access"
             data-cursor-expand
-            className="font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center w-full md:w-fit min-h-[44px] h-10 px-6 bg-transparent border border-[var(--color-oxford)] md:border-[rgba(0,33,71,0.2)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] hover:border-[var(--color-oxford)] mt-8"
+            className="group font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center w-full md:w-fit min-h-[44px] h-10 px-6 bg-transparent border border-[var(--color-oxford)] md:border-[rgba(0,33,71,0.2)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] hover:border-[var(--color-oxford)] mt-8"
             style={{ color: 'var(--color-oxford)' }}
           >
-            REQUEST ACCESS
+            <span className="flex items-center justify-center">
+              <span>REQUEST ACCESS</span>
+              <span
+                className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap w-2 group-hover:w-5"
+              >
+                {'\u00A0—'}
+              </span>
+            </span>
           </Link>
         </section>
 
@@ -181,10 +188,17 @@ export default function HomePage() {
         <Link
           to="/request-access"
           data-cursor-expand
-          className="font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center w-full md:w-fit min-h-[44px] h-10 px-6 bg-transparent border border-[var(--color-oxford)] md:border-[rgba(0,33,71,0.2)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] hover:border-[var(--color-oxford)] mt-8"
+          className="group font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center w-full md:w-fit min-h-[44px] h-10 px-6 bg-transparent border border-[var(--color-oxford)] md:border-[rgba(0,33,71,0.2)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] hover:border-[var(--color-oxford)] mt-8"
           style={{ color: 'var(--color-oxford)' }}
         >
-          REQUEST ACCESS
+          <span className="flex items-center justify-center">
+            <span>REQUEST ACCESS</span>
+            <span
+              className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap w-2 group-hover:w-5"
+            >
+              {'\u00A0—'}
+            </span>
+          </span>
         </Link>
       </section>
 
