@@ -90,7 +90,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
       {/* Mobile / tablet top nav — desktop keeps the vertical SystemBar only */}
       {!isDesktop && (
         <>
-          <header className="flex items-center justify-between px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-oxford/[0.06]">
+          <header className="flex items-center justify-between px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-oxford/[0.06] bg-paper">
             <span
               className="text-[18px] tracking-tight"
               style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em', color: '#002147' }}
@@ -107,8 +107,8 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
           </header>
           {mobileMenuOpen && (
             <section
-              className="px-4 pb-3 border-b border-oxford/[0.06] space-y-1 font-mono text-[10px] uppercase"
-              style={{ letterSpacing: '0.12em', color: 'rgba(0,33,71,0.7)' }}
+              className="px-4 pb-3 border-b border-oxford/[0.06] space-y-1 font-mono text-[10px] uppercase bg-oxford"
+              style={{ letterSpacing: '0.12em', color: 'rgba(242,240,234,0.7)' }}
             >
               <p>
                 {startups.length} companies · {resolvedCount} decided
@@ -141,8 +141,8 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[13rem] lg:pr-6 lg:pt-6">
         <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden pb-3 lg:pb-4 gap-4 lg:gap-4">
           <div className="flex flex-col min-w-0 min-h-0">
-            {/* Title above status strip */}
-            <header className="flex-none mb-4">
+            {/* Title above status strip — desktop only; mobile uses top nav title */}
+            <header className="flex-none mb-4 hidden lg:block">
               <h1
                 className="text-2xl text-oxford tracking-tight"
                 style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em' }}
@@ -151,8 +151,8 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
               </h1>
             </header>
 
-            {/* Status strip: single-line summary of pipeline + queues + escalations */}
-            <section className="flex-none h-11 mb-4 border-b border-[rgba(0,33,71,0.07)] flex items-center py-[6px]">
+            {/* Status strip: single-line summary — desktop only; mobile shows this in the menu */}
+            <section className="hidden lg:flex flex-none h-11 mb-4 border-b border-[rgba(0,33,71,0.07)] items-center py-[6px]">
               <div className="w-full flex items-center text-[10px] font-mono uppercase" style={{ letterSpacing: '0.08em' }}>
                 {/* Pipeline counts (left) */}
                 <span className="text-oxford/55 text-[11px]">

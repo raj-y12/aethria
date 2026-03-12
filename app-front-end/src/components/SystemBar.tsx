@@ -62,120 +62,115 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
   const baseStyle = { boxShadow: '0 1px 0 0 rgba(255,255,255,0.06)', padding: '20px 16px 16px' };
 
   return (
-    <>
-      {/* Nameplate above the SystemBar when a user is present */}
-      {displayName && (
-        <div
-          className="fixed left-4 z-50 flex items-center justify-center"
-          style={{
-            top: '0.75rem',
-            width: '11rem',
-            height: '2rem',
-            backgroundColor: tokens.color.paper,
-            border: '1px solid rgba(0,33,71,0.06)',
-          }}
+    <motion.header
+      className={baseClass}
+      style={baseStyle}
+      aria-label="System"
+      initial={hasEnteredOnce ? undefined : { y: -80, opacity: 0 }}
+      animate={hasEnteredOnce ? undefined : { y: 0, opacity: 1 }}
+      transition={
+        hasEnteredOnce
+          ? undefined
+          : {
+              duration: 0.8,
+              ease: tokens.motion.ease,
+            }
+      }
+    >
+      {/* All controls stacked and centered: clock, username plate, toggles, nav, logout */}
+      <div className="flex flex-col items-center gap-4 h-full">
+        {/* Clock at the top */}
+        <span
+          className="tabular-nums font-mono text-[11px] leading-none"
+          style={{ color: PAPER_INACTIVE, letterSpacing: '0.08em' }}
+          aria-live="polite"
         >
-          <span
-            className="font-mono text-[10px] uppercase"
-            style={{ letterSpacing: '0.16em', color: 'rgba(0,33,71,0.7)' }}
+          {formatted}
+        </span>
+
+        {/* Username nameplate inside the bar, under the time */}
+        {displayName && (
+          <div
+            className="w-full flex items-center justify-center"
+            style={{
+              height: '2rem',
+              border: '1px solid rgba(0,33,71,0.06)',
+            }}
           >
-            {displayName}
-          </span>
-        </div>
-      )}
+            <span
+              className="font-mono text-[10px] uppercase"
+              style={{ letterSpacing: '0.16em', color: 'rgba(0,33,71,0.7)' }}
+            >
+              {displayName}
+            </span>
+          </div>
+        )}
 
-      <motion.header
-        className={baseClass}
-        style={baseStyle}
-        aria-label="System"
-        initial={hasEnteredOnce ? undefined : { y: -80, opacity: 0 }}
-        animate={hasEnteredOnce ? undefined : { y: 0, opacity: 1 }}
-        transition={
-          hasEnteredOnce
-            ? undefined
-            : {
-                duration: 0.8,
-                ease: tokens.motion.ease,
-              }
-        }
-      >
-        {/* All controls stacked and centered: clock, toggles, nav, logout */}
-        <div className="flex flex-col items-center gap-4 h-full">
-          {/* Clock at the top */}
-          <span
-            className="tabular-nums font-mono text-[11px] leading-none"
-            style={{ color: PAPER_INACTIVE, letterSpacing: '0.08em' }}
-            aria-live="polite"
+        {/* Mode toggles */}
+        <div className="flex flex-col items-center gap-2 mt-1">
+          <button
+            type="button"
+            onClick={rightPanel === 'feed' ? onClose : onShowFeed}
+            className="transition-transform duration-200 hover:-translate-y-[1px] hover:opacity-80"
+            style={{
+              fontFamily: tokens.font.mono,
+              fontSize: '10px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              color: rightPanel === 'feed' ? PAPER : PAPER_INACTIVE,
+              background: 'none',
+              border: 'none',
+              borderBottom: rightPanel === 'feed' ? `1px solid ${PAPER}` : '1px solid transparent',
+              paddingBottom: rightPanel === 'feed' ? '3px' : 0,
+              cursor: 'pointer',
+              transition: `color 0.2s ${tokens.motion.easeCss}, border-color 0.2s ${tokens.motion.easeCss}, padding 0.2s ${tokens.motion.easeCss}`,
+            }}
+            aria-pressed={rightPanel === 'feed'}
           >
-            {formatted}
-          </span>
-
-          {/* Mode toggles */}
-          <div className="flex flex-col items-center gap-2 mt-1">
-            <button
-              type="button"
-              onClick={rightPanel === 'feed' ? onClose : onShowFeed}
-              className="transition-transform duration-200 hover:-translate-y-[1px] hover:opacity-80"
-              style={{
-                fontFamily: tokens.font.mono,
-                fontSize: '10px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-                color: rightPanel === 'feed' ? PAPER : PAPER_INACTIVE,
-                background: 'none',
-                border: 'none',
-                borderBottom: rightPanel === 'feed' ? `1px solid ${PAPER}` : '1px solid transparent',
-                paddingBottom: rightPanel === 'feed' ? '3px' : 0,
-                cursor: 'pointer',
-                transition: `color 0.2s ${tokens.motion.easeCss}, border-color 0.2s ${tokens.motion.easeCss}, padding 0.2s ${tokens.motion.easeCss}`,
-              }}
-              aria-pressed={rightPanel === 'feed'}
-            >
-              Judgements
-            </button>
-            <button
-              type="button"
-              onClick={rightPanel === 'system' ? onClose : onShowSystem}
-              className="transition-transform duration-200 hover:-translate-y-[1px] hover:opacity-80"
-              style={{
-                fontFamily: tokens.font.mono,
-                fontSize: '10px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-                color: rightPanel === 'system' ? PAPER : PAPER_INACTIVE,
-                background: 'none',
-                border: 'none',
-                borderBottom: rightPanel === 'system' ? `1px solid ${PAPER}` : '1px solid transparent',
-                paddingBottom: rightPanel === 'system' ? '3px' : 0,
-                cursor: 'pointer',
-                transition: `color 0.2s ${tokens.motion.easeCss}, border-color 0.2s ${tokens.motion.easeCss}, padding 0.2s ${tokens.motion.easeCss}`,
-              }}
-              aria-pressed={rightPanel === 'system'}
-            >
-              System
-            </button>
-          </div>
-
-          {/* Nav + logout pinned to the bottom of the stack */}
-          <div className="mt-auto flex flex-col items-center gap-2">
-            {navLink && (
-              <a
-                href={navLink.href}
-                className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/70 hover:text-ivory transition-colors"
-              >
-                {navLink.label}
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/50 hover:text-ivory/80 transition-colors"
-            >
-              Log out
-            </button>
-          </div>
+            Judgements
+          </button>
+          <button
+            type="button"
+            onClick={rightPanel === 'system' ? onClose : onShowSystem}
+            className="transition-transform duration-200 hover:-translate-y-[1px] hover:opacity-80"
+            style={{
+              fontFamily: tokens.font.mono,
+              fontSize: '10px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              color: rightPanel === 'system' ? PAPER : PAPER_INACTIVE,
+              background: 'none',
+              border: 'none',
+              borderBottom: rightPanel === 'system' ? `1px solid ${PAPER}` : '1px solid transparent',
+              paddingBottom: rightPanel === 'system' ? '3px' : 0,
+              cursor: 'pointer',
+              transition: `color 0.2s ${tokens.motion.easeCss}, border-color 0.2s ${tokens.motion.easeCss}, padding 0.2s ${tokens.motion.easeCss}`,
+            }}
+            aria-pressed={rightPanel === 'system'}
+          >
+            System
+          </button>
         </div>
-      </motion.header>
-    </>
+
+        {/* Nav + logout pinned to the bottom of the stack */}
+        <div className="mt-auto flex flex-col items-center gap-2">
+          {navLink && (
+            <a
+              href={navLink.href}
+              className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/70 hover:text-ivory transition-colors"
+            >
+              {navLink.label}
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/50 hover:text-ivory/80 transition-colors"
+          >
+            Log out
+          </button>
+        </div>
+      </div>
+    </motion.header>
   );
 }
