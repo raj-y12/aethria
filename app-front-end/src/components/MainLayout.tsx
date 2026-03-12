@@ -40,6 +40,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>('system');
 
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const restoreRefVerdictMemo = useRef<HTMLElement | null>(null);
   const judgementsPanelRef = useRef<HTMLDivElement | null>(null);
   const memoContentRef = useRef<InvestmentMemoContentHandle | null>(null);
@@ -86,6 +87,41 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-paper">
+      {/* Mobile / tablet top nav — desktop keeps the vertical SystemBar only */}
+      {!isDesktop && (
+        <>
+          <header className="flex items-center justify-between px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-oxford/[0.06]">
+            <span
+              className="text-[18px] tracking-tight"
+              style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em', color: '#002147' }}
+            >
+              Aethria
+            </span>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              className="font-mono text-[10px] uppercase tracking-[0.18em] text-oxford/70"
+            >
+              Menu
+            </button>
+          </header>
+          {mobileMenuOpen && (
+            <section
+              className="px-4 pb-3 border-b border-oxford/[0.06] space-y-1 font-mono text-[10px] uppercase"
+              style={{ letterSpacing: '0.12em', color: 'rgba(0,33,71,0.7)' }}
+            >
+              <p>
+                {startups.length} companies · {resolvedCount} decided
+              </p>
+              <p>
+                Unreviewed {unreviewed} · Undecided {undecided} · Watchlist {watchlist}
+              </p>
+              <p>Escalations {pendingEscalations}</p>
+            </section>
+          )}
+        </>
+      )}
+
       <SystemBar
         scoutCount={startups.length}
         rightPanel={rightPanel}

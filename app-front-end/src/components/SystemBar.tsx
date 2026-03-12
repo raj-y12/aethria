@@ -58,7 +58,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
   };
 
   const baseClass =
-    'fixed top-0 bottom-4 left-4 z-50 flex flex-col justify-between w-44 bg-oxford border border-white/[0.06]';
+    'hidden lg:flex fixed top-0 bottom-4 left-4 z-50 flex-col justify-between w-44 bg-oxford border border-white/[0.06]';
   const baseStyle = { boxShadow: '0 1px 0 0 rgba(255,255,255,0.06)', padding: '20px 16px 16px' };
 
   return (
@@ -134,18 +134,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
           </button>
         </div>
 
-        {/* Signed-in user (if present) */}
-        {displayName && (
-          <span
-            className="font-mono text-[10px] leading-none"
-            style={{ color: PAPER_INACTIVE, letterSpacing: '0.08em' }}
-            aria-label={`Signed in as ${displayName}`}
-          >
-            {displayName}
-          </span>
-        )}
-
-        {/* Nav + logout pinned to the bottom of the stack */}
+        {/* Nav + username + logout pinned to the bottom of the stack */}
         <div className="mt-auto flex flex-col items-center gap-2">
           {navLink && (
             <a
@@ -154,6 +143,19 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
             >
               {navLink.label}
             </a>
+          )}
+          {displayName && (
+            <span
+              style={{
+                fontFamily: tokens.font.body,
+                fontSize: '11px',
+                fontWeight: 400,
+                color: 'rgba(242, 240, 234, 0.6)',
+              }}
+              aria-label={`Signed in as ${displayName}`}
+            >
+              {displayName}
+            </span>
           )}
           <button
             type="button"
