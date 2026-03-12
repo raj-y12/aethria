@@ -9,6 +9,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens (match app-front-end behaviour; note single-colon :root) */
 :root {
   --color-oxford: #002147;
   --color-paper: #F2F0EA;
@@ -77,23 +78,28 @@
     min-height: -webkit-fill-available;
   }
 
-  /* Subtle custom scrollbar: skinny, track matches background, thumb oxford */
-  body {
+  /* Global scrollbar styling (match app-front-end): skinny, oxford thumb, paper track */
+  * {
     scrollbar-width: thin; /* Firefox */
-    scrollbar-color: var(--color-oxford) var(--color-paper);
-    -ms-overflow-style: auto; /* IE/Edge legacy */
+    scrollbar-color: var(--color-oxford) transparent;
   }
 
-  body::-webkit-scrollbar {
-    width: 4px;
+  *::-webkit-scrollbar {
+    width: 4px; /* really skinny */
+    height: 4px;
   }
 
-  body::-webkit-scrollbar-thumb {
-    background-color: var(--color-oxford);
+  *::-webkit-scrollbar-track {
+    background: transparent;
   }
 
-  body::-webkit-scrollbar-track {
-    background-color: var(--color-paper);
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-oxford);
+    border-radius: 0;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 33, 71, 0.85);
   }
 
   /* iPhone: root fills viewport so 100dvh works in Safari */
