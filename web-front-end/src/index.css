@@ -66,8 +66,6 @@
   body {
     background-color: var(--color-paper);
     color: var(--color-charcoal);
-    overscroll-behavior: none;
-    -webkit-overflow-scrolling: touch;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
