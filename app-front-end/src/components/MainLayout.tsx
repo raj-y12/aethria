@@ -48,7 +48,8 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   const memoOpen = !!selectedStartup;
   const verdictOrMemoOpen = memoOpen;
   const judgementsAsOverlay = rightPanel === 'feed' && !isDesktop;
-  const anyOverlayOpen = verdictOrMemoOpen || judgementsAsOverlay;
+  const systemAsOverlay = rightPanel === 'system' && !isDesktop;
+  const anyOverlayOpen = verdictOrMemoOpen || judgementsAsOverlay || systemAsOverlay;
   const useModal = selectedStartup && !isDesktop;
 
   const handleStartupClick = useCallback((startup: Startup) => {
@@ -74,9 +75,9 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
 
   useScrollLock(anyOverlayOpen);
   useEscapeKey(handleEscape, anyOverlayOpen);
-  useRestoreFocus(verdictOrMemoOpen, restoreRefVerdictMemo, !judgementsAsOverlay);
-  useRestoreFocus(judgementsAsOverlay, { current: null }, !verdictOrMemoOpen);
-  useFocusTrap(judgementsAsOverlay, judgementsPanelRef);
+  useRestoreFocus(verdictOrMemoOpen, restoreRefVerdictMemo, !(judgementsAsOverlay || systemAsOverlay));
+  useRestoreFocus(judgementsAsOverlay || systemAsOverlay, { current: null }, !verdictOrMemoOpen);
+  useFocusTrap(judgementsAsOverlay || systemAsOverlay, judgementsPanelRef);
 
   const resolvedCount = startups.filter((s) => s.partner?.decision != null).length;
   const queueDepths = data.settings?.system_health?.queue_depths;
@@ -300,42 +301,6 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
             {/* WorkGrid: only this area scrolls; fills column so both columns resize together */}
             <div className="flex-1 min-h-0 overflow-y-auto w-full min-w-0 rounded-none border border-oxford/[0.06] bg-paper">
               <div className="px-4 sm:px-6 lg:px-10 pt-2 pb-6 lg:pb-8">
-                {/* On mobile/tablet, stack System and Judgements above the companies list in this column */}
-                {!isDesktop && (
-                  <>
-                    <section className="mb-6">
-                      <div className="flex items-center justify-between pb-2 border-b border-oxford/[0.06]">
-                        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50">
-                          System
-                        </span>
-                      </div>
-                      <div className="pt-3">
-                        <SystemIntelligence
-                          signals={signals}
-                          escalations={escalations}
-                          rejectionAnalytics={rejectionAnalytics}
-                          watchlistAnalytics={watchlistAnalytics}
-                          concentrationAnalytics={concentrationAnalytics}
-                          metaReports={metaReports}
-                          scoutWeights={scoutWeights}
-                          calibrationState={calibrationState}
-                        />
-                      </div>
-                    </section>
-
-                    <section className="mb-6">
-                      <div className="flex items-center justify-between pb-2 border-b border-oxford/[0.06]">
-                        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/50">
-                          Judgements
-                        </span>
-                      </div>
-                      <div className="pt-3">
-                        <LiveIntelligenceFeed startups={startups} />
-                      </div>
-                    </section>
-                  </>
-                )}
-
                 <GhostTransition>
                   <WorkGrid
                     startups={startups}
@@ -447,8 +412,8 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
         </div>
       </main>
 
-      {/* Judgements as slide-over only on mobile; on desktop they appear in the right panel. */}
-      {judgementsAsOverlay && typeof document !== 'undefined' && createPortal(
+      {/* Judgements/System as slide-over only on mobile; on desktop they appear in the right panel. */}
+      {(judgementsAsOverlay || systemAsOverlay) && typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           <motion.div
             key="judgements-overlay"
@@ -470,7 +435,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
               paddingLeft: 'env(safe-area-inset-left)',
               paddingRight: 'env(safe-area-inset-right)',
             }}
-            onClick={handleCloseJudgements}
+            onClick={judgementsAsOverlay ? handleCloseJudgements : () => setRightPanel(null)}
             aria-hidden="true"
           />
           <motion.div
@@ -493,19 +458,32 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
           >
             <div className="flex-none p-4 sm:p-5 flex items-center justify-between border-b border-oxford/[0.06]">
               <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60">
-                Judgements
+                {judgementsAsOverlay ? 'Judgements' : 'System'}
               </h2>
               <button
                 type="button"
-                onClick={handleCloseJudgements}
+                onClick={judgementsAsOverlay ? handleCloseJudgements : () => setRightPanel(null)}
                 className="min-w-[44px] min-h-[44px] flex items-center justify-center font-sans text-xl text-oxford/60 hover:text-oxford transition-colors"
-                aria-label="Close judgements panel"
+                aria-label={judgementsAsOverlay ? 'Close judgements panel' : 'Close system panel'}
               >
                 ×
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-hidden">
-              <LiveIntelligenceFeed startups={startups} />
+              {judgementsAsOverlay ? (
+                <LiveIntelligenceFeed startups={startups} />
+              ) : (
+                <SystemIntelligence
+                  signals={signals}
+                  escalations={escalations}
+                  rejectionAnalytics={rejectionAnalytics}
+                  watchlistAnalytics={watchlistAnalytics}
+                  concentrationAnalytics={concentrationAnalytics}
+                  metaReports={metaReports}
+                  scoutWeights={scoutWeights}
+                  calibrationState={calibrationState}
+                />
+              )}
             </div>
           </motion.div>
         </AnimatePresence>,
