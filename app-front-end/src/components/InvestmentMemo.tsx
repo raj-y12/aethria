@@ -47,7 +47,7 @@ export default function InvestmentMemo({ startup, onClose }: InvestmentMemoProps
     >
       <div
         ref={containerRef}
-        className="relative z-10 w-full max-w-4xl max-h-[85vh] sm:max-h-[90vh] flex flex-col mx-4 sm:mx-6 px-4 xs:px-6 lg:px-10 py-6 sm:py-8 bg-paper overflow-y-auto"
+        className="relative z-10 w-full max-w-[420px] sm:max-w-3xl max-h-[85vh] sm:max-h-[90vh] flex flex-col mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8 bg-paper overflow-y-auto overflow-x-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <InvestmentMemoContent startup={startup} onClose={onClose} />
