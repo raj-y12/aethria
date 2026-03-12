@@ -38,7 +38,10 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-[100dvh] flex flex-col relative overflow-x-hidden w-full" style={{ backgroundColor: 'var(--color-paper)' }}>
+    <div
+      className="min-h-[100dvh] h-[100dvh] overflow-auto overflow-x-hidden flex flex-col relative w-full"
+      style={{ backgroundColor: 'var(--color-paper)' }}
+    >
       <GrainOverlay />
       <CustomCursor />
 
