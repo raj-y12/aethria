@@ -128,8 +128,8 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                 style={{ letterSpacing: '0.12em', color: 'rgba(242,240,234,0.7)' }}
               >
                 <div className="flex flex-col items-start gap-3 py-3">
-                {/* Mode toggles: Judgements / System */}
-                <div className="flex flex-col items-start gap-1">
+                  {/* Mode toggles: Judgements / System */}
+                  <div className="flex flex-col items-start gap-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -204,6 +204,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                     Log out
                   </button>
                 </div>
+              </div>
               </motion.section>
             )}
           </AnimatePresence>
