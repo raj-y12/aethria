@@ -97,7 +97,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
 
       {/* Paper canvas. Fixed height so only WorkGrid scrolls. Gap below SystemBar matches its offset. */}
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden pt-[5.5rem]">
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden px-6 sm:px-8 lg:px-12 pb-3 lg:pb-4 gap-6 lg:gap-10">
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden px-6 sm:px-8 lg:px-12 pb-3 lg:pb-4 gap-4 lg:gap-4">
           <div className="flex flex-col min-w-0 min-h-0">
             {/* System health (same style as Settings page); 4px-equivalent gap above and below */}
             <section className="flex-none py-4 mb-4 border-b border-oxford/[0.06]">
