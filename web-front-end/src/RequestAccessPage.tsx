@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import GrainOverlay from './components/GrainOverlay';
-import CustomCursor from './components/CustomCursor';
 
 const PROCESSING_DURATION_MS = 1200;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -106,7 +105,6 @@ export default function RequestAccessPage() {
       style={{ backgroundColor: 'var(--color-paper)' }}
     >
       <GrainOverlay opacity={0.02} />
-      <CustomCursor />
 
       <header className="flex items-center justify-between page-margin-x pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-8 pb-4 md:pb-6 shrink-0 z-20">
         <Link

@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import GrainOverlay from './components/GrainOverlay';
-import CustomCursor from './components/CustomCursor';
 
 const pipelineColumns = [
   { label: 'SCOUT', body: 'Four parallel agents discovering opportunity signals.' },
@@ -40,7 +39,6 @@ export default function HomePage() {
   return (
     <div className="min-h-[100dvh] flex flex-col relative overflow-x-hidden w-full" style={{ backgroundColor: 'var(--color-paper)' }}>
       <GrainOverlay />
-      <CustomCursor />
 
       <header className="flex items-center justify-between page-margin-x pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-8 pb-4 md:pb-6 shrink-0 z-20">
         <Link
