@@ -102,17 +102,17 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
       {/* Mobile / tablet top nav — desktop keeps the vertical SystemBar only */}
       {!isDesktop && (
         <>
-          <header className="flex items-center justify-between px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-oxford/[0.06] bg-paper">
+          <header className="flex items-center justify-between px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-oxford/[0.06] bg-oxford">
             <span
               className="text-[18px] tracking-tight"
-              style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em', color: '#002147' }}
+              style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em', color: '#F2F0EA' }}
             >
               Aethria
             </span>
             <button
               type="button"
               onClick={() => setMobileMenuOpen((open) => !open)}
-              className="font-mono text-[10px] uppercase tracking-[0.18em] text-oxford/70"
+              className="font-mono text-[10px] uppercase tracking-[0.18em] text-ivory/70"
             >
               Menu
             </button>
@@ -122,9 +122,9 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
               className="px-4 pb-3 border-b border-oxford/[0.06] font-mono text-[10px] uppercase bg-oxford"
               style={{ letterSpacing: '0.12em', color: 'rgba(242,240,234,0.7)' }}
             >
-              <div className="flex flex-col items-center gap-3 py-3">
+              <div className="flex flex-col items-start gap-3 py-3">
                 {/* Mode toggles: Judgements / System */}
-                <div className="flex items-center gap-6">
+                <div className="flex flex-col items-start gap-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -172,7 +172,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                 </div>
 
                 {/* Settings / username / logout */}
-                <div className="flex flex-col items-center gap-1 mt-2">
+                <div className="flex flex-col items-start gap-1 mt-3">
                   <a
                     href="/settings"
                     className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/70 hover:text-ivory transition-colors"
