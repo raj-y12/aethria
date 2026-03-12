@@ -63,17 +63,16 @@ export default function WorkGrid({ startups, onStartupClick, selectedId }: WorkG
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: tokens.motion.duration.short, delay: index * 0.03, ease: tokens.motion.ease }}
-            className={`group cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-oxford/15 focus-visible:ring-inset border-b border-oxford/[0.06]${hasDisagreement ? ' border-l-2 border-l-oxford/40' : ''} h-[140px] lg:h-[152px]`}
+            className={`group cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-oxford/15 focus-visible:ring-inset border-b border-oxford/[0.06]${hasDisagreement ? ' border-l-2 border-l-oxford/40' : ''}`}
             onClick={() => onStartupClick(startup)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStartupClick(startup); }
             }}
           >
-            {/* Single column on mobile/tablet; two columns (60/40) only from lg up. Fixed row height; inner content scrolls if needed. */}
-            <div className="flex flex-col gap-3 sm:gap-4 py-4 sm:py-5 lg:grid lg:grid-cols-[3fr_2fr] lg:items-start lg:gap-4 lg:py-6 h-full">
-              <div className="min-w-0 h-full overflow-hidden">
-                <div className="flex flex-col h-full overflow-y-auto pr-1">
-                  <div className="flex items-center gap-2">
+            {/* Single column on mobile/tablet; two columns (60/40) only from lg up */}
+            <div className="flex flex-col gap-3 sm:gap-4 py-4 sm:py-5 lg:grid lg:grid-cols-[3fr_2fr] lg:items-start lg:gap-4 lg:py-6">
+              <div className="min-w-0 overflow-hidden">
+                <div className="flex items-center gap-2">
                   {isSelected && (
                     <motion.span
                       className="w-1.5 h-1.5 shrink-0 rounded-full bg-oxford/40"
@@ -92,28 +91,27 @@ export default function WorkGrid({ startups, onStartupClick, selectedId }: WorkG
                   {hasDisagreement && (
                     <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/40 shrink-0">contested</span>
                   )}
-                  </div>
-                  {/* One-liner: hidden by default, shown on hover/selected; scrolls within row if very long */}
-                  <div
-                    className={`overflow-hidden transition-all duration-200 ease-out ${isSelected ? 'max-h-12 opacity-100 mt-1' : 'max-h-0 opacity-0 group-hover:max-h-12 group-hover:opacity-100 group-hover:mt-1'}`}
-                  >
-                    <p className="font-sans text-[13px] sm:text-[14px] text-oxford/70 leading-relaxed break-words" style={{ lineHeight: 1.6 }}>
-                      {startup.scout.one_line || <span className="text-oxford/40">—</span>}
-                    </p>
-                  </div>
-                  <div className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 flex items-center gap-3">
-                    {startup.scout.sector && (
-                      <span>{startup.scout.sector}</span>
-                    )}
-                    {confidence != null && (
-                      <span className="flex items-center gap-1.5">
-                        <span className="tabular-nums">{Math.round(confidence * 100)}%</span>
-                        <span className="inline-block w-10 h-0.5" style={{ backgroundColor: 'rgba(0,33,71,0.08)' }}>
-                          <span className="block h-full" style={{ width: `${Math.round(confidence * 100)}%`, backgroundColor: 'rgba(0,33,71,0.3)' }} />
-                        </span>
+                </div>
+                {/* One-liner: hidden by default, shown on hover/selected */}
+                <div
+                  className={`overflow-hidden transition-all duration-200 ease-out ${isSelected ? 'max-h-12 opacity-100 mt-1' : 'max-h-0 opacity-0 group-hover:max-h-12 group-hover:opacity-100 group-hover:mt-1'}`}
+                >
+                  <p className="font-sans text-[13px] sm:text-[14px] text-oxford/70 leading-relaxed line-clamp-2 break-words" style={{ lineHeight: 1.6 }}>
+                    {startup.scout.one_line || <span className="text-oxford/40">—</span>}
+                  </p>
+                </div>
+                <div className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 flex items-center gap-3">
+                  {startup.scout.sector && (
+                    <span>{startup.scout.sector}</span>
+                  )}
+                  {confidence != null && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="tabular-nums">{Math.round(confidence * 100)}%</span>
+                      <span className="inline-block w-10 h-0.5" style={{ backgroundColor: 'rgba(0,33,71,0.08)' }}>
+                        <span className="block h-full" style={{ width: `${Math.round(confidence * 100)}%`, backgroundColor: 'rgba(0,33,71,0.3)' }} />
                       </span>
-                    )}
-                  </div>
+                    </span>
+                  )}
                 </div>
               </div>
               {/* Right side: verdict badge — full-width row on mobile, right-aligned column on lg */}

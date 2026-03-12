@@ -61,6 +61,7 @@
     scroll-behavior: smooth;
     background-color: var(--color-paper);
     overflow-x: hidden;
+    overflow-y: auto;
   }
 
   body {
@@ -71,6 +72,7 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     overflow-x: hidden;
+    overflow-y: auto;
     min-height: 100dvh;
     min-height: -webkit-fill-available;
   }
