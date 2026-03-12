@@ -136,8 +136,9 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
         </div>
       )}
 
-      {/* Paper canvas. Fixed height so only WorkGrid scrolls. Content is offset to clear vertical SystemBar. */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden pl-[13rem] pr-6 pt-6">
+      {/* Paper canvas. Fixed height so only WorkGrid scrolls.
+          On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[13rem] lg:pr-6 lg:pt-6">
         <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden pb-3 lg:pb-4 gap-4 lg:gap-4">
           <div className="flex flex-col min-w-0 min-h-0">
             {/* Title above status strip */}
@@ -216,7 +217,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
 
             {/* WorkGrid: only this area scrolls; fills column so both columns resize together */}
             <div className="flex-1 min-h-0 overflow-y-auto w-full min-w-0 rounded-none border border-oxford/[0.06] bg-paper">
-              <div className="px-6 sm:px-8 lg:px-10 pt-2 pb-6 lg:pb-8">
+              <div className="px-4 sm:px-6 lg:px-10 pt-2 pb-6 lg:pb-8">
                 <GhostTransition>
                   <WorkGrid
                     startups={startups}
