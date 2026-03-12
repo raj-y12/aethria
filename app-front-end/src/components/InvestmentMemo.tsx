@@ -26,7 +26,7 @@ export default function InvestmentMemo({ startup, onClose }: InvestmentMemoProps
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      className="fixed inset-0 z-[9999] flex items-start justify-center"
       style={{
         minHeight: '100dvh',
         width: '100vw',
@@ -35,7 +35,7 @@ export default function InvestmentMemo({ startup, onClose }: InvestmentMemoProps
         right: 0,
         bottom: 0,
         backgroundColor: '#F2F0EA',
-        paddingTop: 'env(safe-area-inset-top)',
+        paddingTop: 'max(24px, env(safe-area-inset-top))',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)',
