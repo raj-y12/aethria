@@ -95,12 +95,12 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
         </div>
       )}
 
-      {/* Paper canvas. Fixed height so only WorkGrid scrolls. On lg+: list and panel resize together (60/40). */}
-      <main className="flex-1 pt-24 flex flex-col min-h-0 overflow-hidden">
+      {/* Paper canvas. Fixed height so only WorkGrid scrolls. Gap below SystemBar matches its offset. */}
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden pt-[5.5rem]">
         <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden px-6 sm:px-8 lg:px-12 pb-3 lg:pb-4 gap-6 lg:gap-10">
           <div className="flex flex-col min-w-0 min-h-0">
-            {/* System health (same style as Settings page) */}
-            <section className="flex-none py-4 border-b border-oxford/[0.06]">
+            {/* System health (same style as Settings page); 4px-equivalent gap above and below */}
+            <section className="flex-none py-4 mb-4 border-b border-oxford/[0.06]">
               <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-2">
                 System health
               </h2>

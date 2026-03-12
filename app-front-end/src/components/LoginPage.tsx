@@ -19,6 +19,7 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const [hover, setHover] = useState(false);
 
   const handleSubmit = useCallback(() => {
     setError(false);
@@ -221,9 +222,11 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
               }}
               onMouseEnter={(e) => {
                 if (!loading) e.currentTarget.style.backgroundColor = 'rgba(0, 33, 71, 0.85)';
+                setHover(true);
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = OXford;
+                setHover(false);
               }}
               onMouseDown={(e) => {
                 if (!loading) e.currentTarget.style.opacity = '0.7';
@@ -239,7 +242,15 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
                   <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}>.</motion.span>
                 </span>
               ) : (
-                'LOG IN'
+                <span className="inline-flex items-center justify-center">
+                  <span>LOG IN</span>
+                  <span
+                    className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap"
+                    style={{ width: hover ? '1.25em' : '0.5em' }}
+                  >
+                    {'\u00A0—'}
+                  </span>
+                </span>
               )}
             </button>
           </motion.div>

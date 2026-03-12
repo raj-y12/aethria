@@ -34,7 +34,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
 
   return (
     <header
-      className="fixed top-4 left-4 sm:top-6 sm:left-6 lg:top-8 lg:left-8 right-0 z-50 flex items-center justify-between h-14 px-6 sm:px-8 lg:px-12 bg-oxford border-b border-white/[0.06]"
+      className="fixed top-4 left-4 right-0 z-50 flex items-center justify-between h-14 px-6 sm:px-8 lg:px-12 bg-oxford border-b border-white/[0.06]"
       style={{ boxShadow: '0 1px 0 0 rgba(255,255,255,0.06)' }}
       aria-label="System"
     >
