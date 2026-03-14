@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router';
+import { BrowserRouter, Routes, Route } from 'react-router';
 import { ClerkProvider } from '@clerk/react-router';
 import './index.css';
 import App from './App.tsx';
@@ -14,7 +14,6 @@ if (!PUBLISHABLE_KEY) {
 
 /** Single route: App handles all paths (sign-in, redirects, dashboard). */
 function ClerkProviderWithRouter() {
-  const navigate = useNavigate();
   return (
     <ClerkProvider
       publishableKey={PUBLISHABLE_KEY}
@@ -22,12 +21,6 @@ function ClerkProviderWithRouter() {
       signInUrl="/sign-in"
       signInFallbackRedirectUrl="/v1"
       afterSignOutUrl="/sign-in"
-      routerReplace={(to) => {
-        navigate(to, { replace: true });
-      }}
-      routerPush={(to) => {
-        navigate(to);
-      }}
     >
       <Routes>
         <Route path="*" element={<App />} />

@@ -16,7 +16,6 @@ interface SystemBarProps {
 
 const PAPER = 'rgba(242,240,234,1)';
 const PAPER_INACTIVE = 'rgba(242,240,234,0.4)';
-const STORAGE_KEY = 'aethria_last_activity';
 
 /**
  * Left-side vertical system bar: wordmark, JUDGEMENTS / SYSTEM toggles, clock, nav + logout.
