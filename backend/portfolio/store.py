@@ -2,6 +2,8 @@
 Portfolio Store - Authoritative Memory Layer.
 
 Append-only, versioned storage for all portfolio data.
+Backed by Supabase for decisions, portfolio, rejections, watchlist, signals, agent_metrics;
+startups remain file-based (data/portfolio/startups.json).
 """
 import json
 import logging
@@ -12,6 +14,7 @@ from uuid import uuid4
 import fcntl
 import os
 
+from supabase_doc_store import list_get_all, list_upsert
 from portfolio.schemas import (
     StartupRecord,
     DecisionRecord,
@@ -52,7 +55,7 @@ class PortfolioStore:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("portfolio.store")
         
-        # File paths
+        # File paths (startups only; rest in Supabase)
         self.files = {
             "startups": self.data_dir / "startups.json",
             "decisions": self.data_dir / "decisions.json",
@@ -62,14 +65,31 @@ class PortfolioStore:
             "signals": self.data_dir / "signals.json",
             "agent_metrics": self.data_dir / "agent_metrics.json",
         }
+        self._supabase_tables = {
+            "decisions": "portfolio_decisions",
+            "portfolio": "portfolio_positions",
+            "rejections": "portfolio_rejections",
+            "watchlist": "portfolio_watchlist",
+            "signals": "portfolio_signals",
+            "agent_metrics": "portfolio_agent_metrics",
+        }
         
-        # Initialize all files
-        for file_path in self.files.values():
-            if not file_path.exists():
-                self._write_file(file_path, [])
+        # Initialize startups file only
+        if not self.files["startups"].exists():
+            self._write_file(self.files["startups"], [])
     
+    def _file_key_for_path(self, file_path: Path) -> Optional[str]:
+        for k, p in self.files.items():
+            if p == file_path:
+                return k
+        return None
+
     def _read_file(self, file_path: Path) -> List[Dict[str, Any]]:
-        """Read and parse JSON file. Thread-safe."""
+        """Read from Supabase or JSON file."""
+        file_key = self._file_key_for_path(file_path)
+        table = self._supabase_tables.get(file_key) if file_key else None
+        if table:
+            return list_get_all(table)
         max_retries = 5
         for attempt in range(max_retries):
             try:
@@ -123,44 +143,36 @@ class PortfolioStore:
     
     def _append_record(self, file_key: str, record: Dict[str, Any]) -> str:
         """
-        Append a record to a file (append-only, versioned).
-        
-        Args:
-            file_key: Key in self.files dict
-            record: Record dict (must have 'id' field)
-        
-        Returns:
-            Record ID
+        Append or update a record (Supabase or file).
         """
+        record_id = record.get("id") or str(uuid4())
+        record = dict(record)
+        record["id"] = record_id
+
+        table = self._supabase_tables.get(file_key)
+        if table:
+            records = list_get_all(table)
+            existing = next((r for r in records if r.get("id") == record_id), None)
+            if existing is not None:
+                record["version"] = existing.get("version", 0) + 1
+                self.logger.info(f"Updated {file_key} record {record_id} to version {record['version']}")
+            else:
+                record["version"] = 1
+                self.logger.info(f"Added new {file_key} record {record_id}")
+            list_upsert(table, record)
+            return record_id
+
         file_path = self.files[file_key]
         records = self._read_file(file_path)
-        
-        # Check if record exists - if so, create new version
-        record_id = record.get("id")
-        if not record_id:
-            record_id = str(uuid4())
-            record["id"] = record_id
-        
-        # Find existing record with same ID
-        existing_idx = None
-        for i, r in enumerate(records):
-            if r.get("id") == record_id:
-                existing_idx = i
-                break
-        
+        existing_idx = next((i for i, r in enumerate(records) if r.get("id") == record_id), None)
         if existing_idx is not None:
-            # Update existing record (versioned update)
-            existing = records[existing_idx]
-            current_version = existing.get("version", 0)
-            record["version"] = current_version + 1
+            record["version"] = records[existing_idx].get("version", 0) + 1
             records[existing_idx] = record
             self.logger.info(f"Updated {file_key} record {record_id} to version {record['version']}")
         else:
-            # New record
             record["version"] = 1
             records.append(record)
             self.logger.info(f"Added new {file_key} record {record_id}")
-        
         self._write_file(file_path, records)
         return record_id
     
@@ -309,25 +321,21 @@ class PortfolioStore:
     ):
         """Update watchlist entry after check."""
         records = self._read_file(self.files["watchlist"])
-        
         for i, record in enumerate(records):
             if record.get("id") == watchlist_id:
                 record["last_checked_at"] = datetime.now().isoformat()
                 record["cached_summary"] = new_summary
-                
-                # Update next check time
                 from datetime import timedelta
                 interval = record.get("check_interval_days", 30)
                 next_check = datetime.now() + timedelta(days=interval)
                 record["next_check_at"] = next_check.isoformat()
-                
-                # Increment version
                 record["version"] = record.get("version", 1) + 1
-                
-                records[i] = record
-                self._write_file(self.files["watchlist"], records)
+                if self._supabase_tables.get("watchlist"):
+                    list_upsert(self._supabase_tables["watchlist"], record)
+                else:
+                    records[i] = record
+                    self._write_file(self.files["watchlist"], records)
                 return
-        
         raise ValueError(f"Watchlist record {watchlist_id} not found")
     
     # Signal methods

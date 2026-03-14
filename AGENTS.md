@@ -23,3 +23,20 @@ Autonomous DealFlow OS for venture capital — AI-powered pipeline: Scout → Re
 - **TypeScript checks**: Run `npx tsc --noEmit` in either frontend directory. Both pass cleanly.
 - **Builds**: `npx vite build` or `npm run build` in either frontend directory.
 - **pytest-asyncio** is needed for the backend test suite (async tests).
+- **Agents and user ID**: User ID is always dynamic (no default in code). With Supabase, run agents with `python3 backend/run_system.py --user-id=<clerk_user_id>`. For `python3 run.py`, set `AETHRIA_AGENT_USER_ID` in `.env` so the all-in-one launcher passes it. You can remove `AETHRIA_DEFAULT_USER_ID` from `.env`.
+
+### Deployment (e.g. Render) — agents must have these env vars
+
+On Render (or any host where only the **backend** runs, no separate agents process), agents run via the API: when a user loads the app, `POST /api/agents/trigger` enqueues a pipeline run and a background worker in the same process runs it. For that to work, set these **backend** environment variables in the Render dashboard:
+
+| Variable | Required for agents | Notes |
+|----------|---------------------|--------|
+| `USE_SUPABASE_STORAGE` | **Yes** | Set to `1`, `true`, or `yes`. If unset, trigger returns "skipped" (supabase_required) and no pipeline runs. |
+| `OPENAI_API_KEY` | **Yes** | If unset, the worker skips the pipeline cycle (logs "OPENAI_API_KEY missing, skipping pipeline"). |
+| `SUPABASE_URL` | **Yes** | Backend and pipeline use this for storage. |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Yes** | Backend uses service role for all Supabase access. |
+| `CLERK_JWKS_URL` | **Yes** (auth) | Required for JWT verification; without it the API will 401. |
+
+Optional: `CLERK_ISSUER`, `ALLOWED_ORIGINS` (comma-separated), `SCOUT_MODEL`, `REVIEWER_MODEL`, etc.
+
+**Debugging**: `GET /api/agents/status` (after signing in) returns `worker_ready`, `supabase_configured`, and `openai_configured` so you can see what’s missing on the server.

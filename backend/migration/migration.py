@@ -12,7 +12,7 @@ from typing import List, Dict, Any
 from datetime import datetime
 
 from models import Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
-from storage import Storage
+from utils.storage import Storage
 
 
 logger = logging.getLogger(__name__)

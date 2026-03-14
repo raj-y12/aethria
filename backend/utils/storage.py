@@ -15,7 +15,7 @@ import fcntl
 import os
 
 from models import Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
-from reference_validation import is_generic_reference
+from utils.reference_validation import is_generic_reference
 
 
 logger = logging.getLogger(__name__)
@@ -392,7 +392,7 @@ class Storage:
 
     def add_discovery(self, scout_output: dict) -> str:
         """Backward compatibility: add from old ScoutOutput dict."""
-        from adapters import scout_output_to_scout_info
+        from utils.adapters import scout_output_to_scout_info
         scout_info = scout_output_to_scout_info(scout_output)
         return self.add_startup(scout_info)
 

@@ -21,7 +21,7 @@ class ScoutInfo(BaseModel):
     why_now: str
     scout_type: Literal["market_driven", "builder_technical", "pain_point", "contrarian"]
     confidence_score: float = Field(ge=0.0, le=1.0)
-    funding_stage: Optional[Literal["Pre-Seed", "Seed", "Series A", "Series B", "Series C+", "Unknown"]] = None
+    funding_stage: Optional[Literal["Pre-Seed", "Seed", "Series A", "Series B", "Series C", "Series C+", "Unknown"]] = None
     est_tam: Optional[str] = None  # Total Addressable Market estimate
     # High-level references / source notes for how this opportunity was discovered.
     # E.g. reports, trends, example companies, or general domain knowledge notes.

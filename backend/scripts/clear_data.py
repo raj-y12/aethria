@@ -23,7 +23,7 @@ sys.path.insert(0, str(BACKEND_ROOT))
 
 def get_default_settings():
     """Default settings structure (same as settings_loader)."""
-    from settings_loader import DEFAULT_SETTINGS
+    from utils.settings_loader import DEFAULT_SETTINGS
     return json.loads(json.dumps(DEFAULT_SETTINGS))
 
 

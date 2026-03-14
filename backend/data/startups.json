@@ -1505,5 +1505,234 @@
     "version": 1,
     "created_at": "2026-03-11T19:26:21.140701",
     "updated_at": "2026-03-11T19:26:21.140703"
+  },
+  {
+    "startup_id": "7f3a9e12-6c2a-4d1b-9180-9f5b3d2d7f3c",
+    "scout_info": {
+      "startup_id": "7f3a9e12-6c2a-4d1b-9180-9f5b3d2d7f3c",
+      "name": "Stytch",
+      "one_line": "Developer-focused passwordless authentication API to modernize user sign-in.",
+      "sector": "Security / Developer Tools / Identity",
+      "problem": "Password-based sign-in is insecure, expensive to manage, and provides poor UX; teams struggle to implement modern, phishing-resistant authentication.",
+      "solution": "A cloud-based passwordless authentication API supporting WebAuthn/passkeys, magic links, and biometric flows, with multi-channel support, analytics, and security guarantees.",
+      "target_users": "SaaS startups, consumer apps, and engineering teams building identity flows",
+      "why_now": "WebAuthn/passkeys standardization and consumer adoption are growing; passwordless UX reduces risk and friction; developer tooling for identity is maturing; cloud APIs enable rapid integration.",
+      "scout_type": "builder_technical",
+      "confidence_score": 0.65,
+      "funding_stage": null,
+      "est_tam": null,
+      "references": [
+        "Stytch - https://stytch.com",
+        "Stytch Crunchbase - https://www.crunchbase.com/organization/stytch",
+        "Stytch LinkedIn - https://www.linkedin.com/company/stytch"
+      ],
+      "discovered_at": "2026-03-13T21:05:36.055527",
+      "prompt_version": "138f77a3"
+    },
+    "review_info": null,
+    "partner_info": null,
+    "financials": {
+      "traction_metrics": null,
+      "funding_history": null,
+      "valuation_est": null,
+      "ip_status": null,
+      "revenue_missing": false,
+      "funding_missing": false,
+      "valuation_missing": false
+    },
+    "version": 1,
+    "created_at": "2026-03-13T21:05:36.055556",
+    "updated_at": "2026-03-13T21:05:36.055557"
+  },
+  {
+    "startup_id": "8f1a9b2d-3c4e-5f6a-7b8c-9d0e1f2a3b4c",
+    "scout_info": {
+      "startup_id": "8f1a9b2d-3c4e-5f6a-7b8c-9d0e1f2a3b4c",
+      "name": "Ironclad",
+      "one_line": "Leading contract lifecycle management platform that automates drafting, negotiations, approvals, and obligation tracking.",
+      "sector": "Legaltech / CLM",
+      "problem": "Manual contract drafting, review, and governance slow cross-functional deals, creates risk from missed obligations, and wastes legal resources.",
+      "solution": "End-to-end CLM with templates, automated redlining, clause libraries, workflow-based approvals, e-sign integrations, and real-time obligation tracking.",
+      "target_users": "In-house legal teams, sales operations, and procurement teams at mid-market to enterprise",
+      "why_now": "Rising contract volumes, distributed teams, and regulatory/compliance pressures are pushing companies to automate contracting at scale; mature CLM offerings are now essential, not optional.",
+      "scout_type": "pain_point",
+      "confidence_score": 0.65,
+      "funding_stage": null,
+      "est_tam": null,
+      "references": [
+        "https://ironcladapp.com",
+        "https://www.crunchbase.com/organization/ironclad",
+        "https://www.linkedin.com/company/ironcladapp/"
+      ],
+      "discovered_at": "2026-03-13T21:05:36.059388",
+      "prompt_version": "b21f0723"
+    },
+    "review_info": null,
+    "partner_info": null,
+    "financials": {
+      "traction_metrics": null,
+      "funding_history": null,
+      "valuation_est": null,
+      "ip_status": null,
+      "revenue_missing": false,
+      "funding_missing": false,
+      "valuation_missing": false
+    },
+    "version": 1,
+    "created_at": "2026-03-13T21:05:36.059420",
+    "updated_at": "2026-03-13T21:05:36.059421"
+  },
+  {
+    "startup_id": "d3f9b7e2-4a5c-4f6b-9e3a-1d0f7f8f9a2c",
+    "scout_info": {
+      "startup_id": "d3f9b7e2-4a5c-4f6b-9e3a-1d0f7f8f9a2c",
+      "name": "Nori",
+      "one_line": "A marketplace for verifiable, permanent carbon removal credits that aligns buyers with credible climate projects.",
+      "sector": "Climate Tech / Carbon Removal",
+      "problem": "Companies struggle to source verifiable, high-quality carbon removal credits at scale, with opacity and illiquidity in the market.",
+      "solution": "A transparent online marketplace that standardizes verification and pricing, enabling direct purchasing from carbon removal projects.",
+      "target_users": "Mid-sized to large corporations and other buyers seeking credible offsets.",
+      "why_now": "Growing corporate net-zero commitments, evolving credit standards, and a capital-constrained removal supply create a need for a trusted, transparent marketplace.",
+      "scout_type": "contrarian",
+      "confidence_score": 0.52,
+      "funding_stage": null,
+      "est_tam": null,
+      "references": [
+        "https://nori.com",
+        "https://www.crunchbase.com/organization/nori",
+        "https://www.linkedin.com/company/nori-co/"
+      ],
+      "discovered_at": "2026-03-13T21:05:36.063248",
+      "prompt_version": "82fa5fdf"
+    },
+    "review_info": null,
+    "partner_info": null,
+    "financials": {
+      "traction_metrics": null,
+      "funding_history": null,
+      "valuation_est": null,
+      "ip_status": null,
+      "revenue_missing": false,
+      "funding_missing": false,
+      "valuation_missing": false
+    },
+    "version": 1,
+    "created_at": "2026-03-13T21:05:36.063269",
+    "updated_at": "2026-03-13T21:05:36.063270"
+  },
+  {
+    "startup_id": "e7a9b2c4-13d4-4f8e-9e2a-5b7a9f6e1c2d",
+    "scout_info": {
+      "startup_id": "e7a9b2c4-13d4-4f8e-9e2a-5b7a9f6e1c2d",
+      "name": "Stability AI",
+      "one_line": "European AI foundation-model platform behind Stable Diffusion, enabling scalable AI deployment for developers and enterprises.",
+      "sector": "Artificial Intelligence / AI models & tooling",
+      "problem": "Access, licensing, and cost fragmentation for foundation models across developers and enterprises.",
+      "solution": "Open-weight foundation models, developer tooling, and ecosystem services to train, fine-tune, and deploy AI at scale.",
+      "target_users": "Developers, startups, and enterprises building AI-powered applications",
+      "why_now": "Compute costs continuing to decline, maturation of open-weight model ecosystems, and regulatory shifts (EU/UK) accelerating enterprise AI adoption.",
+      "scout_type": "market_driven",
+      "confidence_score": 0.72,
+      "funding_stage": "Series A",
+      "est_tam": null,
+      "references": [
+        "https://stability.ai",
+        "https://www.crunchbase.com/organization/stability-ai",
+        "https://techcrunch.com/2023/07/18/stability-ai-series-a-101m/"
+      ],
+      "discovered_at": "2026-03-14T00:13:34.276827",
+      "prompt_version": "7ee80a85"
+    },
+    "review_info": null,
+    "partner_info": null,
+    "financials": {
+      "traction_metrics": null,
+      "funding_history": null,
+      "valuation_est": null,
+      "ip_status": null,
+      "revenue_missing": false,
+      "funding_missing": false,
+      "valuation_missing": false
+    },
+    "version": 1,
+    "created_at": "2026-03-14T00:13:34.276865",
+    "updated_at": "2026-03-14T00:13:34.276867"
+  },
+  {
+    "startup_id": "2a76f0d2-5b9a-4e6b-8d8d-1a2f3b4c5d6e",
+    "scout_info": {
+      "startup_id": "2a76f0d2-5b9a-4e6b-8d8d-1a2f3b4c5d6e",
+      "name": "Aiven",
+      "one_line": "Open-source-driven cloud data platform that manages and scales databases and streaming systems across major clouds as a fully managed service.",
+      "sector": "Cloud data infrastructure / Open source software",
+      "problem": "Organizations struggle to deploy, operate, and scale open-source data technologies across cloud providers, causing operational toil and vendor lock-in.",
+      "solution": "Fully managed, multi-cloud data services (Kafka, PostgreSQL, Redis, etc.) built on open-source tools to simplify deployment, reliability, and governance.",
+      "target_users": "Data engineers, DevOps/SRE teams, and data-centric product teams in enterprises adopting multi-cloud data stacks",
+      "why_now": "Multi-cloud strategies and demand for OSS-based data tooling are accelerating, while cloud-native managed services are expanding, enabling easier adoption and cost control.",
+      "scout_type": "builder_technical",
+      "confidence_score": 0.65,
+      "funding_stage": null,
+      "est_tam": null,
+      "references": [
+        "https://aiven.io",
+        "https://www.crunchbase.com/organization/aiven"
+      ],
+      "discovered_at": "2026-03-14T00:13:34.486341",
+      "prompt_version": "138f77a3"
+    },
+    "review_info": null,
+    "partner_info": null,
+    "financials": {
+      "traction_metrics": null,
+      "funding_history": null,
+      "valuation_est": null,
+      "ip_status": null,
+      "revenue_missing": false,
+      "funding_missing": false,
+      "valuation_missing": false
+    },
+    "version": 1,
+    "created_at": "2026-03-14T00:13:34.486403",
+    "updated_at": "2026-03-14T00:13:34.486406"
+  },
+  {
+    "startup_id": "a3c5e6b8-7fbd-4f3a-8b3e-9a2d6e4f0b8c",
+    "scout_info": {
+      "startup_id": "a3c5e6b8-7fbd-4f3a-8b3e-9a2d6e4f0b8c",
+      "name": "Cledara",
+      "one_line": "Centralized SaaS procurement and spend management for SMBs to tame SaaS sprawl.",
+      "sector": "SaaS procurement / IT spend management",
+      "problem": "SMBs struggle to discover, manage, and control software subscriptions, leading to shadow IT, duplicate licenses, security risks, and wasted spend.",
+      "solution": "A centralized platform for purchasing, onboarding, governance, invoicing, and vendor management of SaaS apps with integrations to payment providers and IT systems.",
+      "target_users": "Finance, IT, and procurement teams at SMBs and startups in Europe (UK-first).",
+      "why_now": "Rapid growth of SaaS usage in remote/hybrid teams creates governance and cost-control pain; rising security/compliance concerns and a fragmented vendor landscape create a clear need for centralized management.",
+      "scout_type": "pain_point",
+      "confidence_score": 0.6,
+      "funding_stage": null,
+      "est_tam": null,
+      "references": [
+        "Cledara - https://cledara.com",
+        "Crunchbase - Cledara - https://www.crunchbase.com/organization/cledara",
+        "LinkedIn - Cledara - https://www.linkedin.com/company/cledara/",
+        "G2 - Cledara - https://www.g2.com/products/cledara/reviews",
+        "Capterra - Cledara - https://www.capterra.com/p/211336/Cledara/"
+      ],
+      "discovered_at": "2026-03-14T00:13:34.607442",
+      "prompt_version": "b21f0723"
+    },
+    "review_info": null,
+    "partner_info": null,
+    "financials": {
+      "traction_metrics": null,
+      "funding_history": null,
+      "valuation_est": null,
+      "ip_status": null,
+      "revenue_missing": false,
+      "funding_missing": false,
+      "valuation_missing": false
+    },
+    "version": 1,
+    "created_at": "2026-03-14T00:13:34.607471",
+    "updated_at": "2026-03-14T00:13:34.607472"
   }
 ]

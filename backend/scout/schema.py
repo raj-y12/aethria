@@ -12,7 +12,7 @@ from typing import TypedDict, List
 from uuid import uuid4
 import json
 
-from reference_validation import is_generic_reference, is_megacap_company
+from utils.reference_validation import is_generic_reference, is_megacap_company
 
 
 class ScoutOutput(TypedDict):

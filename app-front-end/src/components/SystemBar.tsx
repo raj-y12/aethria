@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
+import { useUser, useClerk } from '@clerk/react';
 import { motion } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 
@@ -20,9 +22,16 @@ const STORAGE_KEY = 'aethria_last_activity';
  * Left-side vertical system bar: wordmark, JUDGEMENTS / SYSTEM toggles, clock, nav + logout.
  */
 export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem, onClose, navLink }: SystemBarProps) {
+  const navigate = useNavigate();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   const [time, setTime] = useState(new Date());
+  const displayName = user?.username ?? user?.primaryEmailAddress?.emailAddress ?? 'Account';
   const [hasEnteredOnce, setHasEnteredOnce] = useState(false);
-  const displayName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('authUser') : null;
+
+  const handleLogout = () => {
+    signOut?.().then(() => navigate('/sign-in', { replace: true }));
+  };
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -46,16 +55,6 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
     minute: '2-digit',
     second: '2-digit',
   });
-
-  const handleLogout = () => {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      sessionStorage.removeItem('auth');
-      sessionStorage.removeItem('authUser');
-    } finally {
-      window.location.reload();
-    }
-  };
 
   const baseClass =
     'hidden lg:flex fixed top-0 bottom-4 left-4 z-50 flex-col justify-between w-44 bg-oxford border border-white/[0.06]';
@@ -88,23 +87,16 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
           {formatted}
         </span>
 
-        {/* Username nameplate inside the bar, under the time */}
-        {displayName && (
-          <div
-            className="w-full flex items-center justify-center"
-            style={{
-              height: '2rem',
-              border: '1px solid rgba(242,240,234,0.3)',
-            }}
+        {/* Username (account/settings moved to app Settings later) */}
+        <div className="w-full flex items-center justify-center min-h-[2.5rem]">
+          <span
+            className="font-mono text-[10px] uppercase tracking-[0.1em] truncate max-w-full text-center"
+            style={{ color: PAPER_INACTIVE }}
+            title={displayName}
           >
-            <span
-              className="font-mono text-[10px] uppercase"
-              style={{ letterSpacing: '0.16em', color: 'rgba(242,240,234,0.85)' }}
-            >
-              {displayName}
-            </span>
-          </div>
-        )}
+            {displayName}
+          </span>
+        </div>
 
         {/* Mode toggles */}
         <div className="flex flex-col items-center gap-2 mt-1">
@@ -152,7 +144,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
           </button>
         </div>
 
-        {/* Nav + logout pinned to the bottom of the stack */}
+        {/* Nav + Log out pinned to the bottom of the stack */}
         <div className="mt-auto flex flex-col items-center gap-2">
           {navLink && (
             <a
@@ -165,7 +157,18 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
           <button
             type="button"
             onClick={handleLogout}
-            className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/50 hover:text-ivory/80 transition-colors"
+            className="transition-transform duration-200 hover:-translate-y-[1px] hover:opacity-80"
+            style={{
+              fontFamily: tokens.font.mono,
+              fontSize: '10px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              color: PAPER_INACTIVE,
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+            }}
           >
             Log out
           </button>

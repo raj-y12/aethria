@@ -1,6 +1,6 @@
 """
 MetaAnalyser — reads all performance signal and produces a structured summary.
-Does not make decisions. Only reads and organises.
+Backed by Supabase for agent_metrics, memory, scout_weights, mutation_log, concentration.
 """
 import json
 import logging
@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+
+from supabase_doc_store import doc_get, list_get_all
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +89,7 @@ class MetaAnalyser:
         }
 
     def _read_agent_metrics(self) -> Any:
-        path = _BACKEND_DIR / "data" / "portfolio" / "agent_metrics.json"
-        data = _read_json(path)
-        return data if isinstance(data, list) else []
+        return list_get_all("portfolio_agent_metrics")
 
     def _read_rejection_patterns(self) -> Dict:
         path = _BACKEND_DIR / "data" / "portfolio" / "rejection_patterns.json"
@@ -97,13 +97,11 @@ class MetaAnalyser:
         return data if isinstance(data, dict) else {}
 
     def _read_memory(self) -> Dict:
-        path = _BACKEND_DIR / "data" / "memory.json"
-        data = _read_json(path)
+        data = doc_get("memory")
         return data if isinstance(data, dict) else {}
 
     def _read_scout_weights(self) -> Dict[str, float]:
-        path = _BACKEND_DIR / "data" / "meta" / "scout_weights.json"
-        data = _read_json(path)
+        data = doc_get("meta_scout_weights")
         if isinstance(data, dict) and data:
             return data
         return {
@@ -114,13 +112,10 @@ class MetaAnalyser:
         }
 
     def _read_mutation_log(self) -> List[Dict]:
-        path = _BACKEND_DIR / "data" / "meta" / "mutation_log.json"
-        data = _read_json(path)
-        return data if isinstance(data, list) else []
+        return list_get_all("meta_mutation_log")
 
     def _read_concentration(self) -> Dict:
-        path = _BACKEND_DIR / "data" / "analytics" / "sector_concentration.json"
-        data = _read_json(path)
+        data = doc_get("analytics_sector_concentration")
         return data if isinstance(data, dict) else {}
 
     def _build_scout_performance(

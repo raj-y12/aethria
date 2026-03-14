@@ -1,19 +1,19 @@
 """
 ThresholdCalibrator — adjusts sensitivity parameters based on calibration warnings.
-Deterministic, no LLM.
+Backed by Supabase meta_calibration_state and meta_mutation_log.
 """
-import json
 import logging
 import os
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
+from supabase_doc_store import doc_get, doc_set, list_append_only
+
 logger = logging.getLogger(__name__)
 
-_BACKEND_DIR = Path(__file__).resolve().parent.parent
-_CALIBRATION_PATH = _BACKEND_DIR / "data" / "meta" / "calibration_state.json"
-_MUTATION_LOG_PATH = _BACKEND_DIR / "data" / "meta" / "mutation_log.json"
+_CALIBRATION_TABLE = "meta_calibration_state"
+_MUTATION_LOG_TABLE = "meta_mutation_log"
 
 CONFIDENCE_FLOOR = 0.2
 CONFIDENCE_CEILING = 0.8
@@ -32,41 +32,10 @@ CALIBRATION_COOLDOWN_CYCLES = int(os.getenv("META_AGENT_MUTATION_COOLDOWN_CYCLES
 CALIBRATION_PARAM_COOLDOWN = 5
 
 
-def _atomic_write(path: Path, data: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_suffix(".tmp")
-    with open(temp, "w") as f:
-        json.dump(data, f, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-    temp.replace(path)
-
-
-def _append_to_json_list(path: Path, entry: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    entries = []
-    if path.exists():
-        try:
-            with open(path, "r") as f:
-                entries = json.load(f)
-            if not isinstance(entries, list):
-                entries = []
-        except (json.JSONDecodeError, IOError):
-            entries = []
-    entries.append(entry)
-    _atomic_write(path, entries)
-
-
 def load_calibration_state() -> Dict[str, Any]:
-    """Load current calibration state."""
-    if not _CALIBRATION_PATH.exists():
-        return dict(DEFAULT_CALIBRATION)
-    try:
-        with open(_CALIBRATION_PATH, "r") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else dict(DEFAULT_CALIBRATION)
-    except (json.JSONDecodeError, IOError):
-        return dict(DEFAULT_CALIBRATION)
+    """Load current calibration state from Supabase."""
+    data = doc_get(_CALIBRATION_TABLE)
+    return data if isinstance(data, dict) else dict(DEFAULT_CALIBRATION)
 
 
 class ThresholdCalibrator:
@@ -90,7 +59,7 @@ class ThresholdCalibrator:
             self.logger.info("[Calibrator] In cooldown, skipping calibration")
             return []
 
-        from settings_loader import load_settings
+        from utils.settings_loader import load_settings
         settings = load_settings()
         default_confidence = settings.get("agent_config", {}).get("confidence_threshold", 0.5)
 
@@ -216,7 +185,7 @@ class ThresholdCalibrator:
                 state["reviewer_strong_threshold_override"] = new_val
 
             state["calibration_history"].append(change)
-            _append_to_json_list(_MUTATION_LOG_PATH, {
+            list_append_only(_MUTATION_LOG_TABLE, {
                 "type": "calibration",
                 "agent_target": param,
                 "cycle_number": change["cycle_number"],
@@ -227,4 +196,4 @@ class ThresholdCalibrator:
 
         state["last_calibrated_at"] = datetime.now().isoformat()
         state["last_calibrated_cycle"] = cycle_number or (changes[0]["cycle_number"] if changes else 0)
-        _atomic_write(_CALIBRATION_PATH, state)
+        doc_set(_CALIBRATION_TABLE, state)

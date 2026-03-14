@@ -21,7 +21,7 @@ from portfolio.cost_control import CostController
 from portfolio.health import HealthMonitor
 from portfolio.rejection import RejectionAnalyzer
 from analytics.clustering import ClusterAnalyzer
-from storage import Storage
+from utils.storage import Storage
 
 
 logger = logging.getLogger(__name__)
@@ -307,7 +307,7 @@ async def main():
     portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
     
     # Initialize storage
-    from storage import Storage
+    from utils.storage import Storage
     discovery_storage = Storage(file_path=storage_path)
     
     # Create and run engine

@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { useClerk } from '@clerk/react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import SystemBar from '../components/SystemBar';
+import LoadingAnimation from '../components/LoadingAnimation';
 import { fetchSettings, patchSettings, type AgentBudgetStatus, type Settings } from '../api/settings';
+import { fetchMe } from '../api/me';
+import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
 import { tokens } from '../design-system/tokens';
 import { useMediaQuery } from '../hooks';
 
@@ -93,6 +98,8 @@ function Field({
 }
 
 export default function SettingsPage() {
+  const navigate = useNavigate();
+  const { signOut } = useClerk();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -100,18 +107,17 @@ export default function SettingsPage() {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('cost');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userIdCopied, setUserIdCopied] = useState(false);
 
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const displayName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('authUser') : null;
   const handleLogout = () => {
-    try {
-      localStorage.removeItem('aethria_last_activity');
-      sessionStorage.removeItem('auth');
-      sessionStorage.removeItem('authUser');
-    } finally {
-      window.location.href = '/';
-    }
+    localStorage.removeItem('aethria_last_activity');
+    sessionStorage.removeItem('auth');
+    sessionStorage.removeItem('authUser');
+    signOut?.().then(() => navigate('/sign-in', { replace: true }));
   };
 
   const tabs: { id: TabId; label: string }[] = [
@@ -119,6 +125,20 @@ export default function SettingsPage() {
     { id: 'agent', label: 'Agents & discovery' },
     { id: 'portfolio', label: 'Portfolio' },
   ];
+
+  const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMe().then((me) => { if (!cancelled && me) setUserId(me.user_id); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAgentsStatus().then((s) => { if (!cancelled) setAgentsStatus(s ?? null); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,24 +175,7 @@ export default function SettingsPage() {
     setSettings((s) => s ? { ...s, portfolio: { ...s.portfolio, [k]: v } } : s);
 
   if (loading) {
-    return (
-      <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
-        {!isDesktop && (
-          <header className="flex items-center justify-between px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-oxford/[0.06] bg-oxford">
-            <span
-              className="text-[18px] tracking-tight"
-              style={{ fontFamily: tokens.font.display, letterSpacing: '-0.02em', color: '#F2F0EA' }}
-            >
-              Aethria
-            </span>
-          </header>
-        )}
-        <SystemBar scoutCount={0} navLink={{ href: '/', label: 'Home' }} />
-        <main className="flex-1 min-h-0 flex items-center justify-center px-4 pt-4 lg:pl-[13rem] lg:pr-6 lg:pt-6">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60">Loading settings…</p>
-        </main>
-      </div>
-    );
+    return <LoadingAnimation />;
   }
   if (!settings) {
     return (
@@ -236,12 +239,13 @@ export default function SettingsPage() {
                 <div className="flex flex-col items-start gap-3 py-3">
                   {/* Nav links */}
                   <div className="flex flex-col items-start gap-1">
-                    <a
-                      href="/"
+                    <Link
+                      to="/v1"
                       className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/70 hover:text-ivory transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
                     >
                       Overview
-                    </a>
+                    </Link>
                     <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory">
                       Settings
                     </span>
@@ -330,6 +334,42 @@ export default function SettingsPage() {
 
           {/* Content: scrollable like System panel */}
           <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
+            {agentsStatus && !agentsStatus.agents_will_run && (
+              <div className="mb-4 pb-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                <p className={groupHeadingCls}>Agents may not run on this server</p>
+                <p className={sectionIntroCls}>
+                  The backend is missing config needed for the pipeline. On Render (or your host), set in Environment: <code className="font-mono text-[10px] bg-oxford/[0.06] px-1 py-0.5 rounded">USE_SUPABASE_STORAGE=1</code>, <code className="font-mono text-[10px] bg-oxford/[0.06] px-1 py-0.5 rounded">OPENAI_API_KEY</code>, <code className="font-mono text-[10px] bg-oxford/[0.06] px-1 py-0.5 rounded">SUPABASE_URL</code>, and <code className="font-mono text-[10px] bg-oxford/[0.06] px-1 py-0.5 rounded">SUPABASE_SERVICE_ROLE_KEY</code>. See AGENTS.md for the full list.
+                </p>
+                <p className="font-mono text-[10px] text-oxford/60 mt-1">
+                  Worker: {agentsStatus.worker_ready ? 'ready' : 'not ready'} · Supabase: {agentsStatus.supabase_configured ? 'configured' : 'missing'} · OpenAI: {agentsStatus.openai_configured ? 'configured' : 'missing'}
+                </p>
+              </div>
+            )}
+            {userId && (
+              <div className="mb-4 pb-4 border-b border-oxford/[0.06]">
+                <p className={groupHeadingCls}>Your user ID</p>
+                <p className={sectionIntroCls}>
+                  This is your Clerk user ID. It is used automatically when you’re signed in — startups, settings, and agents are scoped to this account. No .env setup needed. If you run the full stack with <code className="font-mono text-[10px] bg-oxford/[0.06] px-1 py-0.5 rounded">run.py</code> and want the background agents process to run for this account, you can optionally set <code className="font-mono text-[10px] bg-oxford/[0.06] px-1 py-0.5 rounded">AETHRIA_AGENT_USER_ID</code> to this value in your backend <code className="font-mono text-[10px] bg-oxford/[0.06] px-1 py-0.5 rounded">.env</code>.
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <code className="font-mono text-[11px] text-oxford/80 bg-oxford/[0.06] px-2 py-1.5 rounded break-all">
+                    {userId}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(userId).then(() => {
+                        setUserIdCopied(true);
+                        setTimeout(() => setUserIdCopied(false), 2000);
+                      });
+                    }}
+                    className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50 hover:text-oxford border border-oxford/[0.2] px-2 py-1 rounded"
+                  >
+                    {userIdCopied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+            )}
             {validationErrors.length > 0 && (
               <div className="mb-4 pb-4 border-b border-oxford/[0.06]">
                 <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/70 mb-2">Validation errors</p>
@@ -341,6 +381,19 @@ export default function SettingsPage() {
             <div className="space-y-8">
               {activeTab === 'cost' && (
                 <>
+                  <section>
+                    <h3 className={groupHeadingCls}>Budget enforcement</h3>
+                    <p className={sectionIntroCls}>
+                      When enabled, the pipeline respects token limits, cost caps, and cooldowns below. When disabled, no limits are applied.
+                    </p>
+                    <Toggle
+                      id="cost_budget_enabled"
+                      checked={settings.cost_budget?.enabled ?? false}
+                      onChange={(v) => setCost('enabled', v)}
+                      label="Enable cost budget"
+                      hint="Turn on to enforce spending and rate limits."
+                    />
+                  </section>
                   <section>
                     <h3 className={groupHeadingCls}>Spending limits</h3>
                     <p className={sectionIntroCls}>

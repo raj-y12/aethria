@@ -10,7 +10,6 @@ Design:
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import ssl
@@ -21,31 +20,23 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 import certifi
-from settings_loader import get_scout_region, is_scout_serp_enabled, get_scout_serp_daily_budget
+from utils.settings_loader import get_scout_region, is_scout_serp_enabled, get_scout_serp_daily_budget
+from supabase_doc_store import doc_get, doc_set
 
 logger = logging.getLogger("serp")
 
-_DATA_DIR = Path(__file__).resolve().parent / "data"
-_USAGE_PATH = _DATA_DIR / "serp_usage.json"
+_SERP_TABLE = "serp_usage"
 
 
 def _load_usage() -> List[float]:
-    if not _USAGE_PATH.exists():
-        return []
-    try:
-        with open(_USAGE_PATH, "r") as f:
-            data = json.load(f)
-        if isinstance(data, list):
-            return [float(x) for x in data]
-    except Exception:
-        return []
+    data = doc_get(_SERP_TABLE)
+    if isinstance(data, list):
+        return [float(x) for x in data]
     return []
 
 
 def _save_usage(timestamps: List[float]) -> None:
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with open(_USAGE_PATH, "w") as f:
-        json.dump(timestamps, f)
+    doc_set(_SERP_TABLE, timestamps)
 
 
 def _within_daily_budget(now: float) -> bool:

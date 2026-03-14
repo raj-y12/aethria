@@ -19,7 +19,7 @@ else:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logging
-from storage import Storage
+from utils.storage import Storage
 from portfolio.store import PortfolioStore
 from portfolio.execution import ExecutionAgent
 from portfolio.signals import SignalTracker

@@ -1,50 +1,113 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router';
+import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { tokens } from '../design-system/tokens';
-
-const VALID_USERNAME = import.meta.env.VITE_AUTH_USERNAME ?? 'raj';
-const VALID_PASSWORD = import.meta.env.VITE_AUTH_PASSWORD ?? '#Mukesh123';
 
 const OXford = '#002147';
 const PAPER = '#F2F0EA';
 const EASE_UNDERLINE = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
-interface LoginPageProps {
-  onSuccess: () => void;
-}
-
-export default function LoginPage({ onSuccess }: LoginPageProps) {
+export default function LoginPage() {
+  const navigate = useNavigate();
+  const { isLoaded, isSignedIn } = useUser();
+  const { signIn } = useSignIn();
+  const { setActive } = useClerk();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
   const [hover, setHover] = useState(false);
+  const hasRedirectedRef = useRef(false);
 
-  const handleSubmit = useCallback(() => {
-    setError(false);
-    if (username.trim() === VALID_USERNAME && password === VALID_PASSWORD) {
-      setLoading(true);
-      sessionStorage.setItem('auth', 'true');
-      const name = username.trim();
-      sessionStorage.setItem('authUser', name.charAt(0).toUpperCase() + name.slice(1).toLowerCase());
-      onSuccess();
+  // Client-side redirect when already signed in (no full page reload — prevents reload loop)
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    if (hasRedirectedRef.current) return;
+    hasRedirectedRef.current = true;
+    navigate('/v1', { replace: true });
+  }, [isLoaded, isSignedIn, navigate]);
+
+  const handleSubmit = useCallback(async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    if (loading) return;
+    setError(null);
+    setLoading(true);
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password;
+    if (!trimmedUsername || !trimmedPassword) {
+      setError('Please enter both username and password.');
+      setLoading(false);
       return;
     }
-    setError(true);
-    setPassword('');
-    passwordRef.current?.focus();
-  }, [username, password, onSuccess]);
+    if (!signIn) {
+      setError('Sign-in is not ready. Please refresh the page and try again.');
+      setLoading(false);
+      return;
+    }
+    if (isSignedIn) {
+      setLoading(false);
+      navigate('/v1', { replace: true });
+      return;
+    }
+    try {
+      const result = await signIn.password({
+        identifier: trimmedUsername,
+        password: trimmedPassword,
+      });
+
+      if (result.error) {
+        const msg = result.error.message ?? '';
+        if (msg.toLowerCase().includes('already signed in') || (result.error as any)?.code === 'session_exists') {
+          navigate('/v1', { replace: true });
+          return;
+        }
+        setError(typeof result.error.message === 'string' ? result.error.message : 'Invalid username or password.');
+        return;
+      }
+
+      if (signIn.status === 'complete') {
+        if (typeof signIn.finalize === 'function') {
+          await signIn.finalize();
+        } else if (setActive && (signIn as any).createdSessionId) {
+          await setActive({ session: (signIn as any).createdSessionId });
+        }
+        // Full-page navigation so the app reloads with the new session; avoids Clerk state not updating in time
+        window.location.replace('/v1');
+        return;
+      }
+
+      setError('Sign-in could not be completed. Please try again.');
+    } catch (err: any) {
+      const msg = (Array.isArray(err?.errors) && err.errors[0]?.message)
+        ? String(err.errors[0].message)
+        : err?.message ? String(err.message) : '';
+      if (msg.toLowerCase().includes('already signed in') || msg.toLowerCase().includes('session_exists')) {
+        navigate('/v1', { replace: true });
+        return;
+      }
+      setError(Array.isArray(err?.errors) && err.errors[0]?.message ? String(err.errors[0].message) : err?.message ? String(err.message) : 'Something went wrong. Please try again.');
+      setPassword('');
+      passwordRef.current?.focus();
+    } finally {
+      setLoading(false);
+    }
+  }, [loading, username, password, signIn, navigate, isSignedIn, setActive]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, field: 'username' | 'password') => {
       if (e.key === 'Enter') {
         if (field === 'username') passwordRef.current?.focus();
-        else handleSubmit();
+        else void handleSubmit();
       }
     },
-    [handleSubmit]
+    [handleSubmit],
   );
+
+  if (!isLoaded) {
+    return null;
+  }
 
   return (
     <div
@@ -98,161 +161,179 @@ export default function LoginPage({ onSuccess }: LoginPageProps) {
           INVESTMENT INTELLIGENCE
         </motion.p>
 
-        {/* 3. Form fields + 4. Button — no form element */}
+        {/* 3. Custom Clerk-powered sign-in form (username + password) */}
         <div className="w-full max-w-[380px]" style={{ marginTop: '48px' }} data-login-page>
           <motion.div
-            style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.65, duration: 0.25 }}
           >
-            <input
-              type="text"
-              autoComplete="username"
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onKeyDown={(e) => handleKeyDown(e, 'username')}
-              className="w-full bg-transparent outline-none min-h-[44px] touch-manipulation"
-              style={{
-                height: '44px',
-                border: 'none',
-                borderBottom: '1px solid rgba(0, 33, 71, 0.15)',
-                padding: '0 0 10px 0',
-                fontFamily: 'Inter, system-ui, sans-serif',
-                fontSize: '16px',
-                fontWeight: 400,
-                color: 'rgba(0, 33, 71, 0.9)',
-                transition: 'border-color 200ms ease',
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSubmit();
               }}
-              onFocus={(e) => {
-                e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.6)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.15)';
-              }}
-            />
-          </motion.div>
-          <motion.div
-            style={{ marginTop: '20px' }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.75, duration: 0.25 }}
-          >
-            <input
-              ref={passwordRef}
-              type="password"
-              autoComplete="current-password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => handleKeyDown(e, 'password')}
-              className="w-full bg-transparent outline-none min-h-[44px] touch-manipulation"
-              style={{
-                height: '44px',
-                border: 'none',
-                borderBottom: '1px solid rgba(0, 33, 71, 0.15)',
-                padding: '0 0 10px 0',
-                fontFamily: 'Inter, system-ui, sans-serif',
-                fontSize: '16px',
-                fontWeight: 400,
-                color: 'rgba(0, 33, 71, 0.9)',
-                transition: 'border-color 200ms ease',
-              }}
-              onFocus={(e) => {
-                e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.6)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.15)';
-              }}
-            />
-          </motion.div>
+              style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
+              noValidate
+            >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <input
+                type="text"
+                autoComplete="username"
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, 'username')}
+                className="w-full bg-transparent outline-none min-h-[44px] touch-manipulation"
+                style={{
+                  height: '44px',
+                  border: 'none',
+                  borderBottom: '1px solid rgba(0, 33, 71, 0.15)',
+                  padding: '0 0 10px 0',
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  fontSize: '16px',
+                  fontWeight: 400,
+                  color: 'rgba(0, 33, 71, 0.9)',
+                  transition: 'border-color 200ms ease',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.6)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.15)';
+                }}
+              />
+              <input
+                ref={passwordRef}
+                type="password"
+                autoComplete="current-password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, 'password')}
+                className="w-full bg-transparent outline-none min-h-[44px] touch-manipulation"
+                style={{
+                  height: '44px',
+                  border: 'none',
+                  borderBottom: '1px solid rgba(0, 33, 71, 0.15)',
+                  padding: '0 0 10px 0',
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  fontSize: '16px',
+                  fontWeight: 400,
+                  color: 'rgba(0, 33, 71, 0.9)',
+                  transition: 'border-color 200ms ease',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.6)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.15)';
+                }}
+              />
+            </div>
 
-          {/* Placeholder: Space Mono 14px, oxford 30% — scoped to this section */}
-          <style>{`
-            [data-login-page] input::placeholder {
-              color: rgba(0, 33, 71, 0.3);
-              font-family: ${tokens.font.mono};
-              font-size: 14px;
-              font-weight: 400;
-            }
-          `}</style>
+            {/* Placeholder styling scoped to this block */}
+            <style>{`
+              [data-login-page] input::placeholder {
+                color: rgba(0, 33, 71, 0.3);
+                font-family: ${tokens.font.mono};
+                font-size: 14px;
+                font-weight: 400;
+              }
+            `}</style>
 
-          {/* Error state */}
-          {error && (
-            <motion.p
-              className="font-mono uppercase"
-              style={{
-                fontFamily: tokens.font.mono,
-                fontSize: '9px',
-                letterSpacing: '0.15em',
-                color: 'rgba(0, 33, 71, 0.7)',
-                marginTop: '12px',
-              }}
+            {/* Error state */}
+            {error && (
+              <motion.p
+                className="font-mono uppercase"
+                style={{
+                  fontFamily: tokens.font.mono,
+                  fontSize: '9px',
+                  letterSpacing: '0.15em',
+                  color: 'rgba(0, 33, 71, 0.7)',
+                  marginTop: '12px',
+                }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                {error}
+              </motion.p>
+            )}
+
+            {/* Submit button */}
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.2 }}
+              transition={{ delay: 0.85, duration: 0.25 }}
+              style={{ marginTop: '32px' }}
             >
-              INVALID CREDENTIALS
-            </motion.p>
-          )}
-
-          {/* 4. Login button */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.85, duration: 0.25 }}
-            style={{ marginTop: '32px' }}
-          >
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading}
-              className="w-full font-mono uppercase outline-none cursor-pointer transition-colors disabled:opacity-70"
-              style={{
-                height: '44px',
-                background: OXford,
-                color: PAPER,
-                fontFamily: tokens.font.mono,
-                fontSize: '11px',
-                letterSpacing: '0.15em',
-                border: 'none',
-                transitionDuration: '150ms',
-                transitionTimingFunction: 'ease',
-              }}
-              onMouseEnter={(e) => {
-                if (!loading) e.currentTarget.style.backgroundColor = 'rgba(0, 33, 71, 0.85)';
-                setHover(true);
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = OXford;
-                setHover(false);
-              }}
-              onMouseDown={(e) => {
-                if (!loading) e.currentTarget.style.opacity = '0.7';
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.opacity = '1';
-              }}
-            >
-              {loading ? (
-                <span className="inline-flex items-center justify-center gap-1" style={{ fontFamily: tokens.font.mono }}>
-                  <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.6 }}>.</motion.span>
-                  <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}>.</motion.span>
-                  <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}>.</motion.span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center justify-center">
-                  <span>LOG IN</span>
-                  <span
-                    className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap"
-                    style={{ width: hover ? '1.25em' : '0.5em' }}
-                  >
-                    {'\u00A0—'}
+              <button
+                type="button"
+                disabled={loading}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void handleSubmit(e);
+                }}
+                className="w-full font-mono uppercase outline-none cursor-pointer transition-colors disabled:opacity-70"
+                style={{
+                  height: '44px',
+                  background: OXford,
+                  color: PAPER,
+                  fontFamily: tokens.font.mono,
+                  fontSize: '11px',
+                  letterSpacing: '0.15em',
+                  border: 'none',
+                  transitionDuration: '150ms',
+                  transitionTimingFunction: 'ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading) e.currentTarget.style.backgroundColor = 'rgba(0, 33, 71, 0.85)';
+                  setHover(true);
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = OXford;
+                  setHover(false);
+                }}
+                onMouseDown={(e) => {
+                  if (!loading) e.currentTarget.style.opacity = '0.7';
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.opacity = '1';
+                }}
+              >
+                {loading ? (
+                  <span className="inline-flex items-center justify-center gap-1" style={{ fontFamily: tokens.font.mono }}>
+                    <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.6 }}>
+                      .
+                    </motion.span>
+                    <motion.span
+                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+                    >
+                      .
+                    </motion.span>
+                    <motion.span
+                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
+                    >
+                      .
+                    </motion.span>
                   </span>
-                </span>
-              )}
-            </button>
+                ) : (
+                  <span className="inline-flex items-center justify-center">
+                    <span>LOG IN</span>
+                    <span
+                      className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap"
+                      style={{ width: hover ? '1.25em' : '0.5em' }}
+                    >
+                      {'\u00A0—'}
+                    </span>
+                  </span>
+                )}
+              </button>
+            </motion.div>
+            </form>
           </motion.div>
         </div>
       </div>

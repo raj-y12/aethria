@@ -122,13 +122,27 @@ def main() -> int:
             env={**os.environ, "VITE_API_URL": f"http://localhost:{BACKEND_PORT}"},
             shell=os.name == "nt",
         )
-        agents_proc = subprocess.Popen(
-            [sys.executable, "run_system.py"],
-            cwd=str(BACKEND_DIR),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            env={**os.environ, "PYTHONUNBUFFERED": "1"},
-        )
+        # When using Supabase, agents need a user_id (AETHRIA_AGENT_USER_ID or run_system.py --user-id).
+        # If unset, skip the agents process; pipeline runs when users log in and trigger via API.
+        use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+        agent_user_id = os.getenv("AETHRIA_AGENT_USER_ID", "").strip()
+        start_agents = True
+        if use_supabase and not agent_user_id:
+            start_agents = False
+            print("  [run.py] Supabase on but AETHRIA_AGENT_USER_ID not set — agents subprocess skipped. "
+                  "Agents run when users log in and trigger via API.", flush=True)
+        agents_proc = None
+        if start_agents:
+            agents_cmd = [sys.executable, "run_system.py"]
+            if agent_user_id:
+                agents_cmd.extend(["--user-id", agent_user_id])
+            agents_proc = subprocess.Popen(
+                agents_cmd,
+                cwd=str(BACKEND_DIR),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env={**os.environ, "PYTHONUNBUFFERED": "1"},
+            )
 
         # Stream logs
         t_backend = threading.Thread(
@@ -146,21 +160,22 @@ def main() -> int:
             args=(web_proc.stdout, "[Web]", WEB_COLOR, use_color),
             daemon=True,
         )
-        t_agents = threading.Thread(
-            target=_stream_output,
-            args=(agents_proc.stdout, "[Agents]", AGENTS_COLOR, use_color),
-            daemon=True,
-        )
+        if agents_proc is not None:
+            t_agents = threading.Thread(
+                target=_stream_output,
+                args=(agents_proc.stdout, "[Agents]", AGENTS_COLOR, use_color),
+                daemon=True,
+            )
+            t_agents.start()
         t_backend.start()
         t_app.start()
         t_web.start()
-        t_agents.start()
 
         while (
             backend_proc.poll() is None
             and app_proc.poll() is None
             and web_proc.poll() is None
-            and agents_proc.poll() is None
+            and (agents_proc is None or agents_proc.poll() is None)
         ):
             time.sleep(0.25)
     except KeyboardInterrupt:
@@ -175,7 +190,7 @@ def main() -> int:
         if web_proc and web_proc.poll() is None:
             web_proc.terminate()
             web_proc.wait()
-        if agents_proc and agents_proc.poll() is None:
+        if agents_proc is not None and agents_proc.poll() is None:
             agents_proc.terminate()
             agents_proc.wait()
         print("\nStopped.", flush=True)

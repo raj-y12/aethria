@@ -1,6 +1,6 @@
 """
 PromptMutator — decides which prompts to mutate and rewrites them via LLM.
-Decision logic is deterministic. Only the rewriting uses LLM.
+Backed by Supabase meta_prompt_library and meta_mutation_log.
 """
 import json
 import logging
@@ -13,12 +13,16 @@ from datetime import datetime
 from uuid import uuid4
 
 from utils.prompt_version import hash_prompt
+from supabase_doc_store import doc_get, doc_set, list_get_all, list_append_only
 
 logger = logging.getLogger(__name__)
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 _PROMPT_LIBRARY_PATH = _BACKEND_DIR / "data" / "meta" / "prompt_library.json"
 _MUTATION_LOG_PATH = _BACKEND_DIR / "data" / "meta" / "mutation_log.json"
+_PROMPT_LIBRARY_TABLE = "meta_prompt_library"
+_MUTATION_LOG_TABLE = "meta_mutation_log"
+_META_REPORTS_TABLE = "meta_reports"
 
 MUTATOR_SYSTEM_PROMPT = """You are a meta-optimisation agent for an autonomous VC investment pipeline. Your job is to rewrite agent system prompts to improve performance based on observed signal. You must preserve the agent's core cognitive identity and lens. You must not make the agent generic. Mutations should be surgical — one or two targeted adjustments, not a full rewrite.
 
@@ -30,6 +34,10 @@ Return ONLY a JSON object with two fields:
 
 
 def _read_json_list(path: Path) -> list:
+    if path and "meta_reports" in str(path):
+        return list_get_all(_META_REPORTS_TABLE)
+    if path and "mutation_log" in str(path):
+        return list_get_all(_MUTATION_LOG_TABLE)
     if not path.exists():
         return []
     try:
@@ -45,6 +53,9 @@ def _read_json_list(path: Path) -> list:
 
 
 def _read_json_dict(path: Path) -> dict:
+    if path and "prompt_library" in str(path):
+        data = doc_get(_PROMPT_LIBRARY_TABLE)
+        return data if isinstance(data, dict) else {}
     if not path.exists():
         return {}
     try:
@@ -60,6 +71,9 @@ def _read_json_dict(path: Path) -> dict:
 
 
 def _atomic_write(path: Path, data: Any) -> None:
+    if path and "prompt_library" in str(path):
+        doc_set(_PROMPT_LIBRARY_TABLE, data)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(".tmp")
     with open(temp, "w") as f:
@@ -70,7 +84,12 @@ def _atomic_write(path: Path, data: Any) -> None:
 
 
 def _append_to_json_list(path: Path, entry: dict) -> None:
-    """Append to a JSON list file (append-only pattern)."""
+    if path and "mutation_log" in str(path):
+        list_append_only(_MUTATION_LOG_TABLE, entry)
+        return
+    if path and "meta_reports" in str(path):
+        list_append_only(_META_REPORTS_TABLE, entry)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     entries = _read_json_list(path)
     entries.append(entry)
@@ -243,7 +262,7 @@ class PromptMutator:
         return mutation
 
     def _get_current_prompt(self, agent_name: str, scout_engine, reviewer_engine) -> Optional[str]:
-        from meta_agent.analyser import SCOUT_AGENT_NAMES
+        from meta.analyser import SCOUT_AGENT_NAMES
         # Scout agents
         if agent_name in SCOUT_AGENT_NAMES and scout_engine:
             scout_type = SCOUT_AGENT_NAMES[agent_name]
@@ -261,7 +280,7 @@ class PromptMutator:
         return None
 
     def _set_agent_prompt(self, agent_name: str, new_prompt: str, scout_engine, reviewer_engine):
-        from meta_agent.analyser import SCOUT_AGENT_NAMES
+        from meta.analyser import SCOUT_AGENT_NAMES
         if agent_name in SCOUT_AGENT_NAMES and scout_engine:
             scout_type = SCOUT_AGENT_NAMES[agent_name]
             for scout in scout_engine.scouts:

@@ -86,17 +86,6 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   const watchlist = queueDepths?.watchlist ?? 0;
   const pendingEscalations = data.settings?.system_health?.pending_escalations ?? 0;
 
-  const displayName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('authUser') : null;
-  const handleLogout = () => {
-    try {
-      localStorage.removeItem('aethria_last_activity');
-      sessionStorage.removeItem('auth');
-      sessionStorage.removeItem('authUser');
-    } finally {
-      window.location.reload();
-    }
-  };
-
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-paper">
       {/* Mobile / tablet top nav — desktop keeps the vertical SystemBar only */}
@@ -176,7 +165,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                   </button>
                 </div>
 
-                {/* Settings / username / logout */}
+                {/* Settings */}
                 <div className="flex flex-col items-start gap-1 mt-3">
                   <a
                     href="/settings"
@@ -184,25 +173,6 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                   >
                     Settings
                   </a>
-                  {displayName && (
-                    <span
-                      style={{
-                        fontFamily: tokens.font.body,
-                        fontSize: '11px',
-                        fontWeight: 400,
-                        color: 'rgba(242, 240, 234, 0.6)',
-                      }}
-                    >
-                      {displayName}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/50 hover:text-ivory/80 transition-colors"
-                  >
-                    Log out
-                  </button>
                 </div>
               </div>
               </motion.section>

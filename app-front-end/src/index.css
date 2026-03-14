@@ -1,15 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400&display=swap');
 /*
  * Aethria — High-fidelity institutional design (brand_assets + web-front-end).
  * Palette: oxford #002147, paper #F2F0EA (canvas), charcoal #2f333b, ivory #fcfcfc.
  * Display: Libre Baskerville (wordmark/hero only). Body/UI: Inter. Metadata/labels: Space Mono.
  * Frames: 1px rgba(0,33,71,0.06). No rounded corners.
  */
-
 :root {
   --color-accent: #7D2B3A;
+  /* Clerk — match app palette and typography (oxford, paper, Inter/Space Mono) */
+  --clerk-color-primary: #002147;
+  --clerk-color-background: #F2F0EA;
+  --clerk-color-foreground: #002147;
+  --clerk-color-primary-foreground: #fcfcfc;
+  --clerk-color-muted-foreground: rgba(0, 33, 71, 0.6);
+  --clerk-color-muted: rgba(0, 33, 71, 0.06);
+  --clerk-color-border: rgba(0, 33, 71, 0.06);
+  --clerk-color-input: #F2F0EA;
+  --clerk-color-input-foreground: #002147;
+  --clerk-color-ring: #002147;
+  --clerk-font-family: Inter, system-ui, -apple-system, sans-serif;
+  --clerk-font-family-buttons: "Space Mono", ui-monospace, monospace;
+  --clerk-border-radius: 0;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400&display=swap');
+/* Clerk UserProfile modal (Manage account panel) — ensure visible on app canvas */
+.cl-modalBackdrop {
+  background-color: rgba(0, 33, 71, 0.4) !important;
+}
+.cl-modalContent {
+  background-color: #F2F0EA !important;
+  color: #002147 !important;
+  border: 1px solid rgba(0, 33, 71, 0.06) !important;
+  border-radius: 0 !important;
+  box-shadow: 0 8px 32px rgba(0, 33, 71, 0.2) !important;
+}
+.cl-card {
+  background-color: #F2F0EA !important;
+  color: #002147 !important;
+  border: 1px solid rgba(0, 33, 71, 0.06) !important;
+  border-radius: 0 !important;
+}
+.cl-scrollBox {
+  background-color: #F2F0EA !important;
+  color: #002147 !important;
+}
+.cl-userProfile-root .cl-formFieldInput,
+.cl-userProfile-root .cl-formFieldLabel,
+.cl-userProfile-root .cl-navbarButton,
+.cl-userProfile-root .cl-profileSectionTitle {
+  color: #002147 !important;
+}
+.cl-userProfile-root .cl-formFieldInput::placeholder {
+  color: rgba(0, 33, 71, 0.5) !important;
+}
+
+/* Fallback: any Clerk portal content (in case class names differ by version) */
+[data-clerk-portal] [data-clerk-modal],
+[data-clerk-portal] > div {
+  background-color: #F2F0EA !important;
+  color: #002147 !important;
+}
+[data-clerk-portal] [role="dialog"] {
+  background-color: #F2F0EA !important;
+  color: #002147 !important;
+  border: 1px solid rgba(0, 33, 71, 0.06) !important;
+}
 
 @tailwind base;
 @tailwind components;

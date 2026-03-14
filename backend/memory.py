@@ -1,18 +1,23 @@
 """
 Cross-agent deal memory for institutional learning.
-Backed by data/memory.json. Thread-safe atomic writes.
+Backed by Supabase memory table.
 """
-import json
 import logging
-import math
-import os
 import re
-import fcntl
 from collections import Counter
-from pathlib import Path
 from typing import List, Dict, Optional, Any
 
+from supabase_doc_store import doc_get, doc_set
+
 logger = logging.getLogger(__name__)
+
+_MEMORY_TABLE = "memory"
+_DEFAULT_MEMORY = {
+    "seen_sectors": {},
+    "seen_theses": [],
+    "failed_assumptions": [],
+    "successful_theses": [],
+}
 
 _STOP_WORDS = frozenset(
     "a an the is are was were be been being have has had do does did will would "
@@ -42,13 +47,7 @@ def _word_overlap_similarity(a: str, b: str) -> float:
 
 class DealMemory:
     """
-    Cross-agent institutional memory.
-    
-    Stores:
-    - seen_sectors: sector -> count of times scouted
-    - seen_theses: last 50 primary_thesis strings
-    - failed_assumptions: last 100 assumption strings with negative feedback
-    - successful_theses: last 50 primary_thesis strings from YES decisions
+    Cross-agent institutional memory. Backed by Supabase memory table.
     """
 
     MAX_THESES = 50
@@ -57,36 +56,19 @@ class DealMemory:
     SIMILARITY_THRESHOLD = 0.75
 
     def __init__(self, file_path: str = "data/memory.json"):
-        self.file_path = Path(file_path)
-        self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("deal_memory")
-        if not self.file_path.exists():
-            self._write({
-                "seen_sectors": {},
-                "seen_theses": [],
-                "failed_assumptions": [],
-                "successful_theses": [],
-            })
+        data = doc_get(_MEMORY_TABLE)
+        if not data or not isinstance(data, dict):
+            doc_set(_MEMORY_TABLE, dict(_DEFAULT_MEMORY))
 
     def _read(self) -> Dict[str, Any]:
-        try:
-            with open(self.file_path, "r") as f:
-                fcntl.flock(f.fileno(), fcntl.LOCK_SH)
-                try:
-                    data = json.load(f)
-                finally:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-                return data
-        except (json.JSONDecodeError, IOError):
-            return {"seen_sectors": {}, "seen_theses": [], "failed_assumptions": [], "successful_theses": []}
+        data = doc_get(_MEMORY_TABLE)
+        if not isinstance(data, dict):
+            return dict(_DEFAULT_MEMORY)
+        return data
 
     def _write(self, data: Dict[str, Any]) -> None:
-        temp_path = self.file_path.with_suffix(".tmp")
-        with open(temp_path, "w") as f:
-            json.dump(data, f, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
-        temp_path.replace(self.file_path)
+        doc_set(_MEMORY_TABLE, data)
 
     def is_duplicate_thesis(self, thesis: str) -> bool:
         """Check if thesis is too similar to any seen thesis."""

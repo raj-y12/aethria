@@ -1,18 +1,19 @@
 """
 Sector clustering and concentration tracking.
-Groups startups by sector and theme (keyword overlap).
+Backed by Supabase analytics_sector_concentration table.
 """
-import json
 import logging
-import os
-import fcntl
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, Any, List
 from datetime import datetime
 
+from supabase_doc_store import doc_get, doc_set
+
 logger = logging.getLogger(__name__)
+
+_CONCENTRATION_TABLE = "analytics_sector_concentration"
 
 _STOP_WORDS = frozenset(
     "a an the is are was were be been being have has had do does did will would "
@@ -30,11 +31,9 @@ def _extract_keywords(text: str) -> List[str]:
 
 
 class ClusterAnalyzer:
-    """Analyzes sector concentration and theme clusters."""
+    """Analyzes sector concentration and theme clusters. Backed by Supabase."""
 
     def __init__(self, output_file: str = "data/analytics/sector_concentration.json"):
-        self.output_path = Path(output_file)
-        self.output_path.parent.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("cluster.analyzer")
 
     def analyze(self, startups: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -132,18 +131,8 @@ class ClusterAnalyzer:
         ]
 
     def _read(self) -> Dict[str, Any]:
-        if not self.output_path.exists():
-            return {}
-        try:
-            with open(self.output_path, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return {}
+        data = doc_get(_CONCENTRATION_TABLE)
+        return data if isinstance(data, dict) else {}
 
     def _write(self, data: Dict[str, Any]) -> None:
-        temp_path = self.output_path.with_suffix(".tmp")
-        with open(temp_path, "w") as f:
-            json.dump(data, f, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
-        temp_path.replace(self.output_path)
+        doc_set(_CONCENTRATION_TABLE, data)

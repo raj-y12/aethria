@@ -1,19 +1,19 @@
 """
 ScoutReweighter — adjusts scout run frequencies based on performance.
-Pure arithmetic, no LLM calls.
+Backed by Supabase meta_scout_weights and meta_mutation_log.
 """
-import json
 import logging
 import os
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
+from supabase_doc_store import doc_get, doc_set, list_append_only
+
 logger = logging.getLogger(__name__)
 
-_BACKEND_DIR = Path(__file__).resolve().parent.parent
-_WEIGHTS_PATH = _BACKEND_DIR / "data" / "meta" / "scout_weights.json"
-_MUTATION_LOG_PATH = _BACKEND_DIR / "data" / "meta" / "mutation_log.json"
+_WEIGHTS_TABLE = "meta_scout_weights"
+_MUTATION_LOG_TABLE = "meta_mutation_log"
 
 DEFAULT_WEIGHTS = {
     "MarketDrivenScout": 0.25,
@@ -27,42 +27,11 @@ DAMPENING_FACTOR = 0.7
 MIN_DELTA_THRESHOLD = 0.03
 
 
-def _atomic_write(path: Path, data: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_suffix(".tmp")
-    with open(temp, "w") as f:
-        json.dump(data, f, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-    temp.replace(path)
-
-
-def _append_to_json_list(path: Path, entry: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    entries = []
-    if path.exists():
-        try:
-            with open(path, "r") as f:
-                entries = json.load(f)
-            if not isinstance(entries, list):
-                entries = []
-        except (json.JSONDecodeError, IOError):
-            entries = []
-    entries.append(entry)
-    _atomic_write(path, entries)
-
-
 def load_weights() -> Dict[str, float]:
-    """Load current scout weights. Returns defaults if file missing."""
-    if not _WEIGHTS_PATH.exists():
-        return dict(DEFAULT_WEIGHTS)
-    try:
-        with open(_WEIGHTS_PATH, "r") as f:
-            data = json.load(f)
-        if isinstance(data, dict) and data:
-            return data
-    except (json.JSONDecodeError, IOError):
-        pass
+    """Load current scout weights from Supabase."""
+    data = doc_get(_WEIGHTS_TABLE)
+    if isinstance(data, dict) and data:
+        return data
     return dict(DEFAULT_WEIGHTS)
 
 
@@ -147,14 +116,13 @@ class ScoutReweighter:
 
     @staticmethod
     def apply(updates: List[Dict]) -> None:
-        """Write new weights to scout_weights.json and log updates."""
+        """Write new weights to Supabase and log updates."""
         if not updates:
             return
         new_weights = {u["scout_type"]: u["new_weight"] for u in updates}
-        _atomic_write(_WEIGHTS_PATH, new_weights)
-
+        doc_set(_WEIGHTS_TABLE, new_weights)
         for u in updates:
-            _append_to_json_list(_MUTATION_LOG_PATH, {
+            list_append_only(_MUTATION_LOG_TABLE, {
                 "type": "scout_weight_update",
                 "agent_target": u["scout_type"],
                 "cycle_number": u["cycle_number"],

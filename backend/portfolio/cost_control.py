@@ -2,14 +2,14 @@
 Cost & Token Discipline Enforcement.
 
 Tracks and enforces budgets, token limits, and cooldowns.
+Uses local file (data/portfolio/budgets.json); no Supabase buckets yet.
 """
+import json
 import logging
+from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
-import json
-from pathlib import Path
-
 
 logger = logging.getLogger(__name__)
 
@@ -17,55 +17,34 @@ logger = logging.getLogger(__name__)
 class CostController:
     """
     Enforces cost discipline across all agents.
-    
-    Features:
-    - Call budgets per agent
-    - Token ceilings
-    - Cooldown timers
-    - Automatic throttling
     """
     
     def __init__(self, budget_file: str = "data/portfolio/budgets.json"):
-        """
-        Initialize Cost Controller.
-        
-        Args:
-            budget_file: Path to budget tracking file
-        """
         self.budget_file = Path(budget_file)
         self.budget_file.parent.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("cost.controller")
-        
-        # Default budgets (per day)
         self.default_budgets = {
             "scout": {"calls": 100, "tokens": 100000},
             "reviewer": {"calls": 200, "tokens": 200000},
-            "partner": {"calls": 1000, "tokens": 0},  # Partner uses no tokens
+            "partner": {"calls": 1000, "tokens": 0},
         }
-        
-        # Cooldown periods (seconds)
-        self.cooldowns = {
-            "scout": 60,
-            "reviewer": 30,
-            "partner": 10,
-        }
-        
+        self.cooldowns = {"scout": 60, "reviewer": 30, "partner": 10}
         self._load_budgets()
     
     def _load_budgets(self):
         """Load budget state from file."""
         if self.budget_file.exists():
             try:
-                with open(self.budget_file, 'r') as f:
+                with open(self.budget_file, "r") as f:
                     self.budgets = json.load(f)
-            except:
+            except Exception:
                 self.budgets = {}
         else:
             self.budgets = {}
     
     def _save_budgets(self):
         """Save budget state to file."""
-        with open(self.budget_file, 'w') as f:
+        with open(self.budget_file, "w") as f:
             json.dump(self.budgets, f, indent=2)
     
     def _reset_daily_budgets(self):

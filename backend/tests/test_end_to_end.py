@@ -20,7 +20,7 @@ else:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logging
-from storage import Storage
+from utils.storage import Storage
 from scout.engine import ScoutEngine
 from reviewer.engine import ReviewerEngine
 

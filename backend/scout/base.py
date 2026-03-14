@@ -12,7 +12,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from scout.schema import ScoutOutput, validate_scout_output, generate_id
-from serp_client import maybe_enrich_references
+from utils.serp_client import maybe_enrich_references
 
 
 logger = logging.getLogger(__name__)

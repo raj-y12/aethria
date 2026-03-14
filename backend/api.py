@@ -1,28 +1,75 @@
 """
 FastAPI server for Aethria.
 Serves app-front-end: GET /api/startups, GET/PATCH /settings.
-(Web-front-end waitlist uses Vercel serverless /api/waitlist.)
+Per-user agent pipeline: POST /api/agents/trigger enqueues a run for the authenticated user.
 """
+import asyncio
 import json
+import logging
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from storage import Storage
-from settings_loader import DEFAULT_SETTINGS, get_settings_path, load_settings, get_meta_agent_settings
+from utils.storage import Storage
+from utils.settings_loader import DEFAULT_SETTINGS, get_settings_path, load_settings, save_settings, get_meta_agent_settings, is_cost_budget_enabled
+from auth_clerk import verify_clerk_token
+from run_context import set_run_user_id
+from supabase_client import get_service_client
+from supabase_storage import SupabaseStartupsStorage
 from memo_generator import MemoGenerator
-from meta_agent.agent import MetaAgent  # For manual trigger
-from meta_agent.mutator import _PROMPT_LIBRARY_PATH, _read_json_dict, _read_json_list
-from meta_agent.reweighter import load_weights
-from meta_agent.calibrator import load_calibration_state
+from meta.agent import MetaAgent  # For manual trigger
+from meta.mutator import _PROMPT_LIBRARY_PATH, _read_json_dict, _read_json_list
+from meta.reweighter import load_weights
+from meta.calibrator import load_calibration_state
 from portfolio.store import PortfolioStore
 from portfolio.cost_control import CostController
+from pipeline_runner import run_one_pipeline_cycle
 
-app = FastAPI(title="Aethria API")
+_agent_queue: Optional[asyncio.Queue[str]] = None
+_agent_worker_task: Optional[asyncio.Task] = None
+_logger_agents = logging.getLogger("api.agents")
+
+
+async def _agent_worker() -> None:
+    """Background worker: run one pipeline cycle per dequeued user_id."""
+    if _agent_queue is None:
+        return
+    while True:
+        try:
+            user_id = await _agent_queue.get()
+            try:
+                await run_one_pipeline_cycle(user_id)
+            except Exception as e:
+                _logger_agents.exception("Pipeline cycle error for user %s: %s", user_id[:12] if user_id else "?", e)
+            finally:
+                _agent_queue.task_done()
+        except asyncio.CancelledError:
+            break
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    global _agent_queue, _agent_worker_task
+    _agent_queue = asyncio.Queue()
+    _agent_worker_task = asyncio.create_task(_agent_worker())
+    _logger_agents.info("Per-user agent worker started")
+    yield
+    if _agent_worker_task:
+        _agent_worker_task.cancel()
+        try:
+            await _agent_worker_task
+        except asyncio.CancelledError:
+            pass
+    _logger_agents.info("Per-user agent worker stopped")
+
+
+app = FastAPI(title="Aethria API", lifespan=_lifespan)
 
 # CORS: localhost for dev; extend with ALLOWED_ORIGINS (comma-separated) for production domain
 _cors_origins = [
@@ -41,6 +88,37 @@ app.add_middleware(
     allow_methods=["GET", "PATCH", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Public paths that skip Clerk JWT auth
+_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc", "/redoc/", "/openapi.json/"}
+
+@app.middleware("http")
+async def clerk_auth_middleware(request: Request, call_next):
+    """Extract Bearer token, verify Clerk JWT, attach user_id to request.state. Return 401 if invalid."""
+    if request.method == "OPTIONS":
+        return await call_next(request)
+    if request.url.path in _PUBLIC_PATHS or request.url.path.rstrip("/") in _PUBLIC_PATHS:
+        return await call_next(request)
+    auth = request.headers.get("Authorization")
+    token = None
+    if auth and auth.startswith("Bearer "):
+        token = auth[7:].strip()
+    user_id = verify_clerk_token(token) if token else None
+    if not user_id:
+        import logging
+        log = logging.getLogger("auth")
+        if not token:
+            log.info("Auth 401: no Bearer token on %s", request.url.path)
+        else:
+            log.info("Auth 401: invalid or expired token on %s", request.url.path)
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Missing or invalid authorization token"},
+        )
+    request.state.user_id = user_id
+    request.state.clerk_jwt = token
+    set_run_user_id(user_id)  # scope doc/list storage to this user for the request
+    return await call_next(request)
 
 
 def _now_iso() -> str:
@@ -70,8 +148,12 @@ def _read_json_list(path: Path) -> List[Dict[str, Any]]:
         return []
 
 
-def _read_json_dict_file(path: Path) -> Dict[str, Any]:
-    """Best-effort JSON dict reader. Returns {} on missing/invalid files."""
+def _read_json_dict_file(path: Path, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Best-effort reader from Supabase or file. Returns {} on missing/invalid."""
+    if path and "sector_concentration" in str(path):
+        from supabase_doc_store import doc_get
+        data = doc_get("analytics_sector_concentration", user_id=user_id)
+        return data if isinstance(data, dict) else {}
     if not path.exists():
         return {}
     try:
@@ -82,7 +164,9 @@ def _read_json_dict_file(path: Path) -> Dict[str, Any]:
         return {}
 
 
-def _get_pending_escalations(storage: Storage) -> List[Dict[str, Any]]:
+def _get_pending_escalations(
+    storage: Union[Storage, SupabaseStartupsStorage],
+) -> List[Dict[str, Any]]:
     """
     Return raw startup dicts where partner_info.human_review_required is True
     and no human_resolution has been recorded.
@@ -102,17 +186,21 @@ def _get_pending_escalations(storage: Storage) -> List[Dict[str, Any]]:
     return pending
 
 
-def _get_system_health(storage: Storage) -> Dict[str, Any]:
+def _get_system_health(
+    storage: Union[Storage, SupabaseStartupsStorage],
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Assemble system health object from multiple backend sources.
     Mirrors the shape expected by the front-end SystemHealth type.
+    budget_status is only populated when cost_budget.enabled for this user.
     """
-    # Calibration warning from portfolio agent_metrics
+    # Calibration warning from portfolio agent_metrics (Supabase)
     portfolio_store = _get_portfolio_store()
-    metrics_file = portfolio_store.files.get("agent_metrics")
     calibration_warning = None
+    metrics_file = portfolio_store.files.get("agent_metrics")
     if metrics_file is not None:
-        metrics = _read_json_list(metrics_file)
+        metrics = portfolio_store._read_file(metrics_file)
         for m in metrics:
             if m.get("id") == "verdict_distribution":
                 calibration_warning = m.get("calibration_warning")
@@ -135,55 +223,56 @@ def _get_system_health(storage: Storage) -> Dict[str, Any]:
     except Exception:
         watchlist = 0
 
-    # Budget status per agent from CostController
-    cost_controller = CostController()
-    all_budgets: Dict[str, Any] = getattr(cost_controller, "budgets", {}) or {}
+    # Budget status only when cost budget enforcement is enabled for this user
     budget_status: List[Dict[str, Any]] = []
-    for agent_type, defaults in cost_controller.default_budgets.items():
-        agent_budget = all_budgets.get(agent_type, {})
-        calls_today = agent_budget.get("calls_today", 0)
-        tokens_today = agent_budget.get("tokens_today", 0)
-        last_calls = agent_budget.get("last_call_time") or {}
-        if not isinstance(last_calls, dict):
-            last_calls = {}
-        if not last_calls:
-            budget_status.append(
-                {
-                    "agent_id": agent_type,
-                    "daily_calls_used": calls_today,
-                    "daily_calls_limit": defaults.get("calls", 0),
-                    "daily_tokens_used": tokens_today,
-                    "daily_tokens_limit": defaults.get("tokens", 0),
-                    "in_cooldown": False,
-                    "cooldown_until": None,
-                }
-            )
-            continue
-        for agent_id, last_call_str in last_calls.items():
-            try:
-                last_call_time = datetime.fromisoformat(last_call_str)
-                cooldown_seconds = cost_controller.cooldowns.get(agent_type, 60)
-                delta = (datetime.now() - last_call_time).total_seconds()
-                in_cooldown = delta < cooldown_seconds
-                cooldown_until = (
-                    (last_call_time.replace(tzinfo=timezone.utc) + timedelta(seconds=cooldown_seconds)).isoformat()
-                    if in_cooldown
-                    else None
+    if is_cost_budget_enabled(user_id):
+        cost_controller = CostController()
+        all_budgets: Dict[str, Any] = getattr(cost_controller, "budgets", {}) or {}
+        for agent_type, defaults in cost_controller.default_budgets.items():
+            agent_budget = all_budgets.get(agent_type, {})
+            calls_today = agent_budget.get("calls_today", 0)
+            tokens_today = agent_budget.get("tokens_today", 0)
+            last_calls = agent_budget.get("last_call_time") or {}
+            if not isinstance(last_calls, dict):
+                last_calls = {}
+            if not last_calls:
+                budget_status.append(
+                    {
+                        "agent_id": agent_type,
+                        "daily_calls_used": calls_today,
+                        "daily_calls_limit": defaults.get("calls", 0),
+                        "daily_tokens_used": tokens_today,
+                        "daily_tokens_limit": defaults.get("tokens", 0),
+                        "in_cooldown": False,
+                        "cooldown_until": None,
+                    }
                 )
-            except Exception:
-                in_cooldown = False
-                cooldown_until = None
-            budget_status.append(
-                {
-                    "agent_id": str(agent_id),
-                    "daily_calls_used": calls_today,
-                    "daily_calls_limit": defaults.get("calls", 0),
-                    "daily_tokens_used": tokens_today,
-                    "daily_tokens_limit": defaults.get("tokens", 0),
-                    "in_cooldown": in_cooldown,
-                    "cooldown_until": cooldown_until,
-                }
-            )
+                continue
+            for agent_id, last_call_str in last_calls.items():
+                try:
+                    last_call_time = datetime.fromisoformat(last_call_str)
+                    cooldown_seconds = cost_controller.cooldowns.get(agent_type, 60)
+                    delta = (datetime.now() - last_call_time).total_seconds()
+                    in_cooldown = delta < cooldown_seconds
+                    cooldown_until = (
+                        (last_call_time.replace(tzinfo=timezone.utc) + timedelta(seconds=cooldown_seconds)).isoformat()
+                        if in_cooldown
+                        else None
+                    )
+                except Exception:
+                    in_cooldown = False
+                    cooldown_until = None
+                budget_status.append(
+                    {
+                        "agent_id": str(agent_id),
+                        "daily_calls_used": calls_today,
+                        "daily_calls_limit": defaults.get("calls", 0),
+                        "daily_tokens_used": tokens_today,
+                        "daily_tokens_limit": defaults.get("tokens", 0),
+                        "in_cooldown": in_cooldown,
+                        "cooldown_until": cooldown_until,
+                    }
+                )
 
     return {
         "calibration_warning": calibration_warning,
@@ -196,11 +285,8 @@ def _get_system_health(storage: Storage) -> Dict[str, Any]:
         "budget_status": budget_status,
     }
 
-def _save_settings(data: dict) -> None:
-    path = get_settings_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+def _save_settings(data: dict, user_id: str) -> None:
+    save_settings(data, user_id)
 
 
 def _validate_settings(body: dict) -> list[str]:
@@ -210,6 +296,8 @@ def _validate_settings(body: dict) -> list[str]:
         if not isinstance(cb, dict):
             errors.append("cost_budget must be an object")
         else:
+            if "enabled" in cb and not isinstance(cb["enabled"], bool):
+                errors.append("cost_budget.enabled must be a boolean")
             if "max_tokens_per_run" in cb and (not isinstance(cb["max_tokens_per_run"], (int, float)) or cb["max_tokens_per_run"] < 0):
                 errors.append("cost_budget.max_tokens_per_run must be a non-negative number")
             if "daily_cost_ceiling" in cb and (not isinstance(cb["daily_cost_ceiling"], (int, float)) or cb["daily_cost_ceiling"] < 0):
@@ -342,24 +430,27 @@ def _backend_to_frontend(raw: dict) -> dict:
     return out
 
 
-def _get_storage() -> Storage:
-    storage_path = os.getenv("STORAGE_PATH", "data/startups.json")
-    root = _get_root()
-    path = root / storage_path if not Path(storage_path).is_absolute() else Path(storage_path)
-    return Storage(file_path=str(path))
+def _get_storage(request: Request):
+    """Return Supabase startups storage for the authenticated user.
+    Uses service-role client and Clerk-derived user_id; we never send Clerk JWT to Supabase.
+    """
+    return SupabaseStartupsStorage(
+        get_service_client(),
+        request.state.user_id,
+    )
 
 
 @app.get("/api/startups")
-def get_startups():
-    storage = _get_storage()
+def get_startups(request: Request):
+    storage = _get_storage(request)
     raw_list = storage.get_all()
     return [_backend_to_frontend(r) for r in raw_list]
 
 
 @app.get("/api/startups/{startup_id}/memo")
-def get_startup_memo(startup_id: str):
+def get_startup_memo(request: Request, startup_id: str):
     """Return full investment memo (markdown) for a startup from MemoGenerator."""
-    storage = _get_storage()
+    storage = _get_storage(request)
     startup = storage.get_startup(startup_id)
     if not startup:
         raise HTTPException(status_code=404, detail="Startup not found")
@@ -369,16 +460,21 @@ def get_startup_memo(startup_id: str):
 
 @app.get("/health")
 def health():
-    """Lightweight health check with pending escalations count."""
-    storage = _get_storage()
-    pending = len(_get_pending_escalations(storage))
-    return {"status": "ok", "pending_escalations": pending}
+    """Lightweight health check (public; no auth). Pending escalations require auth via /api/settings."""
+    return {"status": "ok"}
+
+
+@app.get("/api/me")
+def get_me(request: Request):
+    """Return the current user's id (Clerk JWT sub). Used for multi-user: API uses this per request; agents use AETHRIA_DEFAULT_USER_ID when running in background."""
+    return {"user_id": request.state.user_id}
 
 
 @app.get("/api/settings")
-def get_settings():
-    """Return current settings (control plane)."""
-    settings = load_settings()
+def get_settings(request: Request):
+    """Return current user's settings (control plane)."""
+    user_id = request.state.user_id
+    settings = load_settings(user_id)
     # Surface Meta-Agent configuration derived from environment variables
     # so the front-end can display current meta-control knobs.
     meta_agent = get_meta_agent_settings()
@@ -386,25 +482,26 @@ def get_settings():
     settings["meta_agent"] = meta_agent
 
     # Embed latest system health snapshot inline so the front-end can avoid extra calls.
-    storage = _get_storage()
-    settings["system_health"] = _get_system_health(storage)
+    storage = _get_storage(request)
+    settings["system_health"] = _get_system_health(storage, user_id=user_id)
     return settings
 
 
 @app.patch("/api/settings")
-def patch_settings(body: dict):
-    """Update settings. Validates server-side; returns 422 on validation errors."""
+def patch_settings(request: Request, body: dict):
+    """Update current user's settings. Validates server-side; returns 422 on validation errors."""
     errors = _validate_settings(body)
     if errors:
         raise HTTPException(status_code=422, detail={"message": "Validation failed", "errors": errors})
-    current = load_settings()
+    user_id = request.state.user_id
+    current = load_settings(user_id)
     for section in ("cost_budget", "agent_config", "portfolio"):
         if section in body and isinstance(body[section], dict):
             if section not in current:
                 current[section] = {}
             for k, v in body[section].items():
                 current[section][k] = v
-    _save_settings(current)
+    _save_settings(current, user_id)
     # Meta-Agent settings are derived from environment; PATCH does not
     # persist or validate them, but we still include the live view.
     meta_agent = get_meta_agent_settings()
@@ -455,6 +552,60 @@ def get_meta_calibration():
     return state
 
 
+@app.get("/api/agents/status")
+async def agents_status():
+    """
+    Return whether the server is configured for agents (for debugging deployment).
+    Does not expose secrets; use to see why agents might be skipped on e.g. Render.
+    """
+    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    supabase_configured = bool(
+        use_supabase
+        and os.getenv("SUPABASE_URL")
+        and os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    )
+    openai_configured = bool(os.getenv("OPENAI_API_KEY", "").strip())
+    return {
+        "worker_ready": _agent_queue is not None,
+        "supabase_configured": supabase_configured,
+        "openai_configured": openai_configured,
+        "agents_will_run": supabase_configured and openai_configured and _agent_queue is not None,
+    }
+
+
+@app.post("/api/agents/trigger")
+async def trigger_agents(request: Request):
+    """
+    Enqueue a pipeline run for the current user (per-user agents).
+    When the user has agents enabled in settings, one scout/reviewer/partner
+    cycle is queued and run in the background. Multiple users get independent runs.
+    """
+    user_id = request.state.user_id
+    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    if not use_supabase:
+        return JSONResponse(
+            status_code=200,
+            content={"status": "skipped", "reason": "supabase_required"},
+        )
+    settings = load_settings(user_id)
+    ac = settings.get("agent_config") or {}
+    if not (ac.get("scouts_enabled", True) or ac.get("reviewers_enabled", True) or ac.get("partners_enabled", True)):
+        return JSONResponse(
+            status_code=200,
+            content={"status": "skipped", "reason": "agents_disabled"},
+        )
+    if _agent_queue is None:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unavailable", "reason": "worker_not_ready"},
+        )
+    await _agent_queue.put(user_id)
+    return JSONResponse(
+        status_code=202,
+        content={"status": "queued", "user_id": user_id},
+    )
+
+
 @app.post("/api/meta/trigger")
 async def trigger_meta_cycle():
     """
@@ -473,12 +624,12 @@ async def trigger_meta_cycle():
 
 
 @app.get("/api/escalations")
-async def get_escalations():
+async def get_escalations(request: Request):
     """
     Returns all startups where human_review_required=True and human_resolution is None.
     Shapes each result as an escalation summary for the System Intelligence panel.
     """
-    storage = _get_storage()
+    storage = _get_storage(request)
     pending_raw = _get_pending_escalations(storage)
     items: List[Dict[str, Any]] = []
     now = datetime.now(timezone.utc)
@@ -526,9 +677,9 @@ async def get_escalations():
 
 
 @app.post("/api/escalations/{startup_id}/resolve")
-async def resolve_escalation(startup_id: str, body: Dict[str, Any]):
+async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, Any]):
     """
-    Resolve an escalation by writing human_resolution to startups.json.
+    Resolve an escalation by writing human_resolution to the startup record.
     Body: {decision: "YES"|"NO"|"MAYBE", notes: str}
     """
     decision = str(body.get("decision", "")).upper()
@@ -536,7 +687,7 @@ async def resolve_escalation(startup_id: str, body: Dict[str, Any]):
     if decision not in ("YES", "NO", "MAYBE"):
         raise HTTPException(status_code=422, detail="decision must be YES, NO, or MAYBE")
 
-    storage = _get_storage()
+    storage = _get_storage(request)
     found = {"value": False}
 
     def _updater(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -572,7 +723,7 @@ async def get_signals():
     """
     store = _get_portfolio_store()
     signals_file = store.files.get("signals")
-    records = _read_json_list(signals_file) if signals_file is not None else []
+    records = store._read_file(signals_file) if signals_file is not None else []
     # Attach startup names where possible
     startups_index = {s.get("id"): s for s in store.get_all_startups()}
     for r in records:
@@ -655,9 +806,9 @@ async def get_watchlist_analytics():
         return {"total": 0, "stale": 0, "avg_days": 0, "entries": []}
 
     now = datetime.now(timezone.utc)
-    # Build signal index
+    # Build signal index (Supabase)
     signals_file = store.files.get("signals")
-    signals = _read_json_list(signals_file) if signals_file is not None else []
+    signals = store._read_file(signals_file) if signals_file is not None else []
     signal_counts: Dict[str, int] = {}
     for s in signals:
         sid = s.get("startup_id")
@@ -704,13 +855,14 @@ async def get_watchlist_analytics():
 
 
 @app.get("/api/analytics/concentration")
-async def get_concentration_analytics():
+async def get_concentration_analytics(request: Request):
     """
     Return sector concentration analytics from data/analytics/sector_concentration.json.
     """
     root = _get_root()
     path = root / "data" / "analytics" / "sector_concentration.json"
-    data = _read_json_dict_file(path)
+    user_id = getattr(request.state, "user_id", None)
+    data = _read_json_dict_file(path, user_id=user_id)
     if not data:
         return {
             "by_sector": {},
@@ -722,9 +874,10 @@ async def get_concentration_analytics():
 
 
 @app.get("/api/analytics/system-health")
-async def get_system_health():
+async def get_system_health(request: Request):
     """
     Aggregate system health metrics (calibration, queues, budgets, escalations).
     """
-    storage = _get_storage()
-    return _get_system_health(storage)
+    storage = _get_storage(request)
+    user_id = getattr(request.state, "user_id", None)
+    return _get_system_health(storage, user_id=user_id)

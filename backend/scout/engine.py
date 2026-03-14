@@ -15,8 +15,8 @@ from scout.scouts import (
     ContrarianScout,
 )
 from scout.schema import ScoutOutput
-from storage import Storage
-from settings_loader import is_scouts_enabled
+from utils.storage import Storage
+from utils.settings_loader import is_scouts_enabled
 from utils.prompt_version import hash_prompt
 
 
@@ -94,7 +94,7 @@ class ScoutEngine:
         # Load scout weights for weighted selection
         import random
         try:
-            from meta_agent.reweighter import load_weights
+            from meta.reweighter import load_weights
             weights = load_weights()
             scout_type_to_name = {
                 "market_driven": "MarketDrivenScout",
@@ -226,18 +226,7 @@ class ScoutEngine:
                     if self.running:
                         await asyncio.sleep(self.interval_seconds)
                     continue
-                # Backpressure: skip cycle if too many unreviewed startups
-                if self.storage:
-                    unreviewed_count = self.storage.count_unreviewed()
-                    if unreviewed_count > self.backpressure_threshold:
-                        self.logger.warning(
-                            f"Backpressure: {unreviewed_count} unreviewed startups "
-                            f"exceeds threshold ({self.backpressure_threshold}), skipping scout cycle"
-                        )
-                        if self.running:
-                            await asyncio.sleep(self.interval_seconds)
-                        continue
-
+                # Backpressure disabled so scouts keep running
                 cycle_count += 1
                 self.logger.info(f"=== Discovery Cycle #{cycle_count} ===")
                 

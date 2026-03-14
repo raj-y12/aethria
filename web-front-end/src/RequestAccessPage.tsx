@@ -6,6 +6,7 @@ const PROCESSING_DURATION_MS = 1200;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 const WAITLIST_URL = API_BASE ? `${API_BASE.replace(/\/$/, '')}/api/waitlist` : '/api/waitlist';
+const APP_URL = import.meta.env.VITE_APP_URL ?? '';
 
 export default function RequestAccessPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -254,6 +255,15 @@ export default function RequestAccessPage() {
                   <p className="font-sans text-[15px] mt-4" style={{ color: 'var(--color-oxford)', opacity: 0.6 }}>
                     You're #{position} on the waitlist.
                   </p>
+                )}
+                {APP_URL && (
+                  <a
+                    href={APP_URL.replace(/\/$/, '') + '/dashboard'}
+                    data-cursor-expand
+                    className="mt-6 inline-flex items-center justify-center min-h-[44px] px-6 border border-[var(--color-oxford)] text-[var(--color-oxford)] font-mono text-[10px] uppercase tracking-[0.1em] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] transition-colors"
+                  >
+                    Proceed to sign in
+                  </a>
                 )}
                 <Link
                   to="/home"

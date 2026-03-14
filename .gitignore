@@ -2,3 +2,5 @@
 .env
 scripts/
 unused_components/
+node_modules/
+.vite/

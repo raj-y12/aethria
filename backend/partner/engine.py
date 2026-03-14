@@ -10,8 +10,8 @@ from datetime import datetime
 
 from partner.decision import PartnerDecisionEngine
 from partner.schema import validate_partner_output
-from storage import Storage
-from settings_loader import is_partners_enabled
+from utils.storage import Storage
+from utils.settings_loader import is_partners_enabled
 from portfolio.store import PortfolioStore
 from memo_generator import MemoGenerator
 
@@ -201,7 +201,7 @@ class PartnerEngine:
                     )
 
                 # Convert to PartnerInfo and save
-                from adapters import partner_output_to_partner_info
+                from utils.adapters import partner_output_to_partner_info
                 partner_info = partner_output_to_partner_info(decision)
                 partner_info.partner_agent_id = self.agent_id
                 success = self.storage.add_partner_decision(entry_id, partner_info)
@@ -310,7 +310,7 @@ async def main():
     use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
     
     # Initialize
-    from storage import Storage
+    from utils.storage import Storage
     storage = Storage(file_path=storage_path)
     engine = PartnerEngine(
         storage=storage,

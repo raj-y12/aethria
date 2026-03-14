@@ -3,7 +3,10 @@
 Run both Scout and Reviewer engines together.
 
 This is the main entry point for running the complete AETHRIA system.
+User ID is always explicit: pass --user-id=<clerk_user_id> so agents read/write
+that user's startups and settings. No .env default.
 """
+import argparse
 import asyncio
 import sys
 import os
@@ -22,7 +25,12 @@ else:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logging
-from storage import Storage
+from typing import Optional
+
+from utils.storage import Storage
+from utils.settings_loader import set_run_user_id, is_cost_budget_enabled
+from supabase_client import get_service_client
+from supabase_storage import SupabaseStartupsStorage
 from scout.engine import ScoutEngine
 from reviewer.engine import ReviewerEngine
 from partner.engine import PartnerEngine
@@ -74,8 +82,19 @@ class ColorFormatter(logging.Formatter):
             record.name = original_name
 
 
-async def run_system():
-    """Run both Scout and Reviewer engines in parallel."""
+def _parse_args():
+    parser = argparse.ArgumentParser(description="Run AETHRIA Scout + Reviewer + Partner + Portfolio + Meta-Agent")
+    parser.add_argument(
+        "--user-id",
+        type=str,
+        default=None,
+        help="Clerk user ID (JWT 'sub') for this run. Required when USE_SUPABASE_STORAGE=1. Agents read/write this user's startups and settings.",
+    )
+    return parser.parse_args()
+
+
+async def run_system(user_id: Optional[str]):
+    """Run both Scout and Reviewer engines in parallel. user_id must be set when using Supabase."""
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
@@ -100,6 +119,7 @@ async def run_system():
         raise ValueError("OPENAI_API_KEY environment variable is required")
     
     storage_path = os.getenv("STORAGE_PATH", "data/startups.json")
+    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
     scout_interval = int(os.getenv("SCOUT_INTERVAL_SECONDS", "300"))
     reviewer_interval = int(os.getenv("REVIEWER_INTERVAL_SECONDS", "60"))
     partner_interval = int(os.getenv("PARTNER_INTERVAL_SECONDS", "30"))
@@ -107,16 +127,31 @@ async def run_system():
     reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-5-nano")
     use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
     
-    # Initialize shared storage
-    storage = Storage(file_path=storage_path)
-    logger.info(f"Using storage: {storage_path}")
+    # User ID is required when using Supabase (no .env default; always dynamic)
+    if use_supabase and not (user_id and user_id.strip()):
+        raise ValueError(
+            "When USE_SUPABASE_STORAGE=1 you must pass --user-id=<clerk_user_id> "
+            "(the Clerk JWT 'sub'). From repo root: python backend/run_system.py --user-id=user_xxx. "
+            "Or set AETHRIA_AGENT_USER_ID in .env when using run.py (all-in-one)."
+        )
+    if user_id and user_id.strip():
+        set_run_user_id(user_id.strip())
+        logger.info("Run user_id=%s (settings and storage scoped to this user)", user_id.strip())
+    
+    # Initialize shared storage: Supabase (service role + user_id) or file
+    if use_supabase and user_id:
+        storage = SupabaseStartupsStorage(get_service_client(), user_id.strip())
+        logger.info("Using storage: Supabase (startups table) — user_id=%s", user_id.strip())
+    else:
+        storage = Storage(file_path=storage_path)
+        logger.info("Using storage: file %s", storage_path)
     # Remove startups without references (references are mandatory)
     n_removed = storage.remove_startups_without_references()
     if n_removed:
         logger.info(f"Cleaned {n_removed} startup(s) without references from database")
     
-    # Create shared cost controller
-    cost_controller = CostController()
+    # Cost controller only when budget enforcement is enabled in settings
+    cost_controller = CostController() if is_cost_budget_enabled() else None
     
     # Create shared deal memory
     deal_memory = DealMemory()
@@ -161,8 +196,8 @@ async def run_system():
     )
     
     # Create Meta-Agent
-    from meta_agent.agent import MetaAgent
-    from meta_agent.engine import MetaAgentEngine
+    from meta.agent import MetaAgent
+    from meta.engine import MetaAgentEngine
     meta_agent = MetaAgent(
         scout_engine=scout_engine,
         reviewer_engine=reviewer_engine,
@@ -198,4 +233,5 @@ async def run_system():
 
 
 if __name__ == "__main__":
-    asyncio.run(run_system())
+    args = _parse_args()
+    asyncio.run(run_system(user_id=args.user_id))

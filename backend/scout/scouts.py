@@ -5,7 +5,7 @@ Each Scout has a distinct cognitive strategy for discovering startup ideas.
 from typing import Optional
 from scout.base import Scout
 from scout.schema import ScoutOutput
-from settings_loader import get_scout_region
+from utils.settings_loader import get_scout_region
 
 
 _SCOUT_REGION = get_scout_region()

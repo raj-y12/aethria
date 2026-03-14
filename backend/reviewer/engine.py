@@ -11,8 +11,8 @@ from datetime import datetime
 from reviewer.reviewer import DefaultReviewer
 from reviewer.skeptical import SkepticalReviewer
 from reviewer.opportunist import OpportunistReviewer
-from storage import Storage
-from settings_loader import is_reviewers_enabled, load_settings
+from utils.storage import Storage
+from utils.settings_loader import is_reviewers_enabled, load_settings
 
 
 logger = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ class ReviewerEngine:
         
         # Apply calibration override if present
         try:
-            from meta_agent.calibrator import load_calibration_state
+            from meta.calibrator import load_calibration_state
             cal_state = load_calibration_state()
             ct_override = cal_state.get("confidence_threshold_override")
             if ct_override is not None:
@@ -258,7 +258,7 @@ class ReviewerEngine:
                     ))
                 
                 # Convert to ReviewInfo and save (primary fields from default reviewer)
-                from adapters import reviewer_output_to_review_info
+                from utils.adapters import reviewer_output_to_review_info
                 review_info = reviewer_output_to_review_info(review_output)
                 review_info.reviewer_agent_id = self.agent_id
                 review_info.reviews = single_reviews

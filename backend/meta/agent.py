@@ -1,24 +1,24 @@
 """
 MetaAgent — the main orchestrator for self-optimisation cycles.
-Reads signal, decides mutations, applies them, and writes reports.
+Backed by Supabase meta_cycle_counters and meta_reports (via _append_to_json_list).
 """
-import json
 import logging
 import os
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 
-from meta_agent.analyser import MetaAnalyser
-from meta_agent.mutator import PromptMutator, _atomic_write, _read_json_list, _append_to_json_list
-from meta_agent.reweighter import ScoutReweighter
-from meta_agent.calibrator import ThresholdCalibrator
+from meta.analyser import MetaAnalyser
+from meta.mutator import PromptMutator, _append_to_json_list
+from meta.reweighter import ScoutReweighter
+from meta.calibrator import ThresholdCalibrator
+from supabase_doc_store import doc_get_int, doc_set_int
 
 logger = logging.getLogger(__name__)
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 _REPORTS_PATH = _BACKEND_DIR / "data" / "meta" / "meta_reports.json"
-_CYCLE_COUNTER_PATH = _BACKEND_DIR / "data" / "meta" / ".cycle_counter"
+_CYCLE_COUNTER_TABLE = "meta_cycle_counters"
 
 
 class MetaAgent:
@@ -35,15 +35,8 @@ class MetaAgent:
         self._no_action_reasons: List[str] = []
 
     def _increment_cycle(self) -> int:
-        _CYCLE_COUNTER_PATH.parent.mkdir(parents=True, exist_ok=True)
-        cycle = 0
-        if _CYCLE_COUNTER_PATH.exists():
-            try:
-                cycle = int(_CYCLE_COUNTER_PATH.read_text().strip())
-            except (ValueError, IOError):
-                cycle = 0
-        cycle += 1
-        _CYCLE_COUNTER_PATH.write_text(str(cycle))
+        cycle = doc_get_int(_CYCLE_COUNTER_TABLE) + 1
+        doc_set_int(_CYCLE_COUNTER_TABLE, cycle)
         return cycle
 
     async def run_cycle(self) -> Optional[Dict]:

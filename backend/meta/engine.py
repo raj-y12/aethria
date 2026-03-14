@@ -7,7 +7,7 @@ import logging
 import os
 from typing import Optional
 
-from meta_agent.agent import MetaAgent
+from meta.agent import MetaAgent
 
 logger = logging.getLogger(__name__)
 

@@ -17,7 +17,7 @@ from pathlib import Path
 # Ensure backend root is on path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from storage import Storage
+from utils.storage import Storage
 
 
 def main() -> int:

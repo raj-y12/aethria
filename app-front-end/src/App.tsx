@@ -1,103 +1,111 @@
-import { useState, useCallback } from 'react';
+import { useState, useLayoutEffect, useEffect, useRef } from 'react';
+import { useLocation, Navigate } from 'react-router';
+import { useAuth } from '@clerk/react-router';
+import { setTokenGetter } from './api/auth';
+import { triggerAgents } from './api/agents';
 import MainLayout from './components/MainLayout';
-import LoadingAnimation from './components/LoadingAnimation';
 import GrainOverlay from './components/GrainOverlay';
-import LoginPage from './components/LoginPage';
+import LoadingAnimation from './components/LoadingAnimation';
 import SettingsPage from './settings/SettingsPage';
-import { useIdleTimeout } from './hooks';
 import { useSystemData } from './hooks/useSystemData';
+import LoginPage from './components/LoginPage';
 
-const MIN_LOADING_MS = 2000;
-const IDLE_MS = 20 * 60 * 1000;
-const STORAGE_KEY = 'aethria_last_activity';
+const APP_ROOT = '/v1';
 
-function hasAuth(): boolean {
-  if (typeof window === 'undefined') return false;
-  return sessionStorage.getItem('auth') === 'true';
-}
-
-function hasValidSession(): boolean {
-  if (typeof window === 'undefined') return false;
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('forceLogin') === '1') {
-    localStorage.removeItem(STORAGE_KEY);
-    return false;
-  }
-  const last = localStorage.getItem(STORAGE_KEY);
-  if (!last) return false;
-  const lastActivity = parseInt(last, 10);
-  return !isNaN(lastActivity) && Date.now() - lastActivity < IDLE_MS;
-}
-
-function App() {
-  const [auth, setAuth] = useState(() => hasAuth());
-  const sessionValid = hasValidSession();
-  const [hasEntered, setHasEntered] = useState(() => sessionValid || hasAuth());
-  const [isLoading, setIsLoading] = useState(() => sessionValid || hasAuth());
+function AppShell() {
+  const { pathname } = useLocation();
   const systemData = useSystemData();
-
-  if (hasEntered && isLoading) {
-    setTimeout(() => setIsLoading(false), MIN_LOADING_MS);
-  }
-
-  const handleLoginSuccess = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, Date.now().toString());
-    setAuth(true);
-    setHasEntered(true);
-    setIsLoading(true);
+  const isSettingsRoute = pathname.startsWith('/settings');
+  const hasTriggeredAgents = useRef(false);
+  useEffect(() => {
+    if (hasTriggeredAgents.current) return;
+    hasTriggeredAgents.current = true;
+    triggerAgents().catch(() => {});
   }, []);
-
-  useIdleTimeout({
-    timeoutMs: IDLE_MS,
-    enabled: auth && hasEntered && !isLoading,
-    onIdle: useCallback(() => {
-      sessionStorage.removeItem('auth');
-      localStorage.removeItem(STORAGE_KEY);
-      setAuth(false);
-      setHasEntered(false);
-    }, []),
-    onActivity: useCallback((now: number) => {
-      localStorage.setItem(STORAGE_KEY, now.toString());
-    }, []),
-  });
-
-  const isSettingsRoute =
-    typeof window !== 'undefined' &&
-    window.location.pathname.startsWith('/settings');
-
-  if (!auth) {
-    return (
-      <>
-        <GrainOverlay opacity={0.02} />
-        <LoginPage onSuccess={handleLoginSuccess} />
-      </>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <>
-        <GrainOverlay opacity={0.02} />
-        <LoadingAnimation />
-      </>
-    );
-  }
-
-  if (isSettingsRoute) {
-    return (
-      <>
-        <GrainOverlay opacity={0.02} />
-        <SettingsPage />
-      </>
-    );
-  }
-
   return (
     <>
       <GrainOverlay opacity={0.02} />
-      <MainLayout data={systemData} />
+      {isSettingsRoute ? <SettingsPage /> : <MainLayout data={systemData} />}
     </>
   );
 }
 
+function App() {
+  const { pathname } = useLocation();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const [tokenReady, setTokenReady] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!isSignedIn) {
+      setTokenGetter(null);
+      setTokenReady(false);
+      return;
+    }
+    setTokenGetter(() => getToken());
+    return () => setTokenGetter(null);
+  }, [isSignedIn, getToken]);
+
+  useEffect(() => {
+    if (!isSignedIn || !getToken) {
+      setTokenReady(false);
+      return;
+    }
+    let cancelled = false;
+    const fallback = setTimeout(() => {
+      if (!cancelled) setTokenReady(true);
+    }, 5000);
+
+    async function tryGetToken(retries = 5) {
+      for (let i = 0; i < retries && !cancelled; i++) {
+        const t = await getToken();
+        if (t) {
+          if (!cancelled) setTokenReady(true);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 300));
+      }
+      if (!cancelled) setTokenReady(true);
+    }
+    tryGetToken();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(fallback);
+    };
+  }, [isSignedIn, getToken]);
+
+  const isSignInRoute = pathname.startsWith('/sign-in');
+  const isAppRoute = pathname === APP_ROOT || pathname.startsWith(APP_ROOT + '/');
+  const isSettingsRoute = pathname.startsWith('/settings');
+
+  // Sign-in page: show login (LoginPage does full-page redirect to /v1 on success)
+  if (isSignInRoute) {
+    return <LoginPage />;
+  }
+
+  // App routes: require sign-in, then wait for token before fetching
+  if (isAppRoute || isSettingsRoute) {
+    if (!isLoaded) {
+      return <LoadingAnimation />;
+    }
+    if (!isSignedIn) {
+      return <Navigate to="/sign-in" replace />;
+    }
+    if (!tokenReady) {
+      return <LoadingAnimation />;
+    }
+    return <AppShell />;
+  }
+
+  // Root or unknown path → go to app (or sign-in if not signed in)
+  if (!isLoaded) {
+    return <LoadingAnimation />;
+  }
+  if (!isSignedIn) {
+    return <Navigate to="/sign-in" replace />;
+  }
+  return <Navigate to={APP_ROOT} replace />;
+}
+
 export default App;
+export { APP_ROOT };

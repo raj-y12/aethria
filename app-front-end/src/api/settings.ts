@@ -2,12 +2,15 @@
  * Settings API. Control plane only. No auto-save; explicit PATCH.
  */
 
+import { getAuthHeaders } from './auth';
+
 const API_BASE =
   typeof window !== 'undefined'
     ? (import.meta.env.VITE_API_URL ?? '')
     : 'http://localhost:8000';
 
 export interface CostBudget {
+  enabled: boolean;
   max_tokens_per_run: number;
   daily_cost_ceiling: number;
   weekly_cost_ceiling: number;
@@ -75,16 +78,16 @@ export interface ValidationError {
 }
 
 export async function fetchSettings(): Promise<Settings> {
+  const auth = await getAuthHeaders();
+  const headers = { Accept: 'application/json', ...auth };
   const [settings, systemHealth] = await Promise.all([
-    fetch(`${API_BASE}/api/settings`, {
-      headers: { Accept: 'application/json' },
-    }).then((r) => {
+    fetch(`${API_BASE}/api/settings`, { headers }).then((r) => {
       if (!r.ok) throw new Error(`Settings API error: ${r.status}`);
       return r.json();
     }),
-    fetch(`${API_BASE}/api/analytics/system-health`, {
-      headers: { Accept: 'application/json' },
-    }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`System health API error: ${r.status}`)))),
+    fetch(`${API_BASE}/api/analytics/system-health`, { headers }).then((r) =>
+      r.ok ? r.json() : Promise.reject(new Error(`System health API error: ${r.status}`))
+    ),
   ]);
   return { ...(settings as Settings), system_health: systemHealth as SystemHealth };
 }
@@ -92,9 +95,10 @@ export async function fetchSettings(): Promise<Settings> {
 export async function patchSettings(
   body: Partial<Settings>
 ): Promise<{ data?: Settings; error?: ValidationError }> {
+  const headers = { 'Content-Type': 'application/json', Accept: 'application/json', ...(await getAuthHeaders()) };
   const res = await fetch(`${API_BASE}/api/settings`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));

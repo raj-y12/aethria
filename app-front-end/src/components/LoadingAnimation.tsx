@@ -25,8 +25,8 @@ export default function LoadingAnimation({
   fullScreen = true,
 }: LoadingAnimationProps) {
   const containerClass = fullScreen
-    ? 'fixed inset-0 bg-paper z-[200] flex flex-col items-center justify-center overflow-hidden'
-    : 'flex flex-col items-center justify-center py-12 overflow-hidden bg-paper';
+    ? 'fixed inset-0 min-h-[100dvh] bg-paper z-[200] flex flex-col items-center justify-center overflow-hidden'
+    : 'flex flex-col items-center justify-center min-h-[200px] py-12 overflow-hidden bg-paper';
 
   return (
     <div className={containerClass}>
