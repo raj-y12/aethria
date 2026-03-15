@@ -232,7 +232,7 @@ function AnalyticsTab({ rejection, watchlist, concentration }: {
         )}
       </section>
 
-      <div className="border-t border-oxford/25" />
+      <div className="border-t border-oxford/12" />
 
       {/* Watchlist Health */}
       <section className="py-6">
@@ -259,11 +259,12 @@ function AnalyticsTab({ rejection, watchlist, concentration }: {
         )}
       </section>
 
-      <div className="border-t border-oxford/25" />
+      <div className="border-t border-oxford/12" />
 
       {/* Sector Concentration */}
       <section className="pt-6">
         <h3 className="type-label-section text-oxford/60 mb-3">Pipeline concentration</h3>
+        <p className="type-meta text-oxford/40 mb-3">Share of pipeline by sector (count · % of total)</p>
         {sectors.map(([sector, data], i) => (
           <div key={sector} className="flex items-center gap-2 mb-1">
             <span className="type-label-section text-oxford/60 w-36 truncate shrink-0">
@@ -273,7 +274,7 @@ function AnalyticsTab({ rejection, watchlist, concentration }: {
               )}
             </span>
             <div className="flex-1"><BarFill pct={(data.count / maxSector) * 100} delay={i * 0.05} /></div>
-            <span className="type-meta text-oxford/40 tabular-nums w-12 text-right">{data.count} · {data.pct_of_total}%</span>
+            <span className="type-meta text-oxford/40 tabular-nums whitespace-nowrap min-w-[5rem] text-right" title={`${data.count} companies, ${data.pct_of_total}% of pipeline`}>{data.count} · {data.pct_of_total}%</span>
           </div>
         ))}
         {sectors.length === 0 && <p className="type-label-tab text-oxford/25">No pipeline data yet</p>}
@@ -328,7 +329,7 @@ function MetaAgentTab({ reports, weights, calibration }: {
         ))}
       </section>
 
-      <div className="border-t border-oxford/25" />
+      <div className="border-t border-oxford/12" />
 
       {/* Calibration State */}
       <section className="py-6">
@@ -365,7 +366,7 @@ function MetaAgentTab({ reports, weights, calibration }: {
         )}
       </section>
 
-      <div className="border-t border-oxford/25" />
+      <div className="border-t border-oxford/12" />
 
       {/* Last Cycle Report */}
       <section className="py-6">
@@ -413,7 +414,7 @@ function MetaAgentTab({ reports, weights, calibration }: {
         )}
       </section>
 
-      <div className="border-t border-oxford/25" />
+      <div className="border-t border-oxford/12" />
 
       {/* Manual Trigger */}
       <section className="pt-6">

@@ -4,8 +4,8 @@ export type DecisionBadgeVariant = 'YES' | 'NO' | 'MAYBE' | 'awaiting';
 
 const VARIANT_CLASS: Record<DecisionBadgeVariant, string> = {
   YES: 'bg-oxford text-ivory',
-  NO: 'bg-oxford/10 text-oxford border border-oxford/25',
-  MAYBE: 'bg-oxford/15 text-oxford border border-oxford/25',
+  NO: 'bg-oxford/10 text-oxford',
+  MAYBE: 'bg-oxford/15 text-oxford',
   awaiting: 'bg-oxford text-ivory',
 };
 

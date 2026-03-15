@@ -75,9 +75,10 @@ function buildMemoPDF(startup: Startup): jsPDF {
       })()
     : '';
   if (judgmentSummary) {
+    const judgmentLines = judgmentToParagraphs(judgmentSummary);
     y = addPDFSection(doc, {
       title: 'Investment judgment',
-      lines: [judgmentSummary],
+      lines: judgmentLines,
       startY: y,
     });
   }
@@ -158,6 +159,23 @@ function buildJudgmentSummary(startup: Startup): string {
   const rationale = p.rationale ?? '';
   if (rationale) return `${decisionLabel}. ${rationale}`;
   return `${decisionLabel}. Quality: ${quality}.`;
+}
+
+/** Split judgment text into display paragraphs. Preserves existing newlines; otherwise breaks on sentence boundaries. */
+function judgmentToParagraphs(text: string): string[] {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+  // Already has paragraph breaks (double newline)
+  if (/\n\s*\n/.test(trimmed)) {
+    return trimmed.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+  }
+  // Single newlines: treat each line as a paragraph
+  if (trimmed.includes('\n')) {
+    return trimmed.split('\n').map((s) => s.trim()).filter(Boolean);
+  }
+  // No newlines: split on sentence boundary (period + space + uppercase) so we don't break "e.g." or "No."
+  const sentences = trimmed.split(/(?<=\.)\s+(?=[A-Z])/).map((s) => s.trim()).filter(Boolean);
+  return sentences.length ? sentences : [trimmed];
 }
 
 function buildScoreJustification(startup: Startup): string | null {
@@ -256,12 +274,16 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
       <div className={`flex-1 min-h-0 overflow-y-auto ${embedded ? 'pr-1' : ''}`}>
         {judgmentSummary && (
           <section className="mb-6 p-4 border border-oxford/[0.08] bg-oxford/[0.04]">
-            <h2 className="type-label-section text-oxford/60 mb-2">
+            <h2 className="type-label-section text-oxford/60 mb-3">
               Investment judgment
             </h2>
-            <p className="type-body text-oxford leading-relaxed" style={{ fontSize: '14px' }}>
-              {judgmentSummary}
-            </p>
+            <div className="type-body text-oxford/80 leading-relaxed space-y-3">
+              {judgmentToParagraphs(judgmentSummary).map((para, i) => (
+                <p key={i} className="m-0">
+                  {para}
+                </p>
+              ))}
+            </div>
           </section>
         )}
 
@@ -273,25 +295,25 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {startup.scout.problem && (
               <div>
                 <p className="type-label-section text-oxford/60 mb-1">Problem</p>
-                <p className="type-body-sm text-oxford/80 leading-relaxed">{startup.scout.problem}</p>
+                <p className="type-body text-oxford/80 leading-relaxed">{startup.scout.problem}</p>
               </div>
             )}
             {startup.scout.solution && (
               <div>
                 <p className="type-label-section text-oxford/60 mb-1">Solution</p>
-                <p className="type-body-sm text-oxford/80 leading-relaxed">{startup.scout.solution}</p>
+                <p className="type-body text-oxford/80 leading-relaxed">{startup.scout.solution}</p>
               </div>
             )}
             {startup.scout.target_users && (
               <div>
                 <p className="type-label-section text-oxford/60 mb-1">Target</p>
-                <p className="type-body-sm text-oxford/80 leading-relaxed">{startup.scout.target_users}</p>
+                <p className="type-body text-oxford/80 leading-relaxed">{startup.scout.target_users}</p>
               </div>
             )}
             {startup.scout.why_now && (
               <div>
                 <p className="type-label-section text-oxford/60 mb-1">Why now</p>
-                <p className="type-body-sm text-oxford/80 leading-relaxed">{startup.scout.why_now}</p>
+                <p className="type-body text-oxford/80 leading-relaxed">{startup.scout.why_now}</p>
               </div>
             )}
           </div>
@@ -322,7 +344,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 <tbody>
                   {startup.review.reviews.map((rev: SingleReview, idx) => (
                     <tr key={rev.reviewer_type + idx} className="border-t border-oxford/[0.06]">
-                      <td className="px-3 py-2 type-label-section text-oxford/80 whitespace-nowrap">
+                      <td className="px-3 py-2 type-body text-oxford/80 whitespace-nowrap">
                         {rev.reviewer_type.replace('Reviewer', '')}
                       </td>
                       {SCORE_DIMENSIONS.map(({ id }) => {
@@ -330,19 +352,19 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         return (
                           <td
                             key={id}
-                            className="px-3 py-2 type-body-sm text-oxford/80 tabular-nums text-center"
+                            className="px-3 py-2 type-body text-oxford/80 tabular-nums text-center"
                           >
                             {score != null ? score.toFixed(0) : '—'}
                           </td>
                         );
                       })}
-                      <td className="px-3 py-2 type-label-section text-oxford/80 whitespace-nowrap">
+                      <td className="px-3 py-2 type-body text-oxford/80 whitespace-nowrap">
                         {rev.verdict}
                       </td>
                     </tr>
                   ))}
                   {startup.review.score_variance && (
-                    <tr className="border-t border-oxford/25 bg-ivory/40">
+                    <tr className="border-t border-oxford/[0.06] bg-ivory/40">
                       <td className="px-3 py-2 type-label-section text-oxford/60">
                         Variance
                       </td>
@@ -353,7 +375,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                           <td
                             key={id}
                             className={`px-3 py-2 type-meta tabular-nums text-right ${
-                              high ? 'text-oxford' : 'text-oxford/40'
+                              high ? 'text-oxford/80' : 'text-oxford/40'
                             }`}
                           >
                             {v ? v.toFixed(2) : '—'}
@@ -371,9 +393,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
         {hasReview && (
           <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="type-label-section text-oxford/70 mb-3">
+            <h2 className="type-label-section text-oxford/60 mb-1">
               Primary drivers
             </h2>
+            <p className="type-meta text-oxford/40 mb-3">
+              1–3: Weak · 4–5: Concerning · 6–7: Promising · 8–10: Strong
+            </p>
             <div className="space-y-4">
               {SCORE_DIMENSIONS.slice(0, 2).map(({ id, name }) => {
                 const score = startup.review?.[id as keyof typeof startup.review];
@@ -383,8 +408,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 return (
                   <div key={id} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
                     <div className="sm:w-36 shrink-0">
-                      <span className="type-body text-oxford font-medium">{name} </span>
-                      <span className="type-body text-oxford tabular-nums">{score}/10</span>
+                      <span className="type-body text-oxford/80">{name} </span>
+                      <span className="type-body text-oxford/80 tabular-nums">{score}/10</span>
                       <span className="type-label-section text-oxford/60 ml-1">({band.label})</span>
                     </div>
                     {reasoning && (
@@ -399,52 +424,34 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
         {hasReview && (
           <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-2">
-              <h2 className="type-label-section text-oxford/60">
-                Supporting analysis
-              </h2>
-              <p className="type-meta text-oxford/40">
-                1–3: Weak · 4–5: Concerning · 6–7: Promising · 8–10: Strong
-              </p>
-            </div>
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-x-6 gap-y-1 type-body-sm text-oxford/60">
-                {SCORE_DIMENSIONS.slice(2).map(({ id, name }) => {
-                  const score = startup.review?.[id as keyof typeof startup.review];
-                  if (score == null || typeof score !== 'number') return null;
-                  const band = getScoreBand(score);
-                  return (
-                    <span key={id}>
-                      <span className="text-oxford/60">{name}</span>{' '}
-                      <span className="text-oxford/60 tabular-nums">{score}/10</span>
-                      <span className="type-label-section text-oxford/40 ml-0.5">({band.label})</span>
-                    </span>
-                  );
-                })}
-              </div>
-              {scoreJustification && (
-                <p className="type-body-sm text-oxford/80 leading-relaxed italic">
-                  {scoreJustification}
-                </p>
-              )}
-              {startup.review?.score_reasoning &&
-                Object.keys(startup.review.score_reasoning).length > 0 && (
-                  <div className="space-y-2 pt-2">
-                    {SCORE_DIMENSIONS.slice(2).map(({ id, name }) => {
-                      const text = startup.review?.score_reasoning?.[id];
-                      if (!text) return null;
-                      return (
-                        <div key={id}>
-                          <p className="type-label-section text-oxford/60 mb-0.5">
-                            {name}
-                          </p>
-                          <p className="type-body-sm text-oxford/80 leading-relaxed">{text}</p>
-                        </div>
-                      );
-                    })}
+            <h2 className="type-label-section text-oxford/60 mb-3">
+              Supporting analysis
+            </h2>
+            <div className="space-y-4">
+              {SCORE_DIMENSIONS.slice(2).map(({ id, name }) => {
+                const score = startup.review?.[id as keyof typeof startup.review];
+                if (score == null || typeof score !== 'number') return null;
+                const band = getScoreBand(score);
+                const reasoning = startup.review?.score_reasoning?.[id];
+                return (
+                  <div key={id} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
+                    <div className="sm:w-36 shrink-0">
+                      <span className="type-body text-oxford/80">{name} </span>
+                      <span className="type-body text-oxford/80 tabular-nums">{score}/10</span>
+                      <span className="type-label-section text-oxford/60 ml-1">({band.label})</span>
+                    </div>
+                    {reasoning && (
+                      <p className="type-body text-oxford/80 leading-relaxed">{reasoning}</p>
+                    )}
                   </div>
-                )}
+                );
+              })}
             </div>
+            {scoreJustification && (
+              <p className="type-body text-oxford/80 leading-relaxed italic mt-3">
+                {scoreJustification}
+              </p>
+            )}
           </section>
         )}
 
@@ -459,7 +466,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <p className="type-label-section text-oxford/60 mb-2">
                     Primary
                   </p>
-                  <ul className="space-y-1 type-body-sm text-oxford/80 leading-relaxed">
+                  <ul className="space-y-1 type-body text-oxford/80 leading-relaxed">
                     {primaryRisks.map((r, i) => (
                       <li key={i} className="flex gap-2">
                         <span className="text-oxford/40">·</span>
@@ -474,7 +481,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <p className="type-label-section text-oxford/60 mb-2">
                     Secondary
                   </p>
-                  <ul className="space-y-1 type-body-sm text-oxford/80 leading-relaxed">
+                  <ul className="space-y-1 type-body text-oxford/80 leading-relaxed">
                     {secondaryRisks.map((r, i) => (
                       <li key={i} className="flex gap-2">
                         <span className="text-oxford/40">·</span>
@@ -493,7 +500,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             <h2 className="type-label-section text-oxford/60 mb-3">
               Summary
             </h2>
-            <p className="type-body-sm text-oxford/80 leading-relaxed">
+            <p className="type-body text-oxford/80 leading-relaxed">
               {startup.review.overall_summary}
             </p>
           </section>
@@ -504,7 +511,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             <h2 className="type-label-section text-oxford/60 mb-3">
               References
             </h2>
-            <ul className="space-y-1 type-body-sm text-oxford/80 leading-relaxed">
+            <ul className="space-y-1 type-body text-oxford/80 leading-relaxed">
               {startup.scout.references.map((ref, i) => (
                 <li key={i} className="flex gap-2">
                   <span className="text-oxford/40">·</span>
@@ -516,19 +523,19 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         )}
 
         {hasPartner && (
-          <section className="mt-6 pt-6 border-t-2 border-oxford/25">
-            <h2 className="type-label-section text-oxford/70 mb-3">
+          <section className="mt-6 pt-6 border-t border-oxford/[0.06]">
+            <h2 className="type-label-section text-oxford/60 mb-3">
               Decision
             </h2>
-            <div className="pl-4 border-l-2 border-oxford/40 space-y-2">
+            <div className="pl-4 border-l-2 border-oxford/40 space-y-3">
               {hasReview && startup.review?.verdict && (
-                <p className="type-body-sm text-oxford/60">
-                  <span className="uppercase tracking-wide">Quality assessment</span> ·{' '}
+                <p className="type-body text-oxford/80">
+                  <span className="type-label-section text-oxford/60 uppercase tracking-wide">Quality assessment</span> ·{' '}
                   {startup.review.verdict} ({QUALITY_LABELS[startup.review.verdict] ?? startup.review.verdict})
                 </p>
               )}
-              <p className="type-body-sm text-oxford/60 flex items-center gap-2 flex-wrap">
-                <span className="uppercase tracking-wide">Investment decision</span>
+              <p className="type-body text-oxford/80 flex items-center gap-2 flex-wrap">
+                <span className="type-label-section text-oxford/60 uppercase tracking-wide">Investment decision</span>
                 <span className="inline-block scale-110 origin-left">
                   <DecisionBadge
                     variant={
@@ -555,13 +562,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </p>
               )}
               {startup.partner!.rationale && (
-                <p className="type-body-sm text-oxford/80 leading-relaxed pt-1">
-                  {startup.partner!.rationale}
-                </p>
+                <div className="type-body text-oxford/80 leading-relaxed space-y-3 pt-1">
+                  {judgmentToParagraphs(startup.partner!.rationale).map((para, i) => (
+                    <p key={i} className="m-0">
+                      {para}
+                    </p>
+                  ))}
+                </div>
               )}
               {startup.partner!.next_action && (
-                <p className="type-body-sm text-oxford/60 pt-1">
-                  <span className="type-label-tab">Next</span> · {startup.partner!.next_action}
+                <p className="type-body text-oxford/80 pt-1">
+                  <span className="type-label-section text-oxford/60">Next</span> · {startup.partner!.next_action}
                 </p>
               )}
               {startup.partner!.portfolio_context_at_decision && (
@@ -569,19 +580,19 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <p className="type-label-section text-oxford/60 mb-1">
                     Portfolio context at decision
                   </p>
-                  <p className="type-body-sm text-oxford/80">
+                  <p className="type-body text-oxford/80">
                     Total portfolio size at decision:{' '}
                     {startup.partner!.portfolio_context_at_decision.total_portfolio_size}
                   </p>
                   {startup.scout.sector && (
-                    <p className="type-body-sm text-oxford/80">
+                    <p className="type-body text-oxford/80">
                       Sector peers in portfolio:{' '}
                       {startup.partner!.portfolio_context_at_decision.sector_counts[startup.scout.sector] ?? 0}
                     </p>
                   )}
                   {startup.partner!.rationale &&
                     startup.partner!.rationale.toLowerCase().includes('concentration') && (
-                      <p className="type-body-sm text-oxford/60 italic mt-1">
+                      <p className="type-body text-oxford/80 italic mt-1">
                         Sector concentration risk was explicitly considered in this decision.
                       </p>
                     )}
@@ -595,8 +606,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             </div>
           </section>
         )}
-        <section className="mt-6 pt-4 border-t border-oxford/25">
-          <p className="type-meta text-oxford/25">
+        <section className="mt-6 pt-4 border-t border-oxford/[0.06]">
+          <p className="type-meta text-oxford/40">
             Scout {startup.scout.prompt_version ?? '—'} · Partner {startup.partner?.prompt_version ?? '—'}
           </p>
         </section>
