@@ -337,6 +337,14 @@ def _validate_settings(body: dict) -> list[str]:
                 v = ac["scout_serp_daily_budget"]
                 if not isinstance(v, (int, float)) or v < 0:
                     errors.append("agent_config.scout_serp_daily_budget must be a non-negative number")
+    fi = body.get("fund_identity")
+    if fi is not None:
+        if not isinstance(fi, dict):
+            errors.append("fund_identity must be an object")
+        else:
+            for key in ("fund_name", "stage_focus", "geographic_focus"):
+                if key in fi and not isinstance(fi[key], str):
+                    errors.append(f"fund_identity.{key} must be a string")
     pf = body.get("portfolio")
     if pf is not None:
         if not isinstance(pf, dict):
@@ -495,7 +503,7 @@ def patch_settings(request: Request, body: dict):
         raise HTTPException(status_code=422, detail={"message": "Validation failed", "errors": errors})
     user_id = request.state.user_id
     current = load_settings(user_id)
-    for section in ("cost_budget", "agent_config", "portfolio"):
+    for section in ("fund_identity", "cost_budget", "agent_config", "portfolio"):
         if section in body and isinstance(body[section], dict):
             if section not in current:
                 current[section] = {}

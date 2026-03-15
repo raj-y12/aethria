@@ -14,11 +14,8 @@ interface SystemBarProps {
   navLink?: { href: string; label: string };
 }
 
-const PAPER = 'rgba(242,240,234,1)';
-const PAPER_INACTIVE = 'rgba(242,240,234,0.4)';
-
 /**
- * Left-side vertical system bar: wordmark, JUDGEMENTS / SYSTEM toggles, clock, nav + logout.
+ * Left-side vertical system bar: clock (top), username, JUDGEMENTS / SYSTEM toggles, nav + logout.
  */
 export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem, onClose, navLink }: SystemBarProps) {
   const navigate = useNavigate();
@@ -29,6 +26,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
   const [hasEnteredOnce, setHasEnteredOnce] = useState(false);
 
   const handleLogout = () => {
+    localStorage.removeItem('aethria_last_activity');
     signOut?.().then(() => navigate('/sign-in', { replace: true }));
   };
 
@@ -70,17 +68,16 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
         hasEnteredOnce
           ? undefined
           : {
-              duration: 0.8,
+              duration: tokens.motion.duration.long,
               ease: tokens.motion.ease,
             }
       }
     >
-      {/* All controls stacked and centered: clock, username plate, toggles, nav, logout */}
+      {/* All controls stacked: clock (top), username, toggles, nav + logout */}
       <div className="flex flex-col items-center gap-4 h-full">
-        {/* Clock at the top */}
+        {/* Clock at top */}
         <span
-          className="tabular-nums font-mono text-[11px] leading-none"
-          style={{ color: PAPER_INACTIVE, letterSpacing: '0.08em' }}
+          className="type-meta tabular-nums leading-none text-ivory/40"
           aria-live="polite"
         >
           {formatted}
@@ -89,66 +86,53 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
         {/* Username (account/settings moved to app Settings later) */}
         <div className="w-full flex items-center justify-center min-h-[2.5rem]">
           <span
-            className="font-mono text-[10px] uppercase tracking-[0.1em] truncate max-w-full text-center"
-            style={{ color: PAPER_INACTIVE }}
+            className="type-label-tab truncate max-w-full text-center text-ivory/40"
             title={displayName}
           >
             {displayName}
           </span>
         </div>
 
-        {/* Mode toggles */}
-        <div className="flex flex-col items-center gap-2 mt-1">
+        {/* Mode toggles: Judgements / System */}
+        <div className="flex flex-col items-center gap-0.5 mt-1 w-full">
           <button
             type="button"
             onClick={rightPanel === 'feed' ? onClose : onShowFeed}
-            className="transition-transform duration-200 hover:-translate-y-[1px] hover:opacity-80"
-            style={{
-              fontFamily: tokens.font.mono,
-              fontSize: '10px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: rightPanel === 'feed' ? PAPER : PAPER_INACTIVE,
-              background: 'none',
-              border: 'none',
-              borderBottom: rightPanel === 'feed' ? `1px solid ${PAPER}` : '1px solid transparent',
-              paddingBottom: rightPanel === 'feed' ? '3px' : 0,
-              cursor: 'pointer',
-              transition: `color 0.2s ${tokens.motion.easeCss}, border-color 0.2s ${tokens.motion.easeCss}, padding 0.2s ${tokens.motion.easeCss}`,
-            }}
+            className={`type-label-tab min-h-[36px] w-full flex items-center justify-center cursor-pointer btn-interaction ${
+              rightPanel === 'feed' ? 'text-ivory' : 'text-ivory/60 hover:text-ivory'
+            }`}
+            style={{ transitionTimingFunction: 'var(--motion-ease)' }}
             aria-pressed={rightPanel === 'feed'}
           >
-            Judgements
+            <span
+              className={`inline-block pb-0.5 ${rightPanel === 'feed' ? 'border-b-2 border-ivory' : ''}`}
+            >
+              Judgements
+            </span>
           </button>
           <button
             type="button"
             onClick={rightPanel === 'system' ? onClose : onShowSystem}
-            className="transition-transform duration-200 hover:-translate-y-[1px] hover:opacity-80"
-            style={{
-              fontFamily: tokens.font.mono,
-              fontSize: '10px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: rightPanel === 'system' ? PAPER : PAPER_INACTIVE,
-              background: 'none',
-              border: 'none',
-              borderBottom: rightPanel === 'system' ? `1px solid ${PAPER}` : '1px solid transparent',
-              paddingBottom: rightPanel === 'system' ? '3px' : 0,
-              cursor: 'pointer',
-              transition: `color 0.2s ${tokens.motion.easeCss}, border-color 0.2s ${tokens.motion.easeCss}, padding 0.2s ${tokens.motion.easeCss}`,
-            }}
+            className={`type-label-tab min-h-[36px] w-full flex items-center justify-center cursor-pointer btn-interaction ${
+              rightPanel === 'system' ? 'text-ivory' : 'text-ivory/60 hover:text-ivory'
+            }`}
+            style={{ transitionTimingFunction: 'var(--motion-ease)' }}
             aria-pressed={rightPanel === 'system'}
           >
-            System
+            <span
+              className={`inline-block pb-0.5 ${rightPanel === 'system' ? 'border-b-2 border-ivory' : ''}`}
+            >
+              System
+            </span>
           </button>
         </div>
 
-        {/* Nav + Log out pinned to the bottom of the stack */}
+        {/* Nav + Log out pinned to the bottom of the spine */}
         <div className="mt-auto flex flex-col items-center gap-2">
           {navLink && (
             <a
               href={navLink.href}
-              className="font-mono text-[10px] uppercase tracking-[0.16em] text-ivory/70 hover:text-ivory transition-colors"
+              className="type-label-section text-ivory/70 hover:text-ivory btn-interaction"
             >
               {navLink.label}
             </a>
@@ -156,18 +140,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
           <button
             type="button"
             onClick={handleLogout}
-            className="transition-transform duration-200 hover:-translate-y-[1px] hover:opacity-80"
-            style={{
-              fontFamily: tokens.font.mono,
-              fontSize: '10px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: PAPER_INACTIVE,
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-            }}
+            className="type-label-tab text-ivory/40 hover:text-ivory bg-transparent border-0 p-0 cursor-pointer btn-interaction"
           >
             Log out
           </button>

@@ -40,3 +40,22 @@ On Render (or any host where only the **backend** runs, no separate agents proce
 Optional: `CLERK_ISSUER`, `ALLOWED_ORIGINS` (comma-separated), `SCOUT_MODEL`, `REVIEWER_MODEL`, etc.
 
 **Debugging**: `GET /api/agents/status` (after signing in) returns `worker_ready`, `supabase_configured`, and `openai_configured` so you can see what’s missing on the server.
+
+### Data written to DB (Supabase, all per user when `USE_SUPABASE_STORAGE=1`)
+
+| Data | Table / store | How it’s user-scoped |
+|------|----------------|----------------------|
+| **Settings** | `settings` (doc) | `(user_id, key)` with key = user_id; load/save pass `user_id`. |
+| **Startups** (discoveries, reviews, partner decision, human_resolution) | `startups` | `SupabaseStartupsStorage(client, user_id)`; every read/write uses `user_id`. |
+| **Escalations** | Derived from startups | Same as startups; resolve writes `human_resolution` on that user’s startup via `_get_storage(request)`. |
+| **Decisions** (advance/pass/hold + reasoning) | `portfolio_decisions` (list) | `list_get_all` / `list_upsert` use run context `user_id` (API sets it; pipeline sets it). |
+| **Portfolio positions, rejections, watchlist, signals, agent_metrics** | `portfolio_*` (list) | Same as decisions; portfolio store uses run context. |
+| **Memory, meta_* (prompt library, weights, calibration, mutation_log, reports), analytics_sector_concentration, serp_usage, portfolio_budgets** | Doc/list tables | All use run context (or explicit `user_id` where added); pipeline and API set run context so writes are per user. |
+
+Run context: API calls `set_run_user_id(request.state.user_id)` after auth; pipeline calls `set_run_user_id(user_id)` at start of each cycle. So all doc/list access during a request or pipeline run is for that user.
+
+### Backpressure and ramp-up
+
+- **Scouts**: If `unreviewed > SCOUT_BACKPRESSURE_THRESHOLD` (default 10), the scout cycle is skipped so reviewers can catch up. Set `SCOUT_BACKPRESSURE_THRESHOLD` in env to tune.
+- **Reviewers**: If `undecided > REVIEWER_BACKPRESSURE_THRESHOLD` (default 10), the review cycle is skipped so partners can catch up. When `unreviewed > REVIEWER_RAMP_THRESHOLD` (default 5), reviewers process up to `REVIEWER_RAMP_BATCH_MAX` (default 5) per cycle instead of `batch_size` (1). Set env vars to tune.
+- **Partners**: Process up to `PARTNER_BATCH_MAX` (default 20) undecided per cycle so cycles stay bounded; when backlog is high they still make progress every interval.

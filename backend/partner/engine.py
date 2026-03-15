@@ -64,6 +64,8 @@ class PartnerEngine:
             api_key=api_key,
             portfolio_store=portfolio_store,
         )
+        # Max undecided to process per cycle (ramp: process a solid batch when backlog is high)
+        self.batch_max = int(os.getenv("PARTNER_BATCH_MAX", "20"))
         
         self.logger = logging.getLogger("partner.engine")
         self.running = False
@@ -144,8 +146,10 @@ class PartnerEngine:
         """
         self.logger.info(f"Starting decision cycle at {datetime.now().isoformat()}")
         
-        # Get undecided entries
-        undecided = self._get_undecided_entries()
+        # Ramp: process up to batch_max per cycle so we make progress without one huge cycle
+        undecided_count = self.storage.count_undecided()
+        limit = min(self.batch_max, undecided_count) if undecided_count else None
+        undecided = self._get_undecided_entries(limit=limit)
         
         if not undecided:
             self.logger.info("No undecided entries found")

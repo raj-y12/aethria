@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useCallback, forwardRef, useImperativeHandle } from 'react';
+import { motion } from 'framer-motion';
 import { jsPDF } from 'jspdf';
 import type { SingleReview, Startup } from '../types/startup';
 import {
@@ -7,6 +8,8 @@ import {
   DECISION_LABELS,
   SCORE_DIMENSIONS,
 } from '../design-system/semantics';
+import { tokens } from '../design-system/tokens';
+import DecisionBadge from './DecisionBadge';
 
 const PDF_MARGIN = 20;
 const PDF_LINE_HEIGHT = 5;
@@ -146,62 +149,6 @@ function buildMemoPDF(startup: Startup): jsPDF {
   return doc;
 }
 
-const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ';
-const SCRAMBLE_TICKS = 6;
-const STAGGER_MS = 28;
-
-function randomChar(): string {
-  return SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
-}
-
-function useScrambleText(
-  target: string,
-  key?: string
-): { displayText: string; isComplete: boolean } {
-  const [displayText, setDisplayText] = useState(() =>
-    target.length ? target.split('').map(() => randomChar()).join('') : target
-  );
-  const [isComplete, setIsComplete] = useState(false);
-
-  useEffect(() => {
-    if (!target.length) {
-      setDisplayText(target);
-      setIsComplete(true);
-      return () => {};
-    }
-    setIsComplete(false);
-    setDisplayText(target.split('').map(() => randomChar()).join(''));
-    const len = target.length;
-    let resolved = 0;
-    let scrambleTicks = 0;
-
-    const id = setInterval(() => {
-      if (scrambleTicks < SCRAMBLE_TICKS) {
-        scrambleTicks++;
-        setDisplayText(
-          target.split('').map(() => randomChar()).join('')
-        );
-      } else {
-        resolved++;
-        setDisplayText(
-          target
-            .split('')
-            .map((c, i) => (i < resolved ? c : randomChar()))
-            .join('')
-        );
-        if (resolved >= len) {
-          setDisplayText(target);
-          setIsComplete(true);
-        }
-      }
-    }, STAGGER_MS);
-
-    return () => clearInterval(id);
-  }, [target, key]);
-
-  return { displayText, isComplete };
-}
-
 function buildJudgmentSummary(startup: Startup): string {
   const r = startup.review;
   const p = startup.partner;
@@ -243,7 +190,7 @@ export interface InvestmentMemoContentHandle {
   downloadPDF: () => void;
 }
 
-const actionBtnCls = 'font-mono text-[10px] uppercase tracking-[0.22em] text-oxford/60 hover:text-oxford active:opacity-80 transition-colors min-h-[44px] flex items-center px-2';
+const actionBtnCls = 'type-label-tab text-oxford/60 hover:text-oxford min-h-[44px] flex items-center px-2 btn-interaction';
 
 /**
  * Memo body only. Used in full-screen modal and in the right-side panel.
@@ -259,7 +206,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const scoreJustification = hasReview ? buildScoreJustification(startup) : null;
 
   const companyName = startup.scout.name ?? '';
-  const { displayText: nameScrambleText } = useScrambleText(companyName, startup.id);
 
   const primaryRisks = startup.review?.diligence_red_flags ?? [];
   const secondaryRisks = (startup.review?.key_risks ?? []).filter(
@@ -291,59 +237,61 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         </div>
       )}
       <div className="flex-1 min-h-0 flex flex-col bg-paper">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-1">
-        Investment memo
-      </p>
-      <h1
-        id="memo-title"
-        className="font-sans font-semibold text-lg lg:text-xl text-oxford tracking-tight mb-1"
-        style={{ letterSpacing: '-0.02em' }}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
       >
-        {nameScrambleText}
-      </h1>
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-6">
-        {startup.scout.sector || '—'}
-      </p>
+        <p className="type-label-section text-oxford/60 mb-1">
+          Investment memo
+        </p>
+        <h1 id="memo-title" className="type-title font-semibold text-oxford mb-1">
+          {companyName}
+        </h1>
+        <p className="type-label-section text-oxford/60 mb-6">
+          {startup.scout.sector || '—'}
+        </p>
+      </motion.div>
 
       <div className={`flex-1 min-h-0 overflow-y-auto ${embedded ? 'pr-1' : ''}`}>
         {judgmentSummary && (
-          <section className="mb-6 p-4 border border-oxford/[0.06] bg-paper">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-2">
+          <section className="mb-6 p-4 border border-oxford/[0.08] bg-oxford/[0.04]">
+            <h2 className="type-label-section text-oxford/60 mb-2">
               Investment judgment
             </h2>
-            <p className="font-sans text-[13px] text-oxford leading-relaxed">
+            <p className="type-body text-oxford leading-relaxed" style={{ fontSize: '14px' }}>
               {judgmentSummary}
             </p>
           </section>
         )}
 
         <section className="mb-6">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
+          <h2 className="type-label-section text-oxford/60 mb-3">
             Overview
           </h2>
           <div className="space-y-4">
             {startup.scout.problem && (
               <div>
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-1">Problem</p>
-                <p className="font-sans text-[13px] text-oxford/80 leading-relaxed">{startup.scout.problem}</p>
+                <p className="type-label-section text-oxford/60 mb-1">Problem</p>
+                <p className="type-body-sm text-oxford/80 leading-relaxed">{startup.scout.problem}</p>
               </div>
             )}
             {startup.scout.solution && (
               <div>
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-1">Solution</p>
-                <p className="font-sans text-[13px] text-oxford/80 leading-relaxed">{startup.scout.solution}</p>
+                <p className="type-label-section text-oxford/60 mb-1">Solution</p>
+                <p className="type-body-sm text-oxford/80 leading-relaxed">{startup.scout.solution}</p>
               </div>
             )}
             {startup.scout.target_users && (
               <div>
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-1">Target</p>
-                <p className="font-sans text-[13px] text-oxford/80 leading-relaxed">{startup.scout.target_users}</p>
+                <p className="type-label-section text-oxford/60 mb-1">Target</p>
+                <p className="type-body-sm text-oxford/80 leading-relaxed">{startup.scout.target_users}</p>
               </div>
             )}
             {startup.scout.why_now && (
               <div>
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-1">Why now</p>
-                <p className="font-sans text-[13px] text-oxford/80 leading-relaxed">{startup.scout.why_now}</p>
+                <p className="type-label-section text-oxford/60 mb-1">Why now</p>
+                <p className="type-body-sm text-oxford/80 leading-relaxed">{startup.scout.why_now}</p>
               </div>
             )}
           </div>
@@ -351,25 +299,22 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
         {hasReview && startup.review?.reviewer_disagreement && Array.isArray(startup.review.reviews) && startup.review.reviews.length > 0 && (
           <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
+            <h2 className="type-label-section text-oxford/60 mb-3">
               Reviewer divergence
             </h2>
             <div className="overflow-x-auto no-scrollbar border border-oxford/[0.06]">
               <table className="w-full border-collapse text-left">
                 <thead className="bg-ivory/60">
                   <tr>
-                    <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/60">
+                    <th className="px-3 py-2 type-label-section text-oxford/60">
                       Reviewer
                     </th>
                     {SCORE_DIMENSIONS.map(({ id, name }) => (
-                      <th
-                        key={id}
-                        className="px-3 py-2 font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50"
-                      >
+                      <th key={id} className="px-3 py-2 type-label-section text-oxford/60">
                         {name}
                       </th>
                     ))}
-                    <th className="px-3 py-2 font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/50">
+                    <th className="px-3 py-2 type-label-section text-oxford/60">
                       Verdict
                     </th>
                   </tr>
@@ -377,7 +322,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 <tbody>
                   {startup.review.reviews.map((rev: SingleReview, idx) => (
                     <tr key={rev.reviewer_type + idx} className="border-t border-oxford/[0.06]">
-                      <td className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/70 whitespace-nowrap">
+                      <td className="px-3 py-2 type-label-section text-oxford/80 whitespace-nowrap">
                         {rev.reviewer_type.replace('Reviewer', '')}
                       </td>
                       {SCORE_DIMENSIONS.map(({ id }) => {
@@ -385,20 +330,20 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         return (
                           <td
                             key={id}
-                            className="px-3 py-2 font-sans text-[12px] text-oxford/75 tabular-nums text-center"
+                            className="px-3 py-2 type-body-sm text-oxford/80 tabular-nums text-center"
                           >
                             {score != null ? score.toFixed(0) : '—'}
                           </td>
                         );
                       })}
-                      <td className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/70 whitespace-nowrap">
+                      <td className="px-3 py-2 type-label-section text-oxford/80 whitespace-nowrap">
                         {rev.verdict}
                       </td>
                     </tr>
                   ))}
                   {startup.review.score_variance && (
-                    <tr className="border-t border-oxford/[0.08] bg-ivory/40">
-                      <td className="px-3 py-2 font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/60">
+                    <tr className="border-t border-oxford/25 bg-ivory/40">
+                      <td className="px-3 py-2 type-label-section text-oxford/60">
                         Variance
                       </td>
                       {SCORE_DIMENSIONS.map(({ id }) => {
@@ -407,7 +352,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         return (
                           <td
                             key={id}
-                            className={`px-3 py-2 font-mono text-[10px] tabular-nums text-right ${
+                            className={`px-3 py-2 type-meta tabular-nums text-right ${
                               high ? 'text-oxford' : 'text-oxford/40'
                             }`}
                           >
@@ -426,10 +371,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
         {hasReview && (
           <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
+            <h2 className="type-label-section text-oxford/70 mb-3">
               Primary drivers
             </h2>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {SCORE_DIMENSIONS.slice(0, 2).map(({ id, name }) => {
                 const score = startup.review?.[id as keyof typeof startup.review];
                 if (score == null || typeof score !== 'number') return null;
@@ -437,13 +382,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 const reasoning = startup.review?.score_reasoning?.[id];
                 return (
                   <div key={id} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
-                    <div className="sm:w-32 shrink-0">
-                      <span className="font-sans text-[13px] text-oxford/80">{name} </span>
-                      <span className="font-sans text-[13px] text-oxford/70 tabular-nums">{score}/10</span>
-                      <span className="font-sans text-[11px] text-oxford/50 ml-1">({band.label})</span>
+                    <div className="sm:w-36 shrink-0">
+                      <span className="type-body text-oxford font-medium">{name} </span>
+                      <span className="type-body text-oxford tabular-nums">{score}/10</span>
+                      <span className="type-label-section text-oxford/60 ml-1">({band.label})</span>
                     </div>
                     {reasoning && (
-                      <p className="font-sans text-[13px] text-oxford/80 leading-relaxed">{reasoning}</p>
+                      <p className="type-body text-oxford/80 leading-relaxed">{reasoning}</p>
                     )}
                   </div>
                 );
@@ -454,31 +399,31 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
         {hasReview && (
           <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-3">
-              <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-2">
+              <h2 className="type-label-section text-oxford/60">
                 Supporting analysis
               </h2>
-              <p className="font-sans text-[10px] text-oxford/40">
+              <p className="type-meta text-oxford/40">
                 1–3: Weak · 4–5: Concerning · 6–7: Promising · 8–10: Strong
               </p>
             </div>
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-x-6 gap-y-1 font-sans text-[13px]">
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-x-6 gap-y-1 type-body-sm text-oxford/60">
                 {SCORE_DIMENSIONS.slice(2).map(({ id, name }) => {
                   const score = startup.review?.[id as keyof typeof startup.review];
                   if (score == null || typeof score !== 'number') return null;
                   const band = getScoreBand(score);
                   return (
                     <span key={id}>
-                      <span className="text-oxford/80">{name}</span>{' '}
-                      <span className="text-oxford/70 tabular-nums">{score}/10</span>
-                      <span className="text-oxford/50 text-[11px] ml-0.5">({band.label})</span>
+                      <span className="text-oxford/60">{name}</span>{' '}
+                      <span className="text-oxford/60 tabular-nums">{score}/10</span>
+                      <span className="type-label-section text-oxford/40 ml-0.5">({band.label})</span>
                     </span>
                   );
                 })}
               </div>
               {scoreJustification && (
-                <p className="font-sans text-[12px] text-oxford/70 leading-relaxed italic">
+                <p className="type-body-sm text-oxford/80 leading-relaxed italic">
                   {scoreJustification}
                 </p>
               )}
@@ -490,10 +435,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       if (!text) return null;
                       return (
                         <div key={id}>
-                          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-0.5">
+                          <p className="type-label-section text-oxford/60 mb-0.5">
                             {name}
                           </p>
-                          <p className="font-sans text-[13px] text-oxford/80 leading-relaxed">{text}</p>
+                          <p className="type-body-sm text-oxford/80 leading-relaxed">{text}</p>
                         </div>
                       );
                     })}
@@ -505,16 +450,16 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
         {(primaryRisks.length > 0 || secondaryRisks.length > 0) && (
           <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
+            <h2 className="type-label-section text-oxford/60 mb-3">
               Risks
             </h2>
             <div className="space-y-4">
               {primaryRisks.length > 0 && (
                 <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-2">
+                  <p className="type-label-section text-oxford/60 mb-2">
                     Primary
                   </p>
-                  <ul className="space-y-1 font-sans text-[13px] text-oxford/80 leading-relaxed">
+                  <ul className="space-y-1 type-body-sm text-oxford/80 leading-relaxed">
                     {primaryRisks.map((r, i) => (
                       <li key={i} className="flex gap-2">
                         <span className="text-oxford/40">·</span>
@@ -526,10 +471,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               )}
               {secondaryRisks.length > 0 && (
                 <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-2">
+                  <p className="type-label-section text-oxford/60 mb-2">
                     Secondary
                   </p>
-                  <ul className="space-y-1 font-sans text-[13px] text-oxford/80 leading-relaxed">
+                  <ul className="space-y-1 type-body-sm text-oxford/80 leading-relaxed">
                     {secondaryRisks.map((r, i) => (
                       <li key={i} className="flex gap-2">
                         <span className="text-oxford/40">·</span>
@@ -545,10 +490,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
         {startup.review?.overall_summary && (
           <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
+            <h2 className="type-label-section text-oxford/60 mb-3">
               Summary
             </h2>
-            <p className="font-sans text-[13px] text-oxford/80 leading-relaxed">
+            <p className="type-body-sm text-oxford/80 leading-relaxed">
               {startup.review.overall_summary}
             </p>
           </section>
@@ -556,10 +501,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
         {startup.scout.references && startup.scout.references.length > 0 && (
           <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
+            <h2 className="type-label-section text-oxford/60 mb-3">
               References
             </h2>
-            <ul className="space-y-1 font-sans text-[13px] text-oxford/80 leading-relaxed">
+            <ul className="space-y-1 type-body-sm text-oxford/80 leading-relaxed">
               {startup.scout.references.map((ref, i) => (
                 <li key={i} className="flex gap-2">
                   <span className="text-oxford/40">·</span>
@@ -571,23 +516,33 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         )}
 
         {hasPartner && (
-          <section className="pt-6 border-t border-oxford/[0.06]">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/60 mb-3">
+          <section className="mt-6 pt-6 border-t-2 border-oxford/25">
+            <h2 className="type-label-section text-oxford/70 mb-3">
               Decision
             </h2>
-            <div className="pl-4 border-l-2 border-oxford/20 space-y-2">
+            <div className="pl-4 border-l-2 border-oxford/40 space-y-2">
               {hasReview && startup.review?.verdict && (
-                <p className="font-sans text-[11px] text-oxford/50">
+                <p className="type-body-sm text-oxford/60">
                   <span className="uppercase tracking-wide">Quality assessment</span> ·{' '}
                   {startup.review.verdict} ({QUALITY_LABELS[startup.review.verdict] ?? startup.review.verdict})
                 </p>
               )}
-              <p className="font-sans text-[11px] text-oxford/60">
-                <span className="uppercase tracking-wide">Investment decision</span> ·{' '}
-                {startup.partner!.decision} ({DECISION_LABELS[startup.partner!.decision] ?? startup.partner!.decision})
+              <p className="type-body-sm text-oxford/60 flex items-center gap-2 flex-wrap">
+                <span className="uppercase tracking-wide">Investment decision</span>
+                <span className="inline-block scale-110 origin-left">
+                  <DecisionBadge
+                    variant={
+                      startup.partner!.decision === 'YES'
+                        ? 'YES'
+                        : startup.partner!.decision === 'NO' || startup.partner!.decision === 'PASS'
+                          ? 'NO'
+                          : 'MAYBE'
+                    }
+                  />
+                </span>
               </p>
               {startup.timestamps?.partnered_at && (
-                <p className="font-sans text-[10px] tabular-nums text-oxford/40">
+                <p className="type-meta tabular-nums text-oxford/40">
                   {new Date(startup.timestamps.partnered_at).toLocaleString('en-GB', {
                     hour12: false,
                     day: '2-digit',
@@ -600,48 +555,48 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </p>
               )}
               {startup.partner!.rationale && (
-                <p className="font-sans text-[13px] text-oxford/75 leading-relaxed pt-1">
+                <p className="type-body-sm text-oxford/80 leading-relaxed pt-1">
                   {startup.partner!.rationale}
                 </p>
               )}
               {startup.partner!.next_action && (
-                <p className="font-sans text-[12px] text-oxford/55 pt-1">
-                  <span className="uppercase tracking-wide">Next</span> · {startup.partner!.next_action}
+                <p className="type-body-sm text-oxford/60 pt-1">
+                  <span className="type-label-tab">Next</span> · {startup.partner!.next_action}
                 </p>
               )}
               {startup.partner!.portfolio_context_at_decision && (
                 <div className="mt-4 border-t border-oxford/[0.06] pt-3">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-oxford/60 mb-1">
+                  <p className="type-label-section text-oxford/60 mb-1">
                     Portfolio context at decision
                   </p>
-                  <p className="font-sans text-[12px] text-oxford/70">
+                  <p className="type-body-sm text-oxford/80">
                     Total portfolio size at decision:{' '}
                     {startup.partner!.portfolio_context_at_decision.total_portfolio_size}
                   </p>
                   {startup.scout.sector && (
-                    <p className="font-sans text-[12px] text-oxford/70">
+                    <p className="type-body-sm text-oxford/80">
                       Sector peers in portfolio:{' '}
                       {startup.partner!.portfolio_context_at_decision.sector_counts[startup.scout.sector] ?? 0}
                     </p>
                   )}
                   {startup.partner!.rationale &&
                     startup.partner!.rationale.toLowerCase().includes('concentration') && (
-                      <p className="font-sans text-[12px] text-oxford/60 italic mt-1">
+                      <p className="type-body-sm text-oxford/60 italic mt-1">
                         Sector concentration risk was explicitly considered in this decision.
                       </p>
                     )}
                 </div>
               )}
               {startup.partner!.llm_fallback_reason && (
-                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-oxford/40 mt-3">
+                <p className="type-meta text-oxford/40 mt-3">
                   LLM-assisted · {startup.partner!.llm_fallback_reason}
                 </p>
               )}
             </div>
           </section>
         )}
-        <section className="mt-6 pt-4 border-t border-oxford/[0.04]">
-          <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-oxford/25">
+        <section className="mt-6 pt-4 border-t border-oxford/25">
+          <p className="type-meta text-oxford/25">
             Scout {startup.scout.prompt_version ?? '—'} · Partner {startup.partner?.prompt_version ?? '—'}
           </p>
         </section>

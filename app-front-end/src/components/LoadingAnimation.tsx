@@ -4,7 +4,7 @@ interface LoadingAnimationProps {
   fullScreen?: boolean;
 }
 
-/** Easing: deliberate, no bounce. Instrument-grade. */
+/** Easing: smooth orbit, no bounce. */
 const EASE = [0.33, 0, 0.67, 1] as const;
 
 /** Triangle vertices (relative to center). Scaled for larger points. */

@@ -25,7 +25,7 @@ export function verdictTextClass(decision: PartnerDecision, onDark = false): str
   }
   switch (decision) {
     case 'PASS':
-      return 'text-oxford/50';
+      return 'text-oxford/60';
     case 'WATCH':
     case 'MAYBE':
       return 'text-oxford/60';

@@ -29,6 +29,8 @@ export default {
         gold: '#B89F6F',
         'alert-crimson': '#E5484D',
         'slate-dark': '#0f1218',
+        /** Brand warning: paper-derived warm tint for validation/alert (not Tailwind amber). */
+        warning: '#F5F0E8',
       },
       fontFamily: {
         display: ['"Libre Baskerville"', 'Georgia', 'serif'],

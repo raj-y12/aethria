@@ -4,7 +4,10 @@ All tables are multi-tenant: pass user_id or it is taken from run context (get_r
 Uses get_service_client(); tables: portfolio_*, memory, settings, serp_usage, analytics_*, meta_*.
 """
 import logging
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, Callable, Dict, List, Optional, TypeVar
+
+T = TypeVar("T")
 from uuid import uuid4
 
 from run_context import get_run_user_id
@@ -14,6 +17,35 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_KEY = "default"
 _DEFAULT_USER = "default"
+
+# Errno 35 = EAGAIN (Resource temporarily unavailable) under concurrent load
+_TRANSIENT_ERRNOS = (35, 11)  # 11 = EAGAIN on some platforms
+_MAX_RETRIES = 2
+_RETRY_DELAY = 0.15
+
+
+def _is_transient(e: BaseException) -> bool:
+    if isinstance(e, OSError) and getattr(e, "errno", None) in _TRANSIENT_ERRNOS:
+        return True
+    if isinstance(e, ConnectionError):
+        return True
+    return False
+
+
+def _retry_on_transient(fn: Callable[[], T]) -> T:
+    """Run fn; on transient OSError/ConnectionError retry up to _MAX_RETRIES times."""
+    last: Optional[BaseException] = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            return fn()
+        except Exception as e:
+            last = e
+            if attempt < _MAX_RETRIES and _is_transient(e):
+                time.sleep(_RETRY_DELAY)
+                continue
+            raise
+    assert last is not None
+    raise last
 
 
 def _client():
@@ -47,14 +79,16 @@ def list_get_all(table: str, user_id: Optional[str] = None) -> List[Dict[str, An
     """Return all rows for user as list of dicts (data column). Order by created_at."""
     uid = _user_id(user_id)
     try:
-        r = (
-            _client()
-            .table(table)
-            .select("data,created_at")
-            .eq("user_id", uid)
-            .order("created_at")
-            .execute()
-        )
+        def _fetch():
+            return (
+                _client()
+                .table(table)
+                .select("data,created_at")
+                .eq("user_id", uid)
+                .order("created_at")
+                .execute()
+            )
+        r = _retry_on_transient(_fetch)
         rows = (r.data or []) if hasattr(r, "data") else []
         out = []
         for row in rows:
@@ -135,15 +169,17 @@ def doc_get(table: str, key: str = _DEFAULT_KEY, user_id: Optional[str] = None) 
     """Return data for (user_id, key), or None if missing."""
     uid = _user_id(user_id)
     try:
-        r = (
-            _client()
-            .table(table)
-            .select("data")
-            .eq("user_id", uid)
-            .eq("key", key)
-            .limit(1)
-            .execute()
-        )
+        def _fetch():
+            return (
+                _client()
+                .table(table)
+                .select("data")
+                .eq("user_id", uid)
+                .eq("key", key)
+                .limit(1)
+                .execute()
+            )
+        r = _retry_on_transient(_fetch)
         rows = (r.data or []) if hasattr(r, "data") else []
         if not rows:
             return None

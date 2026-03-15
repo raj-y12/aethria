@@ -2,6 +2,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { tokens } from '../design-system/tokens';
 import type { Startup, SignalItem, MetaCycleReport } from '../types/startup';
+import DecisionBadge from './DecisionBadge';
+import SignalEventRow from './SignalEventRow';
+import EmptyState from './EmptyState';
 
 interface LogEntry {
   id: string;
@@ -9,6 +12,7 @@ interface LogEntry {
   timestamp: string;
   message: string;
   kind: 'scanned' | 'reviewed' | 'decision' | 'meta_cycle' | 'signal_detected' | 'escalation_resolved';
+  decision?: string; // YES | NO | MAYBE | PASS | WATCH — for kind 'decision'
 }
 
 interface LiveIntelligenceFeedProps {
@@ -67,8 +71,9 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
             minute: '2-digit',
             second: '2-digit',
           }),
-          message: `${s.scout.name} · ${s.partner.decision}`,
+          message: s.scout.name,
           kind: 'decision',
+          decision: s.partner.decision,
         });
       }
     });
@@ -122,6 +127,17 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
     setEntries(out);
   }, [startups, signals, metaReports]);
 
+  if (entries.length === 0) {
+    return (
+      <div className="h-full overflow-y-auto flex flex-col">
+        <EmptyState
+          label="Judgements feed"
+          body="Feed is live; events will appear here as the pipeline runs."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-3 sm:p-4 space-y-0">
@@ -129,14 +145,33 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
           {entries.map((e, i) => (
             <motion.div
               key={e.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: tokens.motion.duration.short, delay: i * 0.02, ease: tokens.motion.ease }}
-              className="flex items-baseline gap-2 sm:gap-3 py-2 sm:py-2.5 border-b font-mono text-[10px] sm:text-[11px]"
+              transition={{
+                duration: tokens.motion.duration.short,
+                delay: i * 0.025,
+                ease: tokens.motion.ease,
+              }}
             >
-              <span className="shrink-0 tabular-nums text-oxford/60 uppercase tracking-[0.22em]">{e.timestamp}</span>
-              <span className="text-oxford/80 min-w-0 truncate">{e.message}</span>
+              <SignalEventRow
+                layout="compact"
+                timestamp={e.timestamp}
+                body={e.message}
+                trailing={
+                  e.kind === 'decision' && e.decision ? (
+                    <DecisionBadge
+                      variant={
+                        e.decision === 'YES'
+                          ? 'YES'
+                          : e.decision === 'NO' || e.decision === 'PASS'
+                            ? 'NO'
+                            : 'MAYBE'
+                      }
+                    />
+                  ) : undefined
+                }
+              />
             </motion.div>
           ))}
         </AnimatePresence>

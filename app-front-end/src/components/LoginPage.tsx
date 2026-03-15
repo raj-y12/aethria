@@ -6,7 +6,6 @@ import { tokens } from '../design-system/tokens';
 
 const OXford = '#002147';
 const PAPER = '#F2F0EA';
-const EASE_UNDERLINE = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -18,7 +17,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
-  const [hover, setHover] = useState(false);
   const hasRedirectedRef = useRef(false);
 
   // Client-side redirect when already signed in (no full page reload — prevents reload loop)
@@ -119,16 +117,10 @@ export default function LoginPage() {
         {/* 1. Wordmark block — wrapper inline-block so underline matches wordmark width; responsive size on mobile */}
         <div className="inline-flex flex-col items-center">
           <motion.h1
-            className="font-display text-oxford"
-            style={{
-              fontFamily: tokens.font.display,
-              fontSize: 'clamp(2rem, 10vw, 48px)',
-              fontWeight: 400,
-              lineHeight: 1,
-            }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4 }}
+            className="type-hero font-bold text-oxford"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
           >
             Aethria
           </motion.h1>
@@ -140,23 +132,16 @@ export default function LoginPage() {
             }}
             initial={{ scaleX: 0 }}
             animate={{ scaleX: 1 }}
-            transition={{ delay: 0.3, duration: 0.6, ease: EASE_UNDERLINE }}
+            transition={{ delay: 0.25, duration: tokens.motion.duration.long, ease: tokens.motion.ease }}
           />
         </div>
 
         {/* 2. Subtitle */}
         <motion.p
-          className="font-mono uppercase"
-          style={{
-            fontFamily: tokens.font.mono,
-            fontSize: '10px',
-            letterSpacing: '0.2em',
-            color: 'rgba(0, 33, 71, 0.45)',
-            marginTop: '16px',
-          }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.3 }}
+          className="type-label-tab text-oxford/40 mt-4"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
         >
           INVESTMENT INTELLIGENCE
         </motion.p>
@@ -164,9 +149,9 @@ export default function LoginPage() {
         {/* 3. Custom Clerk-powered sign-in form (username + password) */}
         <div className="w-full max-w-[380px]" style={{ marginTop: '48px' }} data-login-page>
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.65, duration: 0.25 }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
           >
             <form
               onSubmit={(e) => {
@@ -184,24 +169,7 @@ export default function LoginPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, 'username')}
-                className="w-full bg-transparent outline-none min-h-[44px] touch-manipulation"
-                style={{
-                  height: '44px',
-                  border: 'none',
-                  borderBottom: '1px solid rgba(0, 33, 71, 0.15)',
-                  padding: '0 0 10px 0',
-                  fontFamily: 'Inter, system-ui, sans-serif',
-                  fontSize: '16px',
-                  fontWeight: 400,
-                  color: 'rgba(0, 33, 71, 0.9)',
-                  transition: 'border-color 200ms ease',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.6)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.15)';
-                }}
+                className="w-full bg-transparent outline-none min-h-[44px] touch-manipulation type-body text-oxford/80 border-0 border-b border-oxford/25 pb-2.5 focus:border-oxford/25 focus-visible:ring-0 btn-interaction"
               />
               <input
                 ref={passwordRef}
@@ -211,32 +179,15 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, 'password')}
-                className="w-full bg-transparent outline-none min-h-[44px] touch-manipulation"
-                style={{
-                  height: '44px',
-                  border: 'none',
-                  borderBottom: '1px solid rgba(0, 33, 71, 0.15)',
-                  padding: '0 0 10px 0',
-                  fontFamily: 'Inter, system-ui, sans-serif',
-                  fontSize: '16px',
-                  fontWeight: 400,
-                  color: 'rgba(0, 33, 71, 0.9)',
-                  transition: 'border-color 200ms ease',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.6)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderBottomColor = 'rgba(0, 33, 71, 0.15)';
-                }}
+                className="w-full bg-transparent outline-none min-h-[44px] touch-manipulation type-body text-oxford/80 border-0 border-b border-oxford/25 pb-2.5 focus:border-oxford/25 focus-visible:ring-0 btn-interaction"
               />
             </div>
 
             {/* Placeholder styling scoped to this block */}
             <style>{`
               [data-login-page] input::placeholder {
-                color: rgba(0, 33, 71, 0.3);
-                font-family: ${tokens.font.mono};
+                color: rgba(0, 33, 71, 0.25);
+                font-family: Inter, system-ui, sans-serif;
                 font-size: 14px;
                 font-weight: 400;
               }
@@ -245,17 +196,10 @@ export default function LoginPage() {
             {/* Error state */}
             {error && (
               <motion.p
-                className="font-mono uppercase"
-                style={{
-                  fontFamily: tokens.font.mono,
-                  fontSize: '9px',
-                  letterSpacing: '0.15em',
-                  color: 'rgba(0, 33, 71, 0.7)',
-                  marginTop: '12px',
-                }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.2 }}
+                className="type-label-section text-oxford/60 mt-3"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
               >
                 {error}
               </motion.p>
@@ -263,9 +207,9 @@ export default function LoginPage() {
 
             {/* Submit button */}
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.85, duration: 0.25 }}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.65, duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
               style={{ marginTop: '32px' }}
             >
               <button
@@ -275,61 +219,31 @@ export default function LoginPage() {
                   e.preventDefault();
                   void handleSubmit(e);
                 }}
-                className="w-full font-mono uppercase outline-none cursor-pointer transition-colors disabled:opacity-70"
-                style={{
-                  height: '44px',
-                  background: OXford,
-                  color: PAPER,
-                  fontFamily: tokens.font.mono,
-                  fontSize: '11px',
-                  letterSpacing: '0.15em',
-                  border: 'none',
-                  transitionDuration: '150ms',
-                  transitionTimingFunction: 'ease',
-                }}
-                onMouseEnter={(e) => {
-                  if (!loading) e.currentTarget.style.backgroundColor = 'rgba(0, 33, 71, 0.85)';
-                  setHover(true);
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = OXford;
-                  setHover(false);
-                }}
-                onMouseDown={(e) => {
-                  if (!loading) e.currentTarget.style.opacity = '0.7';
-                }}
-                onMouseUp={(e) => {
-                  e.currentTarget.style.opacity = '1';
-                }}
+                className="w-full type-label-section h-11 bg-oxford text-paper border-0 cursor-pointer btn-interaction hover:opacity-90"
               >
                 {loading ? (
-                  <span className="inline-flex items-center justify-center gap-1" style={{ fontFamily: tokens.font.mono }}>
-                    <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.6 }}>
-                      .
-                    </motion.span>
+                  <span className="inline-flex items-center justify-center gap-1 type-label-section">
                     <motion.span
-                      animate={{ opacity: [0.3, 1, 0.3] }}
-                      transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+                      animate={{ opacity: [0.4, 1, 0.4] }}
+                      transition={{ repeat: Infinity, duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
                     >
                       .
                     </motion.span>
                     <motion.span
-                      animate={{ opacity: [0.3, 1, 0.3] }}
-                      transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
+                      animate={{ opacity: [0.4, 1, 0.4] }}
+                      transition={{ repeat: Infinity, duration: tokens.motion.duration.short, ease: tokens.motion.ease, delay: 0.15 }}
+                    >
+                      .
+                    </motion.span>
+                    <motion.span
+                      animate={{ opacity: [0.4, 1, 0.4] }}
+                      transition={{ repeat: Infinity, duration: tokens.motion.duration.short, ease: tokens.motion.ease, delay: 0.3 }}
                     >
                       .
                     </motion.span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center justify-center">
-                    <span>LOG IN</span>
-                    <span
-                      className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap"
-                      style={{ width: hover ? '1.25em' : '0.5em' }}
-                    >
-                      {'\u00A0—'}
-                    </span>
-                  </span>
+                  'LOG IN'
                 )}
               </button>
             </motion.div>
@@ -342,19 +256,11 @@ export default function LoginPage() {
       <motion.footer
         className="fixed left-0 right-0 flex justify-center px-4 text-center"
         style={{ bottom: 'max(32px, env(safe-area-inset-bottom))' }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.9, duration: 0.3 }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.85, duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
       >
-        <p
-          className="font-mono uppercase"
-          style={{
-            fontFamily: tokens.font.mono,
-            fontSize: '9px',
-            letterSpacing: '0.15em',
-            color: 'rgba(0, 33, 71, 0.25)',
-          }}
-        >
+        <p className="type-meta text-oxford/25">
           AETHRIA · INVESTMENT INTELLIGENCE PLATFORM
         </p>
       </motion.footer>

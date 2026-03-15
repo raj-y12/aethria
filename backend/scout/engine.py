@@ -84,6 +84,19 @@ class ScoutEngine:
         """
         self.logger.info(f"Starting discovery cycle at {datetime.now().isoformat()}")
         
+        # Backpressure: skip discovery when too many unreviewed (let reviewers catch up)
+        if self.storage is not None:
+            try:
+                unreviewed = self.storage.count_unreviewed()
+                if unreviewed > self.backpressure_threshold:
+                    self.logger.warning(
+                        f"Backpressure: {unreviewed} unreviewed exceeds threshold "
+                        f"({self.backpressure_threshold}), skipping scout cycle"
+                    )
+                    return []
+            except Exception as e:
+                self.logger.debug("Could not get unreviewed count for backpressure: %s", e)
+        
         # Check budget before running scouts
         if self.cost_controller:
             allowed, reason = self.cost_controller.check_budget("scout", "scout_engine")
@@ -226,7 +239,6 @@ class ScoutEngine:
                     if self.running:
                         await asyncio.sleep(self.interval_seconds)
                     continue
-                # Backpressure disabled so scouts keep running
                 cycle_count += 1
                 self.logger.info(f"=== Discovery Cycle #{cycle_count} ===")
                 

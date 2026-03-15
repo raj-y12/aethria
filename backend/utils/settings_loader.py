@@ -28,6 +28,11 @@ def _settings_key(user_id: Optional[str] = None, *, for_save: bool = False) -> O
     return None
 
 DEFAULT_SETTINGS = {
+    "fund_identity": {
+        "fund_name": "",
+        "stage_focus": "",
+        "geographic_focus": "",
+    },
     "cost_budget": {
         "enabled": False,  # Set True to enforce token/call limits and cooldowns; False = bypass for now
         "max_tokens_per_run": 50000,
@@ -67,11 +72,12 @@ def load_settings(user_id: Optional[str] = None) -> dict:
     key = _settings_key(user_id, for_save=False)
     if not key:
         return json.loads(json.dumps(DEFAULT_SETTINGS))
-    data = doc_get(_SETTINGS_TABLE, key)
+    # key is the user_id for settings table; pass so doc_get uses (user_id, key) correctly
+    data = doc_get(_SETTINGS_TABLE, key, user_id=key)
     if not data or not isinstance(data, dict):
         return json.loads(json.dumps(DEFAULT_SETTINGS))
     out = json.loads(json.dumps(DEFAULT_SETTINGS))
-    for section in ("cost_budget", "agent_config", "portfolio"):
+    for section in ("fund_identity", "cost_budget", "agent_config", "portfolio"):
         if section in data and isinstance(data[section], dict):
             for k, v in data[section].items():
                 if k in out.get(section, {}):
@@ -84,7 +90,7 @@ def save_settings(settings: dict, user_id: Optional[str] = None) -> None:
     key = _settings_key(user_id, for_save=True)
     if not key:
         raise ValueError("user_id required to save settings (pass explicitly or set run context with set_run_user_id)")
-    doc_set(_SETTINGS_TABLE, settings, key)
+    doc_set(_SETTINGS_TABLE, settings, key, user_id=key)
 
 
 def is_scouts_enabled(user_id: Optional[str] = None) -> bool:

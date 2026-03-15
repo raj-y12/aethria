@@ -63,6 +63,9 @@ class ReviewerEngine:
         self.backpressure_threshold = int(
             os.getenv("REVIEWER_BACKPRESSURE_THRESHOLD", "10")
         )
+        # Ramp-up: when unreviewed backlog is high, process more per cycle
+        self.ramp_threshold = int(os.getenv("REVIEWER_RAMP_THRESHOLD", "5"))
+        self.ramp_batch_max = int(os.getenv("REVIEWER_RAMP_BATCH_MAX", "5"))
         
         # Initialize Reviewers (default + persona reviewers)
         self.reviewer = DefaultReviewer(api_key, model=model)
@@ -115,8 +118,17 @@ class ReviewerEngine:
                 self.logger.warning(f"Reviewer budget denied: {reason}")
                 return 0
         
-        # Get unreviewed startups
-        unreviewed_startups = self.storage.get_unreviewed(limit=self.batch_size)
+        # Ramp-up: process more per cycle when unreviewed backlog is high
+        unreviewed_count = self.storage.count_unreviewed()
+        if unreviewed_count > self.ramp_threshold:
+            effective_batch = min(self.ramp_batch_max, unreviewed_count)
+            self.logger.info(
+                f"Ramp-up: {unreviewed_count} unreviewed > {self.ramp_threshold}, "
+                f"processing up to {effective_batch} this cycle"
+            )
+        else:
+            effective_batch = min(self.batch_size, unreviewed_count) if unreviewed_count else 0
+        unreviewed_startups = self.storage.get_unreviewed(limit=effective_batch)
         
         if not unreviewed_startups:
             self.logger.info("No unreviewed entries found")

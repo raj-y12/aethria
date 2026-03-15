@@ -64,7 +64,14 @@ export interface SystemHealth {
   budget_status: AgentBudgetStatus[];
 }
 
+export interface FundIdentity {
+  fund_name: string;
+  stage_focus: string;
+  geographic_focus: string;
+}
+
 export interface Settings {
+  fund_identity?: FundIdentity;
   cost_budget: CostBudget;
   agent_config: AgentConfig;
   portfolio: Portfolio;
