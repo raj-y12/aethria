@@ -1,20 +1,25 @@
 """
-Run one pipeline cycle (scout → reviewer → partner) for a single user.
+Run one pipeline cycle (scout → reviewer → partner → portfolio → meta) for a single user.
 Used by the per-user agent queue: when a user logs in and agents are enabled,
 we enqueue their user_id and a worker runs this for them.
 """
 import asyncio
 import logging
 import os
+from datetime import datetime, timedelta
 
-from utils.settings_loader import set_run_user_id, load_settings, is_scouts_enabled, is_reviewers_enabled, is_partners_enabled, is_cost_budget_enabled
+from run_context import set_run_user_id
+from utils.settings_loader import load_settings, is_scouts_enabled, is_reviewers_enabled, is_partners_enabled, is_cost_budget_enabled
 from supabase_client import get_service_client
 from supabase_storage import SupabaseStartupsStorage
 from scout.engine import ScoutEngine
 from reviewer.engine import ReviewerEngine
 from partner.engine import PartnerEngine
+from portfolio.store import PortfolioStore
+from portfolio.engine import PortfolioEngine
 from portfolio.cost_control import CostController
 from memory import DealMemory
+from meta.agent import MetaAgent
 
 logger = logging.getLogger("pipeline_runner")
 
@@ -89,6 +94,32 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
             await reviewer_engine.run_cycle()
         if is_partners_enabled(user_id):
             await partner_engine.run_cycle()
+
+        # Portfolio layer: sync partner decisions to portfolio store, run signals, feedback, health
+        portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
+        portfolio_store = PortfolioStore(data_dir=portfolio_dir)
+        portfolio_engine = PortfolioEngine(
+            discovery_storage=storage,
+            portfolio_store=portfolio_store,
+            execution_interval=10,
+            signal_interval=3600,
+            feedback_interval=86400,
+            health_interval=3600,
+        )
+        # Force first run_cycle to execute all steps (execution, signals, feedback, health)
+        portfolio_engine.last_execution = datetime.now() - timedelta(days=1)
+        portfolio_engine.last_signal = datetime.now() - timedelta(days=1)
+        portfolio_engine.last_feedback = datetime.now() - timedelta(days=1)
+        portfolio_engine.last_health = datetime.now() - timedelta(days=1)
+        await portfolio_engine.run_cycle()
+
+        # Meta-agent: one cycle to update weights/calibration/reports
+        try:
+            meta_agent = MetaAgent(scout_engine=scout_engine, reviewer_engine=reviewer_engine)
+            await meta_agent.run_cycle()
+        except Exception as meta_err:
+            logger.warning("[%s] Meta-agent cycle skipped: %s", user_id[:12], meta_err)
+
         logger.info("[%s] Pipeline cycle completed", user_id[:12])
     except Exception as e:
         logger.exception("[%s] Pipeline cycle error: %s", user_id[:12], e)

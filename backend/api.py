@@ -717,20 +717,26 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
 
 
 @app.get("/api/signals")
-async def get_signals():
+async def get_signals(request: Request):
     """
     Return the last 50 portfolio signals sorted by detected_at descending.
+    Startup names come from request-scoped storage (Supabase) so they are user-correct.
     """
     store = _get_portfolio_store()
     signals_file = store.files.get("signals")
     records = store._read_file(signals_file) if signals_file is not None else []
-    # Attach startup names where possible
-    startups_index = {s.get("id"): s for s in store.get_all_startups()}
+    # Attach startup names from request-scoped storage (user's startups)
+    storage = _get_storage(request)
+    raw_startups = storage.get_all()
+    startups_index = {}
+    for s in raw_startups:
+        sid = s.get("startup_id") or s.get("id")
+        if sid:
+            name = (s.get("scout_info") or {}).get("name") or (s.get("scout") or {}).get("name") or ""
+            startups_index[sid] = name
     for r in records:
-        sid = r.get("startup_id")
-        startup = startups_index.get(sid or "")
-        if startup and "startup_name" not in r:
-            r["startup_name"] = startup.get("name")
+        if "startup_name" not in r:
+            r["startup_name"] = startups_index.get(r.get("startup_id") or "", "")
     records.sort(key=lambda r: r.get("detected_at", ""), reverse=True)
     return records[:50]
 
@@ -791,9 +797,10 @@ async def get_rejection_analytics():
 
 
 @app.get("/api/analytics/watchlist")
-async def get_watchlist_analytics():
+async def get_watchlist_analytics(request: Request):
     """
     Return watchlist health analytics: total, stale, average days, and per-entry stats.
+    Startup names come from request-scoped storage so they are user-correct.
     """
     store = _get_portfolio_store()
     try:
@@ -816,7 +823,15 @@ async def get_watchlist_analytics():
             continue
         signal_counts[sid] = signal_counts.get(sid, 0) + 1
 
-    startups_index = {s.get("id"): s for s in store.get_all_startups()}
+    # Startup names from request-scoped storage (user's startups)
+    storage = _get_storage(request)
+    raw_startups = storage.get_all()
+    startups_index = {}
+    for s in raw_startups:
+        sid = s.get("startup_id") or s.get("id")
+        if sid:
+            name = (s.get("scout_info") or {}).get("name") or (s.get("scout") or {}).get("name") or ""
+            startups_index[sid] = name
 
     stale = 0
     days_total = 0
@@ -824,8 +839,7 @@ async def get_watchlist_analytics():
 
     for entry in watchlist:
         sid = entry.get("startup_id")
-        startup = startups_index.get(sid or "")
-        name = startup.get("name") if startup else ""
+        name = startups_index.get(sid or "", "")
         added_at_str = entry.get("added_at")
         days_on_watchlist = 0
         try:
