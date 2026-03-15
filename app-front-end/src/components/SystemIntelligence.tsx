@@ -171,7 +171,7 @@ function EscalationCard({ escalation, onResolved }: { escalation: EscalationItem
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Notes (optional)"
-            className="w-full bg-transparent border border-oxford/25 p-2 type-body-sm text-oxford placeholder:text-oxford/25 outline-none focus:border-oxford/40 resize-none rounded-none"
+            className="w-full bg-transparent border border-oxford/25 p-2 type-body-sm text-oxford placeholder:text-oxford/25 outline-none focus:border-oxford/25 resize-none rounded-none"
             rows={2}
           />
           <div className="flex gap-2">

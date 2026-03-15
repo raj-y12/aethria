@@ -243,15 +243,21 @@
     background: rgba(0, 33, 71, 0.25);
   }
 
-  /* Canonical focus: brand ring (no browser default outline). */
+  /* Canonical focus: brand ring (no browser default outline). Buttons/links get ring; inputs do not. */
   button:focus-visible,
   a:focus-visible,
-  [role="button"]:focus-visible,
-  input:focus-visible,
-  select:focus-visible,
-  textarea:focus-visible {
+  [role="button"]:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px rgba(0, 33, 71, 0.4);
+  }
+  input:focus,
+  input:focus-visible,
+  select:focus,
+  select:focus-visible,
+  textarea:focus,
+  textarea:focus-visible {
+    outline: none;
+    box-shadow: none;
   }
 }
 

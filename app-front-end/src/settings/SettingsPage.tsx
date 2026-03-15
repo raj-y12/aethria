@@ -18,9 +18,9 @@ type TabId = 'account' | 'budget' | 'pipeline' | 'discovery' | 'meta' | 'portfol
 
 const inputCls =
   'w-full min-w-0 max-w-[10rem] border-0 border-b bg-transparent type-body-sm text-oxford placeholder:text-oxford/40 py-1.5 outline-none rounded-none btn-interaction';
-const inputBorder = 'border-oxford/25 focus:border-oxford';
+const inputBorder = 'border-oxford/25 focus:border-oxford/25';
 const hintCls = 'block type-body-sm text-oxford/40 mt-0.5 mb-0 leading-relaxed';
-const selectCls = inputCls + ' border-oxford/25 focus:border-oxford cursor-pointer appearance-none pr-8 max-w-full';
+const selectCls = inputCls + ' border-oxford/25 focus:border-oxford/25 cursor-pointer appearance-none pr-8 max-w-full';
 const toggleLabelCls = 'type-body-sm text-oxford';
 const groupHeadingCls = 'type-label-section text-oxford/60 mb-1';
 const sectionIntroCls = 'type-body-sm text-oxford/60 mb-1.5 max-w-xl leading-snug';
