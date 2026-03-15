@@ -1,7 +1,10 @@
 import type { SignalItem } from '../types/startup';
 import { getAuthHeaders } from './auth';
 
-const API_BASE = typeof window !== 'undefined' ? '' : 'http://localhost:8000';
+const API_BASE =
+  typeof window !== 'undefined'
+    ? (import.meta.env.VITE_API_URL ?? '')
+    : 'http://localhost:8000';
 
 export async function fetchSignals(): Promise<SignalItem[]> {
   const headers = { Accept: 'application/json', ...(await getAuthHeaders()) };
