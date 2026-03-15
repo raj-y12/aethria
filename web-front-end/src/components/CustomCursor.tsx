@@ -1,13 +1,23 @@
 import { useEffect, useState } from 'react';
 
+const DESKTOP_CURSOR_MEDIA = '(pointer: fine) and (min-width: 769px)';
+
 export default function CustomCursor() {
+  const [active, setActive] = useState(false);
   const [pos, setPos] = useState({ x: -100, y: -100 });
   const [expanded, setExpanded] = useState(false);
   const [hasMoved, setHasMoved] = useState(false);
 
   useEffect(() => {
-    const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
-    if (!hasFinePointer) return;
+    const mq = window.matchMedia(DESKTOP_CURSOR_MEDIA);
+    setActive(mq.matches);
+    const listener = () => setActive(mq.matches);
+    mq.addEventListener('change', listener);
+    return () => mq.removeEventListener('change', listener);
+  }, []);
+
+  useEffect(() => {
+    if (!active) return;
 
     const handleMove = (e: MouseEvent) => {
       setPos({ x: e.clientX, y: e.clientY });
@@ -23,7 +33,9 @@ export default function CustomCursor() {
       document.body.style.cursor = '';
       window.removeEventListener('mousemove', handleMove);
     };
-  }, []);
+  }, [active]);
+
+  if (!active) return null;
 
   return (
     <div

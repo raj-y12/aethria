@@ -111,7 +111,7 @@ export default function RequestAccessPage() {
         <Link
           data-cursor-expand
           to="/"
-          className="font-display font-normal text-[17px] hover:opacity-80 transition-opacity md:block text-center md:text-left flex-1 md:flex-none min-h-[44px] flex items-center"
+          className="font-display text-[17px] hover:opacity-80 transition-opacity text-left flex-1 md:flex-none min-h-[44px] flex items-center"
           style={{ color: 'var(--color-oxford)' }}
         >
           Aethria
@@ -126,21 +126,27 @@ export default function RequestAccessPage() {
         </Link>
       </header>
 
-      <div className="shrink-0 page-margin-x pt-0 pb-2">
+      <div className="shrink-0 page-margin-x pt-0 pb-1">
         <p className="form-label-aethria mb-0" style={{ color: 'var(--color-oxford)', opacity: 0.5 }}>
-          REGISTRY / 2026 · EARLY ACCESS
+          2026 · EARLY ACCESS
         </p>
       </div>
 
       <main className="request-content-area flex-1 flex items-center justify-center overflow-auto py-8 md:py-12 page-margin-x">
-        <div className="w-full max-w-5xl flex flex-col justify-center">
+        <div className="w-full max-w-2xl flex flex-col justify-center">
           {!submitted ? (
             <>
               <p
-                className="font-mono text-[12px] uppercase tracking-[0.2em] mb-12"
+                className="font-mono text-[12px] uppercase tracking-[0.2em] mb-3"
                 style={{ color: 'var(--color-oxford)', opacity: 0.75 }}
               >
                 REQUEST ACCESS
+              </p>
+              <p className="font-sans text-[14px] mb-2 leading-relaxed" style={{ color: 'var(--color-oxford)', opacity: 0.6 }}>
+                Join the waitlist. We’ll reach out when a spot opens.
+              </p>
+              <p className="font-sans text-[13px] mb-10" style={{ color: 'var(--color-oxford)', opacity: 0.45 }}>
+                We’ll confirm by email. No spam.
               </p>
 
               <div style={{ opacity: formOut ? 0 : 1, transition: 'opacity 200ms ease' }}>
@@ -211,12 +217,12 @@ export default function RequestAccessPage() {
                   </div>
 
                   {validationError && (
-                    <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: 'var(--color-oxford)', opacity: 0.6 }} role="alert">
-                      PLEASE COMPLETE ALL REQUIRED FIELDS
+                    <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: 'var(--color-oxford)', opacity: 0.55 }} role="alert">
+                      Complete name, email, role, and firm
                     </p>
                   )}
                   {error && (
-                    <p className="mt-4 font-sans text-[13px] font-medium" style={{ color: 'var(--color-oxford)', opacity: 0.8 }} role="alert">
+                    <p className="mt-4 font-sans text-[13px]" style={{ color: 'var(--color-oxford)', opacity: 0.75 }} role="alert">
                       {error}
                     </p>
                   )}
@@ -236,7 +242,7 @@ export default function RequestAccessPage() {
                           className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap"
                           style={{ width: loading || processing || submitHover ? '1.25em' : '0.5em' }}
                         >
-                          {'\u00A0—'}
+                          {'\u00A0›'}
                         </span>
                       </span>
                     </button>
@@ -248,19 +254,19 @@ export default function RequestAccessPage() {
                 className="flex flex-col items-center justify-center text-center"
                 style={{ opacity: showSuccess ? 1 : 0, transition: 'opacity 300ms ease' }}
               >
-                <p className="font-mono text-[11px] uppercase tracking-[0.15em]" style={{ color: 'var(--color-oxford)', opacity: 0.8 }}>
-                  APPLICATION RECEIVED
+                <p className="font-mono text-[11px] uppercase tracking-[0.15em]" style={{ color: 'var(--color-oxford)', opacity: 0.85 }}>
+                  You’re on the list
                 </p>
                 {position != null && (
-                  <p className="font-sans text-[15px] mt-4" style={{ color: 'var(--color-oxford)', opacity: 0.6 }}>
-                    You're #{position} on the waitlist.
+                  <p className="font-sans text-[14px] mt-3" style={{ color: 'var(--color-oxford)', opacity: 0.6 }}>
+                    Position #{position}. We’ll be in touch.
                   </p>
                 )}
                 {APP_URL && (
                   <a
                     href={APP_URL.replace(/\/$/, '') + '/dashboard'}
                     data-cursor-expand
-                    className="mt-6 inline-flex items-center justify-center min-h-[44px] px-6 border border-[var(--color-oxford)] text-[var(--color-oxford)] font-mono text-[10px] uppercase tracking-[0.1em] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] transition-colors"
+                    className="mt-8 inline-flex items-center justify-center min-h-[44px] px-6 border border-[var(--color-oxford)] text-[var(--color-oxford)] font-mono text-[10px] uppercase tracking-[0.1em] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] transition-colors rounded-none"
                   >
                     Proceed to sign in
                   </a>
@@ -268,21 +274,24 @@ export default function RequestAccessPage() {
                 <Link
                   to="/home"
                   data-cursor-expand
-                  className="font-mono text-[10px] uppercase mt-8 inline-block transition-opacity hover:opacity-100"
-                  style={{ color: 'var(--color-oxford)', opacity: 0.4 }}
+                  className="font-mono text-[10px] uppercase mt-8 inline-flex items-center min-h-[44px] transition-opacity hover:opacity-100"
+                  style={{ color: 'var(--color-oxford)', opacity: 0.45 }}
                 >
-                  ← Return home
+                  ← Back to home
                 </Link>
               </div>
             )}
         </div>
       </main>
 
-      <footer className="shrink-0 z-20 flex items-center justify-between page-margin-x pt-2.5 pb-[max(1rem,env(safe-area-inset-bottom))] md:pt-3 md:pb-3">
-        <span className="font-sans text-[10px] md:text-[11px] tracking-wide opacity-70" style={{ color: 'var(--color-oxford)' }}>
+      <footer
+        className="shrink-0 z-20 flex items-center justify-between page-margin-x pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:pt-5 md:pb-4 border-t"
+        style={{ borderColor: 'rgba(0, 33, 71, 0.06)', color: 'var(--color-oxford)', backgroundColor: 'var(--color-paper)' }}
+      >
+        <span className="font-sans text-[10px] md:text-[11px] tracking-wide" style={{ color: 'var(--color-oxford)', opacity: 0.65 }}>
           © Aethria
         </span>
-        <span className="font-mono text-[9px] uppercase tracking-[0.15em] opacity-70" style={{ color: 'var(--color-oxford)' }}>
+        <span className="font-mono text-[9px] uppercase tracking-[0.15em]" style={{ color: 'var(--color-oxford)', opacity: 0.5 }}>
           INVESTMENT INTELLIGENCE
         </span>
       </footer>

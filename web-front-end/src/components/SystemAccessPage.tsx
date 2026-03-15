@@ -9,7 +9,7 @@ export interface SystemAccessPageProps {
 
 const DEFAULTS = {
   hero: 'Aethria',
-  status: 'INFRASTRUCTURE IN PREPARATION',
+  status: 'REDIRECTING',
 } as const;
 
 const NAVIGATE_DELAY_MS = 3200;
@@ -46,11 +46,13 @@ export default function SystemAccessPage({
       onTransitionEnd={handleTransitionEnd}
     >
       <GrainOverlay opacity={0.02} />
-      <div className="w-full min-w-0 flex flex-col items-center justify-center px-4 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12 relative z-10">
+      <div
+        className="w-full min-w-0 flex flex-col items-center justify-center relative z-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-8 sm:py-10 lg:px-12 lg:py-12"
+      >
         {/* Logo: bold, tighter letter-spacing; underline only under "A", left-to-right */}
         <div className="flex flex-col items-center max-w-[80vw] sm:max-w-full">
           <h1
-            className="font-display font-bold text-ivory text-center break-words tracking-[-0.05em]"
+            className="font-display text-ivory text-center break-words tracking-[-0.05em]"
             style={{
               fontSize: 'clamp(1.75rem, 6vw + 1rem, 4rem)',
               lineHeight: 1.1,
@@ -72,7 +74,6 @@ export default function SystemAccessPage({
             )}
           </h1>
         </div>
-        {/* Status: 10px Monospace, all-caps, 0.3em letter-spacing, exactly 24px below logo */}
         <p
           className="font-mono text-[10px] uppercase text-ivory text-center w-full max-w-full break-words system-init-status"
           style={{
@@ -81,6 +82,12 @@ export default function SystemAccessPage({
           }}
         >
           {status}
+        </p>
+        <p
+          className="font-mono text-[9px] uppercase tracking-[0.2em] text-ivory/60 text-center mt-2"
+          style={{ letterSpacing: '0.2em' }}
+        >
+          Investment Intelligence
         </p>
       </div>
     </div>
