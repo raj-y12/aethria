@@ -92,6 +92,7 @@ export default function HomePage() {
             aria-hidden
           />
           <h1
+            data-cursor="headline"
             className="font-display text-[34px] sm:text-[2.85rem] lg:text-[3.5625rem] xl:text-[4.275rem] max-w-[18ch] md:max-w-[20ch] relative z-[1] home-monolith-headline-in"
             style={{ color: 'var(--color-paper)', lineHeight: 1.05 }}
           >

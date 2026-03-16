@@ -2,56 +2,107 @@ import { useEffect, useState } from 'react';
 
 const DESKTOP_CURSOR_MEDIA = '(pointer: fine) and (min-width: 769px)';
 
+type CursorMode = 'default' | 'hover' | 'headline';
+
 export default function CustomCursor() {
   const [active, setActive] = useState(false);
   const [pos, setPos] = useState({ x: -100, y: -100 });
-  const [expanded, setExpanded] = useState(false);
+  const [mode, setMode] = useState<CursorMode>('default');
   const [hasMoved, setHasMoved] = useState(false);
 
+  // Enable only on non-touch, desktop-like pointers
   useEffect(() => {
+    const isTouch = navigator.maxTouchPoints > 0;
+    if (isTouch) {
+      setActive(false);
+      return;
+    }
+
     const mq = window.matchMedia(DESKTOP_CURSOR_MEDIA);
-    setActive(mq.matches);
-    const listener = () => setActive(mq.matches);
-    mq.addEventListener('change', listener);
-    return () => mq.removeEventListener('change', listener);
+    const update = () => setActive(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
   }, []);
 
+  // Mouse tracking + hover mode detection
   useEffect(() => {
     if (!active) return;
 
     const handleMove = (e: MouseEvent) => {
       setPos({ x: e.clientX, y: e.clientY });
       setHasMoved(true);
+
       const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-      setExpanded(!!el?.closest('a') || !!el?.closest('[data-cursor-expand]'));
+      const hoverTarget =
+        el?.closest('a,button') ||
+        el?.closest('[data-cursor-expand]') ||
+        (el && (el as HTMLElement).dataset.cursor === 'hover'
+          ? el
+          : el?.closest('[data-cursor="hover"]') || null);
+      const headlineTarget =
+        el?.dataset.cursor === 'headline' ? el : el?.closest('[data-cursor="headline"]');
+
+      if (headlineTarget) {
+        setMode('headline');
+      } else if (hoverTarget) {
+        setMode('hover');
+      } else {
+        setMode('default');
+      }
     };
 
-    document.body.style.cursor = 'none';
+    document.documentElement.classList.add('has-custom-cursor');
     window.addEventListener('mousemove', handleMove);
 
     return () => {
-      document.body.style.cursor = '';
+      document.documentElement.classList.remove('has-custom-cursor');
       window.removeEventListener('mousemove', handleMove);
     };
   }, [active]);
 
   if (!active) return null;
 
+  const showDot = mode === 'default';
+  const ringSize = mode === 'headline' ? 80 : mode === 'hover' ? 56 : 36;
+  const ringOpacity = mode === 'default' ? 0.35 : 0.6;
+
   return (
     <div
-      className="fixed pointer-events-none z-[10000] rounded-none transition-[transform] duration-300 ease-out"
+      className="fixed pointer-events-none z-[10000]"
       style={{
-        left: pos.x,
-        top: pos.y,
-        width: expanded ? 24 : 8,
-        height: expanded ? 24 : 8,
-        marginLeft: expanded ? -12 : -4,
-        marginTop: expanded ? -12 : -4,
-        backgroundColor: 'rgba(0, 33, 71, 0.9)',
-        opacity: 1,
+        left: 0,
+        top: 0,
+        width: 0,
+        height: 0,
         visibility: hasMoved ? 'visible' : 'hidden',
       }}
       aria-hidden
-    />
+    >
+      {/* Small filled dot */}
+      {showDot && (
+        <div
+          className="absolute rounded-full transition-transform duration-150 ease-out"
+          style={{
+            width: 8,
+            height: 8,
+            backgroundColor: '#002147',
+            transform: `translate(${pos.x - 4}px, ${pos.y - 4}px)`,
+          }}
+        />
+      )}
+
+      {/* Hollow ring */}
+      <div
+        className="absolute rounded-full transition-transform duration-300 ease-out"
+        style={{
+          width: ringSize,
+          height: ringSize,
+          border: '1px solid #002147',
+          opacity: ringOpacity,
+          transform: `translate(${pos.x - ringSize / 2}px, ${pos.y - ringSize / 2}px)`,
+        }}
+      />
+    </div>
   );
 }
