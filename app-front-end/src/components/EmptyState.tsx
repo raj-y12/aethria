@@ -5,8 +5,6 @@
 
 import type { ReactNode } from 'react';
 
-const FONT_BODY = '"Geist Sans", system-ui, sans-serif' as const;
-
 function DefaultMark() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" aria-hidden>
@@ -23,19 +21,12 @@ interface EmptyStateProps {
 
 export default function EmptyState({ label, body, icon }: EmptyStateProps) {
   return (
-    <div className="w-full flex flex-col items-center justify-center py-10 px-4 sm:px-6 text-center">
+    <div className="flex w-full flex-col items-center justify-center px-4 py-10 text-center sm:px-6">
       <div className="mb-3 flex h-7 w-7 shrink-0 items-center justify-center text-oxford/[0.22] [&_svg]:h-full [&_svg]:w-full">
         {icon ?? <DefaultMark />}
       </div>
-      <p className="mb-2 max-w-xs font-mono text-[10px] font-normal uppercase leading-[1.5] tracking-[0.12em] text-oxford/50">
-        {label}
-      </p>
-      <div
-        className="max-w-sm text-[13px] font-normal leading-relaxed text-oxford/50"
-        style={{ fontFamily: FONT_BODY }}
-      >
-        {body}
-      </div>
+      <p className="type-meta mb-2 max-w-xs uppercase text-oxford/50">{label}</p>
+      <div className="type-body-sm max-w-sm leading-relaxed text-oxford/50">{body}</div>
     </div>
   );
 }

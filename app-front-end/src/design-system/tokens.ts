@@ -6,6 +6,7 @@
  * Typography: Libre Baskerville (wordmark / type-hero only). Geist Sans (all UI body, titles, prominent copy). Space Mono (metadata/labels, 0.08–0.14em).
  * Brand scale: section-label 11px/0.12em, tab/meta 10px/0.12–0.14em, intro 13px body 1.6.
  * Frames: 1px rgba(0,33,71,0.06). No rounded corners.
+ * Register tint: CSS variable --color-register-tint (see index.css); Tailwind `registerTint` / `bg-registerTint`.
  *
  * Oxford opacity ladder: the only permitted opacities for Oxford-derived text and semantic borders are 100, 80, 60, 40, 25 (percent).
  * Structural frame borders use 0.06 and are the exception.

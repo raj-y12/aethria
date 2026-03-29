@@ -140,7 +140,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-3 sm:p-4 space-y-0">
+      <div className="space-y-0 p-4 sm:p-5">
         <AnimatePresence mode="popLayout">
           {entries.map((e, i) => (
             <motion.div

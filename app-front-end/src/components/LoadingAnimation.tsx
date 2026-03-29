@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
+import { tokens } from '../design-system/tokens';
 
 interface LoadingAnimationProps {
   fullScreen?: boolean;
 }
 
-/** Easing: smooth orbit, no bounce. */
-const EASE = [0.33, 0, 0.67, 1] as const;
+/** Align with app motion token — smooth orbit, no bounce. */
+const EASE = tokens.motion.ease;
 
 /** Triangle vertices (relative to center). Scaled for larger points. */
 const VERTICES = [

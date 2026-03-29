@@ -7,11 +7,14 @@
  * Text hierarchy: Oxford opacity ladder 100, 80, 60, 40, 25. Line-height: 1.5 labels, 1.6 body.
  */
 :root {
+  --color-paper: #f2f0ea;
   --color-paper-bright: #faf8f4;
   --color-heritage-gold: #b8976a;
   --color-heritage-gold-soft: rgba(184, 151, 106, 0.35);
   /* Escalation-only: use only for escalation dots, pulse, counts, critical human-attention alerts. */
   --color-accent: #7D2B3A;
+  /* Pipe column headers, WorkGrid row selected/hover, memo summary — oxford @ 3%. */
+  --color-register-tint: rgba(0, 33, 71, 0.03);
   /* Validation strip: paper only (palette whitelist). */
   --color-warning-bg: #F2F0EA;
   --color-warning-border: rgba(0, 33, 71, 0.25);
@@ -47,7 +50,7 @@
   color: #002147 !important;
   border: 1px solid rgba(0, 33, 71, 0.06) !important;
   border-radius: 0 !important;
-  box-shadow: 0 8px 32px rgba(0, 33, 71, 0.2) !important;
+  box-shadow: none !important;
   font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
 }
 .cl-card {
@@ -189,6 +192,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * App shell — Bloomberg/Palantir density + Lazard restraint.
+ * Prefer `chrome.frame` from design-system/chrome.ts or these classes for new surfaces.
+ */
+@layer components {
+  .app-chrome-frame {
+    @apply rounded-none border border-oxford/[0.06] bg-paper;
+  }
+  .app-chrome-frame-raised {
+    @apply rounded-none border border-oxford/[0.06] bg-paper-bright;
+  }
+}
+
 @layer base {
   * {
     border-color: rgba(0, 33, 71, 0.06);
@@ -203,7 +219,7 @@
 
   body {
     overflow-x: hidden;
-    background-color: #F2F0EA;
+    background-color: var(--color-paper);
     color: #002147;
     font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
     font-size: 14px;
@@ -250,8 +266,9 @@
   button:focus-visible,
   a:focus-visible,
   [role="button"]:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(0, 33, 71, 0.4);
+    outline: 2px solid rgba(0, 33, 71, 0.4);
+    outline-offset: 2px;
+    box-shadow: none;
   }
   input:focus,
   input:focus-visible,
@@ -307,6 +324,14 @@
     font-size: 10px;
     line-height: 1.5;
     letter-spacing: 0.12em;
+  }
+  /** Data figures in lists / pipe strip — mono, tabular. */
+  .type-data {
+    font-family: "Space Mono", ui-monospace, monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
   }
 
   .ease-smooth {

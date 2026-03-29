@@ -1,16 +1,16 @@
 import type { ReactNode } from 'react';
 
 export const PANEL_HEADER_CLASS =
-  'flex-none flex items-center justify-between px-6 py-4 border-b border-oxford/[0.06]';
+  'flex-none flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3 border-b border-oxford/[0.06]';
 export const PANEL_TITLE_CLASS = 'type-label-tab text-oxford/60';
-export const PANEL_TAB_BAR_CLASS = 'flex-none flex gap-0 border-b border-oxford/[0.06] px-4';
+export const PANEL_TAB_BAR_CLASS = 'flex-none flex gap-0 border-b border-oxford/[0.06] px-3 sm:px-4';
 export const PANEL_TAB_BUTTON_CLASS =
-  'py-3 px-3 type-label-tab border-b-2 -mb-[2px] focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
+  'py-2.5 px-3 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
 export const PANEL_TAB_ACTIVE_CLASS = 'text-oxford border-oxford';
 export const PANEL_TAB_INACTIVE_CLASS =
-  'text-oxford/60 border-transparent hover:text-oxford';
+  'text-oxford/60 border-transparent hover:text-oxford hover:border-oxford/20';
 export const PANEL_CONTENT_CLASS =
-  'flex-1 min-h-0 overflow-y-auto p-4 sm:p-6';
+  'flex-1 min-h-0 overflow-y-auto p-4 sm:p-5';
 
 export interface PanelTab {
   id: string;
@@ -62,7 +62,7 @@ export default function PanelShell({
   contentOverflowHidden,
   contentClassName,
   className = '',
-  headerPaddingClass = 'py-4',
+  headerPaddingClass = 'py-3',
   headerBorderClass = 'border-b border-oxford/[0.06]',
   headerJustifyClass = 'justify-between',
   showTitle = true,
@@ -80,7 +80,7 @@ export default function PanelShell({
   return (
     <div className={`flex h-full flex-col min-h-0 ${className}`}>
       <header
-        className={`flex-none flex items-center px-6 ${headerPaddingClass} ${headerBorderClass} ${headerJustifyClass} ${headerClassName}`.trim()}
+        className={`flex-none flex items-center px-4 sm:px-5 ${headerPaddingClass} ${headerBorderClass} ${headerJustifyClass} ${headerClassName}`.trim()}
       >
         {showTitle ? <span className={titleCls}>{title}</span> : null}
         {actions != null && <div className="flex items-center gap-2">{actions}</div>}

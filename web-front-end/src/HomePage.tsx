@@ -1,463 +1,499 @@
 import { Link } from 'react-router-dom';
-import { useEffect, useRef, useState } from 'react';
-import { motion, Variants } from 'framer-motion';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useEffect, useState, type ReactNode } from 'react';
+import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import GrainOverlay from './components/GrainOverlay';
+import MarketTape from './components/MarketTape';
 import IntelligenceMap from './components/IntelligenceMap';
 import DashboardPreview from './components/DashboardPreview';
+import DeskClock from './components/DeskClock';
+import HomeStatsSection from './components/HomeStatsSection';
+import { ScrollReveal } from './components/ScrollReveal';
+import { SCROLL_EASE } from './motionTokens';
 
-const headlineText = 'Intelligent investment discovery and evaluation system.';
-
-const headlineContainerVariants: Variants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.06,
-    },
-  },
-};
-
-const headlineWordVariants: Variants = {
-  hidden: { y: '110%' },
-  visible: {
-    y: '0%',
-    transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] },
-  },
-};
-
-const subtextVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, delay: 0.4, ease: [0.16, 1, 0.3, 1] },
-  },
-};
-
-const ctaVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { duration: 0.5, delay: 0.9, ease: [0.16, 1, 0.3, 1] },
-  },
-};
+const OXFORD = '#002147';
+const PAPER = '#f2f0ea';
 
 export default function HomePage() {
-  const closingRef = useRef<HTMLElement>(null);
-  const [closingInView, setClosingInView] = useState(false);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const footerRef = useRef<HTMLElement>(null);
+  const reduce = useReducedMotion();
 
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const sync = () => setPrefersReducedMotion(mq.matches);
-    sync();
-    mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
-  }, []);
-
-  useEffect(() => {
-    if (prefersReducedMotion) setClosingInView(true);
-  }, [prefersReducedMotion]);
-
-  useEffect(() => {
-    if (!prefersReducedMotion) return;
-    const footer = footerRef.current;
-    if (footer) footer.classList.add('home-footer-visible');
-  }, [prefersReducedMotion]);
-
-  useEffect(() => {
-    const footer = footerRef.current;
-    if (!footer) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          footer.classList.add('home-footer-visible');
-          obs.disconnect();
-        }
-      },
-      { threshold: 0.15 },
-    );
-    obs.observe(footer);
-    return () => obs.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const section = closingRef.current;
-    if (!section) return;
-
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      gsap.set(section.querySelectorAll('.conviction-line'), { yPercent: 0, opacity: 1, clearProps: 'transform' });
-      const tagsEl = section.querySelector('.conviction-tags');
-      if (tagsEl) gsap.set(tagsEl, { opacity: 1, y: 0, clearProps: 'transform' });
-      return;
-    }
-
-    gsap.registerPlugin(ScrollTrigger);
-    const watermark = section.querySelector<HTMLElement>('.conviction-watermark');
-    const lines = section.querySelectorAll<HTMLElement>('.conviction-line');
-    const tags = section.querySelector<HTMLElement>('.conviction-tags');
-
-    const timeline = gsap.timeline({
-      scrollTrigger: {
-        trigger: section,
-        start: 'top 80%',
-        end: 'bottom 20%',
-        scrub: 1.5,
-      },
-    });
-
-    if (watermark) {
-      timeline.to(
-        watermark,
-        {
-          x: -80,
+  const subtextVariants: Variants = reduce
+    ? {
+        hidden: { opacity: 1, y: 0 },
+        visible: { opacity: 1, y: 0 },
+      }
+    : {
+        hidden: { opacity: 0, y: 18 },
+        visible: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: 0.55, delay: 0.38, ease: SCROLL_EASE },
         },
-        0,
-      );
-    }
+      };
 
-    const lineTween = gsap.fromTo(
-      lines,
-      { yPercent: 100, opacity: 0 },
-      {
-        yPercent: 0,
-        opacity: 1,
-        duration: 0.9,
-        ease: 'power2.out',
-        stagger: 0.06,
-        scrollTrigger: {
-          trigger: section,
-          start: 'top 80%',
+  const ctaVariants: Variants = reduce
+    ? {
+        hidden: { opacity: 1 },
+        visible: { opacity: 1 },
+      }
+    : {
+        hidden: { opacity: 0 },
+        visible: {
+          opacity: 1,
+          transition: { duration: 0.45, delay: 0.72, ease: SCROLL_EASE },
         },
+      };
+
+  const heroViewport = { once: true as const, amount: 0.35 };
+
+  const pipelineGridVariants: Variants = {
+    hidden: {},
+    visible: {
+      transition: {
+        staggerChildren: reduce ? 0 : 0.09,
+        delayChildren: reduce ? 0 : 0.06,
       },
-    );
+    },
+  };
 
-    let tagsTween: gsap.core.Tween | undefined;
-    if (tags) {
-      tagsTween = gsap.to(tags, {
-        opacity: 1,
-        y: 0,
-        duration: 0.6,
-        delay: 0.4,
-        ease: 'power2.out',
-        scrollTrigger: {
-          trigger: section,
-          start: 'top 80%',
-        },
-      });
-    }
+  const pipelineCardVariants: Variants = {
+    hidden: reduce ? {} : { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: reduce ? 0 : 0.48, ease: SCROLL_EASE },
+    },
+  };
 
-    return () => {
-      timeline.scrollTrigger?.kill();
-      timeline.kill();
-      lineTween.scrollTrigger?.kill();
-      lineTween.kill();
-      tagsTween?.scrollTrigger?.kill();
-      tagsTween?.kill();
-    };
-  }, []);
+  const closingSectionVariants: Variants = {
+    hidden: reduce ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: reduce ? 0 : 0.52,
+        ease: SCROLL_EASE,
+        staggerChildren: reduce ? 0 : 0.11,
+        delayChildren: reduce ? 0 : 0.06,
+      },
+    },
+  };
 
-  useEffect(() => {
-    const obs = new IntersectionObserver(([entry]) => entry.isIntersecting && setClosingInView(true), { threshold: 0.15 });
-    const el = closingRef.current;
-    if (el) obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
+  const closingChildVariants: Variants = {
+    hidden: reduce ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: reduce ? 0 : 0.46, ease: SCROLL_EASE },
+    },
+  };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col relative overflow-x-hidden w-full" style={{ backgroundColor: 'var(--color-paper)' }}>
-      <GrainOverlay />
+    <div
+      className="min-h-[100dvh] flex flex-col relative overflow-x-hidden w-full"
+      style={{ backgroundColor: PAPER, color: 'var(--color-charcoal)' }}
+    >
+      <div
+        className="pointer-events-none fixed inset-0 z-[1] opacity-[0.55]"
+        style={{
+          background:
+            'radial-gradient(ellipse 90% 55% at 0% 0%, rgba(0, 33, 71, 0.04), transparent 52%), radial-gradient(ellipse 70% 50% at 100% 10%, rgba(184, 151, 106, 0.06), transparent 48%)',
+        }}
+        aria-hidden
+      />
+      <GrainOverlay opacity={0.028} variant="light" />
 
-      <header className="site-header-bar flex items-center justify-between page-margin-x pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-8 pb-4 md:pb-6 shrink-0 z-20 gap-3">
-        <Link
-          data-cursor-expand
-          to="/"
-          className="font-display hover:opacity-80 transition-opacity duration-300 text-left flex-1 md:flex-none min-h-[44px] flex items-center shrink-0 min-w-0 text-[18px]"
-          style={{ color: 'var(--color-oxford)' }}
-        >
-          Aethria
-        </Link>
-        <span
-          className="font-mono text-[9px] uppercase whitespace-nowrap shrink-0 text-right"
-          style={{
-            color: 'rgba(0, 33, 71, 0.4)',
-            letterSpacing: '0.14em',
-          }}
-        >
-          INVESTMENT INTELLIGENCE
-        </span>
+      <header
+        className="inst-site-header sticky top-0 z-[100] w-full shrink-0 border-b border-solid border-[var(--section-divider)] bg-[#f2f0ea]"
+        style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
+      >
+        <div className="page-margin-x grid min-h-[52px] grid-cols-[1fr_1fr] items-center gap-2 sm:gap-4 md:grid-cols-[1fr_auto_1fr]">
+          <Link
+            data-cursor-expand
+            to="/"
+            className="font-wordmark justify-self-start py-2 text-[15px] font-normal normal-case leading-none tracking-normal text-[#002147] transition-opacity hover:opacity-80 sm:text-[16px]"
+          >
+            Aethria
+          </Link>
+          <p className="hidden justify-self-center text-center font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.35)] md:block">
+            Deal flow operating system
+          </p>
+          <DeskClock className="min-w-0 justify-self-end text-right" />
+        </div>
       </header>
 
-      <main className="flex-1 flex flex-col md:flex-row md:items-center min-h-0 shrink-0 min-w-0 overflow-x-hidden">
-        {/* Left column */}
-        <section
-          className="home-hero-left page-margin-x order-1 flex md:w-[25%] flex-col justify-center py-8 sm:py-16 md:py-0 shrink-0"
-          style={{ backgroundColor: 'var(--color-paper)' }}
-        >
-          <p
-            className="font-mono text-[10px] uppercase"
-            style={{
-              color: 'rgba(0, 33, 71, 0.35)',
-              letterSpacing: '0.1em',
-            }}
-          >
-            2026 · EARLY ACCESS
-          </p>
-          <div style={{ height: 24 }} aria-hidden />
-          <motion.p
-            className="font-sans max-w-[32ch] md:max-w-none text-[16px] leading-relaxed"
-            style={{
-              color: 'rgba(0, 33, 71, 0.72)',
-            }}
-            variants={subtextVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            Aethria runs a full evaluation pipeline autonomously. Scouts, scores, memos. Ready before a partner looks at the deal.
-          </motion.p>
-          <div style={{ height: 32 }} aria-hidden />
-          <motion.div variants={ctaVariants} initial="hidden" animate="visible">
-            <Link
-              to="/request-access"
-              data-cursor-expand
-              className="font-mono uppercase inline-flex items-center justify-center w-full md:w-fit min-h-[44px] rounded-none bg-transparent transition-colors duration-200 ease-out hover:bg-[#002147] hover:text-[#F2F0EA]"
-              style={{
-                fontSize: 11,
-                letterSpacing: '0.1em',
-                color: 'rgba(0, 33, 71, 0.8)',
-                border: '1px solid rgba(0, 33, 71, 0.6)',
-                padding: '10px 24px',
-              }}
+      <main className="relative z-10 flex-1 flex flex-col min-w-0 overflow-x-hidden">
+        {/* Hero — paper column + Oxford monolith + ticker */}
+        <div className="flex shrink-0 min-w-0 flex-col border-b border-solid border-[var(--section-divider)]">
+          <div className="flex min-w-0 flex-col md:flex-row md:items-stretch">
+            <section
+              className="home-hero-left paper-dot-grid page-margin-x order-2 flex w-full shrink-0 flex-col justify-center py-16 md:py-24 md:w-[32%] lg:w-[28%]"
+              style={{ backgroundColor: PAPER }}
             >
-              REQUEST ACCESS
-            </Link>
-          </motion.div>
-        </section>
-
-        {/* Monolith — slides in from the right; headline fades in after */}
-        <div
-          data-cursor-expand
-          className="order-2 relative flex items-center justify-center w-full md:flex-1 min-h-[360px] md:min-h-[70vh] aspect-auto p-6 sm:p-10 md:p-16 lg:p-20 xl:p-24 shrink-0 rounded-none home-monolith-in overflow-hidden"
-          style={{ backgroundColor: 'var(--color-oxford)' }}
-        >
-          <div className="home-monolith-ambient" aria-hidden />
-          <div className="home-monolith-grid" aria-hidden />
-          <div className="home-monolith-frame-line" aria-hidden />
-          <div
-            className="absolute left-0 bottom-0 top-0 w-px pointer-events-none"
-            style={{ backgroundColor: 'rgba(242, 240, 234, 0.12)' }}
-            aria-hidden
-          />
-          <motion.h1
-            data-cursor="headline"
-            className="font-display text-[34px] sm:text-[2.85rem] lg:text-[3.5625rem] xl:text-[4.275rem] max-w-[18ch] md:max-w-[20ch] relative z-[1]"
-            style={{ color: 'var(--color-paper)', lineHeight: 1.15 }}
-            variants={headlineContainerVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            {headlineText.split(' ').map((word, i, words) => (
-              <span
-                key={`${word}-${i}`}
-                style={{
-                  display: 'inline-block',
-                  overflow: 'hidden',
-                  paddingRight: i < words.length - 1 ? '0.35em' : 0,
-                  paddingBottom: '0.2em',
-                }}
+              <motion.p
+                className="section-numeral mb-6"
+                initial={reduce ? false : { opacity: 0, y: 10 }}
+                whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+                viewport={heroViewport}
+                transition={{ duration: reduce ? 0 : 0.45, ease: SCROLL_EASE }}
               >
-                <motion.span
-                  variants={headlineWordVariants}
-                  style={{ display: 'inline-block' }}
-                >
-                  {word}
-                </motion.span>
-              </span>
-            ))}
-          </motion.h1>
-        </div>
-      </main>
-      <section
-        className="flex min-h-[80vh] w-full flex-col overflow-hidden rounded-none"
-        aria-labelledby="pipeline-heading"
-      >
-        <div className="w-full shrink-0" style={{ backgroundColor: 'var(--color-paper)' }}>
-          <p id="pipeline-heading" className="pipeline-section-label page-margin-x pt-12 md:pt-14">
-            THE PIPELINE
-          </p>
+                I
+              </motion.p>
+              <motion.p
+                className="mb-6 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)]"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+                viewport={heroViewport}
+                transition={{ duration: reduce ? 0 : 0.45, delay: reduce ? 0 : 0.06, ease: SCROLL_EASE }}
+              >
+                Early access · 2026
+              </motion.p>
 
-          <div className="page-margin-x py-10 md:py-12">
-            <div className="grid grid-cols-1 gap-0 divide-y divide-[rgba(0,33,71,0.1)] lg:grid-cols-4 lg:divide-x lg:divide-y-0 lg:items-stretch">
+              <motion.p
+                className="font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.75)] max-w-[36ch] md:max-w-none"
+                variants={subtextVariants}
+                initial="hidden"
+                whileInView="visible"
+                viewport={heroViewport}
+              >
+                Autonomous discovery, structured review, and partner-ready memos before the committee opens the file. One
+                pipeline. Full traceability. Conviction you can defend in the room.
+              </motion.p>
+
+              <motion.div
+                variants={ctaVariants}
+                initial="hidden"
+                whileInView="visible"
+                viewport={heroViewport}
+                className="mt-10"
+              >
+                <Link
+                  to="/request-access"
+                  data-cursor-expand
+                  className="group font-mono inline-flex w-full min-h-[44px] cursor-pointer items-center justify-center rounded-none bg-[#002147] px-6 py-3 text-[11px] uppercase tracking-[0.14em] text-[#f2f0ea] transition-colors duration-[250ms] ease hover:bg-[rgba(0,33,71,0.9)] md:w-fit"
+                >
+                  <span className="flex items-center justify-center">
+                    <span>Request access</span>
+                    <span
+                      className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
+                      aria-hidden
+                    >
+                      {'\u00A0→'}
+                    </span>
+                  </span>
+                </Link>
+              </motion.div>
+            </section>
+
+          <div
+            data-cursor-expand
+            className="home-monolith-in order-1 relative flex w-full md:flex-1 min-h-[min(54vh,440px)] md:min-h-[min(74vh,840px)] items-center justify-start overflow-hidden px-6 py-24 sm:px-10 md:px-14 lg:px-16 xl:px-20 shrink-0"
+            style={{
+              backgroundColor: OXFORD,
+            }}
+          >
+            <div className="home-monolith-ambient" aria-hidden />
+            <div className="home-monolith-brass-rule" aria-hidden />
+            <motion.h1
+              data-cursor="headline"
+              className="home-monolith-headline relative z-[1] w-full min-w-0 text-left text-[clamp(2.5rem,5.5vw,4.65rem)] leading-[0.98] max-w-[min(100%,15ch)] md:max-w-[17ch]"
+              style={{ color: PAPER }}
+              initial={reduce ? false : { opacity: 0, x: -28 }}
+              whileInView={reduce ? undefined : { opacity: 1, x: 0 }}
+              viewport={{ once: true, amount: 0.45 }}
+              transition={{ duration: reduce ? 0 : 0.85, delay: reduce ? 0 : 0.2, ease: SCROLL_EASE }}
+            >
+              <span className="block tracking-[-0.035em]">Judgment</span>
+              <span className="block mt-2 md:mt-3 italic font-normal opacity-[0.9] text-[0.88em] tracking-[-0.02em]">
+                at institutional standard.
+              </span>
+            </motion.h1>
+            <p
+              className="absolute z-[2] font-mono text-[8px] sm:text-[9px] tracking-[0.2em] uppercase text-[rgba(242,240,234,0.28)] right-[max(1.25rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] md:right-8 md:bottom-7"
+              aria-hidden
+            >
+              Protocol 4.1 · Oxford surface
+            </p>
+          </div>
+          </div>
+
+          <div className="relative z-10 w-full shrink-0">
+            <MarketTape />
+          </div>
+        </div>
+
+        <HomeStatsSection />
+
+        {/* Section III — pipeline */}
+        <section
+          className="paper-dot-grid w-full border-b border-solid border-[var(--section-divider)] pb-8"
+          aria-labelledby="pipeline-heading"
+          style={{ backgroundColor: PAPER, color: 'var(--color-charcoal)' }}
+        >
+          <div className="w-full border-b border-solid border-[var(--section-divider)] pt-16 md:pt-24">
+            <ScrollReveal className="page-margin-x" y={16} amount={0.2}>
+              <p className="section-numeral mb-6">III</p>
+              <div className="flex min-w-0 flex-row items-stretch">
+                <div className="flex min-w-0 flex-1 flex-col pr-0 md:pr-10">
+                  <h2
+                    id="pipeline-heading"
+                    className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#002147] md:text-[36px] md:tracking-normal"
+                  >
+                    The pipeline
+                  </h2>
+                  <p className="mt-4 max-w-xl font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.65)]">
+                    From signal to position. Four locked phases. No hand-offs lost in email.
+                  </p>
+                </div>
+                <div
+                  className="hidden w-[260px] shrink-0 flex-col items-end justify-center bg-[#002147] lg:flex"
+                  style={{ paddingRight: 'max(16px, env(safe-area-inset-right))' }}
+                >
+                  <div className="flex flex-col items-end gap-2 text-right">
+                    <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(242,240,234,0.55)]">
+                      Phases I — IV
+                    </p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(242,240,234,0.3)]">
+                      Single audit trail
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </ScrollReveal>
+          </div>
+
+          <div className="page-margin-x flex flex-col pb-0 pt-6 md:pt-8">
+            <motion.div
+              className="grid w-full grid-cols-1 gap-0 divide-y divide-solid divide-[var(--section-divider)] lg:grid-cols-4 lg:divide-x lg:divide-y-0 lg:items-start"
+              variants={pipelineGridVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.12, margin: '0px 0px -5% 0px' }}
+            >
               {[
                 {
+                  phase: 'I',
                   label: 'SCOUT',
-                  body: 'Proprietary agents monitor market signals continuously. By the time a deal reaches your desk, the groundwork is done.',
+                  body: 'Agents monitor market signals continuously. When a name surfaces, context and sourcing are already assembled.',
                   signal: 'discovery',
                 },
                 {
+                  phase: 'II',
                   label: 'REVIEW',
-                  body: 'Every opportunity evaluated across multiple dimensions. Conviction surfaces. Ambiguity is named, not buried.',
+                  body: 'Structured evaluation across dimensions you define. Conviction emerges; uncertainty is explicit.',
                   signal: 'conviction',
                 },
                 {
+                  phase: 'III',
                   label: 'DECIDE',
-                  body: 'Structured reasoning produces a clear position. Advance. Pass. Hold. No ambiguity, no delay.',
+                  body: 'Clear positions with reasoning attached. Advance, pass, or hold — no ambiguous queue.',
                   signal: 'precision',
                 },
                 {
+                  phase: 'IV',
                   label: 'PORTFOLIO',
-                  body: 'Each decision informs the next. The system compounds its judgment over time.',
+                  body: 'Decisions compound. Exposure, concentration, and follow-on judgment stay in view.',
                   signal: 'continuity',
                 },
-              ].map(({ label, body, signal }) => (
-                <div
+              ].map(({ phase, label, body, signal }) => (
+                <motion.div
                   key={label}
-                  className="flex min-h-0 min-w-0 flex-col py-8 first:pt-0 last:pb-0 lg:h-full lg:py-0 lg:pl-8 lg:pr-8 lg:first:pl-0 lg:last:pr-0"
+                  variants={pipelineCardVariants}
+                  className="flex min-w-0 flex-col border-l-0 border-solid border-[var(--section-divider)] px-0 py-8 first:pt-6 last:pb-6 sm:px-1 lg:border-l lg:px-8 lg:py-8 lg:first:pt-8 lg:last:pb-8"
                 >
-                  <p
-                    className="font-mono text-[10px] tracking-[0.14em]"
-                    style={{ color: 'rgba(0, 33, 71, 0.4)' }}
-                  >
-                    {label}
-                  </p>
-                  <p className="font-sans mt-4 text-[14px] font-normal leading-[1.75] text-[rgba(0,33,71,0.68)]">
-                    {body}
-                  </p>
-                  <div
-                    className="pipeline-feature-signal font-sans mt-auto pt-6 italic text-[13px] text-[rgba(0,33,71,0.38)] lowercase"
-                    style={{
-                      fontWeight: 500,
-                      letterSpacing: '0.01em',
-                    }}
-                  >
-                    {signal}
+                  <div className="flex flex-row items-baseline justify-between gap-3">
+                    <span className="font-mono text-[10px] tracking-[0.12em] text-[rgba(0,33,71,0.35)]">{phase}</span>
+                    <span className="font-mono text-[10px] tracking-[0.12em] text-[rgba(0,33,71,0.55)]">{label}</span>
                   </div>
-                </div>
+                  <div className="mt-0 h-px w-full shrink-0 bg-[var(--section-divider)]" aria-hidden />
+                  <p className="mt-4 font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.78)]">{body}</p>
+                  <p className="mt-6 font-sans text-[13px] italic leading-snug text-[rgba(0,33,71,0.4)] lowercase">
+                    {signal}
+                  </p>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
-        </div>
+        </section>
 
-        <div
-          className="h-px w-full shrink-0"
-          style={{
-            background: 'linear-gradient(90deg, transparent 12%, var(--color-accent-soft) 50%, transparent 88%)',
-          }}
-          aria-hidden
-        />
-
-        <div
-          className="flex min-h-[48vh] w-full flex-1 flex-col"
-          style={{ backgroundColor: 'var(--color-oxford)' }}
+        {/* Section IV — intelligence map (paper left, monolith right — mirrors hero rhythm) */}
+        <section
+          className="flex min-h-0 w-full flex-col items-stretch border-b border-solid border-[var(--section-divider)] lg:flex-row"
+          aria-labelledby="graph-section-heading"
         >
-          <div className="intelligence-map-shell flex w-full flex-1 flex-col items-stretch justify-center page-margin-x py-12 md:py-16">
-            <div className="flex w-full min-w-0 items-center justify-center">
-              <IntelligenceMap variant="dark" />
+          <ScrollReveal
+            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#f2f0ea] py-12 px-[max(1.25rem,var(--safe-left))] pb-10 pr-[max(1.25rem,var(--safe-right))] pt-12 md:py-14 md:px-8 lg:w-[35%] lg:px-12 lg:py-16"
+            style={{ color: 'var(--color-charcoal)' }}
+            y={24}
+            amount={0.2}
+          >
+            <div className="w-full max-w-lg">
+              <p className="section-numeral mb-6">IV</p>
+              <h2
+                id="graph-section-heading"
+                className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#002147] md:text-[36px] md:tracking-normal"
+              >
+                How intelligence routes
+              </h2>
+              <p className="mt-4 max-w-lg font-sans text-[15px] font-normal leading-[1.7] text-[rgba(0,33,71,0.65)]">
+                Scouts feed the reviewer. Partner logic and portfolio stay coupled. Meta-agent oversight on dashed paths.
+              </p>
             </div>
-          </div>
-        </div>
-      </section>
-      {/* Closing statement with conviction + live signal pills */}
-      <section
-        ref={closingRef}
-        className="home-closing w-full page-margin-x pt-24 pb-24 relative overflow-hidden"
-        style={{
-          backgroundColor: 'var(--color-paper)',
-          opacity: prefersReducedMotion || closingInView ? 1 : 0,
-          transform: prefersReducedMotion || closingInView ? 'translateY(0)' : 'translateY(16px)',
-          transition: prefersReducedMotion
-            ? 'none'
-            : 'opacity 500ms ease, transform 500ms cubic-bezier(0.16, 1, 0.3, 1)',
-        }}
-      >
-        <div className="flex flex-col lg:flex-row gap-10 lg:gap-16 items-start">
-          <div className="flex-1 min-w-0">
-            <h2 className="font-display text-[32px] md:text-[36px] max-w-full md:max-w-[540px] leading-tight" style={{ color: 'var(--color-oxford)', opacity: 0.9 }}>
-              <span className="block overflow-hidden">
-                <span className="inline-block translate-y-full conviction-line">
-                  Run the pipeline.
-                </span>
-              </span>
-              <span className="block overflow-hidden">
-                <span className="inline-block translate-y-full conviction-line">
-                  Keep the conviction.
-                </span>
-              </span>
-            </h2>
-            <p className="font-sans text-[15px] mt-6 max-w-[460px] leading-[1.75]" style={{ color: 'rgba(0, 33, 71, 0.58)' }}>
-              Aethria discovers, scores, and recommends. You advance, pass, or hold.
-            </p>
-            <p className="font-mono text-[10px] uppercase tracking-[0.12em] mt-6 max-w-[480px] conviction-tags" style={{ color: 'rgba(0, 33, 71, 0.45)' }}>
-              {[
-                'Investment memos',
-                'Escalations',
-                'Concentration analytics',
-                'Meta-agent',
-                'Portfolio',
-              ].map((tag) => (
-                <span key={tag} className="conviction-tag">
-                  {tag}
-                </span>
-              ))}
-            </p>
-            <Link
-              to="/request-access"
-              data-cursor-expand
-              className="group font-mono text-[10px] uppercase tracking-[0.1em] cursor-pointer rounded-none transition-all duration-300 inline-flex items-center justify-center w-full md:w-fit min-h-[44px] h-10 px-6 bg-transparent border border-[var(--color-oxford)] md:border-[rgba(0,33,71,0.2)] text-[var(--color-oxford)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] hover:border-[var(--color-oxford)] mt-8"
+          </ScrollReveal>
+          <div className="relative flex w-full min-w-0 shrink-0 flex-col items-stretch bg-[#002147] lg:w-[65%]">
+            <ScrollReveal
+              className="flex min-h-[min(420px,72vw)] w-full flex-1 flex-col items-center justify-center px-3 pb-2 pt-4 sm:min-h-[460px] sm:px-4 lg:min-h-[500px] lg:px-0 lg:pb-0 lg:pt-0"
+              y={16}
+              delay={0.08}
+              amount={0.15}
             >
-              <span className="flex items-center justify-center">
-                <span>REQUEST ACCESS</span>
-                <span
-                  className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap w-2 group-hover:w-5"
-                >
-                  {'\u00A0›'}
-                </span>
-              </span>
-            </Link>
+              <IntelligenceMap variant="dark" />
+            </ScrollReveal>
+            <motion.p
+              className="shrink-0 py-3 text-center font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(242,240,234,0.25)]"
+              initial={reduce ? false : { opacity: 0 }}
+              whileInView={reduce ? undefined : { opacity: 1 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: reduce ? 0 : 0.45, delay: reduce ? 0 : 0.12, ease: SCROLL_EASE }}
+            >
+              Scout · Review · Decide · Portfolio
+            </motion.p>
           </div>
+        </section>
 
-          {/* Right column: live signal pills */}
-          <LiveSignalPills />
-        </div>
-        <span
-          className="hidden md:block absolute left-1/2 top-1/2 font-display select-none pointer-events-none -translate-y-1/2 -translate-x-1/2 conviction-watermark"
-          style={{
-            fontSize: '22vw',
-            lineHeight: 0.9,
-            color: 'var(--color-oxford)',
-            opacity: 0.04,
-            whiteSpace: 'nowrap',
-          }}
-          aria-hidden
+        {/* Section V — live indicators */}
+        <motion.section
+          className="home-closing home-closing-ledger paper-dot-grid section-divider-top relative w-full overflow-hidden border-b border-solid border-[var(--section-divider)]"
+          style={{ backgroundColor: PAPER }}
+          variants={closingSectionVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.16, margin: '0px 0px -8% 0px' }}
         >
-          Conviction
-        </span>
-      </section>
+          <div className="page-margin-x relative z-[1] mx-auto w-full max-w-[1200px] py-16 md:py-24">
+            <motion.p className="section-numeral mb-8 md:mb-12" variants={closingChildVariants}>
+              V
+            </motion.p>
 
-      <DashboardPreview />
+            <div className="flex flex-col gap-10 md:gap-14 lg:flex-row lg:items-stretch lg:gap-16 xl:gap-24">
+              <motion.div
+                className="flex min-h-0 min-w-0 flex-1 flex-col justify-center py-6 md:py-10 lg:max-w-[540px] lg:py-12 lg:pr-6"
+                variants={closingChildVariants}
+              >
+                <h2 className="text-[clamp(1.5rem,4.8vw,1.75rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#002147] md:text-[28px] md:tracking-normal">
+                  <span className="block">Run the pipeline.</span>
+                  <span className="mt-2 block">Keep the conviction.</span>
+                </h2>
+                <p className="mt-7 max-w-[420px] font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.78)]">
+                  Aethria discovers, scores, and recommends. You advance, pass, or hold.
+                </p>
 
-      <footer
-        ref={footerRef}
-        className="home-footer shrink-0 z-20 flex items-center justify-between page-margin-x pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:pt-5 md:pb-4 border-t"
-        style={{ borderColor: 'rgba(0, 33, 71, var(--frame-opacity))', color: 'var(--color-oxford)', backgroundColor: 'var(--color-paper)' }}
-      >
-        <span className="font-sans text-[10px] md:text-[11px] tracking-wide" style={{ color: 'var(--color-oxford)', opacity: 0.65 }}>
-          © Aethria
-        </span>
-        <span className="home-footer-tag font-mono text-[9px] uppercase tracking-[0.15em]" style={{ color: 'var(--color-oxford)', opacity: 0.5 }}>
-          INVESTMENT INTELLIGENCE
-        </span>
-      </footer>
+                <div
+                  className="conviction-cap-lines mt-9 flex flex-col gap-[12px]"
+                  role="list"
+                  aria-label="Product capabilities"
+                >
+                  {[
+                    'INVESTMENT MEMOS · FULL REASONING CHAIN',
+                    'ESCALATIONS · HUMAN-IN-LOOP PATHS',
+                    'PORTFOLIO SIGNALS · CONCENTRATION ANALYTICS',
+                  ].map((line) => (
+                    <p key={line} className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.4)]">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+
+                <Link
+                  to="/request-access"
+                  data-cursor-expand
+                  className="group mt-11 inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-none bg-[#002147] px-6 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-[#f2f0ea] transition-colors duration-[250ms] ease hover:bg-[rgba(0,33,71,0.9)] sm:w-fit"
+                >
+                  <span className="flex items-center justify-center">
+                    <span>Request access</span>
+                    <span
+                      className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
+                      aria-hidden
+                    >
+                      {'\u00A0→'}
+                    </span>
+                  </span>
+                </Link>
+              </motion.div>
+              <motion.div
+                className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center py-6 md:py-10 lg:py-12"
+                variants={closingChildVariants}
+              >
+                <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)]">
+                  Live indicators
+                </p>
+                <LiveSignalPills />
+              </motion.div>
+            </div>
+          </div>
+        </motion.section>
+
+        <DashboardPreview />
+
+        <motion.footer
+          className="home-footer paper-dot-grid section-divider-top relative z-20 w-full shrink-0"
+          initial={reduce ? false : { opacity: 0, y: 18 }}
+          whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: reduce ? 0 : 0.52, ease: SCROLL_EASE }}
+        >
+          <div className="page-margin-x mx-auto flex w-full max-w-[1200px] flex-col pt-14 pb-10 md:pt-24 md:pb-14">
+            <p className="max-w-2xl font-sans text-[15px] font-normal leading-[1.7] text-[rgba(0,33,71,0.65)]">
+              Private markets intelligence. Built for the standards of banks, advisors, and funds that cannot afford
+              narrative drift.
+            </p>
+
+            <div className="my-12 h-px w-full shrink-0 bg-[var(--section-divider)]" aria-hidden />
+
+            <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-12">
+              <div className="flex flex-col gap-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.4)] md:flex-row md:flex-wrap md:items-center md:gap-x-10 md:gap-y-3">
+                <span className="text-[rgba(0,33,71,0.45)]">© {new Date().getFullYear()} Aethria</span>
+                <span className="break-words">Confidential · For qualified recipients</span>
+                <span>Investment intelligence</span>
+              </div>
+              <Link
+                to="/request-access"
+                data-cursor-expand
+                className="home-footer-tag inline-flex min-h-[44px] shrink-0 items-center font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.55)] transition-opacity hover:opacity-70"
+              >
+                Request access
+              </Link>
+            </div>
+          </div>
+        </motion.footer>
+      </main>
     </div>
   );
 }
 
 function LiveSignalPills() {
+  const reduce = useReducedMotion();
   const [dealsCount, setDealsCount] = useState(47);
   const [pipelineStatus, setPipelineStatus] = useState<'ACTIVE' | 'PROCESSING'>('ACTIVE');
   const [minutesAgo, setMinutesAgo] = useState(2);
+
+  const pillListVariants: Variants = {
+    hidden: {},
+    visible: {
+      transition: {
+        staggerChildren: reduce ? 0 : 0.09,
+        delayChildren: reduce ? 0 : 0.05,
+      },
+    },
+  };
+
+  const pillItemVariants: Variants = {
+    hidden: reduce ? {} : { opacity: 0, y: 12 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: reduce ? 0 : 0.42, ease: SCROLL_EASE },
+    },
+  };
 
   useEffect(() => {
     const dealsInterval = setInterval(() => {
@@ -481,67 +517,46 @@ function LiveSignalPills() {
   }, []);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col gap-4">
-      {/* Pill 1 */}
-      <SignalPill
-        label="DEALS REVIEWED THIS CYCLE"
-        value={`${dealsCount}`}
-      />
-      {/* Pill 2 */}
-      <SignalPill
-        label="PIPELINE STATUS"
-        value={
-          pipelineStatus === 'ACTIVE' ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '9999px',
-                  backgroundColor: '#F2F0EA',
-                  animation: 'pipeline-dot-pulse 2s ease-in-out infinite',
-                }}
-              />
-              <span>ACTIVE</span>
-            </span>
-          ) : (
-            'PROCESSING'
-          )
-        }
-      />
-      {/* Pill 3 */}
-      <SignalPill
-        label="LAST MEMO GENERATED"
-        value={`${minutesAgo} min ago`}
-      />
-    </div>
+    <motion.div
+      className="flex w-full max-w-md min-w-0 flex-1 flex-col gap-3 self-stretch"
+      variants={pillListVariants}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.35, margin: '0px 0px -5% 0px' }}
+    >
+      <motion.div variants={pillItemVariants}>
+        <SignalPill label="Deals reviewed this cycle" value={`${dealsCount}`} />
+      </motion.div>
+      <motion.div variants={pillItemVariants}>
+        <SignalPill
+          label="Pipeline status"
+          value={
+            pipelineStatus === 'ACTIVE' ? (
+              <span className="inline-flex items-center gap-2">
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-none bg-[var(--color-oxford)]"
+                  style={{ animation: 'pipeline-dot-pulse 2s ease-in-out infinite' }}
+                />
+                <span>ACTIVE</span>
+              </span>
+            ) : (
+              'PROCESSING'
+            )
+          }
+        />
+      </motion.div>
+      <motion.div variants={pillItemVariants}>
+        <SignalPill label="Last memo generated" value={`${minutesAgo} min ago`} />
+      </motion.div>
+    </motion.div>
   );
 }
 
-interface SignalPillProps {
-  label: string;
-  value: React.ReactNode;
-}
-
-function SignalPill({ label, value }: SignalPillProps) {
+function SignalPill({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div
-      className="signal-pill group flex items-center justify-between py-5 px-6 relative overflow-hidden border border-[rgba(0,33,71,0.14)]"
-    >
-      <div
-        style={{
-          fontFamily: '"Space Mono", monospace',
-          fontSize: 10,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: 'rgba(0, 33, 71, 0.5)',
-        }}
-      >
-        {label}
-      </div>
-      <div className="font-sans text-[13px] font-medium tabular-nums" style={{ color: 'var(--color-oxford)' }}>
-        {value}
-      </div>
+    <div className="signal-pill group relative flex min-h-[52px] items-center justify-between gap-3 overflow-hidden border border-solid border-[var(--section-divider)] bg-[var(--color-paper)] px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
+      <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)]">{label}</div>
+      <div className="font-sans text-[13px] font-semibold tabular-nums text-[var(--color-oxford)]">{value}</div>
     </div>
   );
 }

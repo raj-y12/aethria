@@ -4,6 +4,8 @@
  * and resources/partner_rules.json.
  */
 
+import type { Review } from '../types/startup';
+
 /** Score band: human-readable meaning of a 1–10 score. v1.1 rubric. */
 export const SCORE_BANDS = [
   { range: [1, 3] as [number, number], label: 'Weak', meaning: 'High risk, failing, or structurally broken' },
@@ -27,6 +29,20 @@ export const QUALITY_LABELS: Record<string, string> = {
   MEDIUM: 'Promising but incomplete',
   WEAK: 'Insufficient quality',
 };
+
+export type ReviewerQualityBand = 'STRONG' | 'MEDIUM' | 'WEAK';
+
+/** Consensus / primary reviewer verdict band (same resolution as WorkGrid filters). */
+export function getReviewerQualityBand(review: Review | null | undefined): ReviewerQualityBand | null {
+  if (!review) return null;
+  const c = review.consensus_verdict;
+  if (c === 'STRONG' || c === 'MEDIUM' || c === 'WEAK') return c;
+  const v = typeof review.verdict === 'string' ? review.verdict.trim().toUpperCase() : '';
+  if (v === 'STRONG' || v === 'MEDIUM' || v === 'WEAK') return v as ReviewerQualityBand;
+  const first = review.reviews?.[0]?.verdict;
+  if (first === 'STRONG' || first === 'MEDIUM' || first === 'WEAK') return first;
+  return null;
+}
 
 /** Investment decision from Partner (YES/NO/MAYBE). Legacy PASS/WATCH map for compatibility. */
 export const DECISION_LABELS: Record<string, string> = {

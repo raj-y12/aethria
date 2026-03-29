@@ -8,15 +8,17 @@ export default {
     extend: {
       colors: {
         oxford: '#002147',
+        paper: '#f2f0ea',
         ivory: '#fcfcfc',
         canvas: '#fcfcfc',
         mist: '#f2f4f8',
         graphite: '#2f333b',
       },
       fontFamily: {
-        display: ['"Instrument Serif"', 'Georgia', 'serif'],
-        sans: ['"Geist Sans"', 'system-ui', 'sans-serif'],
+        display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+        sans: ['"Instrument Sans"', 'system-ui', 'sans-serif'],
         mono: ['"Space Mono"', 'monospace'],
+        wordmark: ['var(--font-wordmark)', 'Georgia', 'serif'],
       },
       borderRadius: {
         DEFAULT: '0',

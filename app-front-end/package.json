@@ -12,7 +12,7 @@
   "dependencies": {
     "@clerk/react": "^6.1.0",
     "@clerk/react-router": "^3.0.4",
-    "@fontsource/geist-sans": "^5.2.5",
+    "@fontsource/instrument-sans": "^5.2.8",
     "framer-motion": "^10.16.16",
     "jspdf": "^4.2.0",
     "react": "^18.2.0",

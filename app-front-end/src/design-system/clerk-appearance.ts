@@ -23,7 +23,7 @@ export const clerkAppearance = {
     colorInputForeground: OXford,
     colorRing: OXford,
     colorNeutral: OXford,
-    colorShadow: 'rgba(0, 33, 71, 0.12)',
+    colorShadow: 'transparent',
     fontFamily: tokens.font.body,
     fontFamilyButtons: tokens.font.mono,
     borderRadius: '0',
@@ -125,7 +125,7 @@ export const userProfileAppearance = {
       backgroundColor: PAPER,
       border: tokens.frameBorder,
       borderRadius: 0,
-      boxShadow: '0 8px 32px rgba(0, 33, 71, 0.2)',
+      boxShadow: 'none',
     },
   },
 };
@@ -140,7 +140,7 @@ export const userButtonAppearance = {
       width: 40,
       height: 40,
       border: `1px solid ${BORDER}`,
-      boxShadow: '0 1px 0 0 rgba(255,255,255,0.06)',
+      boxShadow: 'none',
     },
     userButtonTrigger: {
       '&:hover': {
@@ -151,7 +151,7 @@ export const userButtonAppearance = {
       backgroundColor: PAPER,
       border: tokens.frameBorder,
       borderRadius: 0,
-      boxShadow: '0 4px 24px rgba(0, 33, 71, 0.12)',
+      boxShadow: 'none',
     },
     userButtonPopoverMain: {
       fontFamily: tokens.font.body,

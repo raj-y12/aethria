@@ -30,7 +30,7 @@ export default function SignalEventRow({
 
   if (layout === 'compact') {
     return (
-      <div className={`flex items-baseline gap-2 sm:gap-3 py-2 sm:py-2.5 ${borderCls} ${className}`}>
+      <div className={`flex items-baseline gap-2 py-2 sm:gap-3 sm:py-2.5 ${borderCls} ${className}`}>
         <span className={tsCls}>{timestamp}</span>
         <span className={`${bodyCls} min-w-0 truncate flex-1`}>{body}</span>
         {trailing != null && <span className="shrink-0">{trailing}</span>}
@@ -39,7 +39,7 @@ export default function SignalEventRow({
   }
 
   return (
-    <div className={`flex flex-col gap-0.5 py-3 ${borderCls} ${className}`}>
+    <div className={`flex flex-col gap-0.5 py-2.5 sm:py-3 ${borderCls} ${className}`}>
       <div className="flex items-baseline gap-2 flex-wrap">
         <span className={tsCls}>{timestamp}</span>
         {label != null && label !== '' && (

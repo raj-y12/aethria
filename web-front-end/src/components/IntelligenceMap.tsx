@@ -20,8 +20,6 @@ const COLORS = {
     label: 'rgba(242, 240, 234, 0.5)',
     pulse: PAPER,
     pulseMeta: 'rgba(242, 240, 234, 0.3)',
-    rule: 'rgba(242, 240, 234, 0.1)',
-    legend: 'rgba(242, 240, 234, 0.4)',
   },
   light: {
     edge: 'rgba(0, 33, 71, 0.15)',
@@ -34,8 +32,6 @@ const COLORS = {
     label: 'rgba(0, 33, 71, 0.5)',
     pulse: OXFORD,
     pulseMeta: 'rgba(0, 33, 71, 0.3)',
-    rule: 'rgba(0, 33, 71, 0.1)',
-    legend: 'rgba(0, 33, 71, 0.4)',
   },
 } as const;
 
@@ -295,7 +291,7 @@ export default function IntelligenceMap({ variant = 'light' }: IntelligenceMapPr
                       textAnchor="middle"
                       fill={theme.label}
                       style={{
-                        fontFamily: '"Space Mono", monospace',
+                        fontFamily: 'var(--font-mono)',
                         fontSize: 11,
                         letterSpacing: '0.1em',
                       }}
@@ -318,15 +314,6 @@ export default function IntelligenceMap({ variant = 'light' }: IntelligenceMapPr
             })}
           </g>
         </svg>
-      </div>
-
-      <div
-        className="relative z-[1] mt-8 w-full"
-        style={{ borderTop: `1px solid ${theme.rule}`, paddingTop: 18 }}
-      >
-        <p className="text-center font-mono text-[11px] tracking-[0.14em]" style={{ color: theme.legend }}>
-          SCOUT · REVIEW · DECIDE · PORTFOLIO
-        </p>
       </div>
     </div>
   );

@@ -34,6 +34,8 @@ export default {
         'slate-dark': '#0f1218',
         /** Validation strip: same as paper (palette whitelist). */
         warning: '#F2F0EA',
+        /** See :root --color-register-tint */
+        registerTint: 'var(--color-register-tint)',
       },
       fontFamily: {
         display: ['"Libre Baskerville"', 'Georgia', 'serif'],

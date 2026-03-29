@@ -132,22 +132,40 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                 aria-label="Menu"
               >
                 <div className="flex flex-col items-start gap-3 py-3">
-                  {/* Mode toggles: Judgements / System */}
+                  {/* Mode toggles: Deals / Judgements / System — same mono scale as desktop spine */}
                   <div className="flex flex-col items-stretch gap-0.5 w-full">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRightPanel((p) => (p === 'system' ? null : p));
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-0 uppercase tracking-[0.12em] btn-interaction ${
+                        rightPanel !== 'system' ? 'text-white' : 'text-white/55 hover:text-white'
+                      }`}
+                      style={{ transitionTimingFunction: 'var(--motion-ease)' }}
+                      aria-pressed={rightPanel !== 'system'}
+                    >
+                      <span
+                        className={`inline-block pb-0.5 ${rightPanel !== 'system' ? 'border-b border-white' : ''}`}
+                      >
+                        Deals
+                      </span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
                         setRightPanel((panel) => (panel === 'feed' ? null : 'feed'));
                         setMobileMenuOpen(false);
                       }}
-                      className={`type-label-tab min-h-[44px] flex items-center justify-start cursor-pointer px-0 btn-interaction ${
-                        rightPanel === 'feed' ? 'text-white' : 'text-white/60 hover:text-white'
+                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-0 uppercase tracking-[0.12em] btn-interaction ${
+                        rightPanel === 'feed' ? 'text-white' : 'text-white/55 hover:text-white'
                       }`}
                       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
                       aria-pressed={rightPanel === 'feed'}
                     >
                       <span
-                        className={`inline-block pb-0.5 ${rightPanel === 'feed' ? 'border-b-2 border-white' : ''}`}
+                        className={`inline-block pb-0.5 ${rightPanel === 'feed' ? 'border-b border-white' : ''}`}
                       >
                         Judgements
                       </span>
@@ -158,14 +176,14 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                         setRightPanel((panel) => (panel === 'system' ? null : 'system'));
                         setMobileMenuOpen(false);
                       }}
-                      className={`type-label-tab min-h-[44px] flex items-center justify-start cursor-pointer px-0 btn-interaction ${
-                        rightPanel === 'system' ? 'text-white' : 'text-white/60 hover:text-white'
+                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-0 uppercase tracking-[0.12em] btn-interaction ${
+                        rightPanel === 'system' ? 'text-white' : 'text-white/55 hover:text-white'
                       }`}
                       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
                       aria-pressed={rightPanel === 'system'}
                     >
                       <span
-                        className={`inline-block pb-0.5 ${rightPanel === 'system' ? 'border-b-2 border-white' : ''}`}
+                        className={`inline-block pb-0.5 ${rightPanel === 'system' ? 'border-b border-white' : ''}`}
                       >
                         System
                       </span>
@@ -191,6 +209,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
       <SystemBar
         scoutCount={startups.length}
         rightPanel={rightPanel}
+        onShowDeals={() => setRightPanel((p) => (p === 'system' ? null : p))}
         onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
         onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
         onClose={() => setRightPanel(null)}
@@ -208,48 +227,126 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[2fr_3fr] min-h-0 overflow-hidden pb-3 lg:pb-4 gap-4 lg:gap-4">
           <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
-            {/* Title above status strip — desktop only; mobile uses top nav title */}
-            <header className="flex-none mb-2 hidden lg:block pl-[10px]">
-              <h1 className="font-display font-normal text-[20px] leading-[1.4] text-oxford">
-                Aethria
-              </h1>
-              {data.settings?.fund_identity?.fund_name?.trim() && (
-                <p className="type-meta text-oxford/50 mt-1" aria-hidden>
-                  {[
-                    data.settings.fund_identity.fund_name.trim(),
-                    data.settings.fund_identity.stage_focus?.trim(),
-                    data.settings.fund_identity.geographic_focus?.trim(),
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
-              )}
-            </header>
-
-            {/* Status strip: single-line summary — desktop only; mobile shows this in the menu */}
-            <section className="hidden lg:flex flex-none mb-2 min-w-0 items-center py-[6px] pl-[10px] pr-3 sm:pr-4 lg:pr-0">
-              <div className="flex min-w-0 w-full max-w-full flex-nowrap items-center gap-0 font-mono text-[10px] font-normal leading-[1.5] tracking-[0.08em] text-oxford/45 max-[1400px]:text-oxford/40 max-[1200px]:text-oxford/[0.32]">
-                <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap uppercase">
-                  {startups.length} companies · {resolvedCount} decided · {unreviewed} unreviewed ·{' '}
-                  {watchlist} watchlist
-                </span>
-                <span className="flex shrink-0 items-center whitespace-nowrap uppercase">
-                  <span aria-hidden> · </span>
-                  <span
-                    className={`mx-1 inline-block shrink-0 rounded-none ${pendingEscalations > 0 ? 'escalation-dot-active' : ''}`}
-                    style={{
-                      width: 5,
-                      height: 5,
-                      backgroundColor: '#7D2B3A',
-                    }}
-                    aria-hidden
-                  />
-                  <span>
-                    {pendingEscalations} escalations
-                  </span>
-                </span>
+            {/* Title + pipeline summary — desktop only; escalations live here (not duplicated on SystemBar) */}
+            <header className="flex-none mb-2 hidden lg:block min-w-0">
+              <div>
+                <h1 className="font-display font-normal text-[20px] leading-[1.4] text-oxford">
+                  Aethria
+                </h1>
+                {data.settings?.fund_identity?.fund_name?.trim() && (
+                  <p className="type-meta text-oxford/50 mt-1 tracking-[0.12em]" aria-hidden>
+                    {[
+                      data.settings.fund_identity.fund_name.trim(),
+                      data.settings.fund_identity.stage_focus?.trim(),
+                      data.settings.fund_identity.geographic_focus?.trim(),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                )}
               </div>
-            </section>
+              <section
+                aria-label="Pipeline summary"
+                className="mt-2 min-w-0 border border-oxford/[0.06] bg-paper"
+              >
+                <div className="min-w-0">
+                  <table className="w-full table-fixed border-collapse caption-top text-left">
+                    <caption className="type-meta border-b border-oxford/[0.06] px-2 py-1 text-left uppercase tracking-[0.12em] text-oxford/40">
+                      Pipeline
+                    </caption>
+                    <colgroup>
+                      <col className="w-[20%]" />
+                      <col className="w-[20%]" />
+                      <col className="w-[20%]" />
+                      <col className="w-[20%]" />
+                      <col className="w-[20%]" />
+                    </colgroup>
+                    <thead>
+                      <tr className="bg-registerTint type-meta uppercase tracking-[0.1em] text-oxford/38">
+                        <th
+                          scope="col"
+                          aria-label="Companies"
+                          title="Companies"
+                          className="border-r border-oxford/[0.06] px-1 py-1 text-center font-normal"
+                        >
+                          Co
+                        </th>
+                        <th
+                          scope="col"
+                          aria-label="Decided"
+                          title="Decided"
+                          className="border-r border-oxford/[0.06] px-1 py-1 text-center font-normal"
+                        >
+                          Dec
+                        </th>
+                        <th
+                          scope="col"
+                          aria-label="Unreviewed"
+                          title="Unreviewed"
+                          className="border-r border-oxford/[0.06] px-1 py-1 text-center font-normal"
+                        >
+                          Unv
+                        </th>
+                        <th
+                          scope="col"
+                          aria-label="Watchlist"
+                          title="Watchlist"
+                          className="border-r border-oxford/[0.06] px-1 py-1 text-center font-normal"
+                        >
+                          WL
+                        </th>
+                        <th
+                          scope="col"
+                          aria-label="Escalations"
+                          title="Escalations"
+                          className="px-1 py-1 text-center font-normal"
+                        >
+                          Esc
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="type-data border-r border-oxford/[0.06] px-1 py-1.5 text-center align-top text-oxford">
+                          {startups.length}
+                        </td>
+                        <td className="type-data border-r border-oxford/[0.06] px-1 py-1.5 text-center align-top text-oxford">
+                          {resolvedCount}
+                        </td>
+                        <td className="type-data border-r border-oxford/[0.06] px-1 py-1.5 text-center align-top text-oxford">
+                          {unreviewed}
+                        </td>
+                        <td className="type-data border-r border-oxford/[0.06] px-1 py-1.5 text-center align-top text-oxford">
+                          {watchlist}
+                        </td>
+                        <td className="px-1 py-1.5 text-center align-top">
+                          <span className="type-data inline-flex items-center justify-center gap-1">
+                            <span
+                              className={`inline-block shrink-0 rounded-none ${
+                                pendingEscalations > 0 ? 'escalation-dot-active' : ''
+                              }`}
+                              style={{
+                                width: 5,
+                                height: 5,
+                                backgroundColor: '#7D2B3A',
+                              }}
+                              aria-hidden
+                            />
+                            <span
+                              className={
+                                pendingEscalations > 0 ? 'text-[#7D2B3A]' : 'text-oxford/40'
+                              }
+                            >
+                              {pendingEscalations}
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </header>
 
             {rightPanel === 'system' ? (
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden w-full min-w-0 rounded-none border border-oxford/[0.06] bg-paper">
@@ -318,15 +415,19 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
           >
             {rightPanel === 'feed' ? (
               <PanelShell
-                title="Judgements"
+                className="min-h-0 flex-1"
+                title="JUDGEMENTS"
+                titleClassName={PANEL_CHROME_LABEL_CLASS}
+                headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
+                headerBorderClass=""
                 actions={
                   <button
                     type="button"
                     onClick={handleCloseJudgements}
-                    className="type-label-tab text-oxford/60 hover:text-oxford btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset"
+                    className={PANEL_CHROME_ACTION_BTN_CLASS}
                     aria-label="Hide judgements"
                   >
-                    Close
+                    CLOSE
                   </button>
                 }
                 contentOverflowHidden
@@ -364,7 +465,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                     </button>
                   </div>
                 }
-                contentClassName="flex-1 min-h-0 overflow-y-auto px-6 sm:px-8 py-6"
+                contentClassName="flex-1 min-h-0 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6"
               >
                 <InvestmentMemoContent ref={memoContentRef} startup={selectedStartup} embedded />
               </PanelShell>
@@ -425,15 +526,18 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
             onClick={(e) => e.stopPropagation()}
           >
             <PanelShell
-              title="Judgements"
+              title="JUDGEMENTS"
+              titleClassName={PANEL_CHROME_LABEL_CLASS}
+              headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
+              headerBorderClass=""
               actions={
                 <button
                   type="button"
                   onClick={handleCloseJudgements}
-                  className="type-label-tab text-oxford/60 hover:text-oxford btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  className={`${PANEL_CHROME_ACTION_BTN_CLASS} min-w-[44px] min-h-[44px] flex items-center justify-center`}
                   aria-label="Close judgements panel"
                 >
-                  Close
+                  CLOSE
                 </button>
               }
               contentOverflowHidden

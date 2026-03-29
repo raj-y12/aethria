@@ -8,13 +8,15 @@ const API_BASE = import.meta.env.VITE_API_URL ?? '';
 const WAITLIST_URL = API_BASE ? `${API_BASE.replace(/\/$/, '')}/api/waitlist` : '/api/waitlist';
 const APP_URL = import.meta.env.VITE_APP_URL ?? '';
 
+const OXFORD = '#002147';
+const PAPER = '#f2f0ea';
+
 export default function RequestAccessPage() {
   const [submitted, setSubmitted] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState(false);
-  const [submitHover, setSubmitHover] = useState(false);
   const [position, setPosition] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -111,59 +113,59 @@ export default function RequestAccessPage() {
 
   return (
     <div
-      className="min-h-[100dvh] h-[100dvh] overflow-auto overflow-x-hidden flex flex-col relative w-full"
-      style={{ backgroundColor: 'var(--color-paper)' }}
+      className="paper-dot-grid relative flex min-h-[100dvh] flex-col overflow-x-hidden"
+      style={{ backgroundColor: PAPER, color: 'var(--color-charcoal)' }}
     >
-      <GrainOverlay opacity={0.02} />
+      <GrainOverlay opacity={0.028} variant="light" />
 
-      <header className="site-header-bar flex items-center justify-between page-margin-x pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-8 pb-4 md:pb-6 shrink-0 z-20">
-        <Link
-          data-cursor-expand
-          to="/"
-          className="font-display text-[17px] hover:opacity-80 transition-opacity text-left flex-1 md:flex-none min-h-[44px] flex items-center"
-          style={{ color: 'var(--color-oxford)' }}
-        >
-          Aethria
-        </Link>
-        <Link
-          data-cursor-expand
-          to="/home"
-          className="font-mono text-[10px] uppercase tracking-[0.1em] opacity-70 inline-flex items-center min-h-[44px] transition-opacity duration-300 hover:opacity-100"
-          style={{ color: 'var(--color-oxford)' }}
-        >
-          Home
-        </Link>
+      <header
+        className="inst-site-header sticky top-0 z-[50] w-full shrink-0 border-b border-solid border-[var(--section-divider)] bg-[#f2f0ea]"
+        style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
+      >
+        <div className="page-margin-x flex min-h-[52px] items-center justify-between gap-3 sm:gap-4">
+          <Link
+            data-cursor-expand
+            to="/"
+            className="font-wordmark flex min-h-[44px] flex-1 items-center py-2 text-left text-[15px] font-normal normal-case leading-none tracking-normal text-[#002147] transition-opacity hover:opacity-80 sm:flex-none sm:text-[16px]"
+          >
+            Aethria
+          </Link>
+          <Link
+            data-cursor-expand
+            to="/home"
+            className="inline-flex min-h-[44px] items-center font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)] transition-opacity duration-300 hover:text-[#002147]"
+          >
+            Home
+          </Link>
+        </div>
       </header>
 
-      <div className="shrink-0 page-margin-x pt-0 pb-1">
-        <p className="form-label-aethria mb-0" style={{ color: 'var(--color-oxford)', opacity: 0.5 }}>
-          2026 · EARLY ACCESS
-        </p>
-      </div>
-
-      <main className="request-content-area flex-1 flex items-center justify-center overflow-auto py-8 md:py-12 page-margin-x">
-        <div className="w-full max-w-2xl flex flex-col justify-center">
+      <main className="request-content-area page-margin-x flex flex-1 flex-col items-center overflow-auto py-10 md:py-14">
+        <div className="flex w-full max-w-2xl flex-col justify-center">
           {!submitted ? (
             <>
-              <p
-                className="font-mono text-[12px] uppercase tracking-[0.2em] mb-3"
-                style={{ color: 'var(--color-oxford)', opacity: 0.75 }}
-              >
-                REQUEST ACCESS
-              </p>
-              <p className="font-sans text-[14px] mb-2 leading-relaxed" style={{ color: 'var(--color-oxford)', opacity: 0.6 }}>
-                Join the waitlist. We’ll reach out when a spot opens.
-              </p>
-              <p className="font-sans text-[13px] mb-10" style={{ color: 'var(--color-oxford)', opacity: 0.45 }}>
-                We’ll confirm by email. No spam.
-              </p>
+              <div className="mb-10 border-l border-solid border-[var(--section-divider)] pl-4 md:mb-12 md:pl-5">
+                <p className="section-numeral mb-5">VII</p>
+                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)]">
+                  Early access · 2026
+                </p>
+                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.78)]">
+                  Request access
+                </p>
+                <p className="max-w-xl font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.75)]">
+                  Join the waitlist. We&apos;ll reach out when a spot opens.
+                </p>
+                <p className="mt-2 max-w-xl font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.55)]">
+                  We&apos;ll confirm by email. No spam.
+                </p>
+              </div>
 
-              <div style={{ opacity: formOut ? 0 : 1, transition: 'opacity 200ms ease' }}>
-                <form onSubmit={handleSubmit} className="flex flex-col request-form" noValidate>
-                  <div className="grid grid-cols-1 md:grid-cols-2 request-form-grid gap-x-8 md:gap-x-12 gap-y-4 md:gap-y-6">
+              <div className="transition-opacity duration-200 ease-out" style={{ opacity: formOut ? 0 : 1 }}>
+                <form onSubmit={handleSubmit} className="request-form flex flex-col" noValidate>
+                  <div className="request-form-grid grid grid-cols-1 gap-y-5 gap-x-8 md:grid-cols-2 md:gap-x-12 md:gap-y-6">
                     <div className="flex flex-col">
                       <label htmlFor="waitlist-name" className="form-label-aethria">
-                        NAME
+                        Name
                       </label>
                       <div className="form-input-wrapper">
                         <input
@@ -172,12 +174,13 @@ export default function RequestAccessPage() {
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           className={`form-input-aethria ${nameEmpty ? 'form-input-aethria-error' : ''}`}
+                          autoComplete="name"
                         />
                       </div>
                     </div>
                     <div className="flex flex-col">
                       <label htmlFor="waitlist-email" className="form-label-aethria">
-                        EMAIL
+                        Email
                       </label>
                       <div className="form-input-wrapper">
                         <input
@@ -186,12 +189,13 @@ export default function RequestAccessPage() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className={`form-input-aethria ${emailEmpty ? 'form-input-aethria-error' : ''}`}
+                          autoComplete="email"
                         />
                       </div>
                     </div>
                     <div className="flex flex-col">
                       <label htmlFor="waitlist-role" className="form-label-aethria">
-                        ROLE
+                        Role
                       </label>
                       <div className="form-input-wrapper">
                         <input
@@ -200,12 +204,13 @@ export default function RequestAccessPage() {
                           value={role}
                           onChange={(e) => setRole(e.target.value)}
                           className={`form-input-aethria ${roleEmpty ? 'form-input-aethria-error' : ''}`}
+                          autoComplete="organization-title"
                         />
                       </div>
                     </div>
                     <div className="flex flex-col">
                       <label htmlFor="waitlist-firm" className="form-label-aethria">
-                        FIRM
+                        Firm
                       </label>
                       <div className="form-input-wrapper">
                         <input
@@ -214,12 +219,13 @@ export default function RequestAccessPage() {
                           value={firm}
                           onChange={(e) => setFirm(e.target.value)}
                           className={`form-input-aethria ${firmEmpty ? 'form-input-aethria-error' : ''}`}
+                          autoComplete="organization"
                         />
                       </div>
                     </div>
                     <div className="flex flex-col md:col-span-2">
                       <label htmlFor="waitlist-linkedin" className="form-label-aethria">
-                        LINKEDIN <span className="opacity-60 font-normal">(optional)</span>
+                        LinkedIn <span className="font-normal opacity-60">(optional)</span>
                       </label>
                       <div className="form-input-wrapper">
                         <input
@@ -236,12 +242,15 @@ export default function RequestAccessPage() {
                   </div>
 
                   {validationError && (
-                    <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: 'var(--color-oxford)', opacity: 0.55 }} role="alert">
+                    <p
+                      className="mt-4 font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.55)]"
+                      role="alert"
+                    >
                       Complete name, email, role, and firm
                     </p>
                   )}
                   {error && (
-                    <p className="mt-4 font-sans text-[13px]" style={{ color: 'var(--color-oxford)', opacity: 0.75 }} role="alert">
+                    <p className="mt-4 font-sans text-[14px] leading-relaxed text-[rgba(0,33,71,0.78)]" role="alert">
                       {error}
                     </p>
                   )}
@@ -249,52 +258,39 @@ export default function RequestAccessPage() {
                     type="submit"
                     data-cursor-expand
                     disabled={loading || processing}
-                    className="request-submit-btn mt-6 md:mt-8 btn-aethria btn-aethria-solid h-11 disabled:opacity-70 disabled:cursor-not-allowed relative overflow-hidden"
-                    onMouseEnter={() => setSubmitHover(true)}
-                    onMouseLeave={() => setSubmitHover(false)}
+                    className="request-submit-btn group mt-8 inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-none bg-[#002147] px-6 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-[#f2f0ea] transition-colors duration-[250ms] ease-out hover:bg-[rgba(0,33,71,0.9)] disabled:cursor-not-allowed disabled:opacity-70 md:mt-10 md:w-fit"
                   >
-                    <span
-                      className="absolute inset-0"
-                      style={{
-                        backgroundColor: 'var(--color-paper)',
-                        transform: submitHover || loading || processing ? 'translateX(0)' : 'translateX(-100%)',
-                        transition: 'transform 300ms ease',
-                      }}
-                    />
-                    <span className="relative flex items-center justify-center">
+                    <span className="flex items-center justify-center">
                       <span>
                         {loading
                           ? `SUBMITTING${'.'.repeat(ellipsisStep)}`
                           : processing
-                          ? 'PROCESSING ENTRY'
-                          : 'SUBMIT APPLICATION'}
+                            ? 'PROCESSING ENTRY'
+                            : 'SUBMIT APPLICATION'}
                       </span>
                       <span
-                        className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap"
-                        style={{ width: loading || processing || submitHover ? '1.25em' : '0.5em' }}
+                        className={`inline-block shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease-out ${
+                          loading || processing ? 'w-6' : 'w-2 group-hover:w-6'
+                        }`}
+                        aria-hidden
                       >
-                        {'\u00A0›'}
+                        {'\u00A0→'}
                       </span>
                     </span>
                   </button>
-                  </form>
-                </div>
-              </>
-            ) : (
+                </form>
+              </div>
+            </>
+          ) : (
             <div
-              className="flex flex-col items-center justify-center text-center"
+              className="mx-auto flex w-full max-w-md flex-col items-center text-center"
               style={{ opacity: showSuccess ? 1 : 0, transition: 'opacity 300ms ease' }}
             >
-              <p
-                className="font-display text-[28px]"
-                style={{ color: 'var(--color-oxford)', marginBottom: 8 }}
-              >
+              <p className="section-numeral mb-6 w-full">VII</p>
+              <h1 className="font-display text-[clamp(1.625rem,4.5vw,1.875rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#002147]">
                 You&apos;re on the list.
-              </p>
-              <p
-                className="font-sans text-[14px]"
-                style={{ color: 'var(--color-oxford)', opacity: 0.65, marginBottom: 16 }}
-              >
+              </h1>
+              <p className="mt-4 max-w-md font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.72)]">
                 {position != null
                   ? `Position #${position}. We'll reach out when a spot opens.`
                   : "We'll reach out when a spot opens."}
@@ -303,22 +299,22 @@ export default function RequestAccessPage() {
                 width="48"
                 height="48"
                 viewBox="0 0 48 48"
-                aria-hidden="true"
-                style={{ marginTop: 8 }}
+                className="mt-6"
+                aria-hidden
               >
                 <circle
                   cx="24"
                   cy="24"
                   r="21"
                   fill="none"
-                  stroke="#002147"
+                  stroke={OXFORD}
                   strokeWidth="1"
-                  strokeOpacity="0.18"
+                  strokeOpacity="0.15"
                 />
                 <path
                   d="M15 24.5L21 30.5L33.5 18"
                   fill="none"
-                  stroke="#002147"
+                  stroke={OXFORD}
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -329,37 +325,36 @@ export default function RequestAccessPage() {
                   }}
                 />
               </svg>
-                {APP_URL && (
-                  <a
-                    href={APP_URL.replace(/\/$/, '') + '/dashboard'}
-                    data-cursor-expand
-                    className="mt-8 inline-flex items-center justify-center min-h-[44px] px-6 border border-[var(--color-oxford)] text-[var(--color-oxford)] font-mono text-[10px] uppercase tracking-[0.1em] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] transition-colors rounded-none"
-                  >
-                    Proceed to sign in
-                  </a>
-                )}
-                <Link
-                  to="/home"
+              {APP_URL && (
+                <a
+                  href={`${APP_URL.replace(/\/$/, '')}/dashboard`}
                   data-cursor-expand
-                  className="font-mono text-[10px] uppercase mt-8 inline-flex items-center min-h-[44px] transition-opacity hover:opacity-100"
-                  style={{ color: 'var(--color-oxford)', opacity: 0.45 }}
+                  className="mt-10 inline-flex min-h-[44px] items-center justify-center border border-solid border-[var(--section-divider)] bg-transparent px-6 font-mono text-[10px] uppercase tracking-[0.12em] text-[#002147] transition-colors duration-200 hover:border-[#002147] hover:bg-[#002147] hover:text-[#f2f0ea]"
                 >
-                  ← Back to home
-                </Link>
-              </div>
-            )}
+                  Proceed to sign in
+                </a>
+              )}
+              <Link
+                to="/home"
+                data-cursor-expand
+                className="mt-8 inline-flex min-h-[44px] items-center font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)] transition-opacity hover:opacity-100"
+              >
+                ← Back to home
+              </Link>
+            </div>
+          )}
         </div>
       </main>
 
       <footer
-        className="shrink-0 z-20 flex items-center justify-between page-margin-x pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:pt-5 md:pb-4 border-t"
-        style={{ borderColor: 'rgba(0, 33, 71, 0.06)', color: 'var(--color-oxford)', backgroundColor: 'var(--color-paper)' }}
+        className="section-divider-top mt-auto flex shrink-0 flex-col items-start gap-3 border-t border-solid border-[var(--section-divider)] bg-[#f2f0ea] page-margin-x pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-between sm:gap-0 md:pb-5"
+        style={{ color: OXFORD }}
       >
-        <span className="font-sans text-[10px] md:text-[11px] tracking-wide" style={{ color: 'var(--color-oxford)', opacity: 0.65 }}>
-          © Aethria
+        <span className="font-sans text-[13px] leading-relaxed text-[rgba(0,33,71,0.55)]">
+          © {new Date().getFullYear()} Aethria
         </span>
-        <span className="font-mono text-[9px] uppercase tracking-[0.15em]" style={{ color: 'var(--color-oxford)', opacity: 0.5 }}>
-          INVESTMENT INTELLIGENCE
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.4)]">
+          Investment intelligence
         </span>
       </footer>
     </div>

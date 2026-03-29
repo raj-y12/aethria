@@ -8,16 +8,57 @@ interface SystemBarProps {
   scoutCount?: number;
   agentConfig?: unknown;
   rightPanel?: 'memo' | 'feed' | 'system' | null;
+  /** Show work grid (left column); clears System when open. */
+  onShowDeals?: () => void;
   onShowFeed?: () => void;
   onShowSystem?: () => void;
   onClose?: () => void;
   navLink?: { href: string; label: string };
 }
 
+function SpineRule() {
+  return <div className="w-full max-w-[5.5rem] mx-auto h-px bg-white/[0.08]" aria-hidden />;
+}
+
+/** Single 10px mono scale site-wide; 1px active rule (not border-b-2). */
+function SpineNavButton({
+  label,
+  active,
+  onClick,
+  ariaPressed,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  ariaPressed: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`type-meta w-full min-h-[36px] flex items-center justify-center cursor-pointer uppercase tracking-[0.12em] btn-interaction ${
+        active ? 'text-white' : 'text-white/55 hover:text-white'
+      }`}
+      style={{ transitionTimingFunction: 'var(--motion-ease)' }}
+      aria-pressed={ariaPressed}
+    >
+      <span className={`inline-block pb-0.5 ${active ? 'border-b border-white' : ''}`}>{label}</span>
+    </button>
+  );
+}
+
 /**
- * Left-side vertical system bar: clock (top), username, JUDGEMENTS / SYSTEM toggles, nav + logout.
+ * Left-side vertical system bar: time + date, identity, company count, mode toggles, nav + logout.
  */
-export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem, onClose, navLink }: SystemBarProps) {
+export default function SystemBar({
+  scoutCount = 0,
+  rightPanel = null,
+  onShowDeals,
+  onShowFeed,
+  onShowSystem,
+  onClose,
+  navLink,
+}: SystemBarProps) {
   const navigate = useNavigate();
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -31,7 +72,9 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
   };
 
   useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 1000);
+    const tick = () => setTime(new Date());
+    tick();
+    const t = setInterval(tick, 60_000);
     return () => clearInterval(t);
   }, []);
 
@@ -46,16 +89,24 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
     sessionStorage.setItem(key, '1');
   }, []);
 
-  const formatted = time.toLocaleTimeString('en-GB', {
+  const timeShort = time.toLocaleTimeString('en-GB', {
     hour12: false,
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
   });
+  const dateShort = time
+    .toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+    })
+    .toUpperCase();
+
+  const workspaceChrome =
+    onShowDeals != null && onShowFeed != null && onShowSystem != null && onClose != null;
 
   const baseClass =
     'hidden lg:flex fixed top-0 bottom-4 left-4 z-50 flex-col justify-between w-36 bg-oxford border border-white/[0.06]';
-  const baseStyle = { boxShadow: '0 1px 0 0 rgba(255,255,255,0.06)', padding: '20px 16px 16px' };
+  const baseStyle = { padding: '20px 16px 16px' };
 
   return (
     <motion.header
@@ -73,66 +124,66 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
             }
       }
     >
-      {/* All controls stacked: clock (top), username, toggles, nav + logout */}
-      <div className="flex flex-col items-center gap-4 h-full">
-        {/* Clock at top */}
-        <span
-          className="type-meta tabular-nums leading-[1.5] text-white/40"
-          aria-live="polite"
-        >
-          {formatted}
-        </span>
+      <div className="flex flex-col items-center gap-3 h-full min-h-0">
+        {/* Time + date — updates each minute; same 10px mono as rest of spine */}
+        <div className="flex flex-col items-center gap-0.5 shrink-0" aria-live="polite">
+          <span className="type-meta tabular-nums leading-none text-white/50">{timeShort}</span>
+          <span className="type-meta leading-tight tracking-[0.12em] uppercase text-white/35">
+            {dateShort}
+          </span>
+        </div>
 
-        {/* Username (account/settings moved to app Settings later) */}
-        <div className="w-full flex items-center justify-center min-h-[2.5rem]">
+        <SpineRule />
+
+        {/* Account */}
+        <div className="w-full flex flex-col items-center gap-2 shrink-0">
           <span
-            className="type-label-tab truncate max-w-full text-center text-white/40"
+            className="type-meta truncate max-w-full text-center uppercase tracking-[0.12em] text-white/50"
             title={displayName}
           >
             {displayName}
           </span>
+          <div className="flex flex-col items-center gap-1 w-full px-0.5">
+            <span className="type-meta text-center leading-[1.4] tracking-[0.12em] uppercase text-white/38">
+              {scoutCount === 1 ? '1 company' : `${scoutCount} companies`}
+            </span>
+          </div>
         </div>
 
-        {/* Mode toggles: Judgements / System */}
-        <div className="flex flex-col items-center gap-0.5 mt-1 w-full">
-          <button
-            type="button"
-            onClick={rightPanel === 'feed' ? onClose : onShowFeed}
-            className={`type-label-tab min-h-[36px] w-full flex items-center justify-center cursor-pointer btn-interaction ${
-              rightPanel === 'feed' ? 'text-white' : 'text-white/60 hover:text-white'
-            }`}
-            style={{ transitionTimingFunction: 'var(--motion-ease)' }}
-            aria-pressed={rightPanel === 'feed'}
-          >
-            <span
-              className={`inline-block pb-0.5 ${rightPanel === 'feed' ? 'border-b-2 border-white' : ''}`}
-            >
-              Judgements
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={rightPanel === 'system' ? onClose : onShowSystem}
-            className={`type-label-tab min-h-[36px] w-full flex items-center justify-center cursor-pointer btn-interaction ${
-              rightPanel === 'system' ? 'text-white' : 'text-white/60 hover:text-white'
-            }`}
-            style={{ transitionTimingFunction: 'var(--motion-ease)' }}
-            aria-pressed={rightPanel === 'system'}
-          >
-            <span
-              className={`inline-block pb-0.5 ${rightPanel === 'system' ? 'border-b-2 border-white' : ''}`}
-            >
-              System
-            </span>
-          </button>
-        </div>
+        <SpineRule />
 
-        {/* Nav + Log out pinned to the bottom of the spine */}
-        <div className="mt-auto flex flex-col items-center gap-2">
+        {workspaceChrome ? (
+          <>
+            <div className="flex flex-col items-center gap-0.5 w-full shrink-0">
+              <SpineNavButton
+                label="Deals"
+                active={rightPanel !== 'system'}
+                ariaPressed={rightPanel !== 'system'}
+                onClick={() => onShowDeals!()}
+              />
+              <SpineNavButton
+                label="Judgements"
+                active={rightPanel === 'feed'}
+                ariaPressed={rightPanel === 'feed'}
+                onClick={() => (rightPanel === 'feed' ? onClose!() : onShowFeed!())}
+              />
+              <SpineNavButton
+                label="System"
+                active={rightPanel === 'system'}
+                ariaPressed={rightPanel === 'system'}
+                onClick={() => (rightPanel === 'system' ? onClose!() : onShowSystem!())}
+              />
+            </div>
+            <SpineRule />
+          </>
+        ) : null}
+
+        {/* Nav + Log out */}
+        <div className="mt-auto flex flex-col items-center gap-2 pt-1 shrink-0">
           {navLink && (
             <a
               href={navLink.href}
-              className="type-label-section text-white/70 hover:text-white btn-interaction"
+              className="type-meta uppercase tracking-[0.12em] text-white/60 hover:text-white btn-interaction text-center"
             >
               {navLink.label}
             </a>
@@ -140,7 +191,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
           <button
             type="button"
             onClick={handleLogout}
-            className="type-label-tab text-white/40 hover:text-white bg-transparent border-0 p-0 cursor-pointer btn-interaction"
+            className="type-meta uppercase tracking-[0.12em] text-white/40 hover:text-white bg-transparent border-0 p-0 cursor-pointer btn-interaction"
           >
             Log out
           </button>

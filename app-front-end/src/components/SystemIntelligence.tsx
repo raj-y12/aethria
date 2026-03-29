@@ -17,7 +17,7 @@ import EmptyState from './EmptyState';
 
 /** Match pipeline tab strip: underline sits on the nav hairline (items-end + overlap, no extra pb under tabs). */
 const SYSTEM_INTEL_TAB_BUTTON_CLASS =
-  'py-2 px-3 type-label-tab border-b-2 -mb-[3px] focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
+  'py-2.5 px-3 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
 const SYSTEM_INTEL_TAB_BAR_CLASS = `${PANEL_TAB_BAR_CLASS} items-end pt-2 pb-0`;
 
 type Tab = 'signals' | 'escalations' | 'analytics' | 'meta';
@@ -560,7 +560,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
       </nav>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}

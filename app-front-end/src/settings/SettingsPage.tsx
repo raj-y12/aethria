@@ -19,16 +19,17 @@ type TabId = 'account' | 'budget' | 'pipeline' | 'discovery' | 'meta' | 'portfol
 const FONT_GEIST = '"Geist Sans", system-ui, sans-serif' as const;
 
 const SETTINGS_HEADER_LABEL_CLASS =
-  'font-mono text-[10px] font-normal uppercase tracking-[0.1em] text-oxford/40';
+  'type-meta uppercase text-oxford/40';
 
 const SETTINGS_SAVE_BTN_CLASS =
   `${SETTINGS_HEADER_LABEL_CLASS} rounded-none border-0 bg-transparent p-0 cursor-pointer hover:text-oxford/80 transition-colors duration-150 ease-out btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset`;
 
 const SETTINGS_TAB_NAV_CLASS = `${PANEL_TAB_BAR_CLASS} pt-2 pb-0`;
 const SETTINGS_TAB_BTN_CLASS =
-  'py-2 px-3 font-mono text-[10px] font-normal uppercase tracking-[0.1em] border-b-2 -mb-[2px] focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
-const SETTINGS_TAB_ACTIVE_CLASS = 'text-oxford/[0.9] border-oxford';
-const SETTINGS_TAB_INACTIVE_CLASS = 'text-oxford/[0.35] border-transparent';
+  'py-2.5 px-3 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
+const SETTINGS_TAB_ACTIVE_CLASS = 'border-b border-oxford text-oxford/[0.9]';
+const SETTINGS_TAB_INACTIVE_CLASS =
+  'border-b border-transparent text-oxford/[0.35] hover:border-oxford/15 hover:text-oxford/55';
 
 /** Geist 13px / 50% — section descriptions */
 const settingsDescClass =
@@ -53,13 +54,15 @@ const settingsSelectStyle: CSSProperties = {
 
 const hintCls = `block mt-1 mb-0 ${settingsDescClass}`;
 
-const TOGGLE_TRACK = 'h-6 w-11 shrink-0 rounded-none cursor-pointer inline-flex items-center';
-const TOGGLE_KNOB = 'h-4 w-4 rounded-none pointer-events-none block';
+/** Slight radius — institutional, not pill-shaped. */
+const TOGGLE_TRACK =
+  'h-6 w-11 shrink-0 cursor-pointer inline-flex items-center overflow-hidden rounded-[3px]';
+const TOGGLE_KNOB = 'h-4 w-4 rounded-[2px] pointer-events-none block';
 
 function SettingSectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <div>
-      <div className="font-mono text-[10px] font-normal uppercase tracking-[0.12em] text-oxford/50 mb-2">
+      <div className="type-meta uppercase text-oxford/50 mb-2">
         {children}
       </div>
       <div className="h-px w-full bg-oxford/10 mb-5" aria-hidden />
@@ -389,12 +392,12 @@ export default function SettingsPage() {
           animate={{ opacity: 1 }}
           transition={{ duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
         >
-        <header className="flex-none mb-2 hidden lg:block pl-[10px]">
+        <header className="mb-2 hidden min-w-0 flex-none lg:block">
           <h1 className="font-display font-normal text-[20px] leading-[1.4] text-oxford">
             Aethria
           </h1>
           {fundIdentity.fund_name?.trim() && (
-            <p className="type-meta text-oxford/50 mt-1" aria-hidden>
+            <p className="type-meta mt-1 tracking-[0.12em] text-oxford/50" aria-hidden>
               {[
                 fundIdentity.fund_name.trim(),
                 fundIdentity.stage_focus?.trim(),
@@ -445,14 +448,14 @@ export default function SettingsPage() {
             contentClassName="flex-1 min-h-0 flex flex-col overflow-hidden w-full min-w-0"
           >
             {validationErrors.length > 0 && (
-              <div className="flex-none px-4 sm:px-6 py-2 border-b border-oxford/25 bg-warning">
+              <div className="flex-none border-b border-oxford/25 bg-warning px-4 py-2 sm:px-5">
                 <p className="type-label-section text-oxford/80 mb-1">Validation errors</p>
                 <ul className="type-body-sm text-oxford/80 space-y-0.5">
                   {validationErrors.map((e, i) => <li key={i}>{e}</li>)}
                 </ul>
               </div>
             )}
-            <div className="flex-1 min-h-0 overflow-hidden p-4 sm:p-6">
+            <div className="min-h-0 flex-1 overflow-hidden p-4 sm:p-5">
               <div className="h-full flex flex-col gap-8 overflow-hidden">
                 <AnimatePresence mode="wait">
                   <motion.div

@@ -38,6 +38,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { Startup } from '../types/startup';
+import { getReviewerQualityBand, type ReviewerQualityBand } from '../design-system/semantics';
 import { tokens } from '../design-system/tokens';
 import DecisionBadge from './DecisionBadge';
 import EmptyState from './EmptyState';
@@ -61,23 +62,15 @@ const FILTER_ITEMS: { id: ActiveFilter; label: string }[] = [
   { id: 'ESCALATIONS', label: 'ESCALATIONS' },
 ];
 
-type ReviewerVerdictBand = 'STRONG' | 'MEDIUM' | 'WEAK';
+type ReviewerVerdictBand = ReviewerQualityBand;
 
 function getReviewerVerdict(s: Startup): ReviewerVerdictBand | null {
-  const r = s.review;
-  if (!r) return null;
-  const c = r.consensus_verdict;
-  if (c === 'STRONG' || c === 'MEDIUM' || c === 'WEAK') return c;
-  const v = typeof r.verdict === 'string' ? r.verdict.trim().toUpperCase() : '';
-  if (v === 'STRONG' || v === 'MEDIUM' || v === 'WEAK') return v as ReviewerVerdictBand;
-  const first = r.reviews?.[0]?.verdict;
-  if (first === 'STRONG' || first === 'MEDIUM' || first === 'WEAK') return first;
-  return null;
+  return getReviewerQualityBand(s.review);
 }
 
 /** Shared shell for reviewer + partner pills in this grid. */
 const GRID_BADGE_SHELL =
-  'inline-flex items-center justify-center rounded-none font-mono text-[9px] font-normal uppercase leading-[1.5] tracking-[0.1em] py-[3px] px-[6px]';
+  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none font-mono text-[9px] font-normal uppercase leading-[1.5] tracking-[0.1em] py-[3px] px-[6px]';
 
 function VerdictBadge({ band }: { band: ReviewerVerdictBand }) {
   const tone =
@@ -322,7 +315,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
               ease: tokens.motion.ease,
             }}
             className={`group cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-oxford/25 focus-visible:ring-inset btn-interaction transition-colors rounded-none overflow-hidden ${
-              isSelected ? 'bg-oxford/[0.03]' : 'bg-transparent hover:bg-oxford/[0.02]'
+              isSelected ? 'bg-registerTint' : 'bg-transparent hover:bg-registerTint'
             }${hasDisagreement ? ' border-l-2 border-l-oxford/40' : ''}`}
             onClick={() => handleStartupClick(startup)}
             onKeyDown={(e) => {
@@ -386,27 +379,26 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 >
                   → memo
                 </span>
-                <div className="flex w-full max-w-full min-w-0 flex-col items-end gap-1">
+                <div className="flex w-full max-w-full min-w-0 flex-col gap-1.5 lg:items-end">
                   {fundingTier ? (
                     <span
-                      className={`inline-flex shrink-0 items-center rounded-none border border-solid py-[3px] px-[6px] font-mono text-[10px] font-normal uppercase leading-[1.5] tracking-[0.1em] ${FUNDING_STAGE_BADGE_CLASS[fundingTier]}`}
+                      className={`inline-flex w-fit max-w-full shrink-0 items-center rounded-none border border-solid py-[3px] px-[6px] font-mono text-[10px] font-normal uppercase leading-[1.5] tracking-[0.1em] ${FUNDING_STAGE_BADGE_CLASS[fundingTier]}`}
                     >
                       {getFundingStageBadgeLabel(fundingTier, fundingStageRaw)}
                     </span>
                   ) : null}
-                  <div className="flex w-full max-w-full min-w-0 flex-row flex-wrap items-center justify-end gap-1">
+                  {/* Single wrap row: verdict + partner + escalation stay inline on narrow viewports */}
+                  <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-1.5 justify-start sm:justify-end">
                     {reviewBand ? <VerdictBadge band={reviewBand} /> : null}
                     {showPartnerDecisionPlusEscalation ? (
-                      <DecisionBadge variant={economicBadgeVariant} />
+                      <>
+                        <DecisionBadge variant={economicBadgeVariant!} />
+                        <DecisionBadge variant="escalation" />
+                      </>
                     ) : (
                       <DecisionBadge variant={badgeVariant} />
                     )}
                   </div>
-                  {showPartnerDecisionPlusEscalation ? (
-                    <div className="flex w-full flex-wrap items-center justify-end gap-1">
-                      <DecisionBadge variant="escalation" />
-                    </div>
-                  ) : null}
                 </div>
               </div>
             </div>

@@ -115,7 +115,7 @@ export default function CustomCursor() {
       {/* Small filled dot */}
       {showDot && (
         <div
-          className="absolute rounded-full transition-[transform,background-color,border-color] duration-150 ease-out"
+          className="absolute rounded-none transition-[transform,background-color,border-color] duration-150 ease-out"
           style={{
             width: 8,
             height: 8,
@@ -127,7 +127,7 @@ export default function CustomCursor() {
 
       {/* Hollow ring */}
       <div
-        className="absolute rounded-full transition-[transform,border-color,opacity] duration-300 ease-out"
+        className="absolute rounded-none transition-[transform,border-color,opacity] duration-300 ease-out"
         style={{
           width: ringSize,
           height: ringSize,

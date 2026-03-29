@@ -5,7 +5,9 @@ import type { Startup } from '../types/startup';
 import {
   getScoreBand,
   DECISION_LABELS,
+  QUALITY_LABELS,
   SCORE_DIMENSIONS,
+  getReviewerQualityBand,
 } from '../design-system/semantics';
 
 const PDF_MARGIN = 20;
@@ -65,8 +67,14 @@ function buildMemoPDF(startup: Startup): jsPDF {
     ? (() => {
         const p = startup.partner!;
         const decisionLabel = DECISION_LABELS[p.decision] ?? p.decision;
-        const rationale = p.rationale ?? '';
-        return rationale ? `${decisionLabel}. ${rationale}` : `${decisionLabel}.`;
+        const band = getReviewerQualityBand(startup.review);
+        const dossier =
+          band != null
+            ? ` Dossier read: ${band} (${QUALITY_LABELS[band] ?? band}).`
+            : '';
+        const rationale = (p.rationale ?? '').trim();
+        const head = `${decisionLabel}.${dossier}`.replace(/\.\s*\./g, '.').trim();
+        return rationale ? `${head} ${rationale}` : head;
       })()
     : '';
   if (judgmentSummary) {
@@ -201,11 +209,12 @@ function normalizeParagraphs(value: unknown): string[] {
   return [];
 }
 
-function toJudgmentVerdict(startup: Startup): string {
+/** Partner economic headline: ADVANCE / PASS / HOLD (display-only; stored codes unchanged). */
+function partnerDecisionHeadline(startup: Startup): string {
   const d = startup.partner?.decision;
-  if (d === 'YES') return 'STRONG';
-  if (d === 'NO' || d === 'PASS') return 'PASS';
-  return 'HOLD';
+  if (d == null) return '—';
+  const label = DECISION_LABELS[d] ?? String(d);
+  return label.toUpperCase();
 }
 
 function toJudgmentReasoning(startup: Startup): string[] {
@@ -248,7 +257,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const sectorCategory = startup ? formatSectorAndCategory(startup) : '';
 
   const showJudgment = !!startup?.review && !!startup?.partner?.decision;
-  const verdict = startup && showJudgment ? toJudgmentVerdict(startup) : '';
+  const decisionHeadline = startup && showJudgment ? partnerDecisionHeadline(startup) : '';
+  const dossierQualityBand = useMemo(
+    () => (startup && showJudgment ? getReviewerQualityBand(startup.review) : null),
+    [startup, showJudgment]
+  );
   const reasoningParagraphs = useMemo(() => (startup && showJudgment ? toJudgmentReasoning(startup) : []), [startup, showJudgment]);
 
   useEffect(() => {
@@ -278,7 +291,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           width: 60%;
           min-width: 0;
           flex: 0 0 60%;
-          background: #F2F0EA;
+          background: var(--color-paper);
           min-height: 0;
           height: 100%;
           overflow: hidden;
@@ -302,7 +315,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           padding-top: 36px;
           padding-bottom: 36px;
           color: #002147;
-          background: #F2F0EA;
+          background: var(--color-paper);
         }
         .memoPanel--embedded .memoScroll{
           /* PanelShell already applies content padding; avoid double-padding in embedded mode. */
@@ -338,8 +351,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoAction:hover{ color: rgba(0,33,71,1); }
         .memoCompany{
           font-family: "Geist Sans", system-ui, sans-serif;
-          font-weight: 700;
-          font-size: clamp(24px, 3.2vw, 32px);
+          font-weight: 600;
+          font-size: clamp(22px, 3vw, 29px);
           line-height: 1.2;
           margin: 0;
           color: rgba(0,33,71,0.92);
@@ -349,8 +362,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           margin-bottom: 24px;
         }
         .memoSectionSpacer{
-          height: 29px;
+          height: 36px;
           flex-shrink: 0;
+        }
+        .memoSectionSpacer + section{
+          padding-top: 14px;
+        }
+        .memoLeadSection{
+          padding-top: 18px;
         }
         .memoMeta{
           margin-top: 4px;
@@ -376,17 +395,69 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           padding-bottom: 6px;
           border-bottom: none;
         }
-        .memoVerdict{
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-weight: 700;
-          font-size: 32px;
-          line-height: 1.3;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
+        .memoJudgmentHead{
           margin: 0 0 12px 0;
+        }
+        .memoJudgmentHead--solo{
+          margin-bottom: 0;
+        }
+        .memoVerdict{
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-weight: 600;
+          font-size: 32px;
+          line-height: 1.15;
+          letter-spacing: -0.03em;
+          text-transform: uppercase;
+          margin: 0;
           padding-top: 0px;
           padding-bottom: 0px;
-          color: rgba(0,33,71,1);
+          color: #002147;
+        }
+        .memoJudgmentHead--solo .memoVerdict{
+          margin: 0 0 12px 0;
+        }
+        .memoDossierRead{
+          margin-top: 12px;
+          padding-top: 12px;
+          border-top: 1px solid rgba(0,33,71,0.08);
+        }
+        .memoDossierReadKicker{
+          display: block;
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 9px;
+          font-weight: 400;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: rgba(0,33,71,0.38);
+          margin: 0 0 6px 0;
+        }
+        .memoDossierReadLine{
+          display: flex;
+          flex-wrap: wrap;
+          align-items: baseline;
+          gap: 0 6px;
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-size: 13px;
+          line-height: 1.45;
+          color: rgba(0,33,71,0.62);
+          margin: 0;
+        }
+        .memoDossierReadBand{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 10px;
+          font-weight: 400;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: rgba(0,33,71,0.72);
+        }
+        .memoDossierReadDot{
+          color: rgba(0,33,71,0.28);
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 10px;
+        }
+        .memoDossierReadPhrase{
+          font-weight: 400;
+          color: rgba(0,33,71,0.58);
         }
         .memoReasoning{
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
@@ -512,8 +583,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           border-bottom-color: rgba(0,33,71,0.4);
         }
         .memoSummaryCallout{
-          /* Match WorkGrid row hover: oxford @ 2% (Tailwind bg-oxford/[0.02]) */
-          background: rgba(0, 33, 71, 0.02);
+          background: var(--color-register-tint);
           padding: 18px;
         }
         .memoSourcesToggle{
@@ -576,7 +646,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           display: flex;
           align-items: center;
           justify-content: center;
-          background: #F2F0EA;
+          background: var(--color-paper);
         }
         .memoEmptyInner{
           text-align: center;
@@ -642,7 +712,25 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               <>
                 <section>
                   <p className="memoLabel">INVESTMENT JUDGMENT</p>
-                  <div className="memoVerdict">{verdict}</div>
+                  <div
+                    className={`memoJudgmentHead${dossierQualityBand == null ? ' memoJudgmentHead--solo' : ''}`}
+                  >
+                    <p className="memoVerdict">{decisionHeadline}</p>
+                    {dossierQualityBand != null ? (
+                      <div className="memoDossierRead">
+                        <span className="memoDossierReadKicker">Dossier read</span>
+                        <p className="memoDossierReadLine">
+                          <span className="memoDossierReadBand">{dossierQualityBand}</span>
+                          <span className="memoDossierReadDot" aria-hidden>
+                            ·
+                          </span>
+                          <span className="memoDossierReadPhrase">
+                            {QUALITY_LABELS[dossierQualityBand] ?? dossierQualityBand}
+                          </span>
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
                   <div className="memoReasoning">
                     {reasoningParagraphs.filter((p) => String(p ?? '').trim().length > 0).map((p, i) => (
                       <p key={i}>{p}</p>
@@ -655,7 +743,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             )}
 
             {/* Dimension Scores block */}
-            <section>
+            <section className={showJudgment ? undefined : 'memoLeadSection'}>
               <p className="memoLabel">DIMENSION SCORES</p>
               {scoresSummary && <div className="memoScoresSummary">{scoresSummary}</div>}
               <p className="memoScoreLegend">1-3: WEAK · 4-5: CONCERNING · 6-7: PROMISING · 8-10: STRONG</p>

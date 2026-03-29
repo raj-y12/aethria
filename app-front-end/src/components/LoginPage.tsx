@@ -3,9 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { tokens } from '../design-system/tokens';
-
-const OXford = '#002147';
-const PAPER = '#F2F0EA';
+import { chrome } from '../design-system/chrome';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -108,10 +106,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      className="w-full flex flex-col items-center justify-center relative bg-paper min-h-[100dvh]"
-      style={{ backgroundColor: PAPER }}
-    >
+    <div className="relative flex min-h-[100dvh] w-full flex-col items-center justify-center bg-paper">
       {/* Centered column — padding bottom so fixed footer doesn't overlap on small screens */}
       <div className="w-full max-w-[380px] flex flex-col items-center px-4 sm:px-6 flex-1 justify-center pb-28 sm:pb-0">
         {/* 1. Wordmark block — wrapper inline-block so underline matches wordmark width; responsive size on mobile */}
@@ -127,7 +122,7 @@ export default function LoginPage() {
           <motion.span
             className="block h-px w-full origin-left"
             style={{
-              backgroundColor: OXford,
+              backgroundColor: tokens.color.oxford,
               marginTop: '6px',
             }}
             initial={{ scaleX: 0 }}
@@ -147,21 +142,22 @@ export default function LoginPage() {
         </motion.p>
 
         {/* 3. Custom Clerk-powered sign-in form (username + password) */}
-        <div className="w-full max-w-[380px]" style={{ marginTop: '48px' }} data-login-page>
+        <div className="mt-12 w-full max-w-[380px]" data-login-page>
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
+            className={`${chrome.frame} p-5 sm:p-6`}
           >
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 void handleSubmit();
               }}
-              style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
+              className="flex flex-col gap-0"
               noValidate
             >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="flex flex-col gap-5">
               <input
                 type="text"
                 autoComplete="username"
@@ -210,7 +206,7 @@ export default function LoginPage() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.65, duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
-              style={{ marginTop: '32px' }}
+              className="mt-8"
             >
               <button
                 type="button"
