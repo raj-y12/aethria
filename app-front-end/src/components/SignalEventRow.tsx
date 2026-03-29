@@ -26,7 +26,7 @@ export default function SignalEventRow({
 }: SignalEventRowProps) {
   const borderCls = 'border-b border-oxford/[0.06]';
   const tsCls = 'shrink-0 tabular-nums type-meta text-oxford/60';
-  const bodyCls = 'type-body-sm text-oxford/80 leading-relaxed';
+  const bodyCls = 'type-body-sm text-oxford/80 leading-[1.6]';
 
   if (layout === 'compact') {
     return (

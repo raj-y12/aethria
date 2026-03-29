@@ -187,7 +187,7 @@ export default function LoginPage() {
             <style>{`
               [data-login-page] input::placeholder {
                 color: rgba(0, 33, 71, 0.25);
-                font-family: Inter, system-ui, sans-serif;
+                font-family: "Geist Sans", system-ui, sans-serif;
                 font-size: 14px;
                 font-weight: 400;
               }

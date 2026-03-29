@@ -14,8 +14,8 @@ export default {
         graphite: '#2f333b',
       },
       fontFamily: {
-        display: ['"Libre Baskerville"', 'serif'],
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['"Instrument Serif"', 'Georgia', 'serif'],
+        sans: ['"Geist Sans"', 'system-ui', 'sans-serif'],
         mono: ['"Space Mono"', 'monospace'],
       },
       borderRadius: {

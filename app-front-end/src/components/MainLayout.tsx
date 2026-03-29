@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useMemo, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
@@ -17,9 +17,17 @@ import {
   useFocusTrap,
   useMediaQuery,
 } from '../hooks';
-import type { Startup } from '../types/startup';
+import type { Startup, EscalationItem } from '../types/startup';
 import type { SystemData } from '../hooks/useSystemData';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './InvestmentMemoContent';
+
+const SYSTEM_MEMO_HEADER_PADDING = 'py-[10px]';
+
+const PANEL_CHROME_LABEL_CLASS =
+  'font-mono text-[10px] font-normal uppercase tracking-[0.1em] text-oxford/40';
+
+const PANEL_CHROME_ACTION_BTN_CLASS =
+  `${PANEL_CHROME_LABEL_CLASS} rounded-none border-0 bg-transparent p-0 cursor-pointer hover:text-oxford/80 transition-colors duration-150 ease-out btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset`;
 
 interface MainLayoutProps {
   data: SystemData;
@@ -50,8 +58,8 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   const memoOpen = !!selectedStartup;
   const verdictOrMemoOpen = memoOpen;
   const judgementsAsOverlay = rightPanel === 'feed' && !isDesktop;
-  const systemAsOverlay = rightPanel === 'system' && !isDesktop;
-  const anyOverlayOpen = verdictOrMemoOpen || judgementsAsOverlay || systemAsOverlay;
+  /** System replaces the work grid (left column); never an overlay. */
+  const anyOverlayOpen = verdictOrMemoOpen || judgementsAsOverlay;
   const useModal = selectedStartup && !isDesktop;
 
   const handleStartupClick = useCallback((startup: Startup) => {
@@ -59,6 +67,18 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
     setRightPanel('memo');
     setSelectedStartup(startup);
   }, []);
+
+  const handleOpenEscalationMemo = useCallback(
+    (esc: EscalationItem) => {
+      const id = esc.startup_id ?? esc.id;
+      const startup = startups.find((s) => s.id === id);
+      if (!startup) return;
+      restoreRefVerdictMemo.current = document.activeElement as HTMLElement | null;
+      setSelectedStartup(startup);
+      /* Leave rightPanel unchanged so System stays on the left; memo uses selectedStartup on the right. */
+    },
+    [startups]
+  );
 
   const handleCloseMemo = useCallback(() => {
     setSelectedStartup(null);
@@ -77,16 +97,22 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
 
   useScrollLock(anyOverlayOpen);
   useEscapeKey(handleEscape, anyOverlayOpen);
-  useRestoreFocus(verdictOrMemoOpen, restoreRefVerdictMemo, !(judgementsAsOverlay || systemAsOverlay));
-  useRestoreFocus(judgementsAsOverlay || systemAsOverlay, { current: null }, !verdictOrMemoOpen);
-  useFocusTrap(judgementsAsOverlay || systemAsOverlay, judgementsPanelRef);
+  useRestoreFocus(verdictOrMemoOpen, restoreRefVerdictMemo, !judgementsAsOverlay);
+  useRestoreFocus(judgementsAsOverlay, { current: null }, !verdictOrMemoOpen);
+  useFocusTrap(judgementsAsOverlay, judgementsPanelRef);
 
   const resolvedCount = startups.filter((s) => s.partner?.decision != null).length;
   const queueDepths = data.settings?.system_health?.queue_depths;
   const unreviewed = queueDepths?.unreviewed ?? 0;
-  const undecided = queueDepths?.undecided ?? 0;
   const watchlist = queueDepths?.watchlist ?? 0;
   const pendingEscalations = data.settings?.system_health?.pending_escalations ?? 0;
+  const watchlistIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of watchlistAnalytics?.entries ?? []) {
+      if (e?.startup_id) ids.add(e.startup_id);
+    }
+    return ids;
+  }, [watchlistAnalytics]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-paper">
@@ -102,7 +128,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: tokens.motion.duration.micro, ease: tokens.motion.ease }}
-                className="px-4 pb-0 border-b border-oxford/[0.06] type-label-tab bg-oxford overflow-hidden text-ivory/70"
+                className="px-4 pb-0 border-b border-oxford/[0.06] type-label-tab bg-oxford overflow-hidden text-white/70"
                 aria-label="Menu"
               >
                 <div className="flex flex-col items-start gap-3 py-3">
@@ -115,13 +141,13 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                         setMobileMenuOpen(false);
                       }}
                       className={`type-label-tab min-h-[44px] flex items-center justify-start cursor-pointer px-0 btn-interaction ${
-                        rightPanel === 'feed' ? 'text-ivory' : 'text-ivory/60 hover:text-ivory'
+                        rightPanel === 'feed' ? 'text-white' : 'text-white/60 hover:text-white'
                       }`}
                       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
                       aria-pressed={rightPanel === 'feed'}
                     >
                       <span
-                        className={`inline-block pb-0.5 ${rightPanel === 'feed' ? 'border-b-2 border-ivory' : ''}`}
+                        className={`inline-block pb-0.5 ${rightPanel === 'feed' ? 'border-b-2 border-white' : ''}`}
                       >
                         Judgements
                       </span>
@@ -133,13 +159,13 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                         setMobileMenuOpen(false);
                       }}
                       className={`type-label-tab min-h-[44px] flex items-center justify-start cursor-pointer px-0 btn-interaction ${
-                        rightPanel === 'system' ? 'text-ivory' : 'text-ivory/60 hover:text-ivory'
+                        rightPanel === 'system' ? 'text-white' : 'text-white/60 hover:text-white'
                       }`}
                       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
                       aria-pressed={rightPanel === 'system'}
                     >
                       <span
-                        className={`inline-block pb-0.5 ${rightPanel === 'system' ? 'border-b-2 border-ivory' : ''}`}
+                        className={`inline-block pb-0.5 ${rightPanel === 'system' ? 'border-b-2 border-white' : ''}`}
                       >
                         System
                       </span>
@@ -150,7 +176,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                 <div className="flex flex-col items-start gap-1 mt-3">
                   <a
                     href="/settings"
-                    className="type-label-section text-ivory/70 hover:text-ivory btn-interaction"
+                    className="type-label-section text-white/70 hover:text-white btn-interaction"
                   >
                     Settings
                   </a>
@@ -178,13 +204,13 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
 
       {/* Paper canvas. Fixed height so only WorkGrid scrolls.
           On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[13rem] lg:pr-6 lg:pt-6">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[11rem] lg:pr-6 lg:pt-6">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[3fr_2fr] min-h-0 overflow-hidden pb-3 lg:pb-4 gap-4 lg:gap-4">
-          <div className="flex flex-col min-w-0 min-h-0">
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[2fr_3fr] min-h-0 overflow-hidden pb-3 lg:pb-4 gap-4 lg:gap-4">
+          <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
             {/* Title above status strip — desktop only; mobile uses top nav title */}
-            <header className="flex-none mb-2 hidden lg:block">
-              <h1 className="type-hero font-bold text-oxford">
+            <header className="flex-none mb-2 hidden lg:block pl-[10px]">
+              <h1 className="font-display font-normal text-[20px] leading-[1.4] text-oxford">
                 Aethria
               </h1>
               {data.settings?.fund_identity?.fund_name?.trim() && (
@@ -201,127 +227,96 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
             </header>
 
             {/* Status strip: single-line summary — desktop only; mobile shows this in the menu */}
-            <section className="hidden lg:flex flex-none h-11 mb-2 items-center py-[6px]">
-              <div className="w-full flex items-center type-meta">
-                {/* Pipeline counts (left) — friendly line when nothing yet */}
-                <span className="text-oxford/60 type-label-section">
-                  {startups.length === 0 && resolvedCount === 0 && pendingEscalations === 0
-                    ? 'Autonomous dealflow'
-                    : `${startups.length} companies · ${resolvedCount} decided`}
+            <section className="hidden lg:flex flex-none mb-2 min-w-0 items-center py-[6px] pl-[10px] pr-3 sm:pr-4 lg:pr-0">
+              <div className="flex min-w-0 w-full max-w-full flex-nowrap items-center gap-0 font-mono text-[10px] font-normal leading-[1.5] tracking-[0.08em] text-oxford/45 max-[1400px]:text-oxford/40 max-[1200px]:text-oxford/[0.32]">
+                <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap uppercase">
+                  {startups.length} companies · {resolvedCount} decided · {unreviewed} unreviewed ·{' '}
+                  {watchlist} watchlist
                 </span>
-
-                {/* Separator */}
-                <span
-                  className="mx-[12px]"
-                    style={{
-                      width: '3px',
-                      height: '3px',
-                      borderRadius: '9999px',
-                      backgroundColor: 'rgba(0,33,71,0.25)',
-                    }}
-                  aria-hidden
-                />
-
-                {/* Queue depths (middle) */}
-                <span className="text-oxford/60">
-                  Unreviewed {unreviewed} · Undecided {undecided} · Watchlist {watchlist}
-                </span>
-
-                {/* Separator */}
-                <span
-                  className="mx-[12px]"
-                    style={{
-                      width: '3px',
-                      height: '3px',
-                      borderRadius: '9999px',
-                      backgroundColor: 'rgba(0,33,71,0.25)',
-                    }}
-                  aria-hidden
-                />
-
-                {/* Escalations (right) */}
-                <span className="flex items-center gap-2">
+                <span className="flex shrink-0 items-center whitespace-nowrap uppercase">
+                  <span aria-hidden> · </span>
                   <span
-                    className={pendingEscalations > 0 ? 'escalation-dot-active' : ''}
+                    className={`mx-1 inline-block shrink-0 rounded-none ${pendingEscalations > 0 ? 'escalation-dot-active' : ''}`}
                     style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      backgroundColor:
-                        pendingEscalations > 0 ? 'var(--color-accent)' : 'rgba(0,33,71,0.25)', /* accent: escalation-only */
+                      width: 5,
+                      height: 5,
+                      backgroundColor: '#7D2B3A',
                     }}
                     aria-hidden
                   />
-                  <span
-                    style={{
-                      color:
-                          pendingEscalations > 0
-                          ? 'rgba(125, 43, 58, 0.85)' /* escalation count: accent tint */
-                          : 'rgba(0, 33, 71, 0.4)',
-                    }}
-                  >
+                  <span>
                     {pendingEscalations} escalations
                   </span>
                 </span>
               </div>
             </section>
 
-            {/* WorkGrid: only this area scrolls; fills column so both columns resize together */}
-            <div className="flex-1 min-h-0 overflow-y-auto w-full min-w-0 rounded-none border border-oxford/[0.06] bg-paper">
-              <div className="px-4 sm:px-6 lg:px-10 pt-2 pb-6 lg:pb-8">
-                <GhostTransition>
-                  <WorkGrid
-                    startups={startups}
-                    onStartupClick={handleStartupClick}
-                    selectedId={selectedStartup?.id ?? null}
+            {rightPanel === 'system' ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden w-full min-w-0 rounded-none border border-oxford/[0.06] bg-paper">
+                <PanelShell
+                  className="min-h-0 flex-1"
+                  title="SYSTEM"
+                  titleClassName={PANEL_CHROME_LABEL_CLASS}
+                  headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
+                  headerBorderClass=""
+                  actions={
+                    <button
+                      type="button"
+                      onClick={() => setRightPanel(null)}
+                      className={PANEL_CHROME_ACTION_BTN_CLASS}
+                      aria-label="Hide system intelligence"
+                    >
+                      CLOSE
+                    </button>
+                  }
+                  contentOverflowHidden
+                  contentClassName="flex-1 min-h-0 overflow-hidden"
+                >
+                  <SystemIntelligence
+                    signals={signals}
+                    escalations={escalations}
+                    rejectionAnalytics={rejectionAnalytics}
+                    watchlistAnalytics={watchlistAnalytics}
+                    concentrationAnalytics={concentrationAnalytics}
+                    metaReports={metaReports}
+                    scoutWeights={scoutWeights}
+                    calibrationState={calibrationState}
+                    onOpenEscalationMemo={handleOpenEscalationMemo}
                   />
-                </GhostTransition>
+                </PanelShell>
               </div>
-            </div>
+            ) : (
+              <div
+                className="flex-1 min-h-0 overflow-y-auto w-full min-w-0 rounded-none border border-oxford/[0.06] bg-paper"
+                style={{ scrollbarGutter: 'stable both-edges' }}
+              >
+                <div className="px-0 pt-2 pb-6 lg:pb-8">
+                  <GhostTransition disableLift>
+                    <WorkGrid
+                      startups={startups}
+                      onStartupClick={handleStartupClick}
+                      selectedId={selectedStartup?.id ?? null}
+                      watchlistIds={watchlistIds}
+                    />
+                  </GhostTransition>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Right panel on desktop: Judgements, System Intelligence, Memo, or empty. */}
+          {/* Right zone: Judgements or memo only — never System. */}
           <aside
             className="hidden lg:flex flex-col min-w-0 min-h-0 border border-oxford/[0.06] bg-paper overflow-hidden"
             aria-live="polite"
             aria-label={
-              rightPanel === 'system'
-                ? 'System intelligence'
-                : rightPanel === 'feed'
+              rightPanel === 'feed'
                 ? 'Judgements'
                 : selectedStartup
                 ? 'Investment memo'
                 : 'Detail'
             }
           >
-            {rightPanel === 'system' ? (
-              <PanelShell
-                title="System"
-                actions={
-                  <button
-                    type="button"
-                    onClick={() => setRightPanel(null)}
-                    className="type-label-tab text-oxford/60 hover:text-oxford btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset"
-                    aria-label="Hide system intelligence"
-                  >
-                    Close
-                  </button>
-                }
-                contentOverflowHidden
-                contentClassName="flex-1 min-h-0 overflow-hidden"
-              >
-                <SystemIntelligence
-                  signals={signals}
-                  escalations={escalations}
-                  rejectionAnalytics={rejectionAnalytics}
-                  watchlistAnalytics={watchlistAnalytics}
-                  concentrationAnalytics={concentrationAnalytics}
-                  metaReports={metaReports}
-                  scoutWeights={scoutWeights}
-                  calibrationState={calibrationState}
-                />
-              </PanelShell>
-            ) : rightPanel === 'feed' ? (
+            {rightPanel === 'feed' ? (
               <PanelShell
                 title="Judgements"
                 actions={
@@ -345,23 +340,27 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
               </PanelShell>
             ) : selectedStartup ? (
               <PanelShell
-                title="Memo"
+                title=""
+                showTitle={false}
+                headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
+                headerBorderClass=""
+                headerJustifyClass="justify-end"
                 actions={
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => memoContentRef.current?.downloadPDF()}
-                      className="type-label-tab text-oxford/60 hover:text-oxford btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset"
+                      className={PANEL_CHROME_ACTION_BTN_CLASS}
                     >
-                      Download PDF
+                      DOWNLOAD PDF
                     </button>
                     <button
                       type="button"
                       onClick={handleCloseMemo}
-                      className="type-label-tab text-oxford/60 hover:text-oxford btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset"
+                      className={PANEL_CHROME_ACTION_BTN_CLASS}
                       aria-label="Close memo"
                     >
-                      Close
+                      CLOSE
                     </button>
                   </div>
                 }
@@ -381,8 +380,8 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
         </div>
       </main>
 
-      {/* Judgements/System as slide-over only on mobile; on desktop they appear in the right panel. */}
-      {(judgementsAsOverlay || systemAsOverlay) && typeof document !== 'undefined' && createPortal(
+      {/* Judgements slide-over on mobile only; System swaps into the left column above. */}
+      {judgementsAsOverlay && typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           <motion.div
             key="judgements-overlay"
@@ -404,7 +403,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
               paddingLeft: 'env(safe-area-inset-left)',
               paddingRight: 'env(safe-area-inset-right)',
             }}
-            onClick={judgementsAsOverlay ? handleCloseJudgements : () => setRightPanel(null)}
+            onClick={handleCloseJudgements}
             aria-hidden="true"
           />
           <motion.div
@@ -426,13 +425,13 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
             onClick={(e) => e.stopPropagation()}
           >
             <PanelShell
-              title={judgementsAsOverlay ? 'Judgements' : 'System'}
+              title="Judgements"
               actions={
                 <button
                   type="button"
-                  onClick={judgementsAsOverlay ? handleCloseJudgements : () => setRightPanel(null)}
+                  onClick={handleCloseJudgements}
                   className="type-label-tab text-oxford/60 hover:text-oxford btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset min-w-[44px] min-h-[44px] flex items-center justify-center"
-                  aria-label={judgementsAsOverlay ? 'Close judgements panel' : 'Close system panel'}
+                  aria-label="Close judgements panel"
                 >
                   Close
                 </button>
@@ -441,24 +440,11 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
               contentClassName="flex-1 min-h-0 overflow-hidden"
               className="h-full"
             >
-              {judgementsAsOverlay ? (
-                <LiveIntelligenceFeed
-                  startups={startups}
-                  signals={signals}
-                  metaReports={metaReports}
-                />
-              ) : (
-                <SystemIntelligence
-                  signals={signals}
-                  escalations={escalations}
-                  rejectionAnalytics={rejectionAnalytics}
-                  watchlistAnalytics={watchlistAnalytics}
-                  concentrationAnalytics={concentrationAnalytics}
-                  metaReports={metaReports}
-                  scoutWeights={scoutWeights}
-                  calibrationState={calibrationState}
-                />
-              )}
+              <LiveIntelligenceFeed
+                startups={startups}
+                signals={signals}
+                metaReports={metaReports}
+              />
             </PanelShell>
           </motion.div>
         </AnimatePresence>,

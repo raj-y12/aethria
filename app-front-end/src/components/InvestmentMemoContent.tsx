@@ -1,15 +1,12 @@
-import { useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { jsPDF } from 'jspdf';
-import type { SingleReview, Startup } from '../types/startup';
+import type { Startup } from '../types/startup';
 import {
   getScoreBand,
-  QUALITY_LABELS,
   DECISION_LABELS,
   SCORE_DIMENSIONS,
 } from '../design-system/semantics';
-import { tokens } from '../design-system/tokens';
-import DecisionBadge from './DecisionBadge';
 
 const PDF_MARGIN = 20;
 const PDF_LINE_HEIGHT = 5;
@@ -67,11 +64,9 @@ function buildMemoPDF(startup: Startup): jsPDF {
   const judgmentSummary = startup.partner
     ? (() => {
         const p = startup.partner!;
-        const r = startup.review;
         const decisionLabel = DECISION_LABELS[p.decision] ?? p.decision;
-        const quality = r?.verdict ? QUALITY_LABELS[r.verdict] ?? r.verdict : '';
         const rationale = p.rationale ?? '';
-        return rationale ? `${decisionLabel}. ${rationale}` : `${decisionLabel}. Quality: ${quality}.`;
+        return rationale ? `${decisionLabel}. ${rationale}` : `${decisionLabel}.`;
       })()
     : '';
   if (judgmentSummary) {
@@ -139,26 +134,12 @@ function buildMemoPDF(startup: Startup): jsPDF {
   if (startup.partner) {
     const p = startup.partner;
     const decisionLine = `Investment decision: ${p.decision} (${DECISION_LABELS[p.decision] ?? p.decision})`;
-    const qualityLine =
-      startup.review?.verdict != null
-        ? `Quality: ${startup.review.verdict} (${QUALITY_LABELS[startup.review.verdict] ?? startup.review.verdict})`
-        : '';
+    const qualityLine = startup.review?.verdict != null ? `Quality: ${startup.review.verdict}` : '';
     const lines = [decisionLine, ...(qualityLine ? [qualityLine] : []), ...(p.rationale ? [p.rationale] : [])];
     y = addPDFSection(doc, { title: 'Decision', lines, startY: y });
   }
 
   return doc;
-}
-
-function buildJudgmentSummary(startup: Startup): string {
-  const r = startup.review;
-  const p = startup.partner;
-  if (!p) return '';
-  const decisionLabel = DECISION_LABELS[p.decision] ?? p.decision;
-  const quality = r?.verdict ? QUALITY_LABELS[r.verdict] ?? r.verdict : '';
-  const rationale = p.rationale ?? '';
-  if (rationale) return `${decisionLabel}. ${rationale}`;
-  return `${decisionLabel}. Quality: ${quality}.`;
 }
 
 /** Split judgment text into display paragraphs. Preserves existing newlines; otherwise breaks on sentence boundaries. */
@@ -198,7 +179,7 @@ function buildScoreJustification(startup: Startup): string | null {
 }
 
 export interface InvestmentMemoContentProps {
-  startup: Startup;
+  startup: Startup | null;
   onClose?: () => void;
   /** When true, used in side panel (no outer padding; panel provides it). */
   embedded?: boolean;
@@ -208,7 +189,38 @@ export interface InvestmentMemoContentHandle {
   downloadPDF: () => void;
 }
 
-const actionBtnCls = 'type-label-tab text-oxford/60 hover:text-oxford min-h-[44px] flex items-center px-2 btn-interaction';
+function normalizeParagraphs(value: unknown): string[] {
+  if (value == null) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => String(v ?? '').replace(/\s*\n+\s*/g, ' ').trim())
+      .filter(Boolean)
+      .flatMap((v) => [v]);
+  }
+  if (typeof value === 'string') return [value.replace(/\s*\n+\s*/g, ' ').trim()].filter(Boolean);
+  return [];
+}
+
+function toJudgmentVerdict(startup: Startup): string {
+  const d = startup.partner?.decision;
+  if (d === 'YES') return 'STRONG';
+  if (d === 'NO' || d === 'PASS') return 'PASS';
+  return 'HOLD';
+}
+
+function toJudgmentReasoning(startup: Startup): string[] {
+  const rationale = startup.partner?.rationale;
+  if (!rationale) return [];
+  return normalizeParagraphs(rationale);
+}
+
+function formatSectorAndCategory(startup: Startup): string {
+  const sector = startup.scout.sector?.trim() || '—';
+  const category = startup.scout.funding_stage?.trim() || startup.scout.scout_type?.trim() || '';
+  return category ? `${sector} · ${category}` : sector;
+}
+
+const actionBtnCls = 'memoAction';
 
 /**
  * Memo body only. Used in full-screen modal and in the right-side panel.
@@ -218,23 +230,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   { startup, onClose, embedded = false },
   ref
 ) {
-  const hasReview = startup.review != null;
-  const hasPartner = startup.partner != null;
-  const judgmentSummary = hasPartner ? buildJudgmentSummary(startup) : null;
-  const scoreJustification = hasReview ? buildScoreJustification(startup) : null;
-
-  const companyName = startup.scout.name ?? '';
-
-  const primaryRisks = startup.review?.diligence_red_flags ?? [];
-  const secondaryRisks = (startup.review?.key_risks ?? []).filter(
-    (r) => !primaryRisks.some((p) => r.includes(p) || p.includes(r))
-  );
-
-  const wrapperCls = embedded
-    ? 'flex flex-col h-full min-h-0'
-    : 'flex flex-col';
+  const wrapperCls = embedded ? 'memoPanel memoPanel--embedded' : 'memoPanel';
+  const [selectedDimensionIdx, setSelectedDimensionIdx] = useState(0);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
 
   const handleDownloadPDF = useCallback(() => {
+    if (!startup) return;
     const doc = buildMemoPDF(startup);
     const safeName = (startup.scout.name ?? 'memo').replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 60);
     doc.save(`${safeName}-investment-memo.pdf`);
@@ -242,377 +243,573 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
   useImperativeHandle(ref, () => ({ downloadPDF: handleDownloadPDF }), [handleDownloadPDF]);
 
+  const contentKey = startup?.id ?? 'empty';
+  const companyName = startup?.scout.name?.trim() || '';
+  const sectorCategory = startup ? formatSectorAndCategory(startup) : '';
+
+  const showJudgment = !!startup?.review && !!startup?.partner?.decision;
+  const verdict = startup && showJudgment ? toJudgmentVerdict(startup) : '';
+  const reasoningParagraphs = useMemo(() => (startup && showJudgment ? toJudgmentReasoning(startup) : []), [startup, showJudgment]);
+
+  useEffect(() => {
+    setSelectedDimensionIdx(0);
+    setSourcesOpen(false);
+  }, [startup?.id]);
+
+  const scoreBlocks = useMemo(() => {
+    if (!startup?.review) return [];
+    return SCORE_DIMENSIONS.map(({ id, name }) => {
+      const score = startup.review?.[id as keyof typeof startup.review];
+      const numeric = typeof score === 'number' ? score : null;
+      const reasoning = startup.review?.score_reasoning?.[id]?.trim() || '';
+      return { id, name, score: numeric, reasoning };
+    });
+  }, [startup]);
+
+  const scoresSummary = useMemo(() => {
+    if (!startup?.review) return null;
+    return buildScoreJustification(startup);
+  }, [startup]);
+
   return (
     <div className={wrapperCls}>
-      {onClose && (
-        <div className="flex-none flex items-center justify-end gap-2 pb-4 border-b border-oxford/[0.06]">
-          <button type="button" onClick={handleDownloadPDF} className={actionBtnCls}>
-            Download PDF
-          </button>
-          <button type="button" onClick={onClose} className={actionBtnCls}>
-            Close
-          </button>
+      <style>{`
+        .memoPanel{
+          width: 60%;
+          min-width: 0;
+          flex: 0 0 60%;
+          background: #F2F0EA;
+          min-height: 0;
+          height: 100%;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+        .memoPanel--embedded{
+          width: 100%;
+          flex: 1 1 auto;
+          /* Let the parent panel own scrolling in embedded mode. */
+          height: auto;
+          overflow: visible;
+        }
+        .memoScroll{
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding-left: 48px;
+          padding-right: 48px;
+          padding-top: 36px;
+          padding-bottom: 36px;
+          color: #002147;
+          background: #F2F0EA;
+        }
+        .memoPanel--embedded .memoScroll{
+          /* PanelShell already applies content padding; avoid double-padding in embedded mode. */
+          padding-left: 0px;
+          padding-right: 0px;
+          padding-top: 0px;
+          padding-bottom: 0px;
+          /* PanelShell already scrolls in embedded mode; avoid nested scrollbars. */
+          overflow: visible;
+          flex: 0 0 auto;
+          min-height: auto;
+        }
+        .memoHeaderActions{
+          display: flex;
+          justify-content: flex-end;
+          gap: 16px;
+          margin-top: 0px;
+          margin-bottom: 18px;
+        }
+        .memoAction{
+          appearance: none;
+          border: none;
+          background: transparent;
+          padding: 0;
+          cursor: pointer;
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 10px;
+          font-variant-caps: all-small-caps;
+          letter-spacing: 0.1em;
+          color: rgba(0,33,71,0.45);
+          transition: color 150ms ease;
+        }
+        .memoAction:hover{ color: rgba(0,33,71,1); }
+        .memoCompany{
+          font-family: "Geist Sans", system-ui, sans-serif;
+          font-weight: 700;
+          font-size: clamp(24px, 3.2vw, 32px);
+          line-height: 1.2;
+          margin: 0;
+          color: rgba(0,33,71,0.92);
+        }
+        .memoHeaderDivider{
+          margin-top: 13px;
+          margin-bottom: 24px;
+        }
+        .memoSectionSpacer{
+          height: 29px;
+          flex-shrink: 0;
+        }
+        .memoMeta{
+          margin-top: 4px;
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 10px;
+          letter-spacing: 0.1em;
+          color: rgba(0,33,71,0.4);
+          text-transform: uppercase;
+        }
+        .memoDivider{
+          height: 1px;
+          width: 100%;
+          background: rgba(0,33,71,0.08);
+        }
+        .memoLabel{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          line-height: 1.5;
+          color: rgba(0,33,71,0.5);
+          margin: 0 0 15px 0;
+          padding-bottom: 6px;
+          border-bottom: none;
+        }
+        .memoVerdict{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-weight: 700;
+          font-size: 32px;
+          line-height: 1.3;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          margin: 0 0 12px 0;
+          padding-top: 0px;
+          padding-bottom: 0px;
+          color: rgba(0,33,71,1);
+        }
+        .memoReasoning{
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-weight: 400;
+          font-size: 14px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.78);
+        }
+        .memoReasoning p{ margin: 0; }
+        .memoReasoning p + p{ margin-top: 7px; }
+        .memoScoresRow{
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 18px;
+        }
+        .memoScoreCol{
+          appearance: none;
+          border: none;
+          background: transparent;
+          padding: 0;
+          text-align: center;
+          cursor: pointer;
+          min-width: 0;
+        }
+        .memoScoreCol:focus{ outline: none; }
+        .memoScoreCol:focus-visible{
+          outline: 2px solid rgba(0,33,71,0.25);
+          outline-offset: 4px;
+        }
+        .memoScoreName{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 11px;
+          font-variant-caps: all-small-caps;
+          letter-spacing: 0.08em;
+          color: rgba(0,33,71,0.55);
+          margin: 0 0 8px 0;
+        }
+        .memoScoreValue{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-weight: 700;
+          font-size: 28px;
+          line-height: 1.5;
+          margin: 0 0 8px 0;
+          color: #002147;
+        }
+        .memoScoreValueRow{
+          display: flex;
+          align-items: baseline;
+          justify-content: center;
+          gap: 0;
+        }
+        .memoScoreBandLabel{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 10px;
+          letter-spacing: 0.08em;
+          color: rgba(0,33,71,0.4);
+        }
+        .memoScoreLegend{
+          margin-top: 7px;
+          margin-bottom: 14px;
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 10px;
+          line-height: 1.5;
+          color: rgba(0,33,71,0.35);
+        }
+        .memoScoreUnderline{
+          height: 2px;
+          width: 100%;
+          background: rgba(0,33,71,0.15);
+          margin-top: 8px;
+        }
+        .memoScoreWhy{
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-size: 12px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.6);
+          margin: 0;
+          overflow: hidden;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+        }
+        .memoDimensionPanel{
+          margin-top: 14px;
+        }
+        .memoDimensionPanelName{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 11px;
+          font-variant-caps: all-small-caps;
+          letter-spacing: 0.12em;
+          color: rgba(0,33,71,0.4);
+          margin: 0 0 8px 0;
+        }
+        .memoDimensionPanelText{
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-size: 14px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.78);
+          margin: 0;
+          white-space: normal;
+        }
+        .memoList{
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-size: 14px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.78);
+        }
+        .memoListItem{
+          display: flex;
+          gap: 10px;
+        }
+        .memoListItem + .memoListItem{ margin-top: 10px; }
+        .memoBullet{ color: rgba(0,33,71,0.35); }
+        .memoLink{
+          color: rgba(0,33,71,0.85);
+          text-decoration: none;
+          border-bottom: 1px solid rgba(0,33,71,0.15);
+        }
+        .memoLink:hover{
+          border-bottom-color: rgba(0,33,71,0.4);
+        }
+        .memoSummaryCallout{
+          /* Match WorkGrid row hover: oxford @ 2% (Tailwind bg-oxford/[0.02]) */
+          background: rgba(0, 33, 71, 0.02);
+          padding: 18px;
+        }
+        .memoSourcesToggle{
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          appearance: none;
+          border: none;
+          background: transparent;
+          padding: 0;
+          cursor: pointer;
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          color: rgba(0,33,71,0.5);
+          padding-bottom: 8px;
+          border-bottom: none;
+        }
+        .memoSourcesPlus{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 10px;
+          color: rgba(0,33,71,0.5);
+          line-height: 1.5;
+        }
+        .memoScoresSummary{
+          margin: 0 0 10px 0;
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-style: italic;
+          font-size: 13px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.5);
+        }
+        .memoOverviewRow{
+          display: grid;
+          grid-template-columns: 120px minmax(0, 1fr);
+          column-gap: 24px;
+          align-items: start;
+        }
+        .memoOverviewRow + .memoOverviewRow{ margin-top: 14px; }
+        .memoOverviewKey{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 11px;
+          font-variant-caps: all-small-caps;
+          letter-spacing: 0.08em;
+          color: rgba(0,33,71,0.55);
+          margin: 0;
+        }
+        .memoOverviewVal{
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-size: 14px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.78);
+          margin: 0;
+        }
+        .memoEmpty{
+          height: 100%;
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #F2F0EA;
+        }
+        .memoEmptyInner{
+          text-align: center;
+          padding: 48px;
+        }
+        .memoEmptyWordmark{
+          font-family: "Libre Baskerville", Georgia, serif;
+          font-weight: 400;
+          font-size: 24px;
+          line-height: 1.4;
+          color: rgba(0,33,71,0.25);
+          margin: 0;
+        }
+        .memoEmptyHint{
+          margin-top: 12px;
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-size: 13px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.2);
+        }
+
+        @media (max-width: 1100px){
+          .memoPanel{ width: 100%; flex-basis: auto; }
+          .memoScoresRow{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+      `}</style>
+
+      {!startup ? (
+        <div className="memoEmpty">
+          <div className="memoEmptyInner">
+            <p className="memoEmptyWordmark">Aethria</p>
+            <div className="memoEmptyHint">Select a company to view the investment memo.</div>
+          </div>
+        </div>
+      ) : (
+        <div className="memoScroll" role="region" aria-label="Investment memo">
+          {onClose && (
+            <div className="memoHeaderActions">
+              <button type="button" onClick={handleDownloadPDF} className={actionBtnCls}>
+                DOWNLOAD PDF
+              </button>
+              <button type="button" onClick={onClose} className={actionBtnCls}>
+                CLOSE
+              </button>
+            </div>
+          )}
+
+          <motion.div
+            key={contentKey}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {/* Header block */}
+            <h1 id="memo-title" className="memoCompany">
+              {companyName || '—'}
+            </h1>
+            <div className="memoMeta">{sectorCategory}</div>
+            <div className="memoDivider memoHeaderDivider" aria-hidden />
+
+            {/* Investment Judgment block */}
+            {showJudgment && (
+              <>
+                <section>
+                  <p className="memoLabel">INVESTMENT JUDGMENT</p>
+                  <div className="memoVerdict">{verdict}</div>
+                  <div className="memoReasoning">
+                    {reasoningParagraphs.filter((p) => String(p ?? '').trim().length > 0).map((p, i) => (
+                      <p key={i}>{p}</p>
+                    ))}
+                  </div>
+                </section>
+
+                <div className="memoSectionSpacer" aria-hidden />
+              </>
+            )}
+
+            {/* Dimension Scores block */}
+            <section>
+              <p className="memoLabel">DIMENSION SCORES</p>
+              {scoresSummary && <div className="memoScoresSummary">{scoresSummary}</div>}
+              <p className="memoScoreLegend">1-3: WEAK · 4-5: CONCERNING · 6-7: PROMISING · 8-10: STRONG</p>
+              <div className="memoScoresRow">
+                {scoreBlocks.map((b, idx) => {
+                  const isSelected = idx === selectedDimensionIdx;
+                  const displayScore = b.score != null ? `${Math.round(b.score)}/10` : '—';
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      className="memoScoreCol"
+                      onClick={() => setSelectedDimensionIdx(idx)}
+                      aria-pressed={isSelected}
+                    >
+                      <p className="memoScoreName">{b.name}</p>
+                      <div className="memoScoreValueRow">
+                        <p
+                          className="memoScoreValue"
+                          style={{ opacity: isSelected ? 1 : 0.5, transition: 'opacity 180ms ease' }}
+                        >
+                          {displayScore}
+                        </p>
+                      </div>
+                      {isSelected ? <div className="memoScoreUnderline" /> : <div style={{ height: 2, marginTop: 8 }} />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {scoreBlocks.length > 0 && (
+                <div className="memoDimensionPanel">
+                  <motion.div
+                    key={`${contentKey}:${selectedDimensionIdx}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    <p className="memoDimensionPanelName">
+                      {scoreBlocks[selectedDimensionIdx]?.name ?? '—'}
+                    </p>
+                    <p className="memoDimensionPanelText">
+                      {(() => {
+                        const selected = scoreBlocks[selectedDimensionIdx];
+                        if (!selected) return '—';
+                        const reasoning = selected.reasoning?.trim();
+                        if (reasoning) return reasoning;
+                        if (selected.score != null) return getScoreBand(selected.score).meaning || '—';
+                        return '—';
+                      })()}
+                    </p>
+                  </motion.div>
+                </div>
+              )}
+            </section>
+
+            <div className="memoSectionSpacer" aria-hidden />
+
+            {/* Overview block */}
+            <section>
+              <p className="memoLabel">OVERVIEW</p>
+              <div className="memoOverviewRow">
+                <p className="memoOverviewKey">PROBLEM</p>
+                <p className="memoOverviewVal">{startup.scout.problem?.trim() || '—'}</p>
+              </div>
+              <div className="memoOverviewRow">
+                <p className="memoOverviewKey">SOLUTION</p>
+                <p className="memoOverviewVal">{startup.scout.solution?.trim() || '—'}</p>
+              </div>
+              <div className="memoOverviewRow">
+                <p className="memoOverviewKey">TARGET</p>
+                <p className="memoOverviewVal">{startup.scout.target_users?.trim() || '—'}</p>
+              </div>
+              <div className="memoOverviewRow">
+                <p className="memoOverviewKey">WHY NOW</p>
+                <p className="memoOverviewVal">{startup.scout.why_now?.trim() || '—'}</p>
+              </div>
+            </section>
+
+            {startup.review?.overall_summary && (
+              <>
+                <div className="memoSectionSpacer" aria-hidden />
+                <section>
+                  <p className="memoLabel">SUMMARY</p>
+                  <div className="memoSummaryCallout">
+                    <p className="memoOverviewVal" style={{ marginTop: 0 }}>
+                      {startup.review.overall_summary}
+                    </p>
+                  </div>
+                </section>
+              </>
+            )}
+
+            {(startup.review?.diligence_red_flags?.length || startup.review?.key_risks?.length) && (
+              <>
+                <div className="memoSectionSpacer" aria-hidden />
+                <section>
+                  <p className="memoLabel">RED FLAGS</p>
+                  <ul className="memoList">
+                    {[...(startup.review?.diligence_red_flags ?? []), ...(startup.review?.key_risks ?? [])]
+                      .map((r) => String(r ?? '').trim())
+                      .filter(Boolean)
+                      .map((r, i) => (
+                        <li key={i} className="memoListItem">
+                          <span className="memoBullet">·</span>
+                          <span>{r}</span>
+                        </li>
+                      ))}
+                  </ul>
+                </section>
+              </>
+            )}
+
+            {startup.scout.references && startup.scout.references.length > 0 && (
+              <>
+                <div className="memoSectionSpacer" aria-hidden />
+                <section>
+                  <button
+                    type="button"
+                    className="memoSourcesToggle"
+                    onClick={() => setSourcesOpen((v) => !v)}
+                    aria-expanded={sourcesOpen}
+                  >
+                    <span>SOURCES</span>
+                    <span className="memoSourcesPlus">{sourcesOpen ? '−' : '+'}</span>
+                  </button>
+                  <motion.div
+                    initial={false}
+                    animate={sourcesOpen ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div style={{ paddingTop: 14 }}>
+                      <ul className="memoList">
+                        {startup.scout.references
+                          .map((r) => String(r ?? '').trim())
+                          .filter(Boolean)
+                          .map((ref, i) => (
+                            <li key={i} className="memoListItem">
+                              <span className="memoBullet">·</span>
+                              <a className="memoLink" href={ref} target="_blank" rel="noreferrer">
+                                {ref}
+                              </a>
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  </motion.div>
+                </section>
+              </>
+            )}
+          </motion.div>
         </div>
       )}
-      <div className="flex-1 min-h-0 flex flex-col bg-paper">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
-      >
-        <p className="type-label-section text-oxford/60 mb-1">
-          Investment memo
-        </p>
-        <h1 id="memo-title" className="type-title font-semibold text-oxford mb-1">
-          {companyName}
-        </h1>
-        <p className="type-label-section text-oxford/60 mb-6">
-          {startup.scout.sector || '—'}
-        </p>
-      </motion.div>
-
-      <div className={`flex-1 min-h-0 overflow-y-auto ${embedded ? 'pr-1' : ''}`}>
-        {judgmentSummary && (
-          <section className="mb-6 p-4 border border-oxford/[0.08] bg-oxford/[0.04]">
-            <h2 className="type-label-section text-oxford/60 mb-3">
-              Investment judgment
-            </h2>
-            <div className="type-body text-oxford/80 leading-relaxed space-y-3">
-              {judgmentToParagraphs(judgmentSummary).map((para, i) => (
-                <p key={i} className="m-0">
-                  {para}
-                </p>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section className="mb-6">
-          <h2 className="type-label-section text-oxford/60 mb-3">
-            Overview
-          </h2>
-          <div className="space-y-4">
-            {startup.scout.problem && (
-              <div>
-                <p className="type-label-section text-oxford/60 mb-1">Problem</p>
-                <p className="type-body text-oxford/80 leading-relaxed">{startup.scout.problem}</p>
-              </div>
-            )}
-            {startup.scout.solution && (
-              <div>
-                <p className="type-label-section text-oxford/60 mb-1">Solution</p>
-                <p className="type-body text-oxford/80 leading-relaxed">{startup.scout.solution}</p>
-              </div>
-            )}
-            {startup.scout.target_users && (
-              <div>
-                <p className="type-label-section text-oxford/60 mb-1">Target</p>
-                <p className="type-body text-oxford/80 leading-relaxed">{startup.scout.target_users}</p>
-              </div>
-            )}
-            {startup.scout.why_now && (
-              <div>
-                <p className="type-label-section text-oxford/60 mb-1">Why now</p>
-                <p className="type-body text-oxford/80 leading-relaxed">{startup.scout.why_now}</p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {hasReview && startup.review?.reviewer_disagreement && Array.isArray(startup.review.reviews) && startup.review.reviews.length > 0 && (
-          <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="type-label-section text-oxford/60 mb-3">
-              Reviewer divergence
-            </h2>
-            <div className="overflow-x-auto no-scrollbar border border-oxford/[0.06]">
-              <table className="w-full border-collapse text-left">
-                <thead className="bg-ivory/60">
-                  <tr>
-                    <th className="px-3 py-2 type-label-section text-oxford/60">
-                      Reviewer
-                    </th>
-                    {SCORE_DIMENSIONS.map(({ id, name }) => (
-                      <th key={id} className="px-3 py-2 type-label-section text-oxford/60">
-                        {name}
-                      </th>
-                    ))}
-                    <th className="px-3 py-2 type-label-section text-oxford/60">
-                      Verdict
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {startup.review.reviews.map((rev: SingleReview, idx) => (
-                    <tr key={rev.reviewer_type + idx} className="border-t border-oxford/[0.06]">
-                      <td className="px-3 py-2 type-body text-oxford/80 whitespace-nowrap">
-                        {rev.reviewer_type.replace('Reviewer', '')}
-                      </td>
-                      {SCORE_DIMENSIONS.map(({ id }) => {
-                        const score = (rev as any)[id] as number | undefined;
-                        return (
-                          <td
-                            key={id}
-                            className="px-3 py-2 type-body text-oxford/80 tabular-nums text-center"
-                          >
-                            {score != null ? score.toFixed(0) : '—'}
-                          </td>
-                        );
-                      })}
-                      <td className="px-3 py-2 type-body text-oxford/80 whitespace-nowrap">
-                        {rev.verdict}
-                      </td>
-                    </tr>
-                  ))}
-                  {startup.review.score_variance && (
-                    <tr className="border-t border-oxford/[0.06] bg-ivory/40">
-                      <td className="px-3 py-2 type-label-section text-oxford/60">
-                        Variance
-                      </td>
-                      {SCORE_DIMENSIONS.map(({ id }) => {
-                        const v = startup.review?.score_variance?.[id] ?? 0;
-                        const high = v > 1.5;
-                        return (
-                          <td
-                            key={id}
-                            className={`px-3 py-2 type-meta tabular-nums text-right ${
-                              high ? 'text-oxford/80' : 'text-oxford/40'
-                            }`}
-                          >
-                            {v ? v.toFixed(2) : '—'}
-                          </td>
-                        );
-                      })}
-                      <td />
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
-        {hasReview && (
-          <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="type-label-section text-oxford/60 mb-1">
-              Primary drivers
-            </h2>
-            <p className="type-meta text-oxford/40 mb-3">
-              1–3: Weak · 4–5: Concerning · 6–7: Promising · 8–10: Strong
-            </p>
-            <div className="space-y-4">
-              {SCORE_DIMENSIONS.slice(0, 2).map(({ id, name }) => {
-                const score = startup.review?.[id as keyof typeof startup.review];
-                if (score == null || typeof score !== 'number') return null;
-                const band = getScoreBand(score);
-                const reasoning = startup.review?.score_reasoning?.[id];
-                return (
-                  <div key={id} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
-                    <div className="sm:w-36 shrink-0">
-                      <span className="type-body text-oxford/80">{name} </span>
-                      <span className="type-body text-oxford/80 tabular-nums">{score}/10</span>
-                      <span className="type-label-section text-oxford/60 ml-1">({band.label})</span>
-                    </div>
-                    {reasoning && (
-                      <p className="type-body text-oxford/80 leading-relaxed">{reasoning}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {hasReview && (
-          <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="type-label-section text-oxford/60 mb-3">
-              Supporting analysis
-            </h2>
-            <div className="space-y-4">
-              {SCORE_DIMENSIONS.slice(2).map(({ id, name }) => {
-                const score = startup.review?.[id as keyof typeof startup.review];
-                if (score == null || typeof score !== 'number') return null;
-                const band = getScoreBand(score);
-                const reasoning = startup.review?.score_reasoning?.[id];
-                return (
-                  <div key={id} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
-                    <div className="sm:w-36 shrink-0">
-                      <span className="type-body text-oxford/80">{name} </span>
-                      <span className="type-body text-oxford/80 tabular-nums">{score}/10</span>
-                      <span className="type-label-section text-oxford/60 ml-1">({band.label})</span>
-                    </div>
-                    {reasoning && (
-                      <p className="type-body text-oxford/80 leading-relaxed">{reasoning}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {scoreJustification && (
-              <p className="type-body text-oxford/80 leading-relaxed italic mt-3">
-                {scoreJustification}
-              </p>
-            )}
-          </section>
-        )}
-
-        {(primaryRisks.length > 0 || secondaryRisks.length > 0) && (
-          <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="type-label-section text-oxford/60 mb-3">
-              Risks
-            </h2>
-            <div className="space-y-4">
-              {primaryRisks.length > 0 && (
-                <div>
-                  <p className="type-label-section text-oxford/60 mb-2">
-                    Primary
-                  </p>
-                  <ul className="space-y-1 type-body text-oxford/80 leading-relaxed">
-                    {primaryRisks.map((r, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="text-oxford/40">·</span>
-                        <span>{r}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {secondaryRisks.length > 0 && (
-                <div>
-                  <p className="type-label-section text-oxford/60 mb-2">
-                    Secondary
-                  </p>
-                  <ul className="space-y-1 type-body text-oxford/80 leading-relaxed">
-                    {secondaryRisks.map((r, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="text-oxford/40">·</span>
-                        <span>{r}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {startup.review?.overall_summary && (
-          <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="type-label-section text-oxford/60 mb-3">
-              Summary
-            </h2>
-            <p className="type-body text-oxford/80 leading-relaxed">
-              {startup.review.overall_summary}
-            </p>
-          </section>
-        )}
-
-        {startup.scout.references && startup.scout.references.length > 0 && (
-          <section className="mb-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="type-label-section text-oxford/60 mb-3">
-              References
-            </h2>
-            <ul className="space-y-1 type-body text-oxford/80 leading-relaxed">
-              {startup.scout.references.map((ref, i) => (
-                <li key={i} className="flex gap-2">
-                  <span className="text-oxford/40">·</span>
-                  <span>{ref}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {hasPartner && (
-          <section className="mt-6 pt-6 border-t border-oxford/[0.06]">
-            <h2 className="type-label-section text-oxford/60 mb-3">
-              Decision
-            </h2>
-            <div className="pl-4 border-l-2 border-oxford/40 space-y-3">
-              {hasReview && startup.review?.verdict && (
-                <p className="type-body text-oxford/80">
-                  <span className="type-label-section text-oxford/60 uppercase tracking-wide">Quality assessment</span> ·{' '}
-                  {startup.review.verdict} ({QUALITY_LABELS[startup.review.verdict] ?? startup.review.verdict})
-                </p>
-              )}
-              <p className="type-body text-oxford/80 flex items-center gap-2 flex-wrap">
-                <span className="type-label-section text-oxford/60 uppercase tracking-wide">Investment decision</span>
-                <span className="inline-block scale-110 origin-left">
-                  <DecisionBadge
-                    variant={
-                      startup.partner!.decision === 'YES'
-                        ? 'YES'
-                        : startup.partner!.decision === 'NO' || startup.partner!.decision === 'PASS'
-                          ? 'NO'
-                          : 'MAYBE'
-                    }
-                  />
-                </span>
-              </p>
-              {startup.timestamps?.partnered_at && (
-                <p className="type-meta tabular-nums text-oxford/40">
-                  {new Date(startup.timestamps.partnered_at).toLocaleString('en-GB', {
-                    hour12: false,
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                  })}
-                </p>
-              )}
-              {startup.partner!.rationale && (
-                <div className="type-body text-oxford/80 leading-relaxed space-y-3 pt-1">
-                  {judgmentToParagraphs(startup.partner!.rationale).map((para, i) => (
-                    <p key={i} className="m-0">
-                      {para}
-                    </p>
-                  ))}
-                </div>
-              )}
-              {startup.partner!.next_action && (
-                <p className="type-body text-oxford/80 pt-1">
-                  <span className="type-label-section text-oxford/60">Next</span> · {startup.partner!.next_action}
-                </p>
-              )}
-              {startup.partner!.portfolio_context_at_decision && (
-                <div className="mt-4 border-t border-oxford/[0.06] pt-3">
-                  <p className="type-label-section text-oxford/60 mb-1">
-                    Portfolio context at decision
-                  </p>
-                  <p className="type-body text-oxford/80">
-                    Total portfolio size at decision:{' '}
-                    {startup.partner!.portfolio_context_at_decision.total_portfolio_size}
-                  </p>
-                  {startup.scout.sector && (
-                    <p className="type-body text-oxford/80">
-                      Sector peers in portfolio:{' '}
-                      {startup.partner!.portfolio_context_at_decision.sector_counts[startup.scout.sector] ?? 0}
-                    </p>
-                  )}
-                  {startup.partner!.rationale &&
-                    startup.partner!.rationale.toLowerCase().includes('concentration') && (
-                      <p className="type-body text-oxford/80 italic mt-1">
-                        Sector concentration risk was explicitly considered in this decision.
-                      </p>
-                    )}
-                </div>
-              )}
-              {startup.partner!.llm_fallback_reason && (
-                <p className="type-meta text-oxford/40 mt-3">
-                  LLM-assisted · {startup.partner!.llm_fallback_reason}
-                </p>
-              )}
-            </div>
-          </section>
-        )}
-        <section className="mt-6 pt-4 border-t border-oxford/[0.06]">
-          <p className="type-meta text-oxford/40">
-            Scout {startup.scout.prompt_version ?? '—'} · Partner {startup.partner?.prompt_version ?? '—'}
-          </p>
-        </section>
-      </div>
-      </div>
     </div>
   );
 });

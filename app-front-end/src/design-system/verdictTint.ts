@@ -2,8 +2,8 @@
  * Verdict tint — colour-tinted, not colour-coded.
  *
  * One dimension: text colour. Layout does the heavy lifting.
- * PASS = quietest. WATCH/MAYBE = bone/muted. YES/NO = deeper contrast.
- * onDark: for oxford background — ivory text opacities (matches SystemBar / verdict bar).
+ * PASS = quietest. WATCH/MAYBE = muted. YES/NO = deeper contrast.
+ * onDark: for oxford background — white at opacity (matches SystemBar / verdict bar).
  */
 type PartnerDecision = 'YES' | 'NO' | 'MAYBE' | 'PASS' | 'WATCH';
 
@@ -12,15 +12,15 @@ export function verdictTextClass(decision: PartnerDecision, onDark = false): str
   if (onDark) {
     switch (decision) {
       case 'PASS':
-        return 'text-ivory/50';
+        return 'text-white/50';
       case 'WATCH':
       case 'MAYBE':
-        return 'text-ivory/70';
+        return 'text-white/70';
       case 'YES':
       case 'NO':
-        return 'text-ivory/90';
+        return 'text-white/90';
       default:
-        return 'text-ivory/70';
+        return 'text-white/70';
     }
   }
   switch (decision) {

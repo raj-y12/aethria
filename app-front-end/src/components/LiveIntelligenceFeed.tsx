@@ -131,8 +131,8 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
     return (
       <div className="h-full overflow-y-auto flex flex-col">
         <EmptyState
-          label="Judgements feed"
-          body="Feed is live; events will appear here as the pipeline runs."
+          label="Judgements"
+          body="Partner decisions, escalations, and human resolutions will stream here as the pipeline runs."
         />
       </div>
     );

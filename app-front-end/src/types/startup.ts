@@ -147,6 +147,13 @@ export interface WatchlistAnalytics {
   total: number;
   stale: number;
   avg_days: number;
+  entries?: {
+    startup_id?: string;
+    startup_name?: string;
+    days_on_watchlist?: number;
+    stale_warning?: boolean;
+    signal_count?: number;
+  }[];
 }
 
 export interface ConcentrationAnalytics {

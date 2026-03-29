@@ -23,6 +23,7 @@ export default function RequestAccessPage() {
   const [linkedin, setLinkedin] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [formOut, setFormOut] = useState(false);
+  const [ellipsisStep, setEllipsisStep] = useState(0);
 
   useEffect(() => {
     if (!processing) return;
@@ -42,6 +43,14 @@ export default function RequestAccessPage() {
       clearTimeout(t2);
     };
   }, [formOut]);
+
+  useEffect(() => {
+    if (!loading) return;
+    const interval = setInterval(() => {
+      setEllipsisStep((prev) => (prev + 1) % 4);
+    }, 220);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +116,7 @@ export default function RequestAccessPage() {
     >
       <GrainOverlay opacity={0.02} />
 
-      <header className="flex items-center justify-between page-margin-x pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-8 pb-4 md:pb-6 shrink-0 z-20">
+      <header className="site-header-bar flex items-center justify-between page-margin-x pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-8 pb-4 md:pb-6 shrink-0 z-20">
         <Link
           data-cursor-expand
           to="/"
@@ -150,69 +159,79 @@ export default function RequestAccessPage() {
               </p>
 
               <div style={{ opacity: formOut ? 0 : 1, transition: 'opacity 200ms ease' }}>
-                <form onSubmit={handleSubmit} className="flex flex-col" noValidate>
+                <form onSubmit={handleSubmit} className="flex flex-col request-form" noValidate>
                   <div className="grid grid-cols-1 md:grid-cols-2 request-form-grid gap-x-8 md:gap-x-12 gap-y-4 md:gap-y-6">
                     <div className="flex flex-col">
                       <label htmlFor="waitlist-name" className="form-label-aethria">
                         NAME
                       </label>
-                      <input
-                        id="waitlist-name"
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className={`form-input-aethria ${nameEmpty ? 'form-input-aethria-error' : ''}`}
-                      />
+                      <div className="form-input-wrapper">
+                        <input
+                          id="waitlist-name"
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className={`form-input-aethria ${nameEmpty ? 'form-input-aethria-error' : ''}`}
+                        />
+                      </div>
                     </div>
                     <div className="flex flex-col">
                       <label htmlFor="waitlist-email" className="form-label-aethria">
                         EMAIL
                       </label>
-                      <input
-                        id="waitlist-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className={`form-input-aethria ${emailEmpty ? 'form-input-aethria-error' : ''}`}
-                      />
+                      <div className="form-input-wrapper">
+                        <input
+                          id="waitlist-email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className={`form-input-aethria ${emailEmpty ? 'form-input-aethria-error' : ''}`}
+                        />
+                      </div>
                     </div>
                     <div className="flex flex-col">
                       <label htmlFor="waitlist-role" className="form-label-aethria">
                         ROLE
                       </label>
-                      <input
-                        id="waitlist-role"
-                        type="text"
-                        value={role}
-                        onChange={(e) => setRole(e.target.value)}
-                        className={`form-input-aethria ${roleEmpty ? 'form-input-aethria-error' : ''}`}
-                      />
+                      <div className="form-input-wrapper">
+                        <input
+                          id="waitlist-role"
+                          type="text"
+                          value={role}
+                          onChange={(e) => setRole(e.target.value)}
+                          className={`form-input-aethria ${roleEmpty ? 'form-input-aethria-error' : ''}`}
+                        />
+                      </div>
                     </div>
                     <div className="flex flex-col">
                       <label htmlFor="waitlist-firm" className="form-label-aethria">
                         FIRM
                       </label>
-                      <input
-                        id="waitlist-firm"
-                        type="text"
-                        value={firm}
-                        onChange={(e) => setFirm(e.target.value)}
-                        className={`form-input-aethria ${firmEmpty ? 'form-input-aethria-error' : ''}`}
-                      />
+                      <div className="form-input-wrapper">
+                        <input
+                          id="waitlist-firm"
+                          type="text"
+                          value={firm}
+                          onChange={(e) => setFirm(e.target.value)}
+                          className={`form-input-aethria ${firmEmpty ? 'form-input-aethria-error' : ''}`}
+                        />
+                      </div>
                     </div>
                     <div className="flex flex-col md:col-span-2">
                       <label htmlFor="waitlist-linkedin" className="form-label-aethria">
                         LINKEDIN <span className="opacity-60 font-normal">(optional)</span>
                       </label>
-                      <input
-                        id="waitlist-linkedin"
-                        type="url"
-                        value={linkedin}
-                        onChange={(e) => setLinkedin(e.target.value)}
-                        placeholder="https://linkedin.com/in/..."
-                        className="form-input-aethria placeholder:font-mono placeholder:text-[10px]"
-                        autoComplete="off"
-                      />
+                      <div className="form-input-wrapper">
+                        <input
+                          id="waitlist-linkedin"
+                          type="url"
+                          value={linkedin}
+                          onChange={(e) => setLinkedin(e.target.value)}
+                          placeholder="https://linkedin.com/in/..."
+                          className="form-input-aethria placeholder:font-mono placeholder:text-[10px]"
+                          autoComplete="off"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -230,38 +249,86 @@ export default function RequestAccessPage() {
                     type="submit"
                     data-cursor-expand
                     disabled={loading || processing}
-                    className="request-submit-btn mt-6 md:mt-8 btn-aethria btn-aethria-solid h-11 disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="request-submit-btn mt-6 md:mt-8 btn-aethria btn-aethria-solid h-11 disabled:opacity-70 disabled:cursor-not-allowed relative overflow-hidden"
                     onMouseEnter={() => setSubmitHover(true)}
                     onMouseLeave={() => setSubmitHover(false)}
                   >
-                      <span className="flex items-center justify-center">
-                        <span>
-                          {loading ? 'SUBMITTING…' : processing ? 'PROCESSING ENTRY' : 'SUBMIT APPLICATION'}
-                        </span>
-                        <span
-                          className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap"
-                          style={{ width: loading || processing || submitHover ? '1.25em' : '0.5em' }}
-                        >
-                          {'\u00A0›'}
-                        </span>
+                    <span
+                      className="absolute inset-0"
+                      style={{
+                        backgroundColor: 'var(--color-paper)',
+                        transform: submitHover || loading || processing ? 'translateX(0)' : 'translateX(-100%)',
+                        transition: 'transform 300ms ease',
+                      }}
+                    />
+                    <span className="relative flex items-center justify-center">
+                      <span>
+                        {loading
+                          ? `SUBMITTING${'.'.repeat(ellipsisStep)}`
+                          : processing
+                          ? 'PROCESSING ENTRY'
+                          : 'SUBMIT APPLICATION'}
                       </span>
-                    </button>
+                      <span
+                        className="inline-block overflow-hidden transition-all duration-200 ease-out origin-left flex-shrink-0 whitespace-nowrap"
+                        style={{ width: loading || processing || submitHover ? '1.25em' : '0.5em' }}
+                      >
+                        {'\u00A0›'}
+                      </span>
+                    </span>
+                  </button>
                   </form>
                 </div>
               </>
             ) : (
-              <div
-                className="flex flex-col items-center justify-center text-center"
-                style={{ opacity: showSuccess ? 1 : 0, transition: 'opacity 300ms ease' }}
+            <div
+              className="flex flex-col items-center justify-center text-center"
+              style={{ opacity: showSuccess ? 1 : 0, transition: 'opacity 300ms ease' }}
+            >
+              <p
+                className="font-display text-[28px]"
+                style={{ color: 'var(--color-oxford)', marginBottom: 8 }}
               >
-                <p className="font-mono text-[11px] uppercase tracking-[0.15em]" style={{ color: 'var(--color-oxford)', opacity: 0.85 }}>
-                  You’re on the list
-                </p>
-                {position != null && (
-                  <p className="font-sans text-[14px] mt-3" style={{ color: 'var(--color-oxford)', opacity: 0.6 }}>
-                    Position #{position}. We’ll be in touch.
-                  </p>
-                )}
+                You&apos;re on the list.
+              </p>
+              <p
+                className="font-sans text-[14px]"
+                style={{ color: 'var(--color-oxford)', opacity: 0.65, marginBottom: 16 }}
+              >
+                {position != null
+                  ? `Position #${position}. We'll reach out when a spot opens.`
+                  : "We'll reach out when a spot opens."}
+              </p>
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 48 48"
+                aria-hidden="true"
+                style={{ marginTop: 8 }}
+              >
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="21"
+                  fill="none"
+                  stroke="#002147"
+                  strokeWidth="1"
+                  strokeOpacity="0.18"
+                />
+                <path
+                  d="M15 24.5L21 30.5L33.5 18"
+                  fill="none"
+                  stroke="#002147"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    strokeDasharray: 40,
+                    strokeDashoffset: showSuccess ? 0 : 40,
+                    transition: 'stroke-dashoffset 600ms ease',
+                  }}
+                />
+              </svg>
                 {APP_URL && (
                   <a
                     href={APP_URL.replace(/\/$/, '') + '/dashboard'}

@@ -14,6 +14,7 @@ export default function GrainOverlay({ opacity = 0.025 }: { opacity?: number }) 
         backgroundImage: `url("${noiseDataUri}")`,
         backgroundRepeat: 'repeat',
         opacity,
+        mixBlendMode: 'multiply',
         willChange: 'transform',
         transform: 'translateZ(0)',
       }}

@@ -16,7 +16,7 @@ export default function MobileHeader({ onMenuToggle }: MobileHeaderProps) {
     >
       <Link
         to="/v1"
-        className="type-title font-bold text-ivory hover:opacity-90 btn-interaction"
+        className="font-display text-[24px] font-normal leading-[1.4] text-white hover:opacity-90 btn-interaction"
         aria-label="Aethria"
       >
         Aethria
@@ -24,7 +24,7 @@ export default function MobileHeader({ onMenuToggle }: MobileHeaderProps) {
       <button
         type="button"
         onClick={onMenuToggle}
-        className="type-label-tab text-ivory/70 hover:text-ivory btn-interaction"
+        className="type-label-tab text-white/70 hover:text-white btn-interaction"
         aria-controls="mobile-menu"
         id="mobile-menu-button"
       >

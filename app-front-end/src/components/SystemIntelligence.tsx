@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import {
   PANEL_TAB_BAR_CLASS,
-  PANEL_TAB_BUTTON_CLASS,
   PANEL_TAB_ACTIVE_CLASS,
   PANEL_TAB_INACTIVE_CLASS,
 } from './PanelShell';
@@ -15,6 +14,11 @@ import type {
 import { resolveEscalation } from '../api/escalations';
 import { triggerMetaCycle } from '../api/meta';
 import EmptyState from './EmptyState';
+
+/** Match pipeline tab strip: underline sits on the nav hairline (items-end + overlap, no extra pb under tabs). */
+const SYSTEM_INTEL_TAB_BUTTON_CLASS =
+  'py-2 px-3 type-label-tab border-b-2 -mb-[3px] focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
+const SYSTEM_INTEL_TAB_BAR_CLASS = `${PANEL_TAB_BAR_CLASS} items-end pt-2 pb-0`;
 
 type Tab = 'signals' | 'escalations' | 'analytics' | 'meta';
 const TABS: { key: Tab; label: string }[] = [
@@ -34,6 +38,8 @@ interface SystemIntelligenceProps {
   scoutWeights: ScoutWeights;
   calibrationState: CalibrationState;
   onEscalationResolved?: () => void;
+  /** Open the work-grid memo for this escalation’s startup (closes System, selects startup). */
+  onOpenEscalationMemo?: (escalation: EscalationItem) => void;
 }
 
 function formatRelativeTime(isoDate: string): string {
@@ -64,7 +70,7 @@ function SignalsTab({ signals }: { signals: SignalItem[] }) {
     return (
       <EmptyState
         label="Signals"
-        body="Alerts on pipeline companies (news, funding, etc.). They appear here as they’re detected."
+        body="News, funding, and other updates for companies in your pipeline appear here as they are detected."
       />
     );
   }
@@ -94,7 +100,15 @@ function SignalsTab({ signals }: { signals: SignalItem[] }) {
 }
 
 /* ─── ESCALATIONS ─── */
-function EscalationsTab({ escalations, onResolved }: { escalations: EscalationItem[]; onResolved?: () => void }) {
+function EscalationsTab({
+  escalations,
+  onResolved,
+  onOpenMemo,
+}: {
+  escalations: EscalationItem[];
+  onResolved?: () => void;
+  onOpenMemo?: (escalation: EscalationItem) => void;
+}) {
   const pending = escalations.filter((e) => !e.human_resolution);
   if (pending.length === 0) {
     return <p className="text-center py-12 type-label-section text-oxford/25">No pending escalations</p>;
@@ -102,13 +116,27 @@ function EscalationsTab({ escalations, onResolved }: { escalations: EscalationIt
   return (
     <div className="space-y-0">
       {pending.map((esc) => (
-        <EscalationCard key={esc.id} escalation={esc} onResolved={onResolved} />
+        <EscalationCard key={esc.id} escalation={esc} onResolved={onResolved} onOpenMemo={onOpenMemo} />
       ))}
     </div>
   );
 }
 
-function EscalationCard({ escalation, onResolved }: { escalation: EscalationItem; onResolved?: () => void }) {
+function escalationConvictionScore(partner: EscalationItem['partner']): number | null {
+  const c = partner?.confidence;
+  if (c == null || typeof c !== 'number' || Number.isNaN(c)) return null;
+  return c;
+}
+
+function EscalationCard({
+  escalation,
+  onResolved,
+  onOpenMemo,
+}: {
+  escalation: EscalationItem;
+  onResolved?: () => void;
+  onOpenMemo?: (escalation: EscalationItem) => void;
+}) {
   const [resolving, setResolving] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [resolved, setResolved] = useState(false);
@@ -121,6 +149,18 @@ function EscalationCard({ escalation, onResolved }: { escalation: EscalationItem
       setTimeout(() => onResolved?.(), 1500);
     } catch { /* silent */ }
   }, [resolving, notes, escalation.id, onResolved]);
+
+  const conviction = escalationConvictionScore(escalation.partner);
+  const sector = escalation.scout?.sector?.trim() ?? '';
+  const sectorConvictionLine =
+    sector || conviction != null
+      ? [
+          sector || null,
+          conviction != null ? `Conviction ${conviction}/10` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : null;
 
   if (resolved) {
     return (
@@ -136,33 +176,58 @@ function EscalationCard({ escalation, onResolved }: { escalation: EscalationItem
   }
 
   return (
-    <div className="py-4 border-b border-oxford/[0.06] border-l-2 border-l-oxford pl-4">
-      <p className="type-body font-semibold text-oxford">
-        {escalation.startup_name ?? escalation.scout?.name ?? escalation.id}
+    <div className="border-b border-oxford/[0.08] py-3 shadow-none">
+      <div className="flex items-start justify-between gap-3 w-full min-w-0">
+        <p
+          className="min-w-0 flex-1 truncate text-[15px] font-medium leading-[1.5] text-oxford/90"
+          style={{ fontFamily: '"Geist Sans", system-ui, sans-serif' }}
+        >
+          {escalation.startup_name ?? escalation.scout?.name ?? escalation.id}
+        </p>
+        {onOpenMemo ? (
+          <button
+            type="button"
+            onClick={() => onOpenMemo(escalation)}
+            className="shrink-0 cursor-pointer rounded-none border-0 bg-transparent p-0 font-mono text-[9px] font-normal uppercase leading-none tracking-[0.1em] text-oxford opacity-[0.35] transition-opacity duration-150 ease-out hover:opacity-80 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-offset-0"
+          >
+            → MEMO
+          </button>
+        ) : null}
+      </div>
+      <p
+        className="mt-1 text-[9px] font-normal uppercase leading-[1.5] text-oxford/40"
+        style={{ fontFamily: '"Space Mono", ui-monospace, monospace' }}
+      >
+        Awaiting human review
       </p>
-      <p className="type-label-section text-oxford/40 mt-0.5">
-        {escalation.startup_id ?? escalation.id}
-      </p>
-      <p className="type-label-section text-oxford/60 mt-1">
-        {escalation.scout?.sector ?? ''} · Conviction {escalation.partner?.confidence ?? '—'}/10
-      </p>
-      <p className="type-label-section text-oxford mt-2">Awaiting human review</p>
+      {sectorConvictionLine ? (
+        <p className="mt-2 font-body text-[13px] leading-[1.6] text-oxford/60">{sectorConvictionLine}</p>
+      ) : null}
       {escalation.partner?.rationale && (
-        <p className="type-body-sm text-oxford/80 mt-2 leading-relaxed line-clamp-3">{escalation.partner.rationale}</p>
+        <p className="type-body-sm text-oxford/80 mt-2 leading-[1.6] line-clamp-3">{escalation.partner.rationale}</p>
       )}
       {escalation.partner?.llm_fallback_reason && (
         <p className="type-body-sm italic text-oxford/60 mt-1">{escalation.partner.llm_fallback_reason}</p>
       )}
       {!resolving ? (
-        <div className="flex gap-0 mt-3">
-          {(['YES', 'NO', 'MAYBE'] as const).map((d) => (
-            <button
-              key={d}
-              onClick={() => setResolving(d)}
-              className="flex-1 py-2 type-label-section text-oxford/60 border border-oxford/25 hover:text-oxford hover:border-oxford/40 btn-interaction"
-            >
-              {d === 'YES' ? 'Advance' : d === 'NO' ? 'Pass' : 'Hold'}
-            </button>
+        <div className="mt-3 flex flex-wrap items-center">
+          {(
+            [
+              { d: 'YES' as const, label: 'ADVANCE', opacityClass: 'opacity-[0.85] hover:opacity-100' },
+              { d: 'NO' as const, label: 'PASS', opacityClass: 'opacity-50 hover:opacity-100' },
+              { d: 'MAYBE' as const, label: 'HOLD', opacityClass: 'opacity-50 hover:opacity-100' },
+            ] as const
+          ).map(({ d, label, opacityClass }, i) => (
+            <div key={d} className="flex items-center">
+              {i > 0 ? <span className="mx-0 h-3 w-px shrink-0 bg-oxford/[0.15]" aria-hidden /> : null}
+              <button
+                type="button"
+                onClick={() => setResolving(d)}
+                className={`${opacityClass} rounded-none border-0 bg-transparent py-1 px-3 font-mono text-[10px] font-normal uppercase leading-[1.5] tracking-[0.1em] text-oxford transition-opacity duration-150 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-offset-0`}
+              >
+                {label}
+              </button>
+            </div>
           ))}
         </div>
       ) : (
@@ -170,14 +235,20 @@ function EscalationCard({ escalation, onResolved }: { escalation: EscalationItem
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Notes (optional)"
-            className="w-full bg-transparent border border-oxford/25 p-2 type-body-sm text-oxford placeholder:text-oxford/25 outline-none focus:border-oxford/25 resize-none rounded-none"
-            rows={2}
+            placeholder="Add a note before deciding..."
+            className="min-h-[80px] w-full resize-none rounded-none border border-solid border-oxford/[0.15] bg-paper p-3 text-[14px] font-normal leading-[1.6] text-oxford/70 outline-none transition-[border-color] duration-150 placeholder:text-[14px] placeholder:font-normal placeholder:text-oxford/30 focus:border-oxford/40 focus:outline-none"
+            style={{ fontFamily: '"Geist Sans", system-ui, sans-serif' }}
           />
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={handleResolve}
-              className="flex-1 py-2 type-label-tab bg-oxford text-paper btn-interaction"
+              disabled={notes.trim().length < 10}
+              className={`flex-1 py-2 type-label-tab text-paper btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset ${
+                notes.trim().length >= 10
+                  ? 'cursor-pointer bg-oxford'
+                  : 'cursor-not-allowed bg-oxford/30'
+              }`}
             >
               Confirm {resolving === 'YES' ? 'Advance' : resolving === 'NO' ? 'Pass' : 'Hold'}
             </button>
@@ -210,7 +281,7 @@ function AnalyticsTab({ rejection, watchlist, concentration }: {
     return (
       <EmptyState
         label="Analytics"
-        body="Data appears here after the pipeline has run and companies have been reviewed."
+        body="Rejection patterns, watchlist, and sector concentration fill in after reviewers have worked the queue."
       />
     );
   }
@@ -290,6 +361,7 @@ function AnalyticsTab({ rejection, watchlist, concentration }: {
 function MetaAgentTab({ reports, weights, calibration }: {
   reports: MetaCycleReport[]; weights: ScoutWeights; calibration: CalibrationState;
 }) {
+  const [legendOpen, setLegendOpen] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [triggerResult, setTriggerResult] = useState<string | null>(null);
 
@@ -317,6 +389,37 @@ function MetaAgentTab({ reports, weights, calibration }: {
 
   return (
     <div className="space-y-0">
+      {/* Pipeline legend — collapsible, hidden by default */}
+      <section className="flex-none border-b border-oxford/[0.06] pb-3 mb-3">
+        <button
+          type="button"
+          onClick={() => setLegendOpen((o) => !o)}
+          className="w-full flex items-center justify-between py-2 px-0 type-label-tab text-oxford/50 hover:text-oxford/70 btn-interaction text-left"
+          aria-expanded={legendOpen}
+        >
+          <span>Pipeline legend</span>
+          <span className="tabular-nums" aria-hidden>{legendOpen ? '−' : '+'}</span>
+        </button>
+        <AnimatePresence initial={false}>
+          {legendOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: tokens.motion.duration.micro, ease: tokens.motion.ease }}
+              className="overflow-hidden"
+            >
+              <div className="pb-2 pt-0 space-y-2 type-body-sm text-oxford/60 max-w-2xl">
+                <p><span className="type-label-section text-oxford/60">Order</span> · Escalations first, then recency and score.</p>
+                <p><span className="type-label-section text-oxford/60">Decisions</span> · Advance / Hold / Pass. You decide; scouts and reviewer run automatically.</p>
+                <p><span className="type-label-section text-oxford/60">Escalation</span> · Reviewer disagreement or low confidence → human resolution. Count in status strip.</p>
+                <p><span className="type-label-section text-oxford/60">Pipeline</span> · Scouts surface companies, reviewer scores, partner decides advances and escalations.</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
+
       {/* Scout Weights */}
       <section className="pb-6">
         <h3 className="type-label-section text-oxford/60 mb-3">Scout allocation</h3>
@@ -408,8 +511,8 @@ function MetaAgentTab({ reports, weights, calibration }: {
           </>
         ) : (
           <EmptyState
-            label="Meta-agent cycles"
-            body="First cycle runs after enough reviews and decisions; results show here when it completes."
+            label="Last meta cycle"
+            body="The meta-agent runs once there is enough signal from reviews and decisions. Cycle summary and mutations will show here after the first run completes."
           />
         )}
       </section>
@@ -433,12 +536,11 @@ function MetaAgentTab({ reports, weights, calibration }: {
 /* ─── MAIN COMPONENT ─── */
 export default function SystemIntelligence(props: SystemIntelligenceProps) {
   const [activeTab, setActiveTab] = useState<Tab>('meta');
-  const [legendOpen, setLegendOpen] = useState(false);
 
   return (
     <div className="h-full flex flex-col min-h-0">
       {/* Tab bar — same as PanelShell / SettingsPage */}
-      <nav className={PANEL_TAB_BAR_CLASS} aria-label="Tabs">
+      <nav className={SYSTEM_INTEL_TAB_BAR_CLASS} aria-label="Tabs">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -446,7 +548,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
-              className={`${PANEL_TAB_BUTTON_CLASS} ${
+              className={`${SYSTEM_INTEL_TAB_BUTTON_CLASS} ${
                 isActive ? PANEL_TAB_ACTIVE_CLASS : PANEL_TAB_INACTIVE_CLASS
               }`}
               aria-selected={isActive}
@@ -459,37 +561,6 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        {/* Pipeline legend — collapsible, hidden by default */}
-        <section className="flex-none border-b border-oxford/[0.06] pb-3 mb-3">
-          <button
-            type="button"
-            onClick={() => setLegendOpen((o) => !o)}
-            className="w-full flex items-center justify-between py-2 px-0 type-label-tab text-oxford/50 hover:text-oxford/70 btn-interaction text-left"
-            aria-expanded={legendOpen}
-          >
-            <span>Pipeline legend</span>
-            <span className="tabular-nums" aria-hidden>{legendOpen ? '−' : '+'}</span>
-          </button>
-          <AnimatePresence initial={false}>
-            {legendOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: tokens.motion.duration.micro, ease: tokens.motion.ease }}
-                className="overflow-hidden"
-              >
-                <div className="pb-2 pt-0 space-y-2 type-body-sm text-oxford/60 max-w-2xl">
-                  <p><span className="type-label-section text-oxford/60">Order</span> · Escalations first, then recency and score.</p>
-                  <p><span className="type-label-section text-oxford/60">Decisions</span> · Advance / Hold / Pass. You decide; scouts and reviewer run automatically.</p>
-                  <p><span className="type-label-section text-oxford/60">Escalation</span> · Reviewer disagreement or low confidence → human resolution. Count in status strip.</p>
-                  <p><span className="type-label-section text-oxford/60">Pipeline</span> · Scouts surface companies, reviewer scores, partner decides advances and escalations.</p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </section>
-
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -499,7 +570,13 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
             transition={{ duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
           >
             {activeTab === 'signals' && <SignalsTab signals={props.signals} />}
-            {activeTab === 'escalations' && <EscalationsTab escalations={props.escalations} onResolved={props.onEscalationResolved} />}
+            {activeTab === 'escalations' && (
+              <EscalationsTab
+                escalations={props.escalations}
+                onResolved={props.onEscalationResolved}
+                onOpenMemo={props.onOpenEscalationMemo}
+              />
+            )}
             {activeTab === 'analytics' && (
               <AnalyticsTab
                 rejection={props.rejectionAnalytics}

@@ -1,7 +1,7 @@
 /**
  * Clerk component appearance — matches Aethria design tokens.
- * Palette: oxford #002147, paper #F2F0EA, ivory #fcfcfc.
- * Typography: Inter (body, names), Space Mono (labels/actions); no rounded corners.
+ * Palette: oxford #002147, paper #F2F0EA, inverse #FFFFFF.
+ * Typography: Geist Sans (body), Space Mono (labels/actions); no rounded corners.
  */
 import { tokens } from './tokens';
 
@@ -30,7 +30,7 @@ export const clerkAppearance = {
   },
 };
 
-/** UserProfile (Account tab) — match Aethria: oxford, paper, Inter/Space Mono, no radius */
+/** UserProfile (Account tab) — match Aethria: oxford, paper, Geist Sans / Space Mono, no radius */
 export const userProfileAppearance = {
   variables: {
     ...clerkAppearance.variables,

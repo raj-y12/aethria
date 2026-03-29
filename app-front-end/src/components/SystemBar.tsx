@@ -54,7 +54,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
   });
 
   const baseClass =
-    'hidden lg:flex fixed top-0 bottom-4 left-4 z-50 flex-col justify-between w-44 bg-oxford border border-white/[0.06]';
+    'hidden lg:flex fixed top-0 bottom-4 left-4 z-50 flex-col justify-between w-36 bg-oxford border border-white/[0.06]';
   const baseStyle = { boxShadow: '0 1px 0 0 rgba(255,255,255,0.06)', padding: '20px 16px 16px' };
 
   return (
@@ -77,7 +77,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
       <div className="flex flex-col items-center gap-4 h-full">
         {/* Clock at top */}
         <span
-          className="type-meta tabular-nums leading-none text-ivory/40"
+          className="type-meta tabular-nums leading-[1.5] text-white/40"
           aria-live="polite"
         >
           {formatted}
@@ -86,7 +86,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
         {/* Username (account/settings moved to app Settings later) */}
         <div className="w-full flex items-center justify-center min-h-[2.5rem]">
           <span
-            className="type-label-tab truncate max-w-full text-center text-ivory/40"
+            className="type-label-tab truncate max-w-full text-center text-white/40"
             title={displayName}
           >
             {displayName}
@@ -99,13 +99,13 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
             type="button"
             onClick={rightPanel === 'feed' ? onClose : onShowFeed}
             className={`type-label-tab min-h-[36px] w-full flex items-center justify-center cursor-pointer btn-interaction ${
-              rightPanel === 'feed' ? 'text-ivory' : 'text-ivory/60 hover:text-ivory'
+              rightPanel === 'feed' ? 'text-white' : 'text-white/60 hover:text-white'
             }`}
             style={{ transitionTimingFunction: 'var(--motion-ease)' }}
             aria-pressed={rightPanel === 'feed'}
           >
             <span
-              className={`inline-block pb-0.5 ${rightPanel === 'feed' ? 'border-b-2 border-ivory' : ''}`}
+              className={`inline-block pb-0.5 ${rightPanel === 'feed' ? 'border-b-2 border-white' : ''}`}
             >
               Judgements
             </span>
@@ -114,13 +114,13 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
             type="button"
             onClick={rightPanel === 'system' ? onClose : onShowSystem}
             className={`type-label-tab min-h-[36px] w-full flex items-center justify-center cursor-pointer btn-interaction ${
-              rightPanel === 'system' ? 'text-ivory' : 'text-ivory/60 hover:text-ivory'
+              rightPanel === 'system' ? 'text-white' : 'text-white/60 hover:text-white'
             }`}
             style={{ transitionTimingFunction: 'var(--motion-ease)' }}
             aria-pressed={rightPanel === 'system'}
           >
             <span
-              className={`inline-block pb-0.5 ${rightPanel === 'system' ? 'border-b-2 border-ivory' : ''}`}
+              className={`inline-block pb-0.5 ${rightPanel === 'system' ? 'border-b-2 border-white' : ''}`}
             >
               System
             </span>
@@ -132,7 +132,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
           {navLink && (
             <a
               href={navLink.href}
-              className="type-label-section text-ivory/70 hover:text-ivory btn-interaction"
+              className="type-label-section text-white/70 hover:text-white btn-interaction"
             >
               {navLink.label}
             </a>
@@ -140,7 +140,7 @@ export default function SystemBar({ rightPanel = null, onShowFeed, onShowSystem,
           <button
             type="button"
             onClick={handleLogout}
-            className="type-label-tab text-ivory/40 hover:text-ivory bg-transparent border-0 p-0 cursor-pointer btn-interaction"
+            className="type-label-tab text-white/40 hover:text-white bg-transparent border-0 p-0 cursor-pointer btn-interaction"
           >
             Log out
           </button>
