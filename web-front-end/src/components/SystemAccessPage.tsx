@@ -52,41 +52,37 @@ export default function SystemAccessPage({
 
   return (
     <div
-      className="min-h-[100dvh] h-[100dvh] w-full min-w-0 flex items-center justify-center overflow-hidden bg-oxford relative"
+      className="relative flex h-[100dvh] min-h-[100dvh] w-full min-w-0 items-center justify-center overflow-hidden"
       style={{
+        backgroundColor: 'var(--color-oxford)',
         transform: exiting ? 'translateY(-100%)' : 'translateY(0)',
         transition: `transform ${EXIT_DURATION_MS}ms cubic-bezier(0.85, 0, 0.15, 1)`,
       }}
       onTransitionEnd={handleTransitionEnd}
     >
       <div
-        className="absolute inset-0 pointer-events-none z-[1]"
+        className="pointer-events-none absolute inset-0 z-[1]"
         aria-hidden
         style={{
           background:
-            'radial-gradient(ellipse 85% 60% at 50% 38%, rgba(184, 151, 106, 0.11), transparent 58%), radial-gradient(circle at 50% 125%, rgba(0, 0, 0, 0.42), transparent 48%)',
+            'radial-gradient(ellipse 88% 55% at 15% 20%, rgba(252, 252, 252, 0.06), transparent 55%), radial-gradient(ellipse 70% 45% at 85% 15%, rgba(242, 240, 234, 0.05), transparent 50%), radial-gradient(circle at 50% 110%, rgba(0, 0, 0, 0.35), transparent 45%)',
           mixBlendMode: 'soft-light',
         }}
       />
-      <GrainOverlay opacity={0.022} />
+      <GrainOverlay opacity={0.028} variant="dark" />
       <div
-        className="w-full min-w-0 flex flex-col items-center justify-center relative z-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-8 sm:py-10 lg:px-12 lg:py-12"
+        className="relative z-10 flex w-full min-w-0 flex-col items-center justify-center px-[max(1.25rem,env(safe-area-inset-left))] py-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] pr-[max(1.25rem,env(safe-area-inset-right))] sm:px-10 sm:py-12"
       >
-        {/* Logo: bold, tighter letter-spacing; underline only under "A", left-to-right */}
-        <div className="flex flex-col items-center max-w-[80vw] sm:max-w-full">
+        <div className="flex max-w-[min(100%,20rem)] flex-col items-center sm:max-w-none">
           <h1
-            className="font-display text-ivory text-center break-words tracking-[-0.05em] system-access-hero"
-            style={{
-              fontSize: 'clamp(1.75rem, 6vw + 1rem, 4rem)',
-              lineHeight: 1.1,
-            }}
+            className="font-wordmark text-center text-[clamp(1.875rem,5.5vw,3.25rem)] font-normal normal-case leading-[1.08] tracking-normal text-[#f2f0ea] system-access-hero"
           >
             {hero === 'Aethria' ? (
               <>
                 <span className="relative inline-block">
                   A
                   <span
-                    className="system-access-hero-underline absolute left-0 bottom-0 block w-full h-[0.06em] min-h-[2px] bg-ivory"
+                    className="system-access-hero-underline absolute bottom-0 left-0 block h-[0.08em] min-h-[2px] w-full bg-[rgba(252,252,252,0.85)]"
                     aria-hidden
                   />
                 </span>
@@ -98,39 +94,17 @@ export default function SystemAccessPage({
           </h1>
         </div>
         <p
-          className="font-mono text-[10px] uppercase text-ivory text-center w-full max-w-full break-words system-access-status"
-          style={{
-            letterSpacing: '0.3em',
-            marginTop: '24px',
-          }}
-          >
+          className="system-access-status mt-8 w-full max-w-full break-words text-center font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(242,240,234,0.72)]"
+        >
           {statusText}
         </p>
-        <p
-          className="font-mono text-[9px] uppercase tracking-[0.2em] text-ivory/60 text-center mt-2"
-          style={{
-            letterSpacing: '0.2em',
-            opacity: statusText === status ? 1 : 0,
-            transition: 'opacity 0.3s ease 0.3s',
-          }}
-        >
-          Investment Intelligence
-        </p>
         <div
-          style={{
-            width: '160px',
-            height: '1px',
-            backgroundColor: 'rgba(242, 240, 234, 0.2)',
-            marginTop: 24,
-            overflow: 'hidden',
-          }}
+          className="mt-10 h-px w-[min(10rem,55vw)] overflow-hidden bg-[rgba(242,240,234,0.12)]"
+          aria-hidden
         >
           <div
+            className="h-full w-full origin-left bg-[rgba(252,252,252,0.92)]"
             style={{
-              width: '100%',
-              height: '100%',
-              backgroundColor: 'rgba(242, 240, 234, 0.9)',
-              transformOrigin: 'left',
               animation: 'system-access-progress 2.5s ease forwards',
             }}
           />
