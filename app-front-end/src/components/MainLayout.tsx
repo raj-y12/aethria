@@ -1,6 +1,7 @@
-import { useMemo, useState, useRef, useCallback } from 'react';
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router';
 import { tokens } from '../design-system/tokens';
 import SystemBar from './SystemBar';
 import MobileHeader from './MobileHeader';
@@ -16,25 +17,34 @@ import {
   useRestoreFocus,
   useFocusTrap,
   useMediaQuery,
+  usePrefersReducedMotion,
 } from '../hooks';
+import { transitionOrReduced } from '../design-system/motion';
+import { UI_PANEL_CHROME_LABEL } from '../design-system/ui-text';
 import type { Startup, EscalationItem } from '../types/startup';
 import type { SystemData } from '../hooks/useSystemData';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './InvestmentMemoContent';
+import { queueOnDemandLookup } from '../api/startups';
+import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
 
 const SYSTEM_MEMO_HEADER_PADDING = 'py-[10px]';
 
-const PANEL_CHROME_LABEL_CLASS =
-  'font-mono text-[10px] font-normal uppercase tracking-[0.1em] text-oxford/40';
-
 const PANEL_CHROME_ACTION_BTN_CLASS =
-  `${PANEL_CHROME_LABEL_CLASS} rounded-none border-0 bg-transparent p-0 cursor-pointer hover:text-oxford/80 transition-colors duration-150 ease-out btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset`;
+  `${UI_PANEL_CHROME_LABEL} rounded-none border-0 bg-transparent p-0 cursor-pointer hover:text-oxford/80 transition-colors duration-150 ease-out btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset`;
 
 interface MainLayoutProps {
   data: SystemData;
   startupsError?: string | null;
+  onSystemPanelOpenChange?: (open: boolean) => void;
+  onLookupActiveChange?: (active: boolean) => void;
 }
 
-export default function MainLayout({ data, startupsError }: MainLayoutProps) {
+export default function MainLayout({
+  data,
+  startupsError,
+  onSystemPanelOpenChange,
+  onLookupActiveChange,
+}: MainLayoutProps) {
   const {
     startups,
     escalations,
@@ -47,13 +57,26 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
     calibrationState,
   } = data;
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
-  const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>('system');
+  const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>(null);
+  const initialFirstMemoOpened = useRef(false);
+  const [lookupExpanded, setLookupExpanded] = useState(false);
+  const [lookupInput, setLookupInput] = useState('');
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState<string | null>(null);
+  const [showPipelineIssueHelp, setShowPipelineIssueHelp] = useState(false);
+  const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
+  const [pendingLookup, setPendingLookup] = useState<{
+    query: string;
+    autoOpened: boolean;
+  } | null>(null);
 
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const reduceMotion = usePrefersReducedMotion();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const restoreRefVerdictMemo = useRef<HTMLElement | null>(null);
   const judgementsPanelRef = useRef<HTMLDivElement | null>(null);
   const memoContentRef = useRef<InvestmentMemoContentHandle | null>(null);
+  const navigate = useNavigate();
 
   const memoOpen = !!selectedStartup;
   const verdictOrMemoOpen = memoOpen;
@@ -89,6 +112,89 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
     setRightPanel((panel) => (panel === 'feed' ? null : panel));
   }, []);
 
+  const handleLookupSubmit = useCallback(async () => {
+    const value = lookupInput.trim();
+    if (!value || lookupBusy) return;
+    setLookupBusy(true);
+    setLookupMessage('Queueing lookup...');
+    try {
+      const queued = await queueOnDemandLookup(value);
+      setPendingLookup({
+        query: queued.companyName,
+        autoOpened: false,
+      });
+      setLookupMessage(`Queued lookup for ${queued.companyName}. Processing now...`);
+      setLookupInput('');
+    } catch {
+      setLookupMessage('Failed to queue lookup. Please retry.');
+    } finally {
+      setLookupBusy(false);
+    }
+  }, [lookupInput, lookupBusy]);
+
+  const pendingLookupMatch = useMemo(() => {
+    if (!pendingLookup) return null;
+    const normalizedQuery = pendingLookup.query.trim().toLowerCase();
+    if (!normalizedQuery) return null;
+    return (
+      startups.find((s) => {
+        if ((s.scout.origin_type ?? '').toLowerCase() !== 'on_demand_lookup') return false;
+        const lookupQuery = (s.scout.lookup_query ?? '').trim().toLowerCase();
+        const name = (s.scout.name ?? '').trim().toLowerCase();
+        if (lookupQuery && lookupQuery === normalizedQuery) return true;
+        return !lookupQuery && name === normalizedQuery;
+      }) ?? null
+    );
+  }, [startups, pendingLookup]);
+
+  useEffect(() => {
+    if (initialFirstMemoOpened.current || startups.length === 0) return;
+    initialFirstMemoOpened.current = true;
+    setSelectedStartup(startups[0]);
+    setRightPanel('memo');
+  }, [startups]);
+
+  useEffect(() => {
+    if (!pendingLookup) return;
+    const matched = pendingLookupMatch;
+    if (!matched) {
+      setLookupMessage(`Processing ${pendingLookup.query}...`);
+      return;
+    }
+    const hasDecision = !!matched.partner?.decision;
+    if (hasDecision) {
+      setLookupMessage(`Lookup complete: ${matched.scout.name}. Opening memo...`);
+    } else if (matched.review) {
+      setLookupMessage(`Found ${matched.scout.name}. Partner decision in progress...`);
+    } else {
+      setLookupMessage(`Found ${matched.scout.name}. Review in progress...`);
+    }
+    if (hasDecision && !pendingLookup.autoOpened) {
+      setSelectedStartup(matched);
+      setRightPanel('memo');
+      setPendingLookup((prev) => (prev ? { ...prev, autoOpened: true } : prev));
+    }
+  }, [pendingLookup, pendingLookupMatch]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadStatus = async () => {
+      const status = await fetchAgentsStatus();
+      if (active) setAgentsStatus(status);
+    };
+
+    void loadStatus();
+    const intervalId = window.setInterval(() => {
+      void loadStatus();
+    }, 20000);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   const handleEscape = useCallback(() => {
     if (memoOpen) handleCloseMemo();
     else if (rightPanel === 'feed') handleCloseJudgements();
@@ -102,10 +208,46 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
   useFocusTrap(judgementsAsOverlay, judgementsPanelRef);
 
   const resolvedCount = startups.filter((s) => s.partner?.decision != null).length;
-  const queueDepths = data.settings?.system_health?.queue_depths;
-  const unreviewed = queueDepths?.unreviewed ?? 0;
-  const watchlist = queueDepths?.watchlist ?? 0;
+  const openCount = Math.max(0, startups.length - resolvedCount);
   const pendingEscalations = data.settings?.system_health?.pending_escalations ?? 0;
+  const agentConfig = data.settings?.agent_config;
+  const pipelineEnabled =
+    !!agentConfig && !!(agentConfig.scouts_enabled || agentConfig.reviewers_enabled || agentConfig.partners_enabled);
+  const lookupWorking = lookupBusy || (pendingLookup != null && !pendingLookup.autoOpened);
+  const lookupPhaseLabel = !lookupWorking
+    ? null
+    : !pendingLookupMatch
+      ? 'Scouting'
+      : pendingLookupMatch.review
+        ? 'Deciding'
+        : 'Reviewing';
+  const pipelineHealthIssue =
+    pipelineEnabled &&
+    agentsStatus != null &&
+    (!agentsStatus.worker_ready || !agentsStatus.supabase_configured || !agentsStatus.openai_configured);
+  const pipelineStateLabel = !pipelineEnabled
+    ? 'Off'
+    : pipelineHealthIssue
+      ? 'Issue'
+      : lookupWorking
+        ? 'Working'
+        : 'On';
+  const lookupStateLabel = lookupWorking ? (lookupPhaseLabel ?? 'Working') : 'Idle';
+
+  useEffect(() => {
+    onSystemPanelOpenChange?.(rightPanel === 'system');
+  }, [rightPanel, onSystemPanelOpenChange]);
+
+  useEffect(() => {
+    onLookupActiveChange?.(lookupWorking);
+  }, [lookupWorking, onLookupActiveChange]);
+
+  useEffect(() => {
+    if (!pipelineHealthIssue && showPipelineIssueHelp) {
+      setShowPipelineIssueHelp(false);
+    }
+  }, [pipelineHealthIssue, showPipelineIssueHelp]);
+
   const watchlistIds = useMemo(() => {
     const ids = new Set<string>();
     for (const e of watchlistAnalytics?.entries ?? []) {
@@ -127,8 +269,11 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: tokens.motion.duration.micro, ease: tokens.motion.ease }}
-                className="px-4 pb-0 border-b border-oxford/[0.06] type-label-tab bg-oxford overflow-hidden text-white/70"
+                transition={transitionOrReduced(reduceMotion, {
+                  duration: tokens.motion.duration.micro,
+                  ease: tokens.motion.ease,
+                })}
+                className="px-4 pb-0 border-b border-hairline type-label-tab bg-oxford overflow-hidden text-white/70"
                 aria-label="Menu"
               >
                 <div className="flex flex-col items-start gap-3 py-3">
@@ -225,7 +370,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
           On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[11rem] lg:pr-6 lg:pt-6">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[2fr_3fr] min-h-0 overflow-hidden pb-3 lg:pb-4 gap-4 lg:gap-4">
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-3 lg:pb-4 gap-4 lg:gap-4">
           <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
             {/* Title + pipeline summary — desktop only; escalations live here (not duplicated on SystemBar) */}
             <header className="flex-none mb-2 hidden lg:block min-w-0">
@@ -246,114 +391,115 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                 )}
               </div>
               <section
-                aria-label="Pipeline summary"
-                className="mt-2 min-w-0 border border-oxford/[0.06] bg-paper"
+                aria-label="Pipeline summary and agent status"
+                className="mt-2 flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border border-hairline bg-paper px-2 py-1.5"
               >
-                <div className="min-w-0">
-                  <table className="w-full table-fixed border-collapse caption-top text-left">
-                    <caption className="type-meta border-b border-oxford/[0.06] px-2 py-1 text-left uppercase tracking-[0.12em] text-oxford/40">
-                      Pipeline
-                    </caption>
-                    <colgroup>
-                      <col className="w-[20%]" />
-                      <col className="w-[20%]" />
-                      <col className="w-[20%]" />
-                      <col className="w-[20%]" />
-                      <col className="w-[20%]" />
-                    </colgroup>
-                    <thead>
-                      <tr className="bg-registerTint type-meta uppercase tracking-[0.1em] text-oxford/38">
-                        <th
-                          scope="col"
-                          aria-label="Companies"
-                          title="Companies"
-                          className="border-r border-oxford/[0.06] px-1 py-1 text-center font-normal"
+                <p className="min-w-0 font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/45">
+                  Total <span className="text-oxford">{startups.length}</span>
+                  <span className="mx-1.5 text-oxford/20">·</span>
+                  Open <span className="text-oxford">{openCount}</span>
+                  <span className="mx-1.5 text-oxford/20">·</span>
+                  Esc <span className={pendingEscalations > 0 ? 'text-escalation' : 'text-oxford'}>{pendingEscalations}</span>
+                  <span className="mx-1.5 text-oxford/20">·</span>
+                  Dec <span className="text-oxford">{resolvedCount}</span>
+                </p>
+                <p className="shrink-0 text-right font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/45">
+                  Pipeline{' '}
+                  <span className="relative inline-flex items-center gap-1">
+                    <span className={pipelineStateLabel === 'Issue' ? 'text-escalation' : 'text-oxford'}>
+                      {pipelineStateLabel}
+                    </span>
+                    {pipelineStateLabel === 'Issue' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setShowPipelineIssueHelp((open) => !open)}
+                          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-escalation/40 text-[9px] leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
+                          aria-label="Why pipeline has an issue"
+                          aria-expanded={showPipelineIssueHelp}
                         >
-                          Co
-                        </th>
-                        <th
-                          scope="col"
-                          aria-label="Decided"
-                          title="Decided"
-                          className="border-r border-oxford/[0.06] px-1 py-1 text-center font-normal"
-                        >
-                          Dec
-                        </th>
-                        <th
-                          scope="col"
-                          aria-label="Unreviewed"
-                          title="Unreviewed"
-                          className="border-r border-oxford/[0.06] px-1 py-1 text-center font-normal"
-                        >
-                          Unv
-                        </th>
-                        <th
-                          scope="col"
-                          aria-label="Watchlist"
-                          title="Watchlist"
-                          className="border-r border-oxford/[0.06] px-1 py-1 text-center font-normal"
-                        >
-                          WL
-                        </th>
-                        <th
-                          scope="col"
-                          aria-label="Escalations"
-                          title="Escalations"
-                          className="px-1 py-1 text-center font-normal"
-                        >
-                          Esc
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="type-data border-r border-oxford/[0.06] px-1 py-1.5 text-center align-top text-oxford">
-                          {startups.length}
-                        </td>
-                        <td className="type-data border-r border-oxford/[0.06] px-1 py-1.5 text-center align-top text-oxford">
-                          {resolvedCount}
-                        </td>
-                        <td className="type-data border-r border-oxford/[0.06] px-1 py-1.5 text-center align-top text-oxford">
-                          {unreviewed}
-                        </td>
-                        <td className="type-data border-r border-oxford/[0.06] px-1 py-1.5 text-center align-top text-oxford">
-                          {watchlist}
-                        </td>
-                        <td className="px-1 py-1.5 text-center align-top">
-                          <span className="type-data inline-flex items-center justify-center gap-1">
-                            <span
-                              className={`inline-block shrink-0 rounded-none ${
-                                pendingEscalations > 0 ? 'escalation-dot-active' : ''
-                              }`}
-                              style={{
-                                width: 5,
-                                height: 5,
-                                backgroundColor: '#7D2B3A',
-                              }}
-                              aria-hidden
-                            />
-                            <span
-                              className={
-                                pendingEscalations > 0 ? 'text-[#7D2B3A]' : 'text-oxford/40'
-                              }
+                          ?
+                        </button>
+                        {showPipelineIssueHelp && (
+                          <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-56 rounded-none border border-field-border bg-paper p-2 text-left normal-case tracking-normal text-[11px] leading-4 text-oxford shadow-none">
+                            Pipeline has a problem and may not process updates right now.
+                            <button
+                              type="button"
+                              onClick={() => navigate('/settings')}
+                              className="mt-1.5 block text-[10px] uppercase tracking-[0.08em] text-oxford/70 hover:text-oxford btn-interaction"
                             >
-                              {pendingEscalations}
-                            </span>
+                              Open settings
+                            </button>
                           </span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                        )}
+                      </>
+                    )}
+                  </span>
+                  <span className="mx-1.5 text-oxford/20">·</span>
+                  Lookup <span className={lookupWorking ? 'text-escalation' : 'text-oxford'}>{lookupStateLabel}</span>
+                </p>
               </section>
+              <div className="mt-2 border border-hairline bg-paper">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between border-b border-hairline bg-paper px-2 py-1.5 type-meta uppercase tracking-[0.12em] text-oxford/50 hover:text-oxford/70 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset"
+                  aria-expanded={lookupExpanded}
+                  aria-controls="lookup-panel"
+                  onClick={() => setLookupExpanded((open) => !open)}
+                >
+                  <span>On-demand lookup</span>
+                  <span className="tabular-nums" aria-hidden>{lookupExpanded ? '−' : '+'}</span>
+                </button>
+                <AnimatePresence initial={false}>
+                  {lookupExpanded && (
+                    <motion.div
+                      id="lookup-panel"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={transitionOrReduced(reduceMotion, {
+                        duration: tokens.motion.duration.micro,
+                        ease: tokens.motion.ease,
+                      })}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-2 py-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={lookupInput}
+                            onChange={(e) => setLookupInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') void handleLookupSubmit();
+                            }}
+                            placeholder="Company name, website, or context"
+                            className="h-8 flex-1 rounded-none border border-field-border bg-paper px-2 text-[12px] text-oxford outline-none focus:border-field-border-strong"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleLookupSubmit()}
+                            disabled={lookupBusy || !lookupInput.trim()}
+                            className="h-8 px-2 type-meta uppercase tracking-[0.08em] border border-field-border-strong text-oxford disabled:text-oxford/35 disabled:border-hairline-strong"
+                          >
+                            {lookupBusy ? 'Queueing...' : 'Queue'}
+                          </button>
+                        </div>
+                        {lookupMessage ? (
+                          <p className="mt-1 text-[11px] text-oxford/55">{lookupMessage}</p>
+                        ) : null}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </header>
 
             {rightPanel === 'system' ? (
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden w-full min-w-0 rounded-none border border-oxford/[0.06] bg-paper">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden w-full min-w-0 rounded-none border border-hairline bg-paper">
                 <PanelShell
                   className="min-h-0 flex-1"
                   title="SYSTEM"
-                  titleClassName={PANEL_CHROME_LABEL_CLASS}
+                  titleClassName={UI_PANEL_CHROME_LABEL}
                   headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
                   headerBorderClass=""
                   actions={
@@ -384,10 +530,10 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
               </div>
             ) : (
               <div
-                className="flex-1 min-h-0 overflow-y-auto w-full min-w-0 rounded-none border border-oxford/[0.06] bg-paper"
+                className="flex-1 min-h-0 overflow-y-auto w-full min-w-0 rounded-none border border-hairline bg-paper"
                 style={{ scrollbarGutter: 'stable both-edges' }}
               >
-                <div className="px-0 pt-2 pb-6 lg:pb-8">
+                <div className="px-0 pt-0 pb-6 lg:pb-8">
                   <GhostTransition disableLift>
                     <WorkGrid
                       startups={startups}
@@ -403,7 +549,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
 
           {/* Right zone: Judgements or memo only — never System. */}
           <aside
-            className="hidden lg:flex flex-col min-w-0 min-h-0 border border-oxford/[0.06] bg-paper overflow-hidden"
+            className="hidden lg:flex flex-col min-w-0 min-h-0 border border-hairline bg-paper overflow-hidden"
             aria-live="polite"
             aria-label={
               rightPanel === 'feed'
@@ -417,7 +563,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
               <PanelShell
                 className="min-h-0 flex-1"
                 title="JUDGEMENTS"
-                titleClassName={PANEL_CHROME_LABEL_CLASS}
+                titleClassName={UI_PANEL_CHROME_LABEL}
                 headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
                 headerBorderClass=""
                 actions={
@@ -453,7 +599,14 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
                       onClick={() => memoContentRef.current?.downloadPDF()}
                       className={PANEL_CHROME_ACTION_BTN_CLASS}
                     >
-                      DOWNLOAD PDF
+                      IC PACK (PDF)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => memoContentRef.current?.downloadMarkdown()}
+                      className={PANEL_CHROME_ACTION_BTN_CLASS}
+                    >
+                      IC PACK (MD)
                     </button>
                     <button
                       type="button"
@@ -489,7 +642,10 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
+            transition={transitionOrReduced(reduceMotion, {
+              duration: tokens.motion.duration.medium,
+              ease: tokens.motion.ease,
+            })}
             className="fixed inset-0 z-[9999]"
             style={{
               minHeight: '100dvh',
@@ -510,10 +666,13 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
           <motion.div
             ref={judgementsPanelRef}
             key="judgements-panel"
-            initial={{ x: '100%' }}
+            initial={reduceMotion ? { x: 0 } : { x: '100%' }}
             animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
+            exit={reduceMotion ? { x: 0 } : { x: '100%' }}
+            transition={transitionOrReduced(reduceMotion, {
+              duration: tokens.motion.duration.medium,
+              ease: tokens.motion.ease,
+            })}
             className="fixed top-0 right-0 w-full max-w-full sm:w-[380px] lg:w-[400px] z-[10000] flex flex-col bg-paper"
             style={{
               borderLeft: tokens.frameBorder,
@@ -527,7 +686,7 @@ export default function MainLayout({ data, startupsError }: MainLayoutProps) {
           >
             <PanelShell
               title="JUDGEMENTS"
-              titleClassName={PANEL_CHROME_LABEL_CLASS}
+              titleClassName={UI_PANEL_CHROME_LABEL}
               headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
               headerBorderClass=""
               actions={

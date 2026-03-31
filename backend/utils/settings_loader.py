@@ -32,6 +32,9 @@ DEFAULT_SETTINGS = {
         "fund_name": "",
         "stage_focus": "",
         "geographic_focus": "",
+        # Official site for your fund/product (e.g. https://aethria.co). Used to drop
+        # wrong-TLD / parallel-domain links from Scout references when no per-deal website.
+        "canonical_website": "",
     },
     "cost_budget": {
         "enabled": False,  # Set True to enforce token/call limits and cooldowns; False = bypass for now
@@ -124,6 +127,19 @@ def get_scout_region(user_id: Optional[str] = None) -> str:
 def is_scout_serp_enabled(user_id: Optional[str] = None) -> bool:
     """Whether Scouts are allowed to use SERP (guarded + rate-limited)."""
     return bool(load_settings(user_id).get("agent_config", {}).get("scout_serp_enabled", False))
+
+
+def get_canonical_website_hostname(user_id: Optional[str] = None) -> Optional[str]:
+    """
+    Hostname from fund_identity.canonical_website (URL or bare domain), if set.
+    Used as reference anchor for Scout citation filtering.
+    """
+    try:
+        from utils.reference_verify import hostname_from_user_hint
+    except ImportError:
+        return None
+    raw = (load_settings(user_id).get("fund_identity") or {}).get("canonical_website")
+    return hostname_from_user_hint(raw) if raw else None
 
 
 def get_scout_serp_daily_budget(user_id: Optional[str] = None) -> int:

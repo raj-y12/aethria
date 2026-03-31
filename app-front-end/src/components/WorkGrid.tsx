@@ -35,32 +35,28 @@
  * for partner / pipeline state.
  */
 
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, type ChangeEvent } from 'react';
 import { motion } from 'framer-motion';
 import type { Startup } from '../types/startup';
 import { getReviewerQualityBand, type ReviewerQualityBand } from '../design-system/semantics';
 import { tokens } from '../design-system/tokens';
-import DecisionBadge from './DecisionBadge';
-import EmptyState from './EmptyState';
+import { transitionOrReduced } from '../design-system/motion';
 import {
-  PANEL_TAB_ACTIVE_CLASS,
-  PANEL_TAB_BAR_CLASS,
-  PANEL_TAB_BUTTON_CLASS,
-  PANEL_TAB_INACTIVE_CLASS,
-} from './PanelShell';
+  UI_FILTER_SEGMENT_INACTIVE,
+  UI_FILTER_TOOLBAR_LABEL,
+} from '../design-system/ui-text';
+import { usePrefersReducedMotion } from '../hooks';
+import DecisionBadge from './DecisionBadge';
+import VerdictBandBadge from './VerdictBandBadge';
+import EmptyState from './EmptyState';
 
 const ORIENT_DISMISSED_KEY = 'aethria_dashboard_orient_dismissed';
 const COACH_MARK_DURATION_MS = 4000;
 
-type ActiveFilter = 'ALL' | 'STRONG' | 'MEDIUM' | 'WEAK' | 'ESCALATIONS';
-
-const FILTER_ITEMS: { id: ActiveFilter; label: string }[] = [
-  { id: 'ALL', label: 'ALL' },
-  { id: 'STRONG', label: 'STRONG' },
-  { id: 'MEDIUM', label: 'MEDIUM' },
-  { id: 'WEAK', label: 'WEAK' },
-  { id: 'ESCALATIONS', label: 'ESCALATIONS' },
-];
+type SourceFilter = 'ALL' | 'SCOUT' | 'LOOKUP';
+type DecisionFilter = 'ALL' | 'YES' | 'NO' | 'MAYBE' | 'ESCALATION' | 'UNDECIDED' | 'AWAITING_REVIEW';
+type ReviewFilter = 'ALL' | 'STRONG' | 'MEDIUM' | 'WEAK' | 'UNREVIEWED';
+type SortFilter = 'NEWEST' | 'OLDEST' | 'CONFIDENCE_HIGH' | 'CONFIDENCE_LOW' | 'NAME_AZ';
 
 type ReviewerVerdictBand = ReviewerQualityBand;
 
@@ -68,39 +64,26 @@ function getReviewerVerdict(s: Startup): ReviewerVerdictBand | null {
   return getReviewerQualityBand(s.review);
 }
 
-/** Shared shell for reviewer + partner pills in this grid. */
-const GRID_BADGE_SHELL =
-  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none font-mono text-[9px] font-normal uppercase leading-[1.5] tracking-[0.1em] py-[3px] px-[6px]';
+/** Same footprint as DecisionBadge (type-label-tab, py-1 px-2, border) for grid pills. */
+const WORK_GRID_PILL_BASE =
+  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-label-tab py-1 px-2 uppercase shadow-none';
 
-function VerdictBadge({ band }: { band: ReviewerVerdictBand }) {
-  const tone =
-    band === 'STRONG'
-      ? 'bg-oxford text-paper'
-      : band === 'MEDIUM'
-        ? 'bg-oxford/50 text-paper'
-        : 'bg-oxford/20 text-oxford';
-  return (
-    <span className={`${GRID_BADGE_SHELL} ${tone}`}>
-      {band}
-    </span>
-  );
-}
+/** Selects: hairline bottom border only (toolbar chrome). */
+const FILTER_SELECT_CLASS =
+  'h-7 min-w-0 flex-1 cursor-pointer rounded-none border-0 border-b border-hairline-strong bg-transparent py-0.5 pl-0 pr-1 text-[11px] leading-tight text-oxford outline-none focus:border-field-border-strong';
 
-function filterStartupsByActive(list: Startup[], active: ActiveFilter): Startup[] {
-  switch (active) {
-    case 'ALL':
-      return list;
-    case 'STRONG':
-      return list.filter((s) => getReviewerVerdict(s) === 'STRONG');
-    case 'MEDIUM':
-      return list.filter((s) => getReviewerVerdict(s) === 'MEDIUM');
-    case 'WEAK':
-      return list.filter((s) => getReviewerVerdict(s) === 'WEAK');
-    case 'ESCALATIONS':
-      return list.filter((s) => s.partner != null && s.partner.human_review_required === true);
-    default:
-      return list;
-  }
+/** Text actions on the filter toolbar — same border-b language as Source segment buttons (not text-underline). */
+const FILTER_TOOLBAR_BORDER_BTN_BASE =
+  `min-h-7 shrink-0 px-1.5 py-0.5 ${UI_FILTER_SEGMENT_INACTIVE} btn-interaction border-0 border-b bg-transparent`;
+
+const SOURCE_SEGMENTS: { value: SourceFilter; label: string }[] = [
+  { value: 'ALL', label: 'All' },
+  { value: 'SCOUT', label: 'Scout' },
+  { value: 'LOOKUP', label: 'Lookup' },
+];
+
+function getSourceBadge(startup: Startup): 'LOOKUP' | 'SCOUT' {
+  return (startup.scout.origin_type ?? '').toLowerCase() === 'on_demand_lookup' ? 'LOOKUP' : 'SCOUT';
 }
 
 interface WorkGridProps {
@@ -110,13 +93,18 @@ interface WorkGridProps {
   watchlistIds?: Set<string>;
 }
 
-/** Queue / accent: partner flagged for human review (strict boolean `true` only). */
-function isEscalation(s: Startup): boolean {
-  return s.partner != null && s.partner.human_review_required === true;
-}
-
 function sortKey(s: Startup): string {
   return s.timestamps?.partnered_at ?? s.timestamps?.reviewed_at ?? s.timestamps?.discovered_at ?? '';
+}
+
+function getDecisionFilterValue(s: Startup): Exclude<DecisionFilter, 'ALL'> {
+  if (s.partner?.human_review_required) return 'ESCALATION';
+  const decision = s.partner?.decision;
+  if (decision === 'YES') return 'YES';
+  if (decision === 'NO' || decision === 'PASS') return 'NO';
+  if (decision === 'MAYBE' || decision === 'WATCH') return 'MAYBE';
+  if (s.review) return 'UNDECIDED';
+  return 'AWAITING_REVIEW';
 }
 
 type FundingStageTier = 'pre-seed' | 'seed' | 'series-a' | 'series-b' | 'series-c-plus';
@@ -179,26 +167,47 @@ function getPartnerEconomicBadgeVariant(s: Startup): 'YES' | 'NO' | 'MAYBE' | nu
 }
 
 const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchlistIds }: WorkGridProps): JSX.Element => {
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('ALL');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('ALL');
+  const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>('ALL');
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('ALL');
+  const [sortFilter, setSortFilter] = useState<SortFilter>('NEWEST');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   /** Opacity fade on filter change only (not on first paint). */
   const [listFilterFadeEnabled, setListFilterFadeEnabled] = useState(false);
-
-  const filteredStartups = useMemo(
-    () => filterStartupsByActive(startups, activeFilter),
-    [startups, activeFilter]
-  );
+  const reduceMotion = usePrefersReducedMotion();
 
   const ordered = useMemo(() => {
-    const escalations = filteredStartups.filter(isEscalation).sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
-    const decided = filteredStartups
-      .filter((s) => s.partner?.decision != null && !isEscalation(s))
-      .sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
-    const reviewedNoDecision = filteredStartups
-      .filter((s) => s.review != null && !s.partner?.decision)
-      .sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
-    const unreviewed = filteredStartups.filter((s) => s.review == null).sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
-    return [...escalations, ...decided, ...reviewedNoDecision, ...unreviewed];
-  }, [filteredStartups]);
+    const filtered = startups.filter((s) => {
+      if (sourceFilter === 'LOOKUP' && getSourceBadge(s) !== 'LOOKUP') return false;
+      if (sourceFilter === 'SCOUT' && getSourceBadge(s) !== 'SCOUT') return false;
+      if (decisionFilter !== 'ALL' && getDecisionFilterValue(s) !== decisionFilter) return false;
+      if (reviewFilter === 'UNREVIEWED' && s.review != null) return false;
+      if (reviewFilter !== 'ALL' && reviewFilter !== 'UNREVIEWED' && getReviewerVerdict(s) !== reviewFilter) return false;
+      return true;
+    });
+    const list = [...filtered];
+    switch (sortFilter) {
+      case 'OLDEST':
+        list.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+        break;
+      case 'CONFIDENCE_HIGH':
+        list.sort((a, b) => (b.scout.confidence ?? 0) - (a.scout.confidence ?? 0));
+        break;
+      case 'CONFIDENCE_LOW':
+        list.sort((a, b) => (a.scout.confidence ?? 0) - (b.scout.confidence ?? 0));
+        break;
+      case 'NAME_AZ':
+        list.sort((a, b) => (a.scout.name ?? '').localeCompare(b.scout.name ?? ''));
+        break;
+      case 'NEWEST':
+      default:
+        list.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+        break;
+    }
+    return list;
+  }, [startups, sourceFilter, decisionFilter, reviewFilter, sortFilter]);
+
+  const hasActiveAdvancedFilters = decisionFilter !== 'ALL' || reviewFilter !== 'ALL';
 
   const [showCoachMark, setShowCoachMark] = useState(false);
   useEffect(() => {
@@ -240,7 +249,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
 
   if (startups.length === 0) {
     return (
-      <div className="w-full h-full min-h-[12rem] flex flex-col items-center justify-center border-b border-oxford/[0.06]">
+      <div className="w-full h-full min-h-[12rem] flex flex-col items-center justify-center border-b border-hairline">
         <EmptyState
           label="Pipeline"
           body="Scouts are filling the queue. First companies usually appear within a few minutes."
@@ -251,41 +260,157 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
 
   return (
     <div className="w-full">
-      <nav
-        className={`sticky top-0 z-10 w-full flex-none min-w-0 shrink-0 overflow-x-auto no-scrollbar bg-paper ${PANEL_TAB_BAR_CLASS}`}
+      <div
+        className="sticky top-0 z-10 border-b border-hairline bg-paper px-3 py-1.5"
         role="toolbar"
         aria-label="Filter pipeline"
       >
-        {FILTER_ITEMS.map(({ id, label }) => {
-          const isActive = activeFilter === id;
-          return (
+        {/* Below lg: two rows (source | sort+link) so nothing collides beside the memo. lg+: one row. */}
+        <div className="relative">
+          <div className="flex min-w-0 flex-col gap-1.5 sm:pr-[5.5rem] lg:flex-row lg:flex-nowrap lg:items-end lg:gap-x-4 lg:pr-24">
+            <div className="flex w-full min-w-0 items-center justify-between gap-2 lg:w-auto lg:shrink-0 lg:justify-start">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className={`shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Source</span>
+                <div
+                  className="flex min-w-0 flex-1 items-center gap-0 sm:gap-0.5 lg:flex-initial"
+                  role="group"
+                  aria-label="Filter by source"
+                >
+                  {SOURCE_SEGMENTS.map(({ value, label }) => {
+                    const active = sourceFilter === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => {
+                          setListFilterFadeEnabled(true);
+                          setSourceFilter(value);
+                        }}
+                        className={`min-h-7 shrink-0 px-1.5 py-0.5 ${UI_FILTER_SEGMENT_INACTIVE} btn-interaction border-0 border-b bg-transparent ${
+                          active
+                            ? 'border-oxford/45 text-oxford'
+                            : 'border-transparent text-oxford/42 hover:border-oxford/20 hover:text-oxford/75'
+                        }`}
+                        aria-pressed={active}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <span
+                className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/45 tabular-nums sm:hidden"
+                title={`${ordered.length} results after filters`}
+                aria-label={`${ordered.length} results after filters`}
+              >
+                {ordered.length}
+              </span>
+            </div>
+            <div className="flex w-full min-w-0 items-end gap-x-3 lg:flex-1 lg:min-w-0">
+              <label className="flex min-w-0 flex-1 items-center gap-2 lg:max-w-[14rem] xl:max-w-[18rem]">
+                <span className={`shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Sort</span>
+                <select
+                  value={sortFilter}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+                    setListFilterFadeEnabled(true);
+                    setSortFilter(e.target.value as SortFilter);
+                  }}
+                  className={FILTER_SELECT_CLASS}
+                >
+                  <option value="NEWEST">Newest</option>
+                  <option value="OLDEST">Oldest</option>
+                  <option value="CONFIDENCE_HIGH">Confidence high to low</option>
+                  <option value="CONFIDENCE_LOW">Confidence low to high</option>
+                  <option value="NAME_AZ">Name A-Z</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className={`${FILTER_TOOLBAR_BORDER_BTN_BASE} self-end text-left ${
+                  showAdvancedFilters
+                    ? 'border-oxford/45 text-oxford'
+                    : 'border-transparent text-oxford/42 hover:border-oxford/20 hover:text-oxford/75'
+                }`}
+                onClick={() => setShowAdvancedFilters((v) => !v)}
+                aria-expanded={showAdvancedFilters}
+              >
+                {showAdvancedFilters ? 'Fewer filters' : 'More filters'}
+              </button>
+            </div>
+          </div>
+          <div
+            className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/40 tabular-nums sm:block"
+            aria-label={`${ordered.length} results after filters`}
+          >
+            {ordered.length} results
+          </div>
+        </div>
+        {showAdvancedFilters && (
+          <div className="mt-1.5 flex flex-col gap-1.5 border-t border-hairline pt-1.5 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-5 sm:gap-y-1">
+            <label className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[12rem] sm:flex-none">
+              <span className={`shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Decision</span>
+              <select
+                value={decisionFilter}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+                  setListFilterFadeEnabled(true);
+                  setDecisionFilter(e.target.value as DecisionFilter);
+                }}
+                className={FILTER_SELECT_CLASS}
+              >
+                <option value="ALL">All</option>
+                <option value="YES">Yes</option>
+                <option value="NO">No</option>
+                <option value="MAYBE">Maybe</option>
+                <option value="ESCALATION">Escalation</option>
+                <option value="UNDECIDED">Undecided</option>
+                <option value="AWAITING_REVIEW">Awaiting review</option>
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[12rem] sm:flex-none">
+              <span className={`shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Review</span>
+              <select
+                value={reviewFilter}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+                  setListFilterFadeEnabled(true);
+                  setReviewFilter(e.target.value as ReviewFilter);
+                }}
+                className={FILTER_SELECT_CLASS}
+              >
+                <option value="ALL">All</option>
+                <option value="STRONG">Strong</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="WEAK">Weak</option>
+                <option value="UNREVIEWED">Unreviewed</option>
+              </select>
+            </label>
             <button
-              key={id}
               type="button"
-              aria-selected={isActive}
+              className={`${FILTER_TOOLBAR_BORDER_BTN_BASE} self-start border-transparent text-oxford/42 hover:border-oxford/20 hover:text-oxford/75 sm:self-auto disabled:cursor-not-allowed disabled:border-transparent disabled:opacity-35 disabled:hover:border-transparent disabled:hover:text-oxford/25 disabled:text-oxford/25`}
               onClick={() => {
                 setListFilterFadeEnabled(true);
-                setActiveFilter(id);
+                setDecisionFilter('ALL');
+                setReviewFilter('ALL');
+                setSourceFilter('ALL');
+                setSortFilter('NEWEST');
               }}
-              className={`shrink-0 ${PANEL_TAB_BUTTON_CLASS} ${
-                isActive ? PANEL_TAB_ACTIVE_CLASS : PANEL_TAB_INACTIVE_CLASS
-              }`}
+              disabled={!hasActiveAdvancedFilters && sourceFilter === 'ALL' && sortFilter === 'NEWEST'}
             >
-              {label}
+              Reset
             </button>
-          );
-        })}
-      </nav>
+          </div>
+        )}
+      </div>
 
       <motion.div
-        key={activeFilter}
+        key={`${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
         className="w-full"
         initial={{ opacity: listFilterFadeEnabled ? 0 : 1 }}
         animate={{ opacity: 1 }}
-        transition={{
+        transition={transitionOrReduced(reduceMotion, {
           duration: listFilterFadeEnabled ? 0.15 : 0,
           ease: tokens.motion.ease,
-        }}
+        })}
       >
       {ordered.map((startup, index) => {
         const isSelected = selectedId != null && startup.id === selectedId;
@@ -307,13 +432,13 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
             tabIndex={0}
             aria-label={`View ${startup.scout.name}`}
             aria-current={isSelected ? 'true' : undefined}
-            initial={{ opacity: 0, y: 10 }}
+            initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{
+            transition={transitionOrReduced(reduceMotion, {
               duration: tokens.motion.duration.short,
               delay: Math.min(index, 10) * 0.02,
               ease: tokens.motion.ease,
-            }}
+            })}
             className={`group cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-oxford/25 focus-visible:ring-inset btn-interaction transition-colors rounded-none overflow-hidden ${
               isSelected ? 'bg-registerTint' : 'bg-transparent hover:bg-registerTint'
             }${hasDisagreement ? ' border-l-2 border-l-oxford/40' : ''}`}
@@ -323,13 +448,12 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
             }}
           >
             {/* Single column on mobile/tablet; two columns (60/40) only from lg up */}
-            <div className="flex flex-col gap-2 py-3 px-3 sm:px-4 lg:px-6 lg:grid lg:grid-cols-[3fr_2fr] lg:items-start lg:gap-4 border-b border-oxford/[0.06]">
+            <div className="flex flex-col gap-2 py-3 px-3 sm:px-4 lg:px-6 lg:grid lg:grid-cols-[3fr_2fr] lg:items-start lg:gap-4 border-b border-hairline">
               <div className="min-w-0 overflow-hidden">
                 <div className="flex items-center gap-2 min-w-0">
                   {badgeVariant === 'escalation' && !isSelected && (
                     <span
-                      className="w-1.5 h-1.5 shrink-0 rounded-none escalation-dot-active"
-                      style={{ backgroundColor: 'var(--color-accent)' }}
+                      className="w-1.5 h-1.5 shrink-0 rounded-none bg-escalation escalation-dot-active"
                       aria-hidden
                     />
                   )}
@@ -345,7 +469,9 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 </div>
                 {startup.scout.one_line?.trim() ? (
                   <p
-                    className={`min-w-0 text-[12px] leading-[1.6] text-oxford/50 overflow-hidden transition-[opacity,max-height,margin-top] duration-150 ease-out ${
+                    className={`min-w-0 text-[12px] leading-[1.6] text-oxford/50 overflow-hidden transition-[opacity,max-height,margin-top] ease-out ${
+                      reduceMotion ? 'duration-0' : 'duration-150'
+                    } ${
                       isSelected
                         ? 'mt-1 max-h-[200px] opacity-100'
                         : 'mt-0 max-h-0 opacity-0 group-hover:mt-1 group-hover:max-h-[200px] group-hover:opacity-100'
@@ -371,10 +497,13 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                   ) : null}
                 </div>
               </div>
-              <div className="pt-2 border-t border-oxford/[0.06] flex flex-col items-start gap-1.5 min-w-0 lg:pt-1 lg:border-t-0 lg:text-right lg:items-end lg:justify-self-end">
+              <div className="pt-2 border-t border-hairline flex flex-col items-start gap-1.5 min-w-0 lg:pt-1 lg:border-t-0 lg:text-right lg:items-end lg:justify-self-end">
                 <span
-                  className="type-label-tab text-oxford/40 min-h-[1.25rem] flex items-center justify-end w-full opacity-0 group-hover:opacity-100"
-                  style={{ transition: 'opacity 150ms var(--motion-ease, ease-out)' }}
+                  className={`type-label-tab text-oxford/40 min-h-[1.25rem] flex items-center justify-end w-full transition-opacity ease-out ${
+                    reduceMotion ? 'duration-0' : 'duration-150'
+                  } ${
+                    isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  }`}
                   aria-hidden
                 >
                   → memo
@@ -389,7 +518,16 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                   ) : null}
                   {/* Single wrap row: verdict + partner + escalation stay inline on narrow viewports */}
                   <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-1.5 justify-start sm:justify-end">
-                    {reviewBand ? <VerdictBadge band={reviewBand} /> : null}
+                    <span
+                      className={`${WORK_GRID_PILL_BASE} ${
+                        getSourceBadge(startup) === 'LOOKUP'
+                          ? 'bg-lookup-surface text-lookup-ink'
+                          : 'border border-solid border-field-border bg-transparent text-oxford/55'
+                      }`}
+                    >
+                      {getSourceBadge(startup) === 'LOOKUP' ? 'LOOKUP' : 'SCOUT'}
+                    </span>
+                    {reviewBand ? <VerdictBandBadge band={reviewBand} /> : null}
                     {showPartnerDecisionPlusEscalation ? (
                       <>
                         <DecisionBadge variant={economicBadgeVariant!} />

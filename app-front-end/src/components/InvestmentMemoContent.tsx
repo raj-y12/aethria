@@ -1,7 +1,14 @@
 import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { jsPDF } from 'jspdf';
 import type { Startup } from '../types/startup';
+import {
+  buildMemoPDF,
+  buildIcMarkdown,
+  icPackSafeBaseName,
+  getPipelineReplaySteps,
+  type PipelineReplayStep,
+} from '../lib/memoIcPack';
+import { memoReferenceHref, memoReferenceLabel } from '../lib/memoReferenceHref';
 import {
   getScoreBand,
   DECISION_LABELS,
@@ -9,163 +16,10 @@ import {
   SCORE_DIMENSIONS,
   getReviewerQualityBand,
 } from '../design-system/semantics';
-
-const PDF_MARGIN = 20;
-const PDF_LINE_HEIGHT = 5;
-const PDF_FONT_SIZE_TITLE = 16;
-const PDF_FONT_SIZE_HEADING = 11;
-const PDF_FONT_SIZE_BODY = 10;
-const PDF_FONT_SIZE_SMALL = 9;
-
-function addPDFSection(
-  doc: jsPDF,
-  opts: { title?: string; lines: string[]; startY: number }
-): number {
-  let y = opts.startY;
-  const pageH = doc.internal.pageSize.getHeight();
-  const maxW = doc.internal.pageSize.getWidth() - PDF_MARGIN * 2;
-  if (opts.title) {
-    doc.setFontSize(PDF_FONT_SIZE_HEADING);
-    doc.setTextColor(80, 80, 100);
-    doc.text(opts.title, PDF_MARGIN, y);
-    y += PDF_LINE_HEIGHT;
-  }
-  doc.setFontSize(PDF_FONT_SIZE_BODY);
-  doc.setTextColor(0, 33, 71);
-  for (const line of opts.lines) {
-    const split = doc.splitTextToSize(line, maxW);
-    for (const s of split) {
-      if (y > pageH - 20) {
-        doc.addPage();
-        y = PDF_MARGIN;
-      }
-      doc.text(s, PDF_MARGIN, y);
-      y += PDF_LINE_HEIGHT;
-    }
-  }
-  return y + PDF_LINE_HEIGHT;
-}
-
-function buildMemoPDF(startup: Startup): jsPDF {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  let y = PDF_MARGIN;
-
-  doc.setFontSize(PDF_FONT_SIZE_SMALL);
-  doc.setTextColor(80, 80, 100);
-  doc.text('Investment memo', PDF_MARGIN, y);
-  y += PDF_LINE_HEIGHT;
-  doc.setFontSize(PDF_FONT_SIZE_TITLE);
-  doc.setTextColor(0, 33, 71);
-  doc.text(startup.scout.name ?? '—', PDF_MARGIN, y);
-  y += PDF_LINE_HEIGHT + 2;
-  doc.setFontSize(PDF_FONT_SIZE_SMALL);
-  doc.setTextColor(80, 80, 100);
-  doc.text(startup.scout.sector ?? '—', PDF_MARGIN, y);
-  y += PDF_LINE_HEIGHT * 2;
-
-  const judgmentSummary = startup.partner
-    ? (() => {
-        const p = startup.partner!;
-        const decisionLabel = DECISION_LABELS[p.decision] ?? p.decision;
-        const band = getReviewerQualityBand(startup.review);
-        const dossier =
-          band != null
-            ? ` Dossier read: ${band} (${QUALITY_LABELS[band] ?? band}).`
-            : '';
-        const rationale = (p.rationale ?? '').trim();
-        const head = `${decisionLabel}.${dossier}`.replace(/\.\s*\./g, '.').trim();
-        return rationale ? `${head} ${rationale}` : head;
-      })()
-    : '';
-  if (judgmentSummary) {
-    const judgmentLines = judgmentToParagraphs(judgmentSummary);
-    y = addPDFSection(doc, {
-      title: 'Investment judgment',
-      lines: judgmentLines,
-      startY: y,
-    });
-  }
-
-  const overviewLines: string[] = [];
-  if (startup.scout.problem) overviewLines.push(`Problem: ${startup.scout.problem}`);
-  if (startup.scout.solution) overviewLines.push(`Solution: ${startup.scout.solution}`);
-  if (startup.scout.target_users) overviewLines.push(`Target: ${startup.scout.target_users}`);
-  if (startup.scout.why_now) overviewLines.push(`Why now: ${startup.scout.why_now}`);
-  if (overviewLines.length) {
-    y = addPDFSection(doc, { title: 'Overview', lines: overviewLines, startY: y });
-  }
-
-  if (startup.review) {
-    const primary = SCORE_DIMENSIONS.slice(0, 2);
-    const lines = primary
-      .map(({ id, name }) => {
-        const score = startup.review?.[id as keyof typeof startup.review];
-        if (score == null || typeof score !== 'number') return null;
-        const band = getScoreBand(score);
-        return `${name}: ${score}/10 (${band.label})`;
-      })
-      .filter(Boolean) as string[];
-    if (lines.length) y = addPDFSection(doc, { title: 'Primary drivers', lines, startY: y });
-
-    const supporting = SCORE_DIMENSIONS.slice(2);
-    const lines2 = supporting
-      .map(({ id, name }) => {
-        const score = startup.review?.[id as keyof typeof startup.review];
-        if (score == null || typeof score !== 'number') return null;
-        const band = getScoreBand(score);
-        return `${name}: ${score}/10 (${band.label})`;
-      })
-      .filter(Boolean) as string[];
-    if (lines2.length) y = addPDFSection(doc, { title: 'Supporting analysis', lines: lines2, startY: y });
-  }
-
-  const primaryRisks = startup.review?.diligence_red_flags ?? [];
-  const secondaryRisks = (startup.review?.key_risks ?? []).filter(
-    (r) => !primaryRisks.some((p) => r.includes(p) || p.includes(r))
-  );
-  if (primaryRisks.length || secondaryRisks.length) {
-    const riskLines = [
-      ...(primaryRisks.length ? ['Primary: ' + primaryRisks.join('; ')] : []),
-      ...(secondaryRisks.length ? ['Secondary: ' + secondaryRisks.join('; ')] : []),
-    ];
-    y = addPDFSection(doc, { title: 'Risks', lines: riskLines, startY: y });
-  }
-
-  if (startup.review?.overall_summary) {
-    y = addPDFSection(doc, {
-      title: 'Summary',
-      lines: [startup.review.overall_summary],
-      startY: y,
-    });
-  }
-
-  if (startup.partner) {
-    const p = startup.partner;
-    const decisionLine = `Investment decision: ${p.decision} (${DECISION_LABELS[p.decision] ?? p.decision})`;
-    const qualityLine = startup.review?.verdict != null ? `Quality: ${startup.review.verdict}` : '';
-    const lines = [decisionLine, ...(qualityLine ? [qualityLine] : []), ...(p.rationale ? [p.rationale] : [])];
-    y = addPDFSection(doc, { title: 'Decision', lines, startY: y });
-  }
-
-  return doc;
-}
-
-/** Split judgment text into display paragraphs. Preserves existing newlines; otherwise breaks on sentence boundaries. */
-function judgmentToParagraphs(text: string): string[] {
-  const trimmed = text.trim();
-  if (!trimmed) return [];
-  // Already has paragraph breaks (double newline)
-  if (/\n\s*\n/.test(trimmed)) {
-    return trimmed.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
-  }
-  // Single newlines: treat each line as a paragraph
-  if (trimmed.includes('\n')) {
-    return trimmed.split('\n').map((s) => s.trim()).filter(Boolean);
-  }
-  // No newlines: split on sentence boundary (period + space + uppercase) so we don't break "e.g." or "No."
-  const sentences = trimmed.split(/(?<=\.)\s+(?=[A-Z])/).map((s) => s.trim()).filter(Boolean);
-  return sentences.length ? sentences : [trimmed];
-}
+import { transitionOrReduced } from '../design-system/motion';
+import { usePrefersReducedMotion } from '../hooks';
+import DecisionBadge from './DecisionBadge';
+import VerdictBandBadge from './VerdictBandBadge';
 
 function buildScoreJustification(startup: Startup): string | null {
   const r = startup.review;
@@ -195,6 +49,7 @@ export interface InvestmentMemoContentProps {
 
 export interface InvestmentMemoContentHandle {
   downloadPDF: () => void;
+  downloadMarkdown: () => void;
 }
 
 function normalizeParagraphs(value: unknown): string[] {
@@ -223,6 +78,54 @@ function toJudgmentReasoning(startup: Startup): string[] {
   return normalizeParagraphs(rationale);
 }
 
+function getNextStepText(startup: Startup): string {
+  return (startup.partner?.next_action ?? startup.partner?.next_step ?? '').trim();
+}
+
+function parseNextStepItems(raw: string): string[] {
+  const text = raw.trim();
+  if (!text) return [];
+
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^[-*•]\s+/, '').replace(/^\d+[\)\.]\s+/, '').trim())
+    .filter(Boolean);
+  if (lines.length >= 2) return lines;
+
+  const numberedMatches = [...text.matchAll(/(?:^|\s)\d+[\)\.]\s+/g)];
+  if (numberedMatches.length >= 2) {
+    const items: string[] = [];
+    for (let i = 0; i < numberedMatches.length; i++) {
+      const start = (numberedMatches[i].index ?? 0) + numberedMatches[i][0].length;
+      const end = i + 1 < numberedMatches.length ? (numberedMatches[i + 1].index ?? text.length) : text.length;
+      const item = text.slice(start, end).trim().replace(/\s+/g, ' ');
+      if (item) items.push(item.replace(/[;,\s]+$/, ''));
+    }
+    if (items.length >= 2) return items;
+  }
+
+  if (text.includes(' - ')) {
+    const parts = text.split(/\s-\s+/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) return parts;
+  }
+  if (text.includes(';')) {
+    const parts = text.split(';').map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) return parts;
+  }
+
+  return [];
+}
+
+function getPartnerEconomicBadgeVariant(startup: Startup): 'YES' | 'NO' | 'MAYBE' | null {
+  const d = startup.partner?.decision;
+  if (d == null) return null;
+  if (d === 'YES') return 'YES';
+  if (d === 'NO' || d === 'PASS') return 'NO';
+  return 'MAYBE';
+}
+
 function formatSectorAndCategory(startup: Startup): string {
   const sector = startup.scout.sector?.trim() || '—';
   const category = startup.scout.funding_stage?.trim() || startup.scout.scout_type?.trim() || '';
@@ -230,6 +133,14 @@ function formatSectorAndCategory(startup: Startup): string {
 }
 
 const actionBtnCls = 'memoAction';
+
+function pipelineReplayOneLiner(steps: PipelineReplayStep[]): string {
+  if (!steps.length) return '';
+  const flow = steps.map((s) => s.label).join(' → ');
+  const last = [...steps].reverse().find((s) => s.atDisplay && s.atDisplay !== '—');
+  const tail = last?.atDisplay;
+  return tail ? `${flow} · ${tail}` : flow;
+}
 
 /**
  * Memo body only. Used in full-screen modal and in the right-side panel.
@@ -239,18 +150,38 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   { startup, onClose, embedded = false },
   ref
 ) {
+  const reduceMotion = usePrefersReducedMotion();
   const wrapperCls = embedded ? 'memoPanel memoPanel--embedded' : 'memoPanel';
   const [selectedDimensionIdx, setSelectedDimensionIdx] = useState(0);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [pipelineLogOpen, setPipelineLogOpen] = useState(false);
 
   const handleDownloadPDF = useCallback(() => {
     if (!startup) return;
     const doc = buildMemoPDF(startup);
-    const safeName = (startup.scout.name ?? 'memo').replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 60);
-    doc.save(`${safeName}-investment-memo.pdf`);
+    doc.save(`${icPackSafeBaseName(startup)}-ic-pack.pdf`);
   }, [startup]);
 
-  useImperativeHandle(ref, () => ({ downloadPDF: handleDownloadPDF }), [handleDownloadPDF]);
+  const handleDownloadMarkdown = useCallback(() => {
+    if (!startup) return;
+    const md = buildIcMarkdown(startup);
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${icPackSafeBaseName(startup)}-ic-pack.md`;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, [startup]);
+
+  useImperativeHandle(
+    ref,
+    () => ({ downloadPDF: handleDownloadPDF, downloadMarkdown: handleDownloadMarkdown }),
+    [handleDownloadPDF, handleDownloadMarkdown]
+  );
 
   const contentKey = startup?.id ?? 'empty';
   const companyName = startup?.scout.name?.trim() || '';
@@ -262,11 +193,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     () => (startup && showJudgment ? getReviewerQualityBand(startup.review) : null),
     [startup, showJudgment]
   );
+  const decisionBadgeVariant = useMemo(
+    () => (startup && showJudgment ? getPartnerEconomicBadgeVariant(startup) : null),
+    [startup, showJudgment]
+  );
+  const showEscalationBadge = !!(startup?.partner?.human_review_required && decisionBadgeVariant);
   const reasoningParagraphs = useMemo(() => (startup && showJudgment ? toJudgmentReasoning(startup) : []), [startup, showJudgment]);
 
   useEffect(() => {
     setSelectedDimensionIdx(0);
     setSourcesOpen(false);
+    setPipelineLogOpen(false);
   }, [startup?.id]);
 
   const scoreBlocks = useMemo(() => {
@@ -283,6 +220,16 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     if (!startup?.review) return null;
     return buildScoreJustification(startup);
   }, [startup]);
+  const nextStepText = startup ? getNextStepText(startup) : '';
+  const nextStepItems = useMemo(() => parseNextStepItems(nextStepText), [nextStepText]);
+  const pipelineReplaySteps = useMemo(
+    () => (startup ? getPipelineReplaySteps(startup) : []),
+    [startup]
+  );
+  const pipelineReplaySummary = useMemo(
+    () => pipelineReplayOneLiner(pipelineReplaySteps),
+    [pipelineReplaySteps]
+  );
 
   return (
     <div className={wrapperCls}>
@@ -361,12 +308,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           margin-top: 13px;
           margin-bottom: 24px;
         }
-        .memoSectionSpacer{
-          height: 36px;
-          flex-shrink: 0;
-        }
-        .memoSectionSpacer + section{
-          padding-top: 14px;
+        .memoBody > section + section{
+          margin-top: 50px;
         }
         .memoLeadSection{
           padding-top: 18px;
@@ -668,6 +611,108 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           color: rgba(0,33,71,0.2);
         }
 
+        .memoPipelineSection{
+          margin: 0;
+        }
+        .memoPipelineToggle{
+          width: 100%;
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+          appearance: none;
+          border: none;
+          background: transparent;
+          padding: 0 0 10px 0;
+          cursor: pointer;
+          text-align: left;
+          border-bottom: 1px solid rgba(0,33,71,0.06);
+        }
+        .memoPipelineToggleTitle{
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 0;
+          flex: 1;
+        }
+        .memoPipelineKicker{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 9px;
+          font-weight: 400;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: rgba(0,33,71,0.38);
+          margin: 0;
+        }
+        .memoPipelineOneLiner{
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-size: 12px;
+          line-height: 1.45;
+          color: rgba(0,33,71,0.52);
+          margin: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .memoPipelinePlus{
+          flex-shrink: 0;
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 10px;
+          color: rgba(0,33,71,0.45);
+          line-height: 1.5;
+          padding-top: 2px;
+        }
+        .memoReplayList{
+          list-style: none;
+          margin: 0;
+          padding: 4px 0 2px 0;
+        }
+        .memoReplayItem{
+          padding: 12px 0;
+          border-top: 1px solid rgba(0,33,71,0.06);
+        }
+        .memoReplayItem:first-child{
+          border-top: none;
+          padding-top: 8px;
+        }
+        .memoReplayKicker{
+          display: flex;
+          flex-wrap: wrap;
+          align-items: baseline;
+          gap: 6px 10px;
+          margin: 0 0 4px 0;
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-size: 13px;
+          font-weight: 600;
+          line-height: 1.35;
+          color: rgba(0,33,71,0.78);
+        }
+        .memoReplayBadge{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 9px;
+          font-weight: 400;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: rgba(0,33,71,0.42);
+        }
+        .memoReplayBadge--pending{
+          color: rgba(0,33,71,0.32);
+        }
+        .memoReplayWhen{
+          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 10px;
+          letter-spacing: 0.04em;
+          color: rgba(0,33,71,0.4);
+          margin: 0 0 6px 0;
+        }
+        .memoReplayDetail{
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-size: 13px;
+          line-height: 1.55;
+          color: rgba(0,33,71,0.62);
+          margin: 0;
+        }
+
         @media (max-width: 1100px){
           .memoPanel{ width: 100%; flex-basis: auto; }
           .memoScoresRow{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -686,7 +731,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           {onClose && (
             <div className="memoHeaderActions">
               <button type="button" onClick={handleDownloadPDF} className={actionBtnCls}>
-                DOWNLOAD PDF
+                IC PACK (PDF)
+              </button>
+              <button type="button" onClick={handleDownloadMarkdown} className={actionBtnCls}>
+                IC PACK (MD)
               </button>
               <button type="button" onClick={onClose} className={actionBtnCls}>
                 CLOSE
@@ -695,10 +743,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           )}
 
           <motion.div
+            className="memoBody"
             key={contentKey}
-            initial={{ opacity: 0, y: 24 }}
+            initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            transition={transitionOrReduced(reduceMotion, {
+              duration: 0.28,
+              ease: [0.16, 1, 0.3, 1],
+            })}
           >
             {/* Header block */}
             <h1 id="memo-title" className="memoCompany">
@@ -709,9 +761,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
             {/* Investment Judgment block */}
             {showJudgment && (
-              <>
-                <section>
+              <section>
                   <p className="memoLabel">INVESTMENT JUDGMENT</p>
+                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                    {dossierQualityBand ? <VerdictBandBadge band={dossierQualityBand} /> : null}
+                    {decisionBadgeVariant ? <DecisionBadge variant={decisionBadgeVariant} /> : null}
+                    {showEscalationBadge ? <DecisionBadge variant="escalation" /> : null}
+                  </div>
                   <div
                     className={`memoJudgmentHead${dossierQualityBand == null ? ' memoJudgmentHead--solo' : ''}`}
                   >
@@ -737,9 +793,66 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     ))}
                   </div>
                 </section>
+            )}
 
-                <div className="memoSectionSpacer" aria-hidden />
-              </>
+            {pipelineReplaySteps.length > 0 && (
+                <section className="memoPipelineSection" aria-label="Run log">
+                  <button
+                    type="button"
+                    className="memoPipelineToggle"
+                    onClick={() => setPipelineLogOpen((v) => !v)}
+                    aria-expanded={pipelineLogOpen}
+                  >
+                    <span className="memoPipelineToggleTitle">
+                      <span className="memoPipelineKicker">Run log</span>
+                      <span className="memoPipelineOneLiner" title={pipelineReplaySummary}>
+                        {pipelineReplaySummary}
+                      </span>
+                    </span>
+                    <span className="memoPipelinePlus">{pipelineLogOpen ? '−' : '+'}</span>
+                  </button>
+                  <motion.div
+                    initial={false}
+                    animate={
+                      reduceMotion
+                        ? { height: pipelineLogOpen ? 'auto' : 0, opacity: pipelineLogOpen ? 1 : 0 }
+                        : pipelineLogOpen
+                          ? { height: 'auto', opacity: 1 }
+                          : { height: 0, opacity: 0 }
+                    }
+                    transition={transitionOrReduced(reduceMotion, {
+                      duration: 0.2,
+                      ease: [0.16, 1, 0.3, 1],
+                    })}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <ol className="memoReplayList">
+                      {pipelineReplaySteps.map((step) => (
+                        <li key={step.id} className="memoReplayItem">
+                          <p className="memoReplayKicker">
+                            <span>{step.label}</span>
+                            <span className={step.done ? 'memoReplayBadge' : 'memoReplayBadge memoReplayBadge--pending'}>
+                              {step.done ? 'Done' : 'Pending'}
+                            </span>
+                          </p>
+                          <p className="memoReplayWhen">{step.atDisplay}</p>
+                          <p className="memoReplayDetail">{step.detail}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  </motion.div>
+                </section>
+            )}
+
+            {startup.review?.overall_summary && (
+                <section>
+                  <p className="memoLabel">SUMMARY</p>
+                  <div className="memoSummaryCallout">
+                    <p className="memoOverviewVal" style={{ marginTop: 0 }}>
+                      {startup.review.overall_summary}
+                    </p>
+                  </div>
+                </section>
             )}
 
             {/* Dimension Scores block */}
@@ -763,7 +876,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       <div className="memoScoreValueRow">
                         <p
                           className="memoScoreValue"
-                          style={{ opacity: isSelected ? 1 : 0.5, transition: 'opacity 180ms ease' }}
+                          style={{
+                            opacity: isSelected ? 1 : 0.5,
+                            transition: reduceMotion ? 'opacity 0ms' : 'opacity 180ms ease',
+                          }}
                         >
                           {displayScore}
                         </p>
@@ -778,9 +894,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 <div className="memoDimensionPanel">
                   <motion.div
                     key={`${contentKey}:${selectedDimensionIdx}`}
-                    initial={{ opacity: 0 }}
+                    initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    transition={transitionOrReduced(reduceMotion, {
+                      duration: 0.18,
+                      ease: [0.16, 1, 0.3, 1],
+                    })}
                   >
                     <p className="memoDimensionPanelName">
                       {scoreBlocks[selectedDimensionIdx]?.name ?? '—'}
@@ -799,8 +918,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </div>
               )}
             </section>
-
-            <div className="memoSectionSpacer" aria-hidden />
 
             {/* Overview block */}
             <section>
@@ -823,23 +940,40 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </div>
             </section>
 
-            {startup.review?.overall_summary && (
-              <>
-                <div className="memoSectionSpacer" aria-hidden />
+            {(startup.scout.primary_thesis ||
+              (startup.scout.key_assumptions && startup.scout.key_assumptions.length > 0) ||
+              startup.scout.biggest_unknown) && (
                 <section>
-                  <p className="memoLabel">SUMMARY</p>
-                  <div className="memoSummaryCallout">
-                    <p className="memoOverviewVal" style={{ marginTop: 0 }}>
-                      {startup.review.overall_summary}
-                    </p>
-                  </div>
+                  <p className="memoLabel">HYPOTHESIS</p>
+                  {startup.scout.primary_thesis ? (
+                    <div className="memoOverviewRow">
+                      <p className="memoOverviewKey">THESIS</p>
+                      <p className="memoOverviewVal">{startup.scout.primary_thesis}</p>
+                    </div>
+                  ) : null}
+                  {startup.scout.key_assumptions && startup.scout.key_assumptions.length > 0 ? (
+                    <div className="memoOverviewRow">
+                      <p className="memoOverviewKey">ASSUMPTIONS</p>
+                      <ul className="memoList" style={{ marginTop: 2 }}>
+                        {startup.scout.key_assumptions.map((item, i) => (
+                          <li key={i} className="memoListItem">
+                            <span className="memoBullet">·</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {startup.scout.biggest_unknown ? (
+                    <div className="memoOverviewRow">
+                      <p className="memoOverviewKey">BIGGEST UNKNOWN</p>
+                      <p className="memoOverviewVal">{startup.scout.biggest_unknown}</p>
+                    </div>
+                  ) : null}
                 </section>
-              </>
             )}
 
             {(startup.review?.diligence_red_flags?.length || startup.review?.key_risks?.length) && (
-              <>
-                <div className="memoSectionSpacer" aria-hidden />
                 <section>
                   <p className="memoLabel">RED FLAGS</p>
                   <ul className="memoList">
@@ -854,12 +988,47 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       ))}
                   </ul>
                 </section>
-              </>
             )}
 
+            {nextStepText ? (
+                <section>
+                  <p className="memoLabel">NEXT STEP</p>
+                  {nextStepItems.length > 0 ? (
+                    <ul className="memoList">
+                      {nextStepItems.map((item, idx) => (
+                        <li key={idx} className="memoListItem">
+                          <span className="memoBullet">{idx + 1}.</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="memoOverviewVal">{nextStepText}</p>
+                  )}
+                </section>
+            ) : null}
+
+            {(startup.partner?.llm_fallback_reason || startup.partner?.portfolio_context_at_decision) ? (
+                <section>
+                  <p className="memoLabel">DECISION CONTEXT</p>
+                  {startup.partner?.llm_fallback_reason ? (
+                    <div className="memoOverviewRow">
+                      <p className="memoOverviewKey">LLM FALLBACK</p>
+                      <p className="memoOverviewVal">{startup.partner.llm_fallback_reason}</p>
+                    </div>
+                  ) : null}
+                  {startup.partner?.portfolio_context_at_decision ? (
+                    <div className="memoOverviewRow">
+                      <p className="memoOverviewKey">PORTFOLIO SIZE</p>
+                      <p className="memoOverviewVal">
+                        {startup.partner.portfolio_context_at_decision.total_portfolio_size}
+                      </p>
+                    </div>
+                  ) : null}
+                </section>
+            ) : null}
+
             {startup.scout.references && startup.scout.references.length > 0 && (
-              <>
-                <div className="memoSectionSpacer" aria-hidden />
                 <section>
                   <button
                     type="button"
@@ -872,8 +1041,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   </button>
                   <motion.div
                     initial={false}
-                    animate={sourcesOpen ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                    animate={
+                      reduceMotion
+                        ? { height: sourcesOpen ? 'auto' : 0, opacity: sourcesOpen ? 1 : 0 }
+                        : sourcesOpen
+                          ? { height: 'auto', opacity: 1 }
+                          : { height: 0, opacity: 0 }
+                    }
+                    transition={transitionOrReduced(reduceMotion, {
+                      duration: 0.2,
+                      ease: [0.16, 1, 0.3, 1],
+                    })}
                     style={{ overflow: 'hidden' }}
                   >
                     <div style={{ paddingTop: 14 }}>
@@ -881,19 +1059,26 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         {startup.scout.references
                           .map((r) => String(r ?? '').trim())
                           .filter(Boolean)
-                          .map((ref, i) => (
-                            <li key={i} className="memoListItem">
-                              <span className="memoBullet">·</span>
-                              <a className="memoLink" href={ref} target="_blank" rel="noreferrer">
-                                {ref}
-                              </a>
-                            </li>
-                          ))}
+                          .map((ref, i) => {
+                            const href = memoReferenceHref(ref);
+                            const label = memoReferenceLabel(ref);
+                            return (
+                              <li key={i} className="memoListItem">
+                                <span className="memoBullet">·</span>
+                                {href ? (
+                                  <a className="memoLink" href={href} target="_blank" rel="noreferrer">
+                                    {label}
+                                  </a>
+                                ) : (
+                                  <span className="memoOverviewVal">{label}</span>
+                                )}
+                              </li>
+                            );
+                          })}
                       </ul>
                     </div>
                   </motion.div>
                 </section>
-              </>
             )}
           </motion.div>
         </div>

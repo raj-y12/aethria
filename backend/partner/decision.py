@@ -8,6 +8,7 @@ import os
 import json
 import asyncio
 import logging
+import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor
@@ -477,6 +478,66 @@ class PartnerDecisionEngine:
         substantive = [s for s in items if missing not in s.lower() and len(s.strip()) > 20]
         return len(substantive) >= 1
 
+    def _extract_step_items(self, text: str) -> List[str]:
+        """Best-effort extraction of checklist items from variable LLM text formats."""
+        s = (text or "").strip()
+        if not s:
+            return []
+
+        # Numbered markers like: "1) ... 2) ..." or "1. ... 2. ..."
+        marker = re.compile(r"(?:^|\s)(\d+[\)\.])\s+")
+        matches = list(marker.finditer(s))
+        if len(matches) >= 2:
+            items: List[str] = []
+            for i, m in enumerate(matches):
+                start = m.end()
+                end = matches[i + 1].start() if i + 1 < len(matches) else len(s)
+                item = s[start:end].strip(" ;\n\t")
+                if item:
+                    items.append(item)
+            if items:
+                return items[:10]
+
+        # Bullet-style inline separators: " - item - item"
+        if " - " in s:
+            parts = [p.strip(" ;\n\t-") for p in re.split(r"\s-\s+", s) if p.strip()]
+            if len(parts) > 1:
+                return parts[:10]
+
+        # Semicolon-separated checklist
+        if ";" in s:
+            parts = [p.strip(" ;\n\t") for p in s.split(";") if p.strip()]
+            if len(parts) > 1:
+                return parts[:10]
+
+        # Line-based bullets/numbers
+        lines = [ln.strip() for ln in s.splitlines() if ln.strip()]
+        if len(lines) > 1:
+            cleaned: List[str] = []
+            for ln in lines:
+                cleaned_item = re.sub(r"^[-*•]\s+", "", ln)
+                cleaned_item = re.sub(r"^\d+[\)\.]\s+", "", cleaned_item)
+                cleaned_item = cleaned_item.strip()
+                if cleaned_item:
+                    cleaned.append(cleaned_item)
+            if cleaned:
+                return cleaned[:10]
+
+        return []
+
+    def _normalize_next_action(self, next_action: str) -> str:
+        """
+        Normalize next_action to a numbered checklist when multiple actionable
+        steps are present. Keep single-paragraph guidance unchanged.
+        """
+        raw = (next_action or "").strip()
+        if not raw:
+            return ""
+        items = self._extract_step_items(raw)
+        if not items:
+            return raw
+        return "\n".join(f"{i + 1}) {item}" for i, item in enumerate(items))
+
     def _create_decision(
         self,
         decision: str,
@@ -495,7 +556,7 @@ class PartnerDecisionEngine:
             "decision": decision,
             "conviction_level": conviction,
             "rationale": rationale,
-            "next_action": next_action,
+            "next_action": self._normalize_next_action(next_action),
             "human_review_required": human_review_required,
             "assumption_risks": assumption_risks if assumption_risks is not None else [],
         }
@@ -626,7 +687,12 @@ Business Model: {'; '.join(business_model_analysis) if business_model_analysis e
 TRIGGER REASON (why this needs LLM judgment):
 {trigger_reason}
 
-Output ONLY valid JSON: {{"decision": "YES"|"NO"|"MAYBE", "rationale": "...", "next_action": "...", "conviction_level": 1-10, "human_review_required": true|false}}"""
+Output ONLY valid JSON: {{"decision": "YES"|"NO"|"MAYBE", "rationale": "...", "next_action": "...", "conviction_level": 1-10, "human_review_required": true|false}}
+
+For next_action:
+- Provide an actionable checklist, ideally 4-10 items.
+- Prefer numbered format in plain text (e.g., "1) ... 2) ... 3) ...").
+- Keep each item concise and execution-oriented."""
 
         try:
             response = self.client.chat.completions.create(

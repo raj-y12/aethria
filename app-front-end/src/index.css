@@ -198,10 +198,10 @@
  */
 @layer components {
   .app-chrome-frame {
-    @apply rounded-none border border-oxford/[0.06] bg-paper;
+    @apply rounded-none border border-hairline bg-paper;
   }
   .app-chrome-frame-raised {
-    @apply rounded-none border border-oxford/[0.06] bg-paper-bright;
+    @apply rounded-none border border-hairline bg-paper-bright;
   }
 }
 

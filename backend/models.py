@@ -21,11 +21,19 @@ class ScoutInfo(BaseModel):
     why_now: str
     scout_type: Literal["market_driven", "builder_technical", "pain_point", "contrarian"]
     confidence_score: float = Field(ge=0.0, le=1.0)
+    # Hypothesis framing from Scout stage.
+    primary_thesis: Optional[str] = None
+    key_assumptions: Optional[List[str]] = None
+    biggest_unknown: Optional[str] = None
     funding_stage: Optional[Literal["Pre-Seed", "Seed", "Series A", "Series B", "Series C", "Series C+", "Unknown"]] = None
     est_tam: Optional[str] = None  # Total Addressable Market estimate
     # High-level references / source notes for how this opportunity was discovered.
     # E.g. reports, trends, example companies, or general domain knowledge notes.
     references: Optional[List[str]] = None
+    origin_type: Optional[str] = None
+    lookup_input_type: Optional[str] = None
+    lookup_query: Optional[str] = None
+    lookup_website: Optional[str] = None
     discovered_at: datetime = Field(default_factory=datetime.now)
     # Hash of the system prompt used by the Scout when this discovery was created.
     prompt_version: Optional[str] = None

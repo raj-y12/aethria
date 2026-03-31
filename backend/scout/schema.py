@@ -11,6 +11,7 @@ as Scout outputs; Scouts should surface VC-scale startups instead.
 from typing import TypedDict, List
 from uuid import uuid4
 import json
+import re
 
 from utils.reference_validation import is_generic_reference, is_megacap_company
 
@@ -102,7 +103,12 @@ def validate_scout_output(data: dict) -> ScoutOutput:
             "references must include at least one real source (URL, news, Crunchbase, etc.) "
             "that proves the company exists. 'General domain knowledge' is not acceptable."
         )
-    
+    _url_pat = re.compile(r"https?://", re.I)
+    if not any(_url_pat.search(r) for r in valid_refs):
+        raise ValueError(
+            "references must include at least one http(s) URL per source line (prose-only citations are rejected)."
+        )
+
     return ScoutOutput(**data)
 
 

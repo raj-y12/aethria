@@ -218,6 +218,45 @@ class ScoutEngine:
         )
         
         return discoveries
+
+    async def run_named_lookup(
+        self,
+        company_name: str,
+        scout_type: str = "market_driven",
+        website: Optional[str] = None,
+        lookup_query: Optional[str] = None,
+        lookup_input_type: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Run a focused scout lookup for one specific company and persist it.
+        Returns startup_id on success, else None.
+        """
+        company = (company_name or "").strip()
+        if not company:
+            return None
+        selected = next((s for s in self.scouts if s.scout_type == scout_type), None)
+        if selected is None:
+            selected = self.scouts[0] if self.scouts else None
+        if selected is None:
+            return None
+
+        result = await selected.discover_company(company, website=website)
+        if result is None:
+            return None
+
+        try:
+            payload = dict(result)
+            payload["prompt_version"] = hash_prompt(getattr(selected, "system_prompt", ""))
+            payload["origin_type"] = "on_demand_lookup"
+            payload["lookup_query"] = (lookup_query or company).strip()
+            payload["lookup_input_type"] = (lookup_input_type or "company_name").strip()
+            payload["lookup_website"] = (website or "").strip() or None
+            if self.storage:
+                self.storage.add_discovery(payload)
+            return payload.get("id")
+        except Exception as e:
+            self.logger.error("Failed named lookup persistence for %s: %s", company, e)
+            return None
     
     async def run_forever(self):
         """

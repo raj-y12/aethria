@@ -27,6 +27,7 @@ logger = logging.getLogger("auth_clerk")
 
 _CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL")
 _CLERK_ISSUER = os.getenv("CLERK_ISSUER")  # optional, e.g. https://xxx.clerk.accounts.dev
+_JWK_CLIENT: Optional[PyJWKClient] = PyJWKClient(_CLERK_JWKS_URL) if _CLERK_JWKS_URL else None
 
 
 def verify_clerk_token(token: str) -> Optional[str]:
@@ -42,8 +43,10 @@ def verify_clerk_token(token: str) -> Optional[str]:
         logger.warning("CLERK_JWKS_URL not set; cannot verify token")
         return None
     try:
-        client = PyJWKClient(_CLERK_JWKS_URL)
-        signing_key = client.get_signing_key_from_jwt(token)
+        if _JWK_CLIENT is None:
+            logger.warning("Clerk JWKS client is unavailable; cannot verify token")
+            return None
+        signing_key = _JWK_CLIENT.get_signing_key_from_jwt(token)
         opts = {"verify_aud": False}
         kwargs = {"algorithms": ["RS256"]}
         if _CLERK_ISSUER:
@@ -55,6 +58,10 @@ def verify_clerk_token(token: str) -> Optional[str]:
                 **kwargs,
                 options=opts,
             )
+        except jwt.ExpiredSignatureError:
+            # Normal when SPA has a stale token for a short window; frontend retries with refresh.
+            logger.info("Clerk JWT expired; request requires token refresh")
+            return None
         except jwt.InvalidIssuerError as e:
             logger.warning("Clerk JWT issuer mismatch (token iss may differ from CLERK_ISSUER). Retrying without issuer check: %s", e)
             kwargs.pop("issuer", None)

@@ -13,9 +13,12 @@ import type {
 } from '../types/startup';
 import { resolveEscalation } from '../api/escalations';
 import { triggerMetaCycle } from '../api/meta';
+import { transitionOrReduced } from '../design-system/motion';
+import { usePrefersReducedMotion } from '../hooks';
 import EmptyState from './EmptyState';
+import DecisionBadge from './DecisionBadge';
 
-/** Match pipeline tab strip: underline sits on the nav hairline (items-end + overlap, no extra pb under tabs). */
+/** Match pipeline tab strip: bottom border on the nav hairline (items-end + -mb-px, same language as `PanelShell`). */
 const SYSTEM_INTEL_TAB_BUTTON_CLASS =
   'py-2.5 px-3 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
 const SYSTEM_INTEL_TAB_BAR_CLASS = `${PANEL_TAB_BAR_CLASS} items-end pt-2 pb-0`;
@@ -52,13 +55,18 @@ function formatRelativeTime(isoDate: string): string {
 }
 
 function BarFill({ pct, delay = 0 }: { pct: number; delay?: number }) {
+  const reduceMotion = usePrefersReducedMotion();
   return (
     <div className="w-full h-1.5 bg-oxford/25">
       <motion.div
-        className="h-full bg-oxford/40"
-        initial={{ width: 0 }}
+        className="h-full bg-oxford/50"
+        initial={reduceMotion ? { width: `${Math.min(100, Math.max(0, pct))}%` } : { width: 0 }}
         animate={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
-        transition={{ duration: tokens.motion.duration.short, delay, ease: tokens.motion.ease }}
+        transition={transitionOrReduced(reduceMotion, {
+          duration: tokens.motion.duration.short,
+          delay: reduceMotion ? 0 : delay,
+          ease: tokens.motion.ease,
+        })}
       />
     </div>
   );
@@ -137,6 +145,7 @@ function EscalationCard({
   onResolved?: () => void;
   onOpenMemo?: (escalation: EscalationItem) => void;
 }) {
+  const reduceMotion = usePrefersReducedMotion();
   const [resolving, setResolving] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [resolved, setResolved] = useState(false);
@@ -167,7 +176,10 @@ function EscalationCard({
       <motion.div
         initial={{ opacity: 1, height: 'auto' }}
         animate={{ opacity: 0, height: 0 }}
-        transition={{ duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
+        transition={transitionOrReduced(reduceMotion, {
+          duration: tokens.motion.duration.short,
+          ease: tokens.motion.ease,
+        })}
         className="overflow-hidden"
       >
         <p className="py-4 text-center type-label-tab text-oxford/60">Resolved</p>
@@ -236,7 +248,7 @@ function EscalationCard({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Add a note before deciding..."
-            className="min-h-[80px] w-full resize-none rounded-none border border-solid border-oxford/[0.15] bg-paper p-3 text-[14px] font-normal leading-[1.6] text-oxford/70 outline-none transition-[border-color] duration-150 placeholder:text-[14px] placeholder:font-normal placeholder:text-oxford/30 focus:border-oxford/40 focus:outline-none"
+            className="min-h-[80px] w-full resize-none rounded-none border border-solid border-field-border bg-paper p-3 text-[14px] font-normal leading-[1.6] text-oxford/70 outline-none transition-[border-color] duration-150 placeholder:text-[14px] placeholder:font-normal placeholder:text-oxford/30 focus:border-field-border-strong focus:outline-none"
             style={{ fontFamily: '"Geist Sans", system-ui, sans-serif' }}
           />
           <div className="flex gap-2">
@@ -361,6 +373,7 @@ function AnalyticsTab({ rejection, watchlist, concentration }: {
 function MetaAgentTab({ reports, weights, calibration }: {
   reports: MetaCycleReport[]; weights: ScoutWeights; calibration: CalibrationState;
 }) {
+  const reduceMotion = usePrefersReducedMotion();
   const [legendOpen, setLegendOpen] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [triggerResult, setTriggerResult] = useState<string | null>(null);
@@ -390,7 +403,7 @@ function MetaAgentTab({ reports, weights, calibration }: {
   return (
     <div className="space-y-0">
       {/* Pipeline legend — collapsible, hidden by default */}
-      <section className="flex-none border-b border-oxford/[0.06] pb-3 mb-3">
+      <section className="flex-none border-b border-hairline pb-3 mb-3">
         <button
           type="button"
           onClick={() => setLegendOpen((o) => !o)}
@@ -406,12 +419,22 @@ function MetaAgentTab({ reports, weights, calibration }: {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: tokens.motion.duration.micro, ease: tokens.motion.ease }}
+              transition={transitionOrReduced(reduceMotion, {
+                duration: tokens.motion.duration.micro,
+                ease: tokens.motion.ease,
+              })}
               className="overflow-hidden"
             >
               <div className="pb-2 pt-0 space-y-2 type-body-sm text-oxford/60 max-w-2xl">
                 <p><span className="type-label-section text-oxford/60">Order</span> · Escalations first, then recency and score.</p>
-                <p><span className="type-label-section text-oxford/60">Decisions</span> · Advance / Hold / Pass. You decide; scouts and reviewer run automatically.</p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="type-label-section text-oxford/60">Decisions</span>
+                  <span className="text-oxford/25" aria-hidden>·</span>
+                  <DecisionBadge variant="YES" />
+                  <DecisionBadge variant="MAYBE" />
+                  <DecisionBadge variant="NO" />
+                  <span className="ml-1 type-body-sm text-oxford/60">You decide; scouts and reviewer run automatically.</span>
+                </div>
                 <p><span className="type-label-section text-oxford/60">Escalation</span> · Reviewer disagreement or low confidence → human resolution. Count in status strip.</p>
                 <p><span className="type-label-section text-oxford/60">Pipeline</span> · Scouts surface companies, reviewer scores, partner decides advances and escalations.</p>
               </div>
@@ -536,6 +559,7 @@ function MetaAgentTab({ reports, weights, calibration }: {
 /* ─── MAIN COMPONENT ─── */
 export default function SystemIntelligence(props: SystemIntelligenceProps) {
   const [activeTab, setActiveTab] = useState<Tab>('meta');
+  const reduceMotion = usePrefersReducedMotion();
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -567,7 +591,10 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
+            transition={transitionOrReduced(reduceMotion, {
+              duration: tokens.motion.duration.short,
+              ease: tokens.motion.ease,
+            })}
           >
             {activeTab === 'signals' && <SignalsTab signals={props.signals} />}
             {activeTab === 'escalations' && (

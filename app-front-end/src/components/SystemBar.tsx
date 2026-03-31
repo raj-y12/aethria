@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router';
 import { useUser, useClerk } from '@clerk/react';
 import { motion } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
+import { transitionOrReduced } from '../design-system/motion';
+import { usePrefersReducedMotion } from '../hooks';
 
 interface SystemBarProps {
   scoutCount?: number;
@@ -59,6 +61,7 @@ export default function SystemBar({
   onClose,
   navLink,
 }: SystemBarProps) {
+  const reduceMotion = usePrefersReducedMotion();
   const navigate = useNavigate();
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -113,15 +116,17 @@ export default function SystemBar({
       className={baseClass}
       style={baseStyle}
       aria-label="System"
-      initial={hasEnteredOnce ? undefined : { y: -80, opacity: 0 }}
+      initial={
+        hasEnteredOnce ? undefined : reduceMotion ? { y: 0, opacity: 1 } : { y: -80, opacity: 0 }
+      }
       animate={hasEnteredOnce ? undefined : { y: 0, opacity: 1 }}
       transition={
         hasEnteredOnce
           ? undefined
-          : {
+          : transitionOrReduced(reduceMotion, {
               duration: tokens.motion.duration.long,
               ease: tokens.motion.ease,
-            }
+            })
       }
     >
       <div className="flex flex-col items-center gap-3 h-full min-h-0">

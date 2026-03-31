@@ -2,7 +2,7 @@
  * Settings API. Control plane only. No auto-save; explicit PATCH.
  */
 
-import { getAuthHeaders } from './auth';
+import { authedFetch } from './auth';
 
 const API_BASE =
   typeof window !== 'undefined'
@@ -68,6 +68,8 @@ export interface FundIdentity {
   fund_name: string;
   stage_focus: string;
   geographic_focus: string;
+  /** Official site URL or domain; used to filter wrong-TLD links in Scout references. */
+  canonical_website?: string;
 }
 
 export interface Settings {
@@ -85,14 +87,12 @@ export interface ValidationError {
 }
 
 export async function fetchSettings(): Promise<Settings> {
-  const auth = await getAuthHeaders();
-  const headers = { Accept: 'application/json', ...auth };
   const [settings, systemHealth] = await Promise.all([
-    fetch(`${API_BASE}/api/settings`, { headers }).then((r) => {
+    authedFetch(`${API_BASE}/api/settings`, { headers: { Accept: 'application/json' } }).then((r) => {
       if (!r.ok) throw new Error(`Settings API error: ${r.status}`);
       return r.json();
     }),
-    fetch(`${API_BASE}/api/analytics/system-health`, { headers }).then((r) =>
+    authedFetch(`${API_BASE}/api/analytics/system-health`, { headers: { Accept: 'application/json' } }).then((r) =>
       r.ok ? r.json() : Promise.reject(new Error(`System health API error: ${r.status}`))
     ),
   ]);
@@ -102,10 +102,9 @@ export async function fetchSettings(): Promise<Settings> {
 export async function patchSettings(
   body: Partial<Settings>
 ): Promise<{ data?: Settings; error?: ValidationError }> {
-  const headers = { 'Content-Type': 'application/json', Accept: 'application/json', ...(await getAuthHeaders()) };
-  const res = await fetch(`${API_BASE}/api/settings`, {
+  const res = await authedFetch(`${API_BASE}/api/settings`, {
     method: 'PATCH',
-    headers,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));

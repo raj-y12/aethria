@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { tokens } from '../design-system/tokens';
+import { transitionOrReduced } from '../design-system/motion';
+import { usePrefersReducedMotion } from '../hooks';
 import type { Startup, SignalItem, MetaCycleReport } from '../types/startup';
 import DecisionBadge from './DecisionBadge';
 import SignalEventRow from './SignalEventRow';
@@ -25,6 +27,7 @@ interface LiveIntelligenceFeedProps {
  * Judgements log. System issuing judgements — not a feed. Dense, restrained.
  */
 export default function LiveIntelligenceFeed({ startups, signals, metaReports }: LiveIntelligenceFeedProps) {
+  const reduceMotion = usePrefersReducedMotion();
   const [entries, setEntries] = useState<LogEntry[]>([]);
 
   useEffect(() => {
@@ -145,14 +148,14 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
           {entries.map((e, i) => (
             <motion.div
               key={e.id}
-              initial={{ opacity: 0, y: 6 }}
+              initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              transition={{
+              transition={transitionOrReduced(reduceMotion, {
                 duration: tokens.motion.duration.short,
-                delay: i * 0.025,
+                delay: reduceMotion ? 0 : i * 0.025,
                 ease: tokens.motion.ease,
-              }}
+              })}
             >
               <SignalEventRow
                 layout="compact"

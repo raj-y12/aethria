@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 
 export const PANEL_HEADER_CLASS =
-  'flex-none flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3 border-b border-oxford/[0.06]';
+  'flex-none flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3 border-b border-hairline';
 export const PANEL_TITLE_CLASS = 'type-label-tab text-oxford/60';
-export const PANEL_TAB_BAR_CLASS = 'flex-none flex gap-0 border-b border-oxford/[0.06] px-3 sm:px-4';
+export const PANEL_TAB_BAR_CLASS = 'flex-none flex gap-0 border-b border-hairline px-3 sm:px-4';
 export const PANEL_TAB_BUTTON_CLASS =
   'py-2.5 px-3 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
 export const PANEL_TAB_ACTIVE_CLASS = 'text-oxford border-oxford';
@@ -31,7 +31,7 @@ interface PanelShellProps {
   className?: string;
   /** Default py-4. */
   headerPaddingClass?: string;
-  /** Default border-b border-oxford/[0.06]. Pass "" to remove bottom border. */
+  /** Default `border-b border-hairline`. Pass "" to remove bottom border. */
   headerBorderClass?: string;
   /** Default justify-between. */
   headerJustifyClass?: string;
@@ -63,7 +63,7 @@ export default function PanelShell({
   contentClassName,
   className = '',
   headerPaddingClass = 'py-3',
-  headerBorderClass = 'border-b border-oxford/[0.06]',
+  headerBorderClass = 'border-b border-hairline',
   headerJustifyClass = 'justify-between',
   showTitle = true,
   titleClassName,

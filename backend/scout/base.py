@@ -3,7 +3,7 @@ Base Scout abstraction.
 All Scouts inherit from this class and implement the discover() method.
 """
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Any, Dict, Optional
 import json
 import logging
 import asyncio
@@ -117,7 +117,15 @@ class Scout(ABC):
         so subclasses or the prompt can consult it when building requests.
         """
         self.dynamic_context = context or {}
-    
+
+    def _reference_anchor_hostname(self, data: Dict[str, Any], explicit_website: Optional[str] = None) -> Optional[str]:
+        """Hostname hint for citation filtering: lookup website, then fund canonical site."""
+        for cand in (explicit_website, data.get("lookup_website")):
+            h = hostname_from_user_hint(cand if isinstance(cand, str) else None)
+            if h:
+                return h
+        return get_canonical_website_hostname()
+
     def _call_llm_sync(self) -> Optional[dict]:
         """
         Synchronous LLM call (runs in thread pool).
@@ -195,9 +203,13 @@ class Scout(ABC):
             data["scout_type"] = self.scout_type
             # Optionally enrich references using SERP (guarded + rate-limited)
             data = maybe_enrich_references(data)
-            
+            data = finalize_scout_references(
+                data,
+                anchor_hostname=self._reference_anchor_hostname(data),
+            )
+
             return data
-            
+
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse JSON from LLM: {e}")
             return None
@@ -205,6 +217,81 @@ class Scout(ABC):
             self.logger.error(f"LLM call failed: {e}")
             return None
     
+    def _call_llm_for_company_sync(self, company_name: str, website: Optional[str] = None) -> Optional[dict]:
+        """
+        Synchronous LLM call for a specific company name (runs in thread pool).
+        """
+        company = (company_name or "").strip()
+        if not company:
+            return None
+        site = (website or "").strip()
+        try:
+            user_prompt = (
+                f'Analyze this specific company: "{company}". '
+                "Do not pick a different company. "
+                + (
+                    f'Official website/domain hint: "{site}". Use this to disambiguate the exact company identity. '
+                    if site
+                    else ""
+                )
+                + "Output ONLY valid JSON matching the ScoutOutput schema "
+                "(resources/schemas/scout_output_v1.json). Exact shape:\n\n"
+                "{\n"
+                '  "id": "uuid",\n'
+                f'  "scout_type": "{self.scout_type}",\n'
+                '  "name": "string (canonical legal/brand company name, not the full query sentence)",\n'
+                '  "one_line": "string",\n'
+                '  "sector": "string",\n'
+                '  "problem": "string",\n'
+                '  "solution": "string",\n'
+                '  "target_users": "string",\n'
+                '  "why_now": "string",\n'
+                '  "confidence": number between 0 and 1,\n'
+                '  "primary_thesis": "string",\n'
+                '  "key_assumptions": ["string", "string"],\n'
+                '  "biggest_unknown": "string",\n'
+                '  "funding_stage": "Pre-Seed" | "Seed" | "Series A" | "Series B" | "Series C+" | "Unknown" | null,\n'
+                '  "est_tam": "string" | null,\n'
+                '  "references": ["string", ...]\n'
+                "}\n\n"
+                "CRITICAL: references must contain verifiable sources proving this company exists. "
+                "If confidence is low or data is incomplete, still return best-effort fields and set unknowns to null. "
+                "Do not invent references. Output only JSON."
+            )
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {
+                        "role": "user",
+                        "content": user_prompt,
+                    },
+                ],
+                response_format={"type": "json_object"},
+            )
+            content = response.choices[0].message.content
+            if not content:
+                self.logger.error("Empty response from LLM (company lookup)")
+                return None
+            data = json.loads(content)
+            if "id" not in data or not data["id"]:
+                data["id"] = generate_id()
+            data["scout_type"] = self.scout_type
+            if site:
+                data["lookup_website"] = site
+            data = maybe_enrich_references(data)
+            data = finalize_scout_references(
+                data,
+                anchor_hostname=self._reference_anchor_hostname(data, explicit_website=site or None),
+            )
+            return data
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse JSON from LLM (company lookup): {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"LLM company lookup failed: {e}")
+            return None
+
     async def _call_llm(self) -> Optional[dict]:
         """
         Async wrapper for LLM call (runs sync call in thread pool).
@@ -218,6 +305,25 @@ class Scout(ABC):
             self.executor,
             self._call_llm_sync,
         )
+
+    async def discover_company(self, company_name: str, website: Optional[str] = None) -> Optional[ScoutOutput]:
+        """
+        Discover and validate one specific company by name.
+        """
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(
+            self.executor,
+            self._call_llm_for_company_sync,
+            company_name,
+            website,
+        )
+        if data is None:
+            return None
+        try:
+            return validate_scout_output(data)
+        except Exception as e:
+            self.logger.error(f"Company lookup validation failed: {e}")
+            return None
     
     async def _discover_with_validation(self) -> Optional[ScoutOutput]:
         """

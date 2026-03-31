@@ -5,6 +5,7 @@ Uses get_service_client(); tables: portfolio_*, memory, settings, serp_usage, an
 """
 import logging
 import time
+import random
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 T = TypeVar("T")
@@ -17,11 +18,12 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_KEY = "default"
 _DEFAULT_USER = "default"
+_warned_default_user_fallback = False
 
 # Errno 35 = EAGAIN (Resource temporarily unavailable) under concurrent load
 _TRANSIENT_ERRNOS = (35, 11)  # 11 = EAGAIN on some platforms
-_MAX_RETRIES = 2
-_RETRY_DELAY = 0.15
+_MAX_RETRIES = 4
+_RETRY_DELAY = 0.12
 
 
 def _is_transient(e: BaseException) -> bool:
@@ -41,7 +43,9 @@ def _retry_on_transient(fn: Callable[[], T]) -> T:
         except Exception as e:
             last = e
             if attempt < _MAX_RETRIES and _is_transient(e):
-                time.sleep(_RETRY_DELAY)
+                # Exponential backoff with small jitter to avoid synchronized retries.
+                sleep_for = (_RETRY_DELAY * (2 ** attempt)) + random.uniform(0, 0.05)
+                time.sleep(sleep_for)
                 continue
             raise
     assert last is not None
@@ -54,11 +58,18 @@ def _client():
 
 def _user_id(user_id: Optional[str]) -> str:
     """Resolve user_id: explicit or run context; fallback to _DEFAULT_USER for backward compatibility."""
+    global _warned_default_user_fallback
     if user_id and user_id.strip():
         return user_id.strip()
     ctx = get_run_user_id()
     if ctx and ctx.strip():
         return ctx.strip()
+    if not _warned_default_user_fallback:
+        logger.warning(
+            "supabase_doc_store using fallback user_id='default' (no explicit user_id and no run context). "
+            "This may mix data across tenants in non-request code paths."
+        )
+        _warned_default_user_fallback = True
     return _DEFAULT_USER
 
 

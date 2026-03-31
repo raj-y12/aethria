@@ -19,19 +19,23 @@ export default {
         oxford: '#002147',
         paper: '#F2F0EA',
         'paper-bright': '#faf8f4',
-        charcoal: '#2f333b',
-        ivory: '#FFFFFF',
-        bone: '#f2f4f8',
-        mist: '#f2f4f8',
-        canvas: '#FFFFFF',
-        graphite: '#2f333b',
-        heritage: '#F9F8F6',
-        silver: '#D1D5DB',
-        /** Decorative only — aligned with web-front-end warm accent. */
+        /** Structural hairlines — prefer over raw oxford/[0.06] in new code. */
+        hairline: 'rgba(0, 33, 71, 0.06)',
+        'hairline-strong': 'rgba(0, 33, 71, 0.12)',
+        /** Inputs, fields, subtle dividers. */
+        'field-border': 'rgba(0, 33, 71, 0.15)',
+        'field-border-strong': 'rgba(0, 33, 71, 0.20)',
+        /** On-demand lookup origin chip — semantic, not raw hex in components. */
+        lookup: {
+          DEFAULT: '#B5893E',
+          surface: '#E8D7B4',
+          ink: '#3D2A12',
+        },
+        /** Escalation / human-attention only — matches tokens.color.accent. */
+        escalation: '#7D2B3A',
+        /** Decorative — aligned with web-front-end. */
         gold: '#b8976a',
         'gold-soft': 'rgba(184, 151, 106, 0.35)',
-        'alert-crimson': '#E5484D',
-        'slate-dark': '#0f1218',
         /** Validation strip: same as paper (palette whitelist). */
         warning: '#F2F0EA',
         /** See :root --color-register-tint */

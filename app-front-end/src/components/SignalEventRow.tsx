@@ -24,7 +24,7 @@ export default function SignalEventRow({
   layout = 'stacked',
   className = '',
 }: SignalEventRowProps) {
-  const borderCls = 'border-b border-oxford/[0.06]';
+  const borderCls = 'border-b border-hairline';
   const tsCls = 'shrink-0 tabular-nums type-meta text-oxford/60';
   const bodyCls = 'type-body-sm text-oxford/80 leading-[1.6]';
 

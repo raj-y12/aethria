@@ -12,7 +12,8 @@ import { fetchMe } from '../api/me';
 import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
 import { tokens } from '../design-system/tokens';
 import { userProfileAppearance } from '../design-system/clerk-appearance';
-import { useMediaQuery } from '../hooks';
+import { transitionOrReduced } from '../design-system/motion';
+import { useMediaQuery, usePrefersReducedMotion } from '../hooks';
 
 type TabId = 'account' | 'budget' | 'pipeline' | 'discovery' | 'meta' | 'portfolio';
 
@@ -200,6 +201,7 @@ export default function SettingsPage() {
   const [userIdCopied, setUserIdCopied] = useState(false);
 
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const reduceMotion = usePrefersReducedMotion();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const displayName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('authUser') : null;
   const handleLogout = () => {
@@ -274,7 +276,12 @@ export default function SettingsPage() {
     setSettings((s) => s ? { ...s, agent_config: { ...s.agent_config, [k]: v } } : s);
   const setPortfolio = <K extends keyof Settings['portfolio']>(k: K, v: Settings['portfolio'][K]) =>
     setSettings((s) => s ? { ...s, portfolio: { ...s.portfolio, [k]: v } } : s);
-  const fundIdentity = settings?.fund_identity ?? { fund_name: '', stage_focus: '', geographic_focus: '' };
+  const fundIdentity = settings?.fund_identity ?? {
+    fund_name: '',
+    stage_focus: '',
+    geographic_focus: '',
+    canonical_website: '',
+  };
   const setFundIdentity = <K extends keyof FundIdentity>(k: K, v: string) =>
     setSettings((s) => s ? { ...s, fund_identity: { ...(s.fund_identity ?? fundIdentity), [k]: v } } : s);
 
@@ -294,8 +301,11 @@ export default function SettingsPage() {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: tokens.motion.duration.micro, ease: tokens.motion.ease }}
-                  className="px-4 pb-0 border-b border-oxford/[0.06] type-label-tab bg-oxford overflow-hidden text-white/70"
+                  transition={transitionOrReduced(reduceMotion, {
+                    duration: tokens.motion.duration.micro,
+                    ease: tokens.motion.ease,
+                  })}
+                  className="px-4 pb-0 border-b border-hairline type-label-tab bg-oxford overflow-hidden text-white/70"
                   aria-label="Menu"
                 >
                   <div className="flex flex-col items-start gap-3 py-3">
@@ -340,8 +350,11 @@ export default function SettingsPage() {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: tokens.motion.duration.micro, ease: tokens.motion.ease }}
-                className="px-4 pb-0 border-b border-oxford/[0.06] type-label-tab bg-oxford overflow-hidden text-white/70"
+                transition={transitionOrReduced(reduceMotion, {
+                  duration: tokens.motion.duration.micro,
+                  ease: tokens.motion.ease,
+                })}
+                className="px-4 pb-0 border-b border-hairline type-label-tab bg-oxford overflow-hidden text-white/70"
                 aria-label="Menu"
               >
                 <div className="flex flex-col items-start gap-3 py-3">
@@ -388,9 +401,12 @@ export default function SettingsPage() {
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[11rem] lg:pr-6 lg:pt-6 pb-3 lg:pb-4">
         <motion.div
           className="flex-1 flex flex-col min-h-0 overflow-hidden"
-          initial={{ opacity: 0 }}
+          initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
+          transition={transitionOrReduced(reduceMotion, {
+            duration: tokens.motion.duration.short,
+            ease: tokens.motion.ease,
+          })}
         >
         <header className="mb-2 hidden min-w-0 flex-none lg:block">
           <h1 className="font-display font-normal text-[20px] leading-[1.4] text-oxford">
@@ -409,7 +425,7 @@ export default function SettingsPage() {
           )}
         </header>
         {/* Bordered grid: static border; only inner content scrolls (WorkGrid pattern). */}
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden w-full min-w-0 rounded-none border border-oxford/[0.06] bg-paper">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden w-full min-w-0 rounded-none border border-hairline bg-paper">
           <PanelShell
             title="SETTINGS"
             titleClassName={SETTINGS_HEADER_LABEL_CLASS}
@@ -460,10 +476,13 @@ export default function SettingsPage() {
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeTab}
-                    initial={{ opacity: 0 }}
+                    initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: tokens.motion.duration.short, ease: tokens.motion.ease }}
+                    transition={transitionOrReduced(reduceMotion, {
+                      duration: tokens.motion.duration.short,
+                      ease: tokens.motion.ease,
+                    })}
                     className="flex flex-col gap-8 min-h-0 overflow-hidden h-full"
                   >
                 {/* ——— Account ——— */}
@@ -483,12 +502,20 @@ export default function SettingsPage() {
                     <section className="flex flex-col gap-6">
                       <SettingSectionTitle>Fund identity</SettingSectionTitle>
                       <DescText>
-                        Shown on the dashboard (desktop). Fund name, stage focus, and geographic focus.
+                        Shown on the dashboard (desktop). Fund name, stage focus, and geographic focus. Set your real
+                        website so Scouts drop parallel wrong-TLD links (e.g. .com vs your .co) from memo sources.
                       </DescText>
                       <div className="flex flex-col gap-6">
                         <Field id="fund_name" label="Fund name" value={fundIdentity.fund_name} onChange={(v) => setFundIdentity('fund_name', String(v))} type="text" />
                         <Field id="stage_focus" label="Stage focus" value={fundIdentity.stage_focus} onChange={(v) => setFundIdentity('stage_focus', String(v))} type="text" />
                         <Field id="geographic_focus" label="Geographic focus" value={fundIdentity.geographic_focus} onChange={(v) => setFundIdentity('geographic_focus', String(v))} type="text" />
+                        <Field
+                          id="canonical_website"
+                          label="Canonical website (optional)"
+                          value={fundIdentity.canonical_website ?? ''}
+                          onChange={(v) => setFundIdentity('canonical_website', String(v))}
+                          type="text"
+                        />
                       </div>
                     </section>
                     {userId && (
@@ -517,7 +544,7 @@ export default function SettingsPage() {
                       <DescText>
                         Change password, update email, or manage security and sessions.
                       </DescText>
-                      <div className="aethria-clerk-profile min-h-[320px] border border-oxford/[0.06] bg-paper">
+                      <div className="aethria-clerk-profile min-h-[320px] border border-hairline bg-paper">
                         <UserProfile
                           appearance={userProfileAppearance}
                           routing="hash"
@@ -555,7 +582,7 @@ export default function SettingsPage() {
                             const callsWidth = `${Math.min(100, callsPct * 100)}%`;
                             const tokensWidth = `${Math.min(100, tokensPct * 100)}%`;
                             return (
-                              <div key={b.agent_id} className="border border-oxford/[0.06] p-2 space-y-1">
+                              <div key={b.agent_id} className="border border-hairline p-2 space-y-1">
                                 <p className="type-label-section text-oxford/80 truncate">{b.agent_id}</p>
                                 <div>
                                   <p className="type-meta text-oxford/60">Calls {b.daily_calls_used}/{b.daily_calls_limit}</p>

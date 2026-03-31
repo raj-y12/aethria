@@ -1,5 +1,5 @@
 import type { SignalItem } from '../types/startup';
-import { getAuthHeaders } from './auth';
+import { authedFetch } from './auth';
 
 const API_BASE =
   typeof window !== 'undefined'
@@ -7,8 +7,7 @@ const API_BASE =
     : 'http://localhost:8000';
 
 export async function fetchSignals(): Promise<SignalItem[]> {
-  const headers = { Accept: 'application/json', ...(await getAuthHeaders()) };
-  const res = await fetch(`${API_BASE}/api/signals`, { headers });
+  const res = await authedFetch(`${API_BASE}/api/signals`, { headers: { Accept: 'application/json' } });
   if (!res.ok) return [];
   const data = await res.json();
   return Array.isArray(data) ? data : [];

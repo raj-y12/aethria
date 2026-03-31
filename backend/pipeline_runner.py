@@ -7,6 +7,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timedelta
+from typing import Optional
 
 from run_context import set_run_user_id
 from utils.settings_loader import load_settings, is_scouts_enabled, is_reviewers_enabled, is_partners_enabled, is_cost_budget_enabled
@@ -123,3 +124,95 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
         logger.info("[%s] Pipeline cycle completed", user_id[:12])
     except Exception as e:
         logger.exception("[%s] Pipeline cycle error: %s", user_id[:12], e)
+
+
+async def run_on_demand_lookup(
+    user_id: str,
+    company_name: str,
+    website: Optional[str] = None,
+    lookup_query: Optional[str] = None,
+    lookup_input_type: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Run scout -> reviewer -> partner for one explicit company name.
+    Returns startup_id when successful.
+    """
+    if not user_id or not user_id.strip():
+        logger.warning("run_on_demand_lookup: skipped (empty user_id)")
+        return None
+    company = (company_name or "").strip()
+    if not company:
+        logger.warning("run_on_demand_lookup: skipped (empty company name)")
+        return None
+
+    user_id = user_id.strip()
+    set_run_user_id(user_id)
+
+    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    if not use_supabase:
+        logger.info("[%s] Skipping lookup (USE_SUPABASE_STORAGE not set)", user_id[:12])
+        return None
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key:
+        logger.warning("[%s] OPENAI_API_KEY missing, skipping lookup", user_id[:12])
+        return None
+
+    try:
+        storage = SupabaseStartupsStorage(get_service_client(), user_id)
+    except Exception as e:
+        logger.warning("[%s] Failed to create storage for lookup: %s", user_id[:12], e)
+        return None
+
+    cost_controller = CostController() if is_cost_budget_enabled(user_id) else None
+    deal_memory = DealMemory()
+    model = os.getenv("SCOUT_MODEL", "gpt-4o-mini")
+    reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-4o-mini")
+    use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
+
+    scout_engine = ScoutEngine(
+        api_key=api_key,
+        storage=storage,
+        interval_seconds=300,
+        model=model,
+        cost_controller=cost_controller,
+        deal_memory=deal_memory,
+    )
+    reviewer_engine = ReviewerEngine(
+        api_key=api_key,
+        storage=storage,
+        interval_seconds=60,
+        model=reviewer_model,
+        cost_controller=cost_controller,
+        deal_memory=deal_memory,
+    )
+    partner_engine = PartnerEngine(
+        storage=storage,
+        interval_seconds=30,
+        use_llm_fallback=use_llm_fallback,
+        cost_controller=cost_controller,
+        deal_memory=deal_memory,
+    )
+
+    try:
+        startup_id = await scout_engine.run_named_lookup(
+            company_name=company,
+            scout_type="market_driven",
+            website=website,
+            lookup_query=lookup_query,
+            lookup_input_type=lookup_input_type,
+        )
+        if not startup_id:
+            logger.warning("[%s] On-demand lookup failed at scout stage: %s", user_id[:12], company)
+            return None
+        reviewed = await reviewer_engine.run_startup(startup_id, ignore_confidence_threshold=True)
+        if not reviewed:
+            logger.warning("[%s] On-demand lookup not reviewed: %s", user_id[:12], startup_id)
+            return startup_id
+        decided = await partner_engine.run_startup(startup_id)
+        if not decided:
+            logger.warning("[%s] On-demand lookup not decided yet: %s", user_id[:12], startup_id)
+        logger.info("[%s] On-demand lookup completed for %s (%s)", user_id[:12], company, startup_id)
+        return startup_id
+    except Exception as e:
+        logger.exception("[%s] On-demand lookup error (%s): %s", user_id[:12], company, e)
+        return None

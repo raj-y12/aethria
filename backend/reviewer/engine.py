@@ -334,6 +334,122 @@ class ReviewerEngine:
         )
         
         return reviewed_count
+
+    async def run_startup(self, startup_id: str, ignore_confidence_threshold: bool = False) -> bool:
+        """
+        Review one specific startup id.
+        Returns True when a review is saved.
+        """
+        startup = self.storage.get_startup(startup_id)
+        if startup is None:
+            self.logger.warning("Startup not found for review: %s", startup_id)
+            return False
+        if startup.review_info is not None:
+            self.logger.info("Startup already reviewed: %s", startup_id)
+            return True
+
+        settings = load_settings()
+        confidence_threshold = settings.get("agent_config", {}).get("confidence_threshold", 0.5)
+        try:
+            from meta.calibrator import load_calibration_state
+            cal_state = load_calibration_state()
+            ct_override = cal_state.get("confidence_threshold_override")
+            if ct_override is not None:
+                confidence_threshold = ct_override
+        except ImportError:
+            pass
+
+        confidence_score = startup.scout_info.confidence_score
+        if not ignore_confidence_threshold and confidence_score < confidence_threshold:
+            self.logger.info(
+                "Below confidence threshold for startup %s (%.2f < %s)",
+                startup_id,
+                confidence_score,
+                confidence_threshold,
+            )
+            return False
+
+        scout_output: dict = {
+            "id": startup.startup_id,
+            "name": startup.scout_info.name,
+            "one_line": startup.scout_info.one_line,
+            "sector": startup.scout_info.sector,
+            "problem": startup.scout_info.problem,
+            "solution": startup.scout_info.solution,
+            "target_users": startup.scout_info.target_users,
+            "why_now": startup.scout_info.why_now,
+            "confidence": startup.scout_info.confidence_score,
+            "primary_thesis": getattr(startup.scout_info, "primary_thesis", None),
+            "key_assumptions": getattr(startup.scout_info, "key_assumptions", None),
+            "biggest_unknown": getattr(startup.scout_info, "biggest_unknown", None),
+        }
+
+        try:
+            default_task = self.reviewer.review(scout_output)
+            skeptical_task = self.skeptical_reviewer.review(scout_output)
+            opportunist_task = self.opportunist_reviewer.review(scout_output)
+            results = await asyncio.gather(
+                default_task, skeptical_task, opportunist_task,
+                return_exceptions=True,
+            )
+            reviewer_types = ["DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer"]
+            successful_results = []
+            for i, res in enumerate(results):
+                if isinstance(res, Exception):
+                    self.logger.warning("%s reviewer failed for %s: %s", reviewer_types[i], startup_id, res)
+                elif res is not None:
+                    res["reviewer_type"] = reviewer_types[i]
+                    successful_results.append(res)
+            if not successful_results:
+                self.logger.warning("All reviewers failed for startup %s", startup_id)
+                return False
+
+            default_results = [r for r in successful_results if r.get("reviewer_type") == "default"]
+            review_output = default_results[0] if default_results else successful_results[0]
+            consensus = self._compute_consensus(successful_results)
+
+            from models import SingleReview
+            from utils.adapters import reviewer_output_to_review_info
+            single_reviews = []
+            type_map = {
+                "default": "DefaultReviewer",
+                "skeptical": "SkepticalReviewer",
+                "opportunist": "OpportunistReviewer",
+            }
+            for r in successful_results:
+                raw_type = r.get("reviewer_type", "default")
+                reviewer_label = type_map.get(raw_type, "DefaultReviewer")
+                single_reviews.append(SingleReview(
+                    reviewer_type=reviewer_label,
+                    market_score=r.get("market_score", 5),
+                    product_score=r.get("product_score", 5),
+                    technical_score=r.get("technical_score", 5),
+                    execution_score=r.get("execution_score", 5),
+                    defensibility_score=r.get("defensibility_score"),
+                    overall_summary=r.get("overall_summary", ""),
+                    key_risks=r.get("key_risks", []),
+                    verdict=r.get("verdict", "MEDIUM"),
+                    diligence_red_flags=r.get("diligence_red_flags", []),
+                    assumption_feedback=r.get("assumption_feedback", []),
+                    team_analysis=r.get("team_analysis") or None,
+                    competition_analysis=r.get("competition_analysis") or None,
+                    business_model_analysis=r.get("business_model_analysis") or None,
+                    investment_thesis=r.get("investment_thesis") or None,
+                    risk_mitigation=r.get("risk_mitigation") or None,
+                    score_reasoning=r.get("score_reasoning") or None,
+                    prompt_version=r.get("prompt_version"),
+                ))
+
+            review_info = reviewer_output_to_review_info(review_output)
+            review_info.reviewer_agent_id = self.agent_id
+            review_info.reviews = single_reviews
+            review_info.consensus_verdict = consensus["consensus_verdict"]
+            review_info.reviewer_disagreement = consensus["reviewer_disagreement"]
+            review_info.score_variance = consensus["score_variance"]
+            return bool(self.storage.add_review(startup_id, review_info))
+        except Exception as e:
+            self.logger.error("Error reviewing startup %s: %s", startup_id, e, exc_info=True)
+            return False
     
     async def run_forever(self):
         """

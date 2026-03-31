@@ -7,10 +7,12 @@ import asyncio
 import json
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,22 +31,32 @@ from meta.reweighter import load_weights
 from meta.calibrator import load_calibration_state
 from portfolio.store import PortfolioStore
 from portfolio.cost_control import CostController
-from pipeline_runner import run_one_pipeline_cycle
+from pipeline_runner import run_one_pipeline_cycle, run_on_demand_lookup
 
-_agent_queue: Optional[asyncio.Queue[str]] = None
+_agent_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _agent_worker_task: Optional[asyncio.Task] = None
 _logger_agents = logging.getLogger("api.agents")
 
 
 async def _agent_worker() -> None:
-    """Background worker: run one pipeline cycle per dequeued user_id."""
+    """Background worker: run queued per-user pipeline jobs."""
     if _agent_queue is None:
         return
     while True:
         try:
-            user_id = await _agent_queue.get()
+            job = await _agent_queue.get()
+            user_id = str(job.get("user_id") or "").strip()
             try:
-                await run_one_pipeline_cycle(user_id)
+                if job.get("type") == "lookup":
+                    await run_on_demand_lookup(
+                        user_id,
+                        str(job.get("company_name") or ""),
+                        website=str(job.get("website") or "").strip() or None,
+                        lookup_query=str(job.get("lookup_query") or "").strip() or None,
+                        lookup_input_type=str(job.get("lookup_input_type") or "").strip() or None,
+                    )
+                else:
+                    await run_one_pipeline_cycle(user_id)
             except Exception as e:
                 _logger_agents.exception("Pipeline cycle error for user %s: %s", user_id[:12] if user_id else "?", e)
             finally:
@@ -342,7 +354,7 @@ def _validate_settings(body: dict) -> list[str]:
         if not isinstance(fi, dict):
             errors.append("fund_identity must be an object")
         else:
-            for key in ("fund_name", "stage_focus", "geographic_focus"):
+            for key in ("fund_name", "stage_focus", "geographic_focus", "canonical_website"):
                 if key in fi and not isinstance(fi[key], str):
                     errors.append(f"fund_identity.{key} must be a string")
     pf = body.get("portfolio")
@@ -395,9 +407,16 @@ def _backend_to_frontend(raw: dict) -> dict:
             "target_users": scout.get("target_users"),
             "why_now": scout.get("why_now", ""),
             "confidence": scout.get("confidence_score", 0.5),
+            "primary_thesis": scout.get("primary_thesis"),
+            "key_assumptions": scout.get("key_assumptions") or None,
+            "biggest_unknown": scout.get("biggest_unknown"),
             "funding_stage": scout.get("funding_stage"),
             "est_tam": scout.get("est_tam"),
             "references": scout.get("references") or [],
+            "origin_type": scout.get("origin_type"),
+            "lookup_input_type": scout.get("lookup_input_type"),
+            "lookup_query": scout.get("lookup_query"),
+            "lookup_website": scout.get("lookup_website"),
         },
         "timestamps": timestamps,
     }
@@ -431,6 +450,10 @@ def _backend_to_frontend(raw: dict) -> dict:
             "rationale": partner.get("rationale"),
             "next_action": partner.get("next_action"),
             "human_review_required": partner.get("human_review_required", False),
+            "llm_fallback_reason": partner.get("llm_fallback_reason"),
+            "memo_at_decision": partner.get("memo_at_decision"),
+            "portfolio_context_at_decision": partner.get("portfolio_context_at_decision"),
+            "prompt_version": partner.get("prompt_version"),
         }
     else:
         out["partner"] = None
@@ -607,10 +630,85 @@ async def trigger_agents(request: Request):
             status_code=503,
             content={"status": "unavailable", "reason": "worker_not_ready"},
         )
-    await _agent_queue.put(user_id)
+    await _agent_queue.put({"type": "cycle", "user_id": user_id})
     return JSONResponse(
         status_code=202,
         content={"status": "queued", "user_id": user_id},
+    )
+
+
+def _parse_lookup_input(lookup_input: str) -> Dict[str, Optional[str]]:
+    raw = (lookup_input or "").strip()
+    lowered = raw.lower()
+    website: Optional[str] = None
+    company_name = raw
+    input_type = "context_query"
+
+    domain_like = re.match(r"^(https?://)?([a-z0-9-]+\.)+[a-z]{2,}([/:?#].*)?$", lowered)
+    if domain_like:
+        parsed = urlparse(raw if lowered.startswith(("http://", "https://")) else f"https://{raw}")
+        host = (parsed.netloc or parsed.path or "").lower().strip()
+        host = host[4:] if host.startswith("www.") else host
+        website = host or None
+        if website:
+            label = website.split(".")[0].replace("-", " ").strip()
+            company_name = label.title() if label else raw
+            input_type = "website"
+    else:
+        token_count = len([t for t in re.split(r"\s+", raw) if t])
+        input_type = "company_name" if token_count <= 3 else "context_query"
+
+    return {
+        "company_name": company_name.strip() if company_name else raw,
+        "website": website,
+        "lookup_query": raw,
+        "lookup_input_type": input_type,
+    }
+
+
+@app.post("/api/startups/lookup")
+async def lookup_startup(request: Request, body: Dict[str, Any]):
+    """
+    Queue a focused on-demand company lookup for the current user.
+    Body: {"lookup_input": "..."}.
+    Backward compatible with {"company_name": "..."}.
+    """
+    lookup_input = str(body.get("lookup_input") or body.get("company_name") or "").strip()
+    if not lookup_input:
+        raise HTTPException(status_code=422, detail="lookup_input is required")
+    if len(lookup_input) > 300:
+        raise HTTPException(status_code=422, detail="lookup_input is too long")
+    parsed = _parse_lookup_input(lookup_input)
+    company_name = str(parsed.get("company_name") or "").strip()
+    if not company_name:
+        raise HTTPException(status_code=422, detail="Could not derive company name from lookup_input")
+    if _agent_queue is None:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unavailable", "reason": "worker_not_ready"},
+        )
+    user_id = request.state.user_id
+    await _agent_queue.put(
+        {
+            "type": "lookup",
+            "user_id": user_id,
+            "company_name": company_name,
+            "website": parsed.get("website"),
+            "lookup_query": parsed.get("lookup_query"),
+            "lookup_input_type": parsed.get("lookup_input_type"),
+        }
+    )
+    return JSONResponse(
+        status_code=202,
+        content={
+            "status": "queued",
+            "user_id": user_id,
+            "lookup_input": lookup_input,
+            "company_name": company_name,
+            "website": parsed.get("website"),
+            "lookup_input_type": parsed.get("lookup_input_type"),
+            "mode": "on_demand_lookup",
+        },
     )
 
 

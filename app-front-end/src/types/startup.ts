@@ -9,9 +9,16 @@ export interface Scout {
   target_users?: string;
   why_now: string;
   confidence: number;
+  primary_thesis?: string;
+  key_assumptions?: string[];
+  biggest_unknown?: string;
   funding_stage?: string;
   est_tam?: string;
   references?: string[];
+  origin_type?: string;
+  lookup_input_type?: string;
+  lookup_query?: string;
+  lookup_website?: string;
   /** Hash of the system prompt used by the Scout when this record was created. */
   prompt_version?: string;
 }

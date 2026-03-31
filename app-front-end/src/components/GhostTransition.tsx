@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { ReactNode } from 'react';
 import { tokens } from '../design-system/tokens';
+import { transitionOrReduced } from '../design-system/motion';
+import { usePrefersReducedMotion } from '../hooks';
 
 interface GhostTransitionProps {
   children: ReactNode;
@@ -19,16 +21,18 @@ export default function GhostTransition({
   delay = 0,
   disableLift = false,
 }: GhostTransitionProps) {
+  const reduceMotion = usePrefersReducedMotion();
+  const lift = !disableLift && !reduceMotion;
   return (
     <motion.div
-      initial={disableLift ? { opacity: 0 } : { opacity: 0, y: 6 }}
-      animate={disableLift ? { opacity: 1 } : { opacity: 1, y: 0 }}
-      exit={disableLift ? { opacity: 0 } : { opacity: 0, y: -4 }}
-      transition={{
+      initial={lift ? { opacity: 0, y: 6 } : { opacity: 0 }}
+      animate={lift ? { opacity: 1, y: 0 } : { opacity: 1 }}
+      exit={lift ? { opacity: 0, y: -4 } : { opacity: 0 }}
+      transition={transitionOrReduced(reduceMotion, {
         duration: tokens.motion.duration.short,
         ease: tokens.motion.ease,
-        delay,
-      }}
+        delay: reduceMotion ? 0 : delay,
+      })}
       className={className}
     >
       {children}

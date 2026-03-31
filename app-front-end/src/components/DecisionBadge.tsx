@@ -2,19 +2,22 @@ import { DECISION_LABELS } from '../design-system/semantics';
 
 export type DecisionBadgeVariant = 'YES' | 'NO' | 'MAYBE' | 'awaiting' | 'undecided' | 'escalation';
 
+const BADGE_BASE_CLASS =
+  'type-label-tab py-1 px-2 uppercase shadow-none';
+
 const VARIANT_CLASS: Record<DecisionBadgeVariant, string> = {
   YES:
-    'type-label-tab border border-solid border-oxford/20 bg-transparent py-1 px-2 uppercase text-oxford/85 shadow-none',
+    `${BADGE_BASE_CLASS} bg-oxford text-paper`,
   NO:
-    'type-label-tab border border-solid border-oxford/15 bg-transparent py-1 px-2 uppercase text-oxford/55 shadow-none',
+    `${BADGE_BASE_CLASS} border border-solid border-oxford/15 bg-transparent text-oxford/55`,
   MAYBE:
-    'type-label-tab border border-solid border-oxford/18 bg-transparent py-1 px-2 uppercase text-oxford/70 shadow-none',
+    `${BADGE_BASE_CLASS} bg-oxford/10 text-oxford/80`,
   awaiting:
-    'type-meta border-0 bg-transparent px-0 py-0 text-[9px] uppercase tracking-[0.1em] text-oxford/35 shadow-none',
+    `${BADGE_BASE_CLASS} border border-solid border-oxford/10 bg-transparent text-oxford/35`,
   undecided:
-    'type-meta border-0 bg-transparent px-0 py-0 text-[9px] uppercase tracking-[0.1em] text-oxford/45 shadow-none',
+    `${BADGE_BASE_CLASS} border border-solid border-oxford/12 bg-transparent text-oxford/45`,
   escalation:
-    'type-label-tab border-0 bg-[#7D2B3A] py-1 px-2 uppercase text-white shadow-none',
+    `${BADGE_BASE_CLASS} bg-escalation text-white`,
 };
 
 const LABEL_OVERRIDE: Record<DecisionBadgeVariant, string> = {

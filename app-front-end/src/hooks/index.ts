@@ -4,4 +4,5 @@ export { useFocusTrap } from './useFocusTrap';
 export { useRestoreFocus } from './useRestoreFocus';
 export { useIdleTimeout } from './useIdleTimeout';
 export { useMediaQuery } from './useMediaQuery';
+export { usePrefersReducedMotion } from './usePrefersReducedMotion';
 export { useSystemData } from './useSystemData';

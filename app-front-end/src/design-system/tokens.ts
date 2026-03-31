@@ -8,8 +8,8 @@
  * Frames: 1px rgba(0,33,71,0.06). No rounded corners.
  * Register tint: CSS variable --color-register-tint (see index.css); Tailwind `registerTint` / `bg-registerTint`.
  *
- * Oxford opacity ladder: the only permitted opacities for Oxford-derived text and semantic borders are 100, 80, 60, 40, 25 (percent).
- * Structural frame borders use 0.06 and are the exception.
+ * Oxford opacity ladder (100 / 80 / 60 / 40 / 25): preferred for **text** and soft UI chrome.
+ * Structural frames use Tailwind semantic `hairline` / `hairline-strong` / `field-border` (see tailwind.config.js).
  */
 
 export const tokens = {

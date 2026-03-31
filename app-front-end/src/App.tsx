@@ -14,18 +14,38 @@ const APP_ROOT = '/v1';
 
 function AppShell() {
   const { pathname } = useLocation();
-  const systemData = useSystemData();
   const isSettingsRoute = pathname.startsWith('/settings');
+  const [isSystemPanelOpen, setIsSystemPanelOpen] = useState(false);
+  const [isLookupActive, setIsLookupActive] = useState(false);
+  const systemData = useSystemData({
+    systemPanelOpen: !isSettingsRoute && isSystemPanelOpen,
+    lookupActive: !isSettingsRoute && isLookupActive,
+  });
   const hasTriggeredAgents = useRef(false);
   useEffect(() => {
     if (hasTriggeredAgents.current) return;
     hasTriggeredAgents.current = true;
     triggerAgents().catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isSettingsRoute) return;
+    setIsSystemPanelOpen(false);
+    setIsLookupActive(false);
+  }, [isSettingsRoute]);
+
   return (
     <>
       <GrainOverlay opacity={0.02} />
-      {isSettingsRoute ? <SettingsPage /> : <MainLayout data={systemData} />}
+      {isSettingsRoute ? (
+        <SettingsPage />
+      ) : (
+        <MainLayout
+          data={systemData}
+          onSystemPanelOpenChange={setIsSystemPanelOpen}
+          onLookupActiveChange={setIsLookupActive}
+        />
+      )}
     </>
   );
 }
@@ -41,7 +61,7 @@ function App() {
       setTokenReady(false);
       return;
     }
-    setTokenGetter(() => getToken());
+    setTokenGetter(getToken);
     return () => setTokenGetter(null);
   }, [isSignedIn, getToken]);
 

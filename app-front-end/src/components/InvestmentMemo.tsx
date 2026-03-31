@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import type { Startup } from '../types/startup';
 import { tokens } from '../design-system/tokens';
 import { chrome } from '../design-system/chrome';
-import { useFocusTrap } from '../hooks';
+import { transitionOrReduced } from '../design-system/motion';
+import { useFocusTrap, usePrefersReducedMotion } from '../hooks';
 import InvestmentMemoContent from './InvestmentMemoContent';
 
 interface InvestmentMemoProps {
@@ -17,6 +18,7 @@ interface InvestmentMemoProps {
  */
 export default function InvestmentMemo({ startup, onClose }: InvestmentMemoProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const reduceMotion = usePrefersReducedMotion();
   useFocusTrap(true, containerRef);
 
   if (!startup) return null;
@@ -26,7 +28,10 @@ export default function InvestmentMemo({ startup, onClose }: InvestmentMemoProps
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: tokens.motion.duration.medium, ease: tokens.motion.ease }}
+      transition={transitionOrReduced(reduceMotion, {
+        duration: tokens.motion.duration.medium,
+        ease: tokens.motion.ease,
+      })}
       className="fixed inset-0 z-[9999] flex items-start justify-center"
       style={{
         minHeight: '100dvh',

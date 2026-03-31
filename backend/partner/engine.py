@@ -135,6 +135,55 @@ class PartnerEngine:
                 "memo": memo,
             })
         return result
+
+    def _entry_from_startup(self, startup) -> Optional[Dict[str, Any]]:
+        if startup is None or startup.review_info is None:
+            return None
+        scout_info = startup.scout_info
+        review_info = startup.review_info
+        memo_gen = MemoGenerator()
+        try:
+            memo = memo_gen.generate_memo(startup, for_display=False)
+        except Exception as e:
+            self.logger.warning("Memo generation failed for %s: %s", startup.startup_id, e)
+            memo = ""
+        return {
+            "id": startup.startup_id,
+            "scout": {
+                "id": startup.startup_id,
+                "name": scout_info.name,
+                "one_line": scout_info.one_line,
+                "sector": scout_info.sector,
+                "problem": scout_info.problem,
+                "solution": scout_info.solution,
+                "target_users": scout_info.target_users,
+                "why_now": scout_info.why_now,
+                "confidence": scout_info.confidence_score,
+                "primary_thesis": getattr(scout_info, "primary_thesis", None),
+                "key_assumptions": getattr(scout_info, "key_assumptions", None),
+                "biggest_unknown": getattr(scout_info, "biggest_unknown", None),
+                "funding_stage": getattr(scout_info, "funding_stage", None),
+            },
+            "review": {
+                "market_score": review_info.market_score,
+                "product_score": review_info.product_score,
+                "technical_score": review_info.technical_score,
+                "execution_score": review_info.execution_score,
+                "overall_summary": review_info.overall_summary,
+                "key_risks": review_info.key_risks,
+                "verdict": review_info.verdict,
+                "assumption_feedback": getattr(review_info, "assumption_feedback", []) or [],
+                "team_analysis": getattr(review_info, "team_analysis", None) or [],
+                "competition_analysis": getattr(review_info, "competition_analysis", None) or [],
+                "business_model_analysis": getattr(review_info, "business_model_analysis", None) or [],
+                "investment_thesis": getattr(review_info, "investment_thesis", None) or [],
+                "risk_mitigation": getattr(review_info, "risk_mitigation", None) or [],
+                "score_reasoning": getattr(review_info, "score_reasoning", None) or {},
+                "reviewer_disagreement": getattr(review_info, "reviewer_disagreement", False),
+                "score_variance": getattr(review_info, "score_variance", None),
+            },
+            "memo": memo,
+        }
     
     async def run_cycle(self) -> int:
         """
@@ -249,6 +298,37 @@ class PartnerEngine:
         )
         
         return decided_count
+
+    async def run_startup(self, startup_id: str) -> bool:
+        """
+        Make a partner decision for one specific startup id.
+        Returns True when decision is saved.
+        """
+        startup = self.storage.get_startup(startup_id)
+        if startup is None:
+            self.logger.warning("Startup not found for partner decision: %s", startup_id)
+            return False
+        if startup.partner_info is not None:
+            self.logger.info("Startup already has partner decision: %s", startup_id)
+            return True
+        entry = self._entry_from_startup(startup)
+        if entry is None:
+            self.logger.info("Startup is not ready for partner decision: %s", startup_id)
+            return False
+        try:
+            decision = self.decision_engine.decide(
+                entry["scout"],
+                entry["review"],
+                context_memo=entry.get("memo", ""),
+            )
+            validate_partner_output(decision)
+            from utils.adapters import partner_output_to_partner_info
+            partner_info = partner_output_to_partner_info(decision)
+            partner_info.partner_agent_id = self.agent_id
+            return bool(self.storage.add_partner_decision(startup_id, partner_info))
+        except Exception as e:
+            self.logger.error("Error making partner decision for %s: %s", startup_id, e, exc_info=True)
+            return False
     
     async def run_forever(self):
         """
