@@ -41,7 +41,7 @@ async def test_portfolio_layer():
     print()
     
     # Initialize
-    portfolio_store = PortfolioStore(data_dir="data/portfolio_test")
+    portfolio_store = PortfolioStore(data_dir="data/portfolio_test", user_id="test_user")
     
     # Test 1: Add startup
     print("Test 1: Adding startup to portfolio store...")

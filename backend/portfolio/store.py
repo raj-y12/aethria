@@ -14,6 +14,7 @@ from uuid import uuid4
 import fcntl
 import os
 
+from tenant_context import require_user_id
 from supabase_doc_store import list_get_all, list_upsert
 from portfolio.schemas import (
     StartupRecord,
@@ -44,16 +45,18 @@ class PortfolioStore:
     - agent_metrics.json: Agent performance metrics
     """
     
-    def __init__(self, data_dir: str = "data/portfolio"):
+    def __init__(self, data_dir: str = "data/portfolio", user_id: Optional[str] = None):
         """
         Initialize portfolio store.
-        
+
         Args:
             data_dir: Directory for portfolio JSON files
+            user_id: Required when USE_SUPABASE_STORAGE is set (explicit tenant for list tables).
         """
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("portfolio.store")
+        self._tenant_user_id = user_id.strip() if user_id and user_id.strip() else None
         
         # File paths (startups only; rest in Supabase)
         self.files = {
@@ -77,7 +80,13 @@ class PortfolioStore:
         # Initialize startups file only
         if not self.files["startups"].exists():
             self._write_file(self.files["startups"], [])
-    
+
+    def _using_supabase_lists(self) -> bool:
+        return os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+
+    def _supabase_uid(self) -> str:
+        return require_user_id(self._tenant_user_id, context="PortfolioStore")
+
     def _file_key_for_path(self, file_path: Path) -> Optional[str]:
         for k, p in self.files.items():
             if p == file_path:
@@ -88,8 +97,8 @@ class PortfolioStore:
         """Read from Supabase or JSON file."""
         file_key = self._file_key_for_path(file_path)
         table = self._supabase_tables.get(file_key) if file_key else None
-        if table:
-            return list_get_all(table)
+        if table and self._using_supabase_lists():
+            return list_get_all(table, user_id=self._supabase_uid())
         max_retries = 5
         for attempt in range(max_retries):
             try:
@@ -150,8 +159,9 @@ class PortfolioStore:
         record["id"] = record_id
 
         table = self._supabase_tables.get(file_key)
-        if table:
-            records = list_get_all(table)
+        if table and self._using_supabase_lists():
+            uid = self._supabase_uid()
+            records = list_get_all(table, user_id=uid)
             existing = next((r for r in records if r.get("id") == record_id), None)
             if existing is not None:
                 record["version"] = existing.get("version", 0) + 1
@@ -159,7 +169,7 @@ class PortfolioStore:
             else:
                 record["version"] = 1
                 self.logger.info(f"Added new {file_key} record {record_id}")
-            list_upsert(table, record)
+            list_upsert(table, record, user_id=uid)
             return record_id
 
         file_path = self.files[file_key]
@@ -330,8 +340,12 @@ class PortfolioStore:
                 next_check = datetime.now() + timedelta(days=interval)
                 record["next_check_at"] = next_check.isoformat()
                 record["version"] = record.get("version", 1) + 1
-                if self._supabase_tables.get("watchlist"):
-                    list_upsert(self._supabase_tables["watchlist"], record)
+                if self._using_supabase_lists() and self._supabase_tables.get("watchlist"):
+                    list_upsert(
+                        self._supabase_tables["watchlist"],
+                        record,
+                        user_id=self._supabase_uid(),
+                    )
                 else:
                     records[i] = record
                     self._write_file(self.files["watchlist"], records)

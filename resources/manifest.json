@@ -1,56 +1,63 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "1",
-  "updated": "2026-01-25",
+  "updated": "2026-04-02",
   "resources": [
     {
       "name": "scout_output_v1",
       "version": "1",
       "type": "schema",
-      "path": "schemas/scout_output_v1.json",
+      "path": "contracts/schemas/scout_output_v1.json",
       "description": "JSON Schema for Scout agent discovery output. Defines required fields and enums for aggregation."
     },
     {
       "name": "reviewer_output_v1",
       "version": "1",
       "type": "schema",
-      "path": "schemas/reviewer_output_v1.json",
+      "path": "contracts/schemas/reviewer_output_v1.json",
       "description": "JSON Schema for Reviewer agent evaluation output. Defines scores, verdict, and red flags."
     },
     {
       "name": "partner_vote_v1",
       "version": "1",
       "type": "schema",
-      "path": "schemas/partner_vote_v1.json",
+      "path": "contracts/schemas/partner_vote_v1.json",
       "description": "JSON Schema for Partner agent decision output. Defines decision, rationale, and next action."
     },
     {
       "name": "startup_summary_v1",
       "version": "1",
       "type": "schema",
-      "path": "schemas/startup_summary_v1.json",
+      "path": "contracts/schemas/startup_summary_v1.json",
       "description": "JSON Schema for aggregated startup record. Combines scout, review, partner, and financials."
     },
     {
       "name": "investment_memo_v1",
       "version": "1",
       "type": "memo",
-      "path": "memos/investment_memo_v1.json",
+      "path": "contracts/memos/investment_memo_v1.json",
       "description": "Canonical investment memo format. Ordered sections, length constraints, analyst tone."
     },
     {
       "name": "evaluation_rubric_v1",
       "version": "1.1",
       "type": "rubric",
-      "path": "rubrics/evaluation_rubric_v1.json",
+      "path": "config/evaluation_rubric/v1.json",
       "description": "Aethria Investment Evaluation Rubric. Score bands, dimensions (question/criteria), verdict logic, red flags."
     },
     {
       "name": "analyst_style_v1",
       "version": "1",
       "type": "style",
-      "path": "style/analyst_style_v1.json",
+      "path": "contracts/style/analyst_style_v1.json",
       "description": "Writing tone and language constraints for all agent outputs. No hype, no buzzwords."
+    },
+    {
+      "name": "fund_thesis_v1",
+      "version": "1",
+      "type": "schema",
+      "path": "contracts/fund_thesis_v1.json",
+      "description": "JSON Schema for structured resource fund thesis lens (prompts + alignment hints)."
     }
   ],
   "defaults": {

@@ -12,7 +12,7 @@ The **verdict** is one of `STRONG`, `MEDIUM`, or `WEAK`. It is **produced by the
 
 - The **Reviewer** (`backend/reviewer/base.py`) is an LLM-based agent. For each startup it:
   - Receives Scout output (company name, one-line, sector, problem, solution, target users, why now, confidence, and optional hypothesis fields: `primary_thesis`, `key_assumptions`, `biggest_unknown`).
-  - Is given a system prompt built from **reviewer rules** and the **evaluation rubric** (`resources/reviewer_rules.json`, `resources/rubrics/evaluation_rubric_v1.json`).
+  - Is given a system prompt built from **reviewer rules** and the **evaluation rubric** (versioned under `resources/config/` via `active.json`: `reviewer_rules/v1.json`, `evaluation_rubric/v1.json`).
   - Is asked to output strict JSON that includes the five dimension scores (see below) **and** `verdict`.
 
 So the **verdict is chosen by the model** in one shot, guided by the rubric’s thresholds and the same criteria used for the scores.
@@ -41,7 +41,7 @@ The Reviewer’s JSON is validated by `validate_reviewer_output()` in `backend/r
 
 ## 2. Reviewer Scoring Metrics (Dimensions)
 
-The Reviewer scores each startup on **five dimensions**, each from **1 to 10**. Definitions come from `resources/rubrics/evaluation_rubric_v1.json`.
+The Reviewer scores each startup on **five dimensions**, each from **1 to 10**. Definitions come from the versioned evaluation rubric (`resources/config/evaluation_rubric/v1.json` via `active.json`).
 
 ### Required dimensions (always in Reviewer output)
 
@@ -99,7 +99,7 @@ When Scout output includes `primary_thesis`, `key_assumptions`, and `biggest_unk
 
 ## 3. How the Partner Investment Decision Is Made
 
-The **Partner** (`backend/partner/decision.py`) does **not** use an LLM by default. It takes the **Reviewer’s verdict and scores** (and other outputs) and applies **rule-based logic** from `resources/partner_rules.json` to produce a **decision**: `YES`, `MAYBE`, or `NO`.
+The **Partner** (`backend/partner/decision.py`) does **not** use an LLM by default. It takes the **Reviewer’s verdict and scores** (and other outputs) and applies **rule-based logic** from versioned partner rules (`resources/config/partner_rules/v1.json` via `active.json`) to produce a **decision**: `YES`, `MAYBE`, or `NO`.
 
 ### Inputs used
 
@@ -160,7 +160,7 @@ The **Investment Memo** is not a “decision” in the sense of YES/NO. It is a 
 ### Where it’s produced
 
 - **Generator**: `backend/memo_generator.py` — class `MemoGenerator`, method `generate_memo(startup: Startup)`.
-- **Format spec**: `resources/memos/investment_memo_v1.json` defines sections, order, tone (“analyst”), and that missing data should be marked (e.g. `[MISSING]`).
+- **Format spec**: `resources/contracts/memos/investment_memo_v1.json` defines sections, order, tone (“analyst”), and that missing data should be marked (e.g. `[MISSING]`).
 
 ### What “decides” the memo content
 
@@ -204,10 +204,10 @@ So the memo **reflects** the Reviewer’s verdict and scores and the Partner’s
 
 ## 6. Resource Files Reference
 
-- **Reviewer rubric (dimensions + verdict thresholds + red flags)**: `resources/rubrics/evaluation_rubric_v1.json`
-- **Reviewer rules (red-flag labels, verdict thresholds, hypothesis guidance)**: `resources/reviewer_rules.json`
-- **Partner rules (verdict mapping, score thresholds, risks, LLM triggers)**: `resources/partner_rules.json`
-- **Memo format (sections, tone)**: `resources/memos/investment_memo_v1.json`
+- **Reviewer rubric (dimensions + verdict thresholds + red flags)**: `resources/config/evaluation_rubric/v1.json` (via `active.json`)
+- **Reviewer rules (red-flag labels, verdict thresholds, hypothesis guidance)**: `resources/config/reviewer_rules/v1.json` (via `active.json`)
+- **Partner rules (verdict mapping, score thresholds, risks, LLM triggers)**: `resources/config/partner_rules/v1.json` (via `active.json`)
+- **Memo format (sections, tone)**: `resources/contracts/memos/investment_memo_v1.json`
 - **Reviewer output schema**: `backend/reviewer/schema.py` (`ReviewerOutput`, `validate_reviewer_output`)
 - **Reviewer prompt construction**: `backend/reviewer/base.py` (`_build_system_prompt`, `_call_llm_sync`)
 - **Partner decision logic**: `backend/partner/decision.py` (`PartnerDecisionEngine.decide`)

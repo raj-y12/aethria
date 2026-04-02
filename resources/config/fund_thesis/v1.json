@@ -1,0 +1,34 @@
+{
+  "version": "v1",
+  "name": "Default Aethria lens",
+  "description": "Structured investment lens for alignment hints and prompts. Does not replace Supabase fund thesis mandate.",
+  "investment_focus": [
+    "B2B SaaS",
+    "infrastructure",
+    "developer tools",
+    "capital-efficient growth"
+  ],
+  "exclusion_criteria": [
+    "consumer social",
+    "speculative crypto",
+    "low defensibility"
+  ],
+  "stage_preference": ["Seed", "Series A", "Pre-Seed"],
+  "geography": ["US", "Europe"],
+  "check_size_range": "Seed–Series A typical",
+  "risk_tolerance": "medium",
+  "sectors_weighting": {
+    "B2B SaaS": 1.2,
+    "Infrastructure": 1.1,
+    "Developer Tools": 1.15
+  },
+  "signals_of_interest": [
+    "technical founders",
+    "clear ICP",
+    "repeatable GTM"
+  ],
+  "signals_of_avoidance": [
+    "regulatory red flags",
+    "unclear monetization"
+  ]
+}

@@ -33,11 +33,11 @@ Return ONLY a JSON object with two fields:
 }"""
 
 
-def _read_json_list(path: Path) -> list:
+def _read_json_list(path: Path, user_id: str) -> list:
     if path and "meta_reports" in str(path):
-        return list_get_all(_META_REPORTS_TABLE)
+        return list_get_all(_META_REPORTS_TABLE, user_id=user_id)
     if path and "mutation_log" in str(path):
-        return list_get_all(_MUTATION_LOG_TABLE)
+        return list_get_all(_MUTATION_LOG_TABLE, user_id=user_id)
     if not path.exists():
         return []
     try:
@@ -52,9 +52,9 @@ def _read_json_list(path: Path) -> list:
         return []
 
 
-def _read_json_dict(path: Path) -> dict:
+def _read_json_dict(path: Path, user_id: str) -> dict:
     if path and "prompt_library" in str(path):
-        data = doc_get(_PROMPT_LIBRARY_TABLE)
+        data = doc_get(_PROMPT_LIBRARY_TABLE, user_id=user_id)
         return data if isinstance(data, dict) else {}
     if not path.exists():
         return {}
@@ -70,9 +70,9 @@ def _read_json_dict(path: Path) -> dict:
         return {}
 
 
-def _atomic_write(path: Path, data: Any) -> None:
+def _atomic_write(path: Path, data: Any, user_id: str) -> None:
     if path and "prompt_library" in str(path):
-        doc_set(_PROMPT_LIBRARY_TABLE, data)
+        doc_set(_PROMPT_LIBRARY_TABLE, data, user_id=user_id)
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(".tmp")
@@ -83,25 +83,26 @@ def _atomic_write(path: Path, data: Any) -> None:
     temp.replace(path)
 
 
-def _append_to_json_list(path: Path, entry: dict) -> None:
+def _append_to_json_list(path: Path, entry: dict, user_id: str) -> None:
     if path and "mutation_log" in str(path):
-        list_append_only(_MUTATION_LOG_TABLE, entry)
+        list_append_only(_MUTATION_LOG_TABLE, entry, user_id=user_id)
         return
     if path and "meta_reports" in str(path):
-        list_append_only(_META_REPORTS_TABLE, entry)
+        list_append_only(_META_REPORTS_TABLE, entry, user_id=user_id)
         return
     path.parent.mkdir(parents=True, exist_ok=True)
-    entries = _read_json_list(path)
+    entries = _read_json_list(path, user_id)
     entries.append(entry)
-    _atomic_write(path, entries)
+    _atomic_write(path, entries, user_id)
 
 
 class PromptMutator:
     """Decides which prompts to mutate and rewrites them via OpenAI."""
 
-    def __init__(self, signal_summary: Dict[str, Any], cycle_number: int):
+    def __init__(self, signal_summary: Dict[str, Any], cycle_number: int, user_id: str):
         self.signal = signal_summary
         self.cycle_number = cycle_number
+        self.user_id = user_id
         self.logger = logging.getLogger("meta.mutator")
         self.model = os.getenv("META_AGENT_MODEL", "gpt-5-nano")
         self.api_key = os.getenv("OPENAI_API_KEY", "")
@@ -242,10 +243,10 @@ class PromptMutator:
             "applied_at": now,
             "cycle_number": self.cycle_number,
         }
-        _append_to_json_list(_MUTATION_LOG_PATH, mutation)
+        _append_to_json_list(_MUTATION_LOG_PATH, mutation, self.user_id)
 
         # Write to prompt library
-        library = _read_json_dict(_PROMPT_LIBRARY_PATH)
+        library = _read_json_dict(_PROMPT_LIBRARY_PATH, self.user_id)
         library[f"{agent_name}:{new_hash}"] = {
             "prompt": new_prompt,
             "created_at": now,
@@ -253,7 +254,7 @@ class PromptMutator:
             "cycle_number": self.cycle_number,
             "previous_hash": prev_hash,
         }
-        _atomic_write(_PROMPT_LIBRARY_PATH, library)
+        _atomic_write(_PROMPT_LIBRARY_PATH, library, self.user_id)
 
         # Apply to live agent
         self._set_agent_prompt(agent_name, new_prompt, scout_engine, reviewer_engine)

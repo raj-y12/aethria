@@ -34,6 +34,8 @@ class ScoutInfo(BaseModel):
     lookup_input_type: Optional[str] = None
     lookup_query: Optional[str] = None
     lookup_website: Optional[str] = None
+    # Stable id for on-demand lookups: same value from POST /api/startups/lookup → scout row → UI pending match.
+    lookup_id: Optional[str] = None
     discovered_at: datetime = Field(default_factory=datetime.now)
     # Hash of the system prompt used by the Scout when this discovery was created.
     prompt_version: Optional[str] = None
@@ -91,6 +93,15 @@ class ReviewInfo(BaseModel):
     consensus_verdict: Optional[Literal["STRONG", "MEDIUM", "WEAK"]] = None
     reviewer_disagreement: Optional[bool] = None
     score_variance: Optional[Dict[str, float]] = None
+    # Fund thesis alignment (Reviewer consensus row; set when pipeline runs with active thesis)
+    fund_thesis_version_id: Optional[str] = None
+    thesis_alignment_score: Optional[float] = None  # 0–1
+    thesis_matches_fund: Optional[bool] = None
+    thesis_fit_points: Optional[List[str]] = None
+    thesis_deviation_points: Optional[List[str]] = None
+    thesis_alignment_confidence: Optional[float] = None  # 0–1
+    # Resource-backed thesis lens alignment (non-blocking; does not drive rubric scores)
+    fund_thesis_alignment_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
 
 class PartnerInfo(BaseModel):
@@ -139,6 +150,9 @@ class Startup(BaseModel):
     
     # Stage 3: Partner decision (optional)
     partner_info: Optional[PartnerInfo] = None
+
+    # Persisted display memo (Supabase); set only after partner + full markdown write
+    investment_memo_markdown: Optional[str] = None
     
     # Financials (can be populated at any stage)
     financials: Financials = Field(default_factory=Financials)

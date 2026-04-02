@@ -62,6 +62,7 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
         lookup_input_type=scout_output.get("lookup_input_type"),
         lookup_query=scout_output.get("lookup_query"),
         lookup_website=scout_output.get("lookup_website"),
+        lookup_id=scout_output.get("lookup_id"),
         discovered_at=discovered,
         prompt_version=scout_output.get("prompt_version"),
     )
@@ -102,6 +103,13 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
         risk_mitigation=reviewer_output.get("risk_mitigation") or None,
         score_reasoning=reviewer_output.get("score_reasoning") or None,
         prompt_version=reviewer_output.get("prompt_version"),
+        fund_thesis_version_id=reviewer_output.get("fund_thesis_version_id"),
+        thesis_alignment_score=reviewer_output.get("thesis_alignment_score"),
+        thesis_matches_fund=reviewer_output.get("thesis_matches_fund"),
+        thesis_fit_points=reviewer_output.get("thesis_fit_points") or None,
+        thesis_deviation_points=reviewer_output.get("thesis_deviation_points") or None,
+        thesis_alignment_confidence=reviewer_output.get("thesis_alignment_confidence"),
+        fund_thesis_alignment_score=reviewer_output.get("fund_thesis_alignment_score"),
     )
 
 

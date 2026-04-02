@@ -1,25 +1,21 @@
 """
 Thin SERP API client for Scouts.
 
-Design:
-- Uses SERP_API_KEY from environment.
-- Rate-limited via a simple per-day budget stored in data/serp_usage.json.
-- Intended for *light* enrichment only (e.g. adding 1–3 verified URLs as references),
-  not for every Scout call; default budget is very low to respect a 250/month quota.
+Rate-limited via per-day budget stored in Supabase serp_usage (explicit user_id).
 """
-
 from __future__ import annotations
 
+import json
 import logging
 import os
 import ssl
 import time
-from pathlib import Path
 from typing import Any, Dict, List
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
 import certifi
+from tenant_context import require_user_id
 from utils.settings_loader import get_scout_region, is_scout_serp_enabled, get_scout_serp_daily_budget
 from supabase_doc_store import doc_get, doc_set
 
@@ -28,70 +24,54 @@ logger = logging.getLogger("serp")
 _SERP_TABLE = "serp_usage"
 
 
-def _load_usage() -> List[float]:
-    data = doc_get(_SERP_TABLE)
+def _load_usage(user_id: str) -> List[float]:
+    uid = require_user_id(user_id, context="serp_usage")
+    data = doc_get(_SERP_TABLE, user_id=uid)
     if isinstance(data, list):
         return [float(x) for x in data]
     return []
 
 
-def _save_usage(timestamps: List[float]) -> None:
-    doc_set(_SERP_TABLE, timestamps)
+def _save_usage(timestamps: List[float], user_id: str) -> None:
+    uid = require_user_id(user_id, context="serp_usage")
+    doc_set(_SERP_TABLE, timestamps, user_id=uid)
 
 
-def _within_daily_budget(now: float) -> bool:
-    """Return True if we are still under today's SERP budget."""
-    if not is_scout_serp_enabled():
+def _within_daily_budget(now: float, user_id: str) -> bool:
+    if not is_scout_serp_enabled(user_id):
         return False
-    budget = get_scout_serp_daily_budget()
+    budget = get_scout_serp_daily_budget(user_id)
     if budget <= 0:
         return False
     day_seconds = 24 * 60 * 60
-    usage = _load_usage()
-    # Keep only last 24h
+    usage = _load_usage(user_id)
     recent = [t for t in usage if now - t <= day_seconds]
     if len(recent) >= budget:
         return False
     return True
 
 
-def _record_usage(now: float) -> None:
-    usage = _load_usage()
+def _record_usage(now: float, user_id: str) -> None:
+    usage = _load_usage(user_id)
     usage.append(now)
-    # Keep only last 30 days to bound file size
     month_seconds = 30 * 24 * 60 * 60
     recent = [t for t in usage if now - t <= month_seconds]
-    _save_usage(recent)
+    _save_usage(recent, user_id)
 
 
-def _region_to_location(region: str) -> str:
-    """Map internal scout_region to a SERP location string."""
-    if region == "europe":
-        return "Europe"
-    return "World"
-
-
-def _serp_search(query: str, region: str, num_results: int = 3) -> List[Dict[str, Any]]:
-    """
-    Call SERP API (Google search engine) and return a small list of organic results.
-    Obeys simple per-day budget and silently fails closed on errors.
-    """
+def _serp_search(query: str, region: str, user_id: str, num_results: int = 3) -> List[Dict[str, Any]]:
     api_key = os.getenv("SERP_API_KEY")
     if not api_key:
         return []
 
     now = time.time()
-    if not _within_daily_budget(now):
+    if not _within_daily_budget(now, user_id):
         logger.info("SERP budget exhausted or disabled; skipping search")
         return []
 
-    # Use Google Light engine per SerpApi docs:
-    # https://serpapi.com/google-light-api
-    # We avoid the fragile `location` parameter (which often 400s) and instead
-    # bias via `gl` + `google_domain`.
     if region == "europe":
         google_domain = "google.co.uk"
-        gl = "uk"  # SerpApi example; approximates Europe focus
+        gl = "uk"
     else:
         google_domain = "google.com"
         gl = "us"
@@ -108,7 +88,6 @@ def _serp_search(query: str, region: str, num_results: int = 3) -> List[Dict[str
     }
     url = "https://serpapi.com/search.json?" + urlencode(params)
 
-    # Use certifi CA bundle so SSL verification works on macOS (avoids CERTIFICATE_VERIFY_FAILED)
     ssl_ctx = ssl.create_default_context(cafile=certifi.where())
 
     try:
@@ -116,7 +95,7 @@ def _serp_search(query: str, region: str, num_results: int = 3) -> List[Dict[str
             payload = resp.read()
         data = json.loads(payload.decode("utf-8"))
         organic = data.get("organic_results") or []
-        _record_usage(now)
+        _record_usage(now, user_id)
         out: List[Dict[str, Any]] = []
         for item in organic[:num_results]:
             if not isinstance(item, dict):
@@ -128,26 +107,23 @@ def _serp_search(query: str, region: str, num_results: int = 3) -> List[Dict[str
             out.append({"title": title, "link": link})
         return out
     except Exception as e:
-        logger.warning(f"SERP search failed: {e}")
+        logger.warning("SERP search failed: %s", e)
         return []
 
 
-def maybe_enrich_references(output: Dict[str, Any]) -> Dict[str, Any]:
+def maybe_enrich_references(output: Dict[str, Any], user_id: str) -> Dict[str, Any]:
     """
-    Optionally enrich ScoutOutput.references with a few SERP URLs.
-
-    - Only runs if SERP is enabled in settings.
-    - Respects per-day budget.
-    - Never overwrites existing references; only appends new links.
+    Optionally enrich ScoutOutput.references with a few SERP URLs (tenant-scoped budget).
     """
-    if not is_scout_serp_enabled():
+    require_user_id(user_id, context="maybe_enrich_references")
+    if not is_scout_serp_enabled(user_id):
         return output
 
     name = (output.get("name") or "").strip()
     if not name:
         return output
 
-    region = get_scout_region()
+    region = get_scout_region(user_id)
     sector = (output.get("sector") or "").strip()
     query_parts = [name, "startup"]
     if sector:
@@ -156,7 +132,7 @@ def maybe_enrich_references(output: Dict[str, Any]) -> Dict[str, Any]:
         query_parts.append("Europe")
     query = " ".join(query_parts)
 
-    results = _serp_search(query=query, region=region, num_results=3)
+    results = _serp_search(query=query, region=region, user_id=user_id, num_results=3)
     if not results:
         return output
 
@@ -177,4 +153,3 @@ def maybe_enrich_references(output: Dict[str, Any]) -> Dict[str, Any]:
 
     output["references"] = refs
     return output
-

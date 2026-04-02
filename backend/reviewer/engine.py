@@ -5,12 +5,15 @@ Runs continuously, processing unreviewed Scout discoveries.
 import asyncio
 import logging
 import os
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from reviewer.reviewer import DefaultReviewer
 from reviewer.skeptical import SkepticalReviewer
 from reviewer.opportunist import OpportunistReviewer
+from tenant_context import require_user_id
+from fund_thesis import rule_based_thesis_alignment, thesis_context_has_embeddings
+from pipeline_state import upsert_pipeline_state
 from utils.storage import Storage
 from utils.settings_loader import is_reviewers_enabled, load_settings
 
@@ -39,19 +42,19 @@ class ReviewerEngine:
         batch_size: int = 1,  # Process one at a time for now
         cost_controller=None,
         deal_memory=None,
+        tenant_user_id: str = "",
+        active_thesis: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the Reviewer engine.
-        
+
         Args:
-            api_key: OpenAI API key
-            storage: Storage instance to read/write
-            interval_seconds: Time between review cycles
-            model: OpenAI model to use (default: gpt-5-nano)
-            batch_size: Number of entries to process per cycle
-            cost_controller: Optional CostController instance for budget enforcement
-            deal_memory: Optional DealMemory instance for cross-agent learning
+            tenant_user_id: Explicit Clerk user id for settings and calibration.
         """
+        inferred = (tenant_user_id or "").strip()
+        if not inferred:
+            inferred = (getattr(storage, "_user_id", None) or "").strip()
+        self.tenant_user_id = require_user_id(inferred, context="ReviewerEngine")
         self.api_key = api_key
         self.storage = storage
         self.interval_seconds = interval_seconds
@@ -60,6 +63,7 @@ class ReviewerEngine:
         self.agent_id = "reviewer_v1"  # Default agent ID
         self.cost_controller = cost_controller
         self.deal_memory = deal_memory
+        self.active_thesis: Optional[Dict[str, Any]] = active_thesis
         self.backpressure_threshold = int(
             os.getenv("REVIEWER_BACKPRESSURE_THRESHOLD", "10")
         )
@@ -74,6 +78,16 @@ class ReviewerEngine:
         
         self.logger = logging.getLogger("reviewer.engine")
         self.running = False
+
+    def set_active_thesis(self, thesis: Optional[Dict[str, Any]]) -> None:
+        self.active_thesis = thesis
+        self._sync_thesis_to_reviewers()
+
+    def _sync_thesis_to_reviewers(self) -> None:
+        t = self.active_thesis
+        self.reviewer.set_fund_thesis(t)
+        self.skeptical_reviewer.set_fund_thesis(t)
+        self.opportunist_reviewer.set_fund_thesis(t)
     
     def _compute_consensus(self, results: list) -> dict:
         """
@@ -100,7 +114,54 @@ class ReviewerEngine:
             "score_variance": score_variance,
         }
 
-    async def run_cycle(self) -> int:
+    @staticmethod
+    def _mean_round_score(values: list) -> int:
+        nums = [int(v) for v in values if isinstance(v, (int, float))]
+        if not nums:
+            return 5
+        return int(round(sum(nums) / len(nums)))
+
+    def _blend_numeric_scores_into_primary(self, primary: dict, all_results: list) -> None:
+        """Deterministic dimension scores: integer mean across successful reviewers."""
+        dims = ["market_score", "product_score", "technical_score", "execution_score"]
+        for d in dims:
+            primary[d] = self._mean_round_score([r.get(d) for r in all_results])
+        defs = [r.get("defensibility_score") for r in all_results if r.get("defensibility_score") is not None]
+        if defs:
+            primary["defensibility_score"] = self._mean_round_score(defs)
+
+    def _apply_rule_based_thesis_alignment(self, review_output: dict, scout_output: dict) -> None:
+        """When thesis has no embeddings, set alignment from deterministic rules (no extra API calls)."""
+        t = self.active_thesis
+        if not t or not t.get("version_id"):
+            return
+        if thesis_context_has_embeddings(t):
+            return
+        pj = t.get("parsed_json") if isinstance(t.get("parsed_json"), dict) else {}
+        review_output.update(rule_based_thesis_alignment(scout_output, pj))
+
+    def _apply_resource_fund_thesis_alignment(
+        self,
+        review_output: dict,
+        scout_output: dict,
+        startup_id: str,
+    ) -> None:
+        """Non-blocking resource thesis lens score; stored only; does not change rubric scores."""
+        try:
+            from core.fund_thesis_resolver import compute_and_log_alignment
+
+            emb_opt = None
+            ctx = self.active_thesis
+            if ctx and thesis_context_has_embeddings(ctx):
+                te = ctx.get("embedding")
+                if isinstance(te, list) and te:
+                    emb_opt = (None, te)
+            score = compute_and_log_alignment(startup_id, scout_output, emb_opt)
+            review_output["fund_thesis_alignment_score"] = round(float(score), 4)
+        except Exception as e:
+            self.logger.debug("resource fund thesis alignment skipped: %s", e)
+
+    async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> int:
         """
         Run one review cycle.
         Processes up to batch_size unreviewed entries.
@@ -110,7 +171,8 @@ class ReviewerEngine:
             Number of entries reviewed in this cycle
         """
         self.logger.info(f"Starting review cycle at {datetime.now().isoformat()}")
-        
+        self._sync_thesis_to_reviewers()
+
         # Check budget before reviewing
         if self.cost_controller:
             allowed, reason = self.cost_controller.check_budget("reviewer", "reviewer_engine")
@@ -142,13 +204,13 @@ class ReviewerEngine:
         self.logger.info(f"Found {len(unreviewed_startups)} unreviewed entries")
         
         # Load confidence threshold from settings
-        settings = load_settings()
+        settings = load_settings(self.tenant_user_id)
         confidence_threshold = settings.get("agent_config", {}).get("confidence_threshold", 0.5)
-        
+
         # Apply calibration override if present
         try:
             from meta.calibrator import load_calibration_state
-            cal_state = load_calibration_state()
+            cal_state = load_calibration_state(self.tenant_user_id)
             ct_override = cal_state.get("confidence_threshold_override")
             if ct_override is not None:
                 confidence_threshold = ct_override
@@ -219,20 +281,45 @@ class ReviewerEngine:
                 
                 if not successful_results:
                     self.logger.warning(f"All reviewers failed for entry {entry_id}")
+                    pr = (pipeline_run_id or "").strip() or None
+                    client = getattr(self.storage, "_client", None)
+                    uid = getattr(self.storage, "_user_id", None)
+                    if pr and client and uid:
+                        upsert_pipeline_state(
+                            client,
+                            user_id=uid,
+                            startup_id=entry_id,
+                            pipeline_run_id=pr,
+                            status="failed",
+                            error="all reviewers failed",
+                        )
                     continue
                 
-                # Use the default reviewer's output as primary (backward compat)
-                default_results = [r for r in successful_results if r.get("reviewer_type") == "default"]
+                # Primary narrative/summary: DefaultReviewer (types are set to class names above)
+                default_results = [
+                    r for r in successful_results if r.get("reviewer_type") == "DefaultReviewer"
+                ]
                 if default_results:
-                    review_output = default_results[0]
+                    review_output = dict(default_results[0])
                 else:
-                    review_output = successful_results[0]
-                
-                # Record token usage if cost controller exists
+                    review_output = dict(successful_results[0])
+
+                self._blend_numeric_scores_into_primary(review_output, successful_results)
+                if self.active_thesis and self.active_thesis.get("version_id"):
+                    review_output["fund_thesis_version_id"] = self.active_thesis["version_id"]
+                self._apply_rule_based_thesis_alignment(review_output, scout_output)
+                self._apply_resource_fund_thesis_alignment(
+                    review_output, scout_output, entry_id
+                )
+
+                # Record token usage if cost controller exists (sum all persona calls)
                 if self.cost_controller:
-                    self.cost_controller.record_usage(
-                        "reviewer", self.agent_id, self.reviewer._last_token_usage
+                    total_tok = (
+                        int(getattr(self.reviewer, "_last_token_usage", 0) or 0)
+                        + int(getattr(self.skeptical_reviewer, "_last_token_usage", 0) or 0)
+                        + int(getattr(self.opportunist_reviewer, "_last_token_usage", 0) or 0)
                     )
+                    self.cost_controller.record_usage("reviewer", self.agent_id, total_tok)
                 
                 # Compute consensus across all successful results
                 consensus = self._compute_consensus(successful_results)
@@ -246,8 +333,14 @@ class ReviewerEngine:
                     "opportunist": "OpportunistReviewer",
                 }
                 for r in successful_results:
-                    raw_type = r.get("reviewer_type", "default")
-                    reviewer_label = type_map.get(raw_type, "DefaultReviewer")
+                    raw_type = r.get("reviewer_type", "DefaultReviewer")
+                    reviewer_label = type_map.get(raw_type, raw_type)
+                    if reviewer_label not in (
+                        "DefaultReviewer",
+                        "SkepticalReviewer",
+                        "OpportunistReviewer",
+                    ):
+                        reviewer_label = "DefaultReviewer"
                     single_reviews.append(SingleReview(
                         reviewer_type=reviewer_label,
                         market_score=r.get("market_score", 5),
@@ -278,7 +371,9 @@ class ReviewerEngine:
                 review_info.reviewer_disagreement = consensus["reviewer_disagreement"]
                 review_info.score_variance = consensus["score_variance"]
                 
-                success = self.storage.add_review(entry_id, review_info)
+                success = self.storage.add_review(
+                    entry_id, review_info, pipeline_run_id=pipeline_run_id
+                )
                 
                 if success:
                     reviewed_count += 1
@@ -335,7 +430,13 @@ class ReviewerEngine:
         
         return reviewed_count
 
-    async def run_startup(self, startup_id: str, ignore_confidence_threshold: bool = False) -> bool:
+    async def run_startup(
+        self,
+        startup_id: str,
+        ignore_confidence_threshold: bool = False,
+        pipeline_run_id: Optional[str] = None,
+        force_rerun: bool = False,
+    ) -> bool:
         """
         Review one specific startup id.
         Returns True when a review is saved.
@@ -344,20 +445,22 @@ class ReviewerEngine:
         if startup is None:
             self.logger.warning("Startup not found for review: %s", startup_id)
             return False
-        if startup.review_info is not None:
+        if startup.review_info is not None and not force_rerun:
             self.logger.info("Startup already reviewed: %s", startup_id)
             return True
 
-        settings = load_settings()
+        settings = load_settings(self.tenant_user_id)
         confidence_threshold = settings.get("agent_config", {}).get("confidence_threshold", 0.5)
         try:
             from meta.calibrator import load_calibration_state
-            cal_state = load_calibration_state()
+            cal_state = load_calibration_state(self.tenant_user_id)
             ct_override = cal_state.get("confidence_threshold_override")
             if ct_override is not None:
                 confidence_threshold = ct_override
         except ImportError:
             pass
+
+        self._sync_thesis_to_reviewers()
 
         confidence_score = startup.scout_info.confidence_score
         if not ignore_confidence_threshold and confidence_score < confidence_threshold:
@@ -404,8 +507,20 @@ class ReviewerEngine:
                 self.logger.warning("All reviewers failed for startup %s", startup_id)
                 return False
 
-            default_results = [r for r in successful_results if r.get("reviewer_type") == "default"]
-            review_output = default_results[0] if default_results else successful_results[0]
+            default_results = [
+                r for r in successful_results if r.get("reviewer_type") == "DefaultReviewer"
+            ]
+            if default_results:
+                review_output = dict(default_results[0])
+            else:
+                review_output = dict(successful_results[0])
+            self._blend_numeric_scores_into_primary(review_output, successful_results)
+            if self.active_thesis and self.active_thesis.get("version_id"):
+                review_output["fund_thesis_version_id"] = self.active_thesis["version_id"]
+            self._apply_rule_based_thesis_alignment(review_output, scout_output)
+            self._apply_resource_fund_thesis_alignment(
+                review_output, scout_output, startup_id
+            )
             consensus = self._compute_consensus(successful_results)
 
             from models import SingleReview
@@ -417,8 +532,14 @@ class ReviewerEngine:
                 "opportunist": "OpportunistReviewer",
             }
             for r in successful_results:
-                raw_type = r.get("reviewer_type", "default")
-                reviewer_label = type_map.get(raw_type, "DefaultReviewer")
+                raw_type = r.get("reviewer_type", "DefaultReviewer")
+                reviewer_label = type_map.get(raw_type, raw_type)
+                if reviewer_label not in (
+                    "DefaultReviewer",
+                    "SkepticalReviewer",
+                    "OpportunistReviewer",
+                ):
+                    reviewer_label = "DefaultReviewer"
                 single_reviews.append(SingleReview(
                     reviewer_type=reviewer_label,
                     market_score=r.get("market_score", 5),
@@ -446,7 +567,18 @@ class ReviewerEngine:
             review_info.consensus_verdict = consensus["consensus_verdict"]
             review_info.reviewer_disagreement = consensus["reviewer_disagreement"]
             review_info.score_variance = consensus["score_variance"]
-            return bool(self.storage.add_review(startup_id, review_info))
+            if self.cost_controller:
+                total_tok = (
+                    int(getattr(self.reviewer, "_last_token_usage", 0) or 0)
+                    + int(getattr(self.skeptical_reviewer, "_last_token_usage", 0) or 0)
+                    + int(getattr(self.opportunist_reviewer, "_last_token_usage", 0) or 0)
+                )
+                self.cost_controller.record_usage("reviewer", self.agent_id, total_tok)
+            return bool(
+                self.storage.add_review(
+                    startup_id, review_info, pipeline_run_id=pipeline_run_id
+                )
+            )
         except Exception as e:
             self.logger.error("Error reviewing startup %s: %s", startup_id, e, exc_info=True)
             return False
@@ -466,7 +598,7 @@ class ReviewerEngine:
         
         while self.running:
             try:
-                if not is_reviewers_enabled():
+                if not is_reviewers_enabled(self.tenant_user_id):
                     self.logger.info("Reviewers disabled in settings, skipping cycle")
                     if self.running:
                         await asyncio.sleep(self.interval_seconds)
@@ -485,8 +617,9 @@ class ReviewerEngine:
 
                 cycle_count += 1
                 self.logger.info(f"=== Review Cycle #{cycle_count} ===")
-                
-                reviewed = await self.run_cycle()
+                from uuid import uuid4
+
+                reviewed = await self.run_cycle(pipeline_run_id=str(uuid4()))
                 
                 if reviewed > 0:
                     self.logger.info(f"Reviewed {reviewed} entries in this cycle")

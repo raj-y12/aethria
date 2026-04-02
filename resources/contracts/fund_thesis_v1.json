@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aethria/resources/contracts/fund_thesis_v1.json",
+  "title": "FundThesisDocument",
+  "description": "Structured investment lens for policy / alignment (not DB-backed active thesis).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "version": { "type": "string" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "investment_focus": { "type": "array", "items": { "type": "string" } },
+    "exclusion_criteria": { "type": "array", "items": { "type": "string" } },
+    "stage_preference": { "type": "array", "items": { "type": "string" } },
+    "geography": { "type": "array", "items": { "type": "string" } },
+    "check_size_range": { "type": "string" },
+    "risk_tolerance": { "type": "string", "enum": ["low", "medium", "high"] },
+    "sectors_weighting": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "signals_of_interest": { "type": "array", "items": { "type": "string" } },
+    "signals_of_avoidance": { "type": "array", "items": { "type": "string" } }
+  }
+}

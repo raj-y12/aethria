@@ -1,24 +1,22 @@
 """
 Supabase-backed storage for list and doc JSON blobs.
-All tables are multi-tenant: pass user_id or it is taken from run context (get_run_user_id()).
+Every operation requires an explicit user_id (no run_context or default tenant).
 Uses get_service_client(); tables: portfolio_*, memory, settings, serp_usage, analytics_*, meta_*.
 """
 import logging
 import time
 import random
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Dict, List, TypeVar
 
 T = TypeVar("T")
 from uuid import uuid4
 
-from run_context import get_run_user_id
+from tenant_context import require_user_id
 from supabase_client import get_service_client
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_KEY = "default"
-_DEFAULT_USER = "default"
-_warned_default_user_fallback = False
 
 # Errno 35 = EAGAIN (Resource temporarily unavailable) under concurrent load
 _TRANSIENT_ERRNOS = (35, 11)  # 11 = EAGAIN on some platforms
@@ -36,15 +34,14 @@ def _is_transient(e: BaseException) -> bool:
 
 def _retry_on_transient(fn: Callable[[], T]) -> T:
     """Run fn; on transient OSError/ConnectionError retry up to _MAX_RETRIES times."""
-    last: Optional[BaseException] = None
+    last: BaseException | None = None
     for attempt in range(_MAX_RETRIES + 1):
         try:
             return fn()
         except Exception as e:
             last = e
             if attempt < _MAX_RETRIES and _is_transient(e):
-                # Exponential backoff with small jitter to avoid synchronized retries.
-                sleep_for = (_RETRY_DELAY * (2 ** attempt)) + random.uniform(0, 0.05)
+                sleep_for = (_RETRY_DELAY * (2**attempt)) + random.uniform(0, 0.05)
                 time.sleep(sleep_for)
                 continue
             raise
@@ -54,23 +51,6 @@ def _retry_on_transient(fn: Callable[[], T]) -> T:
 
 def _client():
     return get_service_client()
-
-
-def _user_id(user_id: Optional[str]) -> str:
-    """Resolve user_id: explicit or run context; fallback to _DEFAULT_USER for backward compatibility."""
-    global _warned_default_user_fallback
-    if user_id and user_id.strip():
-        return user_id.strip()
-    ctx = get_run_user_id()
-    if ctx and ctx.strip():
-        return ctx.strip()
-    if not _warned_default_user_fallback:
-        logger.warning(
-            "supabase_doc_store using fallback user_id='default' (no explicit user_id and no run context). "
-            "This may mix data across tenants in non-request code paths."
-        )
-        _warned_default_user_fallback = True
-    return _DEFAULT_USER
 
 
 # ---- List tables (user_id + id + data, ordered by created_at) ----
@@ -83,12 +63,13 @@ LIST_TABLES = {
     "portfolio_agent_metrics",
     "meta_mutation_log",
     "meta_reports",
+    "lookup_job_outcomes",
 }
 
 
-def list_get_all(table: str, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def list_get_all(table: str, *, user_id: str) -> List[Dict[str, Any]]:
     """Return all rows for user as list of dicts (data column). Order by created_at."""
-    uid = _user_id(user_id)
+    uid = require_user_id(user_id, context=f"list_get_all({table})")
     try:
         def _fetch():
             return (
@@ -99,6 +80,7 @@ def list_get_all(table: str, user_id: Optional[str] = None) -> List[Dict[str, An
                 .order("created_at")
                 .execute()
             )
+
         r = _retry_on_transient(_fetch)
         rows = (r.data or []) if hasattr(r, "data") else []
         out = []
@@ -112,11 +94,40 @@ def list_get_all(table: str, user_id: Optional[str] = None) -> List[Dict[str, An
         return []
 
 
+def list_get_by_id(table: str, row_id: str, *, user_id: str) -> Dict[str, Any] | None:
+    """Return data JSON for one list row (user_id, id), or None if missing."""
+    uid = require_user_id(user_id, context=f"list_get_by_id({table})")
+    rid = (row_id or "").strip()
+    if not rid:
+        return None
+    try:
+        def _fetch():
+            return (
+                _client()
+                .table(table)
+                .select("data")
+                .eq("user_id", uid)
+                .eq("id", rid)
+                .limit(1)
+                .execute()
+            )
+
+        r = _retry_on_transient(_fetch)
+        rows = (r.data or []) if hasattr(r, "data") else []
+        if not rows:
+            return None
+        d = rows[0].get("data")
+        return d if isinstance(d, dict) else None
+    except Exception as e:
+        logger.warning("supabase_doc_store list_get_by_id %s %s: %s", table, rid, e)
+        return None
+
+
 def list_upsert(
-    table: str, record: Dict[str, Any], id_field: str = "id", user_id: Optional[str] = None
+    table: str, record: Dict[str, Any], id_field: str = "id", *, user_id: str
 ) -> str:
     """Insert or update by (user_id, id). record must have id_field. Returns id."""
-    uid = _user_id(user_id)
+    uid = require_user_id(user_id, context=f"list_upsert({table})")
     rid = record.get(id_field) or str(uuid4())
     if id_field != "id":
         record = dict(record)
@@ -133,10 +144,10 @@ def list_upsert(
 
 
 def list_append(
-    table: str, record: Dict[str, Any], id_field: str = "id", user_id: Optional[str] = None
+    table: str, record: Dict[str, Any], id_field: str = "id", *, user_id: str
 ) -> str:
     """Append a row for user. record gets id if missing. Returns id."""
-    uid = _user_id(user_id)
+    uid = require_user_id(user_id, context=f"list_append({table})")
     rid = record.get(id_field) or str(uuid4())
     record = dict(record)
     record["id"] = rid
@@ -148,9 +159,9 @@ def list_append(
         raise
 
 
-def list_append_only(table: str, record: Dict[str, Any], user_id: Optional[str] = None) -> str:
+def list_append_only(table: str, record: Dict[str, Any], *, user_id: str) -> str:
     """Append with generated id (for mutation_log, meta_reports). Returns id."""
-    uid = _user_id(user_id)
+    uid = require_user_id(user_id, context=f"list_append_only({table})")
     rid = str(uuid4())
     record = dict(record)
     record["id"] = rid
@@ -176,9 +187,9 @@ DOC_TABLES = {
 }
 
 
-def doc_get(table: str, key: str = _DEFAULT_KEY, user_id: Optional[str] = None) -> Optional[Any]:
+def doc_get(table: str, key: str = _DEFAULT_KEY, *, user_id: str) -> Any | None:
     """Return data for (user_id, key), or None if missing."""
-    uid = _user_id(user_id)
+    uid = require_user_id(user_id, context=f"doc_get({table})")
     try:
         def _fetch():
             return (
@@ -190,6 +201,7 @@ def doc_get(table: str, key: str = _DEFAULT_KEY, user_id: Optional[str] = None) 
                 .limit(1)
                 .execute()
             )
+
         r = _retry_on_transient(_fetch)
         rows = (r.data or []) if hasattr(r, "data") else []
         if not rows:
@@ -200,11 +212,9 @@ def doc_get(table: str, key: str = _DEFAULT_KEY, user_id: Optional[str] = None) 
         return None
 
 
-def doc_set(
-    table: str, data: Any, key: str = _DEFAULT_KEY, user_id: Optional[str] = None
-) -> None:
+def doc_set(table: str, data: Any, key: str = _DEFAULT_KEY, *, user_id: str) -> None:
     """Upsert (user_id, key) -> data."""
-    uid = _user_id(user_id)
+    uid = require_user_id(user_id, context=f"doc_set({table})")
     try:
         _client().table(table).upsert(
             {"user_id": uid, "key": key, "data": data},
@@ -215,11 +225,9 @@ def doc_set(
         raise
 
 
-def doc_get_int(
-    table: str, key: str = _DEFAULT_KEY, user_id: Optional[str] = None
-) -> int:
+def doc_get_int(table: str, key: str = _DEFAULT_KEY, *, user_id: str) -> int:
     """Get single int (e.g. cycle counter). Returns 0 if missing."""
-    val = doc_get(table, key, user_id)
+    val = doc_get(table, key, user_id=user_id)
     if val is None:
         return 0
     if isinstance(val, int):
@@ -232,8 +240,6 @@ def doc_get_int(
         return 0
 
 
-def doc_set_int(
-    table: str, value: int, key: str = _DEFAULT_KEY, user_id: Optional[str] = None
-) -> None:
+def doc_set_int(table: str, value: int, key: str = _DEFAULT_KEY, *, user_id: str) -> None:
     """Set single int (e.g. cycle counter)."""
-    doc_set(table, {"value": value}, key, user_id)
+    doc_set(table, {"value": value}, key, user_id=user_id)

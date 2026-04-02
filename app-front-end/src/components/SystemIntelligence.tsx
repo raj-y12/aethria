@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import {
@@ -17,17 +17,19 @@ import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import EmptyState from './EmptyState';
 import DecisionBadge from './DecisionBadge';
+import { fetchFundThesisRuntime, type FundThesisRuntime } from '../api/fundThesis';
 
 /** Match pipeline tab strip: bottom border on the nav hairline (items-end + -mb-px, same language as `PanelShell`). */
 const SYSTEM_INTEL_TAB_BUTTON_CLASS =
   'py-2.5 px-3 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
 const SYSTEM_INTEL_TAB_BAR_CLASS = `${PANEL_TAB_BAR_CLASS} items-end pt-2 pb-0`;
 
-type Tab = 'signals' | 'escalations' | 'analytics' | 'meta';
+type Tab = 'signals' | 'escalations' | 'analytics' | 'thesis' | 'meta';
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'signals', label: 'Signals' },
   { key: 'escalations', label: 'Escalations' },
+  { key: 'signals', label: 'Signals' },
   { key: 'analytics', label: 'Analytics' },
+  { key: 'thesis', label: 'Fund thesis' },
   { key: 'meta', label: 'Meta-Agent' },
 ];
 
@@ -556,9 +558,123 @@ function MetaAgentTab({ reports, weights, calibration }: {
   );
 }
 
+/* ─── FUND THESIS RUNTIME ─── */
+function FundThesisRuntimeTab() {
+  const [data, setData] = useState<FundThesisRuntime | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setErr(null);
+    fetchFundThesisRuntime()
+      .then(setData)
+      .catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Failed to load'));
+  }, []);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 90_000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  if (err) {
+    return <p className="type-body-sm text-red-800/90">{err}</p>;
+  }
+  if (!data) {
+    return <p className="type-label-tab text-oxford/40">Loading…</p>;
+  }
+  if (data.error === 'incomplete') {
+    return (
+      <EmptyState
+        label="Fund thesis"
+        body={
+          data.detail?.trim()
+            ? data.detail
+            : 'Thesis data could not be loaded. Check Supabase connectivity and migrations.'
+        }
+      />
+    );
+  }
+  if (data.mode === 'missing' || data.thesis_ready === false) {
+    return (
+      <EmptyState
+        label="Fund thesis"
+        body="No active thesis yet. Add one under Settings → Fund thesis."
+      />
+    );
+  }
+  if (data.thesis_ready !== true && data.mode !== 'rule_based' && data.mode !== 'embedding') {
+    return (
+      <EmptyState
+        label="Fund thesis"
+        body="Thesis is not ready. Open Settings → Fund thesis."
+      />
+    );
+  }
+
+  const st = data.alignment_stats;
+  return (
+    <div className="space-y-6">
+      <section>
+        <h3 className="type-label-section text-oxford/60 mb-2">Runtime</h3>
+        <p className="type-body-sm text-oxford/60 m-0">
+          Active version{' '}
+          <code className="type-meta bg-oxford/[0.06] px-1 rounded break-all">{data.active_version_id}</code>
+          {data.active_version_number != null ? ` · v${data.active_version_number}` : ''}
+        </p>
+        <p className="type-body-sm text-oxford/60 m-0 mt-1">
+          Last updated:{' '}
+          {data.fund_thesis_updated_at
+            ? new Date(data.fund_thesis_updated_at).toLocaleString('en-GB')
+            : '—'}
+        </p>
+        <p className="type-body-sm text-oxford/60 m-0 mt-1">
+          Thesis mode:{' '}
+          {data.thesis_mode === 'embedding' ? 'AI-enhanced' : 'Rule-based'}
+        </p>
+        <p className="type-body-sm text-oxford/60 m-0 mt-1">
+          Embeddings: {data.embedding?.dimension ?? data.embedding_dimensions ?? '—'} dims ·{' '}
+          {data.embedding?.model ?? data.embedding_model ?? '—'}
+        </p>
+      </section>
+      <div className="border-t border-oxford/12" />
+      <section>
+        <h3 className="type-label-section text-oxford/60 mb-2">Alignment (reviewed deals, current version)</h3>
+        <ul className="type-body-sm text-oxford/60 m-0 pl-4 list-disc space-y-1">
+          <li>
+            Matching mandate:{' '}
+            {st?.pct_matching_thesis != null ? `${st.pct_matching_thesis}%` : '—'} of scored reviews
+          </li>
+          <li>Avg alignment score: {st?.avg_alignment_score ?? '—'}</li>
+          <li>Drift vs prior version: {st?.drift_vs_previous ?? '—'}</li>
+          <li>Reviews tagged with this version: {st?.reviewed_with_thesis_count ?? 0}</li>
+        </ul>
+      </section>
+      <div className="border-t border-oxford/12" />
+      <section>
+        <h3 className="type-label-section text-oxford/60 mb-3">Version timeline</h3>
+        {(data.version_timeline ?? []).length === 0 ? (
+          <p className="type-label-tab text-oxford/40">No versions</p>
+        ) : (
+          <ul className="space-y-2">
+            {(data.version_timeline ?? []).map((v) => (
+              <li key={v.id} className="type-body-sm text-oxford/60 border-b border-oxford/8 pb-2">
+                <span className="type-label-section text-oxford/50">v{v.version_number}</span>
+                {v.is_active ? <span className="ml-2 type-meta text-oxford">active</span> : null}
+                <span className="block type-meta text-oxford/35 mt-0.5">
+                  {v.created_at ? new Date(v.created_at).toLocaleString('en-GB') : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
 /* ─── MAIN COMPONENT ─── */
 export default function SystemIntelligence(props: SystemIntelligenceProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('meta');
+  const [activeTab, setActiveTab] = useState<Tab>('escalations');
   const reduceMotion = usePrefersReducedMotion();
 
   return (
@@ -611,6 +727,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
                 concentration={props.concentrationAnalytics}
               />
             )}
+            {activeTab === 'thesis' && <FundThesisRuntimeTab />}
             {activeTab === 'meta' && (
               <MetaAgentTab reports={props.metaReports} weights={props.scoutWeights} calibration={props.calibrationState} />
             )}

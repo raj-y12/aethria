@@ -127,7 +127,7 @@ storage.replace_all(list_of_startup_dicts)
 1. **Migrations**: Prefer building a full list in memory and calling `replace_all()` once (as in the fixed migration) instead of many small writes.
 2. **Meta-Agent**: Use `get_startups_with_review()`, `get_startups_with_decision()`, `get_startups_requiring_human_review()`, and `validate_and_parse()` for consistent, validated inputs.
 3. **Consistency**: Keep using `skip_invalid=True` in `get_unreviewed` and `get_undecided` so corrupt entries are skipped and logged instead of failing the pipeline.
-4. **Resources**: When wiring agents to `/resources`, validate Scout/Reviewer/Partner outputs against the JSON Schemas in `resources/schemas` before persisting.
+4. **Resources**: When wiring agents to `/resources`, validate Scout/Reviewer/Partner outputs against the JSON Schemas in `resources/contracts/schemas` before persisting.
 5. **Datetimes**: All datetime fields are set or normalized in `from_dict`; serialization remains ISO via `to_dict()` / `model_dump(mode='json')`.
 
 ---

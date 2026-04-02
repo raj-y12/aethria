@@ -6,10 +6,14 @@ Includes all Reviewer output fields (scores, verdict, overall_summary, key_risks
 assumption_feedback, team_analysis, competition_analysis, business_model_analysis, investment_thesis,
 risk_mitigation, score_reasoning). Surfaces Partner next_action, rationale, MAYBE + human_review_required.
 """
-from typing import Optional
+import json
+import logging
+from typing import Any, Dict, Optional
 from datetime import datetime
 
 from models import Startup
+
+_logger_memo = logging.getLogger("memo_generation")
 
 # Dimension labels for scores table (ReviewInfo field -> display name)
 SCORE_DIMENSIONS = [
@@ -31,6 +35,87 @@ def _get_score_band(score: int) -> str:
     return "—"
 
 
+def _append_thesis_alignment_section(
+    lines: list,
+    startup: Startup,
+    fund_thesis: Optional[Dict[str, Any]],
+    for_display: bool,
+) -> None:
+    ri = startup.review_info
+    has_ri_thesis = ri is not None and (
+        getattr(ri, "thesis_alignment_score", None) is not None
+        or getattr(ri, "thesis_fit_points", None)
+        or getattr(ri, "thesis_deviation_points", None)
+    )
+    if not fund_thesis and not has_ri_thesis:
+        return
+    use_embedding_mode = False
+    if fund_thesis:
+        emb = fund_thesis.get("embedding") or []
+        use_embedding_mode = isinstance(emb, list) and len(emb) > 0
+    section_title = (
+        "## Fund Thesis Alignment (AI-Enhanced)"
+        if use_embedding_mode
+        else "## Fund Thesis Alignment (Rule-Based)"
+    )
+    lines.append(section_title)
+    lines.append("")
+    if fund_thesis:
+        pj = fund_thesis.get("parsed_json") or {}
+        vid = fund_thesis.get("version_id", "—")
+        vn = fund_thesis.get("version_number", "—")
+        lines.append(f"**Active thesis:** `{vid}` (version {vn})")
+        lines.append("")
+        if not for_display:
+            lines.append("**Structured mandate**")
+            lines.append("")
+            lines.append(f"```json\n{json.dumps(pj, indent=2)[:6000]}\n```")
+            lines.append("")
+        else:
+            rules = pj.get("investment_rules") or []
+            if isinstance(rules, list) and rules:
+                lines.append("**Investment rules (excerpt)**")
+                for r in rules[:5]:
+                    lines.append(f"- {r}")
+                lines.append("")
+    if ri:
+        tas = getattr(ri, "thesis_alignment_score", None)
+        tm = getattr(ri, "thesis_matches_fund", None)
+        tc = getattr(ri, "thesis_alignment_confidence", None)
+        if tas is not None:
+            if use_embedding_mode:
+                lines.append(f"**Alignment score:** {float(tas):.2f} / 1.00")
+            else:
+                ten = float(tas) * 10.0
+                lines.append(f"**Alignment score (rule-based):** {ten:.1f} / 10")
+        if tm is not None:
+            lines.append(f"**Matches fund mandate:** {'Yes' if tm else 'No'}")
+        if tc is not None:
+            conf_note = " (low — rule-based, no embeddings)" if not use_embedding_mode else ""
+            lines.append(f"**Confidence (alignment assessment):** {float(tc):.2f} / 1.00{conf_note}")
+        lines.append("")
+        lines.append("**Why this fits the thesis**")
+        lines.append("")
+        fits = list(getattr(ri, "thesis_fit_points", None) or [])
+        if fits:
+            for b in fits:
+                lines.append(f"- {b}")
+        else:
+            lines.append("- [MISSING]")
+        lines.append("")
+        lines.append("**Where it deviates**")
+        lines.append("")
+        devs = list(getattr(ri, "thesis_deviation_points", None) or [])
+        if devs:
+            for b in devs:
+                lines.append(f"- {b}")
+        else:
+            lines.append("- [MISSING]")
+        lines.append("")
+    lines.append("---")
+    lines.append("")
+
+
 class MemoGenerator:
     """
     Generates professional VC Investment Memos from Startup records.
@@ -39,25 +124,24 @@ class MemoGenerator:
     Handles missing financial data gracefully; reflects missing data via diligence_red_flags where present.
     """
 
-    def generate_memo(self, startup: Startup, for_display: bool = False) -> str:
+    def generate_memo(
+        self,
+        startup: Startup,
+        for_display: bool = False,
+        tenant_user_id: Optional[str] = None,
+        fund_thesis: Optional[Dict[str, Any]] = None,
+    ) -> str:
         """
         Generate a complete investment memo for a startup.
-        Pulls average scores and verdicts from ReviewInfo. Displays Partner next_action and rationale.
-        Surfaces LLM-triggered MAYBE and human_review_required. Does not mutate startup.
-
-        When for_display=True, omits header (title, Generated, Startup ID), Company Overview,
-        Partner Decision (frontend shows verdict block), Deal Structure, Exit Scenarios, Next Steps,
-        and footer. Omits Team/Competition/Business Model/Investment Thesis/Risk Mitigation when
-        they only contain [MISSING]. Leaner Reviewer Analysis (no Diligence Red Flags / Assumption
-        Feedback subsections) to match old memo design.
-        
-        Args:
-            startup: Startup Pydantic model
-            for_display: If True, return lean markdown for frontend (no redundant header/ID, verdict handled in UI)
-        
-        Returns:
-            Markdown-formatted investment memo
+        tenant_user_id: when set, logs structured tenant context for debugging async pipelines.
         """
+        uid = (tenant_user_id or "").strip()
+        if uid:
+            _logger_memo.info(
+                "event=memo_generation user_id=%s module=memo_generation startup_id=%s",
+                uid[:24],
+                startup.startup_id,
+            )
         lines = []
 
         if not for_display:
@@ -106,6 +190,8 @@ class MemoGenerator:
         lines.append("")
         lines.append(startup.scout_info.why_now)
         lines.append("")
+
+        _append_thesis_alignment_section(lines, startup, fund_thesis, for_display)
 
         # Financials & Traction
         lines.append("## Financials & Traction")

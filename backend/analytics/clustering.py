@@ -33,7 +33,8 @@ def _extract_keywords(text: str) -> List[str]:
 class ClusterAnalyzer:
     """Analyzes sector concentration and theme clusters. Backed by Supabase."""
 
-    def __init__(self, output_file: str = "data/analytics/sector_concentration.json"):
+    def __init__(self, user_id: str, output_file: str = "data/analytics/sector_concentration.json"):
+        self.user_id = user_id
         self.logger = logging.getLogger("cluster.analyzer")
 
     def analyze(self, startups: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -131,8 +132,8 @@ class ClusterAnalyzer:
         ]
 
     def _read(self) -> Dict[str, Any]:
-        data = doc_get(_CONCENTRATION_TABLE)
+        data = doc_get(_CONCENTRATION_TABLE, user_id=self.user_id)
         return data if isinstance(data, dict) else {}
 
     def _write(self, data: Dict[str, Any]) -> None:
-        doc_set(_CONCENTRATION_TABLE, data)
+        doc_set(_CONCENTRATION_TABLE, data, user_id=self.user_id)

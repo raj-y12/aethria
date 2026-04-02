@@ -1,7 +1,7 @@
 """
 Partner decision engine.
 Rule-based, deterministic decision making.
-Uses /resources/partner_rules.json for thresholds, red flags, and LLM fallback triggers.
+Uses versioned partner rules from resources/config (via policy_resolver).
 Default mode: NO LLM calls. LLM only for edge cases (contradictory scores, MEDIUM borderline, missing assumptions).
 """
 import os
@@ -9,7 +9,6 @@ import json
 import asyncio
 import logging
 import re
-from pathlib import Path
 from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor
 
@@ -23,26 +22,17 @@ logger = logging.getLogger(__name__)
 
 def _load_partner_rules() -> Dict[str, Any]:
     """
-    Load partner rules from /resources/partner_rules.json.
-    Returns empty dict if file missing or invalid; callers use defaults.
+    Load partner rules via policy_resolver (resources/config/active.json + versioned JSON).
     """
-    try:
-        project_root = Path(__file__).resolve().parent.parent.parent
-        rules_path = project_root / "resources" / "partner_rules.json"
-        if not rules_path.exists():
-            logger.warning("partner_rules.json not found; using in-code defaults.")
-            return {}
-        with open(rules_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        logger.warning(f"Could not load partner rules: {e}. Using defaults.")
-        return {}
+    from core.policy_resolver import get_partner_rules
+
+    return get_partner_rules()
 
 
 class PartnerDecisionEngine:
     """
     Rule-based decision engine for Partner layer.
-    Applies deterministic rules from /resources/partner_rules.json to Reviewer outputs.
+    Applies deterministic rules from versioned partner policy JSON to Reviewer outputs.
     Hypothesis-aware: uses assumption_feedback and Scout hypothesis fields to flag
     assumption_risks and adjust conviction. Conservative, opinionated, cost-aware.
     """
@@ -56,7 +46,7 @@ class PartnerDecisionEngine:
     ):
         """
         Initialize the decision engine.
-        Loads rules from /resources/partner_rules.json.
+        Loads rules via policy_resolver (active.json + versioned file).
         Args:
             use_llm_fallback: Whether to use LLM for edge cases (default: True)
             api_key: OpenAI API key for real LLM calls (falls back to env)
@@ -113,7 +103,13 @@ class PartnerDecisionEngine:
             self.logger.warning(f"Could not load portfolio context: {e}")
             return {}
 
-    def decide(self, scout_output: Dict[str, Any], review_output: Dict[str, Any], context_memo: str = "") -> Dict[str, Any]:
+    def decide(
+        self,
+        scout_output: Dict[str, Any],
+        review_output: Dict[str, Any],
+        context_memo: str = "",
+        fund_thesis: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """
         Make an investment decision based on Scout and Reviewer outputs.
         Uses assumption_feedback and Scout hypothesis (primary_thesis, key_assumptions,
@@ -132,6 +128,22 @@ class PartnerDecisionEngine:
         next_actions = rules.get("next_actions", {})
 
         portfolio_context = self._get_portfolio_context() if self.portfolio_store else {}
+        thesis_block = ""
+        if fund_thesis:
+            pj = fund_thesis.get("parsed_json") or {}
+            thesis_block = (
+                "\nFUND THESIS MANDATE:\n"
+                f"version_id: {fund_thesis.get('version_id', '')}\n"
+                f"{json.dumps(pj, ensure_ascii=False)[:8000]}\n"
+            )
+        try:
+            from core.fund_thesis_resolver import format_fund_thesis_context_for_prompt
+
+            resource_ctx = format_fund_thesis_context_for_prompt()
+            if resource_ctx:
+                thesis_block = (thesis_block or "") + resource_ctx
+        except Exception:
+            pass
 
         market_score = review_output.get("market_score", 0)
         product_score = review_output.get("product_score", 0)
@@ -299,6 +311,7 @@ class PartnerDecisionEngine:
                     scout_output, review_output, assumption_risks,
                     trigger_reason=trigger_reason, context_memo=context_memo,
                     portfolio_context=portfolio_context,
+                    thesis_block=thesis_block,
                 )
                 result["portfolio_context_at_decision"] = portfolio_context or None
                 result["memo_at_decision"] = context_memo or None
@@ -334,6 +347,7 @@ class PartnerDecisionEngine:
                     scout_output, review_output, assumption_risks,
                     trigger_reason=trigger_reason, context_memo=context_memo,
                     portfolio_context=portfolio_context,
+                    thesis_block=thesis_block,
                 )
                 result["portfolio_context_at_decision"] = portfolio_context or None
                 result["memo_at_decision"] = context_memo or None
@@ -569,6 +583,7 @@ class PartnerDecisionEngine:
         trigger_reason: str = "",
         context_memo: str = "",
         portfolio_context: dict = None,
+        thesis_block: str = "",
     ) -> Dict[str, Any]:
         """
         Use LLM for nuanced decision in edge cases.
@@ -661,9 +676,12 @@ class PartnerDecisionEngine:
         if score_variance:
             score_variance_block = f"\nSCORE VARIANCE ACROSS REVIEWERS:\n{json.dumps(score_variance)}\n"
 
+        tb = (thesis_block or "").strip()
+        thesis_section = f"{tb}\n" if tb else ""
+
         prompt = f"""You are a Senior Investment Partner at a venture capital firm making a final investment decision.
 
-{context_block}
+{thesis_section}{context_block}
 
 REVIEWER SCORES:
 Market: {review_output.get('market_score', 0)}/10 - {score_reasoning.get('market_score', '')}
@@ -714,11 +732,32 @@ For next_action:
 
             content = response.choices[0].message.content
             if not content:
-                self.logger.error("Empty LLM response; falling back to hardcoded")
-                return self._decide_with_llm(
-                    scout_output, review_output, assumption_risks,
-                    trigger_reason=trigger_reason,
+                choice0 = response.choices[0]
+                finish = getattr(choice0, "finish_reason", None)
+                self.logger.error(
+                    "Empty LLM response; using hardcoded edge-case fallback (no retry). "
+                    "finish_reason=%s company=%s",
+                    finish,
+                    scout_output.get("name", "Unknown"),
                 )
+                label = self._verdict_label(verdict)
+                result = self._create_decision(
+                    decision="MAYBE",
+                    confidence=4,
+                    rationale=(
+                        f"LLM returned empty output for edge case ({trigger_reason}). "
+                        f"Average score: {avg_score:.1f}/10, Quality: {label}. Requires human analysis."
+                    ),
+                    next_action=next_actions.get(
+                        "human_review_contradictions",
+                        "Human review required - analyze contradictions",
+                    ),
+                    human_review_required=True,
+                    assumption_risks=assumption_risks,
+                )
+                result["llm_fallback_reason"] = trigger_reason
+                result["prompt_version"] = hash_prompt(prompt)
+                return result
 
             llm_result = json.loads(content)
 

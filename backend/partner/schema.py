@@ -1,7 +1,7 @@
 """
 Strict output schema for Partner decisions.
 All Partners must emit JSON matching this structure exactly.
-Validates against /resources/partner_rules.json decision set (YES, NO, MAYBE).
+Validates against versioned partner rules policy (resources/config via policy_resolver).
 """
 from typing import TypedDict, Literal, List
 
@@ -21,7 +21,7 @@ class PartnerOutput(TypedDict, total=False):
     assumption_risks: List[str]  # Critical unknowns or assumption concerns from Reviewer assumption_feedback / hypothesis
 
 
-# Canonical decisions per /resources/partner_rules.json
+# Canonical decisions per partner policy JSON (active.json version pointer)
 VALID_DECISIONS = ["YES", "NO", "MAYBE"]
 
 

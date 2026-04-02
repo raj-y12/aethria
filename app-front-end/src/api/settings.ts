@@ -87,16 +87,11 @@ export interface ValidationError {
 }
 
 export async function fetchSettings(): Promise<Settings> {
-  const [settings, systemHealth] = await Promise.all([
-    authedFetch(`${API_BASE}/api/settings`, { headers: { Accept: 'application/json' } }).then((r) => {
-      if (!r.ok) throw new Error(`Settings API error: ${r.status}`);
-      return r.json();
-    }),
-    authedFetch(`${API_BASE}/api/analytics/system-health`, { headers: { Accept: 'application/json' } }).then((r) =>
-      r.ok ? r.json() : Promise.reject(new Error(`System health API error: ${r.status}`))
-    ),
-  ]);
-  return { ...(settings as Settings), system_health: systemHealth as SystemHealth };
+  const r = await authedFetch(`${API_BASE}/api/settings`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!r.ok) throw new Error(`Settings API error: ${r.status}`);
+  return r.json() as Promise<Settings>;
 }
 
 export async function patchSettings(

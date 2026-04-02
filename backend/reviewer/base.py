@@ -21,30 +21,13 @@ logger = logging.getLogger(__name__)
 
 def _load_reviewer_resources() -> tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    Load reviewer rules and evaluation rubric from /resources.
-    Returns (reviewer_rules, evaluation_rubric). Uses defaults if files missing.
+    Load reviewer rules and evaluation rubric via policy_resolver (active.json + versions).
     """
-    try:
-        # Project root: backend/reviewer/base.py -> go up to project root
-        project_root = Path(__file__).resolve().parent.parent.parent
-        resources_dir = project_root / "resources"
-        rules_path = resources_dir / "reviewer_rules.json"
-        rubric_path = resources_dir / "rubrics" / "evaluation_rubric_v1.json"
-        
-        reviewer_rules: Dict[str, Any] = {}
-        if rules_path.exists():
-            with open(rules_path, "r", encoding="utf-8") as f:
-                reviewer_rules = json.load(f)
-        
-        rubric: Dict[str, Any] = {}
-        if rubric_path.exists():
-            with open(rubric_path, "r", encoding="utf-8") as f:
-                rubric = json.load(f)
-        
-        return reviewer_rules, rubric
-    except Exception as e:
-        logger.warning(f"Could not load reviewer resources: {e}. Using defaults.")
-        return {}, {}
+    from core.policy_resolver import get_evaluation_rubric, get_reviewer_rules
+
+    reviewer_rules = get_reviewer_rules()
+    rubric = get_evaluation_rubric()
+    return reviewer_rules, rubric
 
 
 def _build_dimensions_block(rubric: Dict[str, Any]) -> str:
@@ -75,7 +58,7 @@ def _build_dimensions_block(rubric: Dict[str, Any]) -> str:
 
 
 def _build_system_prompt(reviewer_rules: Dict[str, Any], rubric: Dict[str, Any]) -> str:
-    """Build system prompt from /resources: reviewer_rules and evaluation rubric."""
+    """Build system prompt from versioned reviewer rules and evaluation rubric (policy_resolver)."""
     red_flags_block = ""
     if reviewer_rules.get("diligence_red_flags"):
         red_flags_block = "\nDILIGENCE RED FLAGS (use these exact labels in diligence_red_flags):\n"
@@ -164,6 +147,11 @@ class Reviewer(ABC):
         self.reviewer_type = getattr(self, 'reviewer_type', 'default')
         self.agent_name = self._get_agent_name()
         self._load_prompt_from_library()
+        self._fund_thesis_ctx: Optional[Dict[str, Any]] = None
+
+    def set_fund_thesis(self, thesis_ctx: Optional[Dict[str, Any]]) -> None:
+        """Runtime mandate from Supabase active thesis; None clears."""
+        self._fund_thesis_ctx = thesis_ctx
 
     def _get_agent_name(self) -> str:
         """Map reviewer_type to agent name for prompt library lookup."""
@@ -263,6 +251,36 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 else:
                     scout_text += "Key assumptions: N/A\n"
                 scout_text += f"Biggest unknown: {biggest_unknown if biggest_unknown else 'N/A'}\n"
+
+            try:
+                from core.fund_thesis_resolver import format_fund_thesis_context_for_prompt
+
+                resource_thesis_block = format_fund_thesis_context_for_prompt()
+            except Exception:
+                resource_thesis_block = ""
+
+            thesis_block = ""
+            ctx = getattr(self, "_fund_thesis_ctx", None)
+            if ctx:
+                pj = ctx.get("parsed_json") or {}
+                raw = str(ctx.get("raw_text") or "").strip()
+                summary = raw[:4000] if len(raw) > 4000 else raw
+                thesis_block = (
+                    "\n\nFUND THESIS MANDATE (required — score this opportunity against this mandate; "
+                    "reasoning in score_reasoning should reference fit vs thesis where relevant):\n"
+                    f"active_thesis_version_id: {ctx.get('version_id', '')}\n"
+                )
+                if summary:
+                    thesis_block += f"thesis_summary (plain text):\n{summary}\n\n"
+                thesis_block += f"structured_mandate (JSON):\n{json.dumps(pj, ensure_ascii=False)[:12000]}\n"
+                emb = ctx.get("embedding") or []
+                if isinstance(emb, list) and emb:
+                    thesis_block += (
+                        f"thesis_embedding_model: {ctx.get('embedding_model', '')}\n"
+                        f"thesis_embedding_dim: {len(emb)}\n"
+                        f"thesis_embedding_preview (first 24 floats, numerical grounding): "
+                        f"{json.dumps([round(float(x), 6) for x in emb[:24]])}\n"
+                    )
             
             json_schema = '''{
   "market_score": int,        // 1-10
@@ -273,18 +291,23 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
   "overall_summary": "string",  // Narrative synthesis for IC; do NOT list scores (e.g. no "Market 7/10: ..."); scores go in score_reasoning
   "key_risks": ["string", "..."],
   "verdict": "STRONG" | "MEDIUM" | "WEAK",
-  "diligence_red_flags": ["string", "..."],  // Use only labels from resources/reviewer_rules.json
+  "diligence_red_flags": ["string", "..."],  // Use only labels from versioned reviewer_rules policy
   "assumption_feedback": ["string", "..."],  // Comments on Scout assumptions; critical unknowns
   "team_analysis": ["string", "..."],        // Optional: founders, roles, experience, unfair advantage; use "[MISSING: ...]" if absent
   "competition_analysis": ["string", "..."], // Optional: competitors, market position, differentiation, SWOT bullets
   "business_model_analysis": ["string", "..."], // Optional: monetization, pricing, growth plan, unit economics; use [MISSING] if absent
   "investment_thesis": ["string", "..."],    // Optional: bullet points why to invest + core assumptions
   "risk_mitigation": ["string", "..."],     // Optional: actionable strategies for each diligence_red_flags item
-  "score_reasoning": {"market_score": "string", "product_score": "string", ...}  // Optional: concise reasoning per dimension for memo table
+  "score_reasoning": {"market_score": "string", "product_score": "string", ...},  // Optional: concise reasoning per dimension for memo table
+  "thesis_alignment_score": number,  // 0.0-1.0 fit to fund thesis mandate (required when FUND THESIS MANDATE section present)
+  "thesis_matches_fund": boolean,     // true if clearly aligned with mandate
+  "thesis_fit_points": ["string"],   // concise bullets: why it fits
+  "thesis_deviation_points": ["string"], // concise bullets: where it diverges
+  "thesis_alignment_confidence": number // 0.0-1.0 confidence in alignment judgment
 }'''
             
             user_content = (
-                f"Evaluate this startup idea discovered by a Scout:\n\n{scout_text}\n\n"
+                f"Evaluate this startup idea discovered by a Scout:\n\n{scout_text}{resource_thesis_block}{thesis_block}\n\n"
                 "Review Scout hypotheses when provided: evaluate assumptions and flag critical unknowns in assumption_feedback. "
                 "Use only information provided or defined in resources; do not hallucinate missing data. "
                 "In overall_summary, write a concise narrative synthesis only; do not list or repeat numeric scores (scores are in score_reasoning). "
@@ -331,6 +354,42 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     data[field] = []
             if "score_reasoning" not in data or not isinstance(data.get("score_reasoning"), dict):
                 data["score_reasoning"] = {}
+            if ctx:
+                for key, default in (
+                    ("thesis_alignment_score", None),
+                    ("thesis_matches_fund", None),
+                    ("thesis_fit_points", []),
+                    ("thesis_deviation_points", []),
+                    ("thesis_alignment_confidence", None),
+                ):
+                    if key not in data:
+                        data[key] = default
+                if not isinstance(data.get("thesis_fit_points"), list):
+                    data["thesis_fit_points"] = []
+                if not isinstance(data.get("thesis_deviation_points"), list):
+                    data["thesis_deviation_points"] = []
+                for lp in ("thesis_fit_points", "thesis_deviation_points"):
+                    data[lp] = [str(x) for x in data[lp] if str(x).strip()][:12]
+                ts = data.get("thesis_alignment_score")
+                if ts is not None:
+                    try:
+                        data["thesis_alignment_score"] = max(0.0, min(1.0, float(ts)))
+                    except (TypeError, ValueError):
+                        data["thesis_alignment_score"] = None
+                tc = data.get("thesis_alignment_confidence")
+                if tc is not None:
+                    try:
+                        data["thesis_alignment_confidence"] = max(0.0, min(1.0, float(tc)))
+                    except (TypeError, ValueError):
+                        data["thesis_alignment_confidence"] = None
+                if data.get("thesis_matches_fund") is not None and not isinstance(
+                    data.get("thesis_matches_fund"), bool
+                ):
+                    data["thesis_matches_fund"] = str(data["thesis_matches_fund"]).lower() in (
+                        "true",
+                        "1",
+                        "yes",
+                    )
             
             data["prompt_version"] = hash_prompt(self.SYSTEM_PROMPT)
             

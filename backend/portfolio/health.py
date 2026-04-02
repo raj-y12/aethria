@@ -35,7 +35,8 @@ class HealthMonitor:
         """
         self.store = portfolio_store
         self.discovery_storage = discovery_storage
-        self.cluster_analyzer = ClusterAnalyzer()
+        uid = (getattr(portfolio_store, "_tenant_user_id", None) or "").strip() or "local_health"
+        self.cluster_analyzer = ClusterAnalyzer(user_id=uid)
         self.logger = logging.getLogger("health.monitor")
         self.health_records = []  # In-memory cache
     

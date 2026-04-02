@@ -15,7 +15,7 @@ class ReviewerOutput(TypedDict, total=False):
     overall_summary: str
     key_risks: list[str]
     verdict: Literal["STRONG", "MEDIUM", "WEAK"]
-    diligence_red_flags: list[str]  # Must align with /resources/reviewer_rules.json
+    diligence_red_flags: list[str]  # Must align with versioned reviewer_rules policy
     assumption_feedback: list[str]  # Comments on Scout assumptions; critical unknowns
     reviewer_agent_id: str  # Optional: Agent identifier for performance tracking
     # VC qualitative fields (optional; use [MISSING] when info absent)
@@ -25,6 +25,12 @@ class ReviewerOutput(TypedDict, total=False):
     investment_thesis: list[str]  # Bullet points why to invest + core assumptions
     risk_mitigation: list[str]  # Actionable strategies per diligence_red_flags
     score_reasoning: Dict[str, str]  # Optional: per-dimension concise reasoning, e.g. {"market_score": "...", "product_score": "..."}
+    thesis_alignment_score: float
+    thesis_matches_fund: bool
+    thesis_fit_points: list[str]
+    thesis_deviation_points: list[str]
+    thesis_alignment_confidence: float
+    fund_thesis_alignment_score: float  # optional at runtime; validated when present
 
 
 def validate_reviewer_output(data: dict) -> ReviewerOutput:
@@ -116,5 +122,42 @@ def validate_reviewer_output(data: dict) -> ReviewerOutput:
         for k, v in sr.items():
             if not isinstance(k, str) or not isinstance(v, str):
                 raise ValueError("score_reasoning keys and values must be strings")
-    
+
+    # Optional fund thesis fields (when mandate present in reviewer prompt)
+    if "thesis_alignment_score" in data and data["thesis_alignment_score"] is not None:
+        try:
+            ts = float(data["thesis_alignment_score"])
+        except (TypeError, ValueError):
+            raise ValueError("thesis_alignment_score must be a number")
+        if not 0.0 <= ts <= 1.0:
+            raise ValueError("thesis_alignment_score must be between 0 and 1")
+        data["thesis_alignment_score"] = ts
+    if "thesis_alignment_confidence" in data and data["thesis_alignment_confidence"] is not None:
+        try:
+            tc = float(data["thesis_alignment_confidence"])
+        except (TypeError, ValueError):
+            raise ValueError("thesis_alignment_confidence must be a number")
+        if not 0.0 <= tc <= 1.0:
+            raise ValueError("thesis_alignment_confidence must be between 0 and 1")
+        data["thesis_alignment_confidence"] = tc
+    if "thesis_matches_fund" in data and data["thesis_matches_fund"] is not None:
+        if not isinstance(data["thesis_matches_fund"], bool):
+            raise ValueError("thesis_matches_fund must be a boolean")
+    for fld in ("thesis_fit_points", "thesis_deviation_points"):
+        if fld in data and data[fld] is not None:
+            if not isinstance(data[fld], list):
+                raise ValueError(f"{fld} must be a list")
+            for item in data[fld]:
+                if not isinstance(item, str):
+                    raise ValueError(f"All items in {fld} must be strings")
+
+    if "fund_thesis_alignment_score" in data and data["fund_thesis_alignment_score"] is not None:
+        try:
+            fs = float(data["fund_thesis_alignment_score"])
+        except (TypeError, ValueError):
+            raise ValueError("fund_thesis_alignment_score must be a number")
+        if not 0.0 <= fs <= 1.0:
+            raise ValueError("fund_thesis_alignment_score must be between 0 and 1")
+        data["fund_thesis_alignment_score"] = fs
+
     return ReviewerOutput(**data)

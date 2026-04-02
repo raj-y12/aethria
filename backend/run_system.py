@@ -28,7 +28,7 @@ import logging
 from typing import Optional
 
 from utils.storage import Storage
-from utils.settings_loader import set_run_user_id, is_cost_budget_enabled
+from utils.settings_loader import is_cost_budget_enabled
 from supabase_client import get_service_client
 from supabase_storage import SupabaseStartupsStorage
 from scout.engine import ScoutEngine
@@ -135,9 +135,8 @@ async def run_system(user_id: Optional[str]):
             "Or set AETHRIA_AGENT_USER_ID in .env when using run.py (all-in-one)."
         )
     if user_id and user_id.strip():
-        set_run_user_id(user_id.strip())
-        logger.info("Run user_id=%s (settings and storage scoped to this user)", user_id.strip())
-    
+        logger.info("Run user_id=%s (explicit tenant for engines and storage)", user_id.strip())
+
     # Initialize shared storage: Supabase (service role + user_id) or file
     if use_supabase and user_id:
         storage = SupabaseStartupsStorage(get_service_client(), user_id.strip())
@@ -151,12 +150,24 @@ async def run_system(user_id: Optional[str]):
         logger.info(f"Cleaned {n_removed} startup(s) without references from database")
     
     # Cost controller only when budget enforcement is enabled in settings
-    cost_controller = CostController() if is_cost_budget_enabled() else None
-    
-    # Create shared deal memory
-    deal_memory = DealMemory()
-    
-    # Create engines
+    uid = (user_id or "").strip()
+    cost_controller = CostController() if is_cost_budget_enabled(uid if uid else None) else None
+
+    mem_uid = uid if uid else "local_agents"
+    deal_memory = DealMemory(user_id=mem_uid)
+
+    thesis_ctx = None
+    if use_supabase and uid:
+        from fund_thesis import FundThesisIncompleteError, FundThesisMissingError, get_active_thesis
+
+        try:
+            thesis_ctx = get_active_thesis(get_service_client(), uid).as_engine_context()
+        except (FundThesisMissingError, FundThesisIncompleteError) as e:
+            raise ValueError(
+                "Could not load or bootstrap fund thesis when USE_SUPABASE_STORAGE=1. "
+                "Check Supabase connectivity and fund_thesis migrations; default thesis does not require OpenAI."
+            ) from e
+
     scout_engine = ScoutEngine(
         api_key=api_key,
         storage=storage,
@@ -164,8 +175,10 @@ async def run_system(user_id: Optional[str]):
         model=model,
         cost_controller=cost_controller,
         deal_memory=deal_memory,
+        tenant_user_id=uid or mem_uid,
+        active_thesis=thesis_ctx,
     )
-    
+
     reviewer_engine = ReviewerEngine(
         api_key=api_key,
         storage=storage,
@@ -173,19 +186,25 @@ async def run_system(user_id: Optional[str]):
         model=reviewer_model,
         cost_controller=cost_controller,
         deal_memory=deal_memory,
+        tenant_user_id=uid or mem_uid,
+        active_thesis=thesis_ctx,
     )
-    
+
+    portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
+    from portfolio.store import PortfolioStore
+
+    portfolio_store = PortfolioStore(data_dir=portfolio_dir, user_id=uid if uid else None)
+
     partner_engine = PartnerEngine(
         storage=storage,
         interval_seconds=partner_interval,
         use_llm_fallback=use_llm_fallback,
         cost_controller=cost_controller,
         deal_memory=deal_memory,
+        portfolio_store=portfolio_store,
+        tenant_user_id=uid or mem_uid,
+        fund_thesis=thesis_ctx,
     )
-    
-    portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
-    from portfolio.store import PortfolioStore
-    portfolio_store = PortfolioStore(data_dir=portfolio_dir)
     portfolio_engine = PortfolioEngine(
         discovery_storage=storage,
         portfolio_store=portfolio_store,
@@ -201,6 +220,7 @@ async def run_system(user_id: Optional[str]):
     meta_agent = MetaAgent(
         scout_engine=scout_engine,
         reviewer_engine=reviewer_engine,
+        user_id=uid or mem_uid,
     )
     meta_agent_engine = MetaAgentEngine(meta_agent)
 

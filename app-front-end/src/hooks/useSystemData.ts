@@ -1,10 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchStartups } from '../api/startups';
 import { fetchEscalations } from '../api/escalations';
 import { fetchSignals } from '../api/signals';
 import { fetchRejectionAnalytics, fetchWatchlistAnalytics, fetchConcentrationAnalytics } from '../api/analytics';
 import { fetchMetaReports, fetchScoutWeights, fetchCalibrationState } from '../api/meta';
 import { fetchSettings } from '../api/settings';
+import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
+import { useQueryLiveGate } from './useQueryLiveGate';
 import type {
   Startup, EscalationItem, SignalItem,
   RejectionAnalytics, WatchlistAnalytics, ConcentrationAnalytics,
@@ -12,92 +15,21 @@ import type {
 } from '../types/startup';
 import type { Settings } from '../api/settings';
 
-const POLL_STARTUPS = 12_000;
-const POLL_ESCALATIONS = 30_000;
-const POLL_SIGNALS = 60_000;
-const POLL_META = 60_000;
-const POLL_ANALYTICS = 300_000;
-const POLL_SETTINGS = 60_000;
-const STARTUPS_DELAY = 0;
-const ESCALATIONS_DELAY = 1_200;
-const SIGNALS_DELAY = 2_400;
-const META_REPORTS_DELAY = 3_600;
-const ANALYTICS_REJECTION_DELAY = 4_800;
-const ANALYTICS_WATCHLIST_DELAY = 6_000;
-const ANALYTICS_CONCENTRATION_DELAY = 7_200;
-const SCOUT_WEIGHTS_DELAY = 8_400;
-const CALIBRATION_DELAY = 9_600;
-const SETTINGS_DELAY = 10_800;
-const POLL_STARTUPS_FAST = 4_000;
-const POLL_META_SLOW = 180_000;
-const POLL_ANALYTICS_SLOW = 900_000;
+const emptyRejection: RejectionAnalytics = {
+  most_common_red_flags: [],
+  rejection_by_sector: {},
+  avg_scores_at_rejection: {},
+  most_common_fail_dimensions: [],
+};
 
-function usePoll<T>(
-  fetcher: () => Promise<T>,
-  interval: number,
-  initial: T,
-  initialDelayMs = 0,
-  enabled = true,
-  /** Increment to run an immediate fetch (e.g. System panel opened). */
-  refreshKey = 0
-): T {
-  const [data, setData] = useState<T>(initial);
-  const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
-  const refreshKeyRef = useRef(refreshKey);
-
-  useEffect(() => {
-    if (!enabled) return;
-
-    let active = true;
-    let inFlight = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const run = () => {
-      if (!active || inFlight) return;
-      inFlight = true;
-      fetcherRef.current()
-        .then((d) => {
-          if (active) setData(d);
-        })
-        .catch(() => {})
-        .finally(() => {
-          inFlight = false;
-        });
-    };
-    if (initialDelayMs > 0) {
-      timeoutId = setTimeout(run, initialDelayMs);
-    } else {
-      run();
-    }
-    const id = setInterval(run, interval);
-    return () => {
-      active = false;
-      clearInterval(id);
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [interval, initialDelayMs, enabled]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    if (refreshKeyRef.current === refreshKey) return;
-    refreshKeyRef.current = refreshKey;
-    if (refreshKey === 0) return;
-
-    let cancelled = false;
-    fetcherRef.current()
-      .then((d) => {
-        if (!cancelled) setData(d);
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshKey, enabled]);
-
-  return data;
-}
+const defaultCalibration: CalibrationState = {
+  confidence_threshold_override: null,
+  reviewer_weak_threshold_override: null,
+  reviewer_strong_threshold_override: null,
+  last_calibrated_at: null,
+  last_calibrated_cycle: 0,
+  calibration_history: [],
+};
 
 export interface SystemData {
   startups: Startup[];
@@ -111,28 +43,23 @@ export interface SystemData {
   calibrationState: CalibrationState;
   settings: Settings | null;
   pendingEscalationCount: number;
+  startupsError: string | null;
+  /** Shared tab + idle gate for child components (e.g. agents status). */
+  liveGate: QueryLiveGate;
 }
 
 export interface UseSystemDataOptions {
   systemPanelOpen?: boolean;
-  lookupActive?: boolean;
 }
 
 export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
-  const { systemPanelOpen = false, lookupActive = false } = options;
-  const [isTabVisible, setIsTabVisible] = useState(() =>
-    typeof document === 'undefined' ? true : document.visibilityState === 'visible'
-  );
-  const [systemIntelRefreshKey, setSystemIntelRefreshKey] = useState(0);
+  const { systemPanelOpen = false } = options;
+  const queryClient = useQueryClient();
+  const { tabVisible: isTabVisible, userActive } = useQueryLiveGate();
+  const liveGate: QueryLiveGate = { tabVisible: isTabVisible, userActive };
+
   const prevSystemPanelOpen = useRef(systemPanelOpen);
   const prevTabVisible = useRef(isTabVisible);
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const handleVisibility = () => setIsTabVisible(document.visibilityState === 'visible');
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, []);
 
   useEffect(() => {
     const panelJustOpened = systemPanelOpen && !prevSystemPanelOpen.current;
@@ -140,54 +67,127 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     prevSystemPanelOpen.current = systemPanelOpen;
     prevTabVisible.current = isTabVisible;
 
+    if (tabJustVisible) {
+      void queryClient.invalidateQueries({ queryKey: ['startups', 'list'] });
+    }
+
     if (!systemPanelOpen || !isTabVisible) return;
     if (panelJustOpened || tabJustVisible) {
-      setSystemIntelRefreshKey((k) => k + 1);
+      void queryClient.invalidateQueries({ queryKey: ['meta'] });
+      void queryClient.invalidateQueries({ queryKey: ['analytics'] });
     }
-  }, [systemPanelOpen, isTabVisible]);
+  }, [systemPanelOpen, isTabVisible, queryClient]);
 
-  const startupsPollMs = lookupActive ? POLL_STARTUPS_FAST : POLL_STARTUPS;
-  const metaPollMs = systemPanelOpen ? POLL_META : POLL_META_SLOW;
-  const analyticsPollMs = systemPanelOpen ? POLL_ANALYTICS : POLL_ANALYTICS_SLOW;
+  const startupsQuery = useQuery({
+    queryKey: ['startups', 'list'],
+    queryFn: fetchStartups,
+    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 60_000 }),
+    placeholderData: (prev) => prev ?? [],
+  });
 
-  const startups = usePoll(fetchStartups, startupsPollMs, [], STARTUPS_DELAY, isTabVisible);
-  const escalations = usePoll(fetchEscalations, POLL_ESCALATIONS, [], ESCALATIONS_DELAY, isTabVisible);
-  const signals = usePoll(fetchSignals, POLL_SIGNALS, [], SIGNALS_DELAY, isTabVisible);
-  const metaReports = usePoll(fetchMetaReports, metaPollMs, [], META_REPORTS_DELAY, isTabVisible, systemIntelRefreshKey);
-  const rejectionAnalytics = usePoll(fetchRejectionAnalytics, analyticsPollMs, {
-    most_common_red_flags: [], rejection_by_sector: {}, avg_scores_at_rejection: {}, most_common_fail_dimensions: [],
-  }, ANALYTICS_REJECTION_DELAY, isTabVisible, systemIntelRefreshKey);
-  const watchlistAnalytics = usePoll(
-    fetchWatchlistAnalytics,
-    analyticsPollMs,
-    { total: 0, stale: 0, avg_days: 0 },
-    ANALYTICS_WATCHLIST_DELAY,
-    isTabVisible,
-    systemIntelRefreshKey
-  );
-  const concentrationAnalytics = usePoll(fetchConcentrationAnalytics, analyticsPollMs, {
-    by_sector: {}, most_concentrated_sector: '', most_concentrated_theme: '', last_updated: '',
-  }, ANALYTICS_CONCENTRATION_DELAY, isTabVisible, systemIntelRefreshKey);
-  const scoutWeights = usePoll(fetchScoutWeights, metaPollMs, {
-    MarketDrivenScout: 0.25, BuilderTechnicalScout: 0.25, PainPointScout: 0.25, ContrarianScout: 0.25,
-  }, SCOUT_WEIGHTS_DELAY, isTabVisible, systemIntelRefreshKey);
-  const calibrationState = usePoll(fetchCalibrationState, metaPollMs, {
-    confidence_threshold_override: null, reviewer_weak_threshold_override: null,
-    reviewer_strong_threshold_override: null, last_calibrated_at: null, last_calibrated_cycle: 0, calibration_history: [],
-  }, CALIBRATION_DELAY, isTabVisible, systemIntelRefreshKey);
-  const settings = usePoll<Settings | null>(
-    () => fetchSettings().catch(() => null),
-    POLL_SETTINGS,
-    null,
-    SETTINGS_DELAY,
-    isTabVisible
-  );
+  const escalationsQuery = useQuery({
+    queryKey: ['escalations'],
+    queryFn: fetchEscalations,
+    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 120_000 }),
+    placeholderData: (prev) => prev ?? [],
+  });
+
+  const signalsQuery = useQuery({
+    queryKey: ['signals'],
+    queryFn: fetchSignals,
+    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 120_000 }),
+    placeholderData: (prev) => prev ?? [],
+  });
+
+  const metaReportsQuery = useQuery({
+    queryKey: ['meta', 'reports'],
+    queryFn: fetchMetaReports,
+    ...getQueryConfig('STATIC'),
+    placeholderData: (prev) => prev ?? [],
+  });
+
+  const rejectionAnalyticsQuery = useQuery({
+    queryKey: ['analytics', 'rejections'],
+    queryFn: fetchRejectionAnalytics,
+    ...getQueryConfig('STATIC'),
+    placeholderData: (prev) => prev ?? emptyRejection,
+  });
+
+  const watchlistAnalyticsQuery = useQuery({
+    queryKey: ['analytics', 'watchlist'],
+    queryFn: fetchWatchlistAnalytics,
+    ...getQueryConfig('STATIC'),
+    placeholderData: (prev) => prev ?? { total: 0, stale: 0, avg_days: 0 },
+  });
+
+  const concentrationAnalyticsQuery = useQuery({
+    queryKey: ['analytics', 'concentration'],
+    queryFn: fetchConcentrationAnalytics,
+    ...getQueryConfig('STATIC'),
+    placeholderData: (prev) =>
+      prev ?? {
+        by_sector: {},
+        most_concentrated_sector: '',
+        most_concentrated_theme: '',
+        last_updated: '',
+      },
+  });
+
+  const scoutWeightsQuery = useQuery({
+    queryKey: ['meta', 'weights'],
+    queryFn: fetchScoutWeights,
+    ...getQueryConfig('STATIC'),
+    placeholderData: (prev) =>
+      prev ?? {
+        MarketDrivenScout: 0.25,
+        BuilderTechnicalScout: 0.25,
+        PainPointScout: 0.25,
+        ContrarianScout: 0.25,
+      },
+  });
+
+  const calibrationQuery = useQuery({
+    queryKey: ['meta', 'calibration'],
+    queryFn: fetchCalibrationState,
+    ...getQueryConfig('STATIC'),
+    placeholderData: (prev) => prev ?? defaultCalibration,
+  });
+
+  const settingsQuery = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => fetchSettings().catch(() => null),
+    ...getQueryConfig('STATIC'),
+    placeholderData: (prev) => prev ?? null,
+  });
+
+  const startups = startupsQuery.data ?? [];
+  const escalations = escalationsQuery.data ?? [];
 
   const pendingEscalationCount = escalations.filter((e) => !e.human_resolution).length;
 
   return {
-    startups, escalations, signals, metaReports,
-    rejectionAnalytics, watchlistAnalytics, concentrationAnalytics,
-    scoutWeights, calibrationState, settings, pendingEscalationCount,
+    startups,
+    escalations,
+    signals: signalsQuery.data ?? [],
+    metaReports: metaReportsQuery.data ?? [],
+    rejectionAnalytics: rejectionAnalyticsQuery.data ?? emptyRejection,
+    watchlistAnalytics: watchlistAnalyticsQuery.data ?? { total: 0, stale: 0, avg_days: 0 },
+    concentrationAnalytics: concentrationAnalyticsQuery.data ?? {
+      by_sector: {},
+      most_concentrated_sector: '',
+      most_concentrated_theme: '',
+      last_updated: '',
+    },
+    scoutWeights: scoutWeightsQuery.data ?? {
+      MarketDrivenScout: 0.25,
+      BuilderTechnicalScout: 0.25,
+      PainPointScout: 0.25,
+      ContrarianScout: 0.25,
+    },
+    calibrationState: calibrationQuery.data ?? defaultCalibration,
+    settings: settingsQuery.data ?? null,
+    pendingEscalationCount,
+    startupsError: startupsQuery.isError ? 'Could not load startups' : null,
+    liveGate,
   };
 }

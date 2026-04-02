@@ -4,3 +4,5 @@ scripts/
 unused_components/
 node_modules/
 .vite/
+__pycache__/
+*.py[cod]

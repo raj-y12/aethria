@@ -63,9 +63,23 @@ class PortfolioEngine:
         if portfolio_store is None:
             portfolio_store = PortfolioStore()
         self.portfolio_store = portfolio_store
-        
+
+        tenant_uid = getattr(self.portfolio_store, "_tenant_user_id", None)
+        if not tenant_uid:
+            tenant_uid = os.getenv("AETHRIA_AGENT_USER_ID", "").strip() or None
+        use_sb = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+        if use_sb and not tenant_uid:
+            raise RuntimeError(
+                "PortfolioEngine requires explicit tenant: set PortfolioStore(..., user_id=...) "
+                "or AETHRIA_AGENT_USER_ID when USE_SUPABASE_STORAGE is enabled"
+            )
+        offline = (tenant_uid or "offline_analytics").strip()
+
         # Initialize components
-        self.rejection_analyzer = RejectionAnalyzer(data_dir=str(self.portfolio_store.data_dir))
+        self.rejection_analyzer = RejectionAnalyzer(
+            data_dir=str(self.portfolio_store.data_dir),
+            user_id=tenant_uid,
+        )
         self.execution_agent = ExecutionAgent(
             self.portfolio_store, rejection_analyzer=self.rejection_analyzer,
         )
@@ -75,7 +89,7 @@ class PortfolioEngine:
         )
         self.cost_controller = CostController()
         self.health_monitor = HealthMonitor(self.portfolio_store, discovery_storage=self.discovery_storage)
-        self.cluster_analyzer = ClusterAnalyzer()
+        self.cluster_analyzer = ClusterAnalyzer(user_id=offline)
         
         # Intervals
         self.execution_interval = execution_interval
@@ -226,16 +240,14 @@ class PortfolioEngine:
                 elif days > 60 and not has_signals:
                     self.logger.warning(f"Watchlist decay: {startup_id} ({days} days, no signals) - escalating")
 
-                    def updater(data):
-                        for i, item in enumerate(data):
-                            if item.get("startup_id") == startup_id:
-                                pi = item.get("partner_info") or {}
-                                pi["human_review_required"] = True
-                                item["partner_info"] = pi
-                                return data
-                        return data
-
-                    self.discovery_storage._atomic_update(updater)
+                    st = self.discovery_storage.get_startup(startup_id)
+                    pi = (
+                        dict(st.partner_info.model_dump(mode="json"))
+                        if st and st.partner_info
+                        else {}
+                    )
+                    pi["human_review_required"] = True
+                    self.discovery_storage.update_startup_partial(startup_id, {"partner_info": pi})
                     self.portfolio_store.add_signal(
                         startup_id=startup_id,
                         signal_type="negative",

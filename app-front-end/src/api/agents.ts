@@ -23,6 +23,9 @@ export interface AgentsStatus {
   supabase_configured: boolean;
   openai_configured: boolean;
   agents_will_run: boolean;
+  thesis_ready?: boolean;
+  active_thesis_version_id?: string | null;
+  thesis_error?: string | null;
 }
 
 export async function fetchAgentsStatus(): Promise<AgentsStatus | null> {

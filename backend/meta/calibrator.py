@@ -1,11 +1,10 @@
 """
 ThresholdCalibrator — adjusts sensitivity parameters based on calibration warnings.
-Backed by Supabase meta_calibration_state and meta_mutation_log.
+Backed by Supabase meta_calibration_state and meta_mutation_log (explicit user_id).
 """
 import logging
 import os
-from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from datetime import datetime
 
 from supabase_doc_store import doc_get, doc_set, list_append_only
@@ -32,23 +31,22 @@ CALIBRATION_COOLDOWN_CYCLES = int(os.getenv("META_AGENT_MUTATION_COOLDOWN_CYCLES
 CALIBRATION_PARAM_COOLDOWN = 5
 
 
-def load_calibration_state() -> Dict[str, Any]:
-    """Load current calibration state from Supabase."""
-    data = doc_get(_CALIBRATION_TABLE)
+def load_calibration_state(user_id: str) -> Dict[str, Any]:
+    data = doc_get(_CALIBRATION_TABLE, user_id=user_id)
     return data if isinstance(data, dict) else dict(DEFAULT_CALIBRATION)
 
 
 class ThresholdCalibrator:
     """Adjusts confidence and reviewer thresholds based on calibration warnings."""
 
-    def __init__(self, signal_summary: Dict[str, Any], cycle_number: int):
+    def __init__(self, signal_summary: Dict[str, Any], cycle_number: int, user_id: str):
         self.signal = signal_summary
         self.cycle_number = cycle_number
+        self.user_id = user_id
         self.logger = logging.getLogger("meta.calibrator")
-        self.state = load_calibration_state()
+        self.state = load_calibration_state(user_id)
 
     def decide(self) -> List[Dict]:
-        """Decide calibration changes. Returns list of CalibrationMutation."""
         reviewer_health = self.signal.get("reviewer_health", {})
         warning = reviewer_health.get("calibration_warning")
         changes = []
@@ -60,11 +58,11 @@ class ThresholdCalibrator:
             return []
 
         from utils.settings_loader import load_settings
-        settings = load_settings()
+
+        settings = load_settings(self.user_id)
         default_confidence = settings.get("agent_config", {}).get("confidence_threshold", 0.5)
 
         if warning and "too strict" in warning.lower():
-            # Loosen
             current_ct = self.state.get("confidence_threshold_override") or default_confidence
             new_ct = max(CONFIDENCE_FLOOR, round(current_ct - 0.05, 3))
             if new_ct != current_ct:
@@ -96,7 +94,6 @@ class ThresholdCalibrator:
                 })
 
         elif warning and "too lenient" in warning.lower():
-            # Tighten
             current_ct = self.state.get("confidence_threshold_override") or default_confidence
             new_ct = min(CONFIDENCE_CEILING, round(current_ct + 0.05, 3))
             if new_ct != current_ct:
@@ -128,14 +125,12 @@ class ThresholdCalibrator:
                 })
 
         else:
-            # No warning — drift overrides back toward defaults
-            drifted = False
             ct_override = self.state.get("confidence_threshold_override")
             if ct_override is not None and ct_override != default_confidence:
                 delta = 0.02 if ct_override < default_confidence else -0.02
                 new_ct = round(ct_override + delta, 3)
                 if abs(new_ct - default_confidence) < 0.02:
-                    new_ct = None  # Reset to default
+                    new_ct = None
                 changes.append({
                     "parameter": "confidence_threshold",
                     "previous_value": ct_override,
@@ -146,7 +141,6 @@ class ThresholdCalibrator:
                     "applied_at": now,
                     "cycle_number": self.cycle_number,
                 })
-                drifted = True
 
             wt_override = self.state.get("reviewer_weak_threshold_override")
             default_weak = 6.0
@@ -168,12 +162,10 @@ class ThresholdCalibrator:
 
         return changes
 
-    @staticmethod
-    def apply(changes: List[Dict], cycle_number: int = 0) -> None:
-        """Write calibration changes to state and mutation log."""
+    def apply(self, changes: List[Dict]) -> None:
         if not changes:
             return
-        state = load_calibration_state()
+        state = load_calibration_state(self.user_id)
         for change in changes:
             param = change["parameter"]
             new_val = change["new_value"]
@@ -185,15 +177,19 @@ class ThresholdCalibrator:
                 state["reviewer_strong_threshold_override"] = new_val
 
             state["calibration_history"].append(change)
-            list_append_only(_MUTATION_LOG_TABLE, {
-                "type": "calibration",
-                "agent_target": param,
-                "cycle_number": change["cycle_number"],
-                "applied_at": change["applied_at"],
-                "direction": change["direction"],
-                "reasoning": change["reasoning"],
-            })
+            list_append_only(
+                _MUTATION_LOG_TABLE,
+                {
+                    "type": "calibration",
+                    "agent_target": param,
+                    "cycle_number": change["cycle_number"],
+                    "applied_at": change["applied_at"],
+                    "direction": change["direction"],
+                    "reasoning": change["reasoning"],
+                },
+                user_id=self.user_id,
+            )
 
         state["last_calibrated_at"] = datetime.now().isoformat()
-        state["last_calibrated_cycle"] = cycle_number or (changes[0]["cycle_number"] if changes else 0)
-        doc_set(_CALIBRATION_TABLE, state)
+        state["last_calibrated_cycle"] = changes[0]["cycle_number"] if changes else 0
+        doc_set(_CALIBRATION_TABLE, state, user_id=self.user_id)

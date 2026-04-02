@@ -1,12 +1,13 @@
 """
 Cross-agent deal memory for institutional learning.
-Backed by Supabase memory table.
+Backed by Supabase memory table (explicit user_id per tenant).
 """
 import logging
 import re
 from collections import Counter
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Any
 
+from tenant_context import require_user_id
 from supabase_doc_store import doc_get, doc_set
 
 logger = logging.getLogger(__name__)
@@ -29,13 +30,11 @@ _STOP_WORDS = frozenset(
 
 
 def _tokenize(text: str) -> List[str]:
-    """Lowercase, split on non-alpha, remove stop words and short tokens."""
     words = re.findall(r"[a-z0-9]+", text.lower())
     return [w for w in words if w not in _STOP_WORDS and len(w) > 2]
 
 
 def _word_overlap_similarity(a: str, b: str) -> float:
-    """Jaccard-like similarity using word overlap. Returns 0-1."""
     tokens_a = set(_tokenize(a))
     tokens_b = set(_tokenize(b))
     if not tokens_a or not tokens_b:
@@ -55,34 +54,33 @@ class DealMemory:
     MAX_SUCCESSFUL = 50
     SIMILARITY_THRESHOLD = 0.75
 
-    def __init__(self, file_path: str = "data/memory.json"):
+    def __init__(self, user_id: str):
         self.logger = logging.getLogger("deal_memory")
-        data = doc_get(_MEMORY_TABLE)
+        self._user_id = require_user_id(user_id, context="DealMemory")
+        data = doc_get(_MEMORY_TABLE, user_id=self._user_id)
         if not data or not isinstance(data, dict):
-            doc_set(_MEMORY_TABLE, dict(_DEFAULT_MEMORY))
+            doc_set(_MEMORY_TABLE, dict(_DEFAULT_MEMORY), user_id=self._user_id)
 
     def _read(self) -> Dict[str, Any]:
-        data = doc_get(_MEMORY_TABLE)
+        data = doc_get(_MEMORY_TABLE, user_id=self._user_id)
         if not isinstance(data, dict):
             return dict(_DEFAULT_MEMORY)
         return data
 
     def _write(self, data: Dict[str, Any]) -> None:
-        doc_set(_MEMORY_TABLE, data)
+        doc_set(_MEMORY_TABLE, data, user_id=self._user_id)
 
     def is_duplicate_thesis(self, thesis: str) -> bool:
-        """Check if thesis is too similar to any seen thesis."""
         if not thesis:
             return False
         data = self._read()
         for existing in data.get("seen_theses", []):
             if _word_overlap_similarity(thesis, existing) > self.SIMILARITY_THRESHOLD:
-                self.logger.info(f"Duplicate thesis detected: '{thesis[:60]}...'")
+                self.logger.info("Duplicate thesis detected: '%s...'", thesis[:60])
                 return True
         return False
 
     def record_scout_discovery(self, sector: str, primary_thesis: str) -> None:
-        """Record a new scout discovery."""
         data = self._read()
         sectors = data.get("seen_sectors", {})
         sectors[sector] = sectors.get(sector, 0) + 1
@@ -94,7 +92,6 @@ class DealMemory:
         self._write(data)
 
     def record_failed_assumptions(self, assumptions: List[str]) -> None:
-        """Record assumptions that received negative feedback."""
         if not assumptions:
             return
         data = self._read()
@@ -104,7 +101,6 @@ class DealMemory:
         self._write(data)
 
     def record_successful_thesis(self, thesis: str) -> None:
-        """Record a thesis from a YES decision."""
         if not thesis:
             return
         data = self._read()
@@ -114,19 +110,16 @@ class DealMemory:
         self._write(data)
 
     def get_oversaturated_sectors(self, top_n: int = 3) -> List[str]:
-        """Return top N most scouted sectors."""
         data = self._read()
         sectors = data.get("seen_sectors", {})
         sorted_sectors = sorted(sectors.items(), key=lambda x: x[1], reverse=True)
         return [s[0] for s in sorted_sectors[:top_n]]
 
     def get_recent_failed_assumptions(self, n: int = 5) -> List[str]:
-        """Return last N failed assumptions."""
         data = self._read()
         return data.get("failed_assumptions", [])[-n:]
 
     def get_memory_context_for_scout(self) -> str:
-        """Build dynamic prompt augmentation for scouts."""
         oversaturated = self.get_oversaturated_sectors(3)
         failed = self.get_recent_failed_assumptions(5)
         parts = []

@@ -9,7 +9,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import List, Optional, Callable, Any
+from typing import List, Optional, Callable, Any, Dict
 
 import fcntl
 import os
@@ -25,6 +25,18 @@ _READ_RETRIES = 5
 _READ_RETRY_DELAY = 0.1
 _WRITE_RETRIES = 5
 _WRITE_RETRY_DELAY = 0.1
+
+
+def _merge_startup_dict_patch(base: dict, patch: Dict[str, Any]) -> None:
+    """Shallow-merge patch into startup dict; nested merge for scout/review/partner/financials blobs."""
+    merge_keys = ("scout_info", "review_info", "partner_info", "financials")
+    for k, v in patch.items():
+        if k in merge_keys and isinstance(v, dict) and isinstance(base.get(k), dict):
+            merged = dict(base[k])
+            merged.update(v)
+            base[k] = merged
+        else:
+            base[k] = v
 
 
 def _parse_list(raw: Any) -> List[dict]:
@@ -123,7 +135,7 @@ class Storage:
                     except Exception:
                         pass
 
-    def add_startup(self, scout_info: ScoutInfo) -> str:
+    def add_startup(self, scout_info: ScoutInfo, *, pipeline_run_id: Optional[str] = None) -> str:
         """
         Add a new startup from Scout discovery.
         Duplicate detection by startup_id; logs warning if same ID already exists.
@@ -157,7 +169,9 @@ class Storage:
         self.logger.info(f"Added startup: {startup.scout_info.name} ({startup.startup_id})")
         return startup.startup_id
 
-    def add_review(self, startup_id: str, review_info: ReviewInfo) -> bool:
+    def add_review(
+        self, startup_id: str, review_info: ReviewInfo, *, pipeline_run_id: Optional[str] = None
+    ) -> bool:
         """Add review to existing startup. Updates updated_at. Returns False if not found."""
         found_ref: List[bool] = [False]
 
@@ -184,7 +198,14 @@ class Storage:
             self.logger.error(f"Startup {startup_id} not found for review")
         return found_ref[0]
 
-    def add_partner_decision(self, startup_id: str, partner_info: PartnerInfo) -> bool:
+    def add_partner_decision(
+        self,
+        startup_id: str,
+        partner_info: PartnerInfo,
+        *,
+        investment_memo_markdown: Optional[str] = None,
+        pipeline_run_id: Optional[str] = None,
+    ) -> bool:
         """Add partner decision (YES/NO/MAYBE, human_review_required, next_action, etc.). Updates updated_at."""
         found_ref: List[bool] = [False]
 
@@ -198,6 +219,8 @@ class Storage:
                     self.logger.error(f"Invalid startup {startup_id} in storage: {e}")
                     return data
                 startup.partner_info = partner_info
+                if investment_memo_markdown is not None:
+                    startup.investment_memo_markdown = investment_memo_markdown
                 startup.update_timestamp()
                 data[i] = startup.to_dict()
                 found_ref[0] = True
@@ -236,6 +259,35 @@ class Storage:
             self.logger.info(f"Updated financials for startup {startup_id}")
         else:
             self.logger.error(f"Startup {startup_id} not found")
+        return found_ref[0]
+
+    def update_startup_partial(self, startup_id: str, patch: Dict[str, Any]) -> bool:
+        """Merge top-level fields into one startup record (file-backed atomic update)."""
+        found_ref: List[bool] = [False]
+
+        def updater(data: List[dict]) -> List[dict]:
+            for i, item in enumerate(data):
+                if item.get("startup_id") != startup_id:
+                    continue
+                try:
+                    startup = Startup.from_dict(item)
+                except Exception as e:
+                    self.logger.error(f"Invalid startup {startup_id} in storage: {e}")
+                    return data
+                base = startup.to_dict()
+                _merge_startup_dict_patch(base, patch)
+                try:
+                    merged = Startup.from_dict(base)
+                except Exception as e:
+                    self.logger.error(f"Invalid startup after patch {startup_id}: {e}")
+                    return data
+                merged.update_timestamp()
+                data[i] = merged.to_dict()
+                found_ref[0] = True
+                return data
+            return data
+
+        self._atomic_update(updater)
         return found_ref[0]
 
     def get_startup(self, startup_id: str) -> Optional[Startup]:
@@ -390,11 +442,13 @@ class Storage:
         """Backward compatibility: undecided startups as dicts."""
         return [s.to_dict() for s in self.get_undecided(limit=limit)]
 
-    def add_discovery(self, scout_output: dict) -> str:
+    def add_discovery(
+        self, scout_output: dict, *, pipeline_run_id: Optional[str] = None
+    ) -> str:
         """Backward compatibility: add from old ScoutOutput dict."""
         from utils.adapters import scout_output_to_scout_info
         scout_info = scout_output_to_scout_info(scout_output)
-        return self.add_startup(scout_info)
+        return self.add_startup(scout_info, pipeline_run_id=pipeline_run_id)
 
     def get_unreviewed_entries(self, limit: Optional[int] = None) -> List[dict]:
         """Backward compatibility: unreviewed startups as dicts."""

@@ -37,10 +37,14 @@ def _read_json(path: Path) -> Any:
         return {}
 
 
+_REJECTION_PATTERNS_KEY = "rejection_patterns"
+
+
 class MetaAnalyser:
     """Reads all available signal sources and produces a structured SignalSummary."""
 
-    def __init__(self):
+    def __init__(self, user_id: str):
+        self.user_id = user_id
         self.logger = logging.getLogger("meta.analyser")
         self.cooldown_cycles = int(os.getenv("META_AGENT_MUTATION_COOLDOWN_CYCLES", "3"))
 
@@ -89,19 +93,22 @@ class MetaAnalyser:
         }
 
     def _read_agent_metrics(self) -> Any:
-        return list_get_all("portfolio_agent_metrics")
+        return list_get_all("portfolio_agent_metrics", user_id=self.user_id)
 
     def _read_rejection_patterns(self) -> Dict:
+        data = doc_get("memory", _REJECTION_PATTERNS_KEY, user_id=self.user_id)
+        if isinstance(data, dict) and data:
+            return data
         path = _BACKEND_DIR / "data" / "portfolio" / "rejection_patterns.json"
-        data = _read_json(path)
-        return data if isinstance(data, dict) else {}
+        legacy = _read_json(path)
+        return legacy if isinstance(legacy, dict) else {}
 
     def _read_memory(self) -> Dict:
-        data = doc_get("memory")
+        data = doc_get("memory", user_id=self.user_id)
         return data if isinstance(data, dict) else {}
 
     def _read_scout_weights(self) -> Dict[str, float]:
-        data = doc_get("meta_scout_weights")
+        data = doc_get("meta_scout_weights", user_id=self.user_id)
         if isinstance(data, dict) and data:
             return data
         return {
@@ -112,10 +119,10 @@ class MetaAnalyser:
         }
 
     def _read_mutation_log(self) -> List[Dict]:
-        return list_get_all("meta_mutation_log")
+        return list_get_all("meta_mutation_log", user_id=self.user_id)
 
     def _read_concentration(self) -> Dict:
-        data = doc_get("analytics_sector_concentration")
+        data = doc_get("analytics_sector_concentration", user_id=self.user_id)
         return data if isinstance(data, dict) else {}
 
     def _build_scout_performance(

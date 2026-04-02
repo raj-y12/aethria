@@ -1,6 +1,7 @@
 import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
-import type { Startup } from '../types/startup';
+import type { Startup, Review } from '../types/startup';
 import {
   buildMemoPDF,
   buildIcMarkdown,
@@ -40,11 +41,33 @@ function buildScoreJustification(startup: Startup): string | null {
   return `Average ${avg.toFixed(1)}/10. Scores reflect promising but incomplete validation.`;
 }
 
+function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | null): Startup {
+  if (!partial) return base;
+  return {
+    ...base,
+    scout: partial.scout ?? base.scout,
+    review: partial.review ?? base.review,
+    partner: partial.partner ?? base.partner,
+  };
+}
+
+function reviewHasThesisAlignment(r: Review | null | undefined): boolean {
+  if (!r) return false;
+  return (
+    r.thesis_alignment_score != null ||
+    (r.thesis_fit_points?.length ?? 0) > 0 ||
+    (r.thesis_deviation_points?.length ?? 0) > 0 ||
+    r.thesis_matches_fund != null
+  );
+}
+
 export interface InvestmentMemoContentProps {
   startup: Startup | null;
   onClose?: () => void;
   /** When true, used in side panel (no outer padding; panel provides it). */
   embedded?: boolean;
+  /** After persisted memo becomes ready; use to refetch startup detail. */
+  onMemoPipelineReady?: () => void;
 }
 
 export interface InvestmentMemoContentHandle {
@@ -147,7 +170,7 @@ function pipelineReplayOneLiner(steps: PipelineReplayStep[]): string {
  * When embedded, ref can be used to call downloadPDF() from the parent (e.g. panel header).
  */
 const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, InvestmentMemoContentProps>(function InvestmentMemoContent(
-  { startup, onClose, embedded = false },
+  { startup, onClose, embedded = false, onMemoPipelineReady },
   ref
 ) {
   const reduceMotion = usePrefersReducedMotion();
@@ -156,26 +179,35 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pipelineLogOpen, setPipelineLogOpen] = useState(false);
 
+  const [memoPartial, setMemoPartial] = useState<MemoPartialPayload | null>(null);
+  const [memoPipeline, setMemoPipeline] = useState<'idle' | 'generating' | 'ready' | 'failed'>('idle');
+  const [memoGateError, setMemoGateError] = useState<string | null>(null);
+
+  const displayStartup = useMemo(
+    () => (startup ? mergeMemoPartial(startup, memoPartial) : null),
+    [startup, memoPartial]
+  );
+
   const handleDownloadPDF = useCallback(() => {
-    if (!startup) return;
-    const doc = buildMemoPDF(startup);
-    doc.save(`${icPackSafeBaseName(startup)}-ic-pack.pdf`);
-  }, [startup]);
+    if (!displayStartup) return;
+    const doc = buildMemoPDF(displayStartup);
+    doc.save(`${icPackSafeBaseName(displayStartup)}-ic-pack.pdf`);
+  }, [displayStartup]);
 
   const handleDownloadMarkdown = useCallback(() => {
-    if (!startup) return;
-    const md = buildIcMarkdown(startup);
+    if (!displayStartup) return;
+    const md = buildIcMarkdown(displayStartup);
     const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${icPackSafeBaseName(startup)}-ic-pack.md`;
+    a.download = `${icPackSafeBaseName(displayStartup)}-ic-pack.md`;
     a.rel = 'noopener';
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  }, [startup]);
+  }, [displayStartup]);
 
   useImperativeHandle(
     ref,
@@ -183,22 +215,72 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [handleDownloadPDF, handleDownloadMarkdown]
   );
 
-  const contentKey = startup?.id ?? 'empty';
-  const companyName = startup?.scout.name?.trim() || '';
-  const sectorCategory = startup ? formatSectorAndCategory(startup) : '';
+  const contentKey = displayStartup?.id ?? startup?.id ?? 'empty';
+  const companyName = displayStartup?.scout.name?.trim() || '';
+  const sectorCategory = displayStartup ? formatSectorAndCategory(displayStartup) : '';
 
-  const showJudgment = !!startup?.review && !!startup?.partner?.decision;
-  const decisionHeadline = startup && showJudgment ? partnerDecisionHeadline(startup) : '';
+  useEffect(() => {
+    if (!startup?.id) {
+      setMemoPipeline('idle');
+      setMemoPartial(null);
+      setMemoGateError(null);
+      return;
+    }
+    setMemoPartial(null);
+    setMemoPipeline('idle');
+    setMemoGateError(null);
+    let cancelled = false;
+    let t: ReturnType<typeof setTimeout> | undefined;
+
+    const poll = async () => {
+      try {
+        const res = await fetchMemo(startup.id);
+        if (cancelled) return;
+        if (!res) {
+          t = setTimeout(poll, 2000);
+          return;
+        }
+        if (res.status === 'ready') {
+          setMemoPipeline('ready');
+          setMemoPartial(null);
+          onMemoPipelineReady?.();
+          return;
+        }
+        if (res.status === 'failed') {
+          setMemoPipeline('failed');
+          setMemoGateError(res.error ?? 'Investment memo pipeline failed.');
+          if (res.partial) setMemoPartial(res.partial);
+          return;
+        }
+        setMemoPipeline('generating');
+        if (res.partial) setMemoPartial(res.partial);
+        t = setTimeout(poll, 2000);
+      } catch {
+        if (!cancelled) t = setTimeout(poll, 2000);
+      }
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+      if (t) clearTimeout(t);
+    };
+  }, [startup?.id, onMemoPipelineReady]);
+
+  const showJudgment = !!displayStartup?.review && !!displayStartup?.partner?.decision;
+  const decisionHeadline = displayStartup && showJudgment ? partnerDecisionHeadline(displayStartup) : '';
   const dossierQualityBand = useMemo(
-    () => (startup && showJudgment ? getReviewerQualityBand(startup.review) : null),
-    [startup, showJudgment]
+    () => (displayStartup && showJudgment ? getReviewerQualityBand(displayStartup.review) : null),
+    [displayStartup, showJudgment]
   );
   const decisionBadgeVariant = useMemo(
-    () => (startup && showJudgment ? getPartnerEconomicBadgeVariant(startup) : null),
-    [startup, showJudgment]
+    () => (displayStartup && showJudgment ? getPartnerEconomicBadgeVariant(displayStartup) : null),
+    [displayStartup, showJudgment]
   );
-  const showEscalationBadge = !!(startup?.partner?.human_review_required && decisionBadgeVariant);
-  const reasoningParagraphs = useMemo(() => (startup && showJudgment ? toJudgmentReasoning(startup) : []), [startup, showJudgment]);
+  const showEscalationBadge = !!(displayStartup?.partner?.human_review_required && decisionBadgeVariant);
+  const reasoningParagraphs = useMemo(
+    () => (displayStartup && showJudgment ? toJudgmentReasoning(displayStartup) : []),
+    [displayStartup, showJudgment]
+  );
 
   useEffect(() => {
     setSelectedDimensionIdx(0);
@@ -207,24 +289,24 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   }, [startup?.id]);
 
   const scoreBlocks = useMemo(() => {
-    if (!startup?.review) return [];
+    if (!displayStartup?.review) return [];
     return SCORE_DIMENSIONS.map(({ id, name }) => {
-      const score = startup.review?.[id as keyof typeof startup.review];
+      const score = displayStartup.review?.[id as keyof typeof displayStartup.review];
       const numeric = typeof score === 'number' ? score : null;
-      const reasoning = startup.review?.score_reasoning?.[id]?.trim() || '';
+      const reasoning = displayStartup.review?.score_reasoning?.[id]?.trim() || '';
       return { id, name, score: numeric, reasoning };
     });
-  }, [startup]);
+  }, [displayStartup]);
 
   const scoresSummary = useMemo(() => {
-    if (!startup?.review) return null;
-    return buildScoreJustification(startup);
-  }, [startup]);
-  const nextStepText = startup ? getNextStepText(startup) : '';
+    if (!displayStartup?.review) return null;
+    return buildScoreJustification(displayStartup);
+  }, [displayStartup]);
+  const nextStepText = displayStartup ? getNextStepText(displayStartup) : '';
   const nextStepItems = useMemo(() => parseNextStepItems(nextStepText), [nextStepText]);
   const pipelineReplaySteps = useMemo(
-    () => (startup ? getPipelineReplaySteps(startup) : []),
-    [startup]
+    () => (displayStartup ? getPipelineReplaySteps(displayStartup) : []),
+    [displayStartup]
   );
   const pipelineReplaySummary = useMemo(
     () => pipelineReplayOneLiner(pipelineReplaySteps),
@@ -611,6 +693,42 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           color: rgba(0,33,71,0.2);
         }
 
+        .memoGateStrip{
+          position: sticky;
+          top: 0;
+          z-index: 30;
+          margin: 0 0 10px 0;
+          padding: 8px 0 14px 0;
+          background: var(--color-paper);
+          border-bottom: 1px solid rgba(0,33,71,0.08);
+          pointer-events: none;
+        }
+        .memoGateStripInner{
+          pointer-events: auto;
+          max-width: 100%;
+        }
+        .memoGateTitle{
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-size: 14px;
+          line-height: 1.5;
+          color: rgba(0,33,71,0.78);
+          margin: 8px 0 0 0;
+        }
+        .memoGateDetail{
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+          font-size: 12px;
+          line-height: 1.45;
+          color: rgba(0,33,71,0.48);
+          margin: 5px 0 0 0;
+          max-width: 38rem;
+        }
+        .memoGateStrip--error .memoGateTitle{
+          color: rgba(125, 43, 58, 0.95);
+        }
+        .memoGateStrip--error .memoPipelineKicker{
+          color: rgba(125, 43, 58, 0.72);
+        }
+
         .memoPipelineSection{
           margin: 0;
         }
@@ -719,7 +837,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
       `}</style>
 
-      {!startup ? (
+      {!displayStartup ? (
         <div className="memoEmpty">
           <div className="memoEmptyInner">
             <p className="memoEmptyWordmark">Aethria</p>
@@ -727,7 +845,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           </div>
         </div>
       ) : (
-        <div className="memoScroll" role="region" aria-label="Investment memo">
+        <div className="memoScroll relative" role="region" aria-label="Investment memo">
           {onClose && (
             <div className="memoHeaderActions">
               <button type="button" onClick={handleDownloadPDF} className={actionBtnCls}>
@@ -739,6 +857,24 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               <button type="button" onClick={onClose} className={actionBtnCls}>
                 CLOSE
               </button>
+            </div>
+          )}
+          {memoPipeline === 'failed' && (
+            <div className="memoGateStrip memoGateStrip--error">
+                <motion.div
+                  className="memoGateStripInner"
+                  initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={transitionOrReduced(reduceMotion, {
+                    duration: 0.28,
+                    ease: [0.16, 1, 0.3, 1],
+                  })}
+                  role="alert"
+                >
+                  <p className="memoPipelineKicker">Pipeline</p>
+                  <p className="memoGateTitle">Memo unavailable</p>
+                  <p className="memoGateDetail">{memoGateError}</p>
+                </motion.div>
             </div>
           )}
 
@@ -795,61 +931,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </section>
             )}
 
-            {pipelineReplaySteps.length > 0 && (
-                <section className="memoPipelineSection" aria-label="Run log">
-                  <button
-                    type="button"
-                    className="memoPipelineToggle"
-                    onClick={() => setPipelineLogOpen((v) => !v)}
-                    aria-expanded={pipelineLogOpen}
-                  >
-                    <span className="memoPipelineToggleTitle">
-                      <span className="memoPipelineKicker">Run log</span>
-                      <span className="memoPipelineOneLiner" title={pipelineReplaySummary}>
-                        {pipelineReplaySummary}
-                      </span>
-                    </span>
-                    <span className="memoPipelinePlus">{pipelineLogOpen ? '−' : '+'}</span>
-                  </button>
-                  <motion.div
-                    initial={false}
-                    animate={
-                      reduceMotion
-                        ? { height: pipelineLogOpen ? 'auto' : 0, opacity: pipelineLogOpen ? 1 : 0 }
-                        : pipelineLogOpen
-                          ? { height: 'auto', opacity: 1 }
-                          : { height: 0, opacity: 0 }
-                    }
-                    transition={transitionOrReduced(reduceMotion, {
-                      duration: 0.2,
-                      ease: [0.16, 1, 0.3, 1],
-                    })}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <ol className="memoReplayList">
-                      {pipelineReplaySteps.map((step) => (
-                        <li key={step.id} className="memoReplayItem">
-                          <p className="memoReplayKicker">
-                            <span>{step.label}</span>
-                            <span className={step.done ? 'memoReplayBadge' : 'memoReplayBadge memoReplayBadge--pending'}>
-                              {step.done ? 'Done' : 'Pending'}
-                            </span>
-                          </p>
-                          <p className="memoReplayWhen">{step.atDisplay}</p>
-                          <p className="memoReplayDetail">{step.detail}</p>
-                        </li>
-                      ))}
-                    </ol>
-                  </motion.div>
-                </section>
-            )}
-
-            {startup.review?.overall_summary && (
+            {displayStartup.review?.overall_summary && (
                 <section>
                   <p className="memoLabel">SUMMARY</p>
                   <div className="memoSummaryCallout">
                     <p className="memoOverviewVal" style={{ marginTop: 0 }}>
-                      {startup.review.overall_summary}
+                      {displayStartup.review.overall_summary}
                     </p>
                   </div>
                 </section>
@@ -919,43 +1006,91 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               )}
             </section>
 
+            {reviewHasThesisAlignment(displayStartup.review) && (
+              <section>
+                <p className="memoLabel">THESIS ALIGNMENT</p>
+                {displayStartup.review?.thesis_alignment_score != null ? (
+                  <p className="memoOverviewVal" style={{ marginBottom: 8 }}>
+                    Score:{' '}
+                    {(() => {
+                      const raw = displayStartup.review!.thesis_alignment_score!;
+                      const ten = raw <= 1 ? raw * 10 : raw;
+                      return `${ten.toFixed(1)} / 10`;
+                    })()}
+                    {displayStartup.review.thesis_matches_fund != null
+                      ? ` · ${displayStartup.review.thesis_matches_fund ? 'Matches mandate' : 'Outside mandate'}`
+                      : ''}
+                    {displayStartup.review.thesis_alignment_confidence != null
+                      ? ` · Confidence ${(displayStartup.review.thesis_alignment_confidence * 100).toFixed(0)}%`
+                      : ''}
+                  </p>
+                ) : null}
+                {(displayStartup.review?.thesis_fit_points?.length ?? 0) > 0 ? (
+                  <div className="memoOverviewRow">
+                    <p className="memoOverviewKey">FITS</p>
+                    <ul className="memoList" style={{ marginTop: 2 }}>
+                      {(displayStartup.review?.thesis_fit_points ?? []).map((item, i) => (
+                        <li key={i} className="memoListItem">
+                          <span className="memoBullet">·</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {(displayStartup.review?.thesis_deviation_points?.length ?? 0) > 0 ? (
+                  <div className="memoOverviewRow">
+                    <p className="memoOverviewKey">GAPS</p>
+                    <ul className="memoList" style={{ marginTop: 2 }}>
+                      {(displayStartup.review?.thesis_deviation_points ?? []).map((item, i) => (
+                        <li key={i} className="memoListItem">
+                          <span className="memoBullet">·</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </section>
+            )}
+
             {/* Overview block */}
             <section>
               <p className="memoLabel">OVERVIEW</p>
               <div className="memoOverviewRow">
                 <p className="memoOverviewKey">PROBLEM</p>
-                <p className="memoOverviewVal">{startup.scout.problem?.trim() || '—'}</p>
+                <p className="memoOverviewVal">{displayStartup.scout.problem?.trim() || '—'}</p>
               </div>
               <div className="memoOverviewRow">
                 <p className="memoOverviewKey">SOLUTION</p>
-                <p className="memoOverviewVal">{startup.scout.solution?.trim() || '—'}</p>
+                <p className="memoOverviewVal">{displayStartup.scout.solution?.trim() || '—'}</p>
               </div>
               <div className="memoOverviewRow">
                 <p className="memoOverviewKey">TARGET</p>
-                <p className="memoOverviewVal">{startup.scout.target_users?.trim() || '—'}</p>
+                <p className="memoOverviewVal">{displayStartup.scout.target_users?.trim() || '—'}</p>
               </div>
               <div className="memoOverviewRow">
                 <p className="memoOverviewKey">WHY NOW</p>
-                <p className="memoOverviewVal">{startup.scout.why_now?.trim() || '—'}</p>
+                <p className="memoOverviewVal">{displayStartup.scout.why_now?.trim() || '—'}</p>
               </div>
             </section>
 
-            {(startup.scout.primary_thesis ||
-              (startup.scout.key_assumptions && startup.scout.key_assumptions.length > 0) ||
-              startup.scout.biggest_unknown) && (
+            {(displayStartup.scout.primary_thesis ||
+              (displayStartup.scout.key_assumptions && displayStartup.scout.key_assumptions.length > 0) ||
+              displayStartup.scout.biggest_unknown) && (
                 <section>
                   <p className="memoLabel">HYPOTHESIS</p>
-                  {startup.scout.primary_thesis ? (
+                  {displayStartup.scout.primary_thesis ? (
                     <div className="memoOverviewRow">
                       <p className="memoOverviewKey">THESIS</p>
-                      <p className="memoOverviewVal">{startup.scout.primary_thesis}</p>
+                      <p className="memoOverviewVal">{displayStartup.scout.primary_thesis}</p>
                     </div>
                   ) : null}
-                  {startup.scout.key_assumptions && startup.scout.key_assumptions.length > 0 ? (
+                  {displayStartup.scout.key_assumptions && displayStartup.scout.key_assumptions.length > 0 ? (
                     <div className="memoOverviewRow">
                       <p className="memoOverviewKey">ASSUMPTIONS</p>
                       <ul className="memoList" style={{ marginTop: 2 }}>
-                        {startup.scout.key_assumptions.map((item, i) => (
+                        {displayStartup.scout.key_assumptions.map((item, i) => (
                           <li key={i} className="memoListItem">
                             <span className="memoBullet">·</span>
                             <span>{item}</span>
@@ -964,20 +1099,20 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       </ul>
                     </div>
                   ) : null}
-                  {startup.scout.biggest_unknown ? (
+                  {displayStartup.scout.biggest_unknown ? (
                     <div className="memoOverviewRow">
                       <p className="memoOverviewKey">BIGGEST UNKNOWN</p>
-                      <p className="memoOverviewVal">{startup.scout.biggest_unknown}</p>
+                      <p className="memoOverviewVal">{displayStartup.scout.biggest_unknown}</p>
                     </div>
                   ) : null}
                 </section>
             )}
 
-            {(startup.review?.diligence_red_flags?.length || startup.review?.key_risks?.length) && (
+            {(displayStartup.review?.diligence_red_flags?.length || displayStartup.review?.key_risks?.length) && (
                 <section>
                   <p className="memoLabel">RED FLAGS</p>
                   <ul className="memoList">
-                    {[...(startup.review?.diligence_red_flags ?? []), ...(startup.review?.key_risks ?? [])]
+                    {[...(displayStartup.review?.diligence_red_flags ?? []), ...(displayStartup.review?.key_risks ?? [])]
                       .map((r) => String(r ?? '').trim())
                       .filter(Boolean)
                       .map((r, i) => (
@@ -1008,27 +1143,27 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </section>
             ) : null}
 
-            {(startup.partner?.llm_fallback_reason || startup.partner?.portfolio_context_at_decision) ? (
+            {(displayStartup.partner?.llm_fallback_reason || displayStartup.partner?.portfolio_context_at_decision) ? (
                 <section>
                   <p className="memoLabel">DECISION CONTEXT</p>
-                  {startup.partner?.llm_fallback_reason ? (
+                  {displayStartup.partner?.llm_fallback_reason ? (
                     <div className="memoOverviewRow">
                       <p className="memoOverviewKey">LLM FALLBACK</p>
-                      <p className="memoOverviewVal">{startup.partner.llm_fallback_reason}</p>
+                      <p className="memoOverviewVal">{displayStartup.partner.llm_fallback_reason}</p>
                     </div>
                   ) : null}
-                  {startup.partner?.portfolio_context_at_decision ? (
+                  {displayStartup.partner?.portfolio_context_at_decision ? (
                     <div className="memoOverviewRow">
                       <p className="memoOverviewKey">PORTFOLIO SIZE</p>
                       <p className="memoOverviewVal">
-                        {startup.partner.portfolio_context_at_decision.total_portfolio_size}
+                        {displayStartup.partner.portfolio_context_at_decision.total_portfolio_size}
                       </p>
                     </div>
                   ) : null}
                 </section>
             ) : null}
 
-            {startup.scout.references && startup.scout.references.length > 0 && (
+            {displayStartup.scout.references && displayStartup.scout.references.length > 0 && (
                 <section>
                   <button
                     type="button"
@@ -1056,7 +1191,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   >
                     <div style={{ paddingTop: 14 }}>
                       <ul className="memoList">
-                        {startup.scout.references
+                        {displayStartup.scout.references
                           .map((r) => String(r ?? '').trim())
                           .filter(Boolean)
                           .map((ref, i) => {
@@ -1079,6 +1214,78 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </div>
                   </motion.div>
                 </section>
+            )}
+
+            {pipelineReplaySteps.length > 0 && (
+              <section className="memoPipelineSection" aria-label="Run log" style={{ marginTop: 28 }}>
+                <button
+                  type="button"
+                  className="memoPipelineToggle"
+                  onClick={() => setPipelineLogOpen((v) => !v)}
+                  aria-expanded={pipelineLogOpen}
+                >
+                  <span className="memoPipelineToggleTitle">
+                    <span className="memoPipelineKicker">Run log</span>
+                    <span className="memoPipelineOneLiner" title={pipelineReplaySummary}>
+                      {pipelineReplaySummary}
+                    </span>
+                  </span>
+                  <span className="memoPipelinePlus">{pipelineLogOpen ? '−' : '+'}</span>
+                </button>
+                <motion.div
+                  initial={false}
+                  animate={
+                    reduceMotion
+                      ? { height: pipelineLogOpen ? 'auto' : 0, opacity: pipelineLogOpen ? 1 : 0 }
+                      : pipelineLogOpen
+                        ? { height: 'auto', opacity: 1 }
+                        : { height: 0, opacity: 0 }
+                  }
+                  transition={transitionOrReduced(reduceMotion, {
+                    duration: 0.2,
+                    ease: [0.16, 1, 0.3, 1],
+                  })}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <ol className="memoReplayList">
+                    {pipelineReplaySteps.map((step) => (
+                      <li key={step.id} className="memoReplayItem">
+                        <p className="memoReplayKicker">
+                          <span>{step.label}</span>
+                          <span className={step.done ? 'memoReplayBadge' : 'memoReplayBadge memoReplayBadge--pending'}>
+                            {step.done ? 'Done' : 'Pending'}
+                          </span>
+                        </p>
+                        <p className="memoReplayWhen">{step.atDisplay}</p>
+                        <p className="memoReplayDetail">{step.detail}</p>
+                      </li>
+                    ))}
+                  </ol>
+                </motion.div>
+              </section>
+            )}
+
+            {memoPipeline === 'generating' && (
+              <section style={{ marginTop: 36 }} aria-live="polite">
+                <div className="memoSummaryCallout" style={{ background: 'rgba(0,33,71,0.04)' }}>
+                  <p className="memoPipelineKicker" style={{ marginBottom: 6 }}>
+                    Investment memo
+                  </p>
+                  <motion.p
+                    className="memoGateTitle"
+                    style={{ marginTop: 0 }}
+                    animate={reduceMotion ? { opacity: 1 } : { opacity: [0.55, 1, 0.55] }}
+                    transition={
+                      reduceMotion ? { duration: 0 } : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }
+                    }
+                  >
+                    Generating full investment memo…
+                  </motion.p>
+                  <p className="memoGateDetail" style={{ marginBottom: 0 }}>
+                    This page updates automatically when the formatted memo is persisted.
+                  </p>
+                </div>
+              </section>
             )}
           </motion.div>
         </div>

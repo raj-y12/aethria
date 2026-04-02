@@ -76,9 +76,9 @@
 | # | Feature | What | User Story | Success Criteria | Priority | Files / Evidence |
 |---|---------|------|------------|------------------|----------|------------------|
 | 1 | Automatic Scouting Agent | Four scout types (market-driven, builder/technical, pain-point, contrarian) run on interval; one LLM call per scout per cycle; persist to storage. | As Emma, I want the system to discover startup ideas automatically so that I have a steady pipeline. | At least one scout returns valid discovery per cycle; stored in `data/startups.json`. | P0 | `backend/scout/base.py`, `scout/scouts.py`, `scout/engine.py` (run_cycle, add_discovery), `storage.py` (add_discovery). |
-| 2 | Reviewer Layer | Evaluates unreviewed discoveries; scores (market, product, technical, execution, optional defensibility); verdict STRONG/MEDIUM/WEAK; one LLM call per review. | As Emma, I want each discovery scored and verdicted so that I can triage quickly. | Unreviewed entries get review; verdict and scores stored. | P0 | `backend/reviewer/base.py`, `reviewer/reviewer.py`, `reviewer/engine.py`, `reviewer/schema.py`, `resources/reviewer_rules.json`, `resources/rubrics/evaluation_rubric_v1.json`. |
-| 3 | Partner Decision Layer | Rule-based YES/NO/MAYBE from verdict + scores; optional LLM fallback for edge cases; next_action, human_review_required. | As a partner, I want a clear decision and next action so that I know what to do. | Every reviewed startup gets a decision; rationale and next_action stored. | P0 | `backend/partner/decision.py`, `partner/engine.py`, `resources/partner_rules.json`. |
-| 4 | Investment Memo | Markdown memo from Startup (Scout + Review + Partner + Financials). | As Emma, I want a one-page memo per startup so that I can share with partners. | Memo contains overview, scores, verdict, decision, next steps; API returns markdown. | P0 | `backend/memo_generator.py` (generate_memo), `GET /api/startups/{id}/memo`, `resources/memos/investment_memo_v1.json`. |
+| 2 | Reviewer Layer | Evaluates unreviewed discoveries; scores (market, product, technical, execution, optional defensibility); verdict STRONG/MEDIUM/WEAK; one LLM call per review. | As Emma, I want each discovery scored and verdicted so that I can triage quickly. | Unreviewed entries get review; verdict and scores stored. | P0 | `backend/reviewer/base.py`, `reviewer/reviewer.py`, `reviewer/engine.py`, `reviewer/schema.py`, `resources/config/active.json`, `resources/config/reviewer_rules/v1.json`, `resources/config/evaluation_rubric/v1.json`. |
+| 3 | Partner Decision Layer | Rule-based YES/NO/MAYBE from verdict + scores; optional LLM fallback for edge cases; next_action, human_review_required. | As a partner, I want a clear decision and next action so that I know what to do. | Every reviewed startup gets a decision; rationale and next_action stored. | P0 | `backend/partner/decision.py`, `partner/engine.py`, `resources/config/active.json`, `resources/config/partner_rules/v1.json`. |
+| 4 | Investment Memo | Markdown memo from Startup (Scout + Review + Partner + Financials). | As Emma, I want a one-page memo per startup so that I can share with partners. | Memo contains overview, scores, verdict, decision, next steps; API returns markdown. | P0 | `backend/memo_generator.py` (generate_memo), `GET /api/startups/{id}/memo`, `resources/contracts/memos/investment_memo_v1.json`. |
 | 5 | Single-Run Dev Experience | One command starts backend (8000), frontend (3000), and agents. | As a developer, I want `python run.py` to run the full stack so that I can demo locally. | Backend, Vite, and agents start; logs stream with [Backend]/[Frontend]/[Agents]. | P0 | `run.py` (lines 72–164). |
 | 6 | Startup List API | GET /api/startups returns all startups (frontend shape). | As the frontend, I need the list of startups to show the feed. | 200 + JSON array; each item has id, scout, review, partner, timestamps. | P0 | `backend/api.py` (_backend_to_frontend, get_startups), `app-front-end/src/api/startups.ts`. |
 | 7 | Settings API & UI | GET/PATCH /api/settings; UI for cost_budget, agent_config (scouts/reviewers/partners toggles), portfolio. | As Emma, I want to turn scouts/reviewers/partners on or off and set cost limits. | PATCH persists to `data/settings.json`; engines respect toggles via `settings_loader`. | P1 | `backend/api.py` (get_settings, patch_settings, _validate_settings), `settings_loader.py`, `SettingsPage.tsx`, `api/settings.ts`. |
@@ -157,11 +157,11 @@
 | Single entrypoint runs backend + frontend + agents | `run.py` (full file); backend uvicorn, frontend npm run dev, agents run_system.py |
 | Scout base and one LLM call per scout | `backend/scout/base.py` (_call_llm_sync, discover); `scout/engine.py` (run_cycle) |
 | Four scout types | `backend/scout/scouts.py`; `scout/engine.py` (MarketDrivenScout, BuilderTechnicalScout, PainPointScout, ContrarianScout) |
-| Reviewer uses rubric and reviewer_rules | `backend/reviewer/base.py` (_load_reviewer_resources, _build_system_prompt); `resources/reviewer_rules.json`, `resources/rubrics/evaluation_rubric_v1.json` |
-| Partner rule-based decision (YES/NO/MAYBE) | `backend/partner/decision.py` (decide, _create_decision); `resources/partner_rules.json` |
+| Reviewer uses rubric and reviewer_rules | `backend/reviewer/base.py` (_load_reviewer_resources, _build_system_prompt); `resources/config/active.json`, `resources/config/reviewer_rules/v1.json`, `resources/config/evaluation_rubric/v1.json`, `backend/core/policy_resolver.py` |
+| Partner rule-based decision (YES/NO/MAYBE) | `backend/partner/decision.py` (decide, _create_decision); `resources/config/active.json`, `resources/config/partner_rules/v1.json` |
 | Storage thread-safe, atomic writes | `backend/storage.py` (_atomic_update, fcntl LOCK_EX, temp file + rename) |
 | Startup model (ScoutInfo, ReviewInfo, PartnerInfo, Financials) | `backend/models.py` (Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials) |
-| Memo from Startup | `backend/memo_generator.py` (MemoGenerator.generate_memo); format ref `resources/memos/investment_memo_v1.json` |
+| Memo from Startup | `backend/memo_generator.py` (MemoGenerator.generate_memo); format ref `resources/contracts/memos/investment_memo_v1.json` |
 | Settings from data/settings.json | `backend/settings_loader.py` (load_settings, get_settings_path); `api.py` (get_settings, patch_settings) |
 | Frontend fetches startups and memo | `app-front-end/src/api/startups.ts` (fetchStartups, fetchMemo); proxy to backend in `vite.config.ts` |
 | Enter → session → main feed | `app-front-end/src/App.tsx` (hasValidSession, hasEntered, handleEnter, STARTUPS_POLL_MS) |
@@ -357,8 +357,8 @@ python scripts/wipe_startups.py [--path data/startups.json] [--dry-run]
 - Single run entrypoint: `run.py` (full).
 - Scout base and LLM call: `backend/scout/base.py` (e.g. lines 58–126, 142–161).
 - Four scouts: `backend/scout/scouts.py`; `backend/scout/engine.py` (56–62, 67–111).
-- Reviewer prompt and rubric: `backend/reviewer/base.py` (22–46, 74–127, 190–262); `resources/reviewer_rules.json`; `resources/rubrics/evaluation_rubric_v1.json`.
-- Partner rules: `backend/partner/decision.py` (65–255); `resources/partner_rules.json`.
+- Reviewer prompt and rubric: `backend/reviewer/base.py` (22–46, 74–127, 190–262); `resources/config/active.json`, `resources/config/reviewer_rules/v1.json`, `resources/config/evaluation_rubric/v1.json`, `backend/core/policy_resolver.py`.
+- Partner rules: `backend/partner/decision.py` (65–255); `resources/config/active.json`, `resources/config/partner_rules/v1.json`.
 - Storage: `backend/storage.py` (59–86, 85–124, 125–155, 321–334).
 - Models: `backend/models.py` (1–157).
 - Memo: `backend/memo_generator.py` (43–329); `backend/api.py` (174–183).

@@ -7,7 +7,6 @@ import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 
 interface SystemBarProps {
-  scoutCount?: number;
   agentConfig?: unknown;
   rightPanel?: 'memo' | 'feed' | 'system' | null;
   /** Show work grid (left column); clears System when open. */
@@ -50,10 +49,9 @@ function SpineNavButton({
 }
 
 /**
- * Left-side vertical system bar: time + date, identity, company count, mode toggles, nav + logout.
+ * Left-side vertical system bar: time + date, identity, nav (Home/Settings), mode toggles, logout.
  */
 export default function SystemBar({
-  scoutCount = 0,
   rightPanel = null,
   onShowDeals,
   onShowFeed,
@@ -148,11 +146,16 @@ export default function SystemBar({
           >
             {displayName}
           </span>
-          <div className="flex flex-col items-center gap-1 w-full px-0.5">
-            <span className="type-meta text-center leading-[1.4] tracking-[0.12em] uppercase text-white/38">
-              {scoutCount === 1 ? '1 company' : `${scoutCount} companies`}
-            </span>
-          </div>
+          {navLink ? (
+            <div className="flex flex-col items-center gap-1 w-full px-0.5">
+              <a
+                href={navLink.href}
+                className="type-meta text-center leading-[1.4] tracking-[0.12em] uppercase text-white/55 hover:text-white btn-interaction"
+              >
+                {navLink.label}
+              </a>
+            </div>
+          ) : null}
         </div>
 
         <SpineRule />
@@ -161,16 +164,16 @@ export default function SystemBar({
           <>
             <div className="flex flex-col items-center gap-0.5 w-full shrink-0">
               <SpineNavButton
-                label="Deals"
-                active={rightPanel !== 'system'}
-                ariaPressed={rightPanel !== 'system'}
-                onClick={() => onShowDeals!()}
-              />
-              <SpineNavButton
                 label="Judgements"
                 active={rightPanel === 'feed'}
                 ariaPressed={rightPanel === 'feed'}
                 onClick={() => (rightPanel === 'feed' ? onClose!() : onShowFeed!())}
+              />
+              <SpineNavButton
+                label="Deals"
+                active={rightPanel !== 'system' && rightPanel !== 'feed'}
+                ariaPressed={rightPanel !== 'system' && rightPanel !== 'feed'}
+                onClick={() => onShowDeals!()}
               />
               <SpineNavButton
                 label="System"
@@ -183,16 +186,8 @@ export default function SystemBar({
           </>
         ) : null}
 
-        {/* Nav + Log out */}
+        {/* Log out */}
         <div className="mt-auto flex flex-col items-center gap-2 pt-1 shrink-0">
-          {navLink && (
-            <a
-              href={navLink.href}
-              className="type-meta uppercase tracking-[0.12em] text-white/60 hover:text-white btn-interaction text-center"
-            >
-              {navLink.label}
-            </a>
-          )}
           <button
             type="button"
             onClick={handleLogout}

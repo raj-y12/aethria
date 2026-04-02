@@ -10,12 +10,19 @@ import LoadingAnimation from '../components/LoadingAnimation';
 import { fetchSettings, patchSettings, type AgentBudgetStatus, type Settings, type FundIdentity } from '../api/settings';
 import { fetchMe } from '../api/me';
 import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
+import {
+  fetchFundThesisSummary,
+  patchFundThesisActiveVersion,
+  postFundThesisReprocessMissing,
+  postFundThesisVersion,
+  type FundThesisSummary,
+} from '../api/fundThesis';
 import { tokens } from '../design-system/tokens';
 import { userProfileAppearance } from '../design-system/clerk-appearance';
 import { transitionOrReduced } from '../design-system/motion';
 import { useMediaQuery, usePrefersReducedMotion } from '../hooks';
 
-type TabId = 'account' | 'budget' | 'pipeline' | 'discovery' | 'meta' | 'portfolio';
+type TabId = 'account' | 'budget' | 'pipeline' | 'thesis' | 'discovery' | 'meta' | 'portfolio';
 
 const FONT_GEIST = '"Geist Sans", system-ui, sans-serif' as const;
 
@@ -215,6 +222,7 @@ export default function SettingsPage() {
     [
       { id: 'budget', label: 'BUDGET' },
       { id: 'pipeline', label: 'PIPELINE' },
+      { id: 'thesis', label: 'FUND THESIS' },
       { id: 'discovery', label: 'DISCOVERY' },
       { id: 'meta', label: 'META-AGENT' },
       { id: 'portfolio', label: 'PORTFOLIO' },
@@ -223,6 +231,50 @@ export default function SettingsPage() {
   ).filter((t) => t.id !== 'meta' || (settings?.meta_agent != null));
 
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
+
+  const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
+  const [thesisLoading, setThesisLoading] = useState(false);
+  const [thesisLoadError, setThesisLoadError] = useState<string | null>(null);
+  const [thesisDraft, setThesisDraft] = useState('');
+  const [thesisBusy, setThesisBusy] = useState(false);
+  const [thesisActivateId, setThesisActivateId] = useState('');
+  const [thesisReprocessOpen, setThesisReprocessOpen] = useState(false);
+  const [thesisReprocessDryLoading, setThesisReprocessDryLoading] = useState(false);
+  const [thesisReprocessEligible, setThesisReprocessEligible] = useState<number | null>(null);
+  const [thesisReprocessModalError, setThesisReprocessModalError] = useState<string | null>(null);
+  const [thesisReprocessRunning, setThesisReprocessRunning] = useState(false);
+  const [thesisReprocessToast, setThesisReprocessToast] = useState<string | null>(null);
+
+  const reloadThesis = () => {
+    setThesisLoadError(null);
+    setThesisLoading(true);
+    fetchFundThesisSummary()
+      .then((s) => {
+        setThesisSummary(s);
+        if (s) {
+          setThesisDraft(s.raw_text ?? '');
+          const a = s.versions.find((v) => v.is_active);
+          setThesisActivateId(a?.id ?? '');
+        }
+      })
+      .catch((e: unknown) => {
+        setThesisSummary(null);
+        setThesisLoadError(e instanceof Error ? e.message : 'Failed to load thesis');
+      })
+      .finally(() => setThesisLoading(false));
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'thesis') return;
+    if (!agentsStatus?.supabase_configured) return;
+    reloadThesis();
+  }, [activeTab, agentsStatus?.supabase_configured]);
+
+  useEffect(() => {
+    if (!thesisReprocessToast) return;
+    const t = window.setTimeout(() => setThesisReprocessToast(null), 6500);
+    return () => window.clearTimeout(t);
+  }, [thesisReprocessToast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -321,7 +373,7 @@ export default function SettingsPage() {
             </AnimatePresence>
           </>
         )}
-        <SystemBar scoutCount={0} navLink={{ href: '/', label: 'Home' }} />
+        <SystemBar navLink={{ href: '/', label: 'Home' }} />
         <main className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 px-4 pt-4 lg:pl-[11rem] lg:pr-6 lg:pt-6">
           <p className="type-label-section text-oxford/60">Failed to load settings.</p>
           {loadError && (
@@ -396,7 +448,7 @@ export default function SettingsPage() {
         </>
       )}
 
-      <SystemBar scoutCount={0} agentConfig={settings.agent_config} navLink={{ href: '/', label: 'Home' }} />
+      <SystemBar agentConfig={settings.agent_config} navLink={{ href: '/', label: 'Home' }} />
       {/* Main: fixed height so only the content inside the bordered grid scrolls (same as WorkGrid). */}
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[11rem] lg:pr-6 lg:pt-6 pb-3 lg:pb-4">
         <motion.div
@@ -652,6 +704,228 @@ export default function SettingsPage() {
                   </div>
                 )}
 
+                {/* ——— Fund thesis ——— */}
+                {activeTab === 'thesis' && (
+                  <div className="flex flex-col gap-8 min-h-0 flex-1 overflow-y-auto">
+                    {!agentsStatus?.supabase_configured ? (
+                      <DescText>
+                        Fund thesis lives in Supabase. Set <code className="type-meta bg-oxford/[0.06] px-1 rounded">USE_SUPABASE_STORAGE=1</code> and apply migrations so scouts and reviewers can load your mandate.
+                      </DescText>
+                    ) : thesisLoading ? (
+                      <p className={`m-0 ${settingsDescClass}`} style={{ fontFamily: FONT_GEIST }}>
+                        Loading thesis…
+                      </p>
+                    ) : thesisLoadError ? (
+                      <p className="m-0 text-[13px] text-red-800/90" style={{ fontFamily: FONT_GEIST }}>
+                        {thesisLoadError}
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 min-w-0 gap-8 lg:grid-cols-2 lg:gap-x-10 lg:items-start">
+                        <section className="flex min-w-0 flex-col gap-4 lg:min-h-0">
+                          <SettingSectionTitle>Active thesis</SettingSectionTitle>
+                          <DescText>
+                            Publishing creates a new version and activates it. The pipeline needs an active thesis; alignment works without AI embeddings using rule-based scoring. Optional embeddings improve grounding when an API key is configured.
+                          </DescText>
+                          {thesisSummary ? (
+                            <>
+                              {thesisSummary.embedding?.status === 'pending' ? (
+                                <p className="m-0 text-[13px] text-oxford/70 leading-relaxed" style={{ fontFamily: FONT_GEIST }}>
+                                  Using rule-based alignment (AI embeddings not enabled). Scouts and reviewers still receive your full mandate text and structured JSON.
+                                </p>
+                              ) : null}
+                              <p className="m-0 text-[12px] text-oxford/55" style={{ fontFamily: FONT_GEIST }}>
+                                Version {thesisSummary.active_version_number} ·{' '}
+                                <code className="type-meta bg-oxford/[0.06] px-1 rounded break-all">
+                                  {thesisSummary.active_version_id}
+                                </code>
+                              </p>
+                              <p className="m-0 text-[12px] text-oxford/55" style={{ fontFamily: FONT_GEIST }}>
+                                Thesis mode:{' '}
+                                {(thesisSummary.mode ??
+                                  (thesisSummary.embedding?.status === 'ready' ? 'embedding' : 'rule_based')) === 'embedding'
+                                  ? 'AI-enhanced (embeddings)'
+                                  : 'Rule-based'}
+                                · Embeddings: {thesisSummary.embedding.dimension ?? thesisSummary.embedding.dimensions ?? 0}{' '}
+                                dims · {thesisSummary.embedding.model ?? '—'}
+                              </p>
+                              <div
+                                className="min-h-[8rem] max-h-[min(22rem,45vh)] overflow-y-auto border border-oxford/10 p-3 text-[12px] text-oxford/70 whitespace-pre-wrap break-words"
+                                style={{ fontFamily: FONT_GEIST }}
+                              >
+                                {JSON.stringify(thesisSummary.parsed_json, null, 2)}
+                              </div>
+                              {thesisSummary.embedding?.status === 'pending' && agentsStatus?.openai_configured ? (
+                                <button
+                                  type="button"
+                                  disabled={thesisBusy || !(thesisSummary.raw_text || '').trim()}
+                                  onClick={() => {
+                                    void (async () => {
+                                      setThesisBusy(true);
+                                      setThesisLoadError(null);
+                                      try {
+                                        await postFundThesisVersion((thesisSummary.raw_text || '').trim());
+                                        reloadThesis();
+                                        const s = await fetchAgentsStatus();
+                                        setAgentsStatus(s ?? null);
+                                      } catch (e) {
+                                        setThesisLoadError(e instanceof Error ? e.message : 'Enable embeddings failed');
+                                      } finally {
+                                        setThesisBusy(false);
+                                      }
+                                    })();
+                                  }}
+                                  className="self-start type-meta uppercase tracking-[0.12em] px-4 py-2 border border-oxford/30 text-oxford disabled:opacity-40 btn-interaction"
+                                >
+                                  {thesisBusy ? 'Working…' : 'Enable AI alignment (optional)'}
+                                </button>
+                              ) : null}
+                              {thesisSummary.embedding?.status === 'pending' && !agentsStatus?.openai_configured ? (
+                                <p className="m-0 text-[12px] text-oxford/45" style={{ fontFamily: FONT_GEIST }}>
+                                  To enable AI embeddings, configure <code className="type-meta bg-oxford/[0.06] px-1 rounded">OPENAI_API_KEY</code> on the server and publish again or use the button above once it is set.
+                                </p>
+                              ) : null}
+                            </>
+                          ) : (
+                            <DescText>No thesis yet. Paste your mandate in the editor and publish your first version.</DescText>
+                          )}
+                        </section>
+                        <div className="flex min-w-0 flex-col gap-8 border-t border-hairline pt-8 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10">
+                          <section className="flex flex-col gap-4">
+                            <SettingSectionTitle>Publish new version</SettingSectionTitle>
+                            <textarea
+                              value={thesisDraft}
+                              onChange={(e) => setThesisDraft(e.target.value)}
+                              rows={12}
+                              className="min-h-[12rem] w-full min-w-0 resize-y border border-oxford/15 bg-paper p-3 text-[13px] text-oxford/85 outline-none focus:border-oxford/40"
+                              style={{ fontFamily: FONT_GEIST }}
+                              placeholder="Fund mandate: sectors, stage, geography, exclusions, check size, risk posture…"
+                            />
+                            <button
+                              type="button"
+                              disabled={thesisBusy || !thesisDraft.trim()}
+                              onClick={() => {
+                                void (async () => {
+                                  setThesisBusy(true);
+                                  setThesisLoadError(null);
+                                  try {
+                                    await postFundThesisVersion(thesisDraft.trim());
+                                    reloadThesis();
+                                    const s = await fetchAgentsStatus();
+                                    setAgentsStatus(s ?? null);
+                                  } catch (e) {
+                                    setThesisLoadError(e instanceof Error ? e.message : 'Publish failed');
+                                  } finally {
+                                    setThesisBusy(false);
+                                  }
+                                })();
+                              }}
+                              className="self-start type-meta uppercase tracking-[0.12em] px-4 py-2 border border-oxford/30 text-oxford disabled:opacity-40 btn-interaction"
+                            >
+                              {thesisBusy ? 'Publishing…' : 'Publish new version'}
+                            </button>
+                          </section>
+                          {thesisSummary && thesisSummary.versions.length > 0 ? (
+                            <section className="flex flex-col gap-4">
+                              <SettingSectionTitle>Version history</SettingSectionTitle>
+                              <div className="flex flex-wrap gap-3 items-center">
+                                <select
+                                  value={thesisActivateId}
+                                  onChange={(e) => setThesisActivateId(e.target.value)}
+                                  className={`${selectCls} min-w-0 flex-1 sm:max-w-md`}
+                                  style={settingsSelectStyle}
+                                  aria-label="Select thesis version"
+                                >
+                                  {thesisSummary.versions.map((v) => (
+                                    <option key={v.id} value={v.id}>
+                                      v{v.version_number}
+                                      {v.is_active ? ' (active)' : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  disabled={
+                                    thesisBusy ||
+                                    !thesisActivateId ||
+                                    thesisSummary.versions.find((v) => v.id === thesisActivateId)?.is_active
+                                  }
+                                  onClick={() => {
+                                    void (async () => {
+                                      setThesisBusy(true);
+                                      setThesisLoadError(null);
+                                      try {
+                                        await patchFundThesisActiveVersion(thesisActivateId);
+                                        reloadThesis();
+                                        const s = await fetchAgentsStatus();
+                                        setAgentsStatus(s ?? null);
+                                      } catch (e) {
+                                        setThesisLoadError(e instanceof Error ? e.message : 'Activate failed');
+                                      } finally {
+                                        setThesisBusy(false);
+                                      }
+                                    })();
+                                  }}
+                                  className="type-meta uppercase tracking-[0.12em] px-3 py-2 border border-oxford/30 text-oxford btn-interaction disabled:opacity-40"
+                                >
+                                  Set active
+                                </button>
+                              </div>
+                            </section>
+                          ) : null}
+                          {thesisSummary ? (
+                            <section className="flex flex-col gap-4">
+                              <SettingSectionTitle>Reprocess existing startups</SettingSectionTitle>
+                              <DescText>
+                                Apply the current fund thesis to previously reviewed startups.
+                              </DescText>
+                              {!agentsStatus?.openai_configured ? (
+                                <p className="m-0 text-[12px] text-oxford/45" style={{ fontFamily: FONT_GEIST }}>
+                                  You can preview how many startups qualify below. The server needs{' '}
+                                  <code className="type-meta bg-oxford/[0.06] px-1 rounded">OPENAI_API_KEY</code> to
+                                  re-run reviewer and partner analysis.
+                                </p>
+                              ) : null}
+                              {thesisReprocessToast ? (
+                                <p
+                                  className="m-0 text-[13px] text-oxford/70"
+                                  role="status"
+                                  aria-live="polite"
+                                  style={{ fontFamily: FONT_GEIST }}
+                                >
+                                  {thesisReprocessToast}
+                                </p>
+                              ) : null}
+                              <button
+                                type="button"
+                                disabled={thesisBusy || thesisReprocessRunning}
+                                onClick={() => {
+                                  setThesisReprocessOpen(true);
+                                  setThesisReprocessModalError(null);
+                                  setThesisReprocessEligible(null);
+                                  setThesisReprocessDryLoading(true);
+                                  void postFundThesisReprocessMissing({ dryRun: true })
+                                    .then((r) => {
+                                      if ('eligible' in r) setThesisReprocessEligible(r.eligible);
+                                    })
+                                    .catch((e: unknown) => {
+                                      setThesisReprocessModalError(
+                                        e instanceof Error ? e.message : 'Could not load count',
+                                      );
+                                    })
+                                    .finally(() => setThesisReprocessDryLoading(false));
+                                }}
+                                className="self-start type-meta uppercase tracking-[0.12em] px-4 py-2 border border-oxford/30 text-oxford disabled:opacity-40 btn-interaction"
+                              >
+                                Reprocess Existing Startups
+                              </button>
+                            </section>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* ——— Discovery ——— */}
                 {activeTab === 'discovery' && (
                   <div className="flex flex-col gap-8 min-h-0">
@@ -753,6 +1027,118 @@ export default function SettingsPage() {
         </div>
         </motion.div>
       </main>
+      {thesisReprocessOpen ? (
+        <div
+          className="fixed inset-0 z-[220] flex items-center justify-center bg-oxford/40 px-4"
+          role="presentation"
+          onClick={() => {
+            if (!thesisReprocessRunning) setThesisReprocessOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="thesis-reprocess-title"
+            className="max-w-md w-full border border-oxford/15 bg-paper p-5 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+            style={{ fontFamily: FONT_GEIST }}
+          >
+            <h2 id="thesis-reprocess-title" className="type-label-section text-oxford m-0 mb-3">
+              Reprocess startups?
+            </h2>
+            <p className="m-0 text-[13px] text-oxford/70 leading-relaxed mb-4">
+              This will re-run analysis on existing startups that were processed before your fund thesis was added.
+              This may take some time.
+            </p>
+            {thesisReprocessDryLoading ? (
+              <p className="m-0 text-[12px] text-oxford/50 mb-2">Counting startups…</p>
+            ) : thesisReprocessModalError ? (
+              <p className="m-0 text-[12px] text-red-800/90 mb-2">{thesisReprocessModalError}</p>
+            ) : thesisReprocessEligible !== null ? (
+              <>
+                <p className="m-0 text-[12px] text-oxford/60 mb-2">
+                  {thesisReprocessEligible} startup{thesisReprocessEligible === 1 ? '' : 's'} will be updated.
+                </p>
+                {thesisReprocessEligible > 500 ? (
+                  <p className="m-0 text-[12px] text-amber-900/90 mb-3">
+                    Large batch: only the first 1000 are processed per run. Run again if needed.
+                  </p>
+                ) : null}
+                {!agentsStatus?.openai_configured &&
+                thesisReprocessEligible !== null &&
+                thesisReprocessEligible >= 1 ? (
+                  <p className="m-0 text-[12px] text-oxford/45 mb-3">
+                    Configure <code className="type-meta bg-oxford/[0.06] px-1 rounded">OPENAI_API_KEY</code> on the
+                    server to enable Continue.
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button
+                type="button"
+                disabled={thesisReprocessRunning}
+                className="type-meta uppercase tracking-[0.12em] px-3 py-2 border border-oxford/20 text-oxford/70 btn-interaction disabled:opacity-40"
+                onClick={() => setThesisReprocessOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  thesisReprocessRunning ||
+                  thesisReprocessDryLoading ||
+                  thesisReprocessEligible === null ||
+                  thesisReprocessEligible < 1 ||
+                  !!thesisReprocessModalError ||
+                  !agentsStatus?.openai_configured
+                }
+                className="type-meta uppercase tracking-[0.12em] px-3 py-2 border border-oxford/30 text-oxford btn-interaction disabled:opacity-40 inline-flex items-center gap-2"
+                onClick={() => {
+                  void (async () => {
+                    setThesisReprocessRunning(true);
+                    setThesisReprocessModalError(null);
+                    try {
+                      const r = await postFundThesisReprocessMissing();
+                      if (!('processed' in r)) return;
+                      setThesisReprocessOpen(false);
+                      let msg = `Reprocessed ${r.processed} startup${r.processed === 1 ? '' : 's'}`;
+                      if (r.failed > 0) msg += ` (${r.failed} failed)`;
+                      setThesisReprocessToast(msg);
+                    } catch (e: unknown) {
+                      setThesisReprocessModalError(e instanceof Error ? e.message : 'Reprocess failed');
+                    } finally {
+                      setThesisReprocessRunning(false);
+                    }
+                  })();
+                }}
+              >
+                {thesisReprocessRunning ? (
+                  <>
+                    <svg
+                      className="animate-spin h-4 w-4 text-oxford"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      aria-hidden
+                    >
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    <span>Reprocessing startups…</span>
+                  </>
+                ) : (
+                  'Continue'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -48,11 +48,9 @@ Optional: `CLERK_ISSUER`, `ALLOWED_ORIGINS` (comma-separated), `SCOUT_MODEL`, `R
 | **Settings** | `settings` (doc) | `(user_id, key)` with key = user_id; load/save pass `user_id`. |
 | **Startups** (discoveries, reviews, partner decision, human_resolution) | `startups` | `SupabaseStartupsStorage(client, user_id)`; every read/write uses `user_id`. |
 | **Escalations** | Derived from startups | Same as startups; resolve writes `human_resolution` on that user’s startup via `_get_storage(request)`. |
-| **Decisions** (advance/pass/hold + reasoning) | `portfolio_decisions` (list) | `list_get_all` / `list_upsert` use run context `user_id` (API sets it; pipeline sets it). |
-| **Portfolio positions, rejections, watchlist, signals, agent_metrics** | `portfolio_*` (list) | Same as decisions; portfolio store uses run context. |
-| **Memory, meta_* (prompt library, weights, calibration, mutation_log, reports), analytics_sector_concentration, serp_usage, portfolio_budgets** | Doc/list tables | All use run context (or explicit `user_id` where added); pipeline and API set run context so writes are per user. |
-
-Run context: API calls `set_run_user_id(request.state.user_id)` after auth; pipeline calls `set_run_user_id(user_id)` at start of each cycle. So all doc/list access during a request or pipeline run is for that user.
+| **Decisions** (advance/pass/hold + reasoning) | `portfolio_decisions` (list) | `list_get_all` / `list_upsert` with explicit `user_id` on `PortfolioStore` (from `request.state.user_id` or the agent job payload). |
+| **Portfolio positions, rejections, watchlist, signals, agent_metrics** | `portfolio_*` (list) | Same as decisions; no global tenant context. |
+| **Memory, meta_* (prompt library, weights, calibration, mutation_log, reports), analytics_sector_concentration, serp_usage, portfolio_budgets** | Doc/list tables | Every call passes explicit `user_id` (or `TenantContext` in the pipeline); there is no thread-local run context. |
 
 ### Backpressure and ramp-up
 

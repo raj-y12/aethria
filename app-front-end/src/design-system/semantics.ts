@@ -1,7 +1,7 @@
 /**
  * Shared semantics for scores, verdicts, and decisions.
- * Align with resources/rubrics/evaluation_rubric_v1.json (v1.1)
- * and resources/partner_rules.json.
+ * Align with versioned policy: resources/config/evaluation_rubric/v1.json (v1.1)
+ * and resources/config/partner_rules/v1.json (via active.json).
  */
 
 import type { Review } from '../types/startup';

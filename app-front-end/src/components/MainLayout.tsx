@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
@@ -24,8 +25,9 @@ import { UI_PANEL_CHROME_LABEL } from '../design-system/ui-text';
 import type { Startup, EscalationItem } from '../types/startup';
 import type { SystemData } from '../hooks/useSystemData';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './InvestmentMemoContent';
-import { queueOnDemandLookup } from '../api/startups';
+import { queueOnDemandLookup, fetchStartupDetail, fetchLookupJobStatus } from '../api/startups';
 import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
+import { getQueryConfig } from '../lib/queryIntent';
 
 const SYSTEM_MEMO_HEADER_PADDING = 'py-[10px]';
 
@@ -36,14 +38,12 @@ interface MainLayoutProps {
   data: SystemData;
   startupsError?: string | null;
   onSystemPanelOpenChange?: (open: boolean) => void;
-  onLookupActiveChange?: (active: boolean) => void;
 }
 
 export default function MainLayout({
   data,
   startupsError,
   onSystemPanelOpenChange,
-  onLookupActiveChange,
 }: MainLayoutProps) {
   const {
     startups,
@@ -55,6 +55,7 @@ export default function MainLayout({
     concentrationAnalytics,
     scoutWeights,
     calibrationState,
+    liveGate,
   } = data;
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
   const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>(null);
@@ -64,9 +65,9 @@ export default function MainLayout({
   const [lookupBusy, setLookupBusy] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
   const [showPipelineIssueHelp, setShowPipelineIssueHelp] = useState(false);
-  const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [pendingLookup, setPendingLookup] = useState<{
-    query: string;
+    lookupId: string;
+    queryLabel: string;
     autoOpened: boolean;
   } | null>(null);
 
@@ -77,8 +78,21 @@ export default function MainLayout({
   const judgementsPanelRef = useRef<HTMLDivElement | null>(null);
   const memoContentRef = useRef<InvestmentMemoContentHandle | null>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const handleMemoPipelineReady = useCallback(() => {
+    const id = selectedStartup?.id;
+    if (id) void queryClient.invalidateQueries({ queryKey: ['startup', 'detail', id] });
+  }, [queryClient, selectedStartup?.id]);
 
   const memoOpen = !!selectedStartup;
+  const startupDetailQuery = useQuery({
+    queryKey: ['startup', 'detail', selectedStartup?.id],
+    queryFn: () => fetchStartupDetail(selectedStartup!.id),
+    enabled: Boolean(selectedStartup?.id && memoOpen),
+    ...getQueryConfig('STATIC'),
+  });
+  /** Full payload for memo (list row is thin; detail fetched on demand). */
+  const memoStartup = startupDetailQuery.data ?? selectedStartup;
   const verdictOrMemoOpen = memoOpen;
   const judgementsAsOverlay = rightPanel === 'feed' && !isDesktop;
   /** System replaces the work grid (left column); never an overlay. */
@@ -118,9 +132,11 @@ export default function MainLayout({
     setLookupBusy(true);
     setLookupMessage('Queueing lookup...');
     try {
-      const queued = await queueOnDemandLookup(value);
+      const lookupId = crypto.randomUUID();
+      const queued = await queueOnDemandLookup(value, lookupId);
       setPendingLookup({
-        query: queued.companyName,
+        lookupId: queued.lookupId,
+        queryLabel: value,
         autoOpened: false,
       });
       setLookupMessage(`Queued lookup for ${queued.companyName}. Processing now...`);
@@ -134,18 +150,39 @@ export default function MainLayout({
 
   const pendingLookupMatch = useMemo(() => {
     if (!pendingLookup) return null;
-    const normalizedQuery = pendingLookup.query.trim().toLowerCase();
-    if (!normalizedQuery) return null;
+    const id = pendingLookup.lookupId.trim();
+    if (!id) return null;
     return (
       startups.find((s) => {
         if ((s.scout.origin_type ?? '').toLowerCase() !== 'on_demand_lookup') return false;
-        const lookupQuery = (s.scout.lookup_query ?? '').trim().toLowerCase();
-        const name = (s.scout.name ?? '').trim().toLowerCase();
-        if (lookupQuery && lookupQuery === normalizedQuery) return true;
-        return !lookupQuery && name === normalizedQuery;
+        return (s.scout.lookup_id ?? '').trim() === id;
       }) ?? null
     );
   }, [startups, pendingLookup]);
+
+  const lookupFailureQuery = useQuery({
+    queryKey: ['startups', 'lookup-status', pendingLookup?.lookupId ?? ''],
+    queryFn: () => fetchLookupJobStatus(pendingLookup!.lookupId),
+    enabled: Boolean(
+      pendingLookup && !pendingLookupMatch && pendingLookup.lookupId.trim().length > 0
+    ),
+    staleTime: 4_000,
+    refetchInterval: (q) => {
+      if (!liveGate.tabVisible || !liveGate.userActive) return false;
+      const row = q.state.data as { failed?: boolean } | undefined;
+      if (row?.failed) return false;
+      return 8_000;
+    },
+    retry: 1,
+  });
+
+  useEffect(() => {
+    if (!pendingLookup || pendingLookupMatch) return;
+    const row = lookupFailureQuery.data;
+    if (!row?.failed) return;
+    setLookupMessage(row.message ?? 'On-demand lookup could not be completed.');
+    setPendingLookup(null);
+  }, [pendingLookup, pendingLookupMatch, lookupFailureQuery.data]);
 
   useEffect(() => {
     if (initialFirstMemoOpened.current || startups.length === 0) return;
@@ -158,7 +195,7 @@ export default function MainLayout({
     if (!pendingLookup) return;
     const matched = pendingLookupMatch;
     if (!matched) {
-      setLookupMessage(`Processing ${pendingLookup.query}...`);
+      setLookupMessage(`Processing ${pendingLookup.queryLabel}...`);
       return;
     }
     const hasDecision = !!matched.partner?.decision;
@@ -175,25 +212,6 @@ export default function MainLayout({
       setPendingLookup((prev) => (prev ? { ...prev, autoOpened: true } : prev));
     }
   }, [pendingLookup, pendingLookupMatch]);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadStatus = async () => {
-      const status = await fetchAgentsStatus();
-      if (active) setAgentsStatus(status);
-    };
-
-    void loadStatus();
-    const intervalId = window.setInterval(() => {
-      void loadStatus();
-    }, 20000);
-
-    return () => {
-      active = false;
-      window.clearInterval(intervalId);
-    };
-  }, []);
 
   const handleEscape = useCallback(() => {
     if (memoOpen) handleCloseMemo();
@@ -214,6 +232,24 @@ export default function MainLayout({
   const pipelineEnabled =
     !!agentConfig && !!(agentConfig.scouts_enabled || agentConfig.reviewers_enabled || agentConfig.partners_enabled);
   const lookupWorking = lookupBusy || (pendingLookup != null && !pendingLookup.autoOpened);
+
+  const agentsQuery = useQuery({
+    queryKey: ['agents', 'status'],
+    queryFn: fetchAgentsStatus,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchInterval: (q) => {
+      if (!liveGate.tabVisible || !liveGate.userActive) return false;
+      const d = q.state.data as AgentsStatus | undefined;
+      const issue =
+        !!d &&
+        pipelineEnabled &&
+        (!d.worker_ready || !d.supabase_configured || !d.openai_configured);
+      return lookupWorking || issue ? 90_000 : false;
+    },
+  });
+  const agentsStatus = agentsQuery.data ?? null;
+
   const lookupPhaseLabel = !lookupWorking
     ? null
     : !pendingLookupMatch
@@ -237,10 +273,6 @@ export default function MainLayout({
   useEffect(() => {
     onSystemPanelOpenChange?.(rightPanel === 'system');
   }, [rightPanel, onSystemPanelOpenChange]);
-
-  useEffect(() => {
-    onLookupActiveChange?.(lookupWorking);
-  }, [lookupWorking, onLookupActiveChange]);
 
   useEffect(() => {
     if (!pipelineHealthIssue && showPipelineIssueHelp) {
@@ -282,24 +314,6 @@ export default function MainLayout({
                     <button
                       type="button"
                       onClick={() => {
-                        setRightPanel((p) => (p === 'system' ? null : p));
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-0 uppercase tracking-[0.12em] btn-interaction ${
-                        rightPanel !== 'system' ? 'text-white' : 'text-white/55 hover:text-white'
-                      }`}
-                      style={{ transitionTimingFunction: 'var(--motion-ease)' }}
-                      aria-pressed={rightPanel !== 'system'}
-                    >
-                      <span
-                        className={`inline-block pb-0.5 ${rightPanel !== 'system' ? 'border-b border-white' : ''}`}
-                      >
-                        Deals
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
                         setRightPanel((panel) => (panel === 'feed' ? null : 'feed'));
                         setMobileMenuOpen(false);
                       }}
@@ -313,6 +327,26 @@ export default function MainLayout({
                         className={`inline-block pb-0.5 ${rightPanel === 'feed' ? 'border-b border-white' : ''}`}
                       >
                         Judgements
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRightPanel((p) => (p === 'system' ? null : p));
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-0 uppercase tracking-[0.12em] btn-interaction ${
+                        rightPanel !== 'system' && rightPanel !== 'feed'
+                          ? 'text-white'
+                          : 'text-white/55 hover:text-white'
+                      }`}
+                      style={{ transitionTimingFunction: 'var(--motion-ease)' }}
+                      aria-pressed={rightPanel !== 'system' && rightPanel !== 'feed'}
+                    >
+                      <span
+                        className={`inline-block pb-0.5 ${rightPanel !== 'system' && rightPanel !== 'feed' ? 'border-b border-white' : ''}`}
+                      >
+                        Deals
                       </span>
                     </button>
                     <button
@@ -352,7 +386,6 @@ export default function MainLayout({
       )}
 
       <SystemBar
-        scoutCount={startups.length}
         rightPanel={rightPanel}
         onShowDeals={() => setRightPanel((p) => (p === 'system' ? null : p))}
         onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
@@ -620,7 +653,13 @@ export default function MainLayout({
                 }
                 contentClassName="flex-1 min-h-0 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6"
               >
-                <InvestmentMemoContent ref={memoContentRef} startup={selectedStartup} embedded />
+                <InvestmentMemoContent
+                  key={memoStartup!.id}
+                  ref={memoContentRef}
+                  startup={memoStartup!}
+                  embedded
+                  onMemoPipelineReady={handleMemoPipelineReady}
+                />
               </PanelShell>
             ) : (
               <div className="flex-1 flex items-center justify-center p-8">
@@ -716,11 +755,12 @@ export default function MainLayout({
 
       {/* Memo modal on small viewports; on desktop the right panel shows the memo. */}
       <AnimatePresence initial={false}>
-        {useModal && selectedStartup && (
+        {useModal && memoStartup && (
           <InvestmentMemo
-            key="memo"
-            startup={selectedStartup}
+            key={`memo-${memoStartup.id}`}
+            startup={memoStartup}
             onClose={handleCloseMemo}
+            onMemoPipelineReady={handleMemoPipelineReady}
           />
         )}
       </AnimatePresence>

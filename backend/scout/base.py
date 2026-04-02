@@ -12,6 +12,9 @@ from pathlib import Path
 from openai import OpenAI
 
 from scout.schema import ScoutOutput, validate_scout_output, generate_id
+from tenant_context import require_user_id
+from utils.reference_verify import finalize_scout_references, hostname_from_user_hint
+from utils.settings_loader import get_canonical_website_hostname
 from utils.serp_client import maybe_enrich_references
 
 
@@ -29,16 +32,21 @@ class Scout(ABC):
     - Emits validated JSON output
     """
     
-    def __init__(self, scout_type: str, system_prompt: str, api_key: str, model: str = "gpt-5-nano"):
+    def __init__(
+        self,
+        scout_type: str,
+        system_prompt: str,
+        api_key: str,
+        model: str = "gpt-5-nano",
+        tenant_user_id: str = "",
+    ):
         """
         Initialize a Scout.
-        
+
         Args:
-            scout_type: Unique identifier for this Scout type (e.g., "market_driven")
-            system_prompt: The system prompt that defines this Scout's strategy
-            api_key: OpenAI API key
-            model: OpenAI model to use (default: gpt-5-nano)
+            tenant_user_id: Clerk user id for SERP usage and settings (explicit tenant).
         """
+        self._tenant_user_id = require_user_id(tenant_user_id, context=f"Scout.{scout_type}")
         self.scout_type = scout_type
         self.system_prompt = system_prompt
         self.client = OpenAI(api_key=api_key)
@@ -50,7 +58,34 @@ class Scout(ABC):
         # Meta-Agent integration: map to agent name and load any mutated prompt
         self.agent_name = self._get_agent_name()
         self._load_prompt_from_library()
-    
+        self._fund_thesis_ctx: Optional[Dict[str, Any]] = None
+
+    def set_fund_thesis(self, thesis_ctx: Optional[Dict[str, Any]]) -> None:
+        """Active fund mandate from Supabase; discovery must align when set."""
+        self._fund_thesis_ctx = thesis_ctx
+
+    def _fund_thesis_user_block(self) -> str:
+        ctx = getattr(self, "_fund_thesis_ctx", None)
+        if not ctx:
+            return ""
+        pj = ctx.get("parsed_json") or {}
+        raw = str(ctx.get("raw_text") or "").strip()
+        summary = raw[:4000] if len(raw) > 4000 else raw
+        lines = [
+            "\n\nEvaluate this startup relative to the following investment mandate:\n",
+            (summary + "\n\n") if summary else "",
+            "FUND THESIS (discover a company that fits this mandate; avoid exclusions):\n",
+            f"thesis_version_id: {ctx.get('version_id', '')}\n",
+            f"mandate_json: {json.dumps(pj, ensure_ascii=False)[:10000]}\n",
+        ]
+        emb = ctx.get("embedding") or []
+        if isinstance(emb, list) and emb:
+            lines.append(
+                f"thesis_embedding_dim: {len(emb)}; preview: "
+                f"{json.dumps([round(float(x), 6) for x in emb[:16]])}\n"
+            )
+        return "".join(lines)
+
     @abstractmethod
     async def discover(self) -> Optional[ScoutOutput]:
         """
@@ -124,7 +159,7 @@ class Scout(ABC):
             h = hostname_from_user_hint(cand if isinstance(cand, str) else None)
             if h:
                 return h
-        return get_canonical_website_hostname()
+        return get_canonical_website_hostname(self._tenant_user_id)
 
     def _call_llm_sync(self) -> Optional[dict]:
         """
@@ -142,10 +177,11 @@ class Scout(ABC):
                     {
                         "role": "user",
                         "content": (
-                            "Find one REAL VC-BACKABLE STARTUP (Seed to Series C, typically private, technology-driven), "
+                            self._fund_thesis_user_block()
+                            + "Find one REAL VC-BACKABLE STARTUP (Seed to Series C, typically private, technology-driven), "
                             "not a hypothetical idea and not a mega-cap incumbent like Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, or their cloud brands. "
                             "Output ONLY valid JSON matching the ScoutOutput schema "
-                            "(resources/schemas/scout_output_v1.json). Exact shape:\n\n"
+                            "(resources/contracts/schemas/scout_output_v1.json). Exact shape:\n\n"
                             "{\n"
                             '  \"id\": \"uuid\",\\n'
                             f'  \"scout_type\": \"{self.scout_type}\",\\n'
@@ -202,7 +238,7 @@ class Scout(ABC):
             # Ensure scout_type matches
             data["scout_type"] = self.scout_type
             # Optionally enrich references using SERP (guarded + rate-limited)
-            data = maybe_enrich_references(data)
+            data = maybe_enrich_references(data, user_id=self._tenant_user_id)
             data = finalize_scout_references(
                 data,
                 anchor_hostname=self._reference_anchor_hostname(data),
@@ -234,8 +270,9 @@ class Scout(ABC):
                     if site
                     else ""
                 )
+                + self._fund_thesis_user_block()
                 + "Output ONLY valid JSON matching the ScoutOutput schema "
-                "(resources/schemas/scout_output_v1.json). Exact shape:\n\n"
+                "(resources/contracts/schemas/scout_output_v1.json). Exact shape:\n\n"
                 "{\n"
                 '  "id": "uuid",\n'
                 f'  "scout_type": "{self.scout_type}",\n'
@@ -279,7 +316,7 @@ class Scout(ABC):
             data["scout_type"] = self.scout_type
             if site:
                 data["lookup_website"] = site
-            data = maybe_enrich_references(data)
+            data = maybe_enrich_references(data, user_id=self._tenant_user_id)
             data = finalize_scout_references(
                 data,
                 anchor_hostname=self._reference_anchor_hostname(data, explicit_website=site or None),

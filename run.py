@@ -235,6 +235,27 @@ def _stream_output(pipe, prefix: str, color: str = "", use_color: bool = False) 
             pass
 
 
+def _stop_process(proc: subprocess.Popen | None) -> None:
+    """Send SIGTERM, wait up to 15s. On timeout or Ctrl+C during wait, SIGKILL."""
+    if proc is None or proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+    except KeyboardInterrupt:
+        proc.kill()
+        try:
+            proc.wait(timeout=5)
+        except (KeyboardInterrupt, subprocess.TimeoutExpired):
+            pass
+
+
 def main() -> int:
     if load_dotenv and ENV_FILE.exists():
         load_dotenv(ENV_FILE)
@@ -340,22 +361,17 @@ def main() -> int:
     except KeyboardInterrupt:
         pass
     finally:
-        if backend_proc and backend_proc.poll() is None:
-            backend_proc.terminate()
-            backend_proc.wait()
-        if app_proc and app_proc.poll() is None:
-            app_proc.terminate()
-            app_proc.wait()
-        if web_proc and web_proc.poll() is None:
-            web_proc.terminate()
-            web_proc.wait()
-        if agents_proc is not None and agents_proc.poll() is None:
-            agents_proc.terminate()
-            agents_proc.wait()
+        _stop_process(backend_proc)
+        _stop_process(app_proc)
+        _stop_process(web_proc)
+        _stop_process(agents_proc)
         print("\nStopped.", flush=True)
 
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(130)

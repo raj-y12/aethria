@@ -1,0 +1,10 @@
+{
+  "partner_rules": "v1",
+  "reviewer_rules": "v1",
+  "evaluation_rubric": "v1",
+  "fund_thesis": "v1",
+  "fund_thesis_active": "default",
+  "fund_thesis_versions": {
+    "default": "v1"
+  }
+}

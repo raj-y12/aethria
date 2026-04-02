@@ -8,21 +8,16 @@ from scout.schema import ScoutOutput
 from utils.settings_loader import get_scout_region
 
 
-_SCOUT_REGION = get_scout_region()
-if _SCOUT_REGION == "europe":
-  _REGION_LABEL = "Europe (EU/UK and broader European ecosystem)"
-else:
-  _REGION_LABEL = "global markets (no region filter)"
+def _region_label_for(tenant_user_id: str) -> str:
+    r = get_scout_region(tenant_user_id)
+    if r == "europe":
+        return "Europe (EU/UK and broader European ecosystem)"
+    return "global markets (no region filter)"
 
 
 class MarketDrivenScout(Scout):
-    """
-    Scout A: Market-Driven Scout
-    
-    Thinks top-down.
-    Focuses on macro trends, funding momentum, large markets.
-    """
-    
+    """Scout A: Market-Driven — top-down, macro and large markets."""
+
     SYSTEM_PROMPT = """You are a Market-Driven Scout for a venture capital firm.
 
 Your cognitive strategy is TOP-DOWN:
@@ -57,20 +52,21 @@ DO NOT hallucinate financial or team data. Use null for unknown fields.
 
 Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists (URLs, news, Crunchbase)."""
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
+        rl = _region_label_for(tenant_user_id)
+        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
         super().__init__(
             scout_type="market_driven",
-            system_prompt=self.SYSTEM_PROMPT,
+            system_prompt=prompt,
             api_key=api_key,
             model=model,
+            tenant_user_id=tenant_user_id,
         )
-    
+
     async def discover(self) -> Optional[ScoutOutput]:
-        """Discover one market-driven startup idea."""
         data = await self._call_llm()
         if data is None:
             return None
-        
         try:
             return ScoutOutput(**data)
         except Exception as e:
@@ -79,13 +75,8 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
 
 
 class BuilderTechnicalScout(Scout):
-    """
-    Scout B: Builder/Technical Scout
-    
-    Thinks bottom-up.
-    Focuses on feasibility, engineering-led ideas, technical innovation.
-    """
-    
+    """Scout B: Builder/Technical — bottom-up, engineering-led."""
+
     SYSTEM_PROMPT = """You are a Builder/Technical Scout for a venture capital firm.
 
 Your cognitive strategy is BOTTOM-UP:
@@ -113,20 +104,21 @@ DO NOT hallucinate financial or team data.
 
 Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists."""
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
+        rl = _region_label_for(tenant_user_id)
+        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
         super().__init__(
             scout_type="builder_technical",
-            system_prompt=self.SYSTEM_PROMPT,
+            system_prompt=prompt,
             api_key=api_key,
             model=model,
+            tenant_user_id=tenant_user_id,
         )
-    
+
     async def discover(self) -> Optional[ScoutOutput]:
-        """Discover one builder/technical startup idea."""
         data = await self._call_llm()
         if data is None:
             return None
-        
         try:
             return ScoutOutput(**data)
         except Exception as e:
@@ -135,13 +127,8 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
 
 
 class PainPointScout(Scout):
-    """
-    Scout C: Pain-Point Scout
-    
-    Obsessed with specific operational pain.
-    Prioritizes monetizable, narrow wedges.
-    """
-    
+    """Scout C: Pain-Point — operational pain and monetizable wedges."""
+
     SYSTEM_PROMPT = """You are a Pain-Point Scout for a venture capital firm.
 
 Your cognitive strategy is PAIN-FOCUSED:
@@ -169,20 +156,21 @@ DO NOT hallucinate financial or team data.
 
 Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists."""
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
+        rl = _region_label_for(tenant_user_id)
+        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
         super().__init__(
             scout_type="pain_point",
-            system_prompt=self.SYSTEM_PROMPT,
+            system_prompt=prompt,
             api_key=api_key,
             model=model,
+            tenant_user_id=tenant_user_id,
         )
-    
+
     async def discover(self) -> Optional[ScoutOutput]:
-        """Discover one pain-point-focused startup idea."""
         data = await self._call_llm()
         if data is None:
             return None
-        
         try:
             return ScoutOutput(**data)
         except Exception as e:
@@ -191,13 +179,8 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
 
 
 class ContrarianScout(Scout):
-    """
-    Scout D: Contrarian Scout
-    
-    Actively avoids hype.
-    Seeks overlooked or non-obvious opportunities.
-    """
-    
+    """Scout D: Contrarian — non-obvious, anti-hype."""
+
     SYSTEM_PROMPT = """You are a Contrarian Scout for a venture capital firm.
 
 Your cognitive strategy is CONTRARIAN:
@@ -225,20 +208,21 @@ DO NOT hallucinate financial or team data.
 
 Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists."""
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
+        rl = _region_label_for(tenant_user_id)
+        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
         super().__init__(
             scout_type="contrarian",
-            system_prompt=self.SYSTEM_PROMPT,
+            system_prompt=prompt,
             api_key=api_key,
             model=model,
+            tenant_user_id=tenant_user_id,
         )
-    
+
     async def discover(self) -> Optional[ScoutOutput]:
-        """Discover one contrarian startup idea."""
         data = await self._call_llm()
         if data is None:
             return None
-        
         try:
             return ScoutOutput(**data)
         except Exception as e:

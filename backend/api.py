@@ -8,30 +8,45 @@ import json
 import logging
 import os
 import re
+from uuid import uuid4
 from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from utils.storage import Storage
 from utils.settings_loader import DEFAULT_SETTINGS, get_settings_path, load_settings, save_settings, get_meta_agent_settings, is_cost_budget_enabled
 from auth_clerk import verify_clerk_token
-from run_context import set_run_user_id
 from supabase_client import get_service_client
+from supabase_doc_store import list_get_all, list_get_by_id
 from supabase_storage import SupabaseStartupsStorage
 from memo_generator import MemoGenerator
 from meta.agent import MetaAgent  # For manual trigger
-from meta.mutator import _PROMPT_LIBRARY_PATH, _read_json_dict, _read_json_list
 from meta.reweighter import load_weights
 from meta.calibrator import load_calibration_state
 from portfolio.store import PortfolioStore
+from portfolio.rejection import RejectionAnalyzer
 from portfolio.cost_control import CostController
-from pipeline_runner import run_one_pipeline_cycle, run_on_demand_lookup
+from pipeline_runner import (
+    reprocess_startups_missing_fund_thesis,
+    run_one_pipeline_cycle,
+    run_on_demand_lookup,
+)
+from fund_thesis import (
+    FundThesisIncompleteError,
+    FundThesisMissingError,
+    compute_thesis_alignment_stats,
+    get_active_thesis,
+    thesis_has_embeddings,
+)
+from fund_thesis_ops import activate_fund_thesis_version, create_fund_thesis_version_for_user
+from models import Startup
+from core import policy_resolver
 
 _agent_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _agent_worker_task: Optional[asyncio.Task] = None
@@ -54,6 +69,7 @@ async def _agent_worker() -> None:
                         website=str(job.get("website") or "").strip() or None,
                         lookup_query=str(job.get("lookup_query") or "").strip() or None,
                         lookup_input_type=str(job.get("lookup_input_type") or "").strip() or None,
+                        lookup_id=str(job.get("lookup_id") or "").strip() or None,
                     )
                 else:
                     await run_one_pipeline_cycle(user_id)
@@ -129,7 +145,6 @@ async def clerk_auth_middleware(request: Request, call_next):
         )
     request.state.user_id = user_id
     request.state.clerk_jwt = token
-    set_run_user_id(user_id)  # scope doc/list storage to this user for the request
     return await call_next(request)
 
 
@@ -142,10 +157,10 @@ def _get_root() -> Path:
     return Path(__file__).resolve().parent
 
 
-def _get_portfolio_store() -> PortfolioStore:
-    """Return a PortfolioStore rooted at data/portfolio."""
+def _get_portfolio_store(user_id: str) -> PortfolioStore:
+    """Return a PortfolioStore for the authenticated tenant (explicit user_id)."""
     root = _get_root()
-    return PortfolioStore(data_dir=str(root / "data" / "portfolio"))
+    return PortfolioStore(data_dir=str(root / "data" / "portfolio"), user_id=user_id)
 
 
 def _read_json_list(path: Path) -> List[Dict[str, Any]]:
@@ -183,6 +198,8 @@ def _get_pending_escalations(
     Return raw startup dicts where partner_info.human_review_required is True
     and no human_resolution has been recorded.
     """
+    if isinstance(storage, SupabaseStartupsStorage):
+        return storage.query_pending_escalations_raw()
     raw = storage.get_all()
     pending: List[Dict[str, Any]] = []
     for item in raw:
@@ -198,6 +215,20 @@ def _get_pending_escalations(
     return pending
 
 
+def _startup_name_index(storage: Union[Storage, SupabaseStartupsStorage]) -> Dict[str, str]:
+    """startup_id -> display name without loading full startup JSON when on Supabase."""
+    if isinstance(storage, SupabaseStartupsStorage):
+        return storage.get_startup_id_name_map()
+    out: Dict[str, str] = {}
+    for s in storage.get_all():
+        sid = s.get("startup_id") or s.get("id")
+        if not sid:
+            continue
+        name = (s.get("scout_info") or {}).get("name") or (s.get("scout") or {}).get("name") or ""
+        out[str(sid)] = name
+    return out
+
+
 def _get_system_health(
     storage: Union[Storage, SupabaseStartupsStorage],
     user_id: Optional[str] = None,
@@ -208,10 +239,10 @@ def _get_system_health(
     budget_status is only populated when cost_budget.enabled for this user.
     """
     # Calibration warning from portfolio agent_metrics (Supabase)
-    portfolio_store = _get_portfolio_store()
+    portfolio_store = _get_portfolio_store(user_id) if user_id else None
     calibration_warning = None
-    metrics_file = portfolio_store.files.get("agent_metrics")
-    if metrics_file is not None:
+    metrics_file = portfolio_store.files.get("agent_metrics") if portfolio_store else None
+    if portfolio_store and metrics_file is not None:
         metrics = portfolio_store._read_file(metrics_file)
         for m in metrics:
             if m.get("id") == "verdict_distribution":
@@ -231,7 +262,7 @@ def _get_system_health(
     except Exception:
         undecided = 0
     try:
-        watchlist = len(portfolio_store.get_all_watchlist())
+        watchlist = len(portfolio_store.get_all_watchlist()) if portfolio_store else 0
     except Exception:
         watchlist = 0
 
@@ -417,6 +448,7 @@ def _backend_to_frontend(raw: dict) -> dict:
             "lookup_input_type": scout.get("lookup_input_type"),
             "lookup_query": scout.get("lookup_query"),
             "lookup_website": scout.get("lookup_website"),
+            "lookup_id": scout.get("lookup_id"),
         },
         "timestamps": timestamps,
     }
@@ -439,6 +471,16 @@ def _backend_to_frontend(raw: dict) -> dict:
             "business_model_analysis": review.get("business_model_analysis") or None,
             "investment_thesis": review.get("investment_thesis") or None,
             "risk_mitigation": review.get("risk_mitigation") or None,
+            "consensus_verdict": review.get("consensus_verdict"),
+            "reviewer_disagreement": review.get("reviewer_disagreement"),
+            "score_variance": review.get("score_variance"),
+            "fund_thesis_version_id": review.get("fund_thesis_version_id"),
+            "thesis_alignment_score": review.get("thesis_alignment_score"),
+            "thesis_matches_fund": review.get("thesis_matches_fund"),
+            "thesis_fit_points": review.get("thesis_fit_points") or None,
+            "thesis_deviation_points": review.get("thesis_deviation_points") or None,
+            "thesis_alignment_confidence": review.get("thesis_alignment_confidence"),
+            "fund_thesis_alignment_score": review.get("fund_thesis_alignment_score"),
         }
     else:
         out["review"] = None
@@ -461,6 +503,112 @@ def _backend_to_frontend(raw: dict) -> dict:
     return out
 
 
+def _memo_partial_payload(startup: Startup) -> Dict[str, Any]:
+    """Scout/review/partner slices for progressive memo UX (frontend Startup shape)."""
+    raw = startup.model_dump(mode="json")
+    fe = _backend_to_frontend(raw)
+    return {
+        "scout": fe["scout"],
+        "review": fe.get("review"),
+        "partner": fe.get("partner"),
+    }
+
+
+def _list_projection_to_frontend(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Map DB list-projection row to frontend Startup-like payload (no memo, no heavy scout blobs)."""
+    sid = str(row.get("startup_id") or "")
+    conf = row.get("list_confidence")
+    try:
+        conf_f = float(conf) if conf is not None else 0.5
+    except (TypeError, ValueError):
+        conf_f = 0.5
+    timestamps: Dict[str, Any] = {
+        "discovered_at": _to_iso(row.get("created_at")),
+        "reviewed_at": _to_iso(row.get("list_reviewed_at")) if row.get("list_reviewed_at") else None,
+        "partnered_at": _to_iso(row.get("list_partnered_at")) if row.get("list_partnered_at") else None,
+    }
+    out: Dict[str, Any] = {
+        "id": sid,
+        "scout": {
+            "id": sid,
+            "scout_type": row.get("list_scout_type") or "market_driven",
+            "name": row.get("display_name") or "",
+            "one_line": row.get("list_one_line") or "",
+            "sector": row.get("list_sector") or "",
+            "why_now": "",
+            "confidence": conf_f,
+            "origin_type": row.get("list_origin_type"),
+            "lookup_id": row.get("list_lookup_id"),
+            "lookup_query": row.get("list_lookup_query"),
+            "lookup_website": row.get("list_lookup_website"),
+        },
+        "timestamps": timestamps,
+    }
+    if row.get("list_verdict") or row.get("list_score") is not None or row.get("short_summary"):
+        score = row.get("list_score")
+        try:
+            agg = float(score) if score is not None else None
+        except (TypeError, ValueError):
+            agg = None
+        out["review"] = {
+            "verdict": row.get("list_verdict"),
+            "consensus_verdict": row.get("list_consensus_verdict") or row.get("list_verdict"),
+            "overall_summary": row.get("short_summary") or "",
+            "reviewer_disagreement": bool(row.get("list_reviewer_disagreement")),
+            "aggregate_score": agg,
+        }
+    else:
+        out["review"] = None
+    if row.get("partner_decision"):
+        out["partner"] = {
+            "decision": row.get("partner_decision"),
+            "human_review_required": bool(row.get("partner_human_review_required")),
+        }
+    else:
+        out["partner"] = None
+    return out
+
+
+def _thin_list_from_full_frontend(obj: Dict[str, Any]) -> Dict[str, Any]:
+    """Fallback when list projection columns are unavailable: strip heavy fields from full map."""
+    scout = dict(obj.get("scout") or {})
+    for k in (
+        "problem",
+        "solution",
+        "target_users",
+        "references",
+        "primary_thesis",
+        "key_assumptions",
+        "biggest_unknown",
+        "funding_stage",
+        "est_tam",
+        "lookup_input_type",
+        "prompt_version",
+    ):
+        scout.pop(k, None)
+    rev = obj.get("review") or {}
+    thin_rev: Optional[Dict[str, Any]] = None
+    if rev:
+        thin_rev = {
+            "verdict": rev.get("verdict"),
+            "consensus_verdict": rev.get("consensus_verdict") or rev.get("verdict"),
+            "overall_summary": (rev.get("overall_summary") or "")[:400],
+            "reviewer_disagreement": rev.get("reviewer_disagreement"),
+            "aggregate_score": None,
+        }
+        scores = [rev.get("market_score"), rev.get("product_score"), rev.get("technical_score"), rev.get("execution_score")]
+        if all(isinstance(x, (int, float)) for x in scores):
+            thin_rev["aggregate_score"] = sum(scores) / 4.0  # type: ignore[arg-type]
+    part = obj.get("partner") or {}
+    thin_part: Optional[Dict[str, Any]] = None
+    if part:
+        thin_part = {
+            "decision": part.get("decision"),
+            "human_review_required": part.get("human_review_required", False),
+        }
+    return {**obj, "scout": scout, "review": thin_rev, "partner": thin_part}
+
+
 def _get_storage(request: Request):
     """Return Supabase startups storage for the authenticated user.
     Uses service-role client and Clerk-derived user_id; we never send Clerk JWT to Supabase.
@@ -474,19 +622,91 @@ def _get_storage(request: Request):
 @app.get("/api/startups")
 def get_startups(request: Request):
     storage = _get_storage(request)
+    if isinstance(storage, SupabaseStartupsStorage):
+        rows = storage.get_list_projection_rows()
+        if rows is not None:
+            return [_list_projection_to_frontend(r) for r in rows]
+        raw_list = storage.get_all()
+        full = [_backend_to_frontend(r) for r in raw_list]
+        return [_thin_list_from_full_frontend(x) for x in full]
     raw_list = storage.get_all()
-    return [_backend_to_frontend(r) for r in raw_list]
+    full = [_backend_to_frontend(r) for r in raw_list]
+    return [_thin_list_from_full_frontend(x) for x in full]
+
+
+@app.get("/api/startups/{startup_id}")
+def get_startup_detail(request: Request, startup_id: str):
+    """Full scout/review/partner JSON for one startup (on-demand; not used for grid polling)."""
+    storage = _get_storage(request)
+    raw = storage.get_by_id(startup_id)
+    if not raw:
+        raise HTTPException(status_code=404, detail="Startup not found")
+    return _backend_to_frontend(raw)
 
 
 @app.get("/api/startups/{startup_id}/memo")
 def get_startup_memo(request: Request, startup_id: str):
-    """Return full investment memo (markdown) for a startup from MemoGenerator."""
+    """
+    Memo readiness + optional persisted markdown (Supabase).
+    Never blocks on memo generation: returns partial scout/review/partner while pipeline runs.
+    Response: { status, memo, partial?, pipeline_run_id, error }.
+    """
+    from pipeline_state import get_pipeline_state_row
+
     storage = _get_storage(request)
+    uid = request.state.user_id
     startup = storage.get_startup(startup_id)
     if not startup:
         raise HTTPException(status_code=404, detail="Startup not found")
-    memo = MemoGenerator().generate_memo(startup, for_display=True)
-    return {"memo": memo}
+
+    if isinstance(storage, SupabaseStartupsStorage):
+        row = get_pipeline_state_row(storage._client, user_id=uid, startup_id=startup_id)
+        state_status = row.get("status") if row else None
+        pr_from_row = row.get("pipeline_run_id") if row else None
+        err_from_row = row.get("error") if row else None
+
+        md = (startup.investment_memo_markdown or "").strip()
+        partial = _memo_partial_payload(startup)
+        pr_str = str(pr_from_row) if pr_from_row else None
+
+        if state_status == "failed":
+            return {
+                "status": "failed",
+                "memo": None,
+                "partial": partial,
+                "pipeline_run_id": pr_str,
+                "error": err_from_row,
+            }
+
+        if md:
+            return {
+                "status": "ready",
+                "memo": md,
+                "partial": None,
+                "pipeline_run_id": pr_str,
+                "error": None,
+            }
+
+        return {
+            "status": "generating",
+            "memo": None,
+            "partial": partial,
+            "pipeline_run_id": pr_str,
+            "error": None,
+        }
+
+    memo = MemoGenerator().generate_memo(
+        startup,
+        for_display=True,
+        tenant_user_id=uid,
+    )
+    return {
+        "status": "ready",
+        "memo": memo,
+        "partial": None,
+        "pipeline_run_id": None,
+        "error": None,
+    }
 
 
 @app.get("/health")
@@ -497,7 +717,7 @@ def health():
 
 @app.get("/api/me")
 def get_me(request: Request):
-    """Return the current user's id (Clerk JWT sub). Used for multi-user: API uses this per request; agents use AETHRIA_DEFAULT_USER_ID when running in background."""
+    """Return the current user's id (Clerk JWT sub). Background agents receive user_id only via the job queue."""
     return {"user_id": request.state.user_id}
 
 
@@ -541,53 +761,112 @@ def patch_settings(request: Request, body: dict):
     return current
 
 
+@app.get("/api/policy/active")
+def get_policy_active(request: Request):
+    """Return resources/config/active.json (version pointers; authenticated)."""
+    return policy_resolver.read_active_json_from_disk()
+
+
+@app.post("/api/policy/reload")
+def post_policy_reload(request: Request):
+    """
+    Reload active.json and all versioned policy JSON into the process cache (no restart).
+    """
+    policy_resolver.reload()
+    return {
+        "ok": True,
+        "active": policy_resolver.get_active_meta_snapshot(),
+    }
+
+
 @app.get("/api/meta/reports")
-def get_meta_reports():
+def get_meta_reports(request: Request):
     """
-    Return the last 10 Meta-Agent cycle reports.
+    Return the last 10 Meta-Agent cycle reports for the authenticated user (Supabase meta_reports).
     """
-    reports = _read_json_list(_PROMPT_LIBRARY_PATH.parent / "meta_reports.json")
+    uid = request.state.user_id
+    reports = list_get_all("meta_reports", user_id=uid)
     if not isinstance(reports, list):
         return []
-    # Return most recent first
-    return list(reversed(reports[-10:]))
+    reports = sorted(
+        reports,
+        key=lambda x: (x.get("ran_at") or "", int(x.get("cycle_number") or 0)),
+        reverse=True,
+    )
+    return reports[:10]
+
+
+@app.get("/api/meta/insights")
+def get_meta_insights(request: Request):
+    """
+    Latest meta cycle: what changed (mutations, weights, calibration) and why (no_action_reasons).
+    """
+    uid = request.state.user_id
+    reports = list_get_all("meta_reports", user_id=uid)
+    if not isinstance(reports, list) or not reports:
+        return {
+            "latest": None,
+            "what_changed": None,
+            "why": [],
+        }
+    latest = max(
+        reports,
+        key=lambda x: (x.get("ran_at") or "", int(x.get("cycle_number") or 0)),
+    )
+    return {
+        "latest": {
+            "cycle_number": latest.get("cycle_number"),
+            "ran_at": latest.get("ran_at"),
+            "next_cycle_at": latest.get("next_cycle_at"),
+        },
+        "what_changed": {
+            "mutations_applied": latest.get("mutations_applied") or [],
+            "weight_updates": latest.get("weight_updates") or [],
+            "calibration_changes": latest.get("calibration_changes") or [],
+        },
+        "why": latest.get("no_action_reasons") or [],
+        "signal_summary": latest.get("signal_summary"),
+    }
 
 
 @app.get("/api/meta/prompt-library")
-def get_meta_prompt_library():
+def get_meta_prompt_library(request: Request):
     """
-    Return the full prompt library used by the Meta-Agent.
+    Return the full prompt library used by the Meta-Agent (Supabase meta_prompt_library).
     """
-    library = _read_json_dict(_PROMPT_LIBRARY_PATH)
+    from supabase_doc_store import doc_get
+
+    library = doc_get("meta_prompt_library", user_id=request.state.user_id)
     if not isinstance(library, dict):
         return {}
     return library
 
 
 @app.get("/api/meta/weights")
-def get_meta_weights():
+def get_meta_weights(request: Request):
     """
     Return current scout weights used by the Meta-Agent reweighter.
     """
-    return load_weights()
+    return load_weights(request.state.user_id)
 
 
 @app.get("/api/meta/calibration")
-def get_meta_calibration():
+def get_meta_calibration(request: Request):
     """
     Return current calibration state for reviewer thresholds.
     """
-    state = load_calibration_state()
+    state = load_calibration_state(request.state.user_id)
     if not isinstance(state, dict):
         return {}
     return state
 
 
 @app.get("/api/agents/status")
-async def agents_status():
+async def agents_status(request: Request):
     """
     Return whether the server is configured for agents (for debugging deployment).
     Does not expose secrets; use to see why agents might be skipped on e.g. Render.
+    Includes fund thesis readiness for the authenticated user.
     """
     use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
     supabase_configured = bool(
@@ -596,12 +875,302 @@ async def agents_status():
         and os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     )
     openai_configured = bool(os.getenv("OPENAI_API_KEY", "").strip())
+    thesis_ready = False
+    active_thesis_version_id: Optional[str] = None
+    thesis_error: Optional[str] = None
+    if supabase_configured:
+        try:
+            t = get_active_thesis(get_service_client(), request.state.user_id)
+            thesis_ready = True
+            active_thesis_version_id = t.version_id
+        except FundThesisMissingError:
+            thesis_error = "missing"
+        except FundThesisIncompleteError:
+            thesis_error = "incomplete"
+        except Exception as e:
+            thesis_error = type(e).__name__
     return {
         "worker_ready": _agent_queue is not None,
         "supabase_configured": supabase_configured,
         "openai_configured": openai_configured,
         "agents_will_run": supabase_configured and openai_configured and _agent_queue is not None,
+        "thesis_ready": thesis_ready,
+        "active_thesis_version_id": active_thesis_version_id,
+        "thesis_error": thesis_error,
     }
+
+
+def _require_supabase_for_thesis() -> None:
+    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    if not use_supabase or not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_SERVICE_ROLE_KEY"):
+        raise HTTPException(status_code=503, detail="Supabase storage is required for fund thesis")
+
+
+@app.get("/api/fund-thesis")
+def api_get_fund_thesis(request: Request):
+    """Active thesis, version list metadata, embedding status, recent pipeline links."""
+    _require_supabase_for_thesis()
+    uid = request.state.user_id
+    client = get_service_client()
+    try:
+        active = get_active_thesis(client, uid)
+    except FundThesisMissingError:
+        raise HTTPException(status_code=404, detail="No fund thesis yet. POST /api/fund-thesis/versions with raw_text.")
+    except FundThesisIncompleteError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    vr = (
+        client.table("fund_thesis_versions")
+        .select("id,version_number,is_active,created_at")
+        .eq("user_id", uid)
+        .eq("thesis_id", active.thesis_id)
+        .order("version_number", desc=True)
+        .limit(50)
+        .execute()
+    )
+    versions = getattr(vr, "data", None) or []
+
+    er = (
+        client.table("fund_thesis_embeddings")
+        .select("model,created_at")
+        .eq("version_id", active.version_id)
+        .eq("user_id", uid)
+        .limit(1)
+        .execute()
+    )
+    erows = getattr(er, "data", None) or []
+    emb_row = erows[0] if erows else {}
+
+    lr = (
+        client.table("fund_thesis_pipeline_link")
+        .select("id,thesis_version_id,pipeline_run_id,affected_startups_count,created_at")
+        .eq("user_id", uid)
+        .order("created_at", desc=True)
+        .limit(20)
+        .execute()
+    )
+
+    has_emb = thesis_has_embeddings(active)
+    emb_status = "ready" if has_emb else "pending"
+    emb_model = active.embedding_model if has_emb else "none"
+    dim = len(active.embedding)
+    return {
+        "thesis_id": active.thesis_id,
+        "active_version_id": active.version_id,
+        "active_version_number": active.version_number,
+        "parsed_json": active.parsed_json,
+        "raw_text": active.raw_text[:50000],
+        "mode": "embedding" if has_emb else "rule_based",
+        "embedding": {
+            "status": emb_status,
+            "model": emb_model,
+            "dimension": dim,
+            "dimensions": dim,
+            "created_at": emb_row.get("created_at"),
+        },
+        "versions": versions,
+        "recent_pipeline_links": getattr(lr, "data", None) or [],
+    }
+
+
+@app.get("/api/fund-thesis/runtime")
+def get_fund_thesis_runtime(request: Request):
+    """Lightweight thesis runtime (mode / embeddings) for System panel; alignment extras without parsed_json."""
+    _require_supabase_for_thesis()
+    uid = request.state.user_id
+    client = get_service_client()
+    try:
+        active = get_active_thesis(client, uid)
+    except FundThesisMissingError:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "mode": "missing",
+                "embedding_status": "pending",
+                "has_embeddings": False,
+            },
+        )
+    except FundThesisIncompleteError as e:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "mode": "missing",
+                "embedding_status": "pending",
+                "has_embeddings": False,
+                "thesis_ready": False,
+                "error": "incomplete",
+                "detail": str(e),
+                "alignment_stats": {},
+            },
+        )
+
+    has_emb = thesis_has_embeddings(active)
+    mode = "embedding" if has_emb else "rule_based"
+    embedding_status = "ready" if has_emb else "pending"
+    emb_model = (
+        (active.embedding_model or "").strip()
+        if has_emb
+        else "none"
+    )
+    if has_emb and not emb_model:
+        emb_model = "none"
+
+    prev_id: Optional[str] = None
+    if active.version_number > 1:
+        pr = (
+            client.table("fund_thesis_versions")
+            .select("id")
+            .eq("user_id", uid)
+            .eq("thesis_id", active.thesis_id)
+            .eq("version_number", active.version_number - 1)
+            .limit(1)
+            .execute()
+        )
+        prow = getattr(pr, "data", None) or []
+        if prow:
+            prev_id = str(prow[0].get("id") or "")
+
+    stats = compute_thesis_alignment_stats(
+        client,
+        uid,
+        active_version_id=active.version_id,
+        previous_version_id=prev_id,
+    )
+
+    tr = (
+        client.table("fund_thesis")
+        .select("updated_at,active_version_id")
+        .eq("user_id", uid)
+        .limit(1)
+        .execute()
+    )
+    trow = (getattr(tr, "data", None) or [{}])[0]
+
+    tl_r = (
+        client.table("fund_thesis_versions")
+        .select("id,version_number,is_active,created_at")
+        .eq("user_id", uid)
+        .eq("thesis_id", active.thesis_id)
+        .order("version_number", desc=True)
+        .limit(15)
+        .execute()
+    )
+    version_timeline = getattr(tl_r, "data", None) or []
+
+    dim = len(active.embedding)
+    payload: Dict[str, Any] = {
+        "thesis_version_id": active.version_id,
+        "mode": mode,
+        "embedding_status": embedding_status,
+        "embedding_model": emb_model,
+        "has_embeddings": has_emb,
+        # Backward-compatible fields for SystemIntelligence / clients
+        "thesis_ready": True,
+        "active_version_id": active.version_id,
+        "active_version_number": active.version_number,
+        "fund_thesis_updated_at": trow.get("updated_at"),
+        "thesis_mode": mode,
+        "embedding": {
+            "status": embedding_status,
+            "model": emb_model,
+            "dimension": dim,
+        },
+        "embedding_dimensions": dim,
+        "alignment_stats": stats,
+        "version_timeline": version_timeline,
+    }
+    return JSONResponse(status_code=200, content=payload)
+
+
+@app.post("/api/fund-thesis/versions")
+async def api_post_fund_thesis_version(request: Request):
+    """Create a new thesis version (parse + embed + activate). Optional skip_embedding + parsed_json avoids OpenAI."""
+    _require_supabase_for_thesis()
+    body = await request.json()
+    raw_text = str(body.get("raw_text") or "").strip()
+    if not raw_text:
+        raise HTTPException(status_code=422, detail="raw_text is required")
+    parsed_override = body.get("parsed_json")
+    pipeline_run_id = str(body.get("pipeline_run_id") or "").strip() or None
+    skip_embedding = bool(body.get("skip_embedding"))
+    po = parsed_override if isinstance(parsed_override, dict) else None
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key and not (po and skip_embedding):
+        raise HTTPException(
+            status_code=503,
+            detail="OPENAI_API_KEY required unless both parsed_json and skip_embedding are set",
+        )
+    uid = request.state.user_id
+    try:
+        out = create_fund_thesis_version_for_user(
+            get_service_client(),
+            user_id=uid,
+            raw_text=raw_text,
+            api_key=api_key,
+            parsed_json_override=po,
+            pipeline_run_id=pipeline_run_id,
+            skip_embedding=skip_embedding,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    return {"status": "created", **out}
+
+
+@app.patch("/api/fund-thesis/active")
+async def api_patch_fund_thesis_active(request: Request):
+    """Activate an existing version (embeddings optional)."""
+    _require_supabase_for_thesis()
+    body = await request.json()
+    version_id = str(body.get("version_id") or "").strip()
+    if not version_id:
+        raise HTTPException(status_code=422, detail="version_id is required")
+    pipeline_run_id = str(body.get("pipeline_run_id") or "").strip() or None
+    uid = request.state.user_id
+    try:
+        activate_fund_thesis_version(
+            get_service_client(),
+            user_id=uid,
+            version_id=version_id,
+            pipeline_run_id=pipeline_run_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    return {"status": "ok", "active_version_id": version_id}
+
+
+@app.post("/api/fund-thesis/reprocess-missing")
+async def api_post_fund_thesis_reprocess_missing(
+    request: Request,
+    dry_run: bool = Query(False, description="If true, return eligible count only (no OpenAI calls)"),
+):
+    """
+    Re-run reviewer + partner for startups that have reviews but no fund_thesis_version_id
+    on review_info. Does not run scout or create new startups.
+    """
+    _require_supabase_for_thesis()
+    uid = request.state.user_id
+    client = get_service_client()
+
+    if not dry_run:
+        try:
+            get_active_thesis(client, uid)
+        except FundThesisMissingError:
+            raise HTTPException(status_code=400, detail="No active thesis")
+        except FundThesisIncompleteError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        if not os.getenv("OPENAI_API_KEY", "").strip():
+            raise HTTPException(
+                status_code=503,
+                detail="OPENAI_API_KEY required for thesis reprocessing",
+            )
+
+    try:
+        result = await reprocess_startups_missing_fund_thesis(uid, dry_run=dry_run)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return result
 
 
 @app.post("/api/agents/trigger")
@@ -630,11 +1199,37 @@ async def trigger_agents(request: Request):
             status_code=503,
             content={"status": "unavailable", "reason": "worker_not_ready"},
         )
+    try:
+        get_active_thesis(get_service_client(), user_id)
+    except (FundThesisMissingError, FundThesisIncompleteError):
+        return JSONResponse(
+            status_code=200,
+            content={"status": "skipped", "reason": "thesis_required"},
+        )
     await _agent_queue.put({"type": "cycle", "user_id": user_id})
     return JSONResponse(
         status_code=202,
         content={"status": "queued", "user_id": user_id},
     )
+
+
+_LOOKUP_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{8,128}$")
+
+
+def _coerce_lookup_id(raw: Any) -> str:
+    """
+    Stable correlation id for on-demand lookup (queue → scout row → UI).
+    Prefer client-generated UUID; otherwise allocate one here for API clients that omit it.
+    """
+    if raw is not None and str(raw).strip():
+        s = str(raw).strip()
+        if not _LOOKUP_ID_RE.match(s):
+            raise HTTPException(
+                status_code=422,
+                detail="lookup_id must be 8-128 characters [a-zA-Z0-9_-]",
+            )
+        return s
+    return str(uuid4())
 
 
 def _parse_lookup_input(lookup_input: str) -> Dict[str, Optional[str]]:
@@ -666,11 +1261,35 @@ def _parse_lookup_input(lookup_input: str) -> Dict[str, Optional[str]]:
     }
 
 
+@app.get("/api/startups/lookup-status")
+async def lookup_job_status(request: Request, lookup_id: str = ""):
+    """
+    Poll after POST /api/startups/lookup: if the worker recorded a failure, returns failed=true and message.
+    """
+    uid = request.state.user_id
+    raw = (lookup_id or "").strip()
+    if not raw or not _LOOKUP_ID_RE.match(raw):
+        raise HTTPException(
+            status_code=422,
+            detail="lookup_id query parameter must be 8-128 characters [a-zA-Z0-9_-]",
+        )
+    if os.getenv("USE_SUPABASE_STORAGE", "").lower() not in ("1", "true", "yes"):
+        return {"lookup_id": raw, "failed": False}
+    row = list_get_by_id("lookup_job_outcomes", raw, user_id=uid)
+    if not row or row.get("status") != "failed":
+        return {"lookup_id": raw, "failed": False}
+    return {
+        "lookup_id": raw,
+        "failed": True,
+        "message": str(row.get("message") or "Lookup failed."),
+    }
+
+
 @app.post("/api/startups/lookup")
 async def lookup_startup(request: Request, body: Dict[str, Any]):
     """
     Queue a focused on-demand company lookup for the current user.
-    Body: {"lookup_input": "..."}.
+    Body: {"lookup_input": "...", "lookup_id": optional stable id (recommended; else server-generated)}.
     Backward compatible with {"company_name": "..."}.
     """
     lookup_input = str(body.get("lookup_input") or body.get("company_name") or "").strip()
@@ -678,6 +1297,7 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
         raise HTTPException(status_code=422, detail="lookup_input is required")
     if len(lookup_input) > 300:
         raise HTTPException(status_code=422, detail="lookup_input is too long")
+    lookup_id = _coerce_lookup_id(body.get("lookup_id"))
     parsed = _parse_lookup_input(lookup_input)
     company_name = str(parsed.get("company_name") or "").strip()
     if not company_name:
@@ -696,6 +1316,7 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
             "website": parsed.get("website"),
             "lookup_query": parsed.get("lookup_query"),
             "lookup_input_type": parsed.get("lookup_input_type"),
+            "lookup_id": lookup_id,
         }
     )
     return JSONResponse(
@@ -703,6 +1324,7 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
         content={
             "status": "queued",
             "user_id": user_id,
+            "lookup_id": lookup_id,
             "lookup_input": lookup_input,
             "company_name": company_name,
             "website": parsed.get("website"),
@@ -713,7 +1335,7 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
 
 
 @app.post("/api/meta/trigger")
-async def trigger_meta_cycle():
+async def trigger_meta_cycle(request: Request):
     """
     Manually trigger a Meta-Agent cycle.
 
@@ -721,7 +1343,7 @@ async def trigger_meta_cycle():
     Meta-Agent is disabled or returns no report, we surface a no-op
     status so the UI can display a graceful message.
     """
-    agent = MetaAgent()
+    agent = MetaAgent(user_id=request.state.user_id)
     report = await agent.run_cycle()
     if not report:
         return {"status": "no-op", "cycle_number": 0}
@@ -794,29 +1416,17 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
         raise HTTPException(status_code=422, detail="decision must be YES, NO, or MAYBE")
 
     storage = _get_storage(request)
-    found = {"value": False}
-
-    def _updater(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        for i, item in enumerate(data):
-            if item.get("startup_id") == startup_id:
-                hr = {
-                    "decision": decision,
-                    "notes": notes,
-                    "resolved_at": _now_iso(),
-                }
-                new_item = dict(item)
-                new_item["human_resolution"] = hr
-                data[i] = new_item
-                found["value"] = True
-                break
-        return data
-
+    hr = {
+        "decision": decision,
+        "notes": notes,
+        "resolved_at": _now_iso(),
+    }
     try:
-        storage._atomic_update(_updater)  # type: ignore[attr-defined]
+        ok = storage.update_startup_partial(startup_id, {"human_resolution": hr})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to resolve escalation: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to resolve escalation: {e}") from e
 
-    if not found["value"]:
+    if not ok:
         raise HTTPException(status_code=404, detail="Startup not found")
 
     return {"status": "ok"}
@@ -828,18 +1438,12 @@ async def get_signals(request: Request):
     Return the last 50 portfolio signals sorted by detected_at descending.
     Startup names come from request-scoped storage (Supabase) so they are user-correct.
     """
-    store = _get_portfolio_store()
+    store = _get_portfolio_store(request.state.user_id)
     signals_file = store.files.get("signals")
     records = store._read_file(signals_file) if signals_file is not None else []
     # Attach startup names from request-scoped storage (user's startups)
     storage = _get_storage(request)
-    raw_startups = storage.get_all()
-    startups_index = {}
-    for s in raw_startups:
-        sid = s.get("startup_id") or s.get("id")
-        if sid:
-            name = (s.get("scout_info") or {}).get("name") or (s.get("scout") or {}).get("name") or ""
-            startups_index[sid] = name
+    startups_index = _startup_name_index(storage)
     for r in records:
         if "startup_name" not in r:
             r["startup_name"] = startups_index.get(r.get("startup_id") or "", "")
@@ -848,13 +1452,18 @@ async def get_signals(request: Request):
 
 
 @app.get("/api/analytics/rejections")
-async def get_rejection_analytics():
+async def get_rejection_analytics(request: Request):
     """
-    Return rejection analytics summarising red flags, sectors, and scores.
+    Return rejection analytics summarising red flags, sectors, and scores (tenant-scoped).
     """
     root = _get_root()
-    patterns_path = root / "data" / "portfolio" / "rejection_patterns.json"
-    patterns = _read_json_dict_file(patterns_path)
+    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    uid = request.state.user_id
+    analyzer = RejectionAnalyzer(
+        data_dir=str(root / "data" / "portfolio"),
+        user_id=uid if use_supabase else None,
+    )
+    patterns = analyzer.get_patterns()
     if not patterns:
         return {
             "most_common_red_flags": [],
@@ -908,7 +1517,7 @@ async def get_watchlist_analytics(request: Request):
     Return watchlist health analytics: total, stale, average days, and per-entry stats.
     Startup names come from request-scoped storage so they are user-correct.
     """
-    store = _get_portfolio_store()
+    store = _get_portfolio_store(request.state.user_id)
     try:
         watchlist = store.get_all_watchlist()
     except Exception:
@@ -931,13 +1540,7 @@ async def get_watchlist_analytics(request: Request):
 
     # Startup names from request-scoped storage (user's startups)
     storage = _get_storage(request)
-    raw_startups = storage.get_all()
-    startups_index = {}
-    for s in raw_startups:
-        sid = s.get("startup_id") or s.get("id")
-        if sid:
-            name = (s.get("scout_info") or {}).get("name") or (s.get("scout") or {}).get("name") or ""
-            startups_index[sid] = name
+    startups_index = _startup_name_index(storage)
 
     stale = 0
     days_total = 0

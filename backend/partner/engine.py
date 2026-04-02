@@ -5,15 +5,17 @@ Runs continuously, processing reviewed entries and making investment decisions.
 import asyncio
 import logging
 import os
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 
 from partner.decision import PartnerDecisionEngine
 from partner.schema import validate_partner_output
+from tenant_context import require_user_id
 from utils.storage import Storage
 from utils.settings_loader import is_partners_enabled
 from portfolio.store import PortfolioStore
 from memo_generator import MemoGenerator
+from pipeline_state import pipeline_stage_log, upsert_pipeline_state
 
 
 logger = logging.getLogger(__name__)
@@ -40,19 +42,19 @@ class PartnerEngine:
         cost_controller=None,
         portfolio_store: PortfolioStore = None,
         deal_memory=None,
+        tenant_user_id: str = "",
+        fund_thesis: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the Partner engine.
-        
+
         Args:
-            storage: Storage instance to read/write
-            interval_seconds: Time between decision cycles
-            use_llm_fallback: Whether to use LLM for edge cases
-            agent_id: Agent identifier for performance tracking
-            cost_controller: Optional CostController instance for budget enforcement
-            portfolio_store: Optional PortfolioStore for portfolio awareness
-            deal_memory: Optional DealMemory instance for cross-agent learning
+            tenant_user_id: Explicit Clerk user id for settings and memo logging.
         """
+        inferred = (tenant_user_id or "").strip()
+        if not inferred:
+            inferred = (getattr(storage, "_user_id", None) or "").strip()
+        self.tenant_user_id = require_user_id(inferred, context="PartnerEngine")
         self.storage = storage
         self.interval_seconds = interval_seconds
         self.agent_id = agent_id
@@ -64,6 +66,7 @@ class PartnerEngine:
             api_key=api_key,
             portfolio_store=portfolio_store,
         )
+        self.fund_thesis: Optional[Dict[str, Any]] = fund_thesis
         # Max undecided to process per cycle (ramp: process a solid batch when backlog is high)
         self.batch_max = int(os.getenv("PARTNER_BATCH_MAX", "20"))
         
@@ -93,7 +96,12 @@ class PartnerEngine:
             scout_info = startup.scout_info
             review_info = startup.review_info
             try:
-                memo = memo_gen.generate_memo(startup, for_display=False)
+                memo = memo_gen.generate_memo(
+                    startup,
+                    for_display=False,
+                    tenant_user_id=self.tenant_user_id,
+                    fund_thesis=self.fund_thesis,
+                )
             except Exception as e:
                 self.logger.warning(f"Memo generation failed for {startup.startup_id}: {e}")
                 memo = ""
@@ -143,7 +151,12 @@ class PartnerEngine:
         review_info = startup.review_info
         memo_gen = MemoGenerator()
         try:
-            memo = memo_gen.generate_memo(startup, for_display=False)
+            memo = memo_gen.generate_memo(
+                startup,
+                for_display=False,
+                tenant_user_id=self.tenant_user_id,
+                fund_thesis=self.fund_thesis,
+            )
         except Exception as e:
             self.logger.warning("Memo generation failed for %s: %s", startup.startup_id, e)
             memo = ""
@@ -184,8 +197,158 @@ class PartnerEngine:
             },
             "memo": memo,
         }
-    
-    async def run_cycle(self) -> int:
+
+    def _supabase_client_uid(self) -> Tuple[Any, Optional[str]]:
+        return getattr(self.storage, "_client", None), getattr(self.storage, "_user_id", None)
+
+    async def _decide_and_save_with_display_memo(
+        self,
+        entry_id: str,
+        scout_output: dict,
+        review_output: dict,
+        context_memo: str,
+        pipeline_run_id: Optional[str],
+    ) -> Tuple[bool, Optional[Dict[str, Any]]]:
+        """
+        Run partner decision, generate display memo, single DB write, pipeline state to ready/failed.
+        """
+        pr = (pipeline_run_id or "").strip() or None
+        client, uid = self._supabase_client_uid()
+
+        if pr and client and uid:
+            upsert_pipeline_state(
+                client,
+                user_id=uid,
+                startup_id=entry_id,
+                pipeline_run_id=pr,
+                status="generating_memo",
+            )
+            pipeline_stage_log(
+                pr, startup_id=entry_id, user_id=self.tenant_user_id, stage="generating_memo", phase="STARTED"
+            )
+
+        decision = self.decision_engine.decide(
+            scout_output,
+            review_output,
+            context_memo=context_memo,
+            fund_thesis=self.fund_thesis,
+        )
+        validate_partner_output(decision)
+
+        if self.cost_controller:
+            tokens_used = 0
+            if decision.get("llm_fallback_reason"):
+                usage = getattr(self.decision_engine, "_last_token_usage", None)
+                if isinstance(usage, dict):
+                    total = usage.get("total_tokens")
+                    if isinstance(total, int):
+                        tokens_used = total
+                    else:
+                        prompt_tokens = usage.get("prompt_tokens", 0) or 0
+                        completion_tokens = usage.get("completion_tokens", 0) or 0
+                        tokens_used = int(prompt_tokens) + int(completion_tokens)
+            self.cost_controller.record_usage("partner", "partner", tokens_used=tokens_used)
+
+        from utils.adapters import partner_output_to_partner_info
+
+        partner_info = partner_output_to_partner_info(decision)
+        partner_info.partner_agent_id = self.agent_id
+
+        st = self.storage.get_startup(entry_id)
+        if st is None:
+            if pr and client and uid:
+                upsert_pipeline_state(
+                    client,
+                    user_id=uid,
+                    startup_id=entry_id,
+                    pipeline_run_id=pr,
+                    status="failed",
+                    error="startup missing before memo write",
+                )
+            return False, decision
+
+        st.partner_info = partner_info
+        memo_gen = MemoGenerator()
+        try:
+            display_memo = memo_gen.generate_memo(
+                st,
+                for_display=True,
+                tenant_user_id=self.tenant_user_id,
+                fund_thesis=self.fund_thesis,
+            )
+        except Exception as e:
+            self.logger.warning("Display memo generation failed for %s: %s", entry_id, e)
+            if pr and client and uid:
+                upsert_pipeline_state(
+                    client,
+                    user_id=uid,
+                    startup_id=entry_id,
+                    pipeline_run_id=pr,
+                    status="failed",
+                    error=f"memo generation: {e}"[:500],
+                )
+            return False, decision
+
+        if not (display_memo or "").strip():
+            if pr and client and uid:
+                upsert_pipeline_state(
+                    client,
+                    user_id=uid,
+                    startup_id=entry_id,
+                    pipeline_run_id=pr,
+                    status="failed",
+                    error="empty display memo",
+                )
+            return False, decision
+
+        if pr and client and uid:
+            pipeline_stage_log(
+                pr, startup_id=entry_id, user_id=self.tenant_user_id, stage="generating_memo", phase="DONE"
+            )
+            pipeline_stage_log(
+                pr, startup_id=entry_id, user_id=self.tenant_user_id, stage="writing_memo", phase="STARTED"
+            )
+            upsert_pipeline_state(
+                client,
+                user_id=uid,
+                startup_id=entry_id,
+                pipeline_run_id=pr,
+                status="writing_memo",
+            )
+
+        try:
+            success = self.storage.add_partner_decision(
+                entry_id,
+                partner_info,
+                investment_memo_markdown=display_memo,
+                pipeline_run_id=pr,
+            )
+        except Exception as e:
+            self.logger.error("Partner persist failed for %s: %s", entry_id, e, exc_info=True)
+            if pr and client and uid:
+                upsert_pipeline_state(
+                    client,
+                    user_id=uid,
+                    startup_id=entry_id,
+                    pipeline_run_id=pr,
+                    status="failed",
+                    error=f"persist: {e}"[:500],
+                )
+            return False, decision
+
+        if not success and pr and client and uid:
+            upsert_pipeline_state(
+                client,
+                user_id=uid,
+                startup_id=entry_id,
+                pipeline_run_id=pr,
+                status="failed",
+                error="add_partner_decision returned false",
+            )
+
+        return success, decision
+
+    async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> int:
         """
         Run one decision cycle.
         Processes all undecided entries.
@@ -231,35 +394,16 @@ class PartnerEngine:
                             f"Partner budget denied for entry {entry_id}: {reason}"
                         )
                         continue
-                
-                # Make decision (hypothesis-aware; uses assumption_feedback, Scout hypothesis, and memo)
-                decision = self.decision_engine.decide(scout_output, review_output, context_memo=context_memo)
-                validate_partner_output(decision)
 
-                # Record usage in CostController (0 tokens for rule path, actual tokens for LLM fallback)
-                if self.cost_controller:
-                    tokens_used = 0
-                    if decision.get("llm_fallback_reason"):
-                        usage = getattr(self.decision_engine, "_last_token_usage", None)
-                        if isinstance(usage, dict):
-                            total = usage.get("total_tokens")
-                            if isinstance(total, int):
-                                tokens_used = total
-                            else:
-                                prompt_tokens = usage.get("prompt_tokens", 0) or 0
-                                completion_tokens = usage.get("completion_tokens", 0) or 0
-                                tokens_used = int(prompt_tokens) + int(completion_tokens)
-                    self.cost_controller.record_usage(
-                        "partner", "partner", tokens_used=tokens_used
-                    )
+                success, decision = await self._decide_and_save_with_display_memo(
+                    entry_id,
+                    scout_output,
+                    review_output,
+                    context_memo,
+                    pipeline_run_id,
+                )
 
-                # Convert to PartnerInfo and save
-                from utils.adapters import partner_output_to_partner_info
-                partner_info = partner_output_to_partner_info(decision)
-                partner_info.partner_agent_id = self.agent_id
-                success = self.storage.add_partner_decision(entry_id, partner_info)
-                
-                if success:
+                if success and decision:
                     decided_count += 1
                     decision_type = decision.get("decision", "UNKNOWN")
                     conviction = decision.get("conviction_level") or decision.get("confidence", 0)
@@ -272,8 +416,7 @@ class PartnerEngine:
                         self.logger.info(
                             f"Entry {entry_id} assumption_risks: {assumption_risks}"
                         )
-                    
-                    # Record successful thesis in deal memory on YES decisions
+
                     if self.deal_memory and decision_type == "YES":
                         try:
                             self.deal_memory.record_successful_thesis(
@@ -283,7 +426,7 @@ class PartnerEngine:
                             self.logger.error(
                                 f"Failed to record successful thesis: {e}"
                             )
-                else:
+                elif not success:
                     self.logger.error(f"Failed to save decision for entry {entry_id}")
                     
             except Exception as e:
@@ -299,7 +442,12 @@ class PartnerEngine:
         
         return decided_count
 
-    async def run_startup(self, startup_id: str) -> bool:
+    async def run_startup(
+        self,
+        startup_id: str,
+        pipeline_run_id: Optional[str] = None,
+        force_rerun: bool = False,
+    ) -> bool:
         """
         Make a partner decision for one specific startup id.
         Returns True when decision is saved.
@@ -308,7 +456,7 @@ class PartnerEngine:
         if startup is None:
             self.logger.warning("Startup not found for partner decision: %s", startup_id)
             return False
-        if startup.partner_info is not None:
+        if startup.partner_info is not None and not force_rerun:
             self.logger.info("Startup already has partner decision: %s", startup_id)
             return True
         entry = self._entry_from_startup(startup)
@@ -316,16 +464,14 @@ class PartnerEngine:
             self.logger.info("Startup is not ready for partner decision: %s", startup_id)
             return False
         try:
-            decision = self.decision_engine.decide(
+            success, _ = await self._decide_and_save_with_display_memo(
+                startup_id,
                 entry["scout"],
                 entry["review"],
-                context_memo=entry.get("memo", ""),
+                entry.get("memo", ""),
+                pipeline_run_id,
             )
-            validate_partner_output(decision)
-            from utils.adapters import partner_output_to_partner_info
-            partner_info = partner_output_to_partner_info(decision)
-            partner_info.partner_agent_id = self.agent_id
-            return bool(self.storage.add_partner_decision(startup_id, partner_info))
+            return bool(success)
         except Exception as e:
             self.logger.error("Error making partner decision for %s: %s", startup_id, e, exc_info=True)
             return False
@@ -345,15 +491,16 @@ class PartnerEngine:
         
         while self.running:
             try:
-                if not is_partners_enabled():
+                if not is_partners_enabled(self.tenant_user_id):
                     self.logger.info("Partners disabled in settings, skipping cycle")
                     if self.running:
                         await asyncio.sleep(self.interval_seconds)
                     continue
                 cycle_count += 1
                 self.logger.info(f"=== Decision Cycle #{cycle_count} ===")
-                
-                decided = await self.run_cycle()
+                from uuid import uuid4
+
+                decided = await self.run_cycle(pipeline_run_id=str(uuid4()))
                 
                 if decided > 0:
                     self.logger.info(f"Made {decided} decisions in this cycle")

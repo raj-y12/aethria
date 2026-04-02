@@ -16,10 +16,8 @@ function AppShell() {
   const { pathname } = useLocation();
   const isSettingsRoute = pathname.startsWith('/settings');
   const [isSystemPanelOpen, setIsSystemPanelOpen] = useState(false);
-  const [isLookupActive, setIsLookupActive] = useState(false);
   const systemData = useSystemData({
     systemPanelOpen: !isSettingsRoute && isSystemPanelOpen,
-    lookupActive: !isSettingsRoute && isLookupActive,
   });
   const hasTriggeredAgents = useRef(false);
   useEffect(() => {
@@ -31,7 +29,6 @@ function AppShell() {
   useEffect(() => {
     if (!isSettingsRoute) return;
     setIsSystemPanelOpen(false);
-    setIsLookupActive(false);
   }, [isSettingsRoute]);
 
   return (
@@ -42,8 +39,8 @@ function AppShell() {
       ) : (
         <MainLayout
           data={systemData}
+          startupsError={systemData.startupsError}
           onSystemPanelOpenChange={setIsSystemPanelOpen}
-          onLookupActiveChange={setIsLookupActive}
         />
       )}
     </>

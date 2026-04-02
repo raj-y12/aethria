@@ -11,12 +11,13 @@ import InvestmentMemoContent from './InvestmentMemoContent';
 interface InvestmentMemoProps {
   startup: Startup | null;
   onClose: () => void;
+  onMemoPipelineReady?: () => void;
 }
 
 /**
  * Full-screen modal wrapper for the investment memo. Used on small viewports.
  */
-export default function InvestmentMemo({ startup, onClose }: InvestmentMemoProps) {
+export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady }: InvestmentMemoProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion = usePrefersReducedMotion();
   useFocusTrap(true, containerRef);
@@ -56,7 +57,7 @@ export default function InvestmentMemo({ startup, onClose }: InvestmentMemoProps
         className={`relative z-10 mx-auto flex max-h-[85vh] w-full max-w-[420px] flex-col overflow-y-auto overflow-x-hidden px-4 py-6 sm:max-h-[90vh] sm:max-w-3xl sm:px-6 sm:py-8 lg:px-10 ${chrome.frame}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <InvestmentMemoContent startup={startup} onClose={onClose} />
+        <InvestmentMemoContent startup={startup} onClose={onClose} onMemoPipelineReady={onMemoPipelineReady} />
       </div>
     </motion.div>
   );

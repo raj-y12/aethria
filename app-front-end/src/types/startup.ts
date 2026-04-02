@@ -17,6 +17,8 @@ export interface Scout {
   references?: string[];
   origin_type?: string;
   lookup_input_type?: string;
+  /** Stable id from POST /api/startups/lookup for on-demand rows (matches pending UI state). */
+  lookup_id?: string;
   lookup_query?: string;
   lookup_website?: string;
   /** Hash of the system prompt used by the Scout when this record was created. */
@@ -68,6 +70,17 @@ export interface Review {
   reviewer_disagreement?: boolean;
   /** Per-dimension score variance (standard deviation) across reviewers. */
   score_variance?: Record<string, number>;
+  /** Mean of core dimension scores (list view / blended reviewer output). */
+  aggregate_score?: number | null;
+  /** Fund thesis alignment (reviewer / rule-based); surfaced in memo progressive load. */
+  fund_thesis_version_id?: string | null;
+  thesis_alignment_score?: number | null;
+  thesis_matches_fund?: boolean | null;
+  thesis_fit_points?: string[] | null;
+  thesis_deviation_points?: string[] | null;
+  thesis_alignment_confidence?: number | null;
+  /** Resource policy thesis lens alignment (0–1); informational; does not drive rubric scores. */
+  fund_thesis_alignment_score?: number | null;
 }
 
 export interface Partner {

@@ -5,7 +5,7 @@ Runs all Scouts in parallel on a configurable interval.
 import asyncio
 import logging
 import os
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from scout.scouts import (
@@ -16,6 +16,7 @@ from scout.scouts import (
 )
 from scout.schema import ScoutOutput
 from utils.storage import Storage
+from tenant_context import require_user_id
 from utils.settings_loader import is_scouts_enabled
 from utils.prompt_version import hash_prompt
 
@@ -42,31 +43,33 @@ class ScoutEngine:
         model: str = "gpt-5-nano",
         cost_controller=None,
         deal_memory=None,
+        tenant_user_id: str = "",
+        active_thesis: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the Scout engine.
-        
+
         Args:
-            api_key: OpenAI API key
-            storage: Optional Storage instance for persistence
-            interval_seconds: Time between discovery cycles
-            model: OpenAI model to use (default: gpt-5-nano for cost efficiency)
-            cost_controller: Optional CostController instance for budget enforcement
-            deal_memory: Optional DealMemory instance for cross-agent learning
+            tenant_user_id: Explicit Clerk user id (settings, SERP, meta weights).
         """
+        inferred = (tenant_user_id or "").strip()
+        if not inferred and storage is not None:
+            inferred = (getattr(storage, "_user_id", None) or "").strip()
+        self.tenant_user_id = require_user_id(inferred, context="ScoutEngine")
         self.api_key = api_key
         self.storage = storage
         self.interval_seconds = interval_seconds
         self.model = model
         self.cost_controller = cost_controller
         self.deal_memory = deal_memory
-        
-        # Initialize all Scouts
+        self.active_thesis: Optional[Dict[str, Any]] = active_thesis
+
+        uid = self.tenant_user_id
         self.scouts: List[Scout] = [
-            MarketDrivenScout(api_key, model=model),
-            BuilderTechnicalScout(api_key, model=model),
-            PainPointScout(api_key, model=model),
-            ContrarianScout(api_key, model=model),
+            MarketDrivenScout(api_key, model=model, tenant_user_id=uid),
+            BuilderTechnicalScout(api_key, model=model, tenant_user_id=uid),
+            PainPointScout(api_key, model=model, tenant_user_id=uid),
+            ContrarianScout(api_key, model=model, tenant_user_id=uid),
         ]
         
         self.backpressure_threshold = int(
@@ -74,8 +77,17 @@ class ScoutEngine:
         )
         self.logger = logging.getLogger("scout.engine")
         self.running = False
+
+    def set_active_thesis(self, thesis: Optional[Dict[str, Any]]) -> None:
+        self.active_thesis = thesis
+        for s in self.scouts:
+            s.set_fund_thesis(thesis)
+
+    def _sync_thesis_to_scouts(self) -> None:
+        for s in self.scouts:
+            s.set_fund_thesis(self.active_thesis)
     
-    async def run_cycle(self) -> List[ScoutOutput]:
+    async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> List[ScoutOutput]:
         """
         Run one discovery cycle with all Scouts in parallel.
         
@@ -83,7 +95,8 @@ class ScoutEngine:
             List of valid ScoutOutputs (may be empty if all Scouts fail)
         """
         self.logger.info(f"Starting discovery cycle at {datetime.now().isoformat()}")
-        
+        self._sync_thesis_to_scouts()
+
         # Backpressure: skip discovery when too many unreviewed (let reviewers catch up)
         if self.storage is not None:
             try:
@@ -108,7 +121,8 @@ class ScoutEngine:
         import random
         try:
             from meta.reweighter import load_weights
-            weights = load_weights()
+
+            weights = load_weights(self.tenant_user_id)
             scout_type_to_name = {
                 "market_driven": "MarketDrivenScout",
                 "builder_technical": "BuilderTechnicalScout",
@@ -197,7 +211,7 @@ class ScoutEngine:
                 # Persist to storage if available
                 if self.storage:
                     try:
-                        self.storage.add_discovery(result)
+                        self.storage.add_discovery(result, pipeline_run_id=pipeline_run_id)
                     except Exception as e:
                         self.logger.error(
                             f"Failed to persist discovery {result.get('id')}: {e}"
@@ -226,6 +240,8 @@ class ScoutEngine:
         website: Optional[str] = None,
         lookup_query: Optional[str] = None,
         lookup_input_type: Optional[str] = None,
+        lookup_id: Optional[str] = None,
+        pipeline_run_id: Optional[str] = None,
     ) -> Optional[str]:
         """
         Run a focused scout lookup for one specific company and persist it.
@@ -240,6 +256,7 @@ class ScoutEngine:
         if selected is None:
             return None
 
+        self._sync_thesis_to_scouts()
         result = await selected.discover_company(company, website=website)
         if result is None:
             return None
@@ -251,8 +268,31 @@ class ScoutEngine:
             payload["lookup_query"] = (lookup_query or company).strip()
             payload["lookup_input_type"] = (lookup_input_type or "company_name").strip()
             payload["lookup_website"] = (website or "").strip() or None
+            if lookup_id and str(lookup_id).strip():
+                payload["lookup_id"] = str(lookup_id).strip()
+            pr = (pipeline_run_id or "").strip() or None
+            sid = payload.get("id")
+            if self.storage and pr and sid:
+                from pipeline_state import pipeline_stage_log, upsert_pipeline_state
+
+                client = getattr(self.storage, "_client", None)
+                uid = getattr(self.storage, "_user_id", None)
+                if client and uid:
+                    pipeline_stage_log(
+                        pr, startup_id=sid, user_id=uid, stage="ingesting", phase="STARTED"
+                    )
+                    upsert_pipeline_state(
+                        client,
+                        user_id=uid,
+                        startup_id=sid,
+                        pipeline_run_id=pr,
+                        status="ingesting",
+                    )
+                    pipeline_stage_log(
+                        pr, startup_id=sid, user_id=uid, stage="ingesting", phase="DONE"
+                    )
             if self.storage:
-                self.storage.add_discovery(payload)
+                self.storage.add_discovery(payload, pipeline_run_id=pr)
             return payload.get("id")
         except Exception as e:
             self.logger.error("Failed named lookup persistence for %s: %s", company, e)
@@ -273,15 +313,16 @@ class ScoutEngine:
         
         while self.running:
             try:
-                if not is_scouts_enabled():
+                if not is_scouts_enabled(self.tenant_user_id):
                     self.logger.info("Scouts disabled in settings, skipping cycle")
                     if self.running:
                         await asyncio.sleep(self.interval_seconds)
                     continue
                 cycle_count += 1
                 self.logger.info(f"=== Discovery Cycle #{cycle_count} ===")
-                
-                discoveries = await self.run_cycle()
+                from uuid import uuid4
+
+                discoveries = await self.run_cycle(pipeline_run_id=str(uuid4()))
                 
                 # Log discoveries in a structured way
                 if discoveries:
