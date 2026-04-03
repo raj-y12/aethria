@@ -1032,10 +1032,16 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {showJudgment && (
               <section>
                   <p className="memoLabel">INVESTMENT JUDGMENT</p>
-                  <div className="flex flex-wrap items-center gap-2 mb-4">
-                    {dossierQualityBand ? <VerdictBandBadge band={dossierQualityBand} /> : null}
-                    {decisionBadgeVariant ? <DecisionBadge variant={decisionBadgeVariant} /> : null}
-                    {showEscalationBadge ? <DecisionBadge variant="escalation" /> : null}
+                  <div className="mb-4 flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {dossierQualityBand ? <VerdictBandBadge band={dossierQualityBand} /> : null}
+                      {decisionBadgeVariant ? <DecisionBadge variant={decisionBadgeVariant} /> : null}
+                    </div>
+                    {showEscalationBadge ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <DecisionBadge variant="escalation" />
+                      </div>
+                    ) : null}
                   </div>
                   <div
                     className={`memoJudgmentHead${dossierQualityBand == null ? ' memoJudgmentHead--solo' : ''}`}

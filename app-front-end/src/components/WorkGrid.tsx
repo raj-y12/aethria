@@ -31,8 +31,9 @@
  * Advance/Pass/Hold). That mixes partner outcome with queue state. Users still need
  * the reviewer quality band (STRONG/MEDIUM/WEAK) beside the partner *decision* text.
  *
- * Each row’s right column: inline reviewer pill (VerdictBadge) + DecisionBadge
- * for partner / pipeline state.
+ * Each row’s right column: source + reviewer pill (VerdictBand) + economic DecisionBadge
+ * on the first line; workflow queue badges (awaiting review/decision, human review)
+ * on a second line below.
  */
 
 import { useMemo, useState, useEffect, useCallback, type ChangeEvent } from 'react';
@@ -164,6 +165,17 @@ function getPartnerEconomicBadgeVariant(s: Startup): 'YES' | 'NO' | 'MAYBE' | nu
   if (d === 'YES') return 'YES';
   if (d === 'NO' || d === 'PASS') return 'NO';
   return 'MAYBE';
+}
+
+type DecisionBadgeKind = ReturnType<typeof getDecisionBadgeVariant>;
+
+function isPartnerEconomicDecisionBadge(v: DecisionBadgeKind): v is 'YES' | 'NO' | 'MAYBE' {
+  return v === 'YES' || v === 'NO' || v === 'MAYBE';
+}
+
+/** Awaiting review, awaiting decision, or human review — shown below economic/verdict badges. */
+function isWorkflowQueueBadge(v: DecisionBadgeKind): boolean {
+  return v === 'awaiting' || v === 'undecided' || v === 'escalation';
 }
 
 const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchlistIds }: WorkGridProps): JSX.Element => {
@@ -423,6 +435,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
         const economicBadgeVariant = getPartnerEconomicBadgeVariant(startup);
         const showPartnerDecisionPlusEscalation =
           badgeVariant === 'escalation' && economicBadgeVariant != null;
+        const showBottomWorkflowBadges =
+          showPartnerDecisionPlusEscalation || isWorkflowQueueBadge(badgeVariant);
         const reviewBand = getReviewerVerdict(startup);
 
         return (
@@ -516,26 +530,34 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                       {getFundingStageBadgeLabel(fundingTier, fundingStageRaw)}
                     </span>
                   ) : null}
-                  {/* Single wrap row: verdict + partner + escalation stay inline on narrow viewports */}
-                  <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-1.5 justify-start sm:justify-end">
-                    <span
-                      className={`${WORK_GRID_PILL_BASE} ${
-                        getSourceBadge(startup) === 'LOOKUP'
-                          ? 'bg-lookup-surface text-lookup-ink'
-                          : 'border border-solid border-field-border bg-transparent text-oxford/55'
-                      }`}
-                    >
-                      {getSourceBadge(startup) === 'LOOKUP' ? 'LOOKUP' : 'SCOUT'}
-                    </span>
-                    {reviewBand ? <VerdictBandBadge band={reviewBand} /> : null}
-                    {showPartnerDecisionPlusEscalation ? (
-                      <>
+                  <div className="flex w-full min-w-0 max-w-full flex-col gap-1.5 lg:items-end">
+                    {/* Source, verdict, partner economic — workflow queue badges on second row */}
+                    <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-1.5 justify-start sm:justify-end">
+                      <span
+                        className={`${WORK_GRID_PILL_BASE} ${
+                          getSourceBadge(startup) === 'LOOKUP'
+                            ? 'bg-lookup-surface text-lookup-ink'
+                            : 'border border-solid border-field-border bg-transparent text-oxford/55'
+                        }`}
+                      >
+                        {getSourceBadge(startup) === 'LOOKUP' ? 'LOOKUP' : 'SCOUT'}
+                      </span>
+                      {reviewBand ? <VerdictBandBadge band={reviewBand} /> : null}
+                      {showPartnerDecisionPlusEscalation ? (
                         <DecisionBadge variant={economicBadgeVariant!} />
-                        <DecisionBadge variant="escalation" />
-                      </>
-                    ) : (
-                      <DecisionBadge variant={badgeVariant} />
-                    )}
+                      ) : isPartnerEconomicDecisionBadge(badgeVariant) ? (
+                        <DecisionBadge variant={badgeVariant} />
+                      ) : null}
+                    </div>
+                    {showBottomWorkflowBadges ? (
+                      <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-1.5 justify-start sm:justify-end">
+                        {showPartnerDecisionPlusEscalation ? (
+                          <DecisionBadge variant="escalation" />
+                        ) : (
+                          <DecisionBadge variant={badgeVariant} />
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
