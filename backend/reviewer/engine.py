@@ -130,6 +130,25 @@ class ReviewerEngine:
         if defs:
             primary["defensibility_score"] = self._mean_round_score(defs)
 
+    @staticmethod
+    def _derive_verdict_from_scores(primary: dict) -> None:
+        """Set primary['derived_verdict'] from blended core scores (mean of present numerics only)."""
+        dims = ["market_score", "product_score", "technical_score", "execution_score"]
+        nums: List[float] = []
+        for d in dims:
+            v = primary.get(d)
+            if isinstance(v, (int, float)):
+                nums.append(float(v))
+        if not nums:
+            return
+        mean = sum(nums) / len(nums)
+        if mean >= 8.0:
+            primary["derived_verdict"] = "STRONG"
+        elif mean >= 6.0:
+            primary["derived_verdict"] = "MEDIUM"
+        else:
+            primary["derived_verdict"] = "WEAK"
+
     def _apply_rule_based_thesis_alignment(self, review_output: dict, scout_output: dict) -> None:
         """When thesis has no embeddings, set alignment from deterministic rules (no extra API calls)."""
         t = self.active_thesis
@@ -305,6 +324,12 @@ class ReviewerEngine:
                     review_output = dict(successful_results[0])
 
                 self._blend_numeric_scores_into_primary(review_output, successful_results)
+                self._derive_verdict_from_scores(review_output)
+                self.logger.info(
+                    "reviewer_engine verdict=%s derived_verdict=%s",
+                    review_output.get("verdict"),
+                    review_output.get("derived_verdict"),
+                )
                 if self.active_thesis and self.active_thesis.get("version_id"):
                     review_output["fund_thesis_version_id"] = self.active_thesis["version_id"]
                 self._apply_rule_based_thesis_alignment(review_output, scout_output)
@@ -515,6 +540,12 @@ class ReviewerEngine:
             else:
                 review_output = dict(successful_results[0])
             self._blend_numeric_scores_into_primary(review_output, successful_results)
+            self._derive_verdict_from_scores(review_output)
+            self.logger.info(
+                "reviewer_engine verdict=%s derived_verdict=%s",
+                review_output.get("verdict"),
+                review_output.get("derived_verdict"),
+            )
             if self.active_thesis and self.active_thesis.get("version_id"):
                 review_output["fund_thesis_version_id"] = self.active_thesis["version_id"]
             self._apply_rule_based_thesis_alignment(review_output, scout_output)

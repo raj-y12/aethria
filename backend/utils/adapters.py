@@ -92,6 +92,7 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
         overall_summary=reviewer_output.get("overall_summary", ""),
         key_risks=reviewer_output.get("key_risks", []),
         verdict=reviewer_output.get("verdict", "MEDIUM"),
+        derived_verdict=reviewer_output.get("derived_verdict"),
         diligence_red_flags=reviewer_output.get("diligence_red_flags", []),
         assumption_feedback=reviewer_output.get("assumption_feedback") or [],
         reviewer_agent_id=reviewer_output.get("reviewer_agent_id"),

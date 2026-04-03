@@ -620,6 +620,7 @@ export default function MainLayout({
               </PanelShell>
             ) : selectedStartup ? (
               <PanelShell
+                className="min-h-0 min-w-0 flex-1 w-full"
                 title=""
                 showTitle={false}
                 headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}

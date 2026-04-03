@@ -91,6 +91,8 @@ class ReviewInfo(BaseModel):
     # Multi-reviewer fields (Meta-Agent aware)
     reviews: Optional[List[SingleReview]] = None
     consensus_verdict: Optional[Literal["STRONG", "MEDIUM", "WEAK"]] = None
+    # Blended-score verdict (ReviewerEngine); partner prefers this when present
+    derived_verdict: Optional[Literal["STRONG", "MEDIUM", "WEAK"]] = None
     reviewer_disagreement: Optional[bool] = None
     score_variance: Optional[Dict[str, float]] = None
     # Fund thesis alignment (Reviewer consensus row; set when pipeline runs with active thesis)

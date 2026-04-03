@@ -6,18 +6,66 @@ Default mode: NO LLM calls. LLM only for edge cases (contradictory scores, MEDIU
 """
 import os
 import json
-import asyncio
 import logging
 import re
-from typing import Dict, Any, List, Optional
-from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Any, List, Optional, Tuple
 
 from openai import OpenAI
-from partner.schema import PartnerOutput, validate_partner_output
 from utils.prompt_version import hash_prompt
 
 
 logger = logging.getLogger(__name__)
+
+# ~6500 chars total user prompt budget (well under ~2000 tokens with system message)
+_MAX_RULES_JSON_CHARS = 2800
+_MAX_THESIS_MANDATE_CHARS = 3000
+
+
+def _confidence_float_to_conviction_level(conf: Any) -> int:
+    """Map model confidence in [0, 1] to conviction_level in [1, 10]."""
+    try:
+        c = float(conf)
+    except (TypeError, ValueError):
+        c = 0.5
+    if c > 1.0:
+        c = c / 10.0 if c <= 10.0 else 1.0
+    c = max(0.0, min(1.0, c))
+    return max(1, min(10, int(round(c * 9)) + 1))
+
+
+def _partner_rules_json_for_prompt(rules: Dict[str, Any]) -> str:
+    """Serialize partner rules; shrink if too large for the prompt token budget."""
+    raw = json.dumps(rules, ensure_ascii=False, indent=2)
+    if len(raw) <= _MAX_RULES_JSON_CHARS:
+        return raw
+    slim = {
+        "version": rules.get("version"),
+        "description": rules.get("description"),
+        "score_thresholds": rules.get("score_thresholds"),
+        "verdict_rules": rules.get("verdict_rules"),
+        "llm_fallback_triggers": rules.get("llm_fallback_triggers"),
+        "contradictory_scores": rules.get("contradictory_scores"),
+        "next_actions": rules.get("next_actions"),
+        "quality_labels": rules.get("quality_labels"),
+    }
+    raw2 = json.dumps(slim, ensure_ascii=False, indent=2)
+    if len(raw2) <= _MAX_RULES_JSON_CHARS:
+        return raw2 + "\n/* note: long keyword lists from full partner_rules were omitted */\n"
+    return raw2[: _MAX_RULES_JSON_CHARS] + "\n/* truncated */\n"
+
+
+def _parse_llm_json_object(content: str) -> Optional[Dict[str, Any]]:
+    s = (content or "").strip()
+    if not s:
+        return None
+    if s.startswith("```"):
+        s = re.sub(r"^```(?:json)?\s*", "", s, flags=re.IGNORECASE).strip()
+        s = re.sub(r"\s*```\s*$", "", s).strip()
+    try:
+        out = json.loads(s)
+    except json.JSONDecodeError:
+        return None
+    return out if isinstance(out, dict) else None
 
 
 def _load_partner_rules() -> Dict[str, Any]:
@@ -43,6 +91,7 @@ class PartnerDecisionEngine:
         api_key: str = None,
         model: str = None,
         portfolio_store=None,
+        tenant_user_id: str = "",
     ):
         """
         Initialize the decision engine.
@@ -52,16 +101,17 @@ class PartnerDecisionEngine:
             api_key: OpenAI API key for real LLM calls (falls back to env)
             model: Model name (falls back to env PARTNER_MODEL or gpt-5-nano)
             portfolio_store: Optional PortfolioStore for portfolio awareness
+            tenant_user_id: Clerk user id for LLM / fallback logging (no implicit tenant).
         """
         self.use_llm_fallback = use_llm_fallback
         self.logger = logging.getLogger("partner.decision")
+        self.tenant_user_id = (tenant_user_id or "").strip()
         self.llm_call_count = 0
         self._rules: Dict[str, Any] = _load_partner_rules()
         self.api_key = api_key or os.getenv("OPENAI_API_KEY", "")
         self.model = model or os.getenv("PARTNER_MODEL", "gpt-5-nano")
         if self.api_key:
             self.client = OpenAI(api_key=self.api_key)
-            self.executor = ThreadPoolExecutor(max_workers=1)
         else:
             self.client = None
         self._last_token_usage: Optional[Dict[str, int]] = None
@@ -103,6 +153,78 @@ class PartnerDecisionEngine:
             self.logger.warning(f"Could not load portfolio context: {e}")
             return {}
 
+    @staticmethod
+    def _avg_score_and_dims(review_output: Dict[str, Any]) -> Tuple[float, int]:
+        """Mean of four core scores; include defensibility in denominator when present and numeric."""
+        m = float(review_output.get("market_score", 0) or 0)
+        p = float(review_output.get("product_score", 0) or 0)
+        t = float(review_output.get("technical_score", 0) or 0)
+        e = float(review_output.get("execution_score", 0) or 0)
+        ds = review_output.get("defensibility_score")
+        if ds is not None:
+            try:
+                dsv = float(ds)
+                return (m + p + t + e + dsv) / 5.0, 5
+            except (TypeError, ValueError):
+                pass
+        return (m + p + t + e) / 4.0, 4
+
+    @staticmethod
+    def _optional_thesis_alignment_score(review_output: Dict[str, Any]) -> Optional[float]:
+        if "thesis_alignment_score" not in review_output:
+            return None
+        raw = review_output.get("thesis_alignment_score")
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
+    def _high_thesis_triggers_llm(
+        self,
+        review_output: Dict[str, Any],
+        avg_score: float,
+        min_avg_medium_maybe: float,
+    ) -> bool:
+        if avg_score < min_avg_medium_maybe:
+            return False
+        tas = self._optional_thesis_alignment_score(review_output)
+        if tas is None:
+            return False
+        return tas >= 0.75
+
+    def _finalize_thesis_soft_and_log(
+        self,
+        result: Dict[str, Any],
+        review_output: Dict[str, Any],
+        scout_output: Dict[str, Any],
+        avg_score: float,
+        avg_dims: int,
+    ) -> Dict[str, Any]:
+        thesis_adjusted = False
+        tas = self._optional_thesis_alignment_score(review_output)
+        if result.get("decision") == "YES" and tas is not None and tas < 0.4:
+            result["decision"] = "MAYBE"
+            r = (result.get("rationale") or "").rstrip()
+            if "Low thesis alignment." not in r:
+                result["rationale"] = r + " Low thesis alignment."
+            thesis_adjusted = True
+        elif result.get("decision") == "NO" and tas is not None and tas < 0.3:
+            r = (result.get("rationale") or "").rstrip()
+            if "Clear thesis mismatch." not in r:
+                result["rationale"] = r + " Clear thesis mismatch."
+            thesis_adjusted = True
+        self.logger.info(
+            "partner_decide company=%s avg_score=%.2f avg_dims=%d thesis_soft=%s final=%s",
+            scout_output.get("name", ""),
+            avg_score,
+            avg_dims,
+            thesis_adjusted,
+            result.get("decision"),
+        )
+        return result
+
     def decide(
         self,
         scout_output: Dict[str, Any],
@@ -119,7 +241,7 @@ class PartnerDecisionEngine:
             review_output: Valid ReviewerOutput dict (may include assumption_feedback; defaults to [])
             context_memo: Optional pre-decision memo text for LLM context
         Returns:
-            PartnerOutput with decision, conviction_level, rationale, next_action,
+            Partner output dict with decision, conviction_level, rationale, next_action,
             human_review_required, assumption_risks.
         """
         rules = self._get_rules()
@@ -149,11 +271,26 @@ class PartnerDecisionEngine:
         product_score = review_output.get("product_score", 0)
         technical_score = review_output.get("technical_score", 0)
         execution_score = review_output.get("execution_score", 0)
-        verdict = review_output.get("verdict", "WEAK")
+        _derived = review_output.get("derived_verdict")
+        if (
+            isinstance(_derived, str)
+            and _derived.strip()
+            and _derived.strip() in ("STRONG", "MEDIUM", "WEAK")
+        ):
+            effective_verdict = _derived.strip()
+            verdict_source = "derived"
+        else:
+            effective_verdict = review_output.get("verdict", "WEAK")
+            verdict_source = "original"
+        self.logger.info(
+            "partner_decide verdict_source=%s effective_verdict=%s",
+            verdict_source,
+            effective_verdict,
+        )
         key_risks = review_output.get("key_risks", [])
         assumption_feedback: List[str] = review_output.get("assumption_feedback") or []
 
-        avg_score = (market_score + product_score + technical_score + execution_score) / 4.0
+        avg_score, avg_dims = self._avg_score_and_dims(review_output)
         min_avg_pass = score_thresholds.get("min_avg_pass", 6.0)
         min_avg_strong_yes = score_thresholds.get("min_avg_strong_yes", 8.0)
         min_avg_medium_maybe = score_thresholds.get("min_avg_medium_maybe", 7.0)
@@ -194,8 +331,8 @@ class PartnerDecisionEngine:
 
         # Rule 1: WEAK verdict → NO
         weak_rule = verdict_rules.get("WEAK", {})
-        if verdict == "WEAK":
-            label = self._verdict_label(verdict)
+        if effective_verdict == "WEAK":
+            label = self._verdict_label(effective_verdict)
             result = self._create_decision(
                 decision=weak_rule.get("decision", "NO"),
                 confidence=weak_rule.get("conviction_level", 9),
@@ -209,7 +346,9 @@ class PartnerDecisionEngine:
             )
             result["portfolio_context_at_decision"] = portfolio_context or None
             result["memo_at_decision"] = context_memo or None
-            return result
+            return self._finalize_thesis_soft_and_log(
+                result, review_output, scout_output, avg_score, avg_dims
+            )
 
         # Portfolio awareness rules (after WEAK → NO)
         startup_sector = scout_output.get("sector", "")
@@ -237,11 +376,13 @@ class PartnerDecisionEngine:
             )
             result["portfolio_context_at_decision"] = portfolio_context or None
             result["memo_at_decision"] = context_memo or None
-            return result
+            return self._finalize_thesis_soft_and_log(
+                result, review_output, scout_output, avg_score, avg_dims
+            )
 
         # Rule 3: Low average score → NO
         if avg_score < min_avg_pass:
-            label = self._verdict_label(verdict)
+            label = self._verdict_label(effective_verdict)
             result = self._create_decision(
                 decision="NO",
                 confidence=7 + conviction_adjust,
@@ -255,18 +396,20 @@ class PartnerDecisionEngine:
             )
             result["portfolio_context_at_decision"] = portfolio_context or None
             result["memo_at_decision"] = context_memo or None
-            return result
+            return self._finalize_thesis_soft_and_log(
+                result, review_output, scout_output, avg_score, avg_dims
+            )
 
         # Rule 4: STRONG verdict + high score → YES
         strong_rule = verdict_rules.get("STRONG", {})
-        if verdict == "STRONG" and avg_score >= min_avg_strong_yes:
+        if effective_verdict == "STRONG" and avg_score >= min_avg_strong_yes:
             next_action = (
                 next_actions.get("request_cap_table_and_review", "Request Cap Table + Technical Code Review")
                 if has_red_flags
                 else next_actions.get("request_cap_table", "Request Cap Table")
             )
             human_review = strong_rule.get("human_review_required_yes", True) or has_missing_critical_qualitative
-            label = self._verdict_label(verdict)
+            label = self._verdict_label(effective_verdict)
             rationale_parts = (
                 f"Quality: {label}. High average score ({avg_score:.1f}/10). "
                 f"Market: {market_score}/10, Product: {product_score}/10, "
@@ -287,14 +430,16 @@ class PartnerDecisionEngine:
             )
             result["portfolio_context_at_decision"] = portfolio_context or None
             result["memo_at_decision"] = context_memo or None
-            return result
+            return self._finalize_thesis_soft_and_log(
+                result, review_output, scout_output, avg_score, avg_dims
+            )
 
         # Check reviewer disagreement for LLM trigger
         reviewer_disagreement = review_output.get("reviewer_disagreement", False)
 
         # Rule 5: MEDIUM verdict + good score → MAYBE (or LLM if contradictory / missing assumptions / missing qualitative / disagreement)
         medium_rule = verdict_rules.get("MEDIUM", {})
-        if verdict == "MEDIUM" and avg_score >= min_avg_medium_maybe:
+        if effective_verdict == "MEDIUM" and avg_score >= min_avg_medium_maybe:
             llm_triggers = rules.get("llm_fallback_triggers", {})
             trigger_reason = ""
             if has_contradiction and llm_triggers.get("contradictory_scores", True):
@@ -305,18 +450,29 @@ class PartnerDecisionEngine:
                 trigger_reason = "Missing critical qualitative data (team/business model)"
             elif reviewer_disagreement and llm_triggers.get("reviewer_disagreement", False):
                 trigger_reason = "Reviewer disagreement detected"
+            elif self._high_thesis_triggers_llm(
+                review_output, avg_score, min_avg_medium_maybe
+            ):
+                trigger_reason = "High thesis alignment with solid average — extended partner review"
             use_llm = self.use_llm_fallback and bool(trigger_reason)
             if use_llm:
                 result = self._decide_with_llm(
-                    scout_output, review_output, assumption_risks,
-                    trigger_reason=trigger_reason, context_memo=context_memo,
+                    scout_output,
+                    review_output,
+                    assumption_risks,
+                    trigger_reason=trigger_reason,
+                    context_memo=context_memo,
                     portfolio_context=portfolio_context,
                     thesis_block=thesis_block,
+                    avg_score=avg_score,
+                    avg_dims=avg_dims,
                 )
                 result["portfolio_context_at_decision"] = portfolio_context or None
                 result["memo_at_decision"] = context_memo or None
-                return result
-            label = self._verdict_label(verdict)
+                return self._finalize_thesis_soft_and_log(
+                    result, review_output, scout_output, avg_score, avg_dims
+                )
+            label = self._verdict_label(effective_verdict)
             rationale_text = (
                 f"Quality: {label}. Solid average score ({avg_score:.1f}/10). "
                 f"Market: {market_score}/10, Product: {product_score}/10, "
@@ -335,24 +491,33 @@ class PartnerDecisionEngine:
             )
             result["portfolio_context_at_decision"] = portfolio_context or None
             result["memo_at_decision"] = context_memo or None
-            return result
+            return self._finalize_thesis_soft_and_log(
+                result, review_output, scout_output, avg_score, avg_dims
+            )
 
         # Rule 6: MEDIUM verdict, borderline score → LLM or NO
-        if verdict == "MEDIUM" and min_avg_borderline_low <= avg_score < max_avg_borderline_high:
+        if effective_verdict == "MEDIUM" and min_avg_borderline_low <= avg_score < max_avg_borderline_high:
             llm_triggers = rules.get("llm_fallback_triggers", {})
             use_llm = self.use_llm_fallback and llm_triggers.get("medium_borderline_avg", True)
             if use_llm:
                 trigger_reason = "MEDIUM verdict with borderline average score"
                 result = self._decide_with_llm(
-                    scout_output, review_output, assumption_risks,
-                    trigger_reason=trigger_reason, context_memo=context_memo,
+                    scout_output,
+                    review_output,
+                    assumption_risks,
+                    trigger_reason=trigger_reason,
+                    context_memo=context_memo,
                     portfolio_context=portfolio_context,
                     thesis_block=thesis_block,
+                    avg_score=avg_score,
+                    avg_dims=avg_dims,
                 )
                 result["portfolio_context_at_decision"] = portfolio_context or None
                 result["memo_at_decision"] = context_memo or None
-                return result
-            label = self._verdict_label(verdict)
+                return self._finalize_thesis_soft_and_log(
+                    result, review_output, scout_output, avg_score, avg_dims
+                )
+            label = self._verdict_label(effective_verdict)
             result = self._create_decision(
                 decision=medium_rule.get("decision_borderline_no_llm", "NO"),
                 confidence=medium_rule.get("conviction_level_borderline", 5) + conviction_adjust,
@@ -366,10 +531,12 @@ class PartnerDecisionEngine:
             )
             result["portfolio_context_at_decision"] = portfolio_context or None
             result["memo_at_decision"] = context_memo or None
-            return result
+            return self._finalize_thesis_soft_and_log(
+                result, review_output, scout_output, avg_score, avg_dims
+            )
 
         # Default: NO
-        label = self._verdict_label(verdict)
+        label = self._verdict_label(effective_verdict)
         result = self._create_decision(
             decision="NO",
             confidence=6 + conviction_adjust,
@@ -383,7 +550,9 @@ class PartnerDecisionEngine:
         )
         result["portfolio_context_at_decision"] = portfolio_context or None
         result["memo_at_decision"] = context_memo or None
-        return result
+        return self._finalize_thesis_soft_and_log(
+            result, review_output, scout_output, avg_score, avg_dims
+        )
 
     def _compute_assumption_risks(
         self,
@@ -562,7 +731,7 @@ class PartnerDecisionEngine:
         assumption_risks: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
-        Build a decision dict conforming to PartnerOutput.
+        Build a decision dict conforming to the partner schema.
         Clamps conviction to 1-10.
         """
         conviction = max(1, min(10, confidence))
@@ -575,6 +744,13 @@ class PartnerDecisionEngine:
             "assumption_risks": assumption_risks if assumption_risks is not None else [],
         }
 
+    def _next_action_for_llm_decision(self, decision: str, next_actions: Dict[str, Any]) -> str:
+        if decision == "YES":
+            return next_actions.get("request_cap_table", "Request Cap Table")
+        if decision == "NO":
+            return next_actions.get("default_no", "Pass - Does not meet criteria")
+        return next_actions.get("human_review_monitor", "Human review required - monitor closely")
+
     def _decide_with_llm(
         self,
         scout_output: Dict[str, Any],
@@ -584,216 +760,203 @@ class PartnerDecisionEngine:
         context_memo: str = "",
         portfolio_context: dict = None,
         thesis_block: str = "",
+        *,
+        avg_score: float = 0.0,
+        avg_dims: int = 4,
     ) -> Dict[str, Any]:
         """
-        Use LLM for nuanced decision in edge cases.
-        If self.client is None, falls back to hardcoded behavior.
-        Otherwise makes a real OpenAI call with structured JSON output.
+        LLM path when rule engine defers (edge cases). Uses OpenAI chat.completions with JSON output.
+        On missing client, empty/invalid response, or errors: MAYBE, conviction 1 (confidence 0.0), safe rationale.
         """
+        del context_memo  # omitted from prompt to respect token budget; rule path unchanged
+        del portfolio_context
+        del avg_score, avg_dims  # caller uses for post-LLM finalize + logging only
+
         self.llm_call_count += 1
+        uid_log = self.tenant_user_id[:24] if self.tenant_user_id else ""
         self.logger.warning(
-            f"LLM call #{self.llm_call_count} triggered for edge case decision. "
-            f"Company: {scout_output.get('name', 'Unknown')}"
+            "partner_llm_fallback user_id=%s call#=%s company=%s trigger=%s",
+            uid_log,
+            self.llm_call_count,
+            scout_output.get("name", "Unknown"),
+            trigger_reason[:120] if trigger_reason else "",
         )
 
-        avg_score = (
-            review_output.get("market_score", 0)
-            + review_output.get("product_score", 0)
-            + review_output.get("technical_score", 0)
-            + review_output.get("execution_score", 0)
-        ) / 4.0
-        verdict = review_output.get("verdict", "MEDIUM")
         rules = self._get_rules()
         next_actions = rules.get("next_actions", {})
+        verdict = review_output.get("verdict", "MEDIUM")
+        score_reasoning = review_output.get("score_reasoning") or {}
 
-        if self.client is None:
-            if verdict == "MEDIUM" and 6.0 <= avg_score < 7.0:
-                label = self._verdict_label(verdict)
-                result = self._create_decision(
-                    decision="MAYBE",
-                    confidence=5,
-                    rationale=(
-                        f"Edge case: Quality {label} with borderline score ({avg_score:.1f}/10). "
-                        f"LLM-assisted analysis suggests monitoring rather than immediate rejection. "
-                        f"Requires human judgment."
-                    ),
-                    next_action=next_actions.get("human_review_monitor", "Human review required - monitor closely"),
-                    human_review_required=True,
-                    assumption_risks=assumption_risks,
-                )
-            else:
-                label = self._verdict_label(verdict)
-                result = self._create_decision(
-                    decision="MAYBE",
-                    confidence=4,
-                    rationale=(
-                        f"Contradictory scores or critical assumptions detected. "
-                        f"LLM-assisted analysis suggests cautious monitoring. "
-                        f"Average score: {avg_score:.1f}/10, Quality: {label}. Requires deeper analysis."
-                    ),
-                    next_action=next_actions.get("human_review_contradictions", "Human review required - analyze contradictions"),
-                    human_review_required=True,
-                    assumption_risks=assumption_risks,
-                )
+        def _failure_outcome(prompt_snapshot: str, rationale: str) -> Dict[str, Any]:
+            result = self._create_decision(
+                decision="MAYBE",
+                confidence=1,
+                rationale=rationale,
+                next_action=next_actions.get(
+                    "human_review_contradictions",
+                    "Human review required - analyze contradictions",
+                ),
+                human_review_required=True,
+                assumption_risks=assumption_risks,
+            )
             result["llm_fallback_reason"] = trigger_reason
-            # No real LLM call occurred; mark prompt_version explicitly as None
-            result["prompt_version"] = None
+            result["prompt_version"] = hash_prompt(prompt_snapshot) if prompt_snapshot else None
             return result
 
-        score_reasoning = review_output.get("score_reasoning") or {}
-        diligence_red_flags = review_output.get("diligence_red_flags", [])
-        team_analysis = review_output.get("team_analysis") or []
-        competition_analysis = review_output.get("competition_analysis") or []
-        business_model_analysis = review_output.get("business_model_analysis") or []
+        _fail_msg = (
+            "The LLM call failed or returned invalid output; defaulting to MAYBE with low confidence pending human review."
+        )
 
-        if context_memo:
-            context_block = f"CONTEXT:\n{context_memo}"
-        else:
-            context_block = (
-                f"CONTEXT:\n"
-                f"Company: {scout_output.get('name', 'Unknown')}\n"
-                f"One-line: {scout_output.get('one_line', 'N/A')}\n"
-                f"Sector: {scout_output.get('sector', 'N/A')}\n"
-                f"Problem: {scout_output.get('problem', 'N/A')}\n"
-                f"Solution: {scout_output.get('solution', 'N/A')}\n"
-                f"Target Users: {scout_output.get('target_users', 'N/A')}\n"
-                f"Why Now: {scout_output.get('why_now', 'N/A')}"
+        if self.client is None:
+            self.logger.warning(
+                "partner_llm_fallback user_id=%s no OpenAI client; skipping model call",
+                uid_log,
+            )
+            return _failure_outcome(
+                "",
+                "The LLM fallback could not run because the OpenAI client is not configured.",
             )
 
-        risks_block = "\n".join(f"- {r}" for r in assumption_risks) if assumption_risks else "None identified"
-        flags_block = "\n".join(f"- {f}" for f in diligence_red_flags) if diligence_red_flags else "None"
+        try:
+            from core.policy_resolver import get_partner_rules
 
-        portfolio_block = ""
-        if portfolio_context and portfolio_context.get("total_portfolio_size", 0) > 0:
-            portfolio_block = (
-                f"\nPORTFOLIO CONTEXT:\n"
-                f"Current portfolio: {portfolio_context.get('total_portfolio_size', 0)} companies\n"
-                f"Sector concentration: {json.dumps(portfolio_context.get('sector_counts', {}))}\n"
-            )
+            partner_rules_payload = get_partner_rules()
+        except Exception as e:
+            self.logger.warning("partner_llm_fallback user_id=%s could not load partner_rules: %s", uid_log, e)
+            partner_rules_payload = rules
 
-        score_variance_block = ""
-        score_variance = review_output.get("score_variance")
-        if score_variance:
-            score_variance_block = f"\nSCORE VARIANCE ACROSS REVIEWERS:\n{json.dumps(score_variance)}\n"
-
+        rules_json = _partner_rules_json_for_prompt(
+            partner_rules_payload if isinstance(partner_rules_payload, dict) else {}
+        )
         tb = (thesis_block or "").strip()
-        thesis_section = f"{tb}\n" if tb else ""
+        if len(tb) > _MAX_THESIS_MANDATE_CHARS:
+            tb = tb[: _MAX_THESIS_MANDATE_CHARS - 30] + "\n...(truncated)\n"
+        thesis_section = f"FUND THESIS MANDATE (and resource lens if present):\n{tb}\n\n" if tb else ""
 
-        prompt = f"""You are a Senior Investment Partner at a venture capital firm making a final investment decision.
+        sr_json = json.dumps(score_reasoning, ensure_ascii=False)
+        if len(sr_json) > 3500:
+            sr_json = sr_json[:3500] + "...(truncated)"
 
-{thesis_section}{context_block}
+        ds = review_output.get("defensibility_score")
+        ds_disp = ds if ds is not None else "N/A"
 
-REVIEWER SCORES:
-Market: {review_output.get('market_score', 0)}/10 - {score_reasoning.get('market_score', '')}
-Product: {review_output.get('product_score', 0)}/10 - {score_reasoning.get('product_score', '')}
-Technical: {review_output.get('technical_score', 0)}/10 - {score_reasoning.get('technical_score', '')}
-Execution: {review_output.get('execution_score', 0)}/10 - {score_reasoning.get('execution_score', '')}
-Defensibility: {review_output.get('defensibility_score', 'N/A')}/10 - {score_reasoning.get('defensibility_score', '')}
-Verdict: {verdict}
+        user_prompt = f"""{thesis_section}STARTUP
+display_name: {scout_output.get('name', 'Unknown')}
+sector: {scout_output.get('sector', 'N/A')}
+stage (funding): {scout_output.get('funding_stage', 'N/A')}
+one_line: {scout_output.get('one_line', 'N/A')}
 
-ASSUMPTION RISKS:
-{risks_block}
+REVIEWER OUTPUT
+verdict: {verdict}
+market_score: {review_output.get('market_score', 0)}/10
+product_score: {review_output.get('product_score', 0)}/10
+technical_score: {review_output.get('technical_score', 0)}/10
+execution_score: {review_output.get('execution_score', 0)}/10
+defensibility_score: {ds_disp}/10
+score_reasoning (full JSON): {sr_json}
 
-DILIGENCE RED FLAGS:
-{flags_block}
+THESIS ALIGNMENT (from review)
+thesis_alignment_score: {review_output.get('thesis_alignment_score')}
+thesis_matches_fund: {review_output.get('thesis_matches_fund')}
+thesis_fit_points: {json.dumps(review_output.get('thesis_fit_points') or [], ensure_ascii=False)}
+thesis_deviation_points: {json.dumps(review_output.get('thesis_deviation_points') or [], ensure_ascii=False)}
+thesis_alignment_confidence: {review_output.get('thesis_alignment_confidence')}
 
-QUALITATIVE ANALYSIS:
-Team: {'; '.join(team_analysis) if team_analysis else '[MISSING]'}
-Competition: {'; '.join(competition_analysis) if competition_analysis else '[MISSING]'}
-Business Model: {'; '.join(business_model_analysis) if business_model_analysis else '[MISSING]'}
-{portfolio_block}{score_variance_block}
-TRIGGER REASON (why this needs LLM judgment):
+PARTNER_RULES_JSON (fund criteria; reason strictly against this policy)
+{rules_json}
+
+TRIGGER REASON (why the rule engine deferred)
 {trigger_reason}
 
-Output ONLY valid JSON: {{"decision": "YES"|"NO"|"MAYBE", "rationale": "...", "next_action": "...", "conviction_level": 1-10, "human_review_required": true|false}}
+Respond with a single JSON object and no other text. Exactly three keys:
+- "decision": one of YES, NO, MAYBE
+- "reasoning": two to four sentences citing specific dimension scores and thesis fit or misalignment
+- "confidence": number from 0 to 1 (your confidence in this decision)
+"""
 
-For next_action:
-- Provide an actionable checklist, ideally 4-10 items.
-- Prefer numbered format in plain text (e.g., "1) ... 2) ... 3) ...").
-- Keep each item concise and execution-oriented."""
+        system_prompt = (
+            "You are a Senior Investment Partner. Edge cases only: the deterministic rule path already passed. "
+            "Apply PARTNER_RULES_JSON strictly. Output only valid JSON per the user instructions."
+        )
+        prompt_for_hash = system_prompt + "\n\n" + user_prompt
 
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a Senior Investment Partner making investment decisions. Be analytical, conservative, and data-driven."},
-                    {"role": "user", "content": prompt},
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
                 ],
                 response_format={"type": "json_object"},
-                max_completion_tokens=2048,
+                max_completion_tokens=512,
             )
-
-            if response.usage:
-                self._last_token_usage = {
-                    "prompt_tokens": response.usage.prompt_tokens,
-                    "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens,
-                }
-
-            content = response.choices[0].message.content
-            if not content:
-                choice0 = response.choices[0]
-                finish = getattr(choice0, "finish_reason", None)
-                self.logger.error(
-                    "Empty LLM response; using hardcoded edge-case fallback (no retry). "
-                    "finish_reason=%s company=%s",
-                    finish,
-                    scout_output.get("name", "Unknown"),
-                )
-                label = self._verdict_label(verdict)
-                result = self._create_decision(
-                    decision="MAYBE",
-                    confidence=4,
-                    rationale=(
-                        f"LLM returned empty output for edge case ({trigger_reason}). "
-                        f"Average score: {avg_score:.1f}/10, Quality: {label}. Requires human analysis."
-                    ),
-                    next_action=next_actions.get(
-                        "human_review_contradictions",
-                        "Human review required - analyze contradictions",
-                    ),
-                    human_review_required=True,
-                    assumption_risks=assumption_risks,
-                )
-                result["llm_fallback_reason"] = trigger_reason
-                result["prompt_version"] = hash_prompt(prompt)
-                return result
-
-            llm_result = json.loads(content)
-
-            decision = llm_result.get("decision", "MAYBE")
-            if decision not in ("YES", "NO", "MAYBE"):
-                decision = "MAYBE"
-            conviction = llm_result.get("conviction_level", 5)
-            if not isinstance(conviction, int) or not (1 <= conviction <= 10):
-                conviction = 5
-
-            result = self._create_decision(
-                decision=decision,
-                confidence=conviction,
-                rationale=llm_result.get("rationale", f"LLM decision for edge case: {trigger_reason}"),
-                next_action=llm_result.get("next_action", next_actions.get("human_review_monitor", "Human review required")),
-                human_review_required=llm_result.get("human_review_required", True),
-                assumption_risks=assumption_risks,
-            )
-            result["llm_fallback_reason"] = trigger_reason
-            result["prompt_version"] = hash_prompt(prompt)
-            return result
-
         except Exception as e:
-            self.logger.error(f"LLM call failed: {e}; falling back to hardcoded")
-            label = self._verdict_label(verdict)
-            result = self._create_decision(
-                decision="MAYBE",
-                confidence=4,
-                rationale=(
-                    f"LLM call failed ({e}). Contradictory scores or critical assumptions detected. "
-                    f"Average score: {avg_score:.1f}/10, Quality: {label}. Requires deeper analysis."
-                ),
-                next_action=next_actions.get("human_review_contradictions", "Human review required - analyze contradictions"),
-                human_review_required=True,
-                assumption_risks=assumption_risks,
+            self.logger.warning(
+                "partner_llm_fallback user_id=%s OpenAI request failed: %s",
+                uid_log,
+                e,
             )
-            result["llm_fallback_reason"] = trigger_reason
-            result["prompt_version"] = hash_prompt(prompt)
-            return result
+            return _failure_outcome(prompt_for_hash, _fail_msg)
+
+        if response.usage:
+            self._last_token_usage = {
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens,
+            }
+
+        try:
+            content = response.choices[0].message.content
+        except (IndexError, AttributeError):
+            content = None
+
+        if not content:
+            self.logger.warning(
+                "partner_llm_fallback user_id=%s empty model content company=%s",
+                uid_log,
+                scout_output.get("name", "Unknown"),
+            )
+            return _failure_outcome(prompt_for_hash, _fail_msg)
+
+        llm_result = _parse_llm_json_object(content)
+        if not llm_result:
+            self.logger.warning(
+                "partner_llm_fallback user_id=%s malformed JSON company=%s",
+                uid_log,
+                scout_output.get("name", "Unknown"),
+            )
+            return _failure_outcome(prompt_for_hash, _fail_msg)
+
+        raw_decision = llm_result.get("decision")
+        decision = str(raw_decision).strip().upper() if raw_decision is not None else ""
+        if decision not in ("YES", "NO", "MAYBE"):
+            self.logger.warning(
+                "partner_llm_fallback user_id=%s invalid decision=%r company=%s",
+                uid_log,
+                raw_decision,
+                scout_output.get("name", "Unknown"),
+            )
+            return _failure_outcome(prompt_for_hash, _fail_msg)
+
+        reasoning = llm_result.get("reasoning") or llm_result.get("rationale") or ""
+        reasoning = str(reasoning).strip()
+        if not reasoning:
+            reasoning = f"LLM edge-case decision: {trigger_reason}"
+
+        conf_raw = llm_result.get("confidence")
+        conviction = _confidence_float_to_conviction_level(conf_raw)
+
+        next_act = self._next_action_for_llm_decision(decision, next_actions)
+        human_rev = decision != "NO"
+
+        result = self._create_decision(
+            decision=decision,
+            confidence=conviction,
+            rationale=reasoning,
+            next_action=next_act,
+            human_review_required=human_rev,
+            assumption_risks=assumption_risks,
+        )
+        result["llm_fallback_reason"] = trigger_reason
+        result["prompt_version"] = hash_prompt(prompt_for_hash)
+        return result

@@ -54,7 +54,7 @@ export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady }
     >
       <div
         ref={containerRef}
-        className={`relative z-10 mx-auto flex max-h-[85vh] w-full max-w-[420px] flex-col overflow-y-auto overflow-x-hidden px-4 py-6 sm:max-h-[90vh] sm:max-w-3xl sm:px-6 sm:py-8 lg:px-10 ${chrome.frame}`}
+        className={`relative z-10 mx-auto flex max-h-[85vh] w-full max-w-[420px] flex-col overflow-y-auto overflow-x-hidden px-4 py-6 sm:max-h-[92vh] sm:max-w-4xl sm:px-8 sm:py-9 lg:px-12 ${chrome.frame}`}
         onClick={(e) => e.stopPropagation()}
       >
         <InvestmentMemoContent startup={startup} onClose={onClose} onMemoPipelineReady={onMemoPipelineReady} />

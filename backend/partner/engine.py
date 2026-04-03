@@ -65,6 +65,7 @@ class PartnerEngine:
             use_llm_fallback=use_llm_fallback,
             api_key=api_key,
             portfolio_store=portfolio_store,
+            tenant_user_id=self.tenant_user_id,
         )
         self.fund_thesis: Optional[Dict[str, Any]] = fund_thesis
         # Max undecided to process per cycle (ramp: process a solid batch when backlog is high)
@@ -127,6 +128,7 @@ class PartnerEngine:
                     "product_score": review_info.product_score,
                     "technical_score": review_info.technical_score,
                     "execution_score": review_info.execution_score,
+                    "defensibility_score": getattr(review_info, "defensibility_score", None),
                     "overall_summary": review_info.overall_summary,
                     "key_risks": review_info.key_risks,
                     "verdict": review_info.verdict,
@@ -139,6 +141,12 @@ class PartnerEngine:
                     "score_reasoning": getattr(review_info, "score_reasoning", None) or {},
                     "reviewer_disagreement": getattr(review_info, "reviewer_disagreement", False),
                     "score_variance": getattr(review_info, "score_variance", None),
+                    "derived_verdict": getattr(review_info, "derived_verdict", None),
+                    "thesis_alignment_score": getattr(review_info, "thesis_alignment_score", None),
+                    "thesis_matches_fund": getattr(review_info, "thesis_matches_fund", None),
+                    "thesis_fit_points": getattr(review_info, "thesis_fit_points", None) or [],
+                    "thesis_deviation_points": getattr(review_info, "thesis_deviation_points", None) or [],
+                    "thesis_alignment_confidence": getattr(review_info, "thesis_alignment_confidence", None),
                 },
                 "memo": memo,
             })
@@ -182,6 +190,7 @@ class PartnerEngine:
                 "product_score": review_info.product_score,
                 "technical_score": review_info.technical_score,
                 "execution_score": review_info.execution_score,
+                "defensibility_score": getattr(review_info, "defensibility_score", None),
                 "overall_summary": review_info.overall_summary,
                 "key_risks": review_info.key_risks,
                 "verdict": review_info.verdict,
@@ -194,6 +203,12 @@ class PartnerEngine:
                 "score_reasoning": getattr(review_info, "score_reasoning", None) or {},
                 "reviewer_disagreement": getattr(review_info, "reviewer_disagreement", False),
                 "score_variance": getattr(review_info, "score_variance", None),
+                "derived_verdict": getattr(review_info, "derived_verdict", None),
+                "thesis_alignment_score": getattr(review_info, "thesis_alignment_score", None),
+                "thesis_matches_fund": getattr(review_info, "thesis_matches_fund", None),
+                "thesis_fit_points": getattr(review_info, "thesis_fit_points", None) or [],
+                "thesis_deviation_points": getattr(review_info, "thesis_deviation_points", None) or [],
+                "thesis_alignment_confidence": getattr(review_info, "thesis_alignment_confidence", None),
             },
             "memo": memo,
         }
