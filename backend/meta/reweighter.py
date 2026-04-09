@@ -60,6 +60,22 @@ class ScoutReweighter:
             if name not in raw_scores:
                 raw_scores[name] = 0.1
 
+        # Portfolio churn penalty: high churn in market-driven companies reduces MarketDrivenScout weight
+        churn_signals = self.signal.get("portfolio_churn_signals", {})
+        market_churn_rate = float(churn_signals.get("market_driven_churn_rate", 0.0) or 0.0)
+        _CHURN_THRESHOLD = 0.30   # 30% churn rate triggers penalty
+        _MAX_CHURN_PENALTY = 0.50  # cap at halving the raw score
+        if market_churn_rate > _CHURN_THRESHOLD:
+            churn_penalty = min(_MAX_CHURN_PENALTY, market_churn_rate - _CHURN_THRESHOLD)
+            raw_scores["MarketDrivenScout"] = raw_scores.get("MarketDrivenScout", 0.1) * (
+                1.0 - churn_penalty
+            )
+            self.logger.info(
+                "[Reweighter] Churn penalty on MarketDrivenScout: churn_rate=%.2f penalty=%.2f",
+                market_churn_rate,
+                churn_penalty,
+            )
+
         total = sum(raw_scores.values())
         new_weights = {name: score / total for name, score in raw_scores.items()}
 

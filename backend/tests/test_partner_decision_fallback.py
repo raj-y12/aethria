@@ -400,6 +400,9 @@ def test_strong_verdict_below_yes_bar_is_maybe_not_no():
 
 def test_scout_biggest_unknown_alone_does_not_trigger_llm_escalation():
     engine = PartnerDecisionEngine(use_llm_fallback=True, api_key=None)
+    # Disable grey-zone deep dive so the test only validates the biggest_unknown behaviour,
+    # not the new grey-zone trigger (avg_score=7.0 would otherwise sit inside [6.5, 7.5]).
+    engine._rules.setdefault("llm_fallback_triggers", {})["grey_zone_deep_dive"] = False
     scout = {**_base_scout(), "biggest_unknown": "Enterprise sales cycle length unproven"}
     review = _base_review()
     review.update(

@@ -104,6 +104,10 @@ class ReviewInfo(BaseModel):
     thesis_alignment_confidence: Optional[float] = None  # 0–1
     # Resource-backed thesis lens alignment (non-blocking; does not drive rubric scores)
     fund_thesis_alignment_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    # Weighted skepticism defensibility (1.5x SkepticalReviewer weight); raw float for downstream use
+    weighted_defensibility_score: Optional[float] = None
+    # Confidence-adjusted score: S_bar × (1 − reviewer_delta/10); penalises high disagreement
+    confidence_adjusted_score: Optional[float] = None
 
 
 class PartnerInfo(BaseModel):
@@ -120,6 +124,8 @@ class PartnerInfo(BaseModel):
     memo_at_decision: Optional[str] = None
     portfolio_context_at_decision: Optional[Dict[str, Any]] = None
     prompt_version: Optional[str] = None
+    # True when LLM deep dive was triggered by grey zone confidence_adjusted_score
+    grey_zone_deep_dive: Optional[bool] = None
 
 
 class Financials(BaseModel):

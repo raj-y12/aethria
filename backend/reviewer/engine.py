@@ -123,13 +123,53 @@ class ReviewerEngine:
         return int(round(sum(nums) / len(nums)))
 
     def _blend_numeric_scores_into_primary(self, primary: dict, all_results: list) -> None:
-        """Deterministic dimension scores: integer mean across successful reviewers."""
-        dims = ["market_score", "product_score", "technical_score", "execution_score"]
-        for d in dims:
+        """Deterministic dimension scores: integer mean across reviewers.
+        Defensibility uses 1.5x weight for SkepticalReviewer (Weighted Skepticism).
+        Also computes confidence_adjusted_score = S_bar × (1 − reviewer_delta/10).
+        """
+        core_dims = ["market_score", "product_score", "technical_score", "execution_score"]
+        for d in core_dims:
             primary[d] = self._mean_round_score([r.get(d) for r in all_results])
-        defs = [r.get("defensibility_score") for r in all_results if r.get("defensibility_score") is not None]
-        if defs:
-            primary["defensibility_score"] = self._mean_round_score(defs)
+
+        # Weighted Skepticism: SkepticalReviewer defensibility counts 1.5×
+        defs_weighted = []
+        for r in all_results:
+            ds = r.get("defensibility_score")
+            if ds is None:
+                continue
+            try:
+                weight = 1.5 if r.get("reviewer_type") == "SkepticalReviewer" else 1.0
+                defs_weighted.append((float(ds), weight))
+            except (TypeError, ValueError):
+                pass
+        if defs_weighted:
+            weighted_sum = sum(v * w for v, w in defs_weighted)
+            total_weight = sum(w for _, w in defs_weighted)
+            weighted_def = weighted_sum / total_weight
+            primary["defensibility_score"] = int(round(weighted_def))
+            primary["weighted_defensibility_score"] = round(weighted_def, 3)
+
+        # Confidence-Adjusted Score: S_bar × (1 − delta/10)
+        all_dims = list(core_dims)
+        if primary.get("defensibility_score") is not None:
+            all_dims.append("defensibility_score")
+        s_bar = sum(float(primary.get(d, 5)) for d in all_dims) / len(all_dims)
+        reviewer_avgs = []
+        for r in all_results:
+            r_scores = [float(r[d]) for d in core_dims if isinstance(r.get(d), (int, float))]
+            ds = r.get("defensibility_score")
+            if ds is not None:
+                try:
+                    r_scores.append(float(ds))
+                except (TypeError, ValueError):
+                    pass
+            if r_scores:
+                reviewer_avgs.append(sum(r_scores) / len(r_scores))
+        if len(reviewer_avgs) >= 2:
+            delta = max(reviewer_avgs) - min(reviewer_avgs)
+            primary["confidence_adjusted_score"] = round(s_bar * (1.0 - delta / 10.0), 3)
+        else:
+            primary["confidence_adjusted_score"] = round(s_bar, 3)
 
     @staticmethod
     def _derive_verdict_from_scores(primary: dict) -> None:

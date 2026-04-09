@@ -65,6 +65,7 @@ class MetaAnalyser:
         )
         pipeline_health = self._build_pipeline_health(memory, concentration)
         cooldowns = self._build_cooldowns(mutation_log)
+        churn_signals = self._build_churn_signals()
 
         # Count total reviews and decisions for minimum thresholds
         total_reviews = sum(
@@ -86,6 +87,7 @@ class MetaAnalyser:
             "reviewer_health": reviewer_health,
             "pipeline_health": pipeline_health,
             "mutation_cooldowns": cooldowns,
+            "portfolio_churn_signals": churn_signals,
             "data_sufficiency": {
                 "total_reviews": max(total_reviews, total_reviews_from_vd),
                 "total_decisions": total_decisions,
@@ -191,11 +193,34 @@ class MetaAnalyser:
         failed_assumptions = memory.get("failed_assumptions", [])[-10:]
         successful_theses = memory.get("successful_theses", [])[-10:]
 
+        rejection_patterns = self._read_rejection_patterns()
+        top_rejection_keywords = [
+            item["flag"]
+            for item in sorted(
+                rejection_patterns.get("most_common_red_flags", []),
+                key=lambda x: x.get("count", 0),
+                reverse=True,
+            )[:8]
+            if isinstance(item, dict) and "flag" in item
+        ]
+        most_rejected_sectors = sorted(
+            rejection_patterns.get("rejection_by_sector", {}).items(),
+            key=lambda x: x[1],
+            reverse=True,
+        )[:5]
+
         return {
             "most_oversaturated_sector": most_oversaturated,
             "top_failed_assumptions": failed_assumptions,
             "top_successful_thesis_patterns": successful_theses,
+            "top_rejection_keywords": top_rejection_keywords,
+            "most_rejected_sectors": [s for s, _ in most_rejected_sectors],
         }
+
+    def _build_churn_signals(self) -> Dict[str, Any]:
+        """Read portfolio churn signals written by FeedbackLoop into meta_churn_signals."""
+        data = doc_get("meta_churn_signals", user_id=self.user_id)
+        return data if isinstance(data, dict) else {}
 
     def _build_cooldowns(self, mutation_log: List[Dict]) -> Dict[str, bool]:
         """Compute cooldown flags. An agent cannot be mutated more than once per N cycles."""

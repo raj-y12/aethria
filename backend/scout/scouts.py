@@ -5,6 +5,18 @@ Each Scout has a distinct cognitive strategy for finding real companies.
 from scout.base import Scout
 from utils.settings_loader import get_scout_region
 
+_NEGATIVE_CONSTRAINTS_BLOCK = """
+NEGATIVE CONSTRAINTS — DO NOT discover any of the following (they cannot reach venture scale):
+- Local or single-location service businesses (dry cleaners, barbers, restaurants, gyms, salons)
+- Professional services firms that scale linearly with headcount (law, accounting, staffing, consulting without IP)
+- Franchise concepts or franchised businesses
+- Commodity distribution, resale, or retail businesses with no proprietary technology or data layer
+- Lifestyle businesses with a realistic revenue ceiling below $10M or clear owner-operator intent
+- Non-scalable B2B services lacking a defensible SaaS or product layer
+- Hardware-only plays with no recurring software/service revenue model
+- Businesses whose addressable market cannot plausibly exceed $100M at scale
+If you cannot identify a VC-backable opportunity meeting all positive criteria, return nothing."""
+
 
 def _region_label_for(tenant_user_id: str) -> str:
     r = get_scout_region(tenant_user_id)
@@ -52,7 +64,7 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
         rl = _region_label_for(tenant_user_id)
-        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
+        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl) + _NEGATIVE_CONSTRAINTS_BLOCK
         super().__init__(
             scout_type="market_driven",
             system_prompt=prompt,
@@ -94,7 +106,7 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
         rl = _region_label_for(tenant_user_id)
-        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
+        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl) + _NEGATIVE_CONSTRAINTS_BLOCK
         super().__init__(
             scout_type="builder_technical",
             system_prompt=prompt,
@@ -136,7 +148,7 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
         rl = _region_label_for(tenant_user_id)
-        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
+        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl) + _NEGATIVE_CONSTRAINTS_BLOCK
         super().__init__(
             scout_type="pain_point",
             system_prompt=prompt,
@@ -178,7 +190,7 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
         rl = _region_label_for(tenant_user_id)
-        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
+        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl) + _NEGATIVE_CONSTRAINTS_BLOCK
         super().__init__(
             scout_type="contrarian",
             system_prompt=prompt,

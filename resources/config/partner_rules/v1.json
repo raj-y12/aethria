@@ -1,5 +1,5 @@
 {
-  "version": "1",
+  "version": "1.1",
   "description": "Partner decision rules: verdict mapping, score thresholds, critical risks, contradictory scores, red flags, and LLM fallback triggers.",
   "quality_labels": {
     "STRONG": "Investment-grade",
@@ -38,7 +38,9 @@
     "min_avg_strong_yes": 8.0,
     "min_avg_medium_maybe": 7.0,
     "min_avg_borderline_low": 6.0,
-    "max_avg_borderline_high": 7.0
+    "max_avg_borderline_high": 7.0,
+    "grey_zone_min": 6.5,
+    "grey_zone_max": 7.5
   },
   "critical_risk_keywords": [
     "regulatory",
@@ -76,7 +78,8 @@
     "low_score_near_threshold_window": 0.25,
     "missing_assumptions_affecting_decision": true,
     "missing_critical_qualitative": true,
-    "reviewer_disagreement": true
+    "reviewer_disagreement": true,
+    "grey_zone_deep_dive": true
   },
   "missing_qualitative_keywords": ["[MISSING]", "missing", "absent", "n/a"],
   "assumption_risk_keywords": [

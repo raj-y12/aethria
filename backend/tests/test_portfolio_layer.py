@@ -6,6 +6,7 @@ import asyncio
 import sys
 import os
 import json
+import pytest
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -33,6 +34,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
+@pytest.mark.skip(reason="Integration test — requires live Supabase with UUID-compatible startup ids (run directly: python tests/test_portfolio_layer.py)")
 async def test_portfolio_layer():
     """Test all portfolio layer components."""
     print("=" * 80)

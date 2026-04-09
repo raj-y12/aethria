@@ -209,6 +209,16 @@ class PromptMutator:
 
         # Build user prompt
         pipeline = self.signal.get("pipeline_health", {})
+        rejection_keywords = pipeline.get("top_rejection_keywords", [])
+        rejected_sectors = pipeline.get("most_rejected_sectors", [])
+        rejection_avoid_block = ""
+        if rejection_keywords and target.get("mutation_type") == "scout_prompt":
+            rejection_avoid_block = (
+                f"- PARTNER REJECT keywords to avoid in future scout prompts: {rejection_keywords[:6]}\n"
+                f"- Most rejected sectors (reduce discovery unless contrarian thesis): {rejected_sectors[:3]}\n"
+                "When mutating: add one targeted 'AVOID:' bullet per top rejection keyword to the prompt's "
+                "negative constraints section. Do not add more than 3 new Avoid bullets per mutation.\n"
+            )
         user_prompt = (
             f"Agent: {agent_name}\n"
             f"Current prompt:\n{current_prompt}\n\n"
@@ -218,7 +228,8 @@ class PromptMutator:
             f"- Blind spots: {target.get('signal', {}).get('blind_spots', [])}\n"
             f"- Top failed assumptions: {pipeline.get('top_failed_assumptions', [])[:5]}\n"
             f"- Top successful thesis patterns: {pipeline.get('top_successful_thesis_patterns', [])[:5]}\n"
-            f"- Oversaturated sectors to avoid: {pipeline.get('most_oversaturated_sector', 'none')}\n\n"
+            f"- Oversaturated sectors to avoid: {pipeline.get('most_oversaturated_sector', 'none')}\n"
+            f"{rejection_avoid_block}\n"
             f"Mutate the prompt to address these failure patterns while "
             f"preserving this agent's core cognitive identity."
         )

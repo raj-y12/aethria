@@ -6,9 +6,12 @@ from portfolio.feedback import FeedbackLoop
 class _FakePortfolioStore:
     def __init__(self):
         self._metrics = []
+        # Pre-compute timestamp so it is guaranteed to precede period_end = datetime.now()
+        # called in the test body (which runs after store construction).
+        self._now = datetime.now().isoformat()
 
     def get_all_decisions(self):
-        now = datetime.now().isoformat()
+        now = self._now
         # Mix canonical + legacy decision labels to verify normalization.
         return [
             {

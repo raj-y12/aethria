@@ -21,9 +21,11 @@ else:
 # Add the backend directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import pytest
 from scout.engine import ScoutEngine
 
 
+@pytest.mark.skip(reason="Integration test — requires live OPENAI_API_KEY and tenant_user_id (run directly: python tests/test_scouts.py)")
 async def test_scouts():
     """Run a single discovery cycle to test all Scouts."""
     # Get API key from environment

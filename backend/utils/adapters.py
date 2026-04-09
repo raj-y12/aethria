@@ -111,6 +111,8 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
         thesis_deviation_points=reviewer_output.get("thesis_deviation_points") or None,
         thesis_alignment_confidence=reviewer_output.get("thesis_alignment_confidence"),
         fund_thesis_alignment_score=reviewer_output.get("fund_thesis_alignment_score"),
+        weighted_defensibility_score=reviewer_output.get("weighted_defensibility_score"),
+        confidence_adjusted_score=reviewer_output.get("confidence_adjusted_score"),
     )
 
 
@@ -151,4 +153,5 @@ def partner_output_to_partner_info(partner_output: Dict[str, Any]) -> PartnerInf
         memo_at_decision=partner_output.get("memo_at_decision"),
         portfolio_context_at_decision=partner_output.get("portfolio_context_at_decision"),
         prompt_version=partner_output.get("prompt_version"),
+        grey_zone_deep_dive=partner_output.get("grey_zone_deep_dive"),
     )

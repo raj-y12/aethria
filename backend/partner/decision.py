@@ -414,6 +414,19 @@ class PartnerDecisionEngine:
         assumption_feedback: List[str] = review_output.get("assumption_feedback") or []
 
         avg_score, avg_dims = self._avg_score_and_dims(review_output)
+
+        # Grey Zone: compute once here; used in MEDIUM rules below
+        llm_triggers_global = rules.get("llm_fallback_triggers", {})
+        grey_zone_score = review_output.get("confidence_adjusted_score")
+        if grey_zone_score is None:
+            grey_zone_score = avg_score
+        grey_zone_min = score_thresholds.get("grey_zone_min", 6.5)
+        grey_zone_max = score_thresholds.get("grey_zone_max", 7.5)
+        grey_zone_active = (
+            llm_triggers_global.get("grey_zone_deep_dive", False)
+            and grey_zone_min <= grey_zone_score <= grey_zone_max
+        )
+
         min_avg_pass = score_thresholds.get("min_avg_pass", 6.0)
         min_avg_strong_yes = score_thresholds.get("min_avg_strong_yes", 8.0)
         min_avg_medium_maybe = score_thresholds.get("min_avg_medium_maybe", 7.0)
@@ -631,7 +644,12 @@ class PartnerDecisionEngine:
         if effective_verdict == "MEDIUM" and avg_score >= min_avg_medium_maybe:
             llm_triggers = rules.get("llm_fallback_triggers", {})
             trigger_reason = ""
-            if has_contradiction and llm_triggers.get("contradictory_scores", True):
+            if grey_zone_active:
+                trigger_reason = (
+                    f"Grey zone deep dive: S_adj={grey_zone_score:.2f} in "
+                    f"[{grey_zone_min}, {grey_zone_max}]"
+                )
+            elif has_contradiction and llm_triggers.get("contradictory_scores", True):
                 trigger_reason = "Contradictory scores detected (gap >= threshold)"
             elif has_missing_assumptions and llm_triggers.get("missing_assumptions_affecting_decision", True):
                 trigger_reason = "Missing assumptions affecting decision"
@@ -656,6 +674,8 @@ class PartnerDecisionEngine:
                     avg_score=avg_score,
                     avg_dims=avg_dims,
                 )
+                if grey_zone_active:
+                    result["grey_zone_deep_dive"] = True
                 result["portfolio_context_at_decision"] = portfolio_context or None
                 result["memo_at_decision"] = context_memo or None
                 return self._finalize_thesis_soft_and_log(
@@ -695,11 +715,14 @@ class PartnerDecisionEngine:
             )
             use_llm = (
                 self.use_llm_fallback
-                and llm_triggers.get("medium_borderline_avg", True)
-                and is_edge_case
+                and (llm_triggers.get("medium_borderline_avg", True) and is_edge_case or grey_zone_active)
             )
             if use_llm:
-                trigger_reason = "MEDIUM verdict with borderline average score"
+                trigger_reason = (
+                    f"Grey zone deep dive: S_adj={grey_zone_score:.2f} in [{grey_zone_min}, {grey_zone_max}]"
+                    if grey_zone_active
+                    else "MEDIUM verdict with borderline average score"
+                )
                 result = self._decide_with_llm(
                     scout_output,
                     review_output,
@@ -711,6 +734,8 @@ class PartnerDecisionEngine:
                     avg_score=avg_score,
                     avg_dims=avg_dims,
                 )
+                if grey_zone_active:
+                    result["grey_zone_deep_dive"] = True
                 result["portfolio_context_at_decision"] = portfolio_context or None
                 result["memo_at_decision"] = context_memo or None
                 return self._finalize_thesis_soft_and_log(

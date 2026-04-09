@@ -20,11 +20,13 @@ else:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logging
+import pytest
 from utils.storage import Storage
 from scout.engine import ScoutEngine
 from reviewer.engine import ReviewerEngine
 
 
+@pytest.mark.skip(reason="Integration test — requires live OPENAI_API_KEY and tenant_user_id (run directly: python tests/test_end_to_end.py)")
 async def test_end_to_end():
     """Test the complete flow: Scout discovers → Storage persists → Reviewer evaluates."""
     # Configure logging
