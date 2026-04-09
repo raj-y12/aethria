@@ -583,7 +583,7 @@ export default function SettingsPage() {
                           <button
                             type="button"
                             onClick={() => navigator.clipboard?.writeText(userId).then(() => { setUserIdCopied(true); setTimeout(() => setUserIdCopied(false), 2000); })}
-                            className="rounded-none border border-solid border-oxford/20 bg-transparent py-[3px] px-2 text-[13px] font-normal text-oxford/[0.75] hover:text-oxford transition-colors duration-150 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset"
+                            className="rounded-none border border-solid border-oxford/20 bg-transparent py-[3px] px-2 text-[13px] font-normal text-oxford/[0.75] hover:text-oxford hover:border-oxford/40 hover:bg-oxford/[0.03] transition-colors duration-150 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset"
                             style={{ fontFamily: FONT_GEIST }}
                           >
                             {userIdCopied ? 'Copied' : 'Copy'}
@@ -774,7 +774,7 @@ export default function SettingsPage() {
                                       }
                                     })();
                                   }}
-                                  className="self-start type-meta uppercase tracking-[0.12em] px-4 py-2 border border-oxford/30 text-oxford disabled:opacity-40 btn-interaction"
+                                  className="self-start type-meta uppercase tracking-[0.12em] px-4 py-2 border border-oxford/30 text-oxford hover:border-oxford/45 hover:bg-oxford/[0.03] disabled:opacity-40 btn-interaction"
                                 >
                                   {thesisBusy ? 'Working…' : 'Enable AI alignment (optional)'}
                                 </button>
@@ -819,7 +819,7 @@ export default function SettingsPage() {
                                   }
                                 })();
                               }}
-                              className="self-start type-meta uppercase tracking-[0.12em] px-4 py-2 border border-oxford/30 text-oxford disabled:opacity-40 btn-interaction"
+                              className="self-start type-meta uppercase tracking-[0.12em] px-4 py-2 border border-oxford/30 text-oxford hover:border-oxford/45 hover:bg-oxford/[0.03] disabled:opacity-40 btn-interaction"
                             >
                               {thesisBusy ? 'Publishing…' : 'Publish new version'}
                             </button>
@@ -865,7 +865,7 @@ export default function SettingsPage() {
                                       }
                                     })();
                                   }}
-                                  className="type-meta uppercase tracking-[0.12em] px-3 py-2 border border-oxford/30 text-oxford btn-interaction disabled:opacity-40"
+                                  className="type-meta uppercase tracking-[0.12em] px-3 py-2 border border-oxford/30 text-oxford hover:border-oxford/45 hover:bg-oxford/[0.03] btn-interaction disabled:opacity-40"
                                 >
                                   Set active
                                 </button>
@@ -914,7 +914,7 @@ export default function SettingsPage() {
                                     })
                                     .finally(() => setThesisReprocessDryLoading(false));
                                 }}
-                                className="self-start type-meta uppercase tracking-[0.12em] px-4 py-2 border border-oxford/30 text-oxford disabled:opacity-40 btn-interaction"
+                                className="self-start type-meta uppercase tracking-[0.12em] px-4 py-2 border border-oxford/30 text-oxford hover:border-oxford/45 hover:bg-oxford/[0.03] disabled:opacity-40 btn-interaction"
                               >
                                 Reprocess Existing Startups
                               </button>
@@ -1078,7 +1078,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 disabled={thesisReprocessRunning}
-                className="type-meta uppercase tracking-[0.12em] px-3 py-2 border border-oxford/20 text-oxford/70 btn-interaction disabled:opacity-40"
+                className="type-meta uppercase tracking-[0.12em] px-3 py-2 border border-oxford/20 text-oxford/70 hover:text-oxford hover:border-oxford/40 hover:bg-oxford/[0.03] btn-interaction disabled:opacity-40"
                 onClick={() => setThesisReprocessOpen(false)}
               >
                 Cancel
@@ -1093,7 +1093,7 @@ export default function SettingsPage() {
                   !!thesisReprocessModalError ||
                   !agentsStatus?.openai_configured
                 }
-                className="type-meta uppercase tracking-[0.12em] px-3 py-2 border border-oxford/30 text-oxford btn-interaction disabled:opacity-40 inline-flex items-center gap-2"
+                className="type-meta uppercase tracking-[0.12em] px-3 py-2 border border-oxford/30 text-oxford hover:border-oxford/45 hover:bg-oxford/[0.03] btn-interaction disabled:opacity-40 inline-flex items-center gap-2"
                 onClick={() => {
                   void (async () => {
                     setThesisReprocessRunning(true);

@@ -9,9 +9,23 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+if load_dotenv:
+    from pathlib import Path
+
+    _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+    if _ENV_PATH.exists():
+        load_dotenv(_ENV_PATH)
+    else:
+        load_dotenv()
+
 from tenant_context import TenantContext
 from supabase_doc_store import list_upsert
-from utils.settings_loader import load_settings, is_scouts_enabled, is_reviewers_enabled, is_partners_enabled, is_cost_budget_enabled
+from utils.settings_loader import load_settings, is_thesis_reprocess_agents_enabled
 from supabase_client import get_service_client
 from supabase_storage import SupabaseStartupsStorage
 from scout.engine import ScoutEngine
@@ -25,6 +39,28 @@ from meta.agent import MetaAgent
 from fund_thesis import FundThesisIncompleteError, FundThesisMissingError, get_active_thesis
 
 logger = logging.getLogger("pipeline_runner")
+_visible_logger = logging.getLogger("uvicorn.error")
+
+
+def _safe_stage_count(storage: SupabaseStartupsStorage, method_name: str, user_id: str) -> Optional[int]:
+    """Best-effort counter for stage logging; never raise."""
+    try:
+        method = getattr(storage, method_name)
+        return int(method())
+    except Exception as e:
+        logger.warning(
+            "[%s] %s unavailable: %s",
+            user_id[:12],
+            method_name,
+            e,
+        )
+        return None
+
+
+def _visible_info(message: str, *args: object) -> None:
+    """Log to both pipeline logger and uvicorn logger for local dev visibility."""
+    logger.info(message, *args)
+    _visible_logger.info(message, *args)
 
 
 def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str) -> None:
@@ -74,11 +110,25 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
         logger.info("[%s] Skipping pipeline (USE_SUPABASE_STORAGE not set)", user_id[:12])
         return
 
-    settings = load_settings(user_id)
+    try:
+        settings = load_settings(user_id)
+    except Exception as e:
+        logger.warning("[%s] Pipeline skipped (settings unavailable): %s", user_id[:12], e)
+        return
     ac = settings.get("agent_config") or {}
-    if not (ac.get("scouts_enabled", True) or ac.get("reviewers_enabled", True) or ac.get("partners_enabled", True)):
+    scouts_enabled = bool(ac.get("scouts_enabled", True))
+    reviewers_enabled = bool(ac.get("reviewers_enabled", True))
+    partners_enabled = bool(ac.get("partners_enabled", True))
+    if not (scouts_enabled or reviewers_enabled or partners_enabled):
         logger.info("[%s] Agents disabled in settings, skipping", user_id[:12])
         return
+    _visible_info(
+        "[%s] agent gates: scouts=%s reviewers=%s partners=%s",
+        user_id[:12],
+        scouts_enabled,
+        reviewers_enabled,
+        partners_enabled,
+    )
 
     try:
         storage = SupabaseStartupsStorage(get_service_client(), user_id)
@@ -89,20 +139,29 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key:
         logger.warning("[%s] OPENAI_API_KEY missing, skipping pipeline", user_id[:12])
+        _visible_logger.warning("[%s] Pipeline skipped: OPENAI_API_KEY not set", user_id[:12])
         return
 
     try:
         svc = get_service_client()
-        thesis_ctx = get_active_thesis(svc, user_id).as_engine_context()
-    except (FundThesisMissingError, FundThesisIncompleteError) as e:
+        active = get_active_thesis(svc, user_id)
+        if active is None:
+            logger.warning("[%s] Pipeline skipped (fund thesis): missing", user_id[:12])
+            _visible_logger.warning("[%s] Pipeline skipped: fund thesis missing — create one in Settings", user_id[:12])
+            return
+        thesis_ctx = active.as_engine_context()
+    except FundThesisIncompleteError as e:
         logger.warning("[%s] Pipeline skipped (fund thesis): %s", user_id[:12], e)
+        _visible_logger.warning("[%s] Pipeline skipped: fund thesis incomplete — %s", user_id[:12], e)
         return
 
-    cost_controller = CostController() if is_cost_budget_enabled(user_id) else None
+    cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
+    cost_controller = CostController(user_id=user_id) if cost_budget_enabled else None
     deal_memory = DealMemory(user_id=user_id)
     model = os.getenv("SCOUT_MODEL", "gpt-4o-mini")
     reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-4o-mini")
     use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
+    reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
 
     scout_engine = ScoutEngine(
         api_key=api_key,
@@ -119,6 +178,7 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
         storage=storage,
         interval_seconds=60,
         model=reviewer_model,
+        batch_size=reviewer_batch_size,
         cost_controller=cost_controller,
         deal_memory=deal_memory,
         tenant_user_id=user_id,
@@ -144,12 +204,49 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
             user_id[:12],
             pipeline_run_id,
         )
-        if is_scouts_enabled(user_id):
+        if scouts_enabled:
             await scout_engine.run_cycle(pipeline_run_id=pipeline_run_id)
-        if is_reviewers_enabled(user_id):
-            await reviewer_engine.run_cycle(pipeline_run_id=pipeline_run_id)
-        if is_partners_enabled(user_id):
-            await partner_engine.run_cycle(pipeline_run_id=pipeline_run_id)
+        else:
+            logger.info("[%s] Scout stage skipped (disabled in settings)", user_id[:12])
+
+        if reviewers_enabled:
+            unreviewed_before = _safe_stage_count(storage, "count_unreviewed", user_id)
+            _visible_info(
+                "[%s] Reviewer stage start: unreviewed_before=%s",
+                user_id[:12],
+                unreviewed_before,
+            )
+            reviewed_count = await reviewer_engine.run_cycle(pipeline_run_id=pipeline_run_id)
+            reviewer_stats = getattr(reviewer_engine, "last_cycle_stats", {}) or {}
+            _visible_info(
+                "[%s] Reviewer stage done: reviewed=%s unreviewed_after=%s threshold=%s candidates_seen=%s skipped_low_confidence=%s reason=%s",
+                user_id[:12],
+                reviewed_count,
+                _safe_stage_count(storage, "count_unreviewed", user_id),
+                reviewer_stats.get("confidence_threshold"),
+                reviewer_stats.get("candidates_seen"),
+                reviewer_stats.get("skipped_low_confidence"),
+                reviewer_stats.get("reason"),
+            )
+        else:
+            logger.info("[%s] Reviewer stage skipped (disabled in settings)", user_id[:12])
+
+        if partners_enabled:
+            undecided_before = _safe_stage_count(storage, "count_undecided", user_id)
+            _visible_info(
+                "[%s] Partner stage start: undecided_before=%s",
+                user_id[:12],
+                undecided_before,
+            )
+            decided_count = await partner_engine.run_cycle(pipeline_run_id=pipeline_run_id)
+            _visible_info(
+                "[%s] Partner stage done: decided=%s undecided_after=%s",
+                user_id[:12],
+                decided_count,
+                _safe_stage_count(storage, "count_undecided", user_id),
+            )
+        else:
+            logger.info("[%s] Partner stage skipped (disabled in settings)", user_id[:12])
 
         portfolio_engine = PortfolioEngine(
             discovery_storage=storage,
@@ -219,6 +316,7 @@ async def run_on_demand_lookup(
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key:
         logger.warning("[%s] OPENAI_API_KEY missing, skipping lookup", user_id[:12])
+        _visible_logger.warning("[%s] Lookup skipped: OPENAI_API_KEY not set", user_id[:12])
         _record_lookup_failure(
             user_id,
             lid,
@@ -238,9 +336,20 @@ async def run_on_demand_lookup(
         return None
 
     try:
-        thesis_ctx = get_active_thesis(get_service_client(), user_id).as_engine_context()
-    except (FundThesisMissingError, FundThesisIncompleteError) as e:
+        active = get_active_thesis(get_service_client(), user_id)
+        if active is None:
+            logger.warning("[%s] Lookup skipped (fund thesis): missing", user_id[:12])
+            _visible_logger.warning("[%s] Lookup skipped: fund thesis missing — create one in Settings", user_id[:12])
+            _record_lookup_failure(
+                user_id,
+                lid,
+                "Fund thesis is missing. Add a thesis in Settings.",
+            )
+            return None
+        thesis_ctx = active.as_engine_context()
+    except FundThesisIncompleteError as e:
         logger.warning("[%s] Lookup skipped (fund thesis): %s", user_id[:12], e)
+        _visible_logger.warning("[%s] Lookup skipped: fund thesis incomplete — %s", user_id[:12], e)
         _record_lookup_failure(
             user_id,
             lid,
@@ -248,11 +357,18 @@ async def run_on_demand_lookup(
         )
         return None
 
-    cost_controller = CostController() if is_cost_budget_enabled(user_id) else None
+    try:
+        settings = load_settings(user_id)
+    except Exception as e:
+        logger.warning("[%s] settings load failed during lookup; using defaults: %s", user_id[:12], e)
+        settings = {"cost_budget": {}}
+    cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
+    cost_controller = CostController(user_id=user_id) if cost_budget_enabled else None
     deal_memory = DealMemory(user_id=user_id)
     model = os.getenv("SCOUT_MODEL", "gpt-4o-mini")
     reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-4o-mini")
     use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
+    reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
 
     scout_engine = ScoutEngine(
         api_key=api_key,
@@ -269,6 +385,7 @@ async def run_on_demand_lookup(
         storage=storage,
         interval_seconds=60,
         model=reviewer_model,
+        batch_size=reviewer_batch_size,
         cost_controller=cost_controller,
         deal_memory=deal_memory,
         tenant_user_id=user_id,
@@ -315,11 +432,16 @@ async def run_on_demand_lookup(
             startup_id,
             ignore_confidence_threshold=True,
             pipeline_run_id=lookup_run_id,
+            bypass_agent_enabled_gate=True,
         )
         if not reviewed:
             logger.warning("[%s] On-demand lookup not reviewed: %s", user_id[:12], startup_id)
             return startup_id
-        decided = await partner_engine.run_startup(startup_id, pipeline_run_id=lookup_run_id)
+        decided = await partner_engine.run_startup(
+            startup_id,
+            pipeline_run_id=lookup_run_id,
+            bypass_agent_enabled_gate=True,
+        )
         if not decided:
             logger.warning("[%s] On-demand lookup not decided yet: %s", user_id[:12], startup_id)
         logger.info("[%s] On-demand lookup completed for %s (%s)", user_id[:12], company, startup_id)
@@ -357,27 +479,46 @@ async def reprocess_startups_missing_fund_thesis(
     ids = storage.get_startups_missing_thesis(limit=limit)
 
     if dry_run:
+        if not is_thesis_reprocess_agents_enabled(uid):
+            raise RuntimeError(
+                "Thesis reprocessing requires Reviewers and Partners to be enabled in Settings (Pipeline)."
+            )
         return {"dry_run": True, "eligible": len(ids)}
 
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key.strip():
         raise RuntimeError("OPENAI_API_KEY required for thesis reprocessing")
 
+    if not is_thesis_reprocess_agents_enabled(uid):
+        raise RuntimeError(
+            "Thesis reprocessing requires Reviewers and Partners to be enabled in Settings (Pipeline)."
+        )
+
     try:
-        thesis_ctx = get_active_thesis(get_service_client(), uid).as_engine_context()
-    except (FundThesisMissingError, FundThesisIncompleteError) as e:
+        active = get_active_thesis(get_service_client(), uid)
+        if active is None:
+            raise RuntimeError("No active thesis")
+        thesis_ctx = active.as_engine_context()
+    except FundThesisIncompleteError as e:
         raise RuntimeError(str(e)) from e
 
-    cost_controller = CostController() if is_cost_budget_enabled(uid) else None
+    try:
+        settings = load_settings(uid)
+    except Exception:
+        settings = {"cost_budget": {}}
+    cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
+    cost_controller = CostController(user_id=uid) if cost_budget_enabled else None
     deal_memory = DealMemory(user_id=uid)
     reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-4o-mini")
     use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
+    reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
 
     reviewer_engine = ReviewerEngine(
         api_key=api_key,
         storage=storage,
         interval_seconds=60,
         model=reviewer_model,
+        batch_size=reviewer_batch_size,
         cost_controller=cost_controller,
         deal_memory=deal_memory,
         tenant_user_id=uid,

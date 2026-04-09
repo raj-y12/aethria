@@ -61,13 +61,6 @@ LEADING_LEVEL_RE = re.compile(r"^\s*(DEBUG|INFO|WARNING|WARN|ERROR|CRITICAL)\s*:
 HTTP_ACCESS_RE = re.compile(
     r'(?P<ip>\d{1,3}(?:\.\d{1,3}){3}):(?P<port>\d+)\s*-\s*"(?P<method>[A-Z]+)\s+(?P<path>[^"]+?)\s+HTTP/[0-9.]+"\s+(?P<status>\d{3})\s*(?P<rest>.*)$'
 )
-LEVEL_PATTERNS = (
-    (re.compile(r"\b(CRITICAL|FATAL|ERROR|ERR)\b", re.IGNORECASE), "ERROR", ERROR_COLOR),
-    (re.compile(r"\b(WARN|WARNING)\b", re.IGNORECASE), "WARN", WARN_COLOR),
-    (re.compile(r"\b(INFO)\b", re.IGNORECASE), "INFO", INFO_COLOR),
-    (re.compile(r"\b(DEBUG|TRACE)\b", re.IGNORECASE), "DEBUG", DEBUG_COLOR),
-)
-
 TAG_COLORS = {
     "SCOUT": "\033[92m",       # bright green
     "REVIEWER": "\033[94m",    # bright blue
@@ -124,12 +117,23 @@ def _strip_ansi(text: str) -> str:
 
 
 def _extract_level(text: str) -> tuple[str, str]:
-    """Infer log level from line text and return label + colour."""
-    clean_text = _strip_ansi(text)
-    for pattern, label, color in LEVEL_PATTERNS:
-        if pattern.search(clean_text):
-            return label, color
-    return "LOG", DEFAULT_TEXT_COLOR
+    """Map log level from a leading stdlib/uvicorn prefix only (e.g. INFO: ...).
+
+    Do not scan the full line: multiline log continuations and JSON payloads often
+    contain words like 'critical' or 'error' and would falsely show as ERROR.
+    """
+    clean_text = _strip_ansi(text).strip()
+    m = LEADING_LEVEL_RE.match(clean_text)
+    if not m:
+        return "LOG", DEFAULT_TEXT_COLOR
+    lev = m.group(1).upper()
+    if lev == "DEBUG":
+        return "DEBUG", DEBUG_COLOR
+    if lev == "INFO":
+        return "INFO", INFO_COLOR
+    if lev in ("WARNING", "WARN"):
+        return "WARN", WARN_COLOR
+    return "ERROR", ERROR_COLOR
 
 
 def _colorize_tags(text: str, use_color: bool) -> str:
@@ -258,7 +262,7 @@ def _stop_process(proc: subprocess.Popen | None) -> None:
 
 def main() -> int:
     if load_dotenv and ENV_FILE.exists():
-        load_dotenv(ENV_FILE)
+        load_dotenv(ENV_FILE, override=True)
 
     if not BACKEND_DIR.is_dir():
         print(f"Error: backend directory not found: {BACKEND_DIR}", file=sys.stderr)
@@ -280,7 +284,7 @@ def main() -> int:
 
     try:
         backend_proc = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", str(BACKEND_PORT)],
+            [sys.executable, "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", str(BACKEND_PORT), "--workers", "1"],
             cwd=str(BACKEND_DIR),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

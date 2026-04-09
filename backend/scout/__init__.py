@@ -1,8 +1,8 @@
 """
 AETHRIA Scout Layer
 
-The Scout layer discovers high-quality startup ideas using multiple
-LLM-powered agents with distinct cognitive strategies.
+The Scout layer discovers real, verifiable startup companies (not hypothetical
+ideas) using multiple LLM-powered agents with distinct cognitive strategies.
 """
 from scout.base import Scout
 from scout.schema import ScoutOutput, validate_scout_output, generate_id

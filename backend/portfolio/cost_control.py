@@ -2,7 +2,8 @@
 Cost & Token Discipline Enforcement.
 
 Tracks and enforces budgets, token limits, and cooldowns.
-Uses local file (data/portfolio/budgets.json); no Supabase buckets yet.
+Uses Supabase `portfolio_budgets` when configured with tenant context;
+falls back to local file only when Supabase is unavailable.
 """
 import json
 import logging
@@ -10,6 +11,9 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
+import os
+
+from supabase_doc_store import doc_get, doc_set
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +23,11 @@ class CostController:
     Enforces cost discipline across all agents.
     """
     
-    def __init__(self, budget_file: str = "data/portfolio/budgets.json"):
+    def __init__(self, budget_file: str = "data/portfolio/budgets.json", user_id: Optional[str] = None):
         self.budget_file = Path(budget_file)
         self.budget_file.parent.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("cost.controller")
+        self.user_id = (user_id or "").strip() or None
         self.default_budgets = {
             "scout": {"calls": 100, "tokens": 100000},
             "reviewer": {"calls": 200, "tokens": 200000},
@@ -30,9 +35,22 @@ class CostController:
         }
         self.cooldowns = {"scout": 60, "reviewer": 30, "partner": 10}
         self._load_budgets()
+
+    def _using_supabase(self) -> bool:
+        return bool(self.user_id and os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
     
     def _load_budgets(self):
-        """Load budget state from file."""
+        """Load budget state from Supabase (preferred) or file fallback."""
+        if self._using_supabase():
+            try:
+                data = doc_get("portfolio_budgets", user_id=self.user_id)
+                if isinstance(data, dict):
+                    self.budgets = data
+                else:
+                    self.budgets = {}
+                return
+            except Exception as e:
+                self.logger.warning("Supabase budget load failed; using file fallback: %s", e)
         if self.budget_file.exists():
             try:
                 with open(self.budget_file, "r") as f:
@@ -43,7 +61,13 @@ class CostController:
             self.budgets = {}
     
     def _save_budgets(self):
-        """Save budget state to file."""
+        """Save budget state to Supabase (preferred) or file fallback."""
+        if self._using_supabase():
+            try:
+                doc_set("portfolio_budgets", self.budgets, user_id=self.user_id)
+                return
+            except Exception as e:
+                self.logger.warning("Supabase budget save failed; using file fallback: %s", e)
         with open(self.budget_file, "w") as f:
             json.dump(self.budgets, f, indent=2)
     

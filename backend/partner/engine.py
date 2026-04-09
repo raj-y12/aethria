@@ -60,7 +60,7 @@ class PartnerEngine:
         self.agent_id = agent_id
         self.cost_controller = cost_controller
         self.deal_memory = deal_memory
-        api_key = os.getenv("OPENAI_API_KEY", "")
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
         self.decision_engine = PartnerDecisionEngine(
             use_llm_fallback=use_llm_fallback,
             api_key=api_key,
@@ -283,40 +283,29 @@ class PartnerEngine:
             return False, decision
 
         st.partner_info = partner_info
+
+        # Generate display memo — failure here must NOT block persisting the decision.
         memo_gen = MemoGenerator()
+        display_memo: Optional[str] = None
         try:
-            display_memo = memo_gen.generate_memo(
+            generated = memo_gen.generate_memo(
                 st,
                 for_display=True,
                 tenant_user_id=self.tenant_user_id,
                 fund_thesis=self.fund_thesis,
             )
+            if (generated or "").strip():
+                display_memo = generated
+            else:
+                self.logger.warning(
+                    "Display memo empty for %s; decision will be persisted without memo", entry_id
+                )
         except Exception as e:
-            self.logger.warning("Display memo generation failed for %s: %s", entry_id, e)
-            if pr and client and uid:
-                upsert_pipeline_state(
-                    client,
-                    user_id=uid,
-                    startup_id=entry_id,
-                    pipeline_run_id=pr,
-                    status="failed",
-                    error=f"memo generation: {e}"[:500],
-                )
-            return False, decision
+            self.logger.warning(
+                "Display memo generation failed for %s: %s; decision will still be persisted", entry_id, e
+            )
 
-        if not (display_memo or "").strip():
-            if pr and client and uid:
-                upsert_pipeline_state(
-                    client,
-                    user_id=uid,
-                    startup_id=entry_id,
-                    pipeline_run_id=pr,
-                    status="failed",
-                    error="empty display memo",
-                )
-            return False, decision
-
-        if pr and client and uid:
+        if display_memo is not None and pr and client and uid:
             pipeline_stage_log(
                 pr, startup_id=entry_id, user_id=self.tenant_user_id, stage="generating_memo", phase="DONE"
             )
@@ -360,6 +349,18 @@ class PartnerEngine:
                 status="failed",
                 error="add_partner_decision returned false",
             )
+            return False, decision
+
+        # Decision persisted. If memo was skipped, mark pipeline ready so frontend
+        # doesn't poll forever on "generating" status.
+        if success and display_memo is None and pr and client and uid:
+            upsert_pipeline_state(
+                client,
+                user_id=uid,
+                startup_id=entry_id,
+                pipeline_run_id=pr,
+                status="ready",
+            )
 
         return success, decision
 
@@ -372,7 +373,10 @@ class PartnerEngine:
             Number of decisions made in this cycle
         """
         self.logger.info(f"Starting decision cycle at {datetime.now().isoformat()}")
-        
+        if not is_partners_enabled(self.tenant_user_id):
+            self.logger.info("Decision cycle skipped (partners disabled in settings)")
+            return 0
+
         # Ramp: process up to batch_max per cycle so we make progress without one huge cycle
         undecided_count = self.storage.count_undecided()
         limit = min(self.batch_max, undecided_count) if undecided_count else None
@@ -462,10 +466,15 @@ class PartnerEngine:
         startup_id: str,
         pipeline_run_id: Optional[str] = None,
         force_rerun: bool = False,
+        *,
+        bypass_agent_enabled_gate: bool = False,
     ) -> bool:
         """
         Make a partner decision for one specific startup id.
         Returns True when decision is saved.
+
+        bypass_agent_enabled_gate: when True, run even if partners are disabled in settings
+        (used for occasional on-demand company lookup only).
         """
         startup = self.storage.get_startup(startup_id)
         if startup is None:
@@ -474,6 +483,9 @@ class PartnerEngine:
         if startup.partner_info is not None and not force_rerun:
             self.logger.info("Startup already has partner decision: %s", startup_id)
             return True
+        if not bypass_agent_enabled_gate and not is_partners_enabled(self.tenant_user_id):
+            self.logger.info("run_startup skipped (partners disabled in settings): %s", startup_id)
+            return False
         entry = self._entry_from_startup(startup)
         if entry is None:
             self.logger.info("Startup is not ready for partner decision: %s", startup_id)

@@ -33,6 +33,14 @@ def _confidence_float_to_conviction_level(conf: Any) -> int:
     return max(1, min(10, int(round(c * 9)) + 1))
 
 
+def _log_safe_single_line(blob: str, max_len: int = 6000) -> str:
+    """Collapse newlines so one log record stays on one physical line (TTY readline consumers)."""
+    s = " ".join((blob or "").replace("\r\n", "\n").replace("\r", "\n").split())
+    if len(s) > max_len:
+        return s[: max_len - 24] + " ...[truncated]"
+    return s
+
+
 def _partner_rules_json_for_prompt(rules: Dict[str, Any]) -> str:
     """Serialize partner rules; shrink if too large for the prompt token budget."""
     raw = json.dumps(rules, ensure_ascii=False, indent=2)
@@ -64,8 +72,64 @@ def _parse_llm_json_object(content: str) -> Optional[Dict[str, Any]]:
     try:
         out = json.loads(s)
     except json.JSONDecodeError:
-        return None
+        # Best-effort salvage when model wraps JSON in prose.
+        start = s.find("{")
+        end = s.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                out = json.loads(s[start : end + 1])
+            except json.JSONDecodeError:
+                return None
+        else:
+            return None
     return out if isinstance(out, dict) else None
+
+
+def _extract_chat_message_content(message: Any) -> str:
+    """
+    Extract text content from OpenAI chat completion message payloads.
+    Supports plain string content and list-of-parts formats.
+    """
+    if message is None:
+        return ""
+    content = getattr(message, "content", None)
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, dict):
+        text_val = content.get("text") or content.get("content") or content.get("value")
+        if isinstance(text_val, dict):
+            text_val = text_val.get("text") or text_val.get("value")
+        if isinstance(text_val, str):
+            return text_val.strip()
+    if isinstance(content, list):
+        chunks: List[str] = []
+        for part in content:
+            if isinstance(part, str):
+                if part.strip():
+                    chunks.append(part.strip())
+                continue
+            text_val = None
+            if isinstance(part, dict):
+                text_val = part.get("text") or part.get("content")
+                if isinstance(text_val, dict):
+                    text_val = text_val.get("value") or text_val.get("text")
+            else:
+                text_val = getattr(part, "text", None) or getattr(part, "content", None)
+                if isinstance(text_val, dict):
+                    text_val = text_val.get("value") or text_val.get("text")
+            if isinstance(text_val, str) and text_val.strip():
+                chunks.append(text_val.strip())
+        return "\n".join(chunks).strip()
+    parsed = getattr(message, "parsed", None)
+    if isinstance(parsed, dict):
+        try:
+            return json.dumps(parsed, ensure_ascii=False)
+        except Exception:
+            pass
+    refusal = getattr(message, "refusal", None)
+    if isinstance(refusal, str) and refusal.strip():
+        return refusal.strip()
+    return ""
 
 
 def _load_partner_rules() -> Dict[str, Any]:
@@ -108,7 +172,7 @@ class PartnerDecisionEngine:
         self.tenant_user_id = (tenant_user_id or "").strip()
         self.llm_call_count = 0
         self._rules: Dict[str, Any] = _load_partner_rules()
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY", "")
+        self.api_key = (api_key or os.getenv("OPENAI_API_KEY", "")).strip()
         self.model = model or os.getenv("PARTNER_MODEL", "gpt-5-nano")
         if self.api_key:
             self.client = OpenAI(api_key=self.api_key)
@@ -116,6 +180,21 @@ class PartnerDecisionEngine:
             self.client = None
         self._last_token_usage: Optional[Dict[str, int]] = None
         self.portfolio_store = portfolio_store
+        self._llm_debug_logs = os.getenv("PARTNER_LLM_DEBUG_LOGS", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        self._llm_stats: Dict[str, int] = {
+            "fallback_invocations": 0,
+            "request_errors": 0,
+            "empty_content": 0,
+            "retry_request_errors": 0,
+            "rescue_request_errors": 0,
+            "malformed_json": 0,
+            "invalid_decision": 0,
+            "generic_rationale_replaced": 0,
+        }
 
     def _verdict_label(self, verdict: str) -> str:
         """Human-readable quality label for verdict. Uses quality_labels from rules."""
@@ -194,6 +273,47 @@ class PartnerDecisionEngine:
             return False
         return tas >= 0.75
 
+    @staticmethod
+    def _is_medium_borderline_edge_case(
+        avg_score: float,
+        min_avg_borderline_low: float,
+        max_avg_borderline_high: float,
+        llm_triggers: Dict[str, Any],
+    ) -> bool:
+        """
+        Trigger MEDIUM borderline LLM fallback only for genuine edge cases near the cutoff.
+        Defaults to the upper 0.6-point band below max_avg_borderline_high (e.g., 6.4-7.0).
+        """
+        if not (min_avg_borderline_low <= avg_score < max_avg_borderline_high):
+            return False
+        edge_window = llm_triggers.get("medium_borderline_edge_window", 0.6)
+        try:
+            edge_window = float(edge_window)
+        except (TypeError, ValueError):
+            edge_window = 0.6
+        edge_window = max(0.05, min(1.0, edge_window))
+        return avg_score >= (max_avg_borderline_high - edge_window)
+
+    @staticmethod
+    def _is_low_score_near_threshold_edge_case(
+        avg_score: float,
+        min_avg_pass: float,
+        llm_triggers: Dict[str, Any],
+    ) -> bool:
+        """
+        Allow LLM fallback for MEDIUM decisions that are just below pass threshold.
+        Default window is 0.25 below min_avg_pass (e.g., 5.75-6.0 when pass=6.0).
+        """
+        if avg_score >= min_avg_pass:
+            return False
+        near_window = llm_triggers.get("low_score_near_threshold_window", 0.25)
+        try:
+            near_window = float(near_window)
+        except (TypeError, ValueError):
+            near_window = 0.25
+        near_window = max(0.05, min(0.6, near_window))
+        return avg_score >= (min_avg_pass - near_window)
+
     def _finalize_thesis_soft_and_log(
         self,
         result: Dict[str, Any],
@@ -224,6 +344,9 @@ class PartnerDecisionEngine:
             result.get("decision"),
         )
         return result
+
+    def _record_llm_stat(self, key: str) -> None:
+        self._llm_stats[key] = int(self._llm_stats.get(key, 0)) + 1
 
     def decide(
         self,
@@ -382,6 +505,34 @@ class PartnerDecisionEngine:
 
         # Rule 3: Low average score → NO
         if avg_score < min_avg_pass:
+            llm_triggers = rules.get("llm_fallback_triggers", {})
+            low_score_edge_case = (
+                effective_verdict == "MEDIUM"
+                and llm_triggers.get("low_score_near_threshold", True)
+                and self._is_low_score_near_threshold_edge_case(
+                    avg_score=avg_score,
+                    min_avg_pass=min_avg_pass,
+                    llm_triggers=llm_triggers,
+                )
+            )
+            if self.use_llm_fallback and low_score_edge_case:
+                trigger_reason = "MEDIUM verdict slightly below pass threshold"
+                result = self._decide_with_llm(
+                    scout_output,
+                    review_output,
+                    assumption_risks,
+                    trigger_reason=trigger_reason,
+                    context_memo=context_memo,
+                    portfolio_context=portfolio_context,
+                    thesis_block=thesis_block,
+                    avg_score=avg_score,
+                    avg_dims=avg_dims,
+                )
+                result["portfolio_context_at_decision"] = portfolio_context or None
+                result["memo_at_decision"] = context_memo or None
+                return self._finalize_thesis_soft_and_log(
+                    result, review_output, scout_output, avg_score, avg_dims
+                )
             label = self._verdict_label(effective_verdict)
             result = self._create_decision(
                 decision="NO",
@@ -400,8 +551,46 @@ class PartnerDecisionEngine:
                 result, review_output, scout_output, avg_score, avg_dims
             )
 
-        # Rule 4: STRONG verdict + high score → YES
+        # Rule 4: STRONG verdict, pass bar met but below YES bar → MAYBE
         strong_rule = verdict_rules.get("STRONG", {})
+        if (
+            effective_verdict == "STRONG"
+            and min_avg_pass <= avg_score < min_avg_strong_yes
+        ):
+            next_act = strong_rule.get(
+                "next_action_below_strong_yes_bar",
+                next_actions.get("monitor", "Monitor market and track progress"),
+            )
+            label = self._verdict_label(effective_verdict)
+            rationale_parts = (
+                f"Quality: {label}. Average score ({avg_score:.1f}/10) meets the pass bar "
+                f"({min_avg_pass}) but is below the strong-YES bar ({min_avg_strong_yes}). "
+                f"Market: {market_score}/10, Product: {product_score}/10, "
+                f"Technical: {technical_score}/10, Execution: {execution_score}/10. "
+                f"Worth monitoring while execution and thesis signals mature."
+            )
+            if portfolio_context and portfolio_context.get("sector_counts", {}).get(
+                startup_sector, 0
+            ) >= 3:
+                rationale_parts += " sector_concentration_risk"
+            result = self._create_decision(
+                decision=strong_rule.get("decision_below_strong_yes_bar", "MAYBE"),
+                confidence=strong_rule.get("conviction_level_below_strong_yes_bar", 6)
+                + conviction_adjust,
+                rationale=rationale_parts,
+                next_action=next_act,
+                human_review_required=strong_rule.get(
+                    "human_review_required_below_strong_yes_bar", False
+                ),
+                assumption_risks=assumption_risks,
+            )
+            result["portfolio_context_at_decision"] = portfolio_context or None
+            result["memo_at_decision"] = context_memo or None
+            return self._finalize_thesis_soft_and_log(
+                result, review_output, scout_output, avg_score, avg_dims
+            )
+
+        # Rule 5: STRONG verdict + high score → YES
         if effective_verdict == "STRONG" and avg_score >= min_avg_strong_yes:
             next_action = (
                 next_actions.get("request_cap_table_and_review", "Request Cap Table + Technical Code Review")
@@ -437,7 +626,7 @@ class PartnerDecisionEngine:
         # Check reviewer disagreement for LLM trigger
         reviewer_disagreement = review_output.get("reviewer_disagreement", False)
 
-        # Rule 5: MEDIUM verdict + good score → MAYBE (or LLM if contradictory / missing assumptions / missing qualitative / disagreement)
+        # Rule 6: MEDIUM verdict + good score → MAYBE (or LLM if contradictory / missing assumptions / missing qualitative / disagreement)
         medium_rule = verdict_rules.get("MEDIUM", {})
         if effective_verdict == "MEDIUM" and avg_score >= min_avg_medium_maybe:
             llm_triggers = rules.get("llm_fallback_triggers", {})
@@ -495,10 +684,20 @@ class PartnerDecisionEngine:
                 result, review_output, scout_output, avg_score, avg_dims
             )
 
-        # Rule 6: MEDIUM verdict, borderline score → LLM or NO
+        # Rule 7: MEDIUM verdict, borderline score → LLM or deterministic MAYBE
         if effective_verdict == "MEDIUM" and min_avg_borderline_low <= avg_score < max_avg_borderline_high:
             llm_triggers = rules.get("llm_fallback_triggers", {})
-            use_llm = self.use_llm_fallback and llm_triggers.get("medium_borderline_avg", True)
+            is_edge_case = self._is_medium_borderline_edge_case(
+                avg_score=avg_score,
+                min_avg_borderline_low=min_avg_borderline_low,
+                max_avg_borderline_high=max_avg_borderline_high,
+                llm_triggers=llm_triggers,
+            )
+            use_llm = (
+                self.use_llm_fallback
+                and llm_triggers.get("medium_borderline_avg", True)
+                and is_edge_case
+            )
             if use_llm:
                 trigger_reason = "MEDIUM verdict with borderline average score"
                 result = self._decide_with_llm(
@@ -519,13 +718,18 @@ class PartnerDecisionEngine:
                 )
             label = self._verdict_label(effective_verdict)
             result = self._create_decision(
-                decision=medium_rule.get("decision_borderline_no_llm", "NO"),
+                decision=medium_rule.get("decision_borderline_no_llm", "MAYBE"),
                 confidence=medium_rule.get("conviction_level_borderline", 5) + conviction_adjust,
                 rationale=(
-                    f"Quality: {label}, but average score ({avg_score:.1f}/10) below threshold. "
-                    f"Borderline case, defaulting to NO."
+                    f"Quality: {label}. Average score ({avg_score:.1f}/10) is in the borderline band "
+                    f"({min_avg_borderline_low}-{max_avg_borderline_high}) — below the watchlist "
+                    f"threshold ({min_avg_medium_maybe}) but at or above the pass bar ({min_avg_pass}). "
+                    f"Defaulting to monitor rather than a hard pass."
                 ),
-                next_action=medium_rule.get("next_action_borderline", "Reject - borderline quality"),
+                next_action=medium_rule.get(
+                    "next_action_borderline",
+                    next_actions.get("monitor", "Monitor market and track progress"),
+                ),
                 human_review_required=False,
                 assumption_risks=assumption_risks,
             )
@@ -632,8 +836,42 @@ class PartnerDecisionEngine:
         assumption_risks: List[str],
         rules: Dict[str, Any],
     ) -> bool:
-        """True if Reviewer flagged critical unknowns that could affect the decision."""
-        return len(assumption_risks) > 0
+        """
+        True when Reviewer feedback (or non-scout risk lines) flag assumptions that
+        warrant partner escalation. Scout-only `biggest_unknown` is kept in
+        assumption_risks for transparency but does not alone trigger LLM.
+        """
+        if not assumption_risks:
+            return False
+
+        def _is_scout_biggest_unknown_line(r: str) -> bool:
+            return (r or "").strip().lower().startswith("biggest unknown:")
+
+        if any(not _is_scout_biggest_unknown_line(r) for r in assumption_risks):
+            return True
+
+        if not assumption_feedback:
+            return False
+
+        keywords = rules.get(
+            "assumption_risk_keywords",
+            [
+                "critical unknown",
+                "unvalidated assumption",
+                "weak assumption",
+                "could invalidate",
+                "unresolved",
+                "missing validation",
+            ],
+        )
+        feedback_lower = [f.lower() for f in assumption_feedback]
+        for i, fb in enumerate(assumption_feedback):
+            if any(kw in feedback_lower[i] for kw in keywords):
+                return True
+        for fb in assumption_feedback:
+            if any(w in fb.lower() for w in ("unknown", "unclear", "unvalidated", "risk")):
+                return True
+        return False
 
     def _has_missing_team(self, review_output: Dict[str, Any], rules: Dict[str, Any]) -> bool:
         """True if team_analysis is absent or only [MISSING] placeholders."""
@@ -751,6 +989,63 @@ class PartnerDecisionEngine:
             return next_actions.get("default_no", "Pass - Does not meet criteria")
         return next_actions.get("human_review_monitor", "Human review required - monitor closely")
 
+    def _compact_llm_rescue_call(
+        self,
+        uid_log: str,
+        model: str,
+        scout_output: Dict[str, Any],
+        review_output: Dict[str, Any],
+        trigger_reason: str,
+    ) -> str:
+        """
+        Final fallback call with a tiny prompt to avoid large-context/formatting failures.
+        Returns raw model text content (possibly empty).
+        """
+        compact_prompt = (
+            "Return ONLY a JSON object with keys decision, reasoning, confidence.\n"
+            "decision must be one of YES/NO/MAYBE.\n"
+            "confidence must be a number in [0,1].\n\n"
+            f"company={scout_output.get('name', 'Unknown')}\n"
+            f"verdict={review_output.get('verdict', 'MEDIUM')}\n"
+            f"scores={{market:{review_output.get('market_score', 0)},product:{review_output.get('product_score', 0)},"
+            f"technical:{review_output.get('technical_score', 0)},execution:{review_output.get('execution_score', 0)},"
+            f"defensibility:{review_output.get('defensibility_score', 'N/A')}}}\n"
+            f"trigger={trigger_reason}\n"
+        )
+        rescue_response = self.client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are a strict JSON generator."},
+                {"role": "user", "content": compact_prompt},
+            ],
+            max_completion_tokens=2048,
+        )
+        rescue_finish_reason = None
+        try:
+            rescue_finish_reason = rescue_response.choices[0].finish_reason
+        except Exception:
+            rescue_finish_reason = None
+        self.logger.info(
+            "[PARTNER] partner_llm_fallback user_id=%s compact_rescue_finish_reason=%s",
+            uid_log,
+            rescue_finish_reason,
+        )
+        if self._llm_debug_logs:
+            rescue_raw = (
+                rescue_response.model_dump_json()
+                if hasattr(rescue_response, "model_dump_json")
+                else repr(rescue_response)
+            )
+            self.logger.info(
+                "[PARTNER] partner_llm_fallback user_id=%s compact_rescue_raw_api_response=%s",
+                uid_log,
+                _log_safe_single_line(rescue_raw),
+            )
+        try:
+            return _extract_chat_message_content(rescue_response.choices[0].message)
+        except (IndexError, AttributeError):
+            return ""
+
     def _decide_with_llm(
         self,
         scout_output: Dict[str, Any],
@@ -773,9 +1068,10 @@ class PartnerDecisionEngine:
         del avg_score, avg_dims  # caller uses for post-LLM finalize + logging only
 
         self.llm_call_count += 1
+        self._record_llm_stat("fallback_invocations")
         uid_log = self.tenant_user_id[:24] if self.tenant_user_id else ""
         self.logger.warning(
-            "partner_llm_fallback user_id=%s call#=%s company=%s trigger=%s",
+            "[PARTNER] partner_llm_fallback user_id=%s call#=%s company=%s trigger=%s",
             uid_log,
             self.llm_call_count,
             scout_output.get("name", "Unknown"),
@@ -801,20 +1097,45 @@ class PartnerDecisionEngine:
             )
             result["llm_fallback_reason"] = trigger_reason
             result["prompt_version"] = hash_prompt(prompt_snapshot) if prompt_snapshot else None
+            self.logger.warning(
+                "[PARTNER] partner_llm_fallback_metrics user_id=%s stats=%s",
+                uid_log,
+                json.dumps(self._llm_stats, sort_keys=True),
+            )
             return result
 
-        _fail_msg = (
-            "The LLM call failed or returned invalid output; defaulting to MAYBE with low confidence pending human review."
-        )
+        def _synthesize_rationale() -> str:
+            """Build a real reasoning rationale from available scores and data when LLM fails."""
+            name = scout_output.get("name", "Unknown")
+            m = review_output.get("market_score", 0)
+            p = review_output.get("product_score", 0)
+            t = review_output.get("technical_score", 0)
+            e = review_output.get("execution_score", 0)
+            avg, _ = self._avg_score_and_dims(review_output)
+            v = review_output.get("derived_verdict") or review_output.get("verdict", "MEDIUM")
+            parts = [
+                f"{name} received a {v} verdict with an average score of {avg:.1f}/10",
+                f"(Market: {m}, Product: {p}, Technical: {t}, Execution: {e}).",
+            ]
+            risks = review_output.get("key_risks") or []
+            if risks:
+                parts.append(f"Key risks: {'; '.join(risks[:3])}.")
+            if assumption_risks:
+                parts.append(f"Assumption concerns: {'; '.join(assumption_risks[:2])}.")
+            parts.append(
+                f"The LLM partner analysis was unable to render a full response (trigger: {trigger_reason}). "
+                "Deferring to human review for a definitive assessment."
+            )
+            return " ".join(parts)
 
         if self.client is None:
             self.logger.warning(
-                "partner_llm_fallback user_id=%s no OpenAI client; skipping model call",
+                "[PARTNER] partner_llm_fallback user_id=%s no OpenAI client; skipping model call",
                 uid_log,
             )
             return _failure_outcome(
                 "",
-                "The LLM fallback could not run because the OpenAI client is not configured.",
+                _synthesize_rationale(),
             )
 
         try:
@@ -822,7 +1143,7 @@ class PartnerDecisionEngine:
 
             partner_rules_payload = get_partner_rules()
         except Exception as e:
-            self.logger.warning("partner_llm_fallback user_id=%s could not load partner_rules: %s", uid_log, e)
+            self.logger.warning("[PARTNER] partner_llm_fallback user_id=%s could not load partner_rules: %s", uid_log, e)
             partner_rules_payload = rules
 
         rules_json = _partner_rules_json_for_prompt(
@@ -881,6 +1202,18 @@ Respond with a single JSON object and no other text. Exactly three keys:
         prompt_for_hash = system_prompt + "\n\n" + user_prompt
 
         try:
+            self.logger.warning(
+                "[PARTNER] partner_llm_fallback user_id=%s model=%s request_started prompt_chars=%s",
+                uid_log,
+                self.model,
+                len(prompt_for_hash),
+            )
+            if self._llm_debug_logs:
+                self.logger.warning(
+                    "[PARTNER] partner_llm_fallback user_id=%s request_prompt=%s",
+                    uid_log,
+                    _log_safe_single_line(prompt_for_hash),
+                )
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -888,17 +1221,39 @@ Respond with a single JSON object and no other text. Exactly three keys:
                     {"role": "user", "content": user_prompt},
                 ],
                 response_format={"type": "json_object"},
-                max_completion_tokens=512,
+                max_completion_tokens=4096,
             )
-        except Exception as e:
+            finish_reason = None
+            try:
+                finish_reason = response.choices[0].finish_reason
+            except Exception:
+                finish_reason = None
             self.logger.warning(
-                "partner_llm_fallback user_id=%s OpenAI request failed: %s",
+                "[PARTNER] partner_llm_fallback user_id=%s finish_reason=%s",
+                uid_log,
+                finish_reason,
+            )
+            if self._llm_debug_logs:
+                raw_response = (
+                    response.model_dump_json()
+                    if hasattr(response, "model_dump_json")
+                    else repr(response)
+                )
+                self.logger.warning(
+                    "[PARTNER] partner_llm_fallback user_id=%s raw_api_response=%s",
+                    uid_log,
+                    _log_safe_single_line(raw_response),
+                )
+        except Exception as e:
+            self._record_llm_stat("request_errors")
+            self.logger.warning(
+                "[PARTNER] partner_llm_fallback user_id=%s OpenAI request failed: %s",
                 uid_log,
                 e,
             )
-            return _failure_outcome(prompt_for_hash, _fail_msg)
+            return _failure_outcome(prompt_for_hash, _synthesize_rationale())
 
-        if response.usage:
+        if getattr(response, "usage", None):
             self._last_token_usage = {
                 "prompt_tokens": response.usage.prompt_tokens,
                 "completion_tokens": response.usage.completion_tokens,
@@ -906,37 +1261,100 @@ Respond with a single JSON object and no other text. Exactly three keys:
             }
 
         try:
-            content = response.choices[0].message.content
+            content = _extract_chat_message_content(response.choices[0].message)
         except (IndexError, AttributeError):
-            content = None
+            content = ""
 
         if not content:
+            self._record_llm_stat("empty_content")
             self.logger.warning(
-                "partner_llm_fallback user_id=%s empty model content company=%s",
+                "[PARTNER] partner_llm_fallback user_id=%s empty model content company=%s; retrying without json mode",
                 uid_log,
                 scout_output.get("name", "Unknown"),
             )
-            return _failure_outcome(prompt_for_hash, _fail_msg)
+            try:
+                retry_response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    max_completion_tokens=4096,
+                )
+                retry_finish_reason = None
+                try:
+                    retry_finish_reason = retry_response.choices[0].finish_reason
+                except Exception:
+                    retry_finish_reason = None
+                self.logger.warning(
+                    "[PARTNER] partner_llm_fallback user_id=%s finish_reason_retry=%s",
+                    uid_log,
+                    retry_finish_reason,
+                )
+                if self._llm_debug_logs:
+                    retry_raw = (
+                        retry_response.model_dump_json()
+                        if hasattr(retry_response, "model_dump_json")
+                        else repr(retry_response)
+                    )
+                    self.logger.warning(
+                        "[PARTNER] partner_llm_fallback user_id=%s raw_api_response_retry=%s",
+                        uid_log,
+                        _log_safe_single_line(retry_raw),
+                    )
+                try:
+                    content = _extract_chat_message_content(retry_response.choices[0].message)
+                except (IndexError, AttributeError):
+                    content = ""
+            except Exception as e:
+                self._record_llm_stat("retry_request_errors")
+                self.logger.warning(
+                    "[PARTNER] partner_llm_fallback user_id=%s retry request failed: %s",
+                    uid_log,
+                    e,
+                )
+                content = ""
+            if not content:
+                try:
+                    content = self._compact_llm_rescue_call(
+                        uid_log=uid_log,
+                        model=self.model,
+                        scout_output=scout_output,
+                        review_output=review_output,
+                        trigger_reason=trigger_reason,
+                    )
+                except Exception as e:
+                    self._record_llm_stat("rescue_request_errors")
+                    self.logger.warning(
+                        "[PARTNER] partner_llm_fallback user_id=%s compact rescue failed: %s",
+                        uid_log,
+                        e,
+                    )
+                    content = ""
+            if not content:
+                return _failure_outcome(prompt_for_hash, _synthesize_rationale())
 
         llm_result = _parse_llm_json_object(content)
         if not llm_result:
+            self._record_llm_stat("malformed_json")
             self.logger.warning(
-                "partner_llm_fallback user_id=%s malformed JSON company=%s",
+                "[PARTNER] partner_llm_fallback user_id=%s malformed JSON company=%s",
                 uid_log,
                 scout_output.get("name", "Unknown"),
             )
-            return _failure_outcome(prompt_for_hash, _fail_msg)
+            return _failure_outcome(prompt_for_hash, _synthesize_rationale())
 
         raw_decision = llm_result.get("decision")
         decision = str(raw_decision).strip().upper() if raw_decision is not None else ""
         if decision not in ("YES", "NO", "MAYBE"):
+            self._record_llm_stat("invalid_decision")
             self.logger.warning(
-                "partner_llm_fallback user_id=%s invalid decision=%r company=%s",
+                "[PARTNER] partner_llm_fallback user_id=%s invalid decision=%r company=%s",
                 uid_log,
                 raw_decision,
                 scout_output.get("name", "Unknown"),
             )
-            return _failure_outcome(prompt_for_hash, _fail_msg)
+            return _failure_outcome(prompt_for_hash, _synthesize_rationale())
 
         reasoning = llm_result.get("reasoning") or llm_result.get("rationale") or ""
         reasoning = str(reasoning).strip()
@@ -959,4 +1377,9 @@ Respond with a single JSON object and no other text. Exactly three keys:
         )
         result["llm_fallback_reason"] = trigger_reason
         result["prompt_version"] = hash_prompt(prompt_for_hash)
+        self.logger.warning(
+            "[PARTNER] partner_llm_fallback_metrics user_id=%s stats=%s",
+            uid_log,
+            json.dumps(self._llm_stats, sort_keys=True),
+        )
         return result

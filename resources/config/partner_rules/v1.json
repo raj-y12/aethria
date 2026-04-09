@@ -17,7 +17,11 @@
       "min_avg_for_yes": 8.0,
       "decision_yes": "YES",
       "conviction_level_yes": 8,
-      "human_review_required_yes": true
+      "human_review_required_yes": true,
+      "decision_below_strong_yes_bar": "MAYBE",
+      "conviction_level_below_strong_yes_bar": 6,
+      "next_action_below_strong_yes_bar": "Monitor market and track progress",
+      "human_review_required_below_strong_yes_bar": false
     },
     "MEDIUM": {
       "min_avg_for_maybe": 7.0,
@@ -25,8 +29,8 @@
       "decision_maybe": "MAYBE",
       "conviction_level_maybe": 6,
       "conviction_level_borderline": 5,
-      "decision_borderline_no_llm": "NO",
-      "next_action_borderline": "Reject - borderline quality"
+      "decision_borderline_no_llm": "MAYBE",
+      "next_action_borderline": "Monitor market and track progress"
     }
   },
   "score_thresholds": {
@@ -67,6 +71,9 @@
   "llm_fallback_triggers": {
     "contradictory_scores": true,
     "medium_borderline_avg": true,
+    "medium_borderline_edge_window": 0.8,
+    "low_score_near_threshold": true,
+    "low_score_near_threshold_window": 0.25,
     "missing_assumptions_affecting_decision": true,
     "missing_critical_qualitative": true,
     "reviewer_disagreement": true

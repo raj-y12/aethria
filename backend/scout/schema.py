@@ -13,11 +13,15 @@ from uuid import uuid4
 import json
 import re
 
-from utils.reference_validation import is_generic_reference, is_megacap_company
+from utils.reference_validation import (
+    is_generic_reference,
+    is_megacap_company,
+    validate_references_not_only_incumbent_domains,
+)
 
 
 class ScoutOutput(TypedDict):
-    """Strict schema for Scout discoveries (hypothesis-oriented). References are mandatory."""
+    """Strict schema for Scout discoveries. `name` is always a real company; thesis fields frame the investment hypothesis about that company. References are mandatory."""
     id: str
     scout_type: str
     name: str
@@ -68,8 +72,8 @@ def validate_scout_output(data: dict) -> ScoutOutput:
     # Reject obvious mega-cap / large incumbent company names
     if is_megacap_company(data["name"]):
         raise ValueError(
-            "name appears to be a large incumbent (FAANG / hyperscaler). "
-            "Scouts must surface venture-scale startups, not mega-cap companies."
+            "name appears to be a large public or mega-scale company. "
+            "Scouts must surface venture-scale startups, not incumbents (e.g. Stripe-scale public names)."
         )
     
     # Validate confidence is between 0 and 1
@@ -108,6 +112,7 @@ def validate_scout_output(data: dict) -> ScoutOutput:
         raise ValueError(
             "references must include at least one http(s) URL per source line (prose-only citations are rejected)."
         )
+    validate_references_not_only_incumbent_domains(valid_refs)
 
     return ScoutOutput(**data)
 

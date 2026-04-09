@@ -2,6 +2,7 @@
 FastAPI server for Aethria.
 Serves app-front-end: GET /api/startups, GET/PATCH /settings.
 Per-user agent pipeline: POST /api/agents/trigger enqueues a run for the authenticated user.
+On-demand lookup uses a separate queue/worker so it is not blocked by full scout/reviewer/partner cycles.
 """
 import asyncio
 import json
@@ -15,12 +16,31 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+if load_dotenv:
+    _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+    if _ENV_PATH.exists():
+        load_dotenv(_ENV_PATH)
+    else:
+        load_dotenv()
+
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from utils.storage import Storage
-from utils.settings_loader import DEFAULT_SETTINGS, get_settings_path, load_settings, save_settings, get_meta_agent_settings, is_cost_budget_enabled
+from utils.settings_loader import (
+    DEFAULT_SETTINGS,
+    get_settings_path,
+    load_settings,
+    save_settings,
+    get_meta_agent_settings,
+    is_cost_budget_enabled,
+)
 from auth_clerk import verify_clerk_token
 from supabase_client import get_service_client
 from supabase_doc_store import list_get_all, list_get_by_id
@@ -50,11 +70,15 @@ from core import policy_resolver
 
 _agent_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _agent_worker_task: Optional[asyncio.Task] = None
+_lookup_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
+_lookup_worker_task: Optional[asyncio.Task] = None
 _logger_agents = logging.getLogger("api.agents")
+_logger_visible = logging.getLogger("uvicorn.error")
+_LOOKUP_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{8,128}$")
 
 
 async def _agent_worker() -> None:
-    """Background worker: run queued per-user pipeline jobs."""
+    """Background worker: full scout/reviewer/partner cycles only (not on-demand lookup)."""
     if _agent_queue is None:
         return
     while True:
@@ -62,17 +86,7 @@ async def _agent_worker() -> None:
             job = await _agent_queue.get()
             user_id = str(job.get("user_id") or "").strip()
             try:
-                if job.get("type") == "lookup":
-                    await run_on_demand_lookup(
-                        user_id,
-                        str(job.get("company_name") or ""),
-                        website=str(job.get("website") or "").strip() or None,
-                        lookup_query=str(job.get("lookup_query") or "").strip() or None,
-                        lookup_input_type=str(job.get("lookup_input_type") or "").strip() or None,
-                        lookup_id=str(job.get("lookup_id") or "").strip() or None,
-                    )
-                else:
-                    await run_one_pipeline_cycle(user_id)
+                await run_one_pipeline_cycle(user_id)
             except Exception as e:
                 _logger_agents.exception("Pipeline cycle error for user %s: %s", user_id[:12] if user_id else "?", e)
             finally:
@@ -81,20 +95,52 @@ async def _agent_worker() -> None:
             break
 
 
+async def _lookup_worker() -> None:
+    """Dedicated worker for POST /api/startups/lookup — does not wait behind pipeline cycles."""
+    if _lookup_queue is None:
+        return
+    while True:
+        try:
+            job = await _lookup_queue.get()
+            user_id = str(job.get("user_id") or "").strip()
+            try:
+                await run_on_demand_lookup(
+                    user_id,
+                    str(job.get("company_name") or ""),
+                    website=str(job.get("website") or "").strip() or None,
+                    lookup_query=str(job.get("lookup_query") or "").strip() or None,
+                    lookup_input_type=str(job.get("lookup_input_type") or "").strip() or None,
+                    lookup_id=str(job.get("lookup_id") or "").strip() or None,
+                )
+            except Exception as e:
+                _logger_agents.exception(
+                    "On-demand lookup error for user %s: %s",
+                    user_id[:12] if user_id else "?",
+                    e,
+                )
+            finally:
+                _lookup_queue.task_done()
+        except asyncio.CancelledError:
+            break
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    global _agent_queue, _agent_worker_task
+    global _agent_queue, _agent_worker_task, _lookup_queue, _lookup_worker_task
     _agent_queue = asyncio.Queue()
+    _lookup_queue = asyncio.Queue()
     _agent_worker_task = asyncio.create_task(_agent_worker())
-    _logger_agents.info("Per-user agent worker started")
+    _lookup_worker_task = asyncio.create_task(_lookup_worker())
+    _logger_agents.info("Pipeline agent worker + on-demand lookup worker started")
     yield
-    if _agent_worker_task:
-        _agent_worker_task.cancel()
-        try:
-            await _agent_worker_task
-        except asyncio.CancelledError:
-            pass
-    _logger_agents.info("Per-user agent worker stopped")
+    for t in (_lookup_worker_task, _agent_worker_task):
+        if t:
+            t.cancel()
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
+    _logger_agents.info("Pipeline agent worker + on-demand lookup worker stopped")
 
 
 app = FastAPI(title="Aethria API", lifespan=_lifespan)
@@ -269,7 +315,7 @@ def _get_system_health(
     # Budget status only when cost budget enforcement is enabled for this user
     budget_status: List[Dict[str, Any]] = []
     if is_cost_budget_enabled(user_id):
-        cost_controller = CostController()
+        cost_controller = CostController(user_id=user_id)
         all_budgets: Dict[str, Any] = getattr(cost_controller, "budgets", {}) or {}
         for agent_type, defaults in cost_controller.default_budgets.items():
             agent_budget = all_budgets.get(agent_type, {})
@@ -380,6 +426,14 @@ def _validate_settings(body: dict) -> list[str]:
                 v = ac["scout_serp_daily_budget"]
                 if not isinstance(v, (int, float)) or v < 0:
                     errors.append("agent_config.scout_serp_daily_budget must be a non-negative number")
+            if "scout_grounded_citations_enabled" in ac and not isinstance(ac["scout_grounded_citations_enabled"], bool):
+                errors.append("agent_config.scout_grounded_citations_enabled must be a boolean")
+            if "scout_fail_closed_on_empty_retrieval" in ac and not isinstance(ac["scout_fail_closed_on_empty_retrieval"], bool):
+                errors.append("agent_config.scout_fail_closed_on_empty_retrieval must be a boolean")
+            if "scout_retrieval_provider" in ac:
+                v = ac["scout_retrieval_provider"]
+                if not isinstance(v, str) or v not in ("tavily", "serpapi"):
+                    errors.append("agent_config.scout_retrieval_provider must be one of: tavily, serpapi")
     fi = body.get("fund_identity")
     if fi is not None:
         if not isinstance(fi, dict):
@@ -634,6 +688,30 @@ def get_startups(request: Request):
     return [_thin_list_from_full_frontend(x) for x in full]
 
 
+@app.get("/api/startups/lookup-status")
+async def lookup_job_status(request: Request, lookup_id: str = ""):
+    """
+    Poll after POST /api/startups/lookup: if the worker recorded a failure, returns failed=true and message.
+    """
+    uid = request.state.user_id
+    raw = (lookup_id or "").strip()
+    if not raw or not _LOOKUP_ID_RE.match(raw):
+        raise HTTPException(
+            status_code=422,
+            detail="lookup_id query parameter must be 8-128 characters [a-zA-Z0-9_-]",
+        )
+    if os.getenv("USE_SUPABASE_STORAGE", "").lower() not in ("1", "true", "yes"):
+        return {"lookup_id": raw, "failed": False}
+    row = list_get_by_id("lookup_job_outcomes", raw, user_id=uid)
+    if not row or row.get("status") != "failed":
+        return {"lookup_id": raw, "failed": False}
+    return {
+        "lookup_id": raw,
+        "failed": True,
+        "message": str(row.get("message") or "Lookup failed."),
+    }
+
+
 @app.get("/api/startups/{startup_id}")
 def get_startup_detail(request: Request, startup_id: str):
     """Full scout/review/partner JSON for one startup (on-demand; not used for grid polling)."""
@@ -648,14 +726,17 @@ def get_startup_detail(request: Request, startup_id: str):
 def get_startup_memo(request: Request, startup_id: str):
     """
     Memo readiness + optional persisted markdown (Supabase).
-    Never blocks on memo generation: returns partial scout/review/partner while pipeline runs.
+    Never blocks on memo generation.
     Response: { status, memo, partial?, pipeline_run_id, error }.
     """
     from pipeline_state import get_pipeline_state_row
 
     storage = _get_storage(request)
     uid = request.state.user_id
-    startup = storage.get_startup(startup_id)
+    if isinstance(storage, SupabaseStartupsStorage):
+        startup = storage.get_startup_for_memo(startup_id)
+    else:
+        startup = storage.get_startup(startup_id)
     if not startup:
         raise HTTPException(status_code=404, detail="Startup not found")
 
@@ -666,10 +747,10 @@ def get_startup_memo(request: Request, startup_id: str):
         err_from_row = row.get("error") if row else None
 
         md = (startup.investment_memo_markdown or "").strip()
-        partial = _memo_partial_payload(startup)
         pr_str = str(pr_from_row) if pr_from_row else None
 
         if state_status == "failed":
+            partial = _memo_partial_payload(startup)
             return {
                 "status": "failed",
                 "memo": None,
@@ -690,7 +771,7 @@ def get_startup_memo(request: Request, startup_id: str):
         return {
             "status": "generating",
             "memo": None,
-            "partial": partial,
+            "partial": None,
             "pipeline_run_id": pr_str,
             "error": None,
         }
@@ -881,10 +962,11 @@ async def agents_status(request: Request):
     if supabase_configured:
         try:
             t = get_active_thesis(get_service_client(), request.state.user_id)
-            thesis_ready = True
-            active_thesis_version_id = t.version_id
-        except FundThesisMissingError:
-            thesis_error = "missing"
+            if t is None:
+                thesis_error = "missing"
+            else:
+                thesis_ready = True
+                active_thesis_version_id = t.version_id
         except FundThesisIncompleteError:
             thesis_error = "incomplete"
         except Exception as e:
@@ -914,8 +996,8 @@ def api_get_fund_thesis(request: Request):
     client = get_service_client()
     try:
         active = get_active_thesis(client, uid)
-    except FundThesisMissingError:
-        raise HTTPException(status_code=404, detail="No fund thesis yet. POST /api/fund-thesis/versions with raw_text.")
+        if active is None:
+            raise HTTPException(status_code=404, detail="No fund thesis yet. POST /api/fund-thesis/versions with raw_text.")
     except FundThesisIncompleteError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
@@ -981,15 +1063,15 @@ def get_fund_thesis_runtime(request: Request):
     client = get_service_client()
     try:
         active = get_active_thesis(client, uid)
-    except FundThesisMissingError:
-        return JSONResponse(
-            status_code=200,
-            content={
-                "mode": "missing",
-                "embedding_status": "pending",
-                "has_embeddings": False,
-            },
-        )
+        if active is None:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "mode": "missing",
+                    "embedding_status": "pending",
+                    "has_embeddings": False,
+                },
+            )
     except FundThesisIncompleteError as e:
         return JSONResponse(
             status_code=200,
@@ -1155,9 +1237,9 @@ async def api_post_fund_thesis_reprocess_missing(
 
     if not dry_run:
         try:
-            get_active_thesis(client, uid)
-        except FundThesisMissingError:
-            raise HTTPException(status_code=400, detail="No active thesis")
+            thesis = get_active_thesis(client, uid)
+            if thesis is None:
+                raise HTTPException(status_code=400, detail="No active thesis")
         except FundThesisIncompleteError as e:
             raise HTTPException(status_code=400, detail=str(e))
         if not os.getenv("OPENAI_API_KEY", "").strip():
@@ -1183,37 +1265,75 @@ async def trigger_agents(request: Request):
     user_id = request.state.user_id
     use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
     if not use_supabase:
+        _logger_agents.info(
+            "trigger_agents skipped user=%s reason=supabase_required",
+            user_id[:12],
+        )
         return JSONResponse(
             status_code=200,
             content={"status": "skipped", "reason": "supabase_required"},
         )
-    settings = load_settings(user_id)
+    try:
+        settings = load_settings(user_id)
+    except Exception as e:
+        _logger_agents.warning(
+            "trigger_agents skipped user=%s reason=settings_unavailable error=%s",
+            user_id[:12],
+            e,
+        )
+        # Fail closed: without real agent_config we cannot honor "all agents off" and
+        # empty dict would default every gate to True (unexpected new discoveries).
+        return JSONResponse(
+            status_code=200,
+            content={"status": "skipped", "reason": "settings_unavailable"},
+        )
     ac = settings.get("agent_config") or {}
     if not (ac.get("scouts_enabled", True) or ac.get("reviewers_enabled", True) or ac.get("partners_enabled", True)):
+        _logger_agents.info(
+            "trigger_agents skipped user=%s reason=agents_disabled",
+            user_id[:12],
+        )
         return JSONResponse(
             status_code=200,
             content={"status": "skipped", "reason": "agents_disabled"},
         )
     if _agent_queue is None:
+        _logger_agents.warning(
+            "trigger_agents unavailable user=%s reason=worker_not_ready",
+            user_id[:12],
+        )
         return JSONResponse(
             status_code=503,
             content={"status": "unavailable", "reason": "worker_not_ready"},
         )
     try:
-        get_active_thesis(get_service_client(), user_id)
-    except (FundThesisMissingError, FundThesisIncompleteError):
+        thesis = get_active_thesis(get_service_client(), user_id)
+        if thesis is None:
+            _logger_agents.info(
+                "trigger_agents skipped user=%s reason=thesis_required",
+                user_id[:12],
+            )
+            return JSONResponse(
+                status_code=200,
+                content={"status": "skipped", "reason": "thesis_required"},
+            )
+    except FundThesisIncompleteError:
+        _logger_agents.info(
+            "trigger_agents skipped user=%s reason=thesis_required_incomplete",
+            user_id[:12],
+        )
         return JSONResponse(
             status_code=200,
             content={"status": "skipped", "reason": "thesis_required"},
         )
     await _agent_queue.put({"type": "cycle", "user_id": user_id})
+    _logger_agents.info("trigger_agents queued user=%s", user_id[:12])
+    _logger_visible.info("trigger_agents queued user=%s", user_id[:12])
     return JSONResponse(
         status_code=202,
         content={"status": "queued", "user_id": user_id},
     )
 
-
-_LOOKUP_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{8,128}$")
 
 
 def _coerce_lookup_id(raw: Any) -> str:
@@ -1261,34 +1381,10 @@ def _parse_lookup_input(lookup_input: str) -> Dict[str, Optional[str]]:
     }
 
 
-@app.get("/api/startups/lookup-status")
-async def lookup_job_status(request: Request, lookup_id: str = ""):
-    """
-    Poll after POST /api/startups/lookup: if the worker recorded a failure, returns failed=true and message.
-    """
-    uid = request.state.user_id
-    raw = (lookup_id or "").strip()
-    if not raw or not _LOOKUP_ID_RE.match(raw):
-        raise HTTPException(
-            status_code=422,
-            detail="lookup_id query parameter must be 8-128 characters [a-zA-Z0-9_-]",
-        )
-    if os.getenv("USE_SUPABASE_STORAGE", "").lower() not in ("1", "true", "yes"):
-        return {"lookup_id": raw, "failed": False}
-    row = list_get_by_id("lookup_job_outcomes", raw, user_id=uid)
-    if not row or row.get("status") != "failed":
-        return {"lookup_id": raw, "failed": False}
-    return {
-        "lookup_id": raw,
-        "failed": True,
-        "message": str(row.get("message") or "Lookup failed."),
-    }
-
-
 @app.post("/api/startups/lookup")
 async def lookup_startup(request: Request, body: Dict[str, Any]):
     """
-    Queue a focused on-demand company lookup for the current user.
+    Enqueue on-demand company lookup on the dedicated lookup worker (not the main pipeline queue).
     Body: {"lookup_input": "...", "lookup_id": optional stable id (recommended; else server-generated)}.
     Backward compatible with {"company_name": "..."}.
     """
@@ -1302,15 +1398,14 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
     company_name = str(parsed.get("company_name") or "").strip()
     if not company_name:
         raise HTTPException(status_code=422, detail="Could not derive company name from lookup_input")
-    if _agent_queue is None:
+    if _lookup_queue is None:
         return JSONResponse(
             status_code=503,
-            content={"status": "unavailable", "reason": "worker_not_ready"},
+            content={"status": "unavailable", "reason": "lookup_worker_not_ready"},
         )
     user_id = request.state.user_id
-    await _agent_queue.put(
+    await _lookup_queue.put(
         {
-            "type": "lookup",
             "user_id": user_id,
             "company_name": company_name,
             "website": parsed.get("website"),

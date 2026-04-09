@@ -87,7 +87,7 @@ class PortfolioEngine:
         self.feedback_loop = FeedbackLoop(
             self.portfolio_store, discovery_storage=discovery_storage,
         )
-        self.cost_controller = CostController()
+        self.cost_controller = CostController(user_id=tenant_uid)
         self.health_monitor = HealthMonitor(self.portfolio_store, discovery_storage=self.discovery_storage)
         self.cluster_analyzer = ClusterAnalyzer(user_id=offline)
         

@@ -27,6 +27,8 @@ logger = logging.getLogger("auth_clerk")
 
 _CLERK_JWKS_URL = os.getenv("CLERK_JWKS_URL")
 _CLERK_ISSUER = os.getenv("CLERK_ISSUER")  # optional, e.g. https://xxx.clerk.accounts.dev
+# Seconds of tolerance for iat/nbf/exp vs local clock (avoids "token is not yet valid (iat)" when skewed).
+_CLERK_JWT_LEEWAY = int(os.getenv("CLERK_JWT_LEEWAY_SECONDS", "60"))
 _JWK_CLIENT: Optional[PyJWKClient] = PyJWKClient(_CLERK_JWKS_URL) if _CLERK_JWKS_URL else None
 
 
@@ -48,7 +50,7 @@ def verify_clerk_token(token: str) -> Optional[str]:
             return None
         signing_key = _JWK_CLIENT.get_signing_key_from_jwt(token)
         opts = {"verify_aud": False}
-        kwargs = {"algorithms": ["RS256"]}
+        kwargs = {"algorithms": ["RS256"], "leeway": _CLERK_JWT_LEEWAY}
         if _CLERK_ISSUER:
             kwargs["issuer"] = _CLERK_ISSUER
         try:
@@ -61,6 +63,10 @@ def verify_clerk_token(token: str) -> Optional[str]:
         except jwt.ExpiredSignatureError:
             # Normal when SPA has a stale token for a short window; frontend retries with refresh.
             logger.info("Clerk JWT expired; request requires token refresh")
+            return None
+        except jwt.ImmatureSignatureError:
+            # iat/nbf still in the future after leeway — usually severe clock skew.
+            logger.info("Clerk JWT not yet valid; check system time or increase CLERK_JWT_LEEWAY_SECONDS")
             return None
         except jwt.InvalidIssuerError as e:
             logger.warning("Clerk JWT issuer mismatch (token iss may differ from CLERK_ISSUER). Retrying without issuer check: %s", e)

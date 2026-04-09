@@ -375,22 +375,17 @@ def _bootstrap_default_thesis_or_raise(client: Any, uid: str) -> None:
     logger.info("[FundThesis] Auto-created default thesis for user_id=%s", uid[:24])
 
 
-def get_active_thesis(client: Any, user_id: str) -> ActiveThesis:
+def get_active_thesis(client: Any, user_id: str) -> Optional[ActiveThesis]:
     """
-    Resolve fund_thesis row and active version from Supabase. Embeddings optional ([] if absent).
-
-    On FundThesisMissingError only: persists a deterministic default thesis (no OpenAI), then returns it.
+    Resolve fund_thesis row and active version from Supabase (read-only).
+    Returns None when no thesis exists for the user.
+    Embeddings are optional ([] if absent).
     """
     uid = require_user_id(user_id, context="get_active_thesis")
     try:
         return _resolve_active_thesis_unsafe(client, uid)
     except FundThesisMissingError:
-        try:
-            return _resolve_active_thesis_unsafe(client, uid)
-        except FundThesisMissingError:
-            pass
-        _bootstrap_default_thesis_or_raise(client, uid)
-        return _resolve_active_thesis_unsafe(client, uid)
+        return None
 
 
 def count_user_startups(client: Any, user_id: str) -> int:

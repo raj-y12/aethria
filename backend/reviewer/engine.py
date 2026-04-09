@@ -78,6 +78,7 @@ class ReviewerEngine:
         
         self.logger = logging.getLogger("reviewer.engine")
         self.running = False
+        self.last_cycle_stats: Dict[str, Any] = {}
 
     def set_active_thesis(self, thesis: Optional[Dict[str, Any]]) -> None:
         self.active_thesis = thesis
@@ -180,6 +181,15 @@ class ReviewerEngine:
         except Exception as e:
             self.logger.debug("resource fund thesis alignment skipped: %s", e)
 
+    @staticmethod
+    def _coerce_confidence_threshold(raw: Any, default: float = 0.5) -> float:
+        """Parse settings threshold safely and clamp to [0, 1]."""
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return default
+        return max(0.0, min(1.0, value))
+
     async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> int:
         """
         Run one review cycle.
@@ -190,6 +200,16 @@ class ReviewerEngine:
             Number of entries reviewed in this cycle
         """
         self.logger.info(f"Starting review cycle at {datetime.now().isoformat()}")
+        if not is_reviewers_enabled(self.tenant_user_id):
+            self.logger.info("Review cycle skipped (reviewers disabled in settings)")
+            self.last_cycle_stats = {
+                "reviewed_count": 0,
+                "skipped_low_confidence": 0,
+                "candidates_seen": 0,
+                "confidence_threshold": None,
+                "reason": "agents_disabled",
+            }
+            return 0
         self._sync_thesis_to_reviewers()
 
         # Check budget before reviewing
@@ -197,6 +217,13 @@ class ReviewerEngine:
             allowed, reason = self.cost_controller.check_budget("reviewer", "reviewer_engine")
             if not allowed:
                 self.logger.warning(f"Reviewer budget denied: {reason}")
+                self.last_cycle_stats = {
+                    "reviewed_count": 0,
+                    "skipped_low_confidence": 0,
+                    "candidates_seen": 0,
+                    "confidence_threshold": None,
+                    "reason": "budget_denied",
+                }
                 return 0
         
         # Ramp-up: process more per cycle when unreviewed backlog is high
@@ -209,22 +236,27 @@ class ReviewerEngine:
             )
         else:
             effective_batch = min(self.batch_size, unreviewed_count) if unreviewed_count else 0
-        unreviewed_startups = self.storage.get_unreviewed(limit=effective_batch)
-        
-        if not unreviewed_startups:
+        if effective_batch <= 0:
             self.logger.info("No unreviewed entries found")
+            self.last_cycle_stats = {
+                "reviewed_count": 0,
+                "skipped_low_confidence": 0,
+                "candidates_seen": 0,
+                "confidence_threshold": None,
+                "reason": "no_unreviewed",
+            }
             return 0
         
-        # Sort by confidence_score descending (highest confidence first)
-        unreviewed_startups.sort(
-            key=lambda s: s.scout_info.confidence_score, reverse=True
-        )
-        
-        self.logger.info(f"Found {len(unreviewed_startups)} unreviewed entries")
-        
         # Load confidence threshold from settings
-        settings = load_settings(self.tenant_user_id)
-        confidence_threshold = settings.get("agent_config", {}).get("confidence_threshold", 0.5)
+        try:
+            settings = load_settings(self.tenant_user_id)
+        except Exception as e:
+            self.logger.warning("Reviewer settings unavailable, using defaults: %s", e)
+            settings = {"agent_config": {}}
+        confidence_threshold = self._coerce_confidence_threshold(
+            (settings.get("agent_config") or {}).get("confidence_threshold", 0.2),
+            default=0.2,
+        )
 
         # Apply calibration override if present
         try:
@@ -232,21 +264,56 @@ class ReviewerEngine:
             cal_state = load_calibration_state(self.tenant_user_id)
             ct_override = cal_state.get("confidence_threshold_override")
             if ct_override is not None:
-                confidence_threshold = ct_override
+                confidence_threshold = self._coerce_confidence_threshold(ct_override, default=confidence_threshold)
                 self.logger.debug(f"Using calibration override: confidence_threshold={ct_override}")
         except ImportError:
             pass
 
+        # Look ahead beyond effective_batch so one low-confidence stale row cannot
+        # block all reviewer throughput for the cycle.
+        lookahead_limit = min(
+            max(effective_batch * 8, 20),
+            max(unreviewed_count, effective_batch),
+            500,
+        )
+        unreviewed_startups = self.storage.get_unreviewed(limit=lookahead_limit)
+
+        if not unreviewed_startups:
+            self.logger.info("No unreviewed entries found")
+            self.last_cycle_stats = {
+                "reviewed_count": 0,
+                "skipped_low_confidence": 0,
+                "candidates_seen": 0,
+                "confidence_threshold": confidence_threshold,
+                "reason": "no_candidates",
+            }
+            return 0
+
+        # Sort by confidence_score descending (highest confidence first)
+        unreviewed_startups.sort(
+            key=lambda s: s.scout_info.confidence_score, reverse=True
+        )
+
+        self.logger.info(
+            "Found %s unreviewed entries (lookahead=%s, target_reviews=%s, threshold=%.2f, top_conf=%.2f, bottom_conf=%.2f)",
+            len(unreviewed_startups),
+            lookahead_limit,
+            effective_batch,
+            confidence_threshold,
+            unreviewed_startups[0].scout_info.confidence_score if unreviewed_startups else 0,
+            unreviewed_startups[-1].scout_info.confidence_score if unreviewed_startups else 0,
+        )
+
         reviewed_count = 0
+        skipped_low_confidence = 0
         
         # Process each startup
         for startup in unreviewed_startups:
+            if reviewed_count >= effective_batch:
+                break
             confidence_score = startup.scout_info.confidence_score
             if confidence_score < confidence_threshold:
-                self.logger.info(
-                    f"Below confidence threshold ({confidence_score:.2f} < {confidence_threshold}), "
-                    f"skipping {startup.scout_info.name}"
-                )
+                skipped_low_confidence += 1
                 continue
             entry_id = startup.startup_id
             scout_output: dict = {
@@ -352,19 +419,10 @@ class ReviewerEngine:
                 # Build SingleReview list for storage
                 from models import SingleReview
                 single_reviews = []
-                type_map = {
-                    "default": "DefaultReviewer",
-                    "skeptical": "SkepticalReviewer",
-                    "opportunist": "OpportunistReviewer",
-                }
+                _valid_reviewer_types = ("DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer")
                 for r in successful_results:
-                    raw_type = r.get("reviewer_type", "DefaultReviewer")
-                    reviewer_label = type_map.get(raw_type, raw_type)
-                    if reviewer_label not in (
-                        "DefaultReviewer",
-                        "SkepticalReviewer",
-                        "OpportunistReviewer",
-                    ):
+                    reviewer_label = r.get("reviewer_type", "DefaultReviewer")
+                    if reviewer_label not in _valid_reviewer_types:
                         reviewer_label = "DefaultReviewer"
                     single_reviews.append(SingleReview(
                         reviewer_type=reviewer_label,
@@ -450,8 +508,18 @@ class ReviewerEngine:
                 continue
         
         self.logger.info(
-            f"Review cycle complete: {reviewed_count}/{len(unreviewed_startups)} reviews successful"
+            "Review cycle complete: reviewed=%s skipped_low_confidence=%s candidates_seen=%s",
+            reviewed_count,
+            skipped_low_confidence,
+            len(unreviewed_startups),
         )
+        self.last_cycle_stats = {
+            "reviewed_count": reviewed_count,
+            "skipped_low_confidence": skipped_low_confidence,
+            "candidates_seen": len(unreviewed_startups),
+            "confidence_threshold": confidence_threshold,
+            "reason": "ok",
+        }
         
         return reviewed_count
 
@@ -461,10 +529,15 @@ class ReviewerEngine:
         ignore_confidence_threshold: bool = False,
         pipeline_run_id: Optional[str] = None,
         force_rerun: bool = False,
+        *,
+        bypass_agent_enabled_gate: bool = False,
     ) -> bool:
         """
         Review one specific startup id.
         Returns True when a review is saved.
+
+        bypass_agent_enabled_gate: when True, run even if reviewers are disabled in settings
+        (used for occasional on-demand company lookup only).
         """
         startup = self.storage.get_startup(startup_id)
         if startup is None:
@@ -473,15 +546,25 @@ class ReviewerEngine:
         if startup.review_info is not None and not force_rerun:
             self.logger.info("Startup already reviewed: %s", startup_id)
             return True
+        if not bypass_agent_enabled_gate and not is_reviewers_enabled(self.tenant_user_id):
+            self.logger.info("run_startup skipped (reviewers disabled in settings): %s", startup_id)
+            return False
 
-        settings = load_settings(self.tenant_user_id)
-        confidence_threshold = settings.get("agent_config", {}).get("confidence_threshold", 0.5)
+        try:
+            settings = load_settings(self.tenant_user_id)
+        except Exception as e:
+            self.logger.warning("Reviewer settings unavailable for run_startup, using defaults: %s", e)
+            settings = {"agent_config": {}}
+        confidence_threshold = self._coerce_confidence_threshold(
+            (settings.get("agent_config") or {}).get("confidence_threshold", 0.2),
+            default=0.2,
+        )
         try:
             from meta.calibrator import load_calibration_state
             cal_state = load_calibration_state(self.tenant_user_id)
             ct_override = cal_state.get("confidence_threshold_override")
             if ct_override is not None:
-                confidence_threshold = ct_override
+                confidence_threshold = self._coerce_confidence_threshold(ct_override, default=confidence_threshold)
         except ImportError:
             pass
 
@@ -557,19 +640,10 @@ class ReviewerEngine:
             from models import SingleReview
             from utils.adapters import reviewer_output_to_review_info
             single_reviews = []
-            type_map = {
-                "default": "DefaultReviewer",
-                "skeptical": "SkepticalReviewer",
-                "opportunist": "OpportunistReviewer",
-            }
+            _valid_reviewer_types = ("DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer")
             for r in successful_results:
-                raw_type = r.get("reviewer_type", "DefaultReviewer")
-                reviewer_label = type_map.get(raw_type, raw_type)
-                if reviewer_label not in (
-                    "DefaultReviewer",
-                    "SkepticalReviewer",
-                    "OpportunistReviewer",
-                ):
+                reviewer_label = r.get("reviewer_type", "DefaultReviewer")
+                if reviewer_label not in _valid_reviewer_types:
                     reviewer_label = "DefaultReviewer"
                 single_reviews.append(SingleReview(
                     reviewer_type=reviewer_label,

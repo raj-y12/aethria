@@ -14,6 +14,7 @@ from scout.scouts import (
     PainPointScout,
     ContrarianScout,
 )
+from scout.base import Scout
 from scout.schema import ScoutOutput
 from utils.storage import Storage
 from tenant_context import require_user_id
@@ -75,6 +76,12 @@ class ScoutEngine:
         self.backpressure_threshold = int(
             os.getenv("SCOUT_BACKPRESSURE_THRESHOLD", "10")
         )
+        # When the unreviewed queue is thin, run multiple parallel scout waves per cycle
+        # so the pipeline keeps getting fresh leads (reviewer-style ramp, inverted for inbound).
+        self.scout_ramp_threshold = int(os.getenv("SCOUT_RAMP_THRESHOLD", "5"))
+        self.scout_ramp_max_waves = max(
+            1, min(int(os.getenv("SCOUT_RAMP_MAX_WAVES", "2")), 4)
+        )
         self.logger = logging.getLogger("scout.engine")
         self.running = False
 
@@ -86,39 +93,11 @@ class ScoutEngine:
     def _sync_thesis_to_scouts(self) -> None:
         for s in self.scouts:
             s.set_fund_thesis(self.active_thesis)
-    
-    async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> List[ScoutOutput]:
-        """
-        Run one discovery cycle with all Scouts in parallel.
-        
-        Returns:
-            List of valid ScoutOutputs (may be empty if all Scouts fail)
-        """
-        self.logger.info(f"Starting discovery cycle at {datetime.now().isoformat()}")
-        self._sync_thesis_to_scouts()
 
-        # Backpressure: skip discovery when too many unreviewed (let reviewers catch up)
-        if self.storage is not None:
-            try:
-                unreviewed = self.storage.count_unreviewed()
-                if unreviewed > self.backpressure_threshold:
-                    self.logger.warning(
-                        f"Backpressure: {unreviewed} unreviewed exceeds threshold "
-                        f"({self.backpressure_threshold}), skipping scout cycle"
-                    )
-                    return []
-            except Exception as e:
-                self.logger.debug("Could not get unreviewed count for backpressure: %s", e)
-        
-        # Check budget before running scouts
-        if self.cost_controller:
-            allowed, reason = self.cost_controller.check_budget("scout", "scout_engine")
-            if not allowed:
-                self.logger.warning(f"Scout budget denied: {reason}")
-                return []
-        
-        # Load scout weights for weighted selection
+    def _select_scouts_for_wave(self) -> List[Scout]:
+        """Pick which scouts run this wave (meta weights or all four)."""
         import random
+
         try:
             from meta.reweighter import load_weights
 
@@ -129,20 +108,19 @@ class ScoutEngine:
                 "pain_point": "PainPointScout",
                 "contrarian": "ContrarianScout",
             }
-            weight_list = [weights.get(scout_type_to_name.get(s.scout_type, ""), 0.25) for s in self.scouts]
-            # Select scouts with weighted probability, minimum 2
-            num_to_run = max(2, len(self.scouts))  # default: run all 4
-            selected_indices = set()
+            weight_list = [
+                weights.get(scout_type_to_name.get(s.scout_type, ""), 0.25) for s in self.scouts
+            ]
             if any(w != 0.25 for w in weight_list):
-                # Weighted selection: pick scouts_per_cycle with replacement, then deduplicate
                 scouts_per_cycle = 4
-                choices = random.choices(range(len(self.scouts)), weights=weight_list, k=scouts_per_cycle * 2)
-                selected_indices = set()
+                choices = random.choices(
+                    range(len(self.scouts)), weights=weight_list, k=scouts_per_cycle * 2
+                )
+                selected_indices: set = set()
                 for c in choices:
                     selected_indices.add(c)
                     if len(selected_indices) >= scouts_per_cycle:
                         break
-                # Ensure minimum 2
                 if len(selected_indices) < 2:
                     all_indices = list(range(len(self.scouts)))
                     random.shuffle(all_indices)
@@ -150,87 +128,133 @@ class ScoutEngine:
                         selected_indices.add(idx)
                         if len(selected_indices) >= 2:
                             break
-                selected_scouts = [self.scouts[i] for i in selected_indices]
-            else:
-                selected_scouts = self.scouts
+                return [self.scouts[i] for i in selected_indices]
+            return self.scouts
         except ImportError:
-            selected_scouts = self.scouts
+            return self.scouts
+    
+    async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> List[ScoutOutput]:
+        """
+        Run one discovery cycle with all Scouts in parallel.
+        
+        Returns:
+            List of valid ScoutOutputs (may be empty if all Scouts fail)
+        """
+        self.logger.info(f"Starting discovery cycle at {datetime.now().isoformat()}")
+        if not is_scouts_enabled(self.tenant_user_id):
+            self.logger.info("Discovery cycle skipped (scouts disabled in settings)")
+            return []
+        self._sync_thesis_to_scouts()
 
-        # Set dynamic context from deal memory for each scout
-        if self.deal_memory:
-            memory_context = self.deal_memory.get_memory_context_for_scout()
-            for scout in self.scouts:
-                scout.set_dynamic_context(memory_context)
-        
-        # Run all Scouts in parallel
-        tasks = [scout._discover_with_validation() for scout in selected_scouts]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Collect valid outputs
+        unreviewed: Optional[int] = None
+        if self.storage is not None:
+            try:
+                unreviewed = self.storage.count_unreviewed()
+            except Exception as e:
+                self.logger.debug("Could not get unreviewed count: %s", e)
+
+        # Backpressure: skip discovery when too many unreviewed (let reviewers catch up)
+        if unreviewed is not None and unreviewed > self.backpressure_threshold:
+            self.logger.warning(
+                f"Backpressure: {unreviewed} unreviewed exceeds threshold "
+                f"({self.backpressure_threshold}), skipping scout cycle"
+            )
+            return []
+
+        waves = 1
+        if (
+            unreviewed is not None
+            and unreviewed <= self.scout_ramp_threshold
+            and self.scout_ramp_max_waves > 1
+        ):
+            waves = self.scout_ramp_max_waves
+            self.logger.info(
+                "Scout ramp: unreviewed=%s <= threshold=%s, running %s parallel waves this cycle",
+                unreviewed,
+                self.scout_ramp_threshold,
+                waves,
+            )
+
         discoveries: List[ScoutOutput] = []
-        for i, result in enumerate(results):
-            scout = selected_scouts[i]
-            
-            if isinstance(result, Exception):
-                self.logger.error(
-                    f"[{scout.scout_type}] Discovery failed with exception: {result}"
-                )
-            elif result is None:
-                self.logger.warning(f"[{scout.scout_type}] Discovery returned None")
-            else:
-                # Check for duplicate thesis via deal memory
-                if self.deal_memory:
-                    thesis = result.get("primary_thesis", "")
-                    if self.deal_memory.is_duplicate_thesis(thesis):
-                        self.logger.info(
-                            f"[{scout.scout_type}] Skipping duplicate thesis: "
-                            f"{result['name']}"
-                        )
-                        continue
-
-                # Stamp prompt_version so downstream storage can persist which prompt produced this discovery
-                try:
-                    result = dict(result)
-                    result["prompt_version"] = hash_prompt(getattr(scout, "system_prompt", ""))
-                except Exception:
-                    # If hashing fails, leave prompt_version unset
-                    result = dict(result)
-
-                discoveries.append(result)
-                self.logger.info(
-                    f"[{scout.scout_type}] Discovered: {result['name']} "
-                    f"(confidence: {result['confidence']:.2f})"
-                )
-                
-                # Record token usage if cost controller exists
-                if self.cost_controller:
-                    self.cost_controller.record_usage(
-                        "scout", scout.scout_type, scout._last_token_usage
+        for wave_idx in range(waves):
+            if self.cost_controller:
+                allowed, reason = self.cost_controller.check_budget("scout", "scout_engine")
+                if not allowed:
+                    self.logger.warning(
+                        "Scout budget denied (wave %s/%s): %s", wave_idx + 1, waves, reason
                     )
-                
-                # Persist to storage if available
-                if self.storage:
+                    break
+
+            selected_scouts = self._select_scouts_for_wave()
+
+            if self.deal_memory:
+                memory_context = self.deal_memory.get_memory_context_for_scout()
+                for scout in self.scouts:
+                    scout.set_dynamic_context(memory_context)
+
+            tasks = [scout._discover_with_validation() for scout in selected_scouts]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for i, result in enumerate(results):
+                scout = selected_scouts[i]
+
+                if isinstance(result, Exception):
+                    self.logger.error(
+                        f"[{scout.scout_type}] Discovery failed with exception: {result}"
+                    )
+                elif result is None:
+                    self.logger.warning(f"[{scout.scout_type}] Discovery returned None")
+                else:
+                    if self.deal_memory:
+                        thesis = result.get("primary_thesis", "")
+                        if self.deal_memory.is_duplicate_thesis(thesis):
+                            self.logger.info(
+                                f"[{scout.scout_type}] Skipping duplicate thesis: "
+                                f"{result['name']}"
+                            )
+                            continue
+
                     try:
-                        self.storage.add_discovery(result, pipeline_run_id=pipeline_run_id)
-                    except Exception as e:
-                        self.logger.error(
-                            f"Failed to persist discovery {result.get('id')}: {e}"
+                        result = dict(result)
+                        result["prompt_version"] = hash_prompt(getattr(scout, "system_prompt", ""))
+                    except Exception:
+                        result = dict(result)
+
+                    discoveries.append(result)
+                    self.logger.info(
+                        f"[{scout.scout_type}] Discovered: {result['name']} "
+                        f"(confidence: {result['confidence']:.2f})"
+                    )
+
+                    if self.cost_controller:
+                        self.cost_controller.record_usage(
+                            "scout", scout.scout_type, scout._last_token_usage
                         )
-                
-                # Record scout discovery in deal memory
-                if self.deal_memory:
-                    try:
-                        self.deal_memory.record_scout_discovery(
-                            result.get("sector", ""),
-                            result.get("primary_thesis", ""),
-                        )
-                    except Exception as e:
-                        self.logger.error(f"Failed to record in deal memory: {e}")
-        
+
+                    if self.storage:
+                        try:
+                            self.storage.add_discovery(result, pipeline_run_id=pipeline_run_id)
+                        except Exception as e:
+                            self.logger.error(
+                                f"Failed to persist discovery {result.get('id')}: {e}"
+                            )
+
+                    if self.deal_memory:
+                        try:
+                            self.deal_memory.record_scout_discovery(
+                                result.get("sector", ""),
+                                result.get("primary_thesis", ""),
+                            )
+                        except Exception as e:
+                            self.logger.error(f"Failed to record in deal memory: {e}")
+
         self.logger.info(
-            f"Cycle complete: {len(discoveries)}/{len(self.scouts)} discoveries successful"
+            "Cycle complete: %s discoveries successful across %s wave(s) (scouts=%s)",
+            len(discoveries),
+            waves,
+            len(self.scouts),
         )
-        
+
         return discoveries
 
     async def run_named_lookup(

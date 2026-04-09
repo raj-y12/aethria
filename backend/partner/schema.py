@@ -48,6 +48,10 @@ def validate_partner_output(data: dict) -> PartnerOutput:
                 f"Field '{field}' must be of type {field_type.__name__}, "
                 f"got {type(data[field]).__name__}"
             )
+    if not data["rationale"].strip():
+        raise ValueError("rationale must be a non-empty string")
+    if not data["next_action"].strip():
+        raise ValueError("next_action must be a non-empty string")
 
     if data["decision"] not in VALID_DECISIONS:
         raise ValueError(

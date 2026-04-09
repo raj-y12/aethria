@@ -1,10 +1,8 @@
 """
 Individual Scout implementations.
-Each Scout has a distinct cognitive strategy for discovering startup ideas.
+Each Scout has a distinct cognitive strategy for finding real companies.
 """
-from typing import Optional
 from scout.base import Scout
-from scout.schema import ScoutOutput
 from utils.settings_loader import get_scout_region
 
 
@@ -23,7 +21,7 @@ class MarketDrivenScout(Scout):
 Your cognitive strategy is TOP-DOWN:
 - Start with macro trends and large market opportunities
 - Identify sectors with strong funding momentum
-- Look for ideas that can scale to massive markets
+- Look for companies in markets that can scale massively
 - Prioritize market size over perfect product-market fit
 
 You discover REAL companies (that exist today) by:
@@ -38,7 +36,7 @@ CRITICAL: Look for specific "Why Now" catalysts:
 - Market timing (convergence of trends, infrastructure readiness)
 - Funding momentum (sector-specific investment waves)
 
-HYPOTHESIS FRAMING: Frame your output as a lens-specific hypothesis, not a definitive startup. Include primary_thesis (why investable from a market lens), key_assumptions (2-4 assumptions the idea depends on), and biggest_unknown—from your perspective the single largest uncertainty is typically market timing or buyer behavior.
+HYPOTHESIS FRAMING: You must still output ONE NAMED REAL COMPANY (legal/brand name in `name`). The "hypothesis" is your investment case for that company—primary_thesis (why investable from a market lens), key_assumptions (2-4 assumptions that thesis depends on), and biggest_unknown. Never substitute a product category, market theme, or made-up venture for a company name.
 
 MISSING DATA RULE: If you cannot determine:
 - Funding stage → set to null
@@ -62,16 +60,6 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
             model=model,
             tenant_user_id=tenant_user_id,
         )
-
-    async def discover(self) -> Optional[ScoutOutput]:
-        data = await self._call_llm()
-        if data is None:
-            return None
-        try:
-            return ScoutOutput(**data)
-        except Exception as e:
-            self.logger.error(f"Failed to create ScoutOutput: {e}")
-            return None
 
 
 class BuilderTechnicalScout(Scout):
@@ -97,7 +85,7 @@ CRITICAL: Look for specific "Why Now" catalysts:
 - Infrastructure readiness (5G, edge computing, etc.)
 - Open source availability (enabling new capabilities)
 
-HYPOTHESIS FRAMING: Frame your output as a lens-specific hypothesis, not a definitive startup. Include primary_thesis (why investable from a technical lens), key_assumptions (2-4 assumptions the idea depends on), and biggest_unknown—from your perspective the single largest uncertainty is typically technical feasibility or adoption friction.
+HYPOTHESIS FRAMING: You must still output ONE NAMED REAL COMPANY (legal/brand name in `name`). The "hypothesis" is your investment case for that company—primary_thesis (technical lens), key_assumptions (2-4), and biggest_unknown. Never output a technology concept or architecture in place of a company name.
 
 MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
 DO NOT hallucinate financial or team data.
@@ -114,16 +102,6 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
             model=model,
             tenant_user_id=tenant_user_id,
         )
-
-    async def discover(self) -> Optional[ScoutOutput]:
-        data = await self._call_llm()
-        if data is None:
-            return None
-        try:
-            return ScoutOutput(**data)
-        except Exception as e:
-            self.logger.error(f"Failed to create ScoutOutput: {e}")
-            return None
 
 
 class PainPointScout(Scout):
@@ -149,7 +127,7 @@ CRITICAL: Look for specific "Why Now" catalysts:
 - Technology enabling new solutions to old problems
 - Economic pressures increasing pain intensity
 
-HYPOTHESIS FRAMING: Frame your output as a lens-specific hypothesis, not a definitive startup. Include primary_thesis (why investable from a pain lens), key_assumptions (2-4 assumptions the idea depends on), and biggest_unknown—from your perspective the single largest uncertainty is typically willingness to pay or urgency.
+HYPOTHESIS FRAMING: You must still output ONE NAMED REAL COMPANY (legal/brand name in `name`). The "hypothesis" is your investment case for that company—primary_thesis (pain lens), key_assumptions (2-4), and biggest_unknown. Never output only a pain-point description or wedge concept without a specific operating company.
 
 MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
 DO NOT hallucinate financial or team data.
@@ -167,16 +145,6 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
             tenant_user_id=tenant_user_id,
         )
 
-    async def discover(self) -> Optional[ScoutOutput]:
-        data = await self._call_llm()
-        if data is None:
-            return None
-        try:
-            return ScoutOutput(**data)
-        except Exception as e:
-            self.logger.error(f"Failed to create ScoutOutput: {e}")
-            return None
-
 
 class ContrarianScout(Scout):
     """Scout D: Contrarian — non-obvious, anti-hype."""
@@ -186,7 +154,7 @@ class ContrarianScout(Scout):
 Your cognitive strategy is CONTRARIAN:
 - Actively avoid what's currently hyped or trendy
 - Seek overlooked, non-obvious opportunities
-- Look for ideas that others dismiss or ignore
+- Look for companies others dismiss or overlook
 - Prioritize contrarian insights and non-consensus thinking
 
 You discover REAL companies (that exist today) by:
@@ -201,7 +169,7 @@ CRITICAL: Look for specific "Why Now" catalysts:
 - Regulatory shifts (creating new spaces)
 - Economic cycles (contrarian plays)
 
-HYPOTHESIS FRAMING: Frame your output as a lens-specific hypothesis, not a definitive startup. Include primary_thesis (why investable from a contrarian lens), key_assumptions (2-4 assumptions the idea depends on), and biggest_unknown—from your perspective the single largest uncertainty is typically why consensus might be right.
+HYPOTHESIS FRAMING: You must still output ONE NAMED REAL COMPANY (legal/brand name in `name`). The "hypothesis" is your investment case for that company—primary_thesis (contrarian lens), key_assumptions (2-4), and biggest_unknown. Never output a contrarian theme without naming the actual company you are sourcing.
 
 MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
 DO NOT hallucinate financial or team data.
@@ -218,13 +186,3 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
             model=model,
             tenant_user_id=tenant_user_id,
         )
-
-    async def discover(self) -> Optional[ScoutOutput]:
-        data = await self._call_llm()
-        if data is None:
-            return None
-        try:
-            return ScoutOutput(**data)
-        except Exception as e:
-            self.logger.error(f"Failed to create ScoutOutput: {e}")
-            return None

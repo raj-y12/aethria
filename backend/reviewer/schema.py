@@ -70,6 +70,19 @@ def validate_reviewer_output(data: dict) -> ReviewerOutput:
         if not isinstance(d, int) or not (1 <= d <= 10):
             raise ValueError(f"defensibility_score must be an int between 1 and 10, got {d}")
     
+    # Normalize common LLM verdict aliases before strict validation.
+    # This prevents otherwise valid reviews from failing on label drift.
+    verdict_aliases = {
+        "PROMISING": "MEDIUM",
+        "AVERAGE": "MEDIUM",
+        "MODERATE": "MEDIUM",
+        "STRONG BUY": "STRONG",
+        "WEAK PASS": "WEAK",
+    }
+    raw_verdict = str(data.get("verdict", "")).strip().upper()
+    if raw_verdict in verdict_aliases:
+        data["verdict"] = verdict_aliases[raw_verdict]
+
     # Validate verdict
     valid_verdicts = ["STRONG", "MEDIUM", "WEAK"]
     if data["verdict"] not in valid_verdicts:

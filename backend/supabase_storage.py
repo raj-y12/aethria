@@ -25,6 +25,9 @@ _LIST_SELECT = (
     "list_consensus_verdict, list_reviewer_disagreement, list_reviewed_at, list_partnered_at, "
     "short_summary, partner_decision, partner_human_review_required, created_at, updated_at"
 )
+_MEMO_PARTIAL_SELECT = (
+    "startup_id, scout_info, review_info, partner_info, investment_memo_markdown"
+)
 
 
 def _row_to_dict(row: dict) -> dict:
@@ -53,7 +56,6 @@ def _dict_to_row(d: dict, user_id: str) -> dict:
         "partner_info": d.get("partner_info"),
         "financials": d.get("financials") or {},
         "version": d.get("version", 1),
-        "human_resolution": d.get("human_resolution"),
         "created_at": d.get("created_at"),
         "updated_at": d.get("updated_at"),
     }
@@ -410,11 +412,11 @@ class SupabaseStartupsStorage:
         self.logger.info("Updated financials for startup %s", startup_id)
         return True
 
-    def get_startup(self, startup_id: str) -> Optional[Startup]:
+    def get_startup(self, startup_id: str, select_columns: str = "*") -> Optional[Startup]:
         try:
             r = (
                 self._client.table(TABLE)
-                .select("*")
+                .select(select_columns)
                 .eq("user_id", self._user_id)
                 .eq("startup_id", startup_id)
                 .limit(1)
@@ -431,6 +433,10 @@ class SupabaseStartupsStorage:
         except Exception as e:
             self.logger.error("Invalid startup %s: %s", startup_id, e)
             return None
+
+    def get_startup_for_memo(self, startup_id: str) -> Optional[Startup]:
+        """Memo endpoint projection: only fields needed for memo readiness/partial payload."""
+        return self.get_startup(startup_id, select_columns=_MEMO_PARTIAL_SELECT)
 
     def get_startup_by_id(self, startup_id: str) -> Optional[Startup]:
         """Alias for get_startup (explicit API for callers)."""

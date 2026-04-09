@@ -83,6 +83,27 @@ def extract_http_urls(text: str) -> List[str]:
     return out
 
 
+def normalize_url_for_match(url: str) -> str:
+    """
+    Normalize URL for allowlist matching.
+    Intentionally ignores scheme, query, and fragment so equivalent URLs match:
+    - http vs https
+    - www prefix
+    - trailing slash
+    """
+    try:
+        p = urlparse(url.strip())
+    except Exception:
+        return ""
+    host = (p.netloc or "").lower().strip(".")
+    if host.startswith("www."):
+        host = host[4:]
+    path = (p.path or "").rstrip("/")
+    if not host:
+        return ""
+    return f"{host}{path}"
+
+
 def registrable_domain(host: str) -> str:
     """
     Approximate registrable domain (eTLD+1 style) without PSL dependency.
@@ -143,7 +164,7 @@ def filter_references_anchor_conflicts(refs: List[Any], anchor_hostname: Optiona
         if not s:
             continue
         if reference_has_anchor_conflict(s, anchor_hostname):
-            logger.info(
+            logger.warning(
                 "reference_verify: dropped anchor-conflicting reference (slug/TLD vs %s): %s",
                 anchor_hostname,
                 s[:120],
@@ -229,9 +250,52 @@ def filter_references_by_url_probe(output: Dict[str, Any], timeout: float = 4.0)
         if reference_string_verified(s, timeout=timeout):
             kept.append(s)
         else:
-            logger.info("reference_verify: dropped unverified reference: %s", s[:120])
+            logger.warning("reference_verify: dropped unverified reference (probe failed/timeout): %s", s[:120])
+    if not kept and refs:
+        logger.warning(
+            "reference_verify: all %d reference(s) failed URL probe — "
+            "company may be valid but temporarily unreachable; startup will be skipped this cycle",
+            len(refs),
+        )
     output["references"] = kept
     return output
+
+
+def filter_references_to_allowlist(refs: List[Any], allowlist_urls: List[str]) -> Dict[str, Any]:
+    """
+    Keep references when at least one cited URL matches retrieval allowlist by:
+    1) exact normalized URL, or
+    2) same normalized host (path differences allowed).
+    """
+    normalized_allow = {normalize_url_for_match(u) for u in allowlist_urls if isinstance(u, str)}
+    normalized_allow.discard("")
+    allow_hosts = {
+        x.split("/", 1)[0]
+        for x in normalized_allow
+        if "/" in x or x
+    }
+    kept: List[str] = []
+    dropped = 0
+    for r in refs:
+        if not isinstance(r, str):
+            dropped += 1
+            continue
+        s = r.strip()
+        if not s:
+            dropped += 1
+            continue
+        urls = [normalize_url_for_match(u) for u in extract_http_urls(s)]
+        urls = [u for u in urls if u]
+        url_hosts = {
+            u.split("/", 1)[0]
+            for u in urls
+            if "/" in u or u
+        }
+        if any(u in normalized_allow for u in urls) or any(h in allow_hosts for h in url_hosts):
+            kept.append(s)
+        else:
+            dropped += 1
+    return {"kept": kept, "dropped_count": dropped}
 
 
 def finalize_scout_references(

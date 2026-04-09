@@ -374,7 +374,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           padding: 4px 0;
           cursor: pointer;
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 10px;
+          font-size: 12px;
           font-variant-caps: all-small-caps;
           letter-spacing: 0.12em;
           color: rgba(0,33,71,0.5);
@@ -414,7 +414,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoMeta{
           margin-top: 8px;
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 11px;
+          font-size: 12px;
           letter-spacing: 0.12em;
           color: rgba(0,33,71,0.48);
           text-transform: uppercase;
@@ -434,7 +434,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoLabel{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 11px;
+          font-size: 12px;
           text-transform: uppercase;
           letter-spacing: 0.12em;
           line-height: 1.45;
@@ -442,6 +442,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           margin: 0 0 12px 0;
           padding-bottom: 8px;
           border-bottom: 1px solid rgba(0,33,71,0.07);
+        }
+        .memoLabel--thesis{
+          font-size: 12px;
+          font-weight: 400;
         }
         .memoJudgmentHead{
           margin: 0 0 12px 0;
@@ -467,12 +471,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoDossierRead{
           margin-top: 12px;
           padding-top: 12px;
-          border-top: 1px solid rgba(0,33,71,0.08);
+          border-top: none;
         }
         .memoDossierReadKicker{
           display: block;
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 10px;
+          font-size: 12px;
           font-weight: 400;
           letter-spacing: 0.12em;
           text-transform: uppercase;
@@ -492,7 +496,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoDossierReadBand{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 10px;
+          font-size: 12px;
           font-weight: 400;
           letter-spacing: 0.1em;
           text-transform: uppercase;
@@ -501,7 +505,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoDossierReadDot{
           color: rgba(0,33,71,0.28);
           font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 10px;
+          font-size: 12px;
         }
         .memoDossierReadPhrase{
           font-weight: 400;
@@ -537,7 +541,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoScoreName{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 11px;
+          font-size: 12px;
           font-variant-caps: all-small-caps;
           letter-spacing: 0.1em;
           color: rgba(0,33,71,0.52);
@@ -559,7 +563,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoScoreBandLabel{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 10px;
+          font-size: 12px;
           letter-spacing: 0.08em;
           color: rgba(0,33,71,0.4);
         }
@@ -597,7 +601,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoDimensionPanelName{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 11px;
+          font-size: 13px;
           font-variant-caps: all-small-caps;
           letter-spacing: 0.12em;
           color: rgba(0,33,71,0.48);
@@ -657,7 +661,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           padding: 0;
           cursor: pointer;
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 10px;
+          font-size: 12px;
           text-transform: uppercase;
           letter-spacing: 0.14em;
           color: rgba(0,33,71,0.5);
@@ -666,7 +670,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoSourcesPlus{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 10px;
+          font-size: 12px;
           color: rgba(0,33,71,0.5);
           line-height: 1.5;
         }
@@ -691,7 +695,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoOverviewRow + .memoOverviewRow{ margin-top: 1rem; }
         .memoOverviewKey{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 11px;
+          font-size: 13px;
           font-variant-caps: all-small-caps;
           letter-spacing: 0.1em;
           color: rgba(0,33,71,0.52);
@@ -795,7 +799,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoPipelineKicker{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 10px;
+          font-size: 12px;
           font-weight: 400;
           letter-spacing: 0.12em;
           text-transform: uppercase;
@@ -804,7 +808,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoPipelineOneLiner{
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-          font-size: 12px;
+          font-size: 13px;
           line-height: 1.45;
           color: rgba(0,33,71,0.52);
           margin: 0;
@@ -815,7 +819,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoPipelinePlus{
           flex-shrink: 0;
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 10px;
+          font-size: 12px;
           color: rgba(0,33,71,0.45);
           line-height: 1.5;
           padding-top: 2px;
@@ -847,7 +851,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoReplayBadge{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 9px;
+          font-size: 12px;
           font-weight: 400;
           letter-spacing: 0.08em;
           text-transform: uppercase;
@@ -858,7 +862,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoReplayWhen{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 10px;
+          font-size: 12px;
           letter-spacing: 0.08em;
           color: rgba(0,33,71,0.4);
           margin: 0 0 6px 0;
@@ -879,7 +883,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoThesisScoreBlock{
           margin: 0;
-          padding: 2px 0 10px 0;
+          padding: 0;
           width: 100%;
           box-sizing: border-box;
         }
@@ -887,8 +891,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           display: grid;
           width: 100%;
           align-items: stretch;
-          gap: clamp(14px, 2.75vw, 22px);
-          padding: 2px 2px 0 2px;
+          gap: clamp(12px, 2.5vw, 20px);
+          padding: 0;
           box-sizing: border-box;
         }
         .memoThesisScoresRow--n1{
@@ -912,14 +916,16 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           min-width: 0;
           width: 100%;
           text-align: center;
-          padding: 0 4px;
+          padding: 0;
           box-sizing: border-box;
         }
         .memoThesisScoreTile .memoScoreName{
           margin: 0 0 8px 0;
           width: 100%;
-          padding: 0 1px;
+          padding: 0;
           box-sizing: border-box;
+          font-size: 12px;
+          font-weight: 400;
         }
         .memoThesisScoreTile .memoScoreValueRow{
           justify-content: center;
@@ -929,6 +935,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoThesisScoreTile .memoScoreValue{
           margin: 0 0 10px 0;
           opacity: 1;
+          font-size: clamp(1.35rem, 3.5vw, 1.75rem);
+          font-weight: 700;
+          line-height: 1.35;
         }
         .memoThesisScoreTile .memoScoreUnderline{
           margin-top: auto;
@@ -1140,7 +1149,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
             {reviewHasThesisAlignment(displayStartup.review) && (
               <section>
-                <p className="memoLabel">THESIS ALIGNMENT</p>
+                <p className="memoLabel memoLabel--thesis">THESIS ALIGNMENT</p>
                 {displayStartup.review &&
                 (displayStartup.review.thesis_alignment_score != null ||
                   displayStartup.review.thesis_matches_fund != null ||
@@ -1166,7 +1175,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                             <div className="memoThesisScoreTile" aria-label="Thesis alignment score">
                               <p className="memoScoreName">Alignment</p>
                               <div className="memoScoreValueRow">
-                                <p className="memoScoreValue">{`${ten.toFixed(1)}/10`}</p>
+                                <p className="memoScoreValue">{`${ten.toFixed(0)}/10`}</p>
                               </div>
                               <div className="memoScoreUnderline" aria-hidden />
                             </div>

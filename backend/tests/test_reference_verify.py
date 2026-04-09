@@ -35,6 +35,74 @@ def test_filter_anchor_conflicts():
     assert any("techcrunch" in r for r in out)
 
 
+def test_schema_rejects_megacap_company_name_stripe():
+    base = {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "scout_type": "market_driven",
+        "name": "Stripe",
+        "one_line": "x",
+        "sector": "x",
+        "problem": "p",
+        "solution": "s",
+        "target_users": "t",
+        "why_now": "w",
+        "confidence": 0.7,
+        "primary_thesis": "t",
+        "key_assumptions": ["a", "b"],
+        "biggest_unknown": "u",
+        "references": ["Stripe — https://stripe.com/about"],
+    }
+    with pytest.raises(ValueError, match="large public|mega-scale|incumbents"):
+        validate_scout_output(dict(base))
+
+
+def test_schema_rejects_only_incumbent_reference_domains():
+    base = {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "scout_type": "market_driven",
+        "name": "MysteryCo",
+        "one_line": "x",
+        "sector": "x",
+        "problem": "p",
+        "solution": "s",
+        "target_users": "t",
+        "why_now": "w",
+        "confidence": 0.7,
+        "primary_thesis": "t",
+        "key_assumptions": ["a", "b"],
+        "biggest_unknown": "u",
+        "references": [
+            "Press https://stripe.com/news",
+            "More https://shopify.com/partners",
+        ],
+    }
+    with pytest.raises(ValueError, match="incumbent corporate domains"):
+        validate_scout_output(dict(base))
+
+
+def test_schema_allows_mix_of_independent_and_incumbent_urls():
+    base = {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "scout_type": "market_driven",
+        "name": "TinyPay",
+        "one_line": "x",
+        "sector": "x",
+        "problem": "p",
+        "solution": "s",
+        "target_users": "t",
+        "why_now": "w",
+        "confidence": 0.7,
+        "primary_thesis": "t",
+        "key_assumptions": ["a", "b"],
+        "biggest_unknown": "u",
+        "references": [
+            "TinyPay — https://tinypay.example/",
+            "Vs Stripe https://stripe.com/competitors",
+        ],
+    }
+    validate_scout_output(dict(base))
+
+
 def test_schema_requires_https_in_reference_line():
     base = {
         "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -73,3 +141,56 @@ def test_finalize_skips_probe_when_env_set(monkeypatch):
     finalize_scout_references(output, anchor_hostname="aethria.co")
     assert len(output["references"]) == 1
     assert "aethria.co" in output["references"][0]
+
+
+def test_filter_references_to_allowlist_keeps_only_allowed_urls():
+    from utils.reference_verify import filter_references_to_allowlist
+
+    refs = [
+        "[S1] Hivery - https://hivery.com/",
+        "[S2] Wrong - https://rivery.io/",
+        "[S3] News - https://techcrunch.com/example",
+    ]
+    allow = ["https://hivery.com", "https://techcrunch.com/example"]
+    out = filter_references_to_allowlist(refs, allow)
+
+    assert len(out["kept"]) == 2
+    assert any("hivery.com" in r for r in out["kept"])
+    assert any("techcrunch.com/example" in r for r in out["kept"])
+    assert out["dropped_count"] == 1
+
+
+def test_filter_references_to_allowlist_rejects_phonetic_domain_mismatch():
+    from utils.reference_verify import filter_references_to_allowlist
+
+    refs = [
+        "[S1] Hivery profile - https://rivery.io/company",
+    ]
+    allow = ["https://hivery.com/company"]
+    out = filter_references_to_allowlist(refs, allow)
+    assert out["kept"] == []
+    assert out["dropped_count"] == 1
+
+
+def test_filter_references_to_allowlist_accepts_equivalent_url_variants():
+    from utils.reference_verify import filter_references_to_allowlist
+
+    refs = [
+        "[S1] Company site - https://www.hivery.com/?ref=abc",
+    ]
+    allow = ["http://hivery.com/"]
+    out = filter_references_to_allowlist(refs, allow)
+    assert len(out["kept"]) == 1
+    assert out["dropped_count"] == 0
+
+
+def test_filter_references_to_allowlist_accepts_same_host_different_path():
+    from utils.reference_verify import filter_references_to_allowlist
+
+    refs = [
+        "[S1] Story - https://techcrunch.com/2025/01/01/company-raises",
+    ]
+    allow = ["https://techcrunch.com/2024/12/31/another-story"]
+    out = filter_references_to_allowlist(refs, allow)
+    assert len(out["kept"]) == 1
+    assert out["dropped_count"] == 0

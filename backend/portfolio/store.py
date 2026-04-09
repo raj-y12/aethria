@@ -2,8 +2,8 @@
 Portfolio Store - Authoritative Memory Layer.
 
 Append-only, versioned storage for all portfolio data.
-Backed by Supabase for decisions, portfolio, rejections, watchlist, signals, agent_metrics;
-startups remain file-based (data/portfolio/startups.json).
+Uses Supabase when configured (including startups via portfolio_startups);
+falls back to local JSON files only when Supabase is unavailable.
 """
 import json
 import logging
@@ -16,6 +16,7 @@ import os
 
 from tenant_context import require_user_id
 from supabase_doc_store import list_get_all, list_upsert
+from supabase_client import get_service_client
 from portfolio.schemas import (
     StartupRecord,
     DecisionRecord,
@@ -50,15 +51,18 @@ class PortfolioStore:
         Initialize portfolio store.
 
         Args:
-            data_dir: Directory for portfolio JSON files
-            user_id: Required when USE_SUPABASE_STORAGE is set (explicit tenant for list tables).
+            data_dir: Directory for portfolio JSON fallback files
+            user_id: Tenant user id for Supabase-backed operations.
         """
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("portfolio.store")
-        self._tenant_user_id = user_id.strip() if user_id and user_id.strip() else None
+        explicit_uid = user_id.strip() if user_id and user_id.strip() else None
+        env_uid = os.getenv("AETHRIA_AGENT_USER_ID", "").strip() or None
+        # Prefer explicit user_id; fall back to process-level tenant id for agent workers.
+        self._tenant_user_id = explicit_uid or env_uid
         
-        # File paths (startups only; rest in Supabase)
+        # File paths (fallback mode only)
         self.files = {
             "startups": self.data_dir / "startups.json",
             "decisions": self.data_dir / "decisions.json",
@@ -69,6 +73,7 @@ class PortfolioStore:
             "agent_metrics": self.data_dir / "agent_metrics.json",
         }
         self._supabase_tables = {
+            "startups": "portfolio_startups",
             "decisions": "portfolio_decisions",
             "portfolio": "portfolio_positions",
             "rejections": "portfolio_rejections",
@@ -76,16 +81,24 @@ class PortfolioStore:
             "signals": "portfolio_signals",
             "agent_metrics": "portfolio_agent_metrics",
         }
-        
-        # Initialize startups file only
-        if not self.files["startups"].exists():
-            self._write_file(self.files["startups"], [])
 
-    def _using_supabase_lists(self) -> bool:
-        return os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+        # Initialize fallback files only when needed.
+        for p in self.files.values():
+            if not p.exists():
+                self._write_local_file(p, [])
+
+    def _is_supabase_configured(self) -> bool:
+        return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+
+    def _using_supabase(self) -> bool:
+        # Supabase-first behavior; fallback only when credentials or tenant are missing.
+        return self._is_supabase_configured() and bool(self._tenant_user_id)
 
     def _supabase_uid(self) -> str:
         return require_user_id(self._tenant_user_id, context="PortfolioStore")
+
+    def _supabase_client(self):
+        return get_service_client()
 
     def _file_key_for_path(self, file_path: Path) -> Optional[str]:
         for k, p in self.files.items():
@@ -93,12 +106,101 @@ class PortfolioStore:
                 return k
         return None
 
+    def _row_to_startup_record(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize portfolio_startups row into StartupRecord shape used by portfolio layer."""
+        return {
+            "id": row.get("id") or row.get("startup_id") or "",
+            "startup_id": row.get("startup_id") or row.get("id") or "",
+            "name": row.get("name") or "",
+            "one_line": row.get("one_line") or "",
+            "sector": row.get("sector") or "",
+            "problem": row.get("problem") or "",
+            "solution": row.get("solution") or "",
+            "target_users": row.get("target_users") or "",
+            "why_now": row.get("why_now") or "",
+            "scout_type": row.get("scout_type") or "",
+            "scout_confidence": row.get("scout_confidence") or 0.0,
+            "discovered_at": row.get("discovered_at") or "",
+            "version": row.get("version") or 1,
+            "metadata": row.get("metadata") if isinstance(row.get("metadata"), dict) else {},
+        }
+
+    def _startup_record_to_row(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        rid = record.get("id") or record.get("startup_id") or str(uuid4())
+        return {
+            "id": rid,
+            "user_id": self._supabase_uid(),
+            "startup_id": record.get("startup_id") or rid,
+            "name": record.get("name", ""),
+            "one_line": record.get("one_line", ""),
+            "sector": record.get("sector", ""),
+            "problem": record.get("problem", ""),
+            "solution": record.get("solution", ""),
+            "target_users": record.get("target_users", ""),
+            "why_now": record.get("why_now", ""),
+            "scout_type": record.get("scout_type", ""),
+            "scout_confidence": record.get("scout_confidence", 0.0),
+            "discovered_at": record.get("discovered_at") or datetime.now().isoformat(),
+            "version": int(record.get("version") or 1),
+            "metadata": record.get("metadata") if isinstance(record.get("metadata"), dict) else {},
+        }
+
+    def _get_startups_supabase(self) -> List[Dict[str, Any]]:
+        try:
+            uid = self._supabase_uid()
+            r = (
+                self._supabase_client()
+                .table(self._supabase_tables["startups"])
+                .select("*")
+                .eq("user_id", uid)
+                .order("discovered_at")
+                .execute()
+            )
+            rows = (r.data or []) if hasattr(r, "data") else []
+            return [self._row_to_startup_record(row) for row in rows if isinstance(row, dict)]
+        except Exception as e:
+            self.logger.warning("Supabase startups read failed; using local fallback: %s", e)
+            return self._read_local_file(self.files["startups"])
+
+    def _upsert_startup_supabase(self, record: Dict[str, Any]) -> str:
+        uid = self._supabase_uid()
+        row = self._startup_record_to_row(record)
+        rid = row["id"]
+        existing = (
+            self._supabase_client()
+            .table(self._supabase_tables["startups"])
+            .select("id,version")
+            .eq("user_id", uid)
+            .eq("id", rid)
+            .limit(1)
+            .execute()
+        )
+        existing_rows = (existing.data or []) if hasattr(existing, "data") else []
+        if existing_rows:
+            row["version"] = int(existing_rows[0].get("version") or 1) + 1
+            self.logger.info("Updated startups record %s to version %s", rid, row["version"])
+        else:
+            row["version"] = int(record.get("version") or 1)
+            self.logger.info("Added new startups record %s", rid)
+
+        self._supabase_client().table(self._supabase_tables["startups"]).upsert(
+            row,
+            on_conflict="id",
+        ).execute()
+        return rid
+
     def _read_file(self, file_path: Path) -> List[Dict[str, Any]]:
-        """Read from Supabase or JSON file."""
+        """Read from Supabase (preferred) or JSON fallback."""
         file_key = self._file_key_for_path(file_path)
         table = self._supabase_tables.get(file_key) if file_key else None
-        if table and self._using_supabase_lists():
+        if table and self._using_supabase():
+            if file_key == "startups":
+                return self._get_startups_supabase()
             return list_get_all(table, user_id=self._supabase_uid())
+        return self._read_local_file(file_path)
+
+    def _read_local_file(self, file_path: Path) -> List[Dict[str, Any]]:
+        """Read JSON file fallback."""
         max_retries = 5
         for attempt in range(max_retries):
             try:
@@ -117,8 +219,26 @@ class PortfolioStore:
                 import time
                 time.sleep(0.1 * (attempt + 1))
         raise ValueError("Failed to read file after retries")
-    
+
     def _write_file(self, file_path: Path, data: List[Dict[str, Any]]):
+        """
+        Write complete collection.
+        In Supabase mode, upserts by id for mapped list tables and startups.
+        """
+        file_key = self._file_key_for_path(file_path)
+        table = self._supabase_tables.get(file_key) if file_key else None
+        if table and self._using_supabase():
+            if file_key == "startups":
+                for rec in data:
+                    self._upsert_startup_supabase(rec)
+                return
+            uid = self._supabase_uid()
+            for rec in data:
+                list_upsert(table, rec, user_id=uid)
+            return
+        self._write_local_file(file_path, data)
+
+    def _write_local_file(self, file_path: Path, data: List[Dict[str, Any]]):
         """Write JSON file atomically. Thread-safe."""
         temp_path = file_path.with_suffix('.tmp')
         
@@ -159,7 +279,9 @@ class PortfolioStore:
         record["id"] = record_id
 
         table = self._supabase_tables.get(file_key)
-        if table and self._using_supabase_lists():
+        if table and self._using_supabase():
+            if file_key == "startups":
+                return self._upsert_startup_supabase(record)
             uid = self._supabase_uid()
             records = list_get_all(table, user_id=uid)
             existing = next((r for r in records if r.get("id") == record_id), None)
@@ -183,7 +305,7 @@ class PortfolioStore:
             record["version"] = 1
             records.append(record)
             self.logger.info(f"Added new {file_key} record {record_id}")
-        self._write_file(file_path, records)
+        self._write_local_file(file_path, records)
         return record_id
     
     # Startup methods
@@ -210,6 +332,15 @@ class PortfolioStore:
             },
         }
         
+        if self._using_supabase():
+            # Keep legacy duplicate protection for name-based duplicates.
+            existing = self._get_startups_supabase()
+            new_name = (record.get("name") or "").strip().lower()
+            for row in existing:
+                existing_name = (row.get("name") or "").strip().lower()
+                if existing_name and existing_name == new_name:
+                    self.logger.info("Duplicate company name detected in Supabase; skipping add: %s", record.get("name"))
+                    return row.get("id") or startup_id
         return self._append_record("startups", record)
     
     # Decision methods
@@ -340,7 +471,7 @@ class PortfolioStore:
                 next_check = datetime.now() + timedelta(days=interval)
                 record["next_check_at"] = next_check.isoformat()
                 record["version"] = record.get("version", 1) + 1
-                if self._using_supabase_lists() and self._supabase_tables.get("watchlist"):
+                if self._using_supabase() and self._supabase_tables.get("watchlist"):
                     list_upsert(
                         self._supabase_tables["watchlist"],
                         record,
@@ -348,7 +479,7 @@ class PortfolioStore:
                     )
                 else:
                     records[i] = record
-                    self._write_file(self.files["watchlist"], records)
+                    self._write_local_file(self.files["watchlist"], records)
                 return
         raise ValueError(f"Watchlist record {watchlist_id} not found")
     

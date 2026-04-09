@@ -111,6 +111,22 @@ def _serp_search(query: str, region: str, user_id: str, num_results: int = 3) ->
         return []
 
 
+def search_serp_results(query: str, user_id: str, num_results: int = 6) -> List[Dict[str, str]]:
+    """
+    Public normalized SERP search helper used by retrieval grounding fallback.
+    """
+    region = get_scout_region(user_id)
+    rows = _serp_search(query=query, region=region, user_id=user_id, num_results=num_results)
+    out: List[Dict[str, str]] = []
+    for item in rows:
+        title = str(item.get("title") or "").strip()
+        link = str(item.get("link") or "").strip()
+        if not title or not link:
+            continue
+        out.append({"title": title, "url": link, "snippet": ""})
+    return out
+
+
 def maybe_enrich_references(output: Dict[str, Any], user_id: str) -> Dict[str, Any]:
     """
     Optionally enrich ScoutOutput.references with a few SERP URLs (tenant-scoped budget).

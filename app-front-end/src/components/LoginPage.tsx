@@ -371,7 +371,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading || signedInGreeting !== null}
-                  className="flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-none border-0 bg-oxford px-4 py-2.5 font-mono text-[10px] leading-none tracking-[0.14em] text-paper transition-[filter] duration-150 ease-out hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/45 focus-visible:ring-offset-2 focus-visible:ring-offset-paper disabled:cursor-not-allowed disabled:opacity-50 btn-interaction"
+                  className="flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-none border-0 bg-oxford px-4 py-2.5 font-mono text-[10px] leading-none tracking-[0.14em] text-paper hover:bg-oxford/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/45 focus-visible:ring-offset-2 focus-visible:ring-offset-paper disabled:cursor-not-allowed disabled:opacity-50 btn-interaction"
                   aria-busy={loading || signedInGreeting !== null}
                 >
                   {signedInGreeting ? 'Redirecting…' : loading ? 'Signing in…' : 'Log in'}

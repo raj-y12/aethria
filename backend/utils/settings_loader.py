@@ -6,12 +6,15 @@ user_id must always be passed explicitly when using Supabase (no run_context).
 """
 import json
 import os
+import time
 from pathlib import Path
 from typing import Optional
 
 from supabase_doc_store import doc_get, doc_set
 
 _SETTINGS_TABLE = "settings"
+_SETTINGS_CACHE_TTL_SECONDS = 2.0
+_SETTINGS_CACHE: dict[str, tuple[float, dict]] = {}
 
 
 def _using_supabase() -> bool:
@@ -46,8 +49,14 @@ DEFAULT_SETTINGS = {
         "reviewers_enabled": True,
         "partners_enabled": True,
         "max_agents_per_run": 10,
-        "confidence_threshold": 0.5,
+        # Lower default to avoid reviewer starvation on normal-confidence scout rows.
+        "confidence_threshold": 0.2,
         "scout_region": "europe",
+        "scout_grounded_citations_enabled": True,
+        # Default fail-open to preserve pipeline throughput when retrieval providers
+        # are flaky; strict mode can be re-enabled per user in settings.
+        "scout_fail_closed_on_empty_retrieval": False,
+        "scout_retrieval_provider": "tavily",
         "scout_serp_enabled": False,
         "scout_serp_daily_budget": 5,
     },
@@ -74,16 +83,37 @@ def load_settings(user_id: Optional[str] = None) -> dict:
         )
     if not key:
         return json.loads(json.dumps(DEFAULT_SETTINGS))
+    cached = _SETTINGS_CACHE.get(key)
+    now = time.monotonic()
+    if cached and (now - cached[0]) <= _SETTINGS_CACHE_TTL_SECONDS:
+        return json.loads(json.dumps(cached[1]))
     data = doc_get(_SETTINGS_TABLE, key, user_id=key)
     if not data or not isinstance(data, dict):
-        return json.loads(json.dumps(DEFAULT_SETTINGS))
+        out = json.loads(json.dumps(DEFAULT_SETTINGS))
+        _SETTINGS_CACHE[key] = (now, out)
+        return json.loads(json.dumps(out))
     out = json.loads(json.dumps(DEFAULT_SETTINGS))
     for section in ("fund_identity", "cost_budget", "agent_config", "portfolio"):
         if section in data and isinstance(data[section], dict):
             for k, v in data[section].items():
                 if k in out.get(section, {}):
                     out[section][k] = v
-    return out
+    # Migration 1: scout_fail_closed_on_empty_retrieval default changed from True
+    # to False; stored settings auto-saved with the old default must be reset.
+    ac = out.get("agent_config")
+    if isinstance(ac, dict) and ac.get("scout_fail_closed_on_empty_retrieval") is True:
+        stored_ac = data.get("agent_config") if isinstance(data, dict) else None
+        if isinstance(stored_ac, dict) and "scout_fail_closed_on_empty_retrieval" in stored_ac:
+            ac["scout_fail_closed_on_empty_retrieval"] = DEFAULT_SETTINGS["agent_config"]["scout_fail_closed_on_empty_retrieval"]
+    # Migration 2: confidence_threshold default changed from 0.5 to 0.2 to improve
+    # reviewer throughput; only rewrite explicit legacy-default values.
+    if isinstance(ac, dict):
+        stored_ac = data.get("agent_config") if isinstance(data, dict) else None
+        stored_threshold = stored_ac.get("confidence_threshold") if isinstance(stored_ac, dict) else None
+        if stored_threshold in (0.5, "0.5"):
+            ac["confidence_threshold"] = DEFAULT_SETTINGS["agent_config"]["confidence_threshold"]
+    _SETTINGS_CACHE[key] = (time.monotonic(), out)
+    return json.loads(json.dumps(out))
 
 
 def save_settings(settings: dict, user_id: Optional[str] = None) -> None:
@@ -92,6 +122,7 @@ def save_settings(settings: dict, user_id: Optional[str] = None) -> None:
     if not key:
         raise ValueError("user_id required to save settings")
     doc_set(_SETTINGS_TABLE, settings, key, user_id=key)
+    _SETTINGS_CACHE.pop(key, None)
 
 
 def is_scouts_enabled(user_id: Optional[str] = None) -> bool:
@@ -104,6 +135,21 @@ def is_reviewers_enabled(user_id: Optional[str] = None) -> bool:
 
 def is_partners_enabled(user_id: Optional[str] = None) -> bool:
     return load_settings(user_id).get("agent_config", {}).get("partners_enabled", True)
+
+
+def _agent_config_safe(user_id: Optional[str] = None) -> dict:
+    """Return agent_config or {} if settings cannot be loaded (callers use .get with defaults)."""
+    try:
+        ac = load_settings(user_id).get("agent_config")
+        return dict(ac) if isinstance(ac, dict) else {}
+    except Exception:
+        return {}
+
+
+def is_thesis_reprocess_agents_enabled(user_id: Optional[str] = None) -> bool:
+    """Fund-thesis backfill re-runs reviewer + partner only."""
+    ac = _agent_config_safe(user_id)
+    return bool(ac.get("reviewers_enabled", True) and ac.get("partners_enabled", True))
 
 
 def is_cost_budget_enabled(user_id: Optional[str] = None) -> bool:
@@ -119,6 +165,24 @@ def get_scout_region(user_id: Optional[str] = None) -> str:
 
 def is_scout_serp_enabled(user_id: Optional[str] = None) -> bool:
     return bool(load_settings(user_id).get("agent_config", {}).get("scout_serp_enabled", False))
+
+
+def is_scout_grounded_citations_enabled(user_id: Optional[str] = None) -> bool:
+    return bool(
+        load_settings(user_id).get("agent_config", {}).get("scout_grounded_citations_enabled", True)
+    )
+
+
+def is_scout_fail_closed_on_empty_retrieval(user_id: Optional[str] = None) -> bool:
+    return bool(
+        load_settings(user_id).get("agent_config", {}).get("scout_fail_closed_on_empty_retrieval", False)
+    )
+
+
+def get_scout_retrieval_provider(user_id: Optional[str] = None) -> str:
+    raw = str(load_settings(user_id).get("agent_config", {}).get("scout_retrieval_provider", "tavily"))
+    lowered = raw.strip().lower()
+    return lowered if lowered in ("tavily", "serpapi") else "tavily"
 
 
 def get_canonical_website_hostname(user_id: Optional[str] = None) -> Optional[str]:

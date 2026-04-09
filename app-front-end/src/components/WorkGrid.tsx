@@ -312,7 +312,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 </div>
               </div>
               <span
-                className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/45 tabular-nums sm:hidden"
+                className="shrink-0 font-mono text-[12px] uppercase tracking-[0.08em] text-oxford/50 tabular-nums sm:hidden"
                 title={`${ordered.length} results after filters`}
                 aria-label={`${ordered.length} results after filters`}
               >
@@ -352,7 +352,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
             </div>
           </div>
           <div
-            className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/40 tabular-nums sm:block"
+            className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 font-mono text-[12px] uppercase tracking-[0.08em] text-oxford/45 tabular-nums sm:block"
             aria-label={`${ordered.length} results after filters`}
           >
             {ordered.length} results
@@ -495,7 +495,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                     {startup.scout.one_line.trim()}
                   </p>
                 ) : null}
-                <div className="mt-1 flex w-full max-w-full flex-nowrap items-center gap-x-2 overflow-x-auto no-scrollbar font-mono text-[10px] leading-[1.5] text-oxford/40">
+                <div className="mt-1 flex w-full max-w-full flex-nowrap items-center gap-x-2 overflow-x-auto no-scrollbar font-mono text-[12px] leading-[1.5] text-oxford/50">
                   {sectorTrim ? (
                     <span className="shrink-0 whitespace-nowrap uppercase">{sectorTrim}</span>
                   ) : null}
@@ -525,7 +525,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 <div className="flex w-full max-w-full min-w-0 flex-col gap-1.5 lg:items-end">
                   {fundingTier ? (
                     <span
-                      className={`inline-flex w-fit max-w-full shrink-0 items-center rounded-none border border-solid py-[3px] px-[6px] font-mono text-[10px] font-normal uppercase leading-[1.5] tracking-[0.1em] ${FUNDING_STAGE_BADGE_CLASS[fundingTier]}`}
+                      className={`inline-flex w-fit max-w-full shrink-0 items-center rounded-none border border-solid py-[3px] px-[6px] font-mono text-[12px] font-normal uppercase leading-[1.5] tracking-[0.08em] ${FUNDING_STAGE_BADGE_CLASS[fundingTier]}`}
                     >
                       {getFundingStageBadgeLabel(fundingTier, fundingStageRaw)}
                     </span>

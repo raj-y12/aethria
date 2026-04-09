@@ -2,7 +2,7 @@
 Base Scout abstraction.
 All Scouts inherit from this class and implement the discover() method.
 """
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Any, Dict, Optional
 import json
 import logging
@@ -13,9 +13,21 @@ from openai import OpenAI
 
 from scout.schema import ScoutOutput, validate_scout_output, generate_id
 from tenant_context import require_user_id
-from utils.reference_verify import finalize_scout_references, hostname_from_user_hint
-from utils.settings_loader import get_canonical_website_hostname
-from utils.serp_client import maybe_enrich_references
+from utils.reference_verify import (
+    finalize_scout_references,
+    filter_references_to_allowlist,
+    hostname_from_user_hint,
+)
+from utils.retrieval_grounding import (
+    log_pre_filter_cited_urls,
+    render_sources_for_prompt,
+    retrieve_source_pack,
+)
+from utils.settings_loader import (
+    get_canonical_website_hostname,
+    is_scout_fail_closed_on_empty_retrieval,
+    is_scout_grounded_citations_enabled,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -86,16 +98,37 @@ class Scout(ABC):
             )
         return "".join(lines)
 
-    @abstractmethod
     async def discover(self) -> Optional[ScoutOutput]:
         """
-        Discover one startup idea.
-        
-        Returns:
-            ScoutOutput if discovery succeeds, None if it fails.
-            Must emit valid JSON matching the strict schema.
+        Run LLM discovery (_call_llm already finalize/repair-validate raw JSON) and
+        assert strict schema. Never return partial dicts (TypedDict(**partial) is not safe).
         """
-        pass
+        data = await self._call_llm()
+        if data is None:
+            return None
+        try:
+            return validate_scout_output(data)
+        except ValueError as e:
+            payload_preview = "none"
+            if isinstance(data, dict):
+                keys = sorted(list(data.keys()))
+                preview = {
+                    "keys": keys[:16],
+                    "has_name": "name" in data,
+                    "name_type": type(data.get("name")).__name__ if "name" in data else None,
+                    "scout_type_field": data.get("scout_type"),
+                }
+                payload_preview = json.dumps(preview, ensure_ascii=False)
+            self.logger.error(
+                "Validation failed: %s | scout_type=%s | payload_preview=%s",
+                e,
+                self.scout_type,
+                payload_preview,
+            )
+            return None
+        except Exception as e:
+            self.logger.error("Discovery failed: %s", e)
+            return None
     
     def _get_agent_name(self) -> str:
         """
@@ -161,6 +194,181 @@ class Scout(ABC):
                 return h
         return get_canonical_website_hostname(self._tenant_user_id)
 
+    def _apply_allowlist(self, data: Dict[str, Any], allowlist_urls: set[str]) -> Dict[str, Any]:
+        refs = data.get("references")
+        if not isinstance(refs, list):
+            refs = []
+        result = filter_references_to_allowlist(refs, list(allowlist_urls))
+        data["references"] = result["kept"]
+        self.logger.info(
+            "grounded_citations: allowlist kept=%d dropped=%d",
+            len(result["kept"]),
+            int(result["dropped_count"]),
+        )
+        return data
+
+    def _normalize_scout_ids_inplace(self, data: Dict[str, Any]) -> None:
+        if not data.get("id"):
+            data["id"] = generate_id()
+        data["scout_type"] = self.scout_type
+
+    def _postprocess_scout_dict(
+        self,
+        data: Dict[str, Any],
+        source_pack: Dict[str, Any],
+        *,
+        grounded_enabled: bool,
+        fail_closed: bool,
+        explicit_website: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Allowlist filter + reference finalize. Returns None if fail-closed with no references."""
+        out = dict(data)
+        if explicit_website and str(explicit_website).strip():
+            out["lookup_website"] = str(explicit_website).strip()
+        if grounded_enabled:
+            log_pre_filter_cited_urls(out.get("references"))
+            out = self._apply_allowlist(out, source_pack["url_allowlist"])
+            if fail_closed and not out.get("references"):
+                self.logger.warning(
+                    "grounded_citations: fail-closed; no allowlisted references survived"
+                )
+                return None
+        return finalize_scout_references(
+            out,
+            anchor_hostname=self._reference_anchor_hostname(out, explicit_website=explicit_website),
+        )
+
+    def _scout_validates(self, data: Dict[str, Any]) -> bool:
+        try:
+            validate_scout_output(data)
+            return True
+        except Exception:
+            return False
+
+    def _repair_scout_json_sync(
+        self,
+        incomplete: Dict[str, Any],
+        source_pack: Dict[str, Any],
+        *,
+        grounded_enabled: bool,
+        context_note: str = "",
+    ) -> Optional[Dict[str, Any]]:
+        """One completion to fix missing/invalid fields. Keeps retrieval citations honest when grounded."""
+        system = (
+            "You repair incomplete Scout JSON for a venture scouting system. "
+            "Output exactly one JSON object and no other text. "
+            "Every required Scout field must be present with correct types: "
+            "name, one_line, sector, problem, solution, target_users, why_now, confidence (0-1 number), "
+            "primary_thesis, key_assumptions (array of 2-4 strings), biggest_unknown, references (1-8 strings). "
+            "Optional: funding_stage, est_tam (may be null). "
+            "`name` must be a real operating company's brand or legal name—not a hypothetical venture, not a market theme. "
+            "Never return a partial object. Do not use markdown."
+        )
+        sources_block = (
+            render_sources_for_prompt(source_pack["sources"])
+            if grounded_enabled and source_pack.get("sources")
+            else "No retrieved source pack for this repair; use only facts you can support. "
+            "references must still include at least one real http(s) URL proving the company exists."
+        )
+        note = (context_note or "").strip()
+        payload = json.dumps(incomplete, ensure_ascii=False)[:14000]
+        user = (
+            (f"Context: {note}\n\n" if note else "")
+            + "The following JSON is INVALID or incomplete — fix it into a single valid Scout payload.\n\n"
+            + payload
+            + "\n\n"
+            + sources_block
+            + "\n\nWhen sources are listed above: each references[] string MUST include an http(s) URL copied from those sources. "
+            "key_assumptions must have 2-4 items. Avoid mega-cap incumbents (Google, Microsoft, Amazon, Apple, Meta, etc.)."
+        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                response_format={"type": "json_object"},
+                max_completion_tokens=4096,
+            )
+            try:
+                if hasattr(response, "usage") and response.usage:
+                    add = getattr(response.usage, "total_tokens", None)
+                    if isinstance(add, int):
+                        self._last_token_usage += add
+            except Exception:
+                pass
+            content = response.choices[0].message.content
+            if not content:
+                return None
+            return json.loads(content)
+        except Exception as e:
+            self.logger.warning("scout repair LLM failed: %s", e)
+            return None
+
+    def _finalize_scout_payload_from_llm(
+        self,
+        raw_data: Dict[str, Any],
+        source_pack: Dict[str, Any],
+        *,
+        grounded_enabled: bool,
+        fail_closed: bool,
+        explicit_website: Optional[str] = None,
+        context_note: str = "",
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Normalize → allowlist + URL finalize → validate; on failure run one repair LLM pass.
+        Subclasses wrap TypedDict(**partial) which does not enforce completeness — this does.
+        """
+        d = dict(raw_data)
+        self._normalize_scout_ids_inplace(d)
+        p = self._postprocess_scout_dict(
+            d,
+            source_pack,
+            grounded_enabled=grounded_enabled,
+            fail_closed=fail_closed,
+            explicit_website=explicit_website,
+        )
+        if p is not None and self._scout_validates(p):
+            return p
+        if p is None:
+            self.logger.info(
+                "[%s] scout payload postprocess failed or empty refs; attempting repair",
+                self.scout_type,
+            )
+        else:
+            self.logger.warning(
+                "[%s] scout payload failed validation; attempting repair pass(es)",
+                self.scout_type,
+            )
+        to_repair: Dict[str, Any] = d
+        for attempt in range(2):
+            fixed = self._repair_scout_json_sync(
+                to_repair,
+                source_pack,
+                grounded_enabled=grounded_enabled,
+                context_note=(
+                    f"{context_note} | repair_attempt={attempt + 1}"
+                    if (context_note or "").strip()
+                    else f"repair_attempt={attempt + 1}"
+                ),
+            )
+            if not isinstance(fixed, dict):
+                return None
+            d2 = dict(fixed)
+            self._normalize_scout_ids_inplace(d2)
+            p2 = self._postprocess_scout_dict(
+                d2,
+                source_pack,
+                grounded_enabled=grounded_enabled,
+                fail_closed=fail_closed,
+                explicit_website=explicit_website,
+            )
+            if p2 is not None and self._scout_validates(p2):
+                return p2
+            to_repair = d2
+        return None
+
     def _call_llm_sync(self) -> Optional[dict]:
         """
         Synchronous LLM call (runs in thread pool).
@@ -170,6 +378,27 @@ class Scout(ABC):
             Parsed JSON dict if successful, None if failed.
         """
         try:
+            self._last_token_usage = 0
+            grounded_enabled = is_scout_grounded_citations_enabled(self._tenant_user_id)
+            fail_closed = is_scout_fail_closed_on_empty_retrieval(self._tenant_user_id)
+            source_pack = {"provider": "none", "sources": [], "url_allowlist": set()}
+            if grounded_enabled:
+                lens_query = (
+                    f"{self.scout_type.replace('_', ' ')} early-stage startup funding "
+                    f"news company website"
+                )
+                source_pack = retrieve_source_pack(
+                    query=lens_query,
+                    user_id=self._tenant_user_id,
+                    max_results=6,
+                )
+                if fail_closed and not source_pack["sources"]:
+                    self.logger.warning(
+                        "grounded_citations: fail-closed; no retrieval sources provider=%s",
+                        source_pack.get("provider"),
+                    )
+                    return None
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -178,8 +407,22 @@ class Scout(ABC):
                         "role": "user",
                         "content": (
                             self._fund_thesis_user_block()
+                            + (
+                                (
+                                    "\n\n"
+                                    + render_sources_for_prompt(source_pack["sources"])
+                                    + "\n\nCITATION RULES:\n"
+                                    "1) Only use URLs present in the retrieved sources above.\n"
+                                    "2) references entries must include exact source URL.\n"
+                                    "3) Format each reference as: [S#] Title - https://...\n"
+                                    "4) If no suitable source is available, return nothing.\n\n"
+                                )
+                                if grounded_enabled
+                                else ""
+                            )
                             + "Find one REAL VC-BACKABLE STARTUP (Seed to Series C, typically private, technology-driven), "
-                            "not a hypothetical idea and not a mega-cap incumbent like Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, or their cloud brands. "
+                            "not a hypothetical idea, not a product category or market theme, and not a mega-cap incumbent like Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, or their cloud brands. "
+                            "`name` must be that company's actual brand or legal name as used in the wild (not a generic label like \"AI compliance tooling\"). "
                             "Output ONLY valid JSON matching the ScoutOutput schema "
                             "(resources/contracts/schemas/scout_output_v1.json). Exact shape:\n\n"
                             "{\n"
@@ -206,6 +449,7 @@ class Scout(ABC):
                             "Avoid giant public companies and hyperscalers (Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, etc.). "
                             "If you cannot find a suitable VC-scale startup with verifiable sources, return nothing. "
                             "Do NOT invent company names or make up sources. Use null for funding_stage/est_tam if unknown. "
+                            "You MUST include every top-level key from the schema (name through references); never return a partial JSON object with only id/scout_type/references. "
                             "Output only the JSON object, no text before or after."
                         ),
                     },
@@ -213,38 +457,29 @@ class Scout(ABC):
                 response_format={"type": "json_object"},
             )
             
-            # Track token usage if available
+            # Track token usage if available (repair pass may add more)
             try:
                 if hasattr(response, "usage") and response.usage:
                     total = getattr(response.usage, "total_tokens", None)
                     if isinstance(total, int):
-                        self._last_token_usage = total
+                        self._last_token_usage += total
             except Exception:
-                # Non-fatal; cost accounting is best-effort
-                self._last_token_usage = 0
+                pass
 
             content = response.choices[0].message.content
             if not content:
                 self.logger.error("Empty response from LLM")
                 return None
             
-            # Parse JSON
             data = json.loads(content)
-            
-            # Ensure ID is set
-            if "id" not in data or not data["id"]:
-                data["id"] = generate_id()
-            
-            # Ensure scout_type matches
-            data["scout_type"] = self.scout_type
-            # Optionally enrich references using SERP (guarded + rate-limited)
-            data = maybe_enrich_references(data, user_id=self._tenant_user_id)
-            data = finalize_scout_references(
+            return self._finalize_scout_payload_from_llm(
                 data,
-                anchor_hostname=self._reference_anchor_hostname(data),
+                source_pack,
+                grounded_enabled=grounded_enabled,
+                fail_closed=fail_closed,
+                explicit_website=None,
+                context_note="open discovery",
             )
-
-            return data
 
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse JSON from LLM: {e}")
@@ -262,6 +497,24 @@ class Scout(ABC):
             return None
         site = (website or "").strip()
         try:
+            self._last_token_usage = 0
+            grounded_enabled = is_scout_grounded_citations_enabled(self._tenant_user_id)
+            fail_closed = is_scout_fail_closed_on_empty_retrieval(self._tenant_user_id)
+            source_pack = {"provider": "none", "sources": [], "url_allowlist": set()}
+            if grounded_enabled:
+                query = f"{company} startup company profile funding website"
+                source_pack = retrieve_source_pack(
+                    query=query,
+                    user_id=self._tenant_user_id,
+                    max_results=6,
+                )
+                if fail_closed and not source_pack["sources"]:
+                    self.logger.warning(
+                        "grounded_citations: fail-closed company=%s no retrieval sources",
+                        company,
+                    )
+                    return None
+
             user_prompt = (
                 f'Analyze this specific company: "{company}". '
                 "Do not pick a different company. "
@@ -271,6 +524,19 @@ class Scout(ABC):
                     else ""
                 )
                 + self._fund_thesis_user_block()
+                + (
+                    (
+                        "\n\n"
+                        + render_sources_for_prompt(source_pack["sources"])
+                        + "\n\nCITATION RULES:\n"
+                        "1) Only cite sources from the retrieved list.\n"
+                        "2) references must include exact URL from that list.\n"
+                        "3) Format references as [S#] Title - https://...\n"
+                        "4) If sources are insufficient, return nothing.\n\n"
+                    )
+                    if grounded_enabled
+                    else ""
+                )
                 + "Output ONLY valid JSON matching the ScoutOutput schema "
                 "(resources/contracts/schemas/scout_output_v1.json). Exact shape:\n\n"
                 "{\n"
@@ -293,6 +559,7 @@ class Scout(ABC):
                 "}\n\n"
                 "CRITICAL: references must contain verifiable sources proving this company exists. "
                 "If confidence is low or data is incomplete, still return best-effort fields and set unknowns to null. "
+                "You MUST include every top-level key from the schema (name through references); never return a partial object. "
                 "Do not invent references. Output only JSON."
             )
             response = self.client.chat.completions.create(
@@ -306,22 +573,28 @@ class Scout(ABC):
                 ],
                 response_format={"type": "json_object"},
             )
+            try:
+                if hasattr(response, "usage") and response.usage:
+                    total = getattr(response.usage, "total_tokens", None)
+                    if isinstance(total, int):
+                        self._last_token_usage += total
+            except Exception:
+                pass
             content = response.choices[0].message.content
             if not content:
                 self.logger.error("Empty response from LLM (company lookup)")
                 return None
             data = json.loads(content)
-            if "id" not in data or not data["id"]:
-                data["id"] = generate_id()
-            data["scout_type"] = self.scout_type
             if site:
                 data["lookup_website"] = site
-            data = maybe_enrich_references(data, user_id=self._tenant_user_id)
-            data = finalize_scout_references(
+            return self._finalize_scout_payload_from_llm(
                 data,
-                anchor_hostname=self._reference_anchor_hostname(data, explicit_website=site or None),
+                source_pack,
+                grounded_enabled=grounded_enabled,
+                fail_closed=fail_closed,
+                explicit_website=site or None,
+                context_note=f'company lookup: "{company}"',
             )
-            return data
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse JSON from LLM (company lookup): {e}")
             return None
@@ -363,21 +636,5 @@ class Scout(ABC):
             return None
     
     async def _discover_with_validation(self) -> Optional[ScoutOutput]:
-        """
-        Internal method that calls discover() and validates output.
-        """
-        try:
-            data = await self.discover()
-            if data is None:
-                return None
-            
-            # Validate against schema
-            validated = validate_scout_output(data)
-            return validated
-            
-        except ValueError as e:
-            self.logger.error(f"Validation failed: {e}")
-            return None
-        except Exception as e:
-            self.logger.error(f"Discovery failed: {e}")
-            return None
+        """Pipeline entrypoint; discover() already enforces schema."""
+        return await self.discover()

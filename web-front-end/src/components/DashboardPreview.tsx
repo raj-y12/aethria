@@ -71,7 +71,7 @@ export default function DashboardPreview() {
         >
           <motion.div className="relative w-full max-w-xl shrink-0 md:w-[40%] md:pt-9" variants={leftColVariants}>
             <p className="section-numeral mb-6 md:absolute md:left-0 md:top-4 md:mb-0">VI</p>
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)]">
+            <p className="mb-3 font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(0,33,71,0.5)]">
               Inside Aethria
             </p>
             <h2 className="mb-6 text-[clamp(2.15rem,4.2vw,3rem)] leading-[1.08] text-[var(--color-oxford)]">
@@ -99,7 +99,7 @@ export default function DashboardPreview() {
                   key={item.label}
                   className="border-l border-solid border-[var(--section-divider)] pl-3 md:pl-4"
                 >
-                  <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.78)]">
+                  <p className="mb-1.5 font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(0,33,71,0.82)]">
                     {item.label}
                   </p>
                   <p className="font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.78)]">{item.body}</p>
@@ -120,19 +120,19 @@ export default function DashboardPreview() {
               }}
               aria-label="Investment memo preview"
             >
-              <p className="mb-4 font-mono text-[8px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.25)]">
+              <p className="mb-4 font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(0,33,71,0.4)]">
                 AETHRIA INTELLIGENCE · AUTONOMOUS OUTPUT
               </p>
               <h3 className="text-xl font-semibold leading-tight tracking-tight text-[var(--color-oxford)] sm:text-2xl">
                 Meridian Systems
               </h3>
-              <p className="mt-1.5 font-mono text-[11px] tracking-[0.1em] text-[rgba(0,33,71,0.4)]">
+              <p className="mt-1.5 font-mono text-[13px] tracking-[0.08em] text-[rgba(0,33,71,0.5)]">
                 B2B INFRASTRUCTURE · SERIES A
               </p>
 
               <div className="my-6 h-px bg-[var(--section-divider)]" aria-hidden />
 
-              <p className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.48)]">
+              <p className="mb-1.5 font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(0,33,71,0.58)]">
                 INVESTMENT JUDGMENT
               </p>
               <p className="font-sans text-[clamp(1.375rem,5vw,2rem)] font-semibold leading-tight tracking-[-0.03em] text-[var(--color-oxford)] md:text-[32px]">
@@ -145,13 +145,13 @@ export default function DashboardPreview() {
 
               <div className="my-6 h-px bg-[var(--section-divider)]" aria-hidden />
 
-              <p className="mb-[18px] font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.48)]">
+              <p className="mb-[18px] font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(0,33,71,0.58)]">
                 DIMENSION SCORES
               </p>
               <div className="grid w-full grid-cols-5 gap-x-0.5 gap-y-1 sm:gap-x-2 sm:gap-y-2 md:gap-x-3">
                 {DIMENSION_SCORES.map((row) => (
                   <div key={`dim-label-${row.label}`} className="flex min-w-0 items-end justify-center text-center">
-                    <p className="m-0 hyphens-auto break-normal font-mono text-[7px] leading-[1.15] tracking-[0.04em] text-[rgba(0,33,71,0.4)] sm:text-[10px] sm:tracking-[0.05em]">
+                    <p className="m-0 hyphens-auto break-normal font-mono text-[12px] leading-[1.25] tracking-[0.03em] text-[rgba(0,33,71,0.55)]">
                       {row.label}
                     </p>
                   </div>

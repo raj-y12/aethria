@@ -20,8 +20,8 @@ _DEFAULT_KEY = "default"
 
 # Errno 35 = EAGAIN (Resource temporarily unavailable) under concurrent load
 _TRANSIENT_ERRNOS = (35, 11)  # 11 = EAGAIN on some platforms
-_MAX_RETRIES = 4
-_RETRY_DELAY = 0.12
+_MAX_RETRIES = 6
+_RETRY_DELAY = 0.08
 
 
 def _is_transient(e: BaseException) -> bool:
@@ -47,6 +47,11 @@ def _retry_on_transient(fn: Callable[[], T]) -> T:
             raise
     assert last is not None
     raise last
+
+
+def _run_with_retry(fn: Callable[[], T]) -> T:
+    """Retry transient transport errors for both reads and writes."""
+    return _retry_on_transient(fn)
 
 
 def _client():
@@ -133,10 +138,15 @@ def list_upsert(
         record = dict(record)
         record["id"] = rid
     try:
-        _client().table(table).upsert(
-            {"user_id": uid, "id": rid, "data": record},
-            on_conflict="user_id,id",
-        ).execute()
+        _run_with_retry(
+            lambda: _client()
+            .table(table)
+            .upsert(
+                {"user_id": uid, "id": rid, "data": record},
+                on_conflict="user_id,id",
+            )
+            .execute()
+        )
         return rid
     except Exception as e:
         logger.warning("supabase_doc_store list_upsert %s: %s", table, e)
@@ -152,7 +162,9 @@ def list_append(
     record = dict(record)
     record["id"] = rid
     try:
-        _client().table(table).insert({"user_id": uid, "id": rid, "data": record}).execute()
+        _run_with_retry(
+            lambda: _client().table(table).insert({"user_id": uid, "id": rid, "data": record}).execute()
+        )
         return rid
     except Exception as e:
         logger.warning("supabase_doc_store list_append %s: %s", table, e)
@@ -166,7 +178,9 @@ def list_append_only(table: str, record: Dict[str, Any], *, user_id: str) -> str
     record = dict(record)
     record["id"] = rid
     try:
-        _client().table(table).insert({"user_id": uid, "id": rid, "data": record}).execute()
+        _run_with_retry(
+            lambda: _client().table(table).insert({"user_id": uid, "id": rid, "data": record}).execute()
+        )
         return rid
     except Exception as e:
         logger.warning("supabase_doc_store list_append_only %s: %s", table, e)
@@ -216,10 +230,15 @@ def doc_set(table: str, data: Any, key: str = _DEFAULT_KEY, *, user_id: str) -> 
     """Upsert (user_id, key) -> data."""
     uid = require_user_id(user_id, context=f"doc_set({table})")
     try:
-        _client().table(table).upsert(
-            {"user_id": uid, "key": key, "data": data},
-            on_conflict="user_id,key",
-        ).execute()
+        _run_with_retry(
+            lambda: _client()
+            .table(table)
+            .upsert(
+                {"user_id": uid, "key": key, "data": data},
+                on_conflict="user_id,key",
+            )
+            .execute()
+        )
     except Exception as e:
         logger.warning("supabase_doc_store doc_set %s %s: %s", table, key, e)
         raise

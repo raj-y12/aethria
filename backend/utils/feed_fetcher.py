@@ -13,6 +13,9 @@ from datetime import datetime
 import urllib.request
 import urllib.error
 import xml.etree.ElementTree as ET
+from uuid import uuid4
+
+from supabase_client import get_service_client
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +52,17 @@ class FeedItem:
 class FeedFetcher:
     """Fetches and caches external signal feeds."""
 
-    def __init__(self, cache_file: str = CACHE_FILE):
+    def __init__(self, cache_file: str = CACHE_FILE, user_id: Optional[str] = None):
         self.cache_path = Path(cache_file)
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
+        self.user_id = (user_id or "").strip() or None
         self.logger = logging.getLogger("feed_fetcher")
+
+    def _using_supabase(self) -> bool:
+        return bool(self.user_id and os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+
+    def _supabase_client(self):
+        return get_service_client()
 
     def fetch_all(self) -> List[Dict[str, str]]:
         """Fetch all feeds. Returns cached results if within TTL."""
@@ -148,6 +158,27 @@ class FeedFetcher:
 
     def _read_cache(self) -> Optional[List[Dict[str, str]]]:
         """Read cache if within TTL."""
+        if self._using_supabase():
+            try:
+                r = (
+                    self._supabase_client()
+                    .table("portfolio_feed_cache")
+                    .select("cached_at,items,created_at")
+                    .eq("user_id", self.user_id)
+                    .order("created_at", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                rows = (r.data or []) if hasattr(r, "data") else []
+                if rows:
+                    row = rows[0]
+                    cached_at = float(row.get("cached_at") or 0)
+                    if time.time() - cached_at < CACHE_TTL_SECONDS:
+                        items = row.get("items")
+                        return items if isinstance(items, list) else []
+                return None
+            except Exception as e:
+                self.logger.warning("Supabase feed cache read failed; using file fallback: %s", e)
         if not self.cache_path.exists():
             return None
         try:
@@ -162,6 +193,30 @@ class FeedFetcher:
 
     def _write_cache(self, items: List[Dict[str, str]]) -> None:
         """Write items to cache with timestamp."""
+        if self._using_supabase():
+            try:
+                q = (
+                    self._supabase_client()
+                    .table("portfolio_feed_cache")
+                    .select("id")
+                    .eq("user_id", self.user_id)
+                    .limit(1)
+                    .execute()
+                )
+                rows = (q.data or []) if hasattr(q, "data") else []
+                payload = {"cached_at": time.time(), "items": items}
+                if rows:
+                    row_id = rows[0].get("id")
+                    self._supabase_client().table("portfolio_feed_cache").update(payload).eq(
+                        "id", row_id
+                    ).eq("user_id", self.user_id).execute()
+                else:
+                    self._supabase_client().table("portfolio_feed_cache").insert(
+                        {"id": str(uuid4()), "user_id": self.user_id, **payload}
+                    ).execute()
+                return
+            except Exception as e:
+                self.logger.warning("Supabase feed cache write failed; using file fallback: %s", e)
         data = {"cached_at": time.time(), "items": items}
         temp_path = self.cache_path.with_suffix(".tmp")
         with open(temp_path, "w") as f:

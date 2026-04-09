@@ -151,7 +151,7 @@ async def run_system(user_id: Optional[str]):
     
     # Cost controller only when budget enforcement is enabled in settings
     uid = (user_id or "").strip()
-    cost_controller = CostController() if is_cost_budget_enabled(uid if uid else None) else None
+    cost_controller = CostController(user_id=uid if uid else None) if is_cost_budget_enabled(uid if uid else None) else None
 
     mem_uid = uid if uid else "local_agents"
     deal_memory = DealMemory(user_id=mem_uid)
@@ -161,11 +161,14 @@ async def run_system(user_id: Optional[str]):
         from fund_thesis import FundThesisIncompleteError, FundThesisMissingError, get_active_thesis
 
         try:
-            thesis_ctx = get_active_thesis(get_service_client(), uid).as_engine_context()
-        except (FundThesisMissingError, FundThesisIncompleteError) as e:
+            active = get_active_thesis(get_service_client(), uid)
+            if active is None:
+                raise ValueError("No active thesis")
+            thesis_ctx = active.as_engine_context()
+        except FundThesisIncompleteError as e:
             raise ValueError(
-                "Could not load or bootstrap fund thesis when USE_SUPABASE_STORAGE=1. "
-                "Check Supabase connectivity and fund_thesis migrations; default thesis does not require OpenAI."
+                "Could not load fund thesis when USE_SUPABASE_STORAGE=1. "
+                "Check Supabase connectivity and fund_thesis migrations."
             ) from e
 
     scout_engine = ScoutEngine(

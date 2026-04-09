@@ -202,14 +202,14 @@ function EscalationCard({
           <button
             type="button"
             onClick={() => onOpenMemo(escalation)}
-            className="shrink-0 cursor-pointer rounded-none border-0 bg-transparent p-0 font-mono text-[9px] font-normal uppercase leading-none tracking-[0.1em] text-oxford opacity-[0.35] transition-opacity duration-150 ease-out hover:opacity-80 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-offset-0"
+            className="shrink-0 inline-flex min-h-7 items-center cursor-pointer rounded-none border border-solid border-oxford/15 bg-transparent px-2.5 py-1 font-mono text-[10px] font-normal uppercase leading-none tracking-[0.1em] text-oxford/65 transition-[background-color,border-color,color,transform] duration-150 ease-out hover:bg-oxford/[0.04] hover:border-oxford/35 hover:text-oxford active:translate-y-px btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-offset-0"
           >
             → MEMO
           </button>
         ) : null}
       </div>
       <p
-        className="mt-1 text-[9px] font-normal uppercase leading-[1.5] text-oxford/40"
+        className="mt-1 inline-flex w-fit min-h-6 items-center rounded-none border border-solid border-oxford/10 bg-transparent px-2 py-0.5 text-[10px] font-normal uppercase leading-[1.5] tracking-[0.08em] text-oxford/50"
         style={{ fontFamily: '"Space Mono", ui-monospace, monospace' }}
       >
         Awaiting human review
@@ -227,17 +227,32 @@ function EscalationCard({
         <div className="mt-3 flex flex-wrap items-center">
           {(
             [
-              { d: 'YES' as const, label: 'ADVANCE', opacityClass: 'opacity-[0.85] hover:opacity-100' },
-              { d: 'NO' as const, label: 'PASS', opacityClass: 'opacity-50 hover:opacity-100' },
-              { d: 'MAYBE' as const, label: 'HOLD', opacityClass: 'opacity-50 hover:opacity-100' },
+              {
+                d: 'YES' as const,
+                label: 'ADVANCE',
+                toneClass:
+                  'border-oxford/30 text-oxford/90 hover:bg-oxford/[0.08] hover:border-oxford/45',
+              },
+              {
+                d: 'NO' as const,
+                label: 'PASS',
+                toneClass:
+                  'border-oxford/18 text-oxford/70 hover:bg-oxford/[0.05] hover:border-oxford/35',
+              },
+              {
+                d: 'MAYBE' as const,
+                label: 'HOLD',
+                toneClass:
+                  'border-oxford/18 text-oxford/70 hover:bg-oxford/[0.05] hover:border-oxford/35',
+              },
             ] as const
-          ).map(({ d, label, opacityClass }, i) => (
+          ).map(({ d, label, toneClass }, i) => (
             <div key={d} className="flex items-center">
-              {i > 0 ? <span className="mx-0 h-3 w-px shrink-0 bg-oxford/[0.15]" aria-hidden /> : null}
+              {i > 0 ? <span className="mx-0.5 h-3 w-px shrink-0 bg-oxford/[0.15]" aria-hidden /> : null}
               <button
                 type="button"
                 onClick={() => setResolving(d)}
-                className={`${opacityClass} rounded-none border-0 bg-transparent py-1 px-3 font-mono text-[10px] font-normal uppercase leading-[1.5] tracking-[0.1em] text-oxford transition-opacity duration-150 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-offset-0`}
+                className={`${toneClass} rounded-none border border-solid bg-transparent py-1 px-3 font-mono text-[10px] font-normal uppercase leading-[1.5] tracking-[0.1em] transition-[background-color,border-color,color,transform] duration-150 btn-interaction active:translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-offset-0`}
               >
                 {label}
               </button>
@@ -260,7 +275,7 @@ function EscalationCard({
               disabled={notes.trim().length < 10}
               className={`flex-1 py-2 type-label-tab text-paper btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset ${
                 notes.trim().length >= 10
-                  ? 'cursor-pointer bg-oxford'
+                  ? 'cursor-pointer bg-oxford hover:bg-oxford/90'
                   : 'cursor-not-allowed bg-oxford/30'
               }`}
             >
@@ -268,7 +283,7 @@ function EscalationCard({
             </button>
             <button
               onClick={() => { setResolving(null); setNotes(''); }}
-              className="py-2 px-3 type-label-tab text-oxford/60 border border-oxford/25 btn-interaction"
+              className="py-2 px-3 type-label-tab text-oxford/60 border border-oxford/25 hover:text-oxford hover:border-oxford/40 hover:bg-oxford/[0.03] btn-interaction"
             >
               Cancel
             </button>
@@ -409,7 +424,7 @@ function MetaAgentTab({ reports, weights, calibration }: {
         <button
           type="button"
           onClick={() => setLegendOpen((o) => !o)}
-          className="w-full flex items-center justify-between py-2 px-0 type-label-tab text-oxford/50 hover:text-oxford/70 btn-interaction text-left"
+          className="w-full flex items-center justify-between py-2 px-0 type-label-tab text-oxford/50 hover:text-oxford/75 btn-interaction text-left"
           aria-expanded={legendOpen}
         >
           <span>Pipeline legend</span>
@@ -549,7 +564,7 @@ function MetaAgentTab({ reports, weights, calibration }: {
         <button
           onClick={handleTrigger}
           disabled={triggering || !!triggerResult}
-          className="w-full py-3 type-label-tab text-oxford/60 border border-oxford/25 hover:text-oxford hover:border-oxford/40 btn-interaction disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3 type-label-tab text-oxford/60 border border-oxford/25 hover:text-oxford hover:border-oxford/40 hover:bg-oxford/[0.03] btn-interaction disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {triggering ? 'Triggering…' : triggerResult ?? 'Trigger meta cycle'}
         </button>

@@ -1,22 +1,19 @@
 """
 Rejection pattern analyzer. Learns from passed deals.
-Persists to Supabase (memory.rejection_patterns per user) when USE_SUPABASE_STORAGE; else local JSON file.
+Persists to Supabase (`portfolio_rejection_patterns`) when configured with tenant context;
+falls back to local JSON file otherwise.
 """
 import json
 import logging
 import os
 import fcntl
-from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+from uuid import uuid4
 
-from tenant_context import require_user_id
-from supabase_doc_store import doc_get, doc_set
+from supabase_client import get_service_client
 
 logger = logging.getLogger(__name__)
-
-_REJECTION_DOC_KEY = "rejection_patterns"
-
 
 def _empty_patterns() -> Dict[str, Any]:
     return {
@@ -36,11 +33,14 @@ class RejectionAnalyzer:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.patterns_file = self.data_dir / "rejection_patterns.json"
-        self.use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
         self.user_id = (user_id or "").strip() or None
-        if self.use_supabase:
-            self.user_id = require_user_id(self.user_id, context="RejectionAnalyzer")
         self.logger = logging.getLogger("rejection.analyzer")
+
+    def _using_supabase(self) -> bool:
+        return bool(self.user_id and os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+
+    def _supabase_client(self):
+        return get_service_client()
 
     def analyze_rejection(
         self,
@@ -99,11 +99,23 @@ class RejectionAnalyzer:
         return self._read_patterns()
 
     def _read_patterns(self) -> Dict[str, Any]:
-        if self.use_supabase and self.user_id:
-            data = doc_get("memory", _REJECTION_DOC_KEY, user_id=self.user_id)
-            if isinstance(data, dict) and data:
-                return data
-            return _empty_patterns()
+        if self._using_supabase():
+            try:
+                r = (
+                    self._supabase_client()
+                    .table("portfolio_rejection_patterns")
+                    .select("stats,created_at")
+                    .eq("user_id", self.user_id)
+                    .order("created_at", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                rows = (r.data or []) if hasattr(r, "data") else []
+                if rows and isinstance(rows[0].get("stats"), dict):
+                    return rows[0]["stats"]
+                return _empty_patterns()
+            except Exception as e:
+                self.logger.warning("Supabase rejection patterns read failed; using file fallback: %s", e)
         if not self.patterns_file.exists():
             return _empty_patterns()
         try:
@@ -117,9 +129,30 @@ class RejectionAnalyzer:
             return _empty_patterns()
 
     def _write_patterns(self, data: Dict[str, Any]) -> None:
-        if self.use_supabase and self.user_id:
-            doc_set("memory", data, _REJECTION_DOC_KEY, user_id=self.user_id)
-            return
+        if self._using_supabase():
+            try:
+                # Keep exactly one current row per user via update-or-insert.
+                q = (
+                    self._supabase_client()
+                    .table("portfolio_rejection_patterns")
+                    .select("id")
+                    .eq("user_id", self.user_id)
+                    .limit(1)
+                    .execute()
+                )
+                rows = (q.data or []) if hasattr(q, "data") else []
+                if rows:
+                    row_id = rows[0].get("id")
+                    self._supabase_client().table("portfolio_rejection_patterns").update(
+                        {"stats": data}
+                    ).eq("id", row_id).eq("user_id", self.user_id).execute()
+                else:
+                    self._supabase_client().table("portfolio_rejection_patterns").insert(
+                        {"id": str(uuid4()), "user_id": self.user_id, "stats": data}
+                    ).execute()
+                return
+            except Exception as e:
+                self.logger.warning("Supabase rejection patterns write failed; using file fallback: %s", e)
         temp_path = self.patterns_file.with_suffix(".tmp")
         with open(temp_path, "w") as f:
             json.dump(data, f, indent=2)
