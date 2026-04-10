@@ -5,10 +5,10 @@ export const PANEL_HEADER_CLASS =
 export const PANEL_TITLE_CLASS = 'type-label-tab text-oxford/60';
 export const PANEL_TAB_BAR_CLASS = 'flex-none flex gap-0 border-b border-hairline px-3 sm:px-4';
 export const PANEL_TAB_BUTTON_CLASS =
-  'py-2.5 px-3 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
+  'py-2.5 px-3 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction transition-[border-color,color]';
 export const PANEL_TAB_ACTIVE_CLASS = 'text-oxford border-oxford';
 export const PANEL_TAB_INACTIVE_CLASS =
-  'text-oxford/60 border-transparent hover:text-oxford hover:border-oxford/20';
+  'text-oxford/40 border-transparent hover:text-oxford/70 hover:border-oxford/35';
 export const PANEL_CONTENT_CLASS =
   'flex-1 min-h-0 overflow-y-auto p-4 sm:p-5';
 

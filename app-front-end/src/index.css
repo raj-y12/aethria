@@ -54,6 +54,26 @@
   --motion-short: 0.4s;
   --motion-medium: 0.5s;
   --motion-long: 0.6s;
+
+  /* ── Golden ratio system (φ = 1.618034) ──────────────────────────────────
+   * Spacing: Fibonacci sequence — each step × φ ≈ next value.
+   * Tailwind classes: p-phi-1 … p-phi-9, gap-phi-4, mt-phi-6, etc.
+   * Type: body 14px → title 23px (×φ) → hero 37px (×φ²). Line-height = φ.
+   * Columns: sidebar 38.2% (1/φ²) : content 61.8% (1/φ).
+   * ─────────────────────────────────────────────────────────────────────── */
+  --phi: 1.618034;
+  --space-1: 3px;    /* micro: icon padding, divider gap */
+  --space-2: 5px;    /* tight inline gap */
+  --space-3: 8px;    /* compact component padding */
+  --space-4: 13px;   /* element/section gap */
+  --space-5: 21px;   /* card padding, page padding-x */
+  --space-6: 34px;   /* section padding, page padding-y */
+  --space-7: 55px;   /* panel gap */
+  --space-8: 89px;   /* page bottom padding */
+  --space-9: 144px;  /* major layout gap */
+  /* Column ratio */
+  --col-sidebar: 38.2%;
+  --col-content: 61.8%;
 }
 
 /* Clerk UserProfile — match Aethria: #002147 oxford, #F2F0EA paper, Geist Sans / Space Mono, no radius */
@@ -239,7 +259,7 @@
     font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
     font-size: 14px;
     font-weight: 400;
-    line-height: 1.6;
+    line-height: var(--phi); /* golden ratio — 1.618034 */
     text-rendering: optimizeLegibility;
   }
 
@@ -296,28 +316,33 @@
 }
 
 @layer utilities {
-  /* Canonical type scale — only these classes for typography. No arbitrary sizes. */
+  /*
+   * Canonical type scale — golden ratio (φ = 1.618034), anchored at 14px body.
+   * body 14px → title 14×φ ≈ 23px → hero 23×φ ≈ 37px.
+   * Body line-height = φ. Title line-height = 1/φ + 1 ≈ 1.618. Hero tighter at 1.2.
+   * No arbitrary sizes outside this scale.
+   */
   .type-hero {
     font-family: "Libre Baskerville", Georgia, serif;
-    font-size: 28px;
-    line-height: 1.4;
+    font-size: 37px;  /* 23px × φ ≈ 37px */
+    line-height: 1.2;
     letter-spacing: -0.02em;
   }
   .type-title {
     font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
-    font-size: 24px;
-    line-height: 1.5;
+    font-size: 23px;  /* 14px × φ ≈ 23px */
+    line-height: 1.382; /* 2 − 1/φ ≈ 1.382 */
     letter-spacing: -0.02em;
   }
   .type-body {
     font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
     font-size: 14px;
-    line-height: 1.6;
+    line-height: var(--phi); /* 1.618 — the golden ratio */
   }
   .type-body-sm {
     font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
     font-size: 13px;
-    line-height: 1.6;
+    line-height: var(--phi); /* 1.618 */
   }
   .type-label-section {
     font-family: "Space Mono", ui-monospace, monospace;
@@ -357,12 +382,12 @@
     letter-spacing: -0.02em;
     line-height: 1.1;
   }
-  /** Display at memo/verdict scale — pairs with .type-display */
+  /** Display at memo/verdict scale — pairs with .type-display. Size: 37px → 60px (37×φ) */
   .type-display-xl {
     font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
     font-weight: 500;
-    font-size: clamp(1.75rem, 5vw, 2.5rem);
-    line-height: 1.08;
+    font-size: clamp(2.3125rem, 5vw, 3.75rem); /* 37px → 60px (37×φ ≈ 60) */
+    line-height: 1.0;
     letter-spacing: -0.03em;
   }
 
@@ -372,7 +397,7 @@
   .paper-dot-grid {
     background-color: var(--color-paper);
     background-image: radial-gradient(rgba(0, 33, 71, 0.055) 1px, transparent 1px);
-    background-size: 28px 28px;
+    background-size: 21px 21px; /* φ-5 spacing — golden ratio grid */
     background-repeat: repeat;
   }
 

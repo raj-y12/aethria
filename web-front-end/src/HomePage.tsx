@@ -602,11 +602,42 @@ export default function HomePage() {
   );
 }
 
+type PipelineStatus = 'ACTIVE' | 'PROCESSING' | 'IDLE';
+
+const PIPELINE_STATUS_CYCLE: PipelineStatus[] = ['ACTIVE', 'PROCESSING', 'IDLE'];
+
+const PIPELINE_STATUS_CONFIG: Record<
+  PipelineStatus,
+  { dot: string; dotAnimation?: string; label: string; valueOpacity: string }
+> = {
+  ACTIVE: {
+    dot: 'bg-[var(--color-oxford)]',
+    dotAnimation: 'pipeline-dot-pulse 2s ease-in-out infinite',
+    label: 'ACTIVE',
+    valueOpacity: 'text-[var(--color-oxford)]',
+  },
+  PROCESSING: {
+    dot: 'bg-[rgba(0,33,71,0.45)]',
+    dotAnimation: 'pipeline-dot-pulse 3.5s ease-in-out infinite',
+    label: 'PROCESSING',
+    valueOpacity: 'text-[rgba(0,33,71,0.55)]',
+  },
+  IDLE: {
+    dot: 'bg-[rgba(0,33,71,0.2)]',
+    dotAnimation: undefined,
+    label: 'IDLE',
+    valueOpacity: 'text-[rgba(0,33,71,0.3)]',
+  },
+};
+
 function LiveSignalPills() {
   const reduce = useReducedMotion();
   const [dealsCount, setDealsCount] = useState(47);
-  const [pipelineStatus, setPipelineStatus] = useState<'ACTIVE' | 'PROCESSING'>('ACTIVE');
+  const [statusIndex, setStatusIndex] = useState(0);
   const [minutesAgo, setMinutesAgo] = useState(2);
+
+  const pipelineStatus = PIPELINE_STATUS_CYCLE[statusIndex];
+  const statusConfig = PIPELINE_STATUS_CONFIG[pipelineStatus];
 
   const pillListVariants: Variants = {
     hidden: {},
@@ -636,7 +667,7 @@ function LiveSignalPills() {
 
   useEffect(() => {
     const statusInterval = setInterval(() => {
-      setPipelineStatus((prev) => (prev === 'ACTIVE' ? 'PROCESSING' : 'ACTIVE'));
+      setStatusIndex((prev) => (prev + 1) % PIPELINE_STATUS_CYCLE.length);
     }, 4000);
     return () => clearInterval(statusInterval);
   }, []);
@@ -650,7 +681,7 @@ function LiveSignalPills() {
 
   return (
     <motion.div
-      className="flex w-full max-w-md min-w-0 flex-1 flex-col gap-3 self-stretch"
+      className="flex w-full max-w-md min-w-0 flex-1 flex-col self-stretch border-t border-[var(--section-divider)]"
       variants={pillListVariants}
       initial="hidden"
       whileInView="visible"
@@ -659,24 +690,24 @@ function LiveSignalPills() {
       <motion.div variants={pillItemVariants}>
         <SignalPill label="Deals reviewed this cycle" value={`${dealsCount}`} />
       </motion.div>
+
+      {/* Pipeline status row — visually weighted by state */}
       <motion.div variants={pillItemVariants}>
         <SignalPill
           label="Pipeline status"
+          prominent
           value={
-            pipelineStatus === 'ACTIVE' ? (
-              <span className="inline-flex items-center gap-2">
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-none bg-[var(--color-oxford)]"
-                  style={{ animation: 'pipeline-dot-pulse 2s ease-in-out infinite' }}
-                />
-                <span>ACTIVE</span>
-              </span>
-            ) : (
-              'PROCESSING'
-            )
+            <span className={`inline-flex items-center gap-2 transition-colors duration-500 ${statusConfig.valueOpacity}`}>
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-none ${statusConfig.dot}`}
+                style={statusConfig.dotAnimation ? { animation: statusConfig.dotAnimation } : undefined}
+              />
+              <span>{statusConfig.label}</span>
+            </span>
           }
         />
       </motion.div>
+
       <motion.div variants={pillItemVariants}>
         <SignalPill label="Last memo generated" value={`${minutesAgo} min ago`} />
       </motion.div>
@@ -684,11 +715,27 @@ function LiveSignalPills() {
   );
 }
 
-function SignalPill({ label, value }: { label: string; value: ReactNode }) {
+function SignalPill({
+  label,
+  value,
+  prominent = false,
+}: {
+  label: string;
+  value: ReactNode;
+  prominent?: boolean;
+}) {
   return (
-    <div className="signal-pill group relative flex min-h-[52px] items-center justify-between gap-3 overflow-hidden border border-solid border-[var(--section-divider)] bg-[var(--color-paper)] px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
-      <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)]">{label}</div>
-      <div className="font-sans text-[13px] font-semibold tabular-nums text-[var(--color-oxford)]">{value}</div>
+    <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-[var(--section-divider)] py-3 sm:gap-4">
+      <div
+        className={`font-mono text-[10px] uppercase tracking-[0.12em] ${
+          prominent ? 'text-[rgba(0,33,71,0.6)]' : 'text-[rgba(0,33,71,0.45)]'
+        }`}
+      >
+        {label}
+      </div>
+      <div className={prominent ? '' : 'font-sans text-[13px] font-semibold tabular-nums text-[var(--color-oxford)]'}>
+        {value}
+      </div>
     </div>
   );
 }

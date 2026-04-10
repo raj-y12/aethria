@@ -298,10 +298,10 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                           setListFilterFadeEnabled(true);
                           setSourceFilter(value);
                         }}
-                        className={`min-h-7 shrink-0 px-1.5 py-0.5 ${UI_FILTER_SEGMENT_INACTIVE} btn-interaction border-0 border-b bg-transparent ${
+                        className={`min-h-7 shrink-0 px-1.5 py-0.5 ${UI_FILTER_SEGMENT_INACTIVE} btn-interaction border-0 border-b bg-transparent transition-[border-color,color] ${
                           active
-                            ? 'border-oxford/45 text-oxford'
-                            : 'border-transparent text-oxford/42 hover:border-oxford/20 hover:text-oxford/75'
+                            ? 'border-oxford text-oxford'
+                            : 'border-transparent text-oxford/40 hover:border-oxford/35 hover:text-oxford/70'
                         }`}
                         aria-pressed={active}
                       >
@@ -339,10 +339,10 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
               </label>
               <button
                 type="button"
-                className={`${FILTER_TOOLBAR_BORDER_BTN_BASE} self-end text-left ${
+                className={`${FILTER_TOOLBAR_BORDER_BTN_BASE} self-end text-left transition-[border-color,color] ${
                   showAdvancedFilters
-                    ? 'border-oxford/45 text-oxford'
-                    : 'border-transparent text-oxford/42 hover:border-oxford/20 hover:text-oxford/75'
+                    ? 'border-oxford text-oxford'
+                    : 'border-transparent text-oxford/40 hover:border-oxford/35 hover:text-oxford/70'
                 }`}
                 onClick={() => setShowAdvancedFilters((v) => !v)}
                 aria-expanded={showAdvancedFilters}

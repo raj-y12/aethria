@@ -34,10 +34,10 @@ const SETTINGS_SAVE_BTN_CLASS =
 
 const SETTINGS_TAB_NAV_CLASS = `${PANEL_TAB_BAR_CLASS} pt-2 pb-0`;
 const SETTINGS_TAB_BTN_CLASS =
-  'py-2.5 px-3 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
-const SETTINGS_TAB_ACTIVE_CLASS = 'border-b border-oxford text-oxford/[0.9]';
+  'py-2.5 px-3 type-label-tab border-b border-oxford/15 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction transition-[border-color,color]';
+const SETTINGS_TAB_ACTIVE_CLASS = 'border-oxford text-oxford';
 const SETTINGS_TAB_INACTIVE_CLASS =
-  'border-b border-transparent text-oxford/[0.35] hover:border-oxford/15 hover:text-oxford/55';
+  'border-oxford/15 text-oxford/35 hover:border-oxford/35 hover:text-oxford/60';
 
 const settingsDescClass =
   'max-w-xl leading-relaxed m-0 text-[13px] font-normal text-oxford/50';

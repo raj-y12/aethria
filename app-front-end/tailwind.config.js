@@ -51,6 +51,22 @@ export default {
       borderRadius: { DEFAULT: '0', none: '0' },
       boxShadow: { DEFAULT: 'none', none: 'none' },
       maxWidth: { reading: '38rem' },
+      /**
+       * Golden ratio spacing scale — Fibonacci sequence, each step × φ ≈ next.
+       * Use as: p-phi-4, gap-phi-5, mt-phi-6, etc.
+       * CSS vars: --space-1 … --space-9 (set in index.css :root).
+       */
+      spacing: {
+        'phi-1': '3px',    // micro gap, icon padding
+        'phi-2': '5px',    // tight inline gap
+        'phi-3': '8px',    // compact component padding
+        'phi-4': '13px',   // element gap, section gap
+        'phi-5': '21px',   // card padding, page padding-x
+        'phi-6': '34px',   // section padding, page padding-y
+        'phi-7': '55px',   // panel gap
+        'phi-8': '89px',   // page bottom padding
+        'phi-9': '144px',  // major layout gap
+      },
     },
   },
   plugins: [],

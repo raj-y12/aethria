@@ -21,7 +21,7 @@ import { fetchFundThesisRuntime, type FundThesisRuntime } from '../api/fundThesi
 
 /** Match pipeline tab strip: bottom border on the nav hairline (items-end + -mb-px, same language as `PanelShell`). */
 const SYSTEM_INTEL_TAB_BUTTON_CLASS =
-  'py-2.5 px-3 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
+  'py-2.5 px-3 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction transition-[border-color,color]';
 const SYSTEM_INTEL_TAB_BAR_CLASS = `${PANEL_TAB_BAR_CLASS} items-end pt-2 pb-0`;
 
 type Tab = 'signals' | 'escalations' | 'analytics' | 'thesis' | 'meta';

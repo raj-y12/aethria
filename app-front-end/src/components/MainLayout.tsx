@@ -477,11 +477,33 @@ export default function MainLayout({
                   <span className={pendingEscalations > 0 ? 'text-escalation' : 'text-oxford/65'}>{pendingEscalations}</span> esc
                   <span className="mx-2 text-oxford/18">·</span>
                   <span className="text-oxford/65">{resolvedCount}</span> decided
+                  {signals.length > 0 && (
+                    <>
+                      <span className="mx-2 text-oxford/18">·</span>
+                      <span className="text-oxford/65">{signals.length}</span> sig
+                    </>
+                  )}
                 </p>
                 <p className="shrink-0 text-right font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/38">
                   Pipeline{' '}
                   <span className="relative inline-flex items-center gap-1.5">
-                    <span className={pipelineStateLabel === 'Issue' ? 'text-escalation' : 'text-oxford/65'}>
+                    {/* Live dot — shown when pipeline is On or Working */}
+                    {(pipelineStateLabel === 'On' || pipelineStateLabel === 'Working') && (
+                      <span
+                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60"
+                        style={{ animation: pipelineStateLabel === 'On'
+                          ? 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite'
+                          : 'aethria-pulse 1.2s cubic-bezier(0.16,1,0.3,1) infinite'
+                        }}
+                        aria-hidden
+                      />
+                    )}
+                    <span className={
+                      pipelineStateLabel === 'Issue'   ? 'text-escalation' :
+                      pipelineStateLabel === 'Off'     ? 'text-oxford/25' :
+                      pipelineStateLabel === 'On'      ? 'text-oxford/80' :
+                      /* Working */                      'text-oxford/65'
+                    }>
                       {pipelineStateLabel}
                     </span>
                     {pipelineStateLabel === 'Issue' && (
@@ -511,7 +533,15 @@ export default function MainLayout({
                     )}
                   </span>
                   <span className="mx-2 text-oxford/18">·</span>
-                  Lookup <span className={lookupWorking ? 'text-escalation' : 'text-oxford/65'}>{lookupStateLabel}</span>
+                  Lookup{' '}
+                  <span className={
+                    !lookupWorking                      ? 'text-oxford/25' :
+                    lookupPhaseLabel === 'Scouting'    ? 'text-oxford/65' :
+                    lookupPhaseLabel === 'Reviewing'   ? 'text-oxford/75' :
+                    /* Deciding */                        'text-oxford/80'
+                  }>
+                    {lookupStateLabel}
+                  </span>
                 </p>
               </section>
               <div className="mt-3 border border-hairline">

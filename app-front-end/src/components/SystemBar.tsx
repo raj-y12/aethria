@@ -37,13 +37,20 @@ function SpineNavButton({
     <button
       type="button"
       onClick={onClick}
-      className={`type-meta w-full min-h-[40px] flex items-center justify-center cursor-pointer uppercase tracking-[0.14em] btn-interaction ${
-        active ? 'text-white' : 'text-white/45 hover:text-white/80'
+      className={`type-meta w-full min-h-[40px] flex items-center justify-center cursor-pointer uppercase tracking-[0.14em] btn-interaction transition-colors ${
+        active ? 'text-white' : 'text-white/40 hover:text-white/70'
       }`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
       aria-pressed={ariaPressed}
     >
-      <span className={`inline-block pb-0.5 ${active ? 'border-b border-white' : ''}`}>{label}</span>
+      {/* Underline always present — full-white when active, dim when inactive */}
+      <span
+        className={`inline-block pb-0.5 border-b transition-[border-color,color] ${
+          active ? 'border-white' : 'border-transparent hover:border-white/50'
+        }`}
+      >
+        {label}
+      </span>
     </button>
   );
 }
