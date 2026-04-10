@@ -459,7 +459,7 @@ export default function MainLayout({
 
       {/* Paper canvas. Fixed height so only WorkGrid scrolls.
           On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[calc(9rem+2rem)] lg:pr-7 lg:pt-7">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[calc(9rem+21px)] lg:pr-[21px] lg:pt-[21px]">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-3 lg:pb-5 gap-3 lg:gap-5">
           <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
