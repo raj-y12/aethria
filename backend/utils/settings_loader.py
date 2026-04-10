@@ -45,9 +45,9 @@ DEFAULT_SETTINGS = {
         "cooldown_seconds": 60,
     },
     "agent_config": {
-        "scouts_enabled": True,
-        "reviewers_enabled": True,
-        "partners_enabled": True,
+        "scouts_enabled": False,
+        "reviewers_enabled": False,
+        "partners_enabled": False,
         "max_agents_per_run": 10,
         # Lower default to avoid reviewer starvation on normal-confidence scout rows.
         "confidence_threshold": 0.2,
@@ -126,15 +126,15 @@ def save_settings(settings: dict, user_id: Optional[str] = None) -> None:
 
 
 def is_scouts_enabled(user_id: Optional[str] = None) -> bool:
-    return load_settings(user_id).get("agent_config", {}).get("scouts_enabled", True)
+    return load_settings(user_id).get("agent_config", {}).get("scouts_enabled", False)
 
 
 def is_reviewers_enabled(user_id: Optional[str] = None) -> bool:
-    return load_settings(user_id).get("agent_config", {}).get("reviewers_enabled", True)
+    return load_settings(user_id).get("agent_config", {}).get("reviewers_enabled", False)
 
 
 def is_partners_enabled(user_id: Optional[str] = None) -> bool:
-    return load_settings(user_id).get("agent_config", {}).get("partners_enabled", True)
+    return load_settings(user_id).get("agent_config", {}).get("partners_enabled", False)
 
 
 def _agent_config_safe(user_id: Optional[str] = None) -> dict:
@@ -149,7 +149,7 @@ def _agent_config_safe(user_id: Optional[str] = None) -> dict:
 def is_thesis_reprocess_agents_enabled(user_id: Optional[str] = None) -> bool:
     """Fund-thesis backfill re-runs reviewer + partner only."""
     ac = _agent_config_safe(user_id)
-    return bool(ac.get("reviewers_enabled", True) and ac.get("partners_enabled", True))
+    return bool(ac.get("reviewers_enabled", False) and ac.get("partners_enabled", False))
 
 
 def is_cost_budget_enabled(user_id: Optional[str] = None) -> bool:

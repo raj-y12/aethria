@@ -76,7 +76,7 @@ function RomanReveal({ show, text }: { show: boolean; text: string }) {
   }, [show]);
   return (
     <span
-      className="font-display text-[clamp(2.5rem,12vw,4rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] transition-opacity duration-500 tabular-nums md:text-[64px]"
+      className="font-mono text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] transition-opacity duration-500 tabular-nums md:text-[44px]"
       style={{ opacity: visible ? 1 : 0 }}
     >
       {text}
@@ -95,19 +95,19 @@ function StatColumn({ metric, index, run }: { metric: Metric; index: number; run
     numberNode = <RomanReveal show={run} text={metric.displayRoman ?? ''} />;
   } else if (metric.kind === 'int') {
     numberNode = (
-      <span className="font-display text-[clamp(2.5rem,12vw,4rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] tabular-nums md:text-[64px]">
+      <span className="font-mono text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] tabular-nums md:text-[44px]">
         {n6}
       </span>
     );
   } else if (metric.kind === 'percent') {
     numberNode = (
-      <span className="font-display text-[clamp(2.5rem,12vw,4rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] tabular-nums md:text-[64px]">
+      <span className="font-mono text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] tabular-nums md:text-[44px]">
         {n100}%
       </span>
     );
   } else {
     numberNode = (
-      <span className="font-display text-[clamp(2.5rem,12vw,4rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] tabular-nums md:text-[64px]">
+      <span className="font-mono text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] tabular-nums md:text-[44px]">
         {dec.toFixed(2)}%
       </span>
     );

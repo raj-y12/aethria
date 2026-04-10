@@ -27,6 +27,7 @@ import type { SystemData } from '../hooks/useSystemData';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './InvestmentMemoContent';
 import { queueOnDemandLookup, fetchStartupDetail, fetchLookupJobStatus } from '../api/startups';
 import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
+import { fetchFundThesisSummary } from '../api/fundThesis';
 import { getQueryConfig } from '../lib/queryIntent';
 
 const SYSTEM_MEMO_HEADER_PADDING = 'py-[10px]';
@@ -250,6 +251,14 @@ export default function MainLayout({
   });
   const agentsStatus = agentsQuery.data ?? null;
 
+  const fundThesisQuery = useQuery({
+    queryKey: ['fund-thesis', 'summary'],
+    queryFn: () => fetchFundThesisSummary().catch(() => null),
+    ...getQueryConfig('STATIC'),
+    placeholderData: (prev) => prev ?? null,
+  });
+  const fundThesisSummary = fundThesisQuery.data ?? null;
+
   const lookupPhaseLabel = !lookupWorking
     ? null
     : !pendingLookupMatch
@@ -287,6 +296,55 @@ export default function MainLayout({
     }
     return ids;
   }, [watchlistAnalytics]);
+
+  const hasThesis = !!fundThesisSummary?.active_version_id;
+  const fundName = useMemo(() => {
+    // Prefer parsed_json name fields from the thesis itself
+    const pj = fundThesisSummary?.parsed_json;
+    if (pj && typeof pj === 'object') {
+      for (const key of ['fund_name', 'name', 'title', 'fund', 'fund_title']) {
+        const val = (pj as Record<string, unknown>)[key];
+        if (typeof val === 'string' && val.trim()) return val.trim();
+      }
+    }
+    // Fall back to settings fund identity
+    const settingsName = data.settings?.fund_identity?.fund_name?.trim();
+    if (settingsName) return settingsName;
+    // Last resort: version label if thesis exists
+    if (fundThesisSummary?.active_version_number != null) {
+      return `Fund Thesis v${fundThesisSummary.active_version_number}`;
+    }
+    return '';
+  }, [fundThesisSummary, data.settings?.fund_identity?.fund_name]);
+
+  const fundStage = data.settings?.fund_identity?.stage_focus?.trim() || '';
+  const fundGeo = data.settings?.fund_identity?.geographic_focus?.trim() || '';
+  const scoutRegionRaw = data.settings?.agent_config?.scout_region?.trim() || '';
+  const scoutRegion =
+    scoutRegionRaw.length > 0
+      ? scoutRegionRaw.charAt(0).toUpperCase() + scoutRegionRaw.slice(1).toLowerCase()
+      : '';
+  const thesisCriteria = useMemo(() => {
+    const pj = fundThesisSummary?.parsed_json;
+    const fromParsed: string[] = [];
+    if (pj && typeof pj === 'object') {
+      for (const key of ['stage', 'stage_focus', 'geography', 'geographic_focus', 'geographies', 'sectors', 'focus_areas', 'investment_criteria', 'themes', 'focus', 'sector']) {
+        const val = (pj as Record<string, unknown>)[key];
+        if (Array.isArray(val)) {
+          for (const item of val) {
+            if (typeof item === 'string' && item.trim()) { fromParsed.push(item.trim()); if (fromParsed.length >= 4) break; }
+          }
+        } else if (typeof val === 'string' && val.trim()) {
+          fromParsed.push(val.trim());
+        }
+        if (fromParsed.length >= 4) break;
+      }
+    }
+    const fromSettings = [fundStage, fundGeo, scoutRegion].filter(Boolean);
+    // Prefer parsed thesis data; fill remaining slots from settings
+    const combined = [...fromParsed, ...fromSettings];
+    return combined.filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 4);
+  }, [fundThesisSummary, fundStage, fundGeo, scoutRegion]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-paper">
@@ -401,45 +459,29 @@ export default function MainLayout({
 
       {/* Paper canvas. Fixed height so only WorkGrid scrolls.
           On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[11rem] lg:pr-6 lg:pt-6">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[calc(9rem+2rem)] lg:pr-7 lg:pt-7">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-3 lg:pb-4 gap-4 lg:gap-4">
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-3 lg:pb-5 gap-3 lg:gap-5">
           <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
-            {/* Title + pipeline summary — desktop only; escalations live here (not duplicated on SystemBar) */}
-            <header className="flex-none mb-2 hidden lg:block min-w-0">
-              <div>
-                <h1 className="font-display font-normal text-[20px] leading-[1.4] text-oxford">
-                  Aethria
-                </h1>
-                {data.settings?.fund_identity?.fund_name?.trim() && (
-                  <p className="type-meta text-oxford/50 mt-1 tracking-[0.12em]" aria-hidden>
-                    {[
-                      data.settings.fund_identity.fund_name.trim(),
-                      data.settings.fund_identity.stage_focus?.trim(),
-                      data.settings.fund_identity.geographic_focus?.trim(),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                )}
-              </div>
+            {/* Pipeline summary + lookup — desktop only */}
+            <header className="flex-none mb-3 hidden lg:block min-w-0">
               <section
                 aria-label="Pipeline summary and agent status"
-                className="mt-2 flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border border-hairline bg-paper px-2 py-1.5"
+                className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-0.5 border-b border-hairline pb-3"
               >
-                <p className="min-w-0 font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/45">
-                  Total <span className="text-oxford">{startups.length}</span>
-                  <span className="mx-1.5 text-oxford/20">·</span>
-                  Open <span className="text-oxford">{openCount}</span>
-                  <span className="mx-1.5 text-oxford/20">·</span>
-                  Esc <span className={pendingEscalations > 0 ? 'text-escalation' : 'text-oxford'}>{pendingEscalations}</span>
-                  <span className="mx-1.5 text-oxford/20">·</span>
-                  Dec <span className="text-oxford">{resolvedCount}</span>
+                <p className="min-w-0 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/38">
+                  <span className="text-oxford/65">{startups.length}</span> total
+                  <span className="mx-2 text-oxford/18">·</span>
+                  <span className="text-oxford/65">{openCount}</span> open
+                  <span className="mx-2 text-oxford/18">·</span>
+                  <span className={pendingEscalations > 0 ? 'text-escalation' : 'text-oxford/65'}>{pendingEscalations}</span> esc
+                  <span className="mx-2 text-oxford/18">·</span>
+                  <span className="text-oxford/65">{resolvedCount}</span> decided
                 </p>
-                <p className="shrink-0 text-right font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/45">
+                <p className="shrink-0 text-right font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/38">
                   Pipeline{' '}
-                  <span className="relative inline-flex items-center gap-1">
-                    <span className={pipelineStateLabel === 'Issue' ? 'text-escalation' : 'text-oxford'}>
+                  <span className="relative inline-flex items-center gap-1.5">
+                    <span className={pipelineStateLabel === 'Issue' ? 'text-escalation' : 'text-oxford/65'}>
                       {pipelineStateLabel}
                     </span>
                     {pipelineStateLabel === 'Issue' && (
@@ -454,34 +496,34 @@ export default function MainLayout({
                           ?
                         </button>
                         {showPipelineIssueHelp && (
-                          <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-56 rounded-none border border-field-border bg-paper p-2 text-left normal-case tracking-normal text-[11px] leading-4 text-oxford shadow-none">
+                          <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-56 rounded-none border border-field-border bg-paper p-3 text-left normal-case tracking-normal text-[11px] leading-[1.6] text-oxford shadow-none">
                             Pipeline has a problem and may not process updates right now.
                             <button
                               type="button"
                               onClick={() => navigate('/settings')}
-                              className="mt-1.5 block text-[10px] uppercase tracking-[0.08em] text-oxford/70 hover:text-oxford btn-interaction"
+                              className="mt-2 block text-[10px] uppercase tracking-[0.08em] text-oxford/60 hover:text-oxford btn-interaction"
                             >
-                              Open settings
+                              Open settings →
                             </button>
                           </span>
                         )}
                       </>
                     )}
                   </span>
-                  <span className="mx-1.5 text-oxford/20">·</span>
-                  Lookup <span className={lookupWorking ? 'text-escalation' : 'text-oxford'}>{lookupStateLabel}</span>
+                  <span className="mx-2 text-oxford/18">·</span>
+                  Lookup <span className={lookupWorking ? 'text-escalation' : 'text-oxford/65'}>{lookupStateLabel}</span>
                 </p>
               </section>
-              <div className="mt-2 border border-hairline bg-paper">
+              <div className="mt-3 border border-hairline">
                 <button
                   type="button"
-                  className="w-full flex items-center justify-between border-b border-hairline bg-paper px-2 py-1.5 type-meta uppercase tracking-[0.12em] text-oxford/50 hover:text-oxford/70 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset"
+                  className="w-full flex items-center justify-between px-3 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45 hover:text-oxford/65 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset border-b border-hairline"
                   aria-expanded={lookupExpanded}
                   aria-controls="lookup-panel"
                   onClick={() => setLookupExpanded((open) => !open)}
                 >
                   <span>On-demand lookup</span>
-                  <span className="tabular-nums" aria-hidden>{lookupExpanded ? '−' : '+'}</span>
+                  <span className="tabular-nums text-oxford/30" aria-hidden>{lookupExpanded ? '−' : '+'}</span>
                 </button>
                 <AnimatePresence initial={false}>
                   {lookupExpanded && (
@@ -496,7 +538,7 @@ export default function MainLayout({
                       })}
                       className="overflow-hidden"
                     >
-                      <div className="px-2 py-2">
+                      <div className="px-3 py-3">
                         <div className="flex items-center gap-2">
                           <input
                             type="text"
@@ -506,19 +548,19 @@ export default function MainLayout({
                               if (e.key === 'Enter') void handleLookupSubmit();
                             }}
                             placeholder="Company name, website, or context"
-                            className="h-8 flex-1 rounded-none border border-field-border bg-paper px-2 text-[12px] text-oxford outline-none focus:border-field-border-strong"
+                            className="h-8 flex-1 rounded-none border border-field-border bg-transparent px-2.5 text-[12px] text-oxford placeholder:text-oxford/35 outline-none focus:border-field-border-strong"
                           />
                           <button
                             type="button"
                             onClick={() => void handleLookupSubmit()}
                             disabled={lookupBusy || !lookupInput.trim()}
-                            className="h-8 px-2 type-meta uppercase tracking-[0.08em] border border-field-border-strong text-oxford disabled:text-oxford/35 disabled:border-hairline-strong"
+                            className="h-8 px-3 font-mono text-[10px] uppercase tracking-[0.1em] border border-oxford/30 text-oxford/70 hover:text-oxford hover:border-oxford/50 disabled:text-oxford/25 disabled:border-hairline-strong btn-interaction"
                           >
                             {lookupBusy ? 'Queueing...' : 'Queue'}
                           </button>
                         </div>
                         {lookupMessage ? (
-                          <p className="mt-1 text-[11px] text-oxford/55">{lookupMessage}</p>
+                          <p className="mt-1.5 font-mono text-[10px] text-oxford/45">{lookupMessage}</p>
                         ) : null}
                       </div>
                     </motion.div>
@@ -563,7 +605,7 @@ export default function MainLayout({
               </div>
             ) : (
               <div
-                className="flex-1 min-h-0 overflow-y-auto w-full min-w-0 rounded-none border border-hairline bg-paper"
+                className="flex-1 min-h-0 overflow-y-auto w-full min-w-0 rounded-none bg-paper"
                 style={{ scrollbarGutter: 'stable both-edges' }}
               >
                 <div className="px-0 pt-0 pb-6 lg:pb-8">
@@ -581,18 +623,50 @@ export default function MainLayout({
           </div>
 
           {/* Right zone: Judgements or memo only — never System. */}
-          <aside
-            className="hidden lg:flex flex-col min-w-0 min-h-0 border border-hairline bg-paper overflow-hidden"
-            aria-live="polite"
-            aria-label={
-              rightPanel === 'feed'
-                ? 'Judgements'
-                : selectedStartup
-                ? 'Investment memo'
-                : 'Detail'
-            }
-          >
-            {rightPanel === 'feed' ? (
+          <div className="hidden lg:flex min-w-0 min-h-0 flex-col gap-3">
+            <article
+              className="w-full border border-hairline bg-paper p-4 sm:p-5"
+              aria-label="Fund thesis preview"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-mono text-[11px] uppercase tracking-[0.11em] text-oxford/40">
+                  Active Mandate · Fund Thesis
+                </p>
+                {hasThesis && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/70 escalation-pulse" aria-hidden />
+                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/50">Live</span>
+                  </span>
+                )}
+              </div>
+              <p className="mt-2.5 font-sans text-[15px] font-semibold leading-tight tracking-tight text-oxford">
+                {fundName || 'No fund configured'}
+              </p>
+              {thesisCriteria.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {thesisCriteria.map((item) => (
+                    <span
+                      key={item}
+                      className="border border-hairline px-2 py-0.5 font-mono text-[10px] tracking-[0.06em] text-oxford/60"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </article>
+            <aside
+              className="min-w-0 min-h-0 flex-1 border border-hairline bg-paper overflow-hidden"
+              aria-live="polite"
+              aria-label={
+                rightPanel === 'feed'
+                  ? 'Judgements'
+                  : selectedStartup
+                  ? 'Investment memo'
+                  : 'Detail'
+              }
+            >
+              {rightPanel === 'feed' ? (
               <PanelShell
                 className="min-h-0 flex-1"
                 title="JUDGEMENTS"
@@ -618,7 +692,7 @@ export default function MainLayout({
                   metaReports={metaReports}
                 />
               </PanelShell>
-            ) : selectedStartup ? (
+              ) : selectedStartup ? (
               <PanelShell
                 className="min-h-0 min-w-0 flex-1 w-full"
                 title=""
@@ -652,7 +726,7 @@ export default function MainLayout({
                     </button>
                   </div>
                 }
-                contentClassName="flex-1 min-h-0 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6"
+                contentClassName="flex-1 min-h-0 overflow-y-auto px-6 py-6 sm:px-8 sm:py-8"
               >
                 <InvestmentMemoContent
                   key={memoStartup!.id}
@@ -662,14 +736,15 @@ export default function MainLayout({
                   onMemoPipelineReady={handleMemoPipelineReady}
                 />
               </PanelShell>
-            ) : (
+              ) : (
               <div className="flex-1 flex items-center justify-center p-8">
                 <p className="type-label-tab text-oxford/25" style={{ transition: 'opacity var(--motion-micro) var(--motion-ease)' }}>
                   Click a deal to open the memo here
                 </p>
               </div>
-            )}
-          </aside>
+              )}
+            </aside>
+          </div>
         </div>
         </div>
       </main>

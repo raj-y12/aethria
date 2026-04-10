@@ -25,11 +25,11 @@ export default function GhostTransition({
   const lift = !disableLift && !reduceMotion;
   return (
     <motion.div
-      initial={lift ? { opacity: 0, y: 6 } : { opacity: 0 }}
+      initial={lift ? { opacity: 0, y: 10 } : { opacity: 0 }}
       animate={lift ? { opacity: 1, y: 0 } : { opacity: 1 }}
-      exit={lift ? { opacity: 0, y: -4 } : { opacity: 0 }}
+      exit={lift ? { opacity: 0, y: -6 } : { opacity: 0 }}
       transition={transitionOrReduced(reduceMotion, {
-        duration: tokens.motion.duration.short,
+        duration: tokens.motion.duration.medium,
         ease: tokens.motion.ease,
         delay: reduceMotion ? 0 : delay,
       })}

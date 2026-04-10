@@ -273,13 +273,13 @@ export default function HomePage() {
                 {
                   phase: 'I',
                   label: 'SCOUT',
-                  body: 'Agents monitor market signals continuously. When a name surfaces, context and sourcing are already assembled.',
-                  signal: 'discovery',
+                  body: 'Agents monitor market signals continuously against your fund thesis. When a name surfaces, context and sourcing are already assembled.',
+                  signal: 'thesis-gated discovery',
                 },
                 {
                   phase: 'II',
                   label: 'REVIEW',
-                  body: 'Structured evaluation across dimensions you define. Conviction emerges; uncertainty is explicit.',
+                  body: 'Structured evaluation across dimensions you define. Conviction emerges; uncertainty is explicit. On-demand lookup runs at any time.',
                   signal: 'conviction',
                 },
                 {
@@ -393,6 +393,8 @@ export default function HomePage() {
                   aria-label="Product capabilities"
                 >
                   {[
+                    'FUND THESIS · MANDATE-GATED PIPELINE',
+                    'ON-DEMAND LOOKUP · INSTANT COMPANY ANALYSIS',
                     'INVESTMENT MEMOS · FULL REASONING CHAIN',
                     'ESCALATIONS · HUMAN-IN-LOOP PATHS',
                     'PORTFOLIO SIGNALS · CONCENTRATION ANALYTICS',
@@ -433,6 +435,136 @@ export default function HomePage() {
         </motion.section>
 
         <DashboardPreview />
+
+        {/* Section VII — Fund Thesis + On-Demand Lookup */}
+        <section
+          className="flex min-h-0 w-full flex-col items-stretch border-b border-solid border-[var(--section-divider)] lg:flex-row"
+          aria-labelledby="thesis-lookup-heading"
+        >
+          {/* Left panel — Fund Thesis (oxford dark) */}
+          <ScrollReveal
+            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#002147] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:px-12 lg:py-20"
+            y={20}
+            amount={0.18}
+          >
+            <div className="w-full max-w-lg">
+              <p className="section-numeral mb-6 text-[rgba(242,240,234,0.22)]">VII</p>
+              <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(242,240,234,0.38)]">
+                Configuration layer
+              </p>
+              <h2
+                id="thesis-lookup-heading"
+                className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[#f2f0ea]"
+              >
+                Define your mandate.
+                <br />
+                <span className="italic font-normal opacity-80 text-[0.92em]">The system obeys.</span>
+              </h2>
+              <p className="mt-5 max-w-[44ch] font-sans text-[15px] leading-[1.7] text-[rgba(242,240,234,0.6)]">
+                Upload or write your investment thesis. Every scout, reviewer, and partner decision is gated against it — automatically, without re-configuration.
+              </p>
+
+              {/* Thesis card mock */}
+              <div
+                className="mt-8 border border-solid border-[rgba(242,240,234,0.12)] p-4 sm:p-5"
+                aria-hidden
+              >
+                <div className="flex items-center justify-between">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-[rgba(242,240,234,0.35)]">
+                    Active Mandate
+                  </p>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className="h-1.5 w-1.5 rounded-none bg-[#f2f0ea]"
+                      style={{ opacity: 0.55, animation: 'pipeline-dot-pulse 2.4s ease-in-out infinite' }}
+                    />
+                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(242,240,234,0.45)]">
+                      Live
+                    </span>
+                  </span>
+                </div>
+                <p className="mt-2.5 font-sans text-[15px] font-semibold text-[#f2f0ea]">
+                  Deep-Tech Infrastructure
+                </p>
+                <p className="mt-1 font-sans text-[13px] leading-[1.6] text-[rgba(242,240,234,0.5)]">
+                  Series A–B · European markets · B2B focus
+                </p>
+                <div className="mt-3 h-px bg-[rgba(242,240,234,0.1)]" />
+                <p className="mt-3 font-sans text-[13px] italic leading-[1.65] text-[rgba(242,240,234,0.4)]">
+                  "Backing infrastructure teams building the plumbing of the next compute cycle — prioritising capital efficiency and defensible wedge."
+                </p>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          {/* Right panel — On-Demand Lookup (paper light) */}
+          <ScrollReveal
+            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#f2f0ea] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:px-12 lg:py-20"
+            y={20}
+            delay={0.08}
+            amount={0.18}
+          >
+            <div className="w-full max-w-lg">
+              <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.38)]">
+                Instant intelligence
+              </p>
+              <h2 className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[#002147]">
+                Interrogate any name.
+                <br />
+                <span className="italic font-normal opacity-75 text-[0.92em]">Instantly.</span>
+              </h2>
+              <p className="mt-5 max-w-[44ch] font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.65)]">
+                On-demand lookup delivers a full investment memo on any company in seconds. No pipeline wait. Benchmarked against your active thesis the moment results arrive.
+              </p>
+
+              {/* Lookup interface mock */}
+              <div
+                className="mt-8 border border-solid border-[var(--section-divider)]"
+                aria-hidden
+              >
+                {/* Query bar */}
+                <div className="flex items-center gap-3 border-b border-solid border-[var(--section-divider)] bg-[rgba(0,33,71,0.025)] px-4 py-2.5">
+                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(0,33,71,0.35)]">
+                    LOOKUP
+                  </span>
+                  <span className="h-3 w-px shrink-0 bg-[var(--section-divider)]" />
+                  <span className="font-sans text-[13px] text-[rgba(0,33,71,0.65)]">Meridian Systems</span>
+                  <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-[rgba(0,33,71,0.3)]">
+                    ↵ run
+                  </span>
+                </div>
+
+                {/* Result preview */}
+                <div className="px-4 py-4">
+                  <div className="mb-3 flex items-baseline justify-between gap-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-[rgba(0,33,71,0.4)]">
+                      Result
+                    </p>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(0,33,71,0.35)]">
+                      B2B Infrastructure · Series A
+                    </p>
+                  </div>
+                  <p className="font-sans text-[18px] font-semibold leading-tight text-[#002147]">
+                    STRONG.
+                  </p>
+                  <p className="mt-1.5 font-sans text-[13px] leading-[1.6] text-[rgba(0,33,71,0.58)]">
+                    Thesis-aligned · High conviction · Pending unit economics review
+                  </p>
+                  <div className="mt-3 grid grid-cols-5 gap-x-2">
+                    {['MKT', 'EXEC', 'PROD', 'TECH', 'DEF'].map((d, i) => (
+                      <div key={d} className="flex flex-col items-center gap-0.5">
+                        <span className="font-mono text-[10px] text-[rgba(0,33,71,0.35)]">{d}</span>
+                        <span className="font-mono text-[11px] font-bold text-[rgba(0,33,71,0.7)]">
+                          {[9, 8, 8, 9, 7][i]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollReveal>
+        </section>
 
         <motion.footer
           className="home-footer paper-dot-grid section-divider-top relative z-20 w-full shrink-0"

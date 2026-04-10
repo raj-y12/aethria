@@ -261,7 +261,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
 
   if (startups.length === 0) {
     return (
-      <div className="w-full h-full min-h-[12rem] flex flex-col items-center justify-center border-b border-hairline">
+      <div className="w-full h-full min-h-[12rem] flex flex-col items-center justify-center">
         <EmptyState
           label="Pipeline"
           body="Scouts are filling the queue. First companies usually appear within a few minutes."
@@ -273,7 +273,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
   return (
     <div className="w-full">
       <div
-        className="sticky top-0 z-10 border-b border-hairline bg-paper px-3 py-1.5"
+        className="sticky top-0 z-10 border-b border-hairline bg-paper px-4 py-2.5"
         role="toolbar"
         aria-label="Filter pipeline"
       >
@@ -359,7 +359,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
           </div>
         </div>
         {showAdvancedFilters && (
-          <div className="mt-1.5 flex flex-col gap-1.5 border-t border-hairline pt-1.5 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-5 sm:gap-y-1">
+          <div className="mt-1.5 flex flex-col gap-1.5 pt-1.5 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-5 sm:gap-y-1">
             <label className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[12rem] sm:flex-none">
               <span className={`shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Decision</span>
               <select
@@ -446,14 +446,14 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
             tabIndex={0}
             aria-label={`View ${startup.scout.name}`}
             aria-current={isSelected ? 'true' : undefined}
-            initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+            initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={transitionOrReduced(reduceMotion, {
-              duration: tokens.motion.duration.short,
-              delay: Math.min(index, 10) * 0.02,
+              duration: tokens.motion.duration.medium,
+              delay: Math.min(index, 12) * 0.035,
               ease: tokens.motion.ease,
             })}
-            className={`group cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-oxford/25 focus-visible:ring-inset btn-interaction transition-colors rounded-none overflow-hidden ${
+            className={`group cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-oxford/25 focus-visible:ring-inset btn-interaction transition-colors rounded-none overflow-hidden border-b border-hairline ${
               isSelected ? 'bg-registerTint' : 'bg-transparent hover:bg-registerTint'
             }${hasDisagreement ? ' border-l-2 border-l-oxford/40' : ''}`}
             onClick={() => handleStartupClick(startup)}
@@ -462,7 +462,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
             }}
           >
             {/* Single column on mobile/tablet; two columns (60/40) only from lg up */}
-            <div className="flex flex-col gap-2 py-3 px-3 sm:px-4 lg:px-6 lg:grid lg:grid-cols-[3fr_2fr] lg:items-start lg:gap-4 border-b border-hairline">
+            <div className="flex flex-col gap-2 px-4 py-4 sm:px-5 lg:grid lg:grid-cols-[3fr_2fr] lg:gap-6 lg:px-6 lg:py-5 lg:items-start">
               <div className="min-w-0 overflow-hidden">
                 <div className="flex items-center gap-2 min-w-0">
                   {badgeVariant === 'escalation' && !isSelected && (
@@ -472,7 +472,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                     />
                   )}
                   <h2
-                    className="min-w-0 flex-1 truncate text-[15px] font-medium leading-[1.5] tracking-tight text-oxford/90"
+                    className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-[1.5] tracking-tight text-oxford"
                     style={{ fontFamily: '"Geist Sans", system-ui, sans-serif' }}
                   >
                     {startup.scout.name}
@@ -483,19 +483,18 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 </div>
                 {startup.scout.one_line?.trim() ? (
                   <p
-                    className={`min-w-0 text-[12px] leading-[1.6] text-oxford/50 overflow-hidden transition-[opacity,max-height,margin-top] ease-out ${
-                      reduceMotion ? 'duration-0' : 'duration-150'
+                    className={`min-w-0 text-[13px] leading-[1.6] text-oxford/55 overflow-hidden transition-[opacity,max-height,margin-top] ease-out ${
+                      reduceMotion ? 'duration-0' : 'duration-200'
                     } ${
                       isSelected
-                        ? 'mt-1 max-h-[200px] opacity-100'
-                        : 'mt-0 max-h-0 opacity-0 group-hover:mt-1 group-hover:max-h-[200px] group-hover:opacity-100'
+                        ? 'mt-1.5 max-h-[200px] opacity-100'
+                        : 'mt-0 max-h-0 opacity-0 group-hover:mt-1.5 group-hover:max-h-[200px] group-hover:opacity-100'
                     }`}
-                    style={{ fontFamily: '"Geist Sans", system-ui, sans-serif' }}
                   >
                     {startup.scout.one_line.trim()}
                   </p>
                 ) : null}
-                <div className="mt-1 flex w-full max-w-full flex-nowrap items-center gap-x-2 overflow-x-auto no-scrollbar font-mono text-[12px] leading-[1.5] text-oxford/50">
+                <div className="mt-1.5 flex w-full max-w-full flex-nowrap items-center gap-x-2 overflow-x-auto no-scrollbar font-mono text-[11px] leading-[1.5] tracking-[0.07em] text-oxford/45">
                   {sectorTrim ? (
                     <span className="shrink-0 whitespace-nowrap uppercase">{sectorTrim}</span>
                   ) : null}
@@ -511,16 +510,16 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                   ) : null}
                 </div>
               </div>
-              <div className="pt-2 border-t border-hairline flex flex-col items-start gap-1.5 min-w-0 lg:pt-1 lg:border-t-0 lg:text-right lg:items-end lg:justify-self-end">
+              <div className="min-w-0 flex flex-col items-start gap-2 lg:justify-self-end lg:items-end lg:text-right">
                 <span
-                  className={`type-label-tab text-oxford/40 min-h-[1.25rem] flex items-center justify-end w-full transition-opacity ease-out ${
+                  className={`font-mono text-[10px] tracking-[0.14em] uppercase text-oxford/35 min-h-[1.25rem] flex items-center justify-end w-full transition-opacity ease-out ${
                     reduceMotion ? 'duration-0' : 'duration-150'
                   } ${
                     isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                   }`}
                   aria-hidden
                 >
-                  → memo
+                  open memo →
                 </span>
                 <div className="flex w-full max-w-full min-w-0 flex-col gap-1.5 lg:items-end">
                   {fundingTier ? (

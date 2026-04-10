@@ -40,7 +40,10 @@ export const tokens = {
     25: 0.25,
   },
   font: {
-    display: '"Libre Baskerville", Georgia, serif',
+    /** Editorial headings — Cormorant Garamond (matches --font-display and web-front-end). */
+    display: '"Cormorant Garamond", Georgia, "Times New Roman", serif',
+    /** Wordmark / type-hero only — Libre Baskerville. */
+    wordmark: '"Libre Baskerville", Georgia, serif',
     body: '"Geist Sans", system-ui, -apple-system, sans-serif',
     mono: '"Space Mono", ui-monospace, monospace',
   },

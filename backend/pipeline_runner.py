@@ -116,9 +116,9 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
         logger.warning("[%s] Pipeline skipped (settings unavailable): %s", user_id[:12], e)
         return
     ac = settings.get("agent_config") or {}
-    scouts_enabled = bool(ac.get("scouts_enabled", True))
-    reviewers_enabled = bool(ac.get("reviewers_enabled", True))
-    partners_enabled = bool(ac.get("partners_enabled", True))
+    scouts_enabled = bool(ac.get("scouts_enabled", False))
+    reviewers_enabled = bool(ac.get("reviewers_enabled", False))
+    partners_enabled = bool(ac.get("partners_enabled", False))
     if not (scouts_enabled or reviewers_enabled or partners_enabled):
         logger.info("[%s] Agents disabled in settings, skipping", user_id[:12])
         return

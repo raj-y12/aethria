@@ -155,6 +155,10 @@ function formatSectorAndCategory(startup: Startup): string {
   return category ? `${sector} · ${category}` : sector;
 }
 
+function isLookupStartup(startup: Startup): boolean {
+  return (startup.scout.origin_type ?? '').toLowerCase() === 'on_demand_lookup';
+}
+
 const actionBtnCls = 'memoAction';
 
 function pipelineReplayOneLiner(steps: PipelineReplayStep[]): string {
@@ -277,6 +281,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [displayStartup, showJudgment]
   );
   const showEscalationBadge = !!(displayStartup?.partner?.human_review_required && decisionBadgeVariant);
+  const showLookupBadge = !!(displayStartup && isLookupStartup(displayStartup));
   const reasoningParagraphs = useMemo(
     () => (displayStartup && showJudgment ? toJudgmentReasoning(displayStartup) : []),
     [displayStartup, showJudgment]
@@ -340,10 +345,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           min-height: 0;
           overflow-y: auto;
           overflow-x: hidden;
-          padding-left: clamp(20px, 4vw, 48px);
-          padding-right: clamp(20px, 4vw, 48px);
-          padding-top: clamp(24px, 3vw, 40px);
-          padding-bottom: clamp(28px, 4vw, 48px);
+          padding-left: clamp(20px, 3.5vw, 44px);
+          padding-right: clamp(20px, 3.5vw, 44px);
+          padding-top: clamp(24px, 3vw, 36px);
+          padding-bottom: clamp(26px, 4vw, 42px);
           color: #002147;
           background: var(--color-paper);
         }
@@ -365,7 +370,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           align-items: center;
           gap: 10px 18px;
           margin-top: 0;
-          margin-bottom: clamp(16px, 2.5vw, 22px);
+          margin-bottom: 10px;
         }
         .memoAction{
           appearance: none;
@@ -382,21 +387,21 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoAction:hover{ color: #002147; }
         .memoCompany{
-          font-family: "Geist Sans", system-ui, sans-serif;
+          font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
           font-weight: 600;
-          font-size: clamp(1.375rem, 2.25vw + 0.35rem, 1.875rem);
-          line-height: 1.22;
-          letter-spacing: -0.02em;
+          font-size: clamp(1.25rem, 2.2vw, 1.5rem);
+          line-height: 1.12;
+          letter-spacing: -0.01em;
           margin: 0;
-          max-width: 40rem;
+          max-width: 100%;
           color: #002147;
         }
         .memoHeaderDivider{
-          margin-top: 14px;
-          margin-bottom: clamp(22px, 3vw, 30px);
+          margin-top: 20px;
+          margin-bottom: clamp(28px, 4vw, 40px);
         }
         .memoBody{
-          max-width: 42rem;
+          max-width: 48rem;
         }
         .memoPanel--embedded .memoBody{
           max-width: none;
@@ -406,16 +411,16 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           max-width: none;
         }
         .memoBody > section + section{
-          margin-top: clamp(2rem, 4vw, 2.75rem);
+          margin-top: clamp(2.5rem, 5vw, 3.5rem);
         }
         .memoLeadSection{
           padding-top: 12px;
         }
         .memoMeta{
-          margin-top: 8px;
+          margin-top: 14px;
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
           font-size: 12px;
-          letter-spacing: 0.12em;
+          letter-spacing: 0.08em;
           color: rgba(0,33,71,0.48);
           text-transform: uppercase;
         }
@@ -425,23 +430,18 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           background: rgba(0,33,71,0.08);
         }
         .memoDivider.memoHeaderDivider{
-          background: linear-gradient(
-            90deg,
-            rgba(184, 151, 106, 0.45) 0%,
-            rgba(0, 33, 71, 0.09) 32%,
-            rgba(0, 33, 71, 0.07) 100%
-          );
+          background: rgba(0,33,71,0.1);
         }
         .memoLabel{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
           font-size: 12px;
           text-transform: uppercase;
-          letter-spacing: 0.12em;
+          letter-spacing: 0.11em;
           line-height: 1.45;
-          color: rgba(0,33,71,0.58);
-          margin: 0 0 12px 0;
-          padding-bottom: 8px;
-          border-bottom: 1px solid rgba(0,33,71,0.07);
+          color: rgba(0,33,71,0.42);
+          margin: 0 0 18px 0;
+          padding-bottom: 0;
+          border-bottom: none;
         }
         .memoLabel--thesis{
           font-size: 12px;
@@ -456,9 +456,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoVerdict{
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
           font-weight: 600;
-          font-size: clamp(1.5rem, 4.5vw, 2rem);
-          line-height: 1.18;
-          letter-spacing: -0.02em;
+          font-size: clamp(1.375rem, 5vw, 2rem);
+          line-height: 1.08;
+          letter-spacing: -0.03em;
           text-transform: uppercase;
           margin: 0;
           padding-top: 0px;
@@ -514,16 +514,16 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoReasoning{
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
           font-weight: 400;
-          font-size: 14px;
-          line-height: 1.65;
-          color: rgba(0,33,71,0.72);
+          font-size: 15px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.7);
         }
         .memoReasoning p{ margin: 0; }
         .memoReasoning p + p{ margin-top: 0.6rem; }
         .memoScoresRow{
           display: grid;
           grid-template-columns: repeat(5, minmax(0, 1fr));
-          gap: clamp(12px, 2.5vw, 20px);
+          gap: clamp(12px, 2.2vw, 18px);
         }
         .memoScoreCol{
           appearance: none;
@@ -543,15 +543,15 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
           font-size: 12px;
           font-variant-caps: all-small-caps;
-          letter-spacing: 0.1em;
-          color: rgba(0,33,71,0.52);
-          margin: 0 0 10px 0;
+          letter-spacing: 0.03em;
+          color: rgba(0,33,71,0.55);
+          margin: 0 0 8px 0;
         }
         .memoScoreValue{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
           font-weight: 700;
-          font-size: clamp(1.35rem, 3.5vw, 1.75rem);
-          line-height: 1.35;
+          font-size: clamp(1rem, 1.8vw, 1.5rem);
+          line-height: 1.05;
           margin: 0 0 8px 0;
           color: #002147;
         }
@@ -568,10 +568,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           color: rgba(0,33,71,0.4);
         }
         .memoScoreLegend{
-          margin-top: 8px;
-          margin-bottom: 16px;
+          margin-top: 4px;
+          margin-bottom: 18px;
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 10px;
+          font-size: 11px;
           line-height: 1.55;
           letter-spacing: 0.06em;
           color: rgba(0,33,71,0.4);
@@ -1042,6 +1042,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               <section>
                   <p className="memoLabel">INVESTMENT JUDGMENT</p>
                   <div className="mb-4 flex flex-wrap items-center gap-2">
+                    {showLookupBadge ? (
+                      <span className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-label-tab py-1 px-2 uppercase shadow-none bg-lookup-surface text-lookup-ink">
+                        LOOKUP
+                      </span>
+                    ) : null}
                     {dossierQualityBand ? <VerdictBandBadge band={dossierQualityBand} /> : null}
                     {decisionBadgeVariant ? <DecisionBadge variant={decisionBadgeVariant} /> : null}
                     {showEscalationBadge ? <DecisionBadge variant="escalation" /> : null}
@@ -1084,6 +1089,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
             {/* Dimension Scores block */}
             <section className={showJudgment ? undefined : 'memoLeadSection'}>
+              {showJudgment && <div className="memoDivider" style={{ marginBottom: 'clamp(28px, 4vw, 40px)' }} aria-hidden />}
               <p className="memoLabel">DIMENSION SCORES</p>
               <p className="memoScoreLegend">1-3: WEAK · 4-5: CONCERNING · 6-7: PROMISING · 8-10: STRONG</p>
               <div className="memoScoresRow">
@@ -1103,7 +1109,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         <p
                           className="memoScoreValue"
                           style={{
-                            opacity: isSelected ? 1 : 0.5,
+                            opacity: 1,
                             transition: reduceMotion ? 'opacity 0ms' : 'opacity 180ms ease',
                           }}
                         >

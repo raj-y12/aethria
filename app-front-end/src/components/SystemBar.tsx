@@ -37,8 +37,8 @@ function SpineNavButton({
     <button
       type="button"
       onClick={onClick}
-      className={`type-meta w-full min-h-[36px] flex items-center justify-center cursor-pointer uppercase tracking-[0.12em] btn-interaction ${
-        active ? 'text-white' : 'text-white/55 hover:text-white'
+      className={`type-meta w-full min-h-[40px] flex items-center justify-center cursor-pointer uppercase tracking-[0.14em] btn-interaction ${
+        active ? 'text-white' : 'text-white/45 hover:text-white/80'
       }`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
       aria-pressed={ariaPressed}
@@ -106,8 +106,8 @@ export default function SystemBar({
     onShowDeals != null && onShowFeed != null && onShowSystem != null && onClose != null;
 
   const baseClass =
-    'hidden lg:flex fixed top-0 bottom-4 left-4 z-50 flex-col justify-between w-36 bg-oxford border border-white/[0.06]';
-  const baseStyle = { padding: '20px 16px 16px' };
+    'hidden lg:flex fixed top-0 bottom-0 left-0 z-50 flex-col justify-between w-36 bg-oxford border-r border-r-white/[0.07]';
+  const baseStyle = { padding: '24px 18px 20px' };
 
   return (
     <motion.header
@@ -127,11 +127,20 @@ export default function SystemBar({
             })
       }
     >
-      <div className="flex flex-col items-center gap-3 h-full min-h-0">
+      <div className="flex flex-col items-center gap-4 h-full min-h-0">
+        {/* Wordmark */}
+        <div className="shrink-0 text-center">
+          <p className="font-display font-normal text-[15px] leading-none tracking-[0.02em] text-white/65">
+            Aethria
+          </p>
+        </div>
+
+        <SpineRule />
+
         {/* Time + date — updates each minute; same 10px mono as rest of spine */}
-        <div className="flex flex-col items-center gap-0.5 shrink-0" aria-live="polite">
-          <span className="type-meta tabular-nums leading-none text-white/50">{timeShort}</span>
-          <span className="type-meta leading-tight tracking-[0.12em] uppercase text-white/35">
+        <div className="flex flex-col items-center gap-1 shrink-0" aria-live="polite">
+          <span className="type-meta tabular-nums leading-none text-white/55">{timeShort}</span>
+          <span className="type-meta leading-tight tracking-[0.14em] uppercase text-white/30">
             {dateShort}
           </span>
         </div>
@@ -141,7 +150,7 @@ export default function SystemBar({
         {/* Account */}
         <div className="w-full flex flex-col items-center gap-2 shrink-0">
           <span
-            className="type-meta truncate max-w-full text-center uppercase tracking-[0.12em] text-white/50"
+            className="type-meta truncate max-w-full text-center uppercase tracking-[0.14em] text-white/45"
             title={displayName}
           >
             {displayName}

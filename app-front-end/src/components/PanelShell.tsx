@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 export const PANEL_HEADER_CLASS =
-  'flex-none flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3 border-b border-hairline';
+  'flex-none flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3 border-b border-hairline doc-rule-with-diamond';
 export const PANEL_TITLE_CLASS = 'type-label-tab text-oxford/60';
 export const PANEL_TAB_BAR_CLASS = 'flex-none flex gap-0 border-b border-hairline px-3 sm:px-4';
 export const PANEL_TAB_BUTTON_CLASS =

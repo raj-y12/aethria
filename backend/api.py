@@ -971,11 +971,24 @@ async def agents_status(request: Request):
             thesis_error = "incomplete"
         except Exception as e:
             thesis_error = type(e).__name__
+    # Check user-level agent toggles so the status field reflects actual intent.
+    user_id = request.state.user_id
+    user_agents_enabled = False
+    try:
+        user_settings = load_settings(user_id)
+        ac = user_settings.get("agent_config") or {}
+        user_agents_enabled = bool(
+            ac.get("scouts_enabled", False)
+            or ac.get("reviewers_enabled", False)
+            or ac.get("partners_enabled", False)
+        )
+    except Exception:
+        pass
     return {
         "worker_ready": _agent_queue is not None,
         "supabase_configured": supabase_configured,
         "openai_configured": openai_configured,
-        "agents_will_run": supabase_configured and openai_configured and _agent_queue is not None,
+        "agents_will_run": supabase_configured and openai_configured and _agent_queue is not None and user_agents_enabled,
         "thesis_ready": thesis_ready,
         "active_thesis_version_id": active_thesis_version_id,
         "thesis_error": thesis_error,
@@ -1288,7 +1301,7 @@ async def trigger_agents(request: Request):
             content={"status": "skipped", "reason": "settings_unavailable"},
         )
     ac = settings.get("agent_config") or {}
-    if not (ac.get("scouts_enabled", True) or ac.get("reviewers_enabled", True) or ac.get("partners_enabled", True)):
+    if not (ac.get("scouts_enabled", False) or ac.get("reviewers_enabled", False) or ac.get("partners_enabled", False)):
         _logger_agents.info(
             "trigger_agents skipped user=%s reason=agents_disabled",
             user_id[:12],
