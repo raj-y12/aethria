@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import GrainOverlay from './components/GrainOverlay';
+import DeskClock from './components/DeskClock';
 
 const PROCESSING_DURATION_MS = 1200;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -117,31 +118,35 @@ export default function RequestAccessPage() {
 
   return (
     <div
-      className="relative flex min-h-[100dvh] w-full flex-col overflow-x-hidden lg:flex-row"
-      style={{ backgroundColor: OXFORD }}
+      className="relative flex min-h-[100dvh] w-full flex-col overflow-x-hidden"
+      style={{ backgroundColor: PAPER }}
     >
-      {/* ── Left: Oxford monolith ─────────────────────────────────────── */}
-      <div
-        className="relative flex w-full shrink-0 flex-col justify-between overflow-hidden px-8 py-10 sm:px-12 sm:py-14 lg:sticky lg:top-0 lg:h-[100dvh] lg:w-[42%] lg:px-14 lg:py-16"
-        style={{ backgroundColor: OXFORD }}
+      <header
+        className="inst-site-header sticky top-0 z-[100] w-full shrink-0 border-b border-solid border-[var(--section-divider)] bg-[#f2f0ea]"
+        style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
       >
-        <GrainOverlay opacity={0.032} variant="dark" />
-
-        {/* Top: wordmark + nav */}
-        <div className="relative z-10 flex items-center justify-between">
+        <div className="page-margin-x grid min-h-[52px] grid-cols-[1fr_1fr] items-center gap-2 sm:gap-4 md:grid-cols-[1fr_auto_1fr]">
           <Link
+            data-cursor-expand
             to="/"
-            className="font-wordmark text-[15px] font-normal leading-none tracking-normal text-[rgba(242,240,234,0.82)] transition-opacity hover:opacity-100 sm:text-[16px]"
+            className="font-wordmark justify-self-start py-2 text-[15px] font-normal normal-case leading-none tracking-normal text-[#002147] transition-opacity hover:opacity-80 sm:text-[16px]"
           >
             Aethria
           </Link>
-          <Link
-            to="/home"
-            className="font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(242,240,234,0.38)] transition-opacity hover:text-[rgba(242,240,234,0.7)]"
-          >
-            ← Home
-          </Link>
+          <p className="hidden justify-self-center text-center font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.35)] md:block">
+            Deal flow operating system
+          </p>
+          <DeskClock className="min-w-0 justify-self-end text-right" />
         </div>
+      </header>
+
+      <div className="flex flex-1 flex-col overflow-x-hidden lg:flex-row">
+      {/* ── Left: Oxford monolith ─────────────────────────────────────── */}
+      <div
+        className="relative flex w-full shrink-0 flex-col justify-center overflow-hidden px-8 py-12 sm:px-12 sm:py-16 lg:sticky lg:top-[53px] lg:h-[calc(100dvh-53px)] lg:w-[42%] lg:px-14 lg:py-16"
+        style={{ backgroundColor: OXFORD }}
+      >
+        <GrainOverlay opacity={0.032} variant="dark" />
 
         {/* Centre: editorial headline */}
         <div
@@ -163,15 +168,9 @@ export default function RequestAccessPage() {
           </p>
         </div>
 
-        {/* Bottom: meta */}
-        <div className="relative z-10 flex items-end justify-between">
-          <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(242,240,234,0.25)]">
-            Early access · 2026
-          </p>
-          <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(242,240,234,0.18)]">
-            Investment intelligence
-          </p>
-        </div>
+        <p className="relative z-10 mt-8 font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(242,240,234,0.22)]">
+          Early access · 2026
+        </p>
       </div>
 
       {/* ── Right: form panel ─────────────────────────────────────────── */}
@@ -391,6 +390,7 @@ export default function RequestAccessPage() {
             Investment intelligence
           </span>
         </div>
+      </div>
       </div>
     </div>
   );
