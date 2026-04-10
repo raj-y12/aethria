@@ -125,27 +125,6 @@ export default function RequestAccessPage() {
         className="relative flex w-full shrink-0 flex-col justify-between overflow-hidden px-8 py-10 sm:px-12 sm:py-14 lg:sticky lg:top-0 lg:h-[100dvh] lg:w-[42%] lg:px-14 lg:py-16"
         style={{ backgroundColor: OXFORD }}
       >
-        {/* Ambient glow — matches homepage monolith */}
-        <div
-          className="pointer-events-none absolute inset-0 z-[1]"
-          aria-hidden
-          style={{
-            background:
-              'radial-gradient(ellipse 80% 50% at 18% 28%, rgba(184,151,106,0.13), transparent 55%), radial-gradient(ellipse 60% 40% at 85% 70%, rgba(242,240,234,0.06), transparent 50%), radial-gradient(circle at 50% 115%, rgba(0,0,0,0.4), transparent 50%)',
-            mixBlendMode: 'soft-light',
-          }}
-        />
-        {/* Brass spine — bottom-left decorative rule */}
-        <div
-          className="pointer-events-none absolute bottom-0 left-12 z-[2] hidden lg:block"
-          aria-hidden
-          style={{
-            width: '1px',
-            height: '38%',
-            background:
-              'linear-gradient(180deg, transparent, rgba(184,151,106,0.5) 30%, rgba(184,151,106,0.3) 75%, transparent)',
-          }}
-        />
         <GrainOverlay opacity={0.032} variant="dark" />
 
         {/* Top: wordmark + nav */}
@@ -173,20 +152,13 @@ export default function RequestAccessPage() {
             transition: 'opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1)',
           }}
         >
-          <p className="section-numeral--on-dark mb-8">VII</p>
           <h1
-            className="home-monolith-headline mb-6 text-[clamp(2.75rem,6vw,4.25rem)] leading-[0.96] text-[#f2f0ea]"
+            className="home-monolith-headline mb-5 text-[clamp(1.5rem,3vw,2rem)] leading-[1.15] text-[#f2f0ea]"
           >
-            The deal<br />
-            pipeline,<br />
-            <em style={{ fontStyle: 'italic', color: 'rgba(242,240,234,0.65)' }}>automated.</em>
+            The deal pipeline,{' '}
+            <em style={{ fontStyle: 'italic', color: 'rgba(242,240,234,0.55)' }}>automated.</em>
           </h1>
-          <div
-            className="mb-8 h-px w-16"
-            style={{ background: 'linear-gradient(90deg, rgba(184,151,106,0.7), transparent)' }}
-            aria-hidden
-          />
-          <p className="max-w-[32ch] font-sans text-[14px] leading-[1.75] text-[rgba(242,240,234,0.55)]">
+          <p className="max-w-[34ch] font-sans text-[13px] leading-[1.7] text-[rgba(242,240,234,0.45)]">
             Autonomous discovery, structured review, and partner-ready memos — before the committee opens the file.
           </p>
         </div>
@@ -371,29 +343,16 @@ export default function RequestAccessPage() {
                   transition: 'opacity 0.55s cubic-bezier(0.16,1,0.3,1), transform 0.55s cubic-bezier(0.16,1,0.3,1)',
                 }}
               >
-                {/* Diamond mark */}
-                <div
-                  className="mb-10 h-5 w-5 border border-[rgba(0,33,71,0.25)]"
-                  style={{ transform: 'rotate(45deg)' }}
-                  aria-hidden
-                />
-
                 <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.16em] text-[rgba(0,33,71,0.35)]">
                   Entry recorded
                 </p>
                 <h2
-                  className="mb-4 font-display text-[clamp(2rem,5vw,2.75rem)] font-normal leading-[1.08] tracking-[-0.02em] text-[#002147]"
+                  className="mb-5 font-display text-[clamp(1.5rem,3vw,1.875rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#002147]"
                 >
-                  You're on<br />the list.
+                  You're on the list.
                 </h2>
 
-                <div
-                  className="mb-6 h-px w-12"
-                  style={{ background: 'linear-gradient(90deg, rgba(0,33,71,0.25), transparent)' }}
-                  aria-hidden
-                />
-
-                <p className="max-w-[30ch] font-sans text-[14px] leading-[1.75] text-[rgba(0,33,71,0.58)]">
+                <p className="max-w-[30ch] font-sans text-[13px] leading-[1.75] text-[rgba(0,33,71,0.55)]">
                   {position != null
                     ? `Position #${position}. We'll reach out when a spot opens.`
                     : "We'll reach out when a spot opens."}
