@@ -26,6 +26,12 @@ export default function RequestAccessPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [formOut, setFormOut] = useState(false);
   const [ellipsisStep, setEllipsisStep] = useState(0);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const t = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(t);
+  }, []);
 
   useEffect(() => {
     if (!processing) return;
@@ -39,7 +45,7 @@ export default function RequestAccessPage() {
   useEffect(() => {
     if (!formOut) return;
     const t1 = setTimeout(() => setSubmitted(true), 200);
-    const t2 = setTimeout(() => setShowSuccess(true), 200 + 100);
+    const t2 = setTimeout(() => setShowSuccess(true), 300);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
@@ -94,9 +100,7 @@ export default function RequestAccessPage() {
         throw new Error(msg);
       }
       const resData = await res.json().catch(() => ({}));
-      if (resData.position != null) {
-        setPosition(resData.position);
-      }
+      if (resData.position != null) setPosition(resData.position);
       setLoading(false);
       setProcessing(true);
     } catch (err) {
@@ -113,56 +117,121 @@ export default function RequestAccessPage() {
 
   return (
     <div
-      className="paper-dot-grid relative flex min-h-[100dvh] flex-col overflow-x-hidden"
-      style={{ backgroundColor: PAPER, color: 'var(--color-charcoal)' }}
+      className="relative flex min-h-[100dvh] w-full flex-col overflow-x-hidden lg:flex-row"
+      style={{ backgroundColor: OXFORD }}
     >
-      <GrainOverlay opacity={0.028} variant="light" />
-
-      <header
-        className="inst-site-header sticky top-0 z-[50] w-full shrink-0 border-b border-solid border-[var(--section-divider)] bg-[#f2f0ea]"
-        style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
+      {/* ── Left: Oxford monolith ─────────────────────────────────────── */}
+      <div
+        className="relative flex w-full shrink-0 flex-col justify-between overflow-hidden px-8 py-10 sm:px-12 sm:py-14 lg:sticky lg:top-0 lg:h-[100dvh] lg:w-[42%] lg:px-14 lg:py-16"
+        style={{ backgroundColor: OXFORD }}
       >
-        <div className="page-margin-x flex min-h-[52px] items-center justify-between gap-3 sm:gap-4">
+        {/* Ambient glow — matches homepage monolith */}
+        <div
+          className="pointer-events-none absolute inset-0 z-[1]"
+          aria-hidden
+          style={{
+            background:
+              'radial-gradient(ellipse 80% 50% at 18% 28%, rgba(184,151,106,0.13), transparent 55%), radial-gradient(ellipse 60% 40% at 85% 70%, rgba(242,240,234,0.06), transparent 50%), radial-gradient(circle at 50% 115%, rgba(0,0,0,0.4), transparent 50%)',
+            mixBlendMode: 'soft-light',
+          }}
+        />
+        {/* Brass spine — bottom-left decorative rule */}
+        <div
+          className="pointer-events-none absolute bottom-0 left-12 z-[2] hidden lg:block"
+          aria-hidden
+          style={{
+            width: '1px',
+            height: '38%',
+            background:
+              'linear-gradient(180deg, transparent, rgba(184,151,106,0.5) 30%, rgba(184,151,106,0.3) 75%, transparent)',
+          }}
+        />
+        <GrainOverlay opacity={0.032} variant="dark" />
+
+        {/* Top: wordmark + nav */}
+        <div className="relative z-10 flex items-center justify-between">
           <Link
-            data-cursor-expand
             to="/"
-            className="font-wordmark flex min-h-[44px] flex-1 items-center py-2 text-left text-[15px] font-normal normal-case leading-none tracking-normal text-[#002147] transition-opacity hover:opacity-80 sm:flex-none sm:text-[16px]"
+            className="font-wordmark text-[15px] font-normal leading-none tracking-normal text-[rgba(242,240,234,0.82)] transition-opacity hover:opacity-100 sm:text-[16px]"
           >
             Aethria
           </Link>
           <Link
-            data-cursor-expand
             to="/home"
-            className="inline-flex min-h-[44px] items-center font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)] transition-opacity duration-300 hover:text-[#002147]"
+            className="font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(242,240,234,0.38)] transition-opacity hover:text-[rgba(242,240,234,0.7)]"
           >
-            Home
+            ← Home
           </Link>
         </div>
-      </header>
 
-      <main className="request-content-area page-margin-x flex flex-1 flex-col items-center overflow-auto py-10 md:py-14">
-        <div className="flex w-full max-w-2xl flex-col justify-center">
-          {!submitted ? (
-            <>
-              <div className="mb-10 border-l border-solid border-[var(--section-divider)] pl-4 md:mb-12 md:pl-5">
-                <p className="section-numeral mb-5">VII</p>
-                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)]">
-                  Early access · 2026
-                </p>
-                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.78)]">
-                  Request access
-                </p>
-                <p className="max-w-xl font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.75)]">
-                  Join the waitlist. We&apos;ll reach out when a spot opens.
-                </p>
-                <p className="mt-2 max-w-xl font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.55)]">
-                  We&apos;ll confirm by email. No spam.
-                </p>
-              </div>
+        {/* Centre: editorial headline */}
+        <div
+          className="relative z-10 my-12 lg:my-0"
+          style={{
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? 'translateY(0)' : 'translateY(20px)',
+            transition: 'opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1)',
+          }}
+        >
+          <p className="section-numeral--on-dark mb-8">VII</p>
+          <h1
+            className="home-monolith-headline mb-6 text-[clamp(2.75rem,6vw,4.25rem)] leading-[0.96] text-[#f2f0ea]"
+          >
+            The deal<br />
+            pipeline,<br />
+            <em style={{ fontStyle: 'italic', color: 'rgba(242,240,234,0.65)' }}>automated.</em>
+          </h1>
+          <div
+            className="mb-8 h-px w-16"
+            style={{ background: 'linear-gradient(90deg, rgba(184,151,106,0.7), transparent)' }}
+            aria-hidden
+          />
+          <p className="max-w-[32ch] font-sans text-[14px] leading-[1.75] text-[rgba(242,240,234,0.55)]">
+            Autonomous discovery, structured review, and partner-ready memos — before the committee opens the file.
+          </p>
+        </div>
 
-              <div className="transition-opacity duration-200 ease-out" style={{ opacity: formOut ? 0 : 1 }}>
-                <form onSubmit={handleSubmit} className="request-form flex flex-col" noValidate>
-                  <div className="request-form-grid grid grid-cols-1 gap-y-5 gap-x-8 md:grid-cols-2 md:gap-x-12 md:gap-y-6">
+        {/* Bottom: meta */}
+        <div className="relative z-10 flex items-end justify-between">
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(242,240,234,0.25)]">
+            Early access · 2026
+          </p>
+          <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(242,240,234,0.18)]">
+            Investment intelligence
+          </p>
+        </div>
+      </div>
+
+      {/* ── Right: form panel ─────────────────────────────────────────── */}
+      <div
+        className="paper-dot-grid relative flex flex-1 flex-col"
+        style={{ backgroundColor: PAPER }}
+      >
+        <GrainOverlay opacity={0.022} variant="light" />
+
+        <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-8 py-12 sm:px-12 sm:py-16 lg:px-16 lg:py-20">
+          <div className="w-full max-w-[26rem]">
+            {!submitted ? (
+              <div
+                style={{
+                  opacity: formOut ? 0 : mounted ? 1 : 0,
+                  transform: formOut ? 'translateY(-8px)' : 'translateY(0)',
+                  transition: 'opacity 0.25s ease, transform 0.25s ease',
+                }}
+              >
+                {/* Form header */}
+                <div className="mb-10">
+                  <p className="mb-3 font-mono text-[9px] uppercase tracking-[0.16em] text-[rgba(0,33,71,0.35)]">
+                    Access request
+                  </p>
+                  <p className="font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.62)]">
+                    Join the waitlist. We'll reach out when a spot opens — no spam.
+                  </p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex flex-col gap-7" noValidate>
+                  {/* Name + Email */}
+                  <div className="grid grid-cols-1 gap-7 sm:grid-cols-2">
                     <div className="flex flex-col">
                       <label htmlFor="waitlist-name" className="form-label-aethria">
                         Name
@@ -193,6 +262,10 @@ export default function RequestAccessPage() {
                         />
                       </div>
                     </div>
+                  </div>
+
+                  {/* Role + Firm */}
+                  <div className="grid grid-cols-1 gap-7 sm:grid-cols-2">
                     <div className="flex flex-col">
                       <label htmlFor="waitlist-role" className="form-label-aethria">
                         Role
@@ -223,50 +296,58 @@ export default function RequestAccessPage() {
                         />
                       </div>
                     </div>
-                    <div className="flex flex-col md:col-span-2">
-                      <label htmlFor="waitlist-linkedin" className="form-label-aethria">
-                        LinkedIn <span className="font-normal opacity-60">(optional)</span>
-                      </label>
-                      <div className="form-input-wrapper">
-                        <input
-                          id="waitlist-linkedin"
-                          type="url"
-                          value={linkedin}
-                          onChange={(e) => setLinkedin(e.target.value)}
-                          placeholder="https://linkedin.com/in/..."
-                          className="form-input-aethria placeholder:font-mono placeholder:text-[10px]"
-                          autoComplete="off"
-                        />
-                      </div>
+                  </div>
+
+                  {/* LinkedIn */}
+                  <div className="flex flex-col">
+                    <label htmlFor="waitlist-linkedin" className="form-label-aethria">
+                      LinkedIn{' '}
+                      <span className="font-normal opacity-55">(optional)</span>
+                    </label>
+                    <div className="form-input-wrapper">
+                      <input
+                        id="waitlist-linkedin"
+                        type="url"
+                        value={linkedin}
+                        onChange={(e) => setLinkedin(e.target.value)}
+                        placeholder="https://linkedin.com/in/..."
+                        className="form-input-aethria placeholder:font-mono placeholder:text-[10px] placeholder:opacity-40"
+                        autoComplete="off"
+                      />
                     </div>
                   </div>
 
+                  {/* Errors */}
                   {validationError && (
                     <p
-                      className="mt-4 font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.55)]"
+                      className="font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.5)]"
                       role="alert"
                     >
                       Complete name, email, role, and firm
                     </p>
                   )}
                   {error && (
-                    <p className="mt-4 font-sans text-[14px] leading-relaxed text-[rgba(0,33,71,0.78)]" role="alert">
+                    <p
+                      className="font-sans text-[13px] leading-relaxed text-[rgba(0,33,71,0.72)]"
+                      role="alert"
+                    >
                       {error}
                     </p>
                   )}
+
+                  {/* Submit */}
                   <button
                     type="submit"
-                    data-cursor-expand
                     disabled={loading || processing}
-                    className="request-submit-btn group mt-8 inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-none bg-[#002147] px-6 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-[#f2f0ea] transition-colors duration-[250ms] ease-out hover:bg-[rgba(0,33,71,0.9)] disabled:cursor-not-allowed disabled:opacity-70 md:mt-10 md:w-fit"
+                    className="group mt-1 inline-flex min-h-[46px] w-full cursor-pointer items-center justify-center rounded-none bg-[#002147] px-6 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-[#f2f0ea] transition-colors duration-[250ms] ease-out hover:bg-[rgba(0,33,71,0.88)] disabled:cursor-not-allowed disabled:opacity-65"
                   >
-                    <span className="flex items-center justify-center">
+                    <span className="flex items-center justify-center gap-0">
                       <span>
                         {loading
-                          ? `SUBMITTING${'.'.repeat(ellipsisStep)}`
+                          ? `Submitting${'.'.repeat(ellipsisStep)}`
                           : processing
-                            ? 'PROCESSING ENTRY'
-                            : 'SUBMIT APPLICATION'}
+                            ? 'Processing entry'
+                            : 'Submit application'}
                       </span>
                       <span
                         className={`inline-block shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease-out ${
@@ -280,83 +361,78 @@ export default function RequestAccessPage() {
                   </button>
                 </form>
               </div>
-            </>
-          ) : (
-            <div
-              className="mx-auto flex w-full max-w-md flex-col items-center text-center"
-              style={{ opacity: showSuccess ? 1 : 0, transition: 'opacity 300ms ease' }}
-            >
-              <p className="section-numeral mb-6 w-full">VII</p>
-              <h1 className="font-display text-[clamp(1.625rem,4.5vw,1.875rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#002147]">
-                You&apos;re on the list.
-              </h1>
-              <p className="mt-4 max-w-md font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.72)]">
-                {position != null
-                  ? `Position #${position}. We'll reach out when a spot opens.`
-                  : "We'll reach out when a spot opens."}
-              </p>
-              <svg
-                width="48"
-                height="48"
-                viewBox="0 0 48 48"
-                className="mt-6"
-                aria-hidden
+            ) : (
+              /* ── Success state ──────────────────────────────────────── */
+              <div
+                className="flex flex-col items-start"
+                style={{
+                  opacity: showSuccess ? 1 : 0,
+                  transform: showSuccess ? 'translateY(0)' : 'translateY(12px)',
+                  transition: 'opacity 0.55s cubic-bezier(0.16,1,0.3,1), transform 0.55s cubic-bezier(0.16,1,0.3,1)',
+                }}
               >
-                <circle
-                  cx="24"
-                  cy="24"
-                  r="21"
-                  fill="none"
-                  stroke={OXFORD}
-                  strokeWidth="1"
-                  strokeOpacity="0.15"
+                {/* Diamond mark */}
+                <div
+                  className="mb-10 h-5 w-5 border border-[rgba(0,33,71,0.25)]"
+                  style={{ transform: 'rotate(45deg)' }}
+                  aria-hidden
                 />
-                <path
-                  d="M15 24.5L21 30.5L33.5 18"
-                  fill="none"
-                  stroke={OXFORD}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{
-                    strokeDasharray: 40,
-                    strokeDashoffset: showSuccess ? 0 : 40,
-                    transition: 'stroke-dashoffset 600ms ease',
-                  }}
-                />
-              </svg>
-              {APP_URL && (
-                <a
-                  href={`${APP_URL.replace(/\/$/, '')}/dashboard`}
-                  data-cursor-expand
-                  className="mt-10 inline-flex min-h-[44px] items-center justify-center border border-solid border-[var(--section-divider)] bg-transparent px-6 font-mono text-[10px] uppercase tracking-[0.12em] text-[#002147] transition-colors duration-200 hover:border-[#002147] hover:bg-[#002147] hover:text-[#f2f0ea]"
-                >
-                  Proceed to sign in
-                </a>
-              )}
-              <Link
-                to="/home"
-                data-cursor-expand
-                className="mt-8 inline-flex min-h-[44px] items-center font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)] transition-opacity hover:opacity-100"
-              >
-                ← Back to home
-              </Link>
-            </div>
-          )}
-        </div>
-      </main>
 
-      <footer
-        className="section-divider-top mt-auto flex shrink-0 flex-col items-start gap-3 border-t border-solid border-[var(--section-divider)] bg-[#f2f0ea] page-margin-x pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-between sm:gap-0 md:pb-5"
-        style={{ color: OXFORD }}
-      >
-        <span className="font-sans text-[13px] leading-relaxed text-[rgba(0,33,71,0.55)]">
-          © {new Date().getFullYear()} Aethria
-        </span>
-        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.4)]">
-          Investment intelligence
-        </span>
-      </footer>
+                <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.16em] text-[rgba(0,33,71,0.35)]">
+                  Entry recorded
+                </p>
+                <h2
+                  className="mb-4 font-display text-[clamp(2rem,5vw,2.75rem)] font-normal leading-[1.08] tracking-[-0.02em] text-[#002147]"
+                >
+                  You're on<br />the list.
+                </h2>
+
+                <div
+                  className="mb-6 h-px w-12"
+                  style={{ background: 'linear-gradient(90deg, rgba(0,33,71,0.25), transparent)' }}
+                  aria-hidden
+                />
+
+                <p className="max-w-[30ch] font-sans text-[14px] leading-[1.75] text-[rgba(0,33,71,0.58)]">
+                  {position != null
+                    ? `Position #${position}. We'll reach out when a spot opens.`
+                    : "We'll reach out when a spot opens."}
+                </p>
+
+                <div className="mt-10 flex flex-col items-start gap-4">
+                  {APP_URL && (
+                    <a
+                      href={`${APP_URL.replace(/\/$/, '')}/dashboard`}
+                      className="inline-flex min-h-[44px] items-center justify-center border border-[rgba(0,33,71,0.2)] bg-transparent px-6 font-mono text-[10px] uppercase tracking-[0.12em] text-[#002147] transition-colors duration-200 hover:border-[#002147] hover:bg-[#002147] hover:text-[#f2f0ea]"
+                    >
+                      Proceed to sign in →
+                    </a>
+                  )}
+                  <Link
+                    to="/home"
+                    className="font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(0,33,71,0.38)] transition-opacity hover:text-[rgba(0,33,71,0.7)]"
+                  >
+                    ← Back to home
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom rule */}
+        <div
+          className="relative z-10 flex shrink-0 items-center justify-between px-8 py-4 sm:px-12 lg:px-16"
+          style={{ borderTop: '1px solid var(--section-divider)' }}
+        >
+          <span className="font-sans text-[12px] text-[rgba(0,33,71,0.38)]">
+            © {new Date().getFullYear()} Aethria
+          </span>
+          <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.25)]">
+            Investment intelligence
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
