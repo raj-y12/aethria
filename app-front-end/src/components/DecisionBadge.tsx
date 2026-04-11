@@ -3,7 +3,7 @@ import { DECISION_LABELS } from '../design-system/semantics';
 export type DecisionBadgeVariant = 'YES' | 'NO' | 'MAYBE' | 'awaiting' | 'undecided' | 'escalation';
 
 const BADGE_BASE_CLASS =
-  'type-label-tab py-1 px-2 uppercase shadow-none';
+  'type-label-tab py-0.5 px-1.5 lg:py-1 lg:px-2 uppercase shadow-none';
 
 const VARIANT_CLASS: Record<DecisionBadgeVariant, string> = {
   YES:

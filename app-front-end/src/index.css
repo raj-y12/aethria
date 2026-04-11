@@ -263,6 +263,10 @@
     text-rendering: optimizeLegibility;
   }
 
+  @media screen and (max-width: 1023px) {
+    body { font-size: 13px; }
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
     font-weight: 500;
@@ -313,6 +317,16 @@
     outline: none;
     box-shadow: none;
   }
+
+  /* iOS: suppress grey tap-highlight flash on every tapped element */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+/* iOS: enable momentum (kinetic) scrolling in WebKit overflow containers */
+  .overflow-y-auto, .overflow-y-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 @layer utilities {
@@ -346,9 +360,9 @@
   }
   .type-label-section {
     font-family: "Space Mono", ui-monospace, monospace;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.5;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.11em;
     text-transform: uppercase;
   }
   .type-label-tab {
@@ -498,6 +512,20 @@
     );
     background-size: 200% 100%;
     animation: skeleton-shimmer 2s var(--motion-ease) infinite;
+  }
+
+  /* ── Mobile typography scale (< 1024px) ─────────────────────────────────
+   * Scale down named type classes. Mono labels (type-label-tab / type-meta)
+   * stay at 10px — already near minimum legibility.
+   */
+  @media screen and (max-width: 1023px) {
+    .type-hero         { font-size: 26px; }
+    .type-title        { font-size: 18px; }
+    .type-body         { font-size: 13px; }
+    .type-body-sm      { font-size: 12px; }
+    .type-label-section { font-size: 10px; }
+    .type-data         { font-size: 11px; }
+    .type-display-xl   { font-size: 26px; }
   }
 }
 

@@ -345,10 +345,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           min-height: 0;
           overflow-y: auto;
           overflow-x: hidden;
-          padding-left: clamp(20px, 3.5vw, 44px);
-          padding-right: clamp(20px, 3.5vw, 44px);
-          padding-top: clamp(24px, 3vw, 36px);
-          padding-bottom: clamp(26px, 4vw, 42px);
+          padding-left: clamp(21px, 3.5vw, 34px);
+          padding-right: clamp(21px, 3.5vw, 34px);
+          padding-top: clamp(21px, 3vw, 34px);
+          padding-bottom: clamp(21px, 4vw, 34px);
           color: #002147;
           background: var(--color-paper);
         }
@@ -389,7 +389,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoCompany{
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
           font-weight: 600;
-          font-size: clamp(1.25rem, 2.2vw, 1.5rem);
+          font-size: clamp(1.375rem, 2.5vw, 1.75rem);
           line-height: 1.12;
           letter-spacing: -0.01em;
           margin: 0;
@@ -397,8 +397,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           color: #002147;
         }
         .memoHeaderDivider{
-          margin-top: 20px;
-          margin-bottom: clamp(28px, 4vw, 40px);
+          margin-top: 13px;
+          margin-bottom: clamp(21px, 4vw, 34px);
         }
         .memoBody{
           max-width: 48rem;
@@ -411,17 +411,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           max-width: none;
         }
         .memoBody > section + section{
-          margin-top: clamp(2.5rem, 5vw, 3.5rem);
+          margin-top: clamp(34px, 5vw, 55px);
         }
         .memoLeadSection{
           padding-top: 12px;
         }
         .memoMeta{
-          margin-top: 14px;
+          margin-top: 13px;
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
           font-size: 12px;
           letter-spacing: 0.08em;
-          color: rgba(0,33,71,0.48);
+          color: rgba(0,33,71,0.50);
           text-transform: uppercase;
         }
         .memoDivider{
@@ -438,8 +438,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           text-transform: uppercase;
           letter-spacing: 0.11em;
           line-height: 1.45;
-          color: rgba(0,33,71,0.42);
-          margin: 0 0 18px 0;
+          color: rgba(0,33,71,0.58);
+          margin: 0 0 13px 0;
           padding-bottom: 0;
           border-bottom: none;
         }
@@ -448,7 +448,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           font-weight: 400;
         }
         .memoJudgmentHead{
-          margin: 0 0 12px 0;
+          margin: 0 0 13px 0;
         }
         .memoJudgmentHead--solo{
           margin-bottom: 0;
@@ -456,7 +456,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoVerdict{
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
           font-weight: 600;
-          font-size: clamp(1.375rem, 5vw, 2rem);
+          font-size: clamp(1.5rem, 5vw, 2.25rem);
           line-height: 1.08;
           letter-spacing: -0.03em;
           text-transform: uppercase;
@@ -469,8 +469,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           margin: 0 0 12px 0;
         }
         .memoDossierRead{
-          margin-top: 12px;
-          padding-top: 12px;
+          margin-top: 13px;
+          padding-top: 13px;
           border-top: none;
         }
         .memoDossierReadKicker{
@@ -478,9 +478,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
           font-size: 12px;
           font-weight: 400;
-          letter-spacing: 0.12em;
+          letter-spacing: 0.11em;
           text-transform: uppercase;
-          color: rgba(0,33,71,0.42);
+          color: rgba(0,33,71,0.58);
           margin: 0 0 8px 0;
         }
         .memoDossierReadLine{
@@ -489,9 +489,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           align-items: baseline;
           gap: 0 6px;
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-          font-size: 13px;
-          line-height: 1.45;
-          color: rgba(0,33,71,0.62);
+          font-size: 14px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.70);
           margin: 0;
         }
         .memoDossierReadBand{
@@ -500,30 +500,30 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           font-weight: 400;
           letter-spacing: 0.1em;
           text-transform: uppercase;
-          color: rgba(0,33,71,0.72);
+          color: rgba(0,33,71,0.78);
         }
         .memoDossierReadDot{
-          color: rgba(0,33,71,0.28);
+          color: rgba(0,33,71,0.35);
           font-family: "Space Mono", ui-monospace, monospace;
           font-size: 12px;
         }
         .memoDossierReadPhrase{
           font-weight: 400;
-          color: rgba(0,33,71,0.58);
+          color: rgba(0,33,71,0.70);
         }
         .memoReasoning{
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
           font-weight: 400;
-          font-size: 15px;
+          font-size: 16px;
           line-height: 1.6;
           color: rgba(0,33,71,0.7);
         }
         .memoReasoning p{ margin: 0; }
-        .memoReasoning p + p{ margin-top: 0.6rem; }
+        .memoReasoning p + p{ margin-top: 8px; }
         .memoScoresRow{
           display: grid;
           grid-template-columns: repeat(5, minmax(0, 1fr));
-          gap: clamp(12px, 2.2vw, 18px);
+          gap: clamp(13px, 2.2vw, 21px);
         }
         .memoScoreCol{
           appearance: none;
@@ -568,13 +568,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           color: rgba(0,33,71,0.4);
         }
         .memoScoreLegend{
-          margin-top: 4px;
-          margin-bottom: 18px;
+          margin-top: 5px;
+          margin-bottom: 13px;
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 11px;
-          line-height: 1.55;
+          font-size: 12px;
+          line-height: 1.5;
           letter-spacing: 0.06em;
-          color: rgba(0,33,71,0.4);
+          color: rgba(0,33,71,0.40);
         }
         .memoScoreUnderline{
           height: 2px;
@@ -584,9 +584,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoScoreWhy{
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-          font-size: 12px;
+          font-size: 13px;
           line-height: 1.6;
-          color: rgba(0,33,71,0.6);
+          color: rgba(0,33,71,0.70);
           margin: 0;
           overflow: hidden;
           display: -webkit-box;
@@ -601,17 +601,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoDimensionPanelName{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 13px;
-          font-variant-caps: all-small-caps;
-          letter-spacing: 0.12em;
-          color: rgba(0,33,71,0.48);
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.11em;
+          color: rgba(0,33,71,0.55);
           margin: 0 0 10px 0;
         }
         .memoDimensionPanelText{
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-          font-size: 14px;
-          line-height: 1.65;
-          color: rgba(0,33,71,0.76);
+          font-size: 15px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.78);
           margin: 0;
           white-space: normal;
         }
@@ -631,7 +631,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoListItem + .memoListItem{ margin-top: 0.5rem; }
         .memoBullet{
           flex-shrink: 0;
-          color: rgba(0,33,71,0.38);
+          color: rgba(0,33,71,0.40);
           font-weight: 500;
         }
         .memoLink{
@@ -695,18 +695,18 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoOverviewRow + .memoOverviewRow{ margin-top: 1rem; }
         .memoOverviewKey{
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 13px;
-          font-variant-caps: all-small-caps;
-          letter-spacing: 0.1em;
-          color: rgba(0,33,71,0.52);
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.11em;
+          color: rgba(0,33,71,0.55);
           margin: 0;
           padding-top: 2px;
         }
         .memoOverviewVal{
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
           font-size: 14px;
-          line-height: 1.65;
-          color: rgba(0,33,71,0.76);
+          line-height: 1.6;
+          color: rgba(0,33,71,0.78);
           margin: 0;
         }
         .memoEmpty{
@@ -760,9 +760,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoGateDetail{
           font-family: "Geist Sans", system-ui, -apple-system, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-          font-size: 12px;
-          line-height: 1.45;
-          color: rgba(0,33,71,0.48);
+          font-size: 13px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.58);
           margin: 5px 0 0 0;
           max-width: 38rem;
         }
@@ -801,9 +801,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
           font-size: 12px;
           font-weight: 400;
-          letter-spacing: 0.12em;
+          letter-spacing: 0.11em;
           text-transform: uppercase;
-          color: rgba(0,33,71,0.42);
+          color: rgba(0,33,71,0.50);
           margin: 0;
         }
         .memoPipelineOneLiner{

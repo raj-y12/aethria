@@ -347,7 +347,7 @@ export default function MainLayout({
   }, [fundThesisSummary, fundStage, fundGeo, scoutRegion]);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-paper">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-paper">
       {/* Mobile / tablet top nav — desktop keeps the vertical SystemBar only */}
       {!isDesktop && (
         <>
@@ -463,8 +463,8 @@ export default function MainLayout({
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-3 lg:pb-5 gap-3 lg:gap-5">
           <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
-            {/* Pipeline summary + lookup — desktop only */}
-            <header className="flex-none mb-3 hidden lg:block min-w-0">
+            {/* Pipeline summary + lookup */}
+            <header className="flex-none mb-3 min-w-0">
               <section
                 aria-label="Pipeline summary and agent status"
                 className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-0.5 border-b border-hairline pb-3"
@@ -544,10 +544,10 @@ export default function MainLayout({
                   </span>
                 </p>
               </section>
-              <div className="mt-3 border border-hairline">
+              <div className="mt-2 lg:mt-3 border border-hairline">
                 <button
                   type="button"
-                  className="w-full flex items-center justify-between px-3 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45 hover:text-oxford/65 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset border-b border-hairline"
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 lg:px-3 lg:py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45 hover:text-oxford/65 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset border-b border-hairline"
                   aria-expanded={lookupExpanded}
                   aria-controls="lookup-panel"
                   onClick={() => setLookupExpanded((open) => !open)}
@@ -568,8 +568,8 @@ export default function MainLayout({
                       })}
                       className="overflow-hidden"
                     >
-                      <div className="px-3 py-3">
-                        <div className="flex items-center gap-2">
+                      <div className="px-2.5 py-2 lg:px-3 lg:py-3">
+                        <div className="flex items-center gap-1.5 lg:gap-2">
                           <input
                             type="text"
                             value={lookupInput}
@@ -578,13 +578,13 @@ export default function MainLayout({
                               if (e.key === 'Enter') void handleLookupSubmit();
                             }}
                             placeholder="Company name, website, or context"
-                            className="h-8 flex-1 rounded-none border border-field-border bg-transparent px-2.5 text-[12px] text-oxford placeholder:text-oxford/35 outline-none focus:border-field-border-strong"
+                            className="h-6 lg:h-8 flex-1 rounded-none border border-field-border bg-transparent px-2 lg:px-2.5 text-[11px] lg:text-[12px] text-oxford placeholder:text-oxford/30 outline-none focus:border-field-border-strong"
                           />
                           <button
                             type="button"
                             onClick={() => void handleLookupSubmit()}
                             disabled={lookupBusy || !lookupInput.trim()}
-                            className="h-8 px-3 font-mono text-[10px] uppercase tracking-[0.1em] border border-oxford/30 text-oxford/70 hover:text-oxford hover:border-oxford/50 disabled:text-oxford/25 disabled:border-hairline-strong btn-interaction"
+                            className="h-6 lg:h-8 px-2 lg:px-3 font-mono text-[9px] lg:text-[10px] uppercase tracking-[0.1em] border border-oxford/30 text-oxford/70 hover:text-oxford hover:border-oxford/50 disabled:text-oxford/25 disabled:border-hairline-strong btn-interaction"
                           >
                             {lookupBusy ? 'Queueing...' : 'Queue'}
                           </button>
@@ -598,6 +598,46 @@ export default function MainLayout({
                 </AnimatePresence>
               </div>
             </header>
+
+            {/* Fund thesis — mobile only (desktop shows it in the right column) */}
+            <div className="flex-none mb-2 block lg:hidden">
+              <article
+                className="w-full border border-oxford/10 bg-paper px-3 py-2.5"
+                style={{ borderRadius: 0, boxSizing: 'border-box' }}
+                aria-label="Fund thesis preview"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.11em] text-oxford/40">
+                    Active Mandate · Fund Thesis
+                  </p>
+                  {hasThesis && (
+                    <span className="inline-flex items-center gap-1">
+                      <span
+                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
+                        style={{ opacity: 0.65 }}
+                        aria-hidden
+                      />
+                      <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-oxford/50">Live</span>
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 font-sans text-[13px] font-semibold leading-tight tracking-tight text-oxford">
+                  {fundName || 'No fund configured'}
+                </p>
+                {thesisCriteria.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {thesisCriteria.map((item) => (
+                      <span
+                        key={item}
+                        className="border border-solid border-oxford/10 px-1.5 py-px font-mono text-[9px] tracking-[0.06em] text-oxford/[0.58]"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </article>
+            </div>
 
             {rightPanel === 'system' ? (
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden w-full min-w-0 rounded-none border border-hairline bg-paper">
@@ -635,7 +675,7 @@ export default function MainLayout({
               </div>
             ) : (
               <div
-                className="flex-1 min-h-0 overflow-y-auto w-full min-w-0 rounded-none bg-paper"
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain w-full min-w-0 rounded-none bg-paper"
                 style={{ scrollbarGutter: 'stable both-edges' }}
               >
                 <div className="px-0 pt-0 pb-6 lg:pb-8">
@@ -655,7 +695,8 @@ export default function MainLayout({
           {/* Right zone: Judgements or memo only — never System. */}
           <div className="hidden lg:flex min-w-0 min-h-0 flex-col gap-3">
             <article
-              className="w-full border border-hairline bg-paper p-4 sm:p-5"
+              className="w-full border border-oxford/10 bg-paper p-phi-5"
+              style={{ borderRadius: 0, boxSizing: 'border-box' }}
               aria-label="Fund thesis preview"
             >
               <div className="flex items-center justify-between gap-2">
@@ -663,21 +704,25 @@ export default function MainLayout({
                   Active Mandate · Fund Thesis
                 </p>
                 {hasThesis && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/70 escalation-pulse" aria-hidden />
+                  <span className="inline-flex items-center gap-phi-2">
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
+                      style={{ opacity: 0.65 }}
+                      aria-hidden
+                    />
                     <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/50">Live</span>
                   </span>
                 )}
               </div>
-              <p className="mt-2.5 font-sans text-[15px] font-semibold leading-tight tracking-tight text-oxford">
+              <p className="mt-phi-3 font-sans text-[15px] font-semibold leading-tight tracking-tight text-oxford">
                 {fundName || 'No fund configured'}
               </p>
               {thesisCriteria.length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-1.5">
+                <div className="mt-phi-3 flex flex-wrap gap-phi-2">
                   {thesisCriteria.map((item) => (
                     <span
                       key={item}
-                      className="border border-hairline px-2 py-0.5 font-mono text-[10px] tracking-[0.06em] text-oxford/60"
+                      className="border border-solid border-oxford/10 px-2 py-0.5 font-mono text-[10px] tracking-[0.06em] text-oxford/[0.58]"
                     >
                       {item}
                     </span>

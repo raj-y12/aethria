@@ -32,17 +32,17 @@ const SETTINGS_HEADER_LABEL_CLASS =
 const SETTINGS_SAVE_BTN_CLASS =
   `${SETTINGS_HEADER_LABEL_CLASS} rounded-none border-0 bg-transparent p-0 cursor-pointer hover:text-oxford/80 transition-colors duration-150 ease-out btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset`;
 
-const SETTINGS_TAB_NAV_CLASS = `${PANEL_TAB_BAR_CLASS} pt-2 pb-0`;
+const SETTINGS_TAB_NAV_CLASS = `${PANEL_TAB_BAR_CLASS} pt-phi-3 pb-0`;
 const SETTINGS_TAB_BTN_CLASS =
-  'py-2.5 px-3 type-label-tab border-b border-oxford/15 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction transition-[border-color,color]';
+  'py-phi-3 px-phi-4 type-label-tab border-b border-oxford/15 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction transition-[border-color,color]';
 const SETTINGS_TAB_ACTIVE_CLASS = 'border-oxford text-oxford';
 const SETTINGS_TAB_INACTIVE_CLASS =
   'border-oxford/15 text-oxford/35 hover:border-oxford/35 hover:text-oxford/60';
 
 const settingsDescClass =
-  'max-w-xl leading-relaxed m-0 text-[13px] font-normal text-oxford/50';
+  'max-w-xl leading-[1.6] m-0 text-[14px] font-normal text-oxford/70';
 
-const settingsFieldLabelClass = 'text-[13px] font-normal text-oxford/[0.75]';
+const settingsFieldLabelClass = 'text-[13px] font-normal text-oxford/70';
 
 const settingsInputCls =
   'w-full min-w-0 max-w-[10rem] appearance-none bg-transparent border-0 border-b border-solid border-oxford/20 rounded-none shadow-none outline-none ring-0 focus:ring-0 focus:border-oxford/60 focus:outline-none transition-[border-color] duration-150 ease-out text-[14px] font-normal text-oxford/[0.85] py-[6px] px-0 placeholder:text-oxford/35 btn-interaction [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]';
@@ -67,10 +67,10 @@ const TOGGLE_KNOB = 'h-4 w-4 rounded-[2px] pointer-events-none block';
 function SettingSectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <div>
-      <div className="type-meta uppercase text-oxford/50 mb-2">
+      <div className="type-label-section text-oxford/[0.58] mb-phi-3">
         {children}
       </div>
-      <div className="h-px w-full bg-oxford/10 mb-5" aria-hidden />
+      <div className="h-px w-full bg-oxford/10 mb-phi-4" aria-hidden />
     </div>
   );
 }
@@ -424,7 +424,7 @@ export default function SettingsPage() {
       )}
 
       <SystemBar agentConfig={settings.agent_config} navLink={{ href: '/', label: 'Home' }} />
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[calc(9rem+2rem)] lg:pr-7 lg:pt-7 pb-3 lg:pb-5">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-5 lg:pl-[calc(9rem+2rem)] lg:pr-phi-6 lg:pt-phi-6 pb-phi-4 lg:pb-phi-5">
         <motion.div
           className="flex-1 flex flex-col min-h-0 overflow-hidden"
           initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
@@ -480,7 +480,7 @@ export default function SettingsPage() {
                 </ul>
               </div>
             )}
-            <div className="min-h-0 flex-1 overflow-hidden p-4 sm:p-5">
+            <div className="min-h-0 flex-1 overflow-hidden p-phi-5">
               <div className="h-full flex flex-col gap-8 overflow-hidden">
                 <AnimatePresence mode="wait">
                   <motion.div

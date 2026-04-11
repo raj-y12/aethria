@@ -67,15 +67,15 @@ function getReviewerVerdict(s: Startup): ReviewerVerdictBand | null {
 
 /** Same footprint as DecisionBadge (type-label-tab, py-1 px-2, border) for grid pills. */
 const WORK_GRID_PILL_BASE =
-  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-label-tab py-1 px-2 uppercase shadow-none';
+  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-label-tab py-0.5 px-1.5 lg:py-1 lg:px-2 uppercase shadow-none';
 
 /** Selects: hairline bottom border only (toolbar chrome). */
 const FILTER_SELECT_CLASS =
-  'h-7 min-w-0 flex-1 cursor-pointer rounded-none border-0 border-b border-hairline-strong bg-transparent py-0.5 pl-0 pr-1 text-[11px] leading-tight text-oxford outline-none focus:border-field-border-strong';
+  'h-6 sm:h-7 min-w-0 sm:flex-1 cursor-pointer rounded-none border-0 border-b border-oxford/[0.12] bg-transparent py-0 sm:py-0.5 pl-0 pr-1 text-[11px] sm:text-[12px] leading-tight text-oxford/70 outline-none focus:border-oxford/[0.35]';
 
 /** Text actions on the filter toolbar — same border-b language as Source segment buttons (not text-underline). */
 const FILTER_TOOLBAR_BORDER_BTN_BASE =
-  `min-h-7 shrink-0 px-1.5 py-0.5 ${UI_FILTER_SEGMENT_INACTIVE} btn-interaction border-0 border-b bg-transparent`;
+  `min-h-6 sm:min-h-7 shrink-0 px-1.5 py-0.5 ${UI_FILTER_SEGMENT_INACTIVE} btn-interaction border-0 border-b bg-transparent`;
 
 const SOURCE_SEGMENTS: { value: SourceFilter; label: string }[] = [
   { value: 'ALL', label: 'All' },
@@ -273,18 +273,19 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
   return (
     <div className="w-full">
       <div
-        className="sticky top-0 z-10 border-b border-hairline bg-paper px-4 py-2.5"
+        className="sticky top-0 z-10 border-b border-hairline bg-paper px-2 py-1.5 lg:px-phi-5 lg:py-phi-3"
         role="toolbar"
         aria-label="Filter pipeline"
       >
         {/* Below lg: two rows (source | sort+link) so nothing collides beside the memo. lg+: one row. */}
         <div className="relative">
-          <div className="flex min-w-0 flex-col gap-1.5 sm:pr-[5.5rem] lg:flex-row lg:flex-nowrap lg:items-end lg:gap-x-4 lg:pr-24">
-            <div className="flex w-full min-w-0 items-center justify-between gap-2 lg:w-auto lg:shrink-0 lg:justify-start">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className={`shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Source</span>
+          <div className="flex min-w-0 flex-row items-center gap-x-2 sm:flex-col sm:gap-phi-3 sm:pr-[5.5rem] lg:flex-row lg:flex-nowrap lg:items-end lg:gap-x-phi-5 lg:pr-24">
+            {/* Source segments */}
+            <div className="flex min-w-0 items-center gap-phi-2 sm:w-full sm:justify-between sm:gap-phi-3 lg:w-auto lg:shrink-0 lg:justify-start">
+              <div className="flex min-w-0 items-center gap-phi-2 sm:gap-phi-3">
+                <span className={`hidden sm:inline-block shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Source</span>
                 <div
-                  className="flex min-w-0 flex-1 items-center gap-0 sm:gap-0.5 lg:flex-initial"
+                  className="flex min-w-0 items-center gap-1 lg:flex-initial"
                   role="group"
                   aria-label="Filter by source"
                 >
@@ -298,7 +299,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                           setListFilterFadeEnabled(true);
                           setSourceFilter(value);
                         }}
-                        className={`min-h-7 shrink-0 px-1.5 py-0.5 ${UI_FILTER_SEGMENT_INACTIVE} btn-interaction border-0 border-b bg-transparent transition-[border-color,color] ${
+                        className={`min-h-6 sm:min-h-7 shrink-0 px-1 sm:px-1.5 py-0.5 ${UI_FILTER_SEGMENT_INACTIVE} btn-interaction border-0 border-b bg-transparent transition-[border-color,color] ${
                           active
                             ? 'border-oxford text-oxford'
                             : 'border-transparent text-oxford/40 hover:border-oxford/35 hover:text-oxford/70'
@@ -311,17 +312,12 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                   })}
                 </div>
               </div>
-              <span
-                className="shrink-0 font-mono text-[12px] uppercase tracking-[0.08em] text-oxford/50 tabular-nums sm:hidden"
-                title={`${ordered.length} results after filters`}
-                aria-label={`${ordered.length} results after filters`}
-              >
-                {ordered.length}
-              </span>
             </div>
-            <div className="flex w-full min-w-0 items-end gap-x-3 lg:flex-1 lg:min-w-0">
-              <label className="flex min-w-0 flex-1 items-center gap-2 lg:max-w-[14rem] xl:max-w-[18rem]">
-                <span className={`shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Sort</span>
+
+            {/* Sort + toggles */}
+            <div className="flex min-w-0 flex-1 items-center gap-x-1.5 sm:w-full sm:items-end sm:gap-x-phi-4 lg:flex-1 lg:min-w-0">
+              <label className="flex min-w-0 items-center gap-phi-2 sm:flex-1 sm:gap-phi-3 lg:max-w-[14rem] xl:max-w-[18rem]">
+                <span className={`hidden sm:inline-block shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Sort</span>
                 <select
                   value={sortFilter}
                   onChange={(e: ChangeEvent<HTMLSelectElement>) => {
@@ -332,14 +328,14 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 >
                   <option value="NEWEST">Newest</option>
                   <option value="OLDEST">Oldest</option>
-                  <option value="CONFIDENCE_HIGH">Confidence high to low</option>
-                  <option value="CONFIDENCE_LOW">Confidence low to high</option>
-                  <option value="NAME_AZ">Name A-Z</option>
+                  <option value="CONFIDENCE_HIGH">Confidence ↓</option>
+                  <option value="CONFIDENCE_LOW">Confidence ↑</option>
+                  <option value="NAME_AZ">Name A–Z</option>
                 </select>
               </label>
               <button
                 type="button"
-                className={`${FILTER_TOOLBAR_BORDER_BTN_BASE} self-end text-left transition-[border-color,color] ${
+                className={`${FILTER_TOOLBAR_BORDER_BTN_BASE} shrink-0 transition-[border-color,color] ${
                   showAdvancedFilters
                     ? 'border-oxford text-oxford'
                     : 'border-transparent text-oxford/40 hover:border-oxford/35 hover:text-oxford/70'
@@ -347,20 +343,28 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 onClick={() => setShowAdvancedFilters((v) => !v)}
                 aria-expanded={showAdvancedFilters}
               >
-                {showAdvancedFilters ? 'Fewer filters' : 'More filters'}
+                <span className="sm:hidden">{showAdvancedFilters ? 'Less' : 'More'}</span>
+                <span className="hidden sm:inline">{showAdvancedFilters ? 'Fewer filters' : 'More filters'}</span>
               </button>
+              {/* Count — mobile only, sits at the far right */}
+              <span
+                className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-oxford/35 tabular-nums sm:hidden"
+                aria-label={`${ordered.length} results`}
+              >
+                {ordered.length}
+              </span>
             </div>
           </div>
           <div
-            className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 font-mono text-[12px] uppercase tracking-[0.08em] text-oxford/45 tabular-nums sm:block"
+            className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 font-mono text-[11px] uppercase tracking-[0.08em] text-oxford/40 tabular-nums sm:block"
             aria-label={`${ordered.length} results after filters`}
           >
             {ordered.length} results
           </div>
         </div>
         {showAdvancedFilters && (
-          <div className="mt-1.5 flex flex-col gap-1.5 pt-1.5 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-5 sm:gap-y-1">
-            <label className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[12rem] sm:flex-none">
+          <div className="mt-phi-3 flex flex-col gap-phi-3 pt-phi-3 border-t border-oxford/[0.06] sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-phi-5 sm:gap-y-phi-2">
+            <label className="flex min-w-0 flex-1 items-center gap-phi-3 sm:max-w-[12rem] sm:flex-none">
               <span className={`shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Decision</span>
               <select
                 value={decisionFilter}
@@ -379,7 +383,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 <option value="AWAITING_REVIEW">Awaiting review</option>
               </select>
             </label>
-            <label className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[12rem] sm:flex-none">
+            <label className="flex min-w-0 flex-1 items-center gap-phi-3 sm:max-w-[12rem] sm:flex-none">
               <span className={`shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Review</span>
               <select
                 value={reviewFilter}
@@ -398,7 +402,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
             </label>
             <button
               type="button"
-              className={`${FILTER_TOOLBAR_BORDER_BTN_BASE} self-start border-transparent text-oxford/42 hover:border-oxford/20 hover:text-oxford/75 sm:self-auto disabled:cursor-not-allowed disabled:border-transparent disabled:opacity-35 disabled:hover:border-transparent disabled:hover:text-oxford/25 disabled:text-oxford/25`}
+              className={`${FILTER_TOOLBAR_BORDER_BTN_BASE} self-start border-transparent text-oxford/40 hover:border-oxford/20 hover:text-oxford/70 sm:self-auto disabled:cursor-not-allowed disabled:border-transparent disabled:opacity-30 disabled:hover:border-transparent disabled:hover:text-oxford/25 disabled:text-oxford/25`}
               onClick={() => {
                 setListFilterFadeEnabled(true);
                 setDecisionFilter('ALL');
@@ -462,7 +466,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
             }}
           >
             {/* Single column on mobile/tablet; two columns (60/40) only from lg up */}
-            <div className="flex flex-col gap-2 px-4 py-4 sm:px-5 lg:grid lg:grid-cols-[3fr_2fr] lg:gap-6 lg:px-6 lg:py-5 lg:items-start">
+            <div className="flex flex-col gap-phi-3 px-phi-4 py-phi-3 lg:grid lg:grid-cols-[3fr_2fr] lg:gap-phi-5 lg:px-phi-6 lg:py-phi-5 lg:items-start">
               <div className="min-w-0 overflow-hidden">
                 <div className="flex items-center gap-2 min-w-0">
                   {badgeVariant === 'escalation' && !isSelected && (
@@ -472,7 +476,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                     />
                   )}
                   <h2
-                    className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-[1.5] tracking-tight text-oxford"
+                    className="min-w-0 flex-1 truncate text-[14px] lg:text-[16px] font-semibold leading-[1.5] tracking-tight text-oxford"
                     style={{ fontFamily: '"Geist Sans", system-ui, sans-serif' }}
                   >
                     {startup.scout.name}
@@ -483,18 +487,18 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 </div>
                 {startup.scout.one_line?.trim() ? (
                   <p
-                    className={`min-w-0 text-[13px] leading-[1.6] text-oxford/55 overflow-hidden transition-[opacity,max-height,margin-top] ease-out ${
+                    className={`min-w-0 text-[12px] lg:text-[14px] leading-[1.6] text-oxford/70 overflow-hidden transition-[opacity,max-height,margin-top] ease-out ${
                       reduceMotion ? 'duration-0' : 'duration-200'
                     } ${
                       isSelected
-                        ? 'mt-1.5 max-h-[200px] opacity-100'
-                        : 'mt-0 max-h-0 opacity-0 group-hover:mt-1.5 group-hover:max-h-[200px] group-hover:opacity-100'
+                        ? 'mt-phi-3 max-h-[200px] opacity-100'
+                        : 'mt-0 max-h-0 opacity-0 group-hover:mt-phi-3 group-hover:max-h-[200px] group-hover:opacity-100'
                     }`}
                   >
                     {startup.scout.one_line.trim()}
                   </p>
                 ) : null}
-                <div className="mt-1.5 flex w-full max-w-full flex-nowrap items-center gap-x-2 overflow-x-auto no-scrollbar font-mono text-[11px] leading-[1.5] tracking-[0.07em] text-oxford/45">
+                <div className="mt-phi-3 flex w-full max-w-full flex-nowrap items-center gap-x-phi-3 overflow-x-auto no-scrollbar font-mono text-[10px] lg:text-[12px] leading-[1.5] tracking-[0.08em] text-oxford/50">
                   {sectorTrim ? (
                     <span className="shrink-0 whitespace-nowrap uppercase">{sectorTrim}</span>
                   ) : null}
@@ -510,7 +514,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                   ) : null}
                 </div>
               </div>
-              <div className="min-w-0 flex flex-col items-start gap-2 lg:justify-self-end lg:items-end lg:text-right">
+              <div className="min-w-0 flex flex-col items-start gap-phi-3 lg:justify-self-end lg:items-end lg:text-right">
                 <span
                   className={`font-mono text-[10px] tracking-[0.14em] uppercase text-oxford/35 min-h-[1.25rem] flex items-center justify-end w-full transition-opacity ease-out ${
                     reduceMotion ? 'duration-0' : 'duration-150'
@@ -521,17 +525,17 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 >
                   open memo →
                 </span>
-                <div className="flex w-full max-w-full min-w-0 flex-col gap-1.5 lg:items-end">
+                <div className="flex w-full max-w-full min-w-0 flex-col gap-phi-3 lg:items-end">
                   {fundingTier ? (
                     <span
-                      className={`inline-flex w-fit max-w-full shrink-0 items-center rounded-none border border-solid py-[3px] px-[6px] font-mono text-[12px] font-normal uppercase leading-[1.5] tracking-[0.08em] ${FUNDING_STAGE_BADGE_CLASS[fundingTier]}`}
+                      className={`inline-flex w-fit max-w-full shrink-0 items-center rounded-none border border-solid py-[2px] px-[5px] lg:py-[3px] lg:px-[6px] font-mono text-[10px] lg:text-[12px] font-normal uppercase leading-[1.5] tracking-[0.08em] ${FUNDING_STAGE_BADGE_CLASS[fundingTier]}`}
                     >
                       {getFundingStageBadgeLabel(fundingTier, fundingStageRaw)}
                     </span>
                   ) : null}
-                  <div className="flex w-full min-w-0 max-w-full flex-col gap-1.5 lg:items-end">
+                  <div className="flex w-full min-w-0 max-w-full flex-col gap-phi-2 lg:items-end">
                     {/* Source, verdict, partner economic — workflow queue badges on second row */}
-                    <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-1.5 justify-start sm:justify-end">
+                    <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-phi-2 justify-start sm:justify-end">
                       <span
                         className={`${WORK_GRID_PILL_BASE} ${
                           getSourceBadge(startup) === 'LOOKUP'
@@ -549,7 +553,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                       ) : null}
                     </div>
                     {showBottomWorkflowBadges ? (
-                      <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-1.5 justify-start sm:justify-end">
+                      <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-phi-2 justify-start sm:justify-end">
                         {showPartnerDecisionPlusEscalation ? (
                           <DecisionBadge variant="escalation" />
                         ) : (
