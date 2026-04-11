@@ -459,12 +459,12 @@ export default function MainLayout({
 
       {/* Paper canvas. Fixed height so only WorkGrid scrolls.
           On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-4 lg:pl-[calc(9rem+21px)] lg:pr-[21px] lg:pt-[21px]">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden pt-3 lg:pl-[calc(9rem+21px)] lg:pr-[21px] lg:pt-[21px]">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-3 lg:pb-5 gap-3 lg:gap-5">
           <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
             {/* Pipeline summary + lookup */}
-            <header className="flex-none mb-3 min-w-0">
+            <header className="flex-none mb-3 min-w-0 px-4 lg:px-0">
               <section
                 aria-label="Pipeline summary and agent status"
                 className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-0.5 border-b border-hairline pb-3"
@@ -600,7 +600,7 @@ export default function MainLayout({
             </header>
 
             {/* Fund thesis — mobile only (desktop shows it in the right column) */}
-            <div className="flex-none mb-2 block lg:hidden">
+            <div className="flex-none mb-2 block lg:hidden px-4">
               <article
                 className="w-full border border-oxford/10 bg-paper px-3 py-2.5"
                 style={{ borderRadius: 0, boxSizing: 'border-box' }}
