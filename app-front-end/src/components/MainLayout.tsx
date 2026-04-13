@@ -548,12 +548,12 @@ export default function MainLayout({
                   <span
                     className={`min-w-0 flex-1 truncate text-right font-mono text-[10px] uppercase tracking-[0.1em] ${
                       !lookupWorking
-                        ? 'text-oxford/30'
+                        ? 'text-oxford/28'
                         : lookupPhaseLabel === 'Scouting'
-                          ? 'text-oxford/60'
+                          ? 'text-[#6E8199]'
                           : lookupPhaseLabel === 'Reviewing'
-                            ? 'text-oxford/72'
-                            : 'text-oxford/80'
+                            ? 'text-[#355F87]'
+                            : 'text-[#002147] font-semibold'
                     }`}
                   >
                     {lookupStateLabel}
