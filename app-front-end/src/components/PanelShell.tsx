@@ -2,13 +2,13 @@ import type { ReactNode } from 'react';
 
 export const PANEL_HEADER_CLASS =
   'flex-none flex items-center justify-between px-phi-5 py-phi-3 sm:px-phi-5 sm:py-phi-3 border-b border-hairline doc-rule-with-diamond';
-export const PANEL_TITLE_CLASS = 'type-label-section text-oxford/[0.58]';
+export const PANEL_TITLE_CLASS = 'type-label-section text-oxford/60';
 export const PANEL_TAB_BAR_CLASS = 'flex-none flex gap-0 border-b border-hairline px-phi-4 sm:px-phi-5';
 export const PANEL_TAB_BUTTON_CLASS =
   'py-phi-3 px-phi-4 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction transition-[border-color,color]';
 export const PANEL_TAB_ACTIVE_CLASS = 'text-oxford border-oxford';
 export const PANEL_TAB_INACTIVE_CLASS =
-  'text-oxford/40 border-transparent hover:text-oxford/70 hover:border-oxford/35';
+  'text-oxford/40 border-transparent hover:text-oxford/80 hover:border-oxford/40';
 export const PANEL_CONTENT_CLASS =
   'flex-1 min-h-0 overflow-y-auto p-phi-5';
 
@@ -83,7 +83,7 @@ export default function PanelShell({
         className={`flex-none flex items-center px-phi-4 lg:px-phi-5 ${headerPaddingClass} ${headerBorderClass} ${headerJustifyClass} ${headerClassName}`.trim()}
       >
         {showTitle ? <span className={titleCls}>{title}</span> : null}
-        {actions != null && <div className="flex items-center gap-2">{actions}</div>}
+        {actions != null && <div className="flex items-center gap-phi-2">{actions}</div>}
       </header>
 
       {tabs != null && tabs.length > 0 && (

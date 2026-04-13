@@ -366,9 +366,9 @@ export default function MainLayout({
                 className="px-4 pb-0 border-b border-hairline type-label-tab bg-oxford overflow-hidden text-white/70"
                 aria-label="Menu"
               >
-                <div className="flex flex-col items-start gap-3 py-3">
+                <div className="flex flex-col items-start gap-phi-3 py-phi-3">
                   {/* Mode toggles: Deals / Judgements / System — same mono scale as desktop spine */}
-                  <div className="flex flex-col items-stretch gap-0.5 w-full">
+                  <div className="flex flex-col items-stretch gap-phi-1 w-full">
                     <button
                       type="button"
                       onClick={() => {
@@ -428,7 +428,7 @@ export default function MainLayout({
                   </div>
 
                 {/* Settings */}
-                <div className="flex flex-col items-start gap-1 mt-3">
+                <div className="flex flex-col items-start gap-phi-1 mt-phi-3">
                   <a
                     href="/settings"
                     className="type-label-section text-white/70 hover:text-white btn-interaction"
@@ -461,32 +461,32 @@ export default function MainLayout({
           On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-3 lg:pl-[calc(9rem+21px)] lg:pr-[21px] lg:pt-[21px]">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-3 lg:pb-5 gap-3 lg:gap-5">
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-phi-3 lg:pb-phi-5 gap-phi-3 lg:gap-phi-5">
           <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
             {/* Pipeline summary + lookup */}
-            <header className="flex-none mb-3 min-w-0 lg:px-0">
+            <header className="flex-none mb-phi-3 min-w-0 lg:px-0">
               <section
                 aria-label="Pipeline summary and agent status"
-                className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-0.5 border-b border-hairline pb-3"
+                className="flex min-w-0 flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-1 border-b border-hairline pb-phi-3"
               >
-                <p className="min-w-0 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/38">
-                  <span className="text-oxford/65">{startups.length}</span> total
-                  <span className="mx-2 text-oxford/18">·</span>
-                  <span className="text-oxford/65">{openCount}</span> open
-                  <span className="mx-2 text-oxford/18">·</span>
-                  <span className={pendingEscalations > 0 ? 'text-escalation' : 'text-oxford/65'}>{pendingEscalations}</span> esc
-                  <span className="mx-2 text-oxford/18">·</span>
-                  <span className="text-oxford/65">{resolvedCount}</span> decided
+                <p className="min-w-0 type-meta tracking-label uppercase text-oxford/40">
+                  <span className="text-oxford/60">{startups.length}</span> total
+                  <span className="mx-phi-2 text-oxford/25">·</span>
+                  <span className="text-oxford/60">{openCount}</span> open
+                  <span className="mx-phi-2 text-oxford/25">·</span>
+                  <span className={pendingEscalations > 0 ? 'text-escalation' : 'text-oxford/60'}>{pendingEscalations}</span> esc
+                  <span className="mx-phi-2 text-oxford/25">·</span>
+                  <span className="text-oxford/60">{resolvedCount}</span> decided
                   {signals.length > 0 && (
                     <>
-                      <span className="mx-2 text-oxford/18">·</span>
-                      <span className="text-oxford/65">{signals.length}</span> sig
+                      <span className="mx-phi-2 text-oxford/25">·</span>
+                      <span className="text-oxford/60">{signals.length}</span> sig
                     </>
                   )}
                 </p>
-                <p className="shrink-0 text-right font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/38">
+                <p className="shrink-0 text-right type-meta tracking-label uppercase text-oxford/40">
                   Pipeline{' '}
-                  <span className="relative inline-flex items-center gap-1.5">
+                  <span className="relative inline-flex items-center gap-phi-2">
                     {/* Live dot — shown when pipeline is On or Working */}
                     {(pipelineStateLabel === 'On' || pipelineStateLabel === 'Working') && (
                       <span
@@ -502,7 +502,7 @@ export default function MainLayout({
                       pipelineStateLabel === 'Issue'   ? 'text-escalation' :
                       pipelineStateLabel === 'Off'     ? 'text-oxford/25' :
                       pipelineStateLabel === 'On'      ? 'text-oxford/80' :
-                      /* Working */                      'text-oxford/65'
+                      /* Working */                      'text-oxford/60'
                     }>
                       {pipelineStateLabel}
                     </span>
@@ -511,19 +511,19 @@ export default function MainLayout({
                         <button
                           type="button"
                           onClick={() => setShowPipelineIssueHelp((open) => !open)}
-                          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-escalation/40 text-[9px] leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
+                          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
                           aria-label="Why pipeline has an issue"
                           aria-expanded={showPipelineIssueHelp}
                         >
                           ?
                         </button>
                         {showPipelineIssueHelp && (
-                          <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-56 rounded-none border border-field-border bg-paper p-3 text-left normal-case tracking-normal text-[11px] leading-[1.6] text-oxford shadow-none">
+                          <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
                             Pipeline has a problem and may not process updates right now.
                             <button
                               type="button"
                               onClick={() => navigate('/settings')}
-                              className="mt-2 block text-[10px] uppercase tracking-[0.08em] text-oxford/60 hover:text-oxford btn-interaction"
+                              className="mt-phi-2 block type-meta tracking-badge uppercase text-oxford/60 hover:text-oxford btn-interaction"
                             >
                               Open settings →
                             </button>
@@ -534,31 +534,31 @@ export default function MainLayout({
                   </span>
                 </p>
               </section>
-              <div className="mt-2 lg:mt-3 min-w-0 border-l border-solid border-[var(--section-divider)] pl-3 md:pl-4">
+              <div className="mt-phi-2 lg:mt-phi-3 min-w-0 border-l border-[var(--section-divider)] pl-phi-3 md:pl-phi-4">
                 <button
                   type="button"
-                  className="flex w-full min-w-0 items-center gap-3 py-1.5 text-left btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+                  className="flex w-full min-w-0 items-center gap-phi-3 py-phi-2 text-left btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
                   aria-expanded={lookupExpanded}
                   aria-controls="lookup-panel"
                   onClick={() => setLookupExpanded((open) => !open)}
                 >
-                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/55">
+                  <span className="shrink-0 type-meta tracking-label uppercase text-oxford/40">
                     Lookup
                   </span>
                   <span
-                    className={`min-w-0 flex-1 truncate text-right font-mono text-[10px] uppercase tracking-[0.1em] ${
+                    className={`min-w-0 flex-1 truncate text-right type-meta tracking-badge uppercase ${
                       !lookupWorking
-                        ? 'text-oxford/28'
+                        ? 'text-oxford/25'
                         : lookupPhaseLabel === 'Scouting'
-                          ? 'text-[#6E8199]'
+                          ? 'text-oxford/60'
                           : lookupPhaseLabel === 'Reviewing'
-                            ? 'text-[#355F87]'
-                            : 'text-[#002147] font-semibold'
+                            ? 'text-oxford/80'
+                            : 'text-oxford font-semibold'
                     }`}
                   >
                     {lookupStateLabel}
                   </span>
-                  <span className="shrink-0 tabular-nums text-oxford/28" aria-hidden>
+                  <span className="shrink-0 tabular-nums text-oxford/25" aria-hidden>
                     {lookupExpanded ? '−' : '+'}
                   </span>
                 </button>
@@ -575,11 +575,11 @@ export default function MainLayout({
                       })}
                       className="overflow-hidden"
                     >
-                      <div className="pb-2 pt-1">
-                        <p className="mb-2 max-w-[42ch] font-sans text-[12px] leading-[1.55] text-oxford/55">
+                      <div className="pb-phi-2 pt-phi-1">
+                        <p className="mb-phi-2 max-w-[42ch] type-body-sm leading-phi text-oxford/40">
                           Run the full pipeline on any company. Results appear in your queue when ready.
                         </p>
-                        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+                        <div className="flex min-w-0 flex-col gap-phi-2 sm:flex-row sm:items-end sm:gap-phi-3">
                           <label className="min-w-0 flex-1">
                             <span className="sr-only">Company to look up</span>
                             <input
@@ -591,20 +591,20 @@ export default function MainLayout({
                               }}
                               placeholder="Company name or URL"
                               autoComplete="off"
-                              className="h-9 w-full rounded-none border-0 border-b border-oxford/15 bg-transparent px-0 text-[12px] text-oxford placeholder:text-oxford/28 outline-none focus:border-oxford/35"
+                              className="h-9 w-full rounded-none border-0 border-b border-field-border bg-transparent px-0 type-body-sm text-oxford placeholder:text-oxford/25 outline-none focus:border-field-border-strong"
                             />
                           </label>
                           <button
                             type="button"
                             onClick={() => void handleLookupSubmit()}
                             disabled={lookupBusy || !lookupInput.trim()}
-                            className="h-9 shrink-0 self-stretch px-0 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/55 underline decoration-oxford/20 underline-offset-4 transition-colors hover:text-oxford hover:decoration-oxford/40 disabled:pointer-events-none disabled:text-oxford/22 disabled:no-underline btn-interaction sm:self-auto"
+                            className="h-9 shrink-0 self-stretch px-0 type-meta tracking-label uppercase text-oxford/40 underline decoration-oxford/20 underline-offset-4 transition-colors hover:text-oxford hover:decoration-oxford/40 disabled:pointer-events-none disabled:text-oxford/25 disabled:no-underline btn-interaction sm:self-auto"
                           >
                             {lookupBusy ? 'Queueing…' : 'Run lookup'}
                           </button>
                         </div>
                         {lookupMessage ? (
-                          <p className="mt-2 font-mono text-[10px] leading-[1.5] text-oxford/42">{lookupMessage}</p>
+                          <p className="mt-phi-2 type-meta leading-label text-oxford/40">{lookupMessage}</p>
                         ) : null}
                       </div>
                     </motion.div>
@@ -614,36 +614,36 @@ export default function MainLayout({
             </header>
 
             {/* Fund thesis — mobile only (desktop shows it in the right column) */}
-            <div className="flex-none mb-2 block lg:hidden ">
+            <div className="flex-none mb-phi-2 block lg:hidden">
               <article
-                className="w-full border border-oxford/10 bg-paper px-3 py-2.5"
-                style={{ borderRadius: 0, boxSizing: 'border-box' }}
+                className="w-full border border-hairline bg-paper px-phi-3 py-phi-2"
+                style={{ boxSizing: 'border-box' }}
                 aria-label="Fund thesis preview"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-mono text-[9px] uppercase tracking-[0.11em] text-oxford/40">
+                <div className="flex items-center justify-between gap-phi-2">
+                  <p className="type-meta tracking-label uppercase text-oxford/40">
                     Active Mandate · Fund Thesis
                   </p>
                   {hasThesis && (
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-phi-1">
                       <span
                         className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
-                        style={{ opacity: 0.65 }}
+                        style={{ opacity: 0.6 }}
                         aria-hidden
                       />
-                      <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-oxford/50">Live</span>
+                      <span className="type-meta tracking-badge uppercase text-oxford/40">Live</span>
                     </span>
                   )}
                 </div>
-                <p className="mt-1 font-sans text-[13px] font-semibold leading-tight tracking-tight text-oxford">
+                <p className="mt-phi-1 type-body-sm font-semibold tracking-tight text-oxford">
                   {fundName || 'No fund configured'}
                 </p>
                 {thesisCriteria.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
+                  <div className="mt-phi-2 flex flex-wrap gap-phi-1">
                     {thesisCriteria.map((item) => (
                       <span
                         key={item}
-                        className="border border-solid border-oxford/10 px-1.5 py-px font-mono text-[9px] tracking-[0.06em] text-oxford/[0.58]"
+                        className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40"
                       >
                         {item}
                       </span>
@@ -692,7 +692,7 @@ export default function MainLayout({
                 className="flex-1 min-h-0 overflow-y-auto overscroll-contain w-full min-w-0 rounded-none bg-paper"
                 style={{ scrollbarGutter: 'stable both-edges' }}
               >
-                <div className="px-0 pt-0 pb-6 lg:pb-8">
+                <div className="px-0 pt-0 pb-phi-6 lg:pb-phi-7">
                   <GhostTransition disableLift>
                     <WorkGrid
                       startups={startups}
@@ -707,28 +707,28 @@ export default function MainLayout({
           </div>
 
           {/* Right zone: Judgements or memo only — never System. */}
-          <div className="hidden lg:flex min-w-0 min-h-0 flex-col gap-3">
+          <div className="hidden lg:flex min-w-0 min-h-0 flex-col gap-phi-3">
             <article
-              className="w-full border border-oxford/10 bg-paper p-phi-5"
-              style={{ borderRadius: 0, boxSizing: 'border-box' }}
+              className="w-full border border-hairline bg-paper p-phi-5"
+              style={{ boxSizing: 'border-box' }}
               aria-label="Fund thesis preview"
             >
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-mono text-[11px] uppercase tracking-[0.11em] text-oxford/40">
+              <div className="flex items-center justify-between gap-phi-2">
+                <p className="type-label-section text-oxford/40">
                   Active Mandate · Fund Thesis
                 </p>
                 {hasThesis && (
                   <span className="inline-flex items-center gap-phi-2">
                     <span
                       className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
-                      style={{ opacity: 0.65 }}
+                      style={{ opacity: 0.6 }}
                       aria-hidden
                     />
-                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/50">Live</span>
+                    <span className="type-meta tracking-badge uppercase text-oxford/40">Live</span>
                   </span>
                 )}
               </div>
-              <p className="mt-phi-3 font-sans text-[15px] font-semibold leading-tight tracking-tight text-oxford">
+              <p className="mt-phi-3 type-body font-semibold tracking-tight text-oxford">
                 {fundName || 'No fund configured'}
               </p>
               {thesisCriteria.length > 0 ? (
@@ -736,7 +736,7 @@ export default function MainLayout({
                   {thesisCriteria.map((item) => (
                     <span
                       key={item}
-                      className="border border-solid border-oxford/10 px-2 py-0.5 font-mono text-[10px] tracking-[0.06em] text-oxford/[0.58]"
+                      className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40"
                     >
                       {item}
                     </span>
@@ -790,7 +790,7 @@ export default function MainLayout({
                 headerBorderClass=""
                 headerJustifyClass="justify-end"
                 actions={
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-phi-2">
                     <button
                       type="button"
                       onClick={() => memoContentRef.current?.downloadPDF()}
@@ -858,7 +858,7 @@ export default function MainLayout({
               top: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: '#F2F0EA',
+              backgroundColor: 'var(--color-paper)',
               paddingTop: 'env(safe-area-inset-top)',
               paddingBottom: 'env(safe-area-inset-bottom)',
               paddingLeft: 'env(safe-area-inset-left)',

@@ -25,8 +25,8 @@ export default function SignalEventRow({
   className = '',
 }: SignalEventRowProps) {
   const borderCls = 'border-b border-hairline';
-  const tsCls = 'shrink-0 tabular-nums type-meta text-oxford/50';
-  const bodyCls = 'type-body-sm text-oxford/70 leading-[1.6]';
+  const tsCls = 'shrink-0 tabular-nums type-meta text-oxford/40';
+  const bodyCls = 'type-body-sm text-oxford/60 leading-phi';
 
   if (layout === 'compact') {
     return (
@@ -40,16 +40,16 @@ export default function SignalEventRow({
 
   return (
     <div className={`flex flex-col gap-phi-2 py-phi-4 ${borderCls} ${className}`}>
-      <div className="flex items-baseline gap-2 flex-wrap">
+      <div className="flex items-baseline gap-phi-2 flex-wrap">
         <span className={tsCls}>{timestamp}</span>
         {label != null && label !== '' && (
-          <span className="type-label-section text-oxford/[0.58]">{label}</span>
+          <span className="type-label-section text-oxford/60">{label}</span>
         )}
         {trailing != null && <span className="ml-auto shrink-0">{trailing}</span>}
       </div>
       <div className={bodyCls}>{body}</div>
       {meta != null && meta !== '' && (
-        <p className="type-meta text-oxford/40 mt-1">{meta}</p>
+        <p className="type-meta text-oxford/40 mt-phi-1">{meta}</p>
       )}
     </div>
   );

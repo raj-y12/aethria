@@ -71,7 +71,7 @@ const WORK_GRID_PILL_BASE =
 
 /** Selects: hairline bottom border only (toolbar chrome). */
 const FILTER_SELECT_CLASS =
-  'h-6 sm:h-7 min-w-0 sm:flex-1 cursor-pointer rounded-none border-0 border-b border-oxford/[0.12] bg-transparent py-0 sm:py-0.5 pl-0 pr-1 text-[11px] sm:text-[12px] leading-tight text-oxford/70 outline-none focus:border-oxford/[0.35]';
+  'h-6 sm:h-7 min-w-0 sm:flex-1 cursor-pointer rounded-none border-0 border-b border-hairline bg-transparent py-0 sm:py-0.5 pl-0 pr-1 type-label-section text-oxford/60 outline-none focus:border-field-border-strong';
 
 /** Text actions on the filter toolbar — same border-b language as Source segment buttons (not text-underline). */
 const FILTER_TOOLBAR_BORDER_BTN_BASE =
@@ -142,11 +142,11 @@ function getFundingStageBadgeLabel(tier: FundingStageTier, raw: string): string 
 }
 
 const FUNDING_STAGE_BADGE_CLASS: Record<FundingStageTier, string> = {
-  'pre-seed': 'text-oxford/[0.30] border-oxford/[0.15]',
-  seed: 'text-oxford/[0.50] border-oxford/[0.25]',
-  'series-a': 'text-oxford/[0.75] border-oxford/[0.40]',
-  'series-b': 'text-oxford/[0.90] border-oxford/[0.55]',
-  'series-c-plus': 'text-oxford border-oxford/[0.70]',
+  'pre-seed': 'text-oxford/25 border-hairline',
+  seed: 'text-oxford/40 border-oxford/25',
+  'series-a': 'text-oxford/80 border-oxford/40',
+  'series-b': 'text-oxford/80 border-oxford/60',
+  'series-c-plus': 'text-oxford border-oxford/60',
 };
 
 function getDecisionBadgeVariant(s: Startup): 'YES' | 'NO' | 'MAYBE' | 'awaiting' | 'undecided' | 'escalation' {
@@ -302,7 +302,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                         className={`min-h-6 sm:min-h-7 shrink-0 px-1 sm:px-1.5 py-0.5 ${UI_FILTER_SEGMENT_INACTIVE} btn-interaction border-0 border-b bg-transparent transition-[border-color,color] ${
                           active
                             ? 'border-oxford text-oxford'
-                            : 'border-transparent text-oxford/40 hover:border-oxford/35 hover:text-oxford/70'
+                            : 'border-transparent text-oxford/40 hover:border-oxford/40 hover:text-oxford/80'
                         }`}
                         aria-pressed={active}
                       >
@@ -338,17 +338,17 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 className={`${FILTER_TOOLBAR_BORDER_BTN_BASE} shrink-0 transition-[border-color,color] ${
                   showAdvancedFilters
                     ? 'border-oxford text-oxford'
-                    : 'border-transparent text-oxford/40 hover:border-oxford/35 hover:text-oxford/70'
+                    : 'border-transparent text-oxford/40 hover:border-oxford/40 hover:text-oxford/80'
                 }`}
                 onClick={() => setShowAdvancedFilters((v) => !v)}
                 aria-expanded={showAdvancedFilters}
               >
-                <span className="sm:hidden">{showAdvancedFilters ? 'Less' : 'More'}</span>
-                <span className="hidden sm:inline">{showAdvancedFilters ? 'Fewer filters' : 'More filters'}</span>
+                <span className="sm:hidden">{showAdvancedFilters ? 'Fewer' : 'More'}</span>
+                <span className="hidden sm:inline">{showAdvancedFilters ? 'Fewer' : 'More'}</span>
               </button>
               {/* Count — mobile only, sits at the far right */}
               <span
-                className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-oxford/35 tabular-nums sm:hidden"
+                className="ml-auto shrink-0 type-meta tracking-badge uppercase text-oxford/40 tabular-nums sm:hidden"
                 aria-label={`${ordered.length} results`}
               >
                 {ordered.length}
@@ -356,7 +356,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
             </div>
           </div>
           <div
-            className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 font-mono text-[11px] uppercase tracking-[0.08em] text-oxford/40 tabular-nums sm:block"
+            className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 type-label-section text-oxford/40 tabular-nums sm:block"
             aria-label={`${ordered.length} results after filters`}
           >
             {ordered.length} results
@@ -459,7 +459,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
             })}
             className={`group cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-oxford/25 focus-visible:ring-inset btn-interaction transition-colors rounded-none overflow-hidden border-b border-hairline ${
               isSelected ? 'bg-registerTint' : 'bg-transparent hover:bg-registerTint'
-            }${hasDisagreement ? ' border-l-2 border-l-oxford/40' : ''}`}
+            }${hasDisagreement ? ' border-l border-l-oxford/40' : ''}`}
             onClick={() => handleStartupClick(startup)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleStartupClick(startup); }
@@ -468,7 +468,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
             {/* Single column on mobile/tablet; two columns (60/40) only from lg up */}
             <div className="flex flex-col gap-phi-3 px-phi-4 py-phi-3 lg:grid lg:grid-cols-[3fr_2fr] lg:gap-phi-5 lg:px-phi-6 lg:py-phi-5 lg:items-start">
               <div className="min-w-0 overflow-hidden">
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-phi-2 min-w-0">
                   {badgeVariant === 'escalation' && !isSelected && (
                     <span
                       className="w-1.5 h-1.5 shrink-0 rounded-none bg-escalation escalation-dot-active"
@@ -476,8 +476,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                     />
                   )}
                   <h2
-                    className="min-w-0 flex-1 truncate text-[14px] lg:text-[16px] font-semibold leading-[1.5] tracking-tight text-oxford"
-                    style={{ fontFamily: '"Geist Sans", system-ui, sans-serif' }}
+                    className="min-w-0 flex-1 truncate type-body font-semibold tracking-tight text-oxford"
                   >
                     {startup.scout.name}
                   </h2>
@@ -487,7 +486,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 </div>
                 {startup.scout.one_line?.trim() ? (
                   <p
-                    className={`min-w-0 text-[12px] lg:text-[14px] leading-[1.6] text-oxford/70 overflow-hidden transition-[opacity,max-height,margin-top] ease-out ${
+                    className={`min-w-0 type-body-sm leading-phi text-oxford/60 overflow-hidden transition-[opacity,max-height,margin-top] ease-out ${
                       reduceMotion ? 'duration-0' : 'duration-200'
                     } ${
                       isSelected
@@ -498,7 +497,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                     {startup.scout.one_line.trim()}
                   </p>
                 ) : null}
-                <div className="mt-phi-3 flex w-full max-w-full flex-nowrap items-center gap-x-phi-3 overflow-x-auto no-scrollbar font-mono text-[10px] lg:text-[12px] leading-[1.5] tracking-[0.08em] text-oxford/50">
+                <div className="mt-phi-3 flex w-full max-w-full flex-nowrap items-center gap-x-phi-3 overflow-x-auto no-scrollbar type-meta tracking-badge text-oxford/40">
                   {sectorTrim ? (
                     <span className="shrink-0 whitespace-nowrap uppercase">{sectorTrim}</span>
                   ) : null}
@@ -516,7 +515,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
               </div>
               <div className="min-w-0 flex flex-col items-start gap-phi-3 lg:justify-self-end lg:items-end lg:text-right">
                 <span
-                  className={`font-mono text-[10px] tracking-[0.14em] uppercase text-oxford/35 min-h-[1.25rem] flex items-center justify-end w-full transition-opacity ease-out ${
+                  className={`type-meta tracking-tab uppercase text-oxford/40 min-h-[1.25rem] flex items-center justify-end w-full transition-opacity ease-out ${
                     reduceMotion ? 'duration-0' : 'duration-150'
                   } ${
                     isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
@@ -528,7 +527,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 <div className="flex w-full max-w-full min-w-0 flex-col gap-phi-3 lg:items-end">
                   {fundingTier ? (
                     <span
-                      className={`inline-flex w-fit max-w-full shrink-0 items-center rounded-none border border-solid py-[2px] px-[5px] lg:py-[3px] lg:px-[6px] font-mono text-[10px] lg:text-[12px] font-normal uppercase leading-[1.5] tracking-[0.08em] ${FUNDING_STAGE_BADGE_CLASS[fundingTier]}`}
+                      className={`inline-flex w-fit max-w-full shrink-0 items-center rounded-none border py-phi-1 px-phi-2 type-meta tracking-badge uppercase ${FUNDING_STAGE_BADGE_CLASS[fundingTier]}`}
                     >
                       {getFundingStageBadgeLabel(fundingTier, fundingStageRaw)}
                     </span>
@@ -540,7 +539,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                         className={`${WORK_GRID_PILL_BASE} ${
                           getSourceBadge(startup) === 'LOOKUP'
                             ? 'bg-lookup-surface text-lookup-ink'
-                            : 'border border-solid border-field-border bg-transparent text-oxford/55'
+                            : 'border border-field-border bg-transparent text-oxford/60'
                         }`}
                       >
                         {getSourceBadge(startup) === 'LOOKUP' ? 'LOOKUP' : 'SCOUT'}
@@ -566,7 +565,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
               </div>
             </div>
             {index === 0 && showCoachMark && (
-              <p className="type-label-tab text-oxford/25 mt-1 pb-2">Click to open memo</p>
+              <p className="type-label-tab text-oxford/25 mt-phi-1 pb-phi-2">Click to open memo</p>
             )}
           </motion.div>
         );

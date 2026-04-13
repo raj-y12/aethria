@@ -12,9 +12,9 @@ export type DecisionBadgeVariant = 'YES' | 'NO' | 'MAYBE' | 'awaiting' | 'undeci
 const VARIANT_CLASS: Record<DecisionBadgeVariant, string> = {
   YES:       'bg-oxford text-paper border border-oxford',
   NO:        'border border-oxford/20 text-oxford/40',
-  MAYBE:     'border border-oxford/30 text-oxford/55',
-  awaiting:  'border border-oxford/[0.12] text-oxford/25',
-  undecided: 'border border-oxford/[0.12] text-oxford/30',
+  MAYBE:     'border border-oxford/25 text-oxford/60',
+  awaiting:  'border border-hairline text-oxford/25',
+  undecided: 'border border-hairline text-oxford/25',
   escalation:'bg-escalation border border-escalation text-white',
 };
 
@@ -30,7 +30,7 @@ const LABEL: Record<DecisionBadgeVariant, string> = {
 export default function DecisionBadge({ variant }: { variant: DecisionBadgeVariant }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none font-mono text-[9px] tracking-[0.1em] uppercase py-[2px] px-[5px] ${VARIANT_CLASS[variant]}`}
+      className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-meta tracking-badge uppercase py-phi-1 px-phi-2 ${VARIANT_CLASS[variant]}`}
       aria-label={LABEL[variant]}
     >
       {LABEL[variant]}

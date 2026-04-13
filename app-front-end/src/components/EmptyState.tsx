@@ -22,11 +22,11 @@ interface EmptyStateProps {
 export default function EmptyState({ label, body, icon }: EmptyStateProps) {
   return (
     <div className="flex w-full flex-col items-center justify-center px-4 py-10 text-center sm:px-6">
-      <div className="mb-3 flex h-7 w-7 shrink-0 items-center justify-center text-oxford/[0.22] [&_svg]:h-full [&_svg]:w-full">
+      <div className="mb-phi-3 flex h-7 w-7 shrink-0 items-center justify-center text-oxford/25 [&_svg]:h-full [&_svg]:w-full">
         {icon ?? <DefaultMark />}
       </div>
-      <p className="type-meta mb-2 max-w-xs uppercase text-oxford/50">{label}</p>
-      <div className="type-body-sm max-w-sm leading-relaxed text-oxford/50">{body}</div>
+      <p className="type-meta mb-phi-2 max-w-xs uppercase text-oxford/40">{label}</p>
+      <div className="type-body-sm max-w-sm leading-phi text-oxford/40">{body}</div>
     </div>
   );
 }

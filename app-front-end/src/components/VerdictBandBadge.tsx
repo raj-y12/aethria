@@ -10,7 +10,7 @@ export default function VerdictBandBadge({ band }: { band: ReviewerQualityBand }
   if (band === 'STRONG') {
     return (
       <span
-        className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none font-mono text-[9px] tracking-[0.1em] uppercase py-[2px] px-[5px] bg-oxford text-paper"
+        className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-meta tracking-badge uppercase py-phi-1 px-phi-2 bg-oxford text-paper"
         aria-label={band}
       >
         {band}
@@ -21,7 +21,7 @@ export default function VerdictBandBadge({ band }: { band: ReviewerQualityBand }
   if (band === 'MEDIUM') {
     return (
       <span
-        className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none font-mono text-[9px] tracking-[0.1em] uppercase py-[2px] px-[5px] border border-oxford/35 text-oxford/60"
+        className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-meta tracking-badge uppercase py-phi-1 px-phi-2 border border-oxford/40 text-oxford/60"
         aria-label={band}
       >
         {band}
@@ -32,7 +32,7 @@ export default function VerdictBandBadge({ band }: { band: ReviewerQualityBand }
   // WEAK — dot indicator, no box
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-[4px] whitespace-nowrap font-mono text-[9px] tracking-[0.12em] uppercase text-oxford/30"
+      className="inline-flex shrink-0 items-center gap-phi-1 whitespace-nowrap type-meta tracking-label uppercase text-oxford/25"
       aria-label={band}
     >
       <span className="w-[4px] h-[4px] shrink-0 bg-oxford/20" aria-hidden />

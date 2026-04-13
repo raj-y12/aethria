@@ -255,7 +255,7 @@
   body {
     overflow-x: hidden;
     background-color: var(--color-paper);
-    color: #002147;
+    color: var(--color-oxford);
     font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
     font-size: 14px;
     font-weight: 400;
@@ -269,9 +269,9 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Instrument Sans', system-ui, -apple-system, sans-serif;
-    font-weight: 600;
-    letter-spacing: -0.015em;
-    color: #002147;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: var(--color-oxford);
   }
 
   ::selection {
@@ -343,26 +343,26 @@
     letter-spacing: -0.02em;
   }
   .type-title {
-    font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans);
     font-size: 23px;  /* 14px × φ ≈ 23px */
     line-height: 1.382; /* 2 − 1/φ ≈ 1.382 */
     letter-spacing: -0.02em;
   }
   .type-body {
-    font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans);
     font-size: 14px;
     line-height: var(--phi); /* 1.618 — the golden ratio */
   }
   .type-body-sm {
-    font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans);
     font-size: 13px;
     line-height: var(--phi); /* 1.618 */
   }
   .type-label-section {
     font-family: "Space Mono", ui-monospace, monospace;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.5;
-    letter-spacing: 0.11em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
   }
   .type-label-tab {

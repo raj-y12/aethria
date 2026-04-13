@@ -44,13 +44,51 @@ export default {
       fontFamily: {
         display: ['"Libre Baskerville"', 'Georgia', 'serif'],
         cormorant: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+        // Instrument Sans is the canonical app + web UI font (loaded via @fontsource in main.tsx).
         sans: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],
         body: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['"Space Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
+      /**
+       * Type scale — golden ratio (φ = 1.618034), anchored at 14px.
+       * body 14px → title 23px (×φ) → hero 37px (×φ²).
+       * Pair with lineHeight and letterSpacing tokens below.
+       */
+      fontSize: {
+        'type-meta':   ['10px', { lineHeight: '1.5', letterSpacing: '0.12em' }],
+        'type-tab':    ['10px', { lineHeight: '1.5', letterSpacing: '0.14em' }],
+        'type-label':  ['11px', { lineHeight: '1.5', letterSpacing: '0.12em' }],
+        'type-sm':     ['13px', { lineHeight: '1.618' }],
+        'type-body':   ['14px', { lineHeight: '1.618' }],
+        'type-title':  ['23px', { lineHeight: '1.382', letterSpacing: '-0.02em' }],
+        'type-hero':   ['37px', { lineHeight: '1.2',   letterSpacing: '-0.02em' }],
+      },
+      lineHeight: {
+        phi: '1.618034',    // body line-height = golden ratio
+        title: '1.382',     // 2 − 1/φ
+        hero: '1.2',        // display / hero
+        label: '1.5',       // mono labels
+      },
+      letterSpacing: {
+        tight:  '-0.02em',  // titles and hero
+        label:  '0.12em',   // section labels (Space Mono)
+        tab:    '0.14em',   // tab labels (Space Mono)
+        badge:  '0.08em',   // badge/chip text
+      },
       borderRadius: { DEFAULT: '0', none: '0' },
       boxShadow: { DEFAULT: 'none', none: 'none' },
       maxWidth: { reading: '38rem' },
+      transitionProperty: {
+        interactive: 'background-color, border-color, color, transform',
+      },
+      transitionDuration: {
+        DEFAULT: '150ms',
+        fast: '100ms',
+        slow: '250ms',
+      },
+      transitionTimingFunction: {
+        DEFAULT: 'cubic-bezier(0, 0, 0.2, 1)', // ease-out
+      },
       /**
        * Golden ratio spacing scale — Fibonacci sequence, each step × φ ≈ next.
        * Use as: p-phi-4, gap-phi-5, mt-phi-6, etc.

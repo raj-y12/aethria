@@ -24,7 +24,8 @@ import { useMediaQuery, usePrefersReducedMotion } from '../hooks';
 
 type TabId = 'fund' | 'pipeline' | 'discovery' | 'portfolio' | 'budget' | 'account';
 
-const FONT_SANS = '"Instrument Sans", system-ui, sans-serif' as const;
+// Font is inherited from body — do not apply inline. Kept as reference only.
+// const FONT_SANS = '"Instrument Sans", system-ui, sans-serif' as const;
 
 const SETTINGS_HEADER_LABEL_CLASS =
   'type-meta uppercase text-oxford/40';
@@ -37,15 +38,15 @@ const SETTINGS_TAB_BTN_CLASS =
   'py-phi-3 px-phi-4 type-label-tab border-b border-oxford/15 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction transition-[border-color,color]';
 const SETTINGS_TAB_ACTIVE_CLASS = 'border-oxford text-oxford';
 const SETTINGS_TAB_INACTIVE_CLASS =
-  'border-oxford/15 text-oxford/35 hover:border-oxford/35 hover:text-oxford/60';
+  'border-hairline text-oxford/40 hover:border-oxford/40 hover:text-oxford/60';
 
 const settingsDescClass =
-  'max-w-xl leading-[1.6] m-0 text-[14px] font-normal text-oxford/70';
+  'max-w-xl leading-phi m-0 type-body text-oxford/60';
 
-const settingsFieldLabelClass = 'text-[13px] font-normal text-oxford/70';
+const settingsFieldLabelClass = 'type-body-sm text-oxford/60';
 
 const settingsInputCls =
-  'w-full min-w-0 max-w-[10rem] appearance-none bg-transparent border-0 border-b border-solid border-oxford/20 rounded-none shadow-none outline-none ring-0 focus:ring-0 focus:border-oxford/60 focus:outline-none transition-[border-color] duration-150 ease-out text-[14px] font-normal text-oxford/[0.85] py-[6px] px-0 placeholder:text-oxford/35 btn-interaction [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]';
+  'w-full min-w-0 max-w-[10rem] appearance-none font-sans bg-transparent border-0 border-b border-field-border rounded-none shadow-none outline-none ring-0 focus:ring-0 focus:border-field-border-strong focus:outline-none transition-[border-color] duration-150 ease-out type-body text-oxford/80 py-phi-2 px-0 placeholder:text-oxford/25 btn-interaction [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]';
 
 const SELECT_CHEVRON =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23002147' fill-opacity='0.5' d='M0 3h10L5 8z'/%3E%3C/svg%3E\")";
@@ -54,15 +55,14 @@ const selectCls =
   `${settingsInputCls} cursor-pointer max-w-full pr-8 bg-no-repeat bg-[length:10px] bg-[center_right_2px]`;
 
 const settingsSelectStyle: CSSProperties = {
-  fontFamily: FONT_SANS,
   backgroundImage: SELECT_CHEVRON,
 };
 
 const hintCls = `block mt-1 mb-0 ${settingsDescClass}`;
 
 const TOGGLE_TRACK =
-  'h-6 w-11 shrink-0 cursor-pointer inline-flex items-center overflow-hidden rounded-[3px]';
-const TOGGLE_KNOB = 'h-4 w-4 rounded-[2px] pointer-events-none block';
+  'h-6 w-11 shrink-0 cursor-pointer inline-flex items-center overflow-hidden rounded-none';
+const TOGGLE_KNOB = 'h-4 w-4 rounded-none pointer-events-none block';
 
 function SettingSectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -77,7 +77,7 @@ function SettingSectionTitle({ children }: { children: React.ReactNode }) {
 
 function DescText({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <p className={`${settingsDescClass} ${className}`} style={{ fontFamily: FONT_SANS }}>
+    <p className={`${settingsDescClass} ${className}`}>
       {children}
     </p>
   );
@@ -90,19 +90,19 @@ function SettingRow({
   id,
 }: { label: string; hint?: string; children: ReactNode; id?: string }) {
   return (
-    <div className="grid grid-cols-[minmax(0,200px)_1fr] gap-x-6 gap-y-1 items-start">
+    <div className="grid grid-cols-[minmax(0,200px)_1fr] gap-x-phi-5 gap-y-phi-1 items-start">
       <div className="min-w-0">
         {id ? (
-          <label htmlFor={id} className={settingsFieldLabelClass} style={{ fontFamily: FONT_SANS }}>
+          <label htmlFor={id} className={settingsFieldLabelClass}>
             {label}
           </label>
         ) : (
-          <span className={settingsFieldLabelClass} style={{ fontFamily: FONT_SANS }}>
+          <span className={settingsFieldLabelClass}>
             {label}
           </span>
         )}
         {hint && (
-          <div className={hintCls} style={{ fontFamily: FONT_SANS }}>
+          <div className={hintCls}>
             {hint}
           </div>
         )}
@@ -176,7 +176,6 @@ function Field({
       aria-label={label}
       onChange={(e) => (type === 'number' ? onChange(Number(e.target.value) || 0) : onChange(e.target.value))}
       className={settingsInputCls}
-      style={{ fontFamily: FONT_SANS }}
     />
   );
   if (inline) {
@@ -444,10 +443,9 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3">
                 {saveSuccess && (
                   <p
-                    className="m-0 text-[13px] font-normal text-oxford/50"
+                    className="m-0 type-body-sm text-oxford/40"
                     role="status"
                     aria-live="polite"
-                    style={{ fontFamily: FONT_SANS }}
                   >
                     Saved
                   </p>
@@ -500,7 +498,7 @@ export default function SettingsPage() {
                   <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-10">
 
                     {/* Fund identity */}
-                    <section className="flex flex-col gap-6">
+                    <section className="flex flex-col gap-phi-5">
                       <SettingSectionTitle>Fund identity</SettingSectionTitle>
                       <DescText>
                         Your fund name, investment stage, and geography. These appear on the dashboard and help scouts
@@ -552,9 +550,9 @@ export default function SettingsPage() {
                           Fund thesis lives in Supabase. Set <code className="type-meta bg-oxford/[0.06] px-1">USE_SUPABASE_STORAGE=1</code> and apply migrations so scouts and reviewers can load your mandate.
                         </DescText>
                       ) : thesisLoading ? (
-                        <p className={`m-0 ${settingsDescClass}`} style={{ fontFamily: FONT_SANS }}>Loading thesis…</p>
+                        <p className={`m-0 ${settingsDescClass}`}>Loading thesis…</p>
                       ) : thesisLoadError ? (
-                        <p className="m-0 text-[13px] text-red-800/90" style={{ fontFamily: FONT_SANS }}>{thesisLoadError}</p>
+                        <p className="m-0 type-body-sm text-escalation/80">{thesisLoadError}</p>
                       ) : (
                         <div className="grid grid-cols-1 min-w-0 gap-8 lg:grid-cols-2 lg:gap-x-10 lg:items-start">
 
@@ -565,20 +563,19 @@ export default function SettingsPage() {
                             </DescText>
                             {thesisSummary ? (
                               <>
-                                <p className="m-0 text-[12px] text-oxford/55" style={{ fontFamily: FONT_SANS }}>
+                                <p className="m-0 type-body-sm text-oxford/60">
                                   Active: version {thesisSummary.active_version_number}
                                   {(thesisSummary.mode ?? 'rule_based') === 'embedding'
                                     ? ' · AI-enhanced'
                                     : ' · Rule-based'}
                                 </p>
                                 {thesisSummary.embedding?.status === 'pending' && (
-                                  <p className="m-0 text-[13px] text-oxford/60 leading-relaxed" style={{ fontFamily: FONT_SANS }}>
+                                  <p className="m-0 type-body-sm text-oxford/60">
                                     Using rule-based scoring. AI-enhanced alignment is available when an OpenAI key is configured.
                                   </p>
                                 )}
                                 <div
-                                  className="min-h-[8rem] max-h-[min(20rem,40vh)] overflow-y-auto border border-oxford/10 p-3 text-[12px] text-oxford/70 whitespace-pre-wrap break-words"
-                                  style={{ fontFamily: FONT_SANS }}
+                                  className="min-h-[8rem] max-h-[min(20rem,40vh)] overflow-y-auto border border-hairline p-phi-3 type-body-sm text-oxford/60 whitespace-pre-wrap break-words font-mono"
                                 >
                                   {JSON.stringify(thesisSummary.parsed_json, null, 2)}
                                 </div>
@@ -610,7 +607,7 @@ export default function SettingsPage() {
 
                                 {/* Version history */}
                                 {thesisSummary.versions.length > 0 && (
-                                  <div className="flex flex-col gap-3 pt-2 border-t border-hairline mt-2">
+                                  <div className="flex flex-col gap-phi-3 pt-phi-3 border-t border-hairline mt-phi-3">
                                     <span className="type-meta uppercase text-oxford/40">Version history</span>
                                     <div className="flex flex-wrap gap-3 items-center">
                                       <select
@@ -658,11 +655,11 @@ export default function SettingsPage() {
                                 )}
 
                                 {/* Reprocess */}
-                                <div className="flex flex-col gap-3 pt-2 border-t border-hairline mt-2">
+                                <div className="flex flex-col gap-phi-3 pt-phi-2 border-t border-hairline mt-phi-2">
                                   <span className="type-meta uppercase text-oxford/40">Apply to existing pipeline</span>
                                   <DescText>Re-run your mandate against previously reviewed startups.</DescText>
                                   {thesisReprocessToast && (
-                                    <p className="m-0 text-[13px] text-oxford/70" role="status" aria-live="polite" style={{ fontFamily: FONT_SANS }}>
+                                    <p className="m-0 type-body-sm text-oxford/60" role="status" aria-live="polite">
                                       {thesisReprocessToast}
                                     </p>
                                   )}
@@ -703,8 +700,7 @@ export default function SettingsPage() {
                               value={thesisDraft}
                               onChange={(e) => setThesisDraft(e.target.value)}
                               rows={12}
-                              className="min-h-[12rem] w-full min-w-0 resize-y border border-oxford/15 bg-paper p-3 text-[13px] text-oxford/85 outline-none focus:border-oxford/40"
-                              style={{ fontFamily: FONT_SANS }}
+                              className="min-h-[12rem] w-full min-w-0 resize-y border border-field-border bg-paper p-phi-3 type-body-sm text-oxford/80 outline-none focus:border-field-border-strong"
                               placeholder="Fund mandate: sectors, stage, geography, exclusions, check size, risk posture…"
                             />
                             <button
@@ -741,20 +737,20 @@ export default function SettingsPage() {
                 {activeTab === 'pipeline' && (
                   <div className="flex flex-col gap-8 min-h-0 overflow-y-auto">
                     {agentsStatus && !agentsStatus.agents_will_run && (
-                      <div className="border border-oxford/12 bg-oxford/[0.03] px-4 py-3">
-                        <p className="type-label-section text-oxford/70 mb-1">Pipeline may not be running</p>
-                        <p className="m-0 text-[12px] text-oxford/50" style={{ fontFamily: FONT_SANS }}>
+                      <div className="border border-hairline bg-oxford/[0.03] px-phi-4 py-phi-3">
+                        <p className="type-label-section text-oxford/60 mb-1">Pipeline may not be running</p>
+                        <p className="m-0 type-body-sm text-oxford/40">
                           Worker: {agentsStatus.worker_ready ? 'ready' : 'not ready'} · Supabase: {agentsStatus.supabase_configured ? 'ok' : 'missing'} · OpenAI: {agentsStatus.openai_configured ? 'ok' : 'missing'}
                         </p>
                       </div>
                     )}
 
-                    <section className="flex flex-col gap-6">
+                    <section className="flex flex-col gap-phi-5">
                       <SettingSectionTitle>Pipeline stages</SettingSectionTitle>
                       <DescText>
                         Enable or pause each stage of the deal-flow pipeline. Scouts discover companies, Reviewers score them against your mandate, Partners make the final call.
                       </DescText>
-                      <div className="flex flex-col gap-6">
+                      <div className="flex flex-col gap-phi-5">
                         <Toggle
                           id="scouts_enabled"
                           checked={settings.agent_config.scouts_enabled}
@@ -779,10 +775,10 @@ export default function SettingsPage() {
                       </div>
                     </section>
 
-                    <section className="flex flex-col gap-6">
+                    <section className="flex flex-col gap-phi-5">
                       <SettingSectionTitle>Run settings</SettingSectionTitle>
                       <DescText>Controls how many companies are evaluated each cycle and how confident the pipeline must be before making an automated call.</DescText>
-                      <div className="flex flex-col gap-6">
+                      <div className="flex flex-col gap-phi-5">
                         <Field
                           id="max_agents"
                           label="Companies per cycle"
@@ -802,7 +798,6 @@ export default function SettingsPage() {
                               setAgent('confidence_threshold', v.trim() === '' ? 0.5 : Number.isFinite(n) ? n : v);
                             }}
                             className={settingsInputCls}
-                            style={{ fontFamily: FONT_SANS }}
                             aria-label="Decision threshold 0 to 1"
                           />
                         </SettingRow>
@@ -810,12 +805,12 @@ export default function SettingsPage() {
                     </section>
 
                     {settings.meta_agent && (
-                      <section className="flex flex-col gap-6">
+                      <section className="flex flex-col gap-phi-5">
                         <SettingSectionTitle>Self-optimisation</SettingSectionTitle>
                         <DescText>
                           The optimisation agent analyses past decisions and automatically reweights scouts and adjusts thresholds. Runs on a cadence you define.
                         </DescText>
-                        <div className="flex flex-col gap-6">
+                        <div className="flex flex-col gap-phi-5">
                           <Toggle
                             id="meta_enabled"
                             checked={settings.meta_agent.enabled}
@@ -863,10 +858,10 @@ export default function SettingsPage() {
                 {/* ——— Discovery ——— */}
                 {activeTab === 'discovery' && (
                   <div className="flex flex-col gap-8 min-h-0">
-                    <section className="flex flex-col gap-6">
+                    <section className="flex flex-col gap-phi-5">
                       <SettingSectionTitle>Search scope</SettingSectionTitle>
                       <DescText>Where scouts look for companies. Narrowing the region keeps results relevant to your mandate and reduces noise.</DescText>
-                      <div className="flex flex-col gap-6">
+                      <div className="flex flex-col gap-phi-5">
                         <SettingRow id="scout_region" label="Target region">
                           <select
                             id="scout_region"
@@ -902,7 +897,7 @@ export default function SettingsPage() {
                 {/* ——— Portfolio ——— */}
                 {activeTab === 'portfolio' && (
                   <div className="flex flex-col gap-8 min-h-0">
-                    <section className="flex flex-col gap-6">
+                    <section className="flex flex-col gap-phi-5">
                       <SettingSectionTitle>Watchlist</SettingSectionTitle>
                       <DescText>Companies marked as strong signals are automatically added to your watchlist for ongoing monitoring.</DescText>
                       <Toggle
@@ -913,10 +908,10 @@ export default function SettingsPage() {
                         hint="When enabled, companies scoring above the signal threshold are added automatically"
                       />
                     </section>
-                    <section className="flex flex-col gap-6">
+                    <section className="flex flex-col gap-phi-5">
                       <SettingSectionTitle>Monitoring</SettingSectionTitle>
                       <DescText>How often Aethria checks for new signals on watchlisted companies and how detailed the resulting memos are.</DescText>
-                      <div className="flex flex-col gap-6">
+                      <div className="flex flex-col gap-phi-5">
                         <SettingRow id="signal_scan" label="Signal scan frequency">
                           <select
                             id="signal_scan"
@@ -951,7 +946,7 @@ export default function SettingsPage() {
                 {/* ——— Budget ——— */}
                 {activeTab === 'budget' && (
                   <div className="flex flex-col gap-8 min-h-0 overflow-y-auto">
-                    <section className="flex flex-col gap-6">
+                    <section className="flex flex-col gap-phi-5">
                       <SettingSectionTitle>Spending controls</SettingSectionTitle>
                       <DescText>Set daily and weekly ceilings on AI spend. The pipeline pauses automatically when a cap is hit and resumes after the cooldown.</DescText>
                       <Toggle
@@ -961,9 +956,9 @@ export default function SettingsPage() {
                         label="Enable spending limits"
                       />
                     </section>
-                    <section className="flex flex-col gap-6">
+                    <section className="flex flex-col gap-phi-5">
                       <SettingSectionTitle>Caps</SettingSectionTitle>
-                      <div className="flex flex-col gap-6">
+                      <div className="flex flex-col gap-phi-5">
                         <Field
                           id="daily_ceiling"
                           label="Daily cap (USD)"
@@ -999,16 +994,16 @@ export default function SettingsPage() {
                       </div>
                     </section>
                     {settings.system_health && settings.system_health.budget_status.length > 0 ? (
-                      <section className="flex flex-col gap-6">
+                      <section className="flex flex-col gap-phi-5">
                         <SettingSectionTitle>Usage today</SettingSectionTitle>
-                        <div className="flex flex-col gap-2 max-w-md">
+                        <div className="flex flex-col gap-phi-2 max-w-md">
                           {settings.system_health.budget_status.map((b: AgentBudgetStatus) => {
                             const callsPct = b.daily_calls_limit > 0 ? (b.daily_calls_used / b.daily_calls_limit) : 0;
                             const tokensPct = b.daily_tokens_limit > 0 ? (b.daily_tokens_used / b.daily_tokens_limit) : 0;
                             const callsWidth = `${Math.min(100, callsPct * 100)}%`;
                             const tokensWidth = `${Math.min(100, tokensPct * 100)}%`;
                             return (
-                              <div key={b.agent_id} className="border border-hairline p-2 space-y-1">
+                              <div key={b.agent_id} className="border border-hairline p-phi-2 space-y-phi-1">
                                 <p className="type-label-section text-oxford/80 truncate">{b.agent_id}</p>
                                 <div>
                                   <p className="type-meta text-oxford/60">Calls {b.daily_calls_used}/{b.daily_calls_limit}</p>
@@ -1025,9 +1020,9 @@ export default function SettingsPage() {
                         </div>
                       </section>
                     ) : (
-                      <section className="flex flex-col gap-6">
+                      <section className="flex flex-col gap-phi-5">
                         <SettingSectionTitle>Usage today</SettingSectionTitle>
-                        <p className="m-0 text-[13px] font-normal text-oxford/[0.35] italic leading-relaxed max-w-xl" style={{ fontFamily: FONT_SANS }}>
+                        <p className="m-0 type-body-sm text-oxford/40 leading-phi max-w-xl">
                           No usage recorded yet.
                         </p>
                       </section>
@@ -1038,7 +1033,7 @@ export default function SettingsPage() {
                 {/* ——— Account ——— */}
                 {activeTab === 'account' && (
                   <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-8">
-                    <section className="flex flex-col gap-6">
+                    <section className="flex flex-col gap-phi-5">
                       <SettingSectionTitle>Profile & security</SettingSectionTitle>
                       <DescText>Change your email, password, or manage active sessions.</DescText>
                       <div className="aethria-clerk-profile min-h-[320px] border border-hairline bg-paper">
@@ -1049,21 +1044,20 @@ export default function SettingsPage() {
                       </div>
                     </section>
                     {userId && (
-                      <section className="flex flex-col gap-4">
+                      <section className="flex flex-col gap-phi-4">
                         <SettingSectionTitle>User ID</SettingSectionTitle>
                         <DescText>
                           Your Clerk user ID. If you self-host the backend and run agents locally, set{' '}
                           <code className="type-meta bg-oxford/[0.06] px-1">AETHRIA_AGENT_USER_ID</code> to this value in your backend <code className="type-meta bg-oxford/[0.06] px-1">.env</code>.
                         </DescText>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <code className="type-meta text-oxford/80 bg-oxford/[0.06] px-2 py-1 select-none" aria-hidden="true">
+                        <div className="flex items-center gap-phi-2 flex-wrap">
+                          <code className="type-meta text-oxford/80 bg-oxford/[0.06] px-phi-2 py-phi-1 select-none" aria-hidden="true">
                             {userId.replace(/./g, '•')}
                           </code>
                           <button
                             type="button"
                             onClick={() => navigator.clipboard?.writeText(userId).then(() => { setUserIdCopied(true); setTimeout(() => setUserIdCopied(false), 2000); })}
-                            className="border border-solid border-oxford/20 bg-transparent py-[3px] px-2 text-[13px] font-normal text-oxford/[0.75] hover:text-oxford hover:border-oxford/40 hover:bg-oxford/[0.03] transition-colors duration-150 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset"
-                            style={{ fontFamily: FONT_SANS }}
+                            className="border border-field-border bg-transparent py-phi-1 px-phi-2 type-body-sm text-oxford/60 hover:text-oxford hover:border-field-border-strong hover:bg-oxford/[0.03] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset"
                           >
                             {userIdCopied ? 'Copied' : 'Copy'}
                           </button>
@@ -1094,42 +1088,41 @@ export default function SettingsPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="thesis-reprocess-title"
-            className="max-w-md w-full border border-oxford/15 bg-paper p-5 shadow-lg"
+            className="max-w-md w-full border border-field-border bg-paper p-phi-5"
             onClick={(e) => e.stopPropagation()}
-            style={{ fontFamily: FONT_SANS }}
           >
-            <h2 id="thesis-reprocess-title" className="type-label-section text-oxford m-0 mb-3">
+            <h2 id="thesis-reprocess-title" className="type-label-section text-oxford m-0 mb-phi-3">
               Reprocess startups?
             </h2>
-            <p className="m-0 text-[13px] text-oxford/70 leading-relaxed mb-4">
+            <p className="m-0 type-body-sm text-oxford/60 leading-phi mb-phi-4">
               This will re-run analysis on existing startups that were evaluated before your current mandate was active. May take a few minutes.
             </p>
             {thesisReprocessDryLoading ? (
-              <p className="m-0 text-[12px] text-oxford/50 mb-2">Counting eligible startups…</p>
+              <p className="m-0 type-body-sm text-oxford/40 mb-phi-2">Counting eligible startups…</p>
             ) : thesisReprocessModalError ? (
-              <p className="m-0 text-[12px] text-red-800/90 mb-2">{thesisReprocessModalError}</p>
+              <p className="m-0 type-body-sm text-escalation/80 mb-phi-2">{thesisReprocessModalError}</p>
             ) : thesisReprocessEligible !== null ? (
               <>
-                <p className="m-0 text-[12px] text-oxford/60 mb-2">
+                <p className="m-0 type-body-sm text-oxford/60 mb-phi-2">
                   {thesisReprocessEligible} startup{thesisReprocessEligible === 1 ? '' : 's'} will be updated.
                 </p>
                 {thesisReprocessEligible > 500 ? (
-                  <p className="m-0 text-[12px] text-amber-900/90 mb-3">
+                  <p className="m-0 type-body-sm text-escalation/60 mb-phi-3">
                     Large batch: only the first 1000 are processed per run. Run again if needed.
                   </p>
                 ) : null}
                 {!agentsStatus?.openai_configured && thesisReprocessEligible !== null && thesisReprocessEligible >= 1 ? (
-                  <p className="m-0 text-[12px] text-oxford/45 mb-3">
+                  <p className="m-0 type-body-sm text-oxford/40 mb-phi-3">
                     Configure <code className="type-meta bg-oxford/[0.06] px-1">OPENAI_API_KEY</code> on the server to continue.
                   </p>
                 ) : null}
               </>
             ) : null}
-            <div className="flex flex-wrap gap-2 justify-end">
+            <div className="flex flex-wrap gap-phi-2 justify-end">
               <button
                 type="button"
                 disabled={thesisReprocessRunning}
-                className="type-meta uppercase tracking-[0.12em] px-3 py-2 border border-oxford/20 text-oxford/70 hover:text-oxford hover:border-oxford/40 hover:bg-oxford/[0.03] btn-interaction disabled:opacity-40"
+                className="type-meta uppercase tracking-[0.12em] px-phi-3 py-phi-2 border border-oxford/25 text-oxford/60 hover:text-oxford hover:border-oxford/40 hover:bg-oxford/[0.03] btn-interaction disabled:opacity-40"
                 onClick={() => setThesisReprocessOpen(false)}
               >
                 Cancel
