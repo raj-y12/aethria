@@ -692,16 +692,14 @@ export default function MainLayout({
                 className="flex-1 min-h-0 overflow-y-auto overscroll-contain w-full min-w-0 rounded-none bg-paper"
                 style={{ scrollbarGutter: 'stable both-edges' }}
               >
-                <div className="px-0 pt-0 pb-phi-6 lg:pb-phi-7">
-                  <GhostTransition disableLift>
-                    <WorkGrid
-                      startups={startups}
-                      onStartupClick={handleStartupClick}
-                      selectedId={selectedStartup?.id ?? null}
-                      watchlistIds={watchlistIds}
-                    />
-                  </GhostTransition>
-                </div>
+                <GhostTransition disableLift>
+                  <WorkGrid
+                    startups={startups}
+                    onStartupClick={handleStartupClick}
+                    selectedId={selectedStartup?.id ?? null}
+                    watchlistIds={watchlistIds}
+                  />
+                </GhostTransition>
               </div>
             )}
           </div>

@@ -273,7 +273,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
   return (
     <div className="w-full">
       <div
-        className="sticky top-0 z-10 border-b border-hairline bg-paper px-2 py-1.5 lg:px-phi-5 lg:py-phi-3"
+        className="sticky top-0 z-10 border-b border-hairline bg-paper px-1 py-1.5 lg:px-phi-3 lg:py-phi-3"
         role="toolbar"
         aria-label="Filter pipeline"
       >
