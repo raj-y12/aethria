@@ -24,7 +24,7 @@ import { useMediaQuery, usePrefersReducedMotion } from '../hooks';
 
 type TabId = 'fund' | 'pipeline' | 'discovery' | 'portfolio' | 'budget' | 'account';
 
-const FONT_GEIST = '"Geist Sans", system-ui, sans-serif' as const;
+const FONT_SANS = '"Instrument Sans", system-ui, sans-serif' as const;
 
 const SETTINGS_HEADER_LABEL_CLASS =
   'type-meta uppercase text-oxford/40';
@@ -54,7 +54,7 @@ const selectCls =
   `${settingsInputCls} cursor-pointer max-w-full pr-8 bg-no-repeat bg-[length:10px] bg-[center_right_2px]`;
 
 const settingsSelectStyle: CSSProperties = {
-  fontFamily: FONT_GEIST,
+  fontFamily: FONT_SANS,
   backgroundImage: SELECT_CHEVRON,
 };
 
@@ -77,7 +77,7 @@ function SettingSectionTitle({ children }: { children: React.ReactNode }) {
 
 function DescText({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <p className={`${settingsDescClass} ${className}`} style={{ fontFamily: FONT_GEIST }}>
+    <p className={`${settingsDescClass} ${className}`} style={{ fontFamily: FONT_SANS }}>
       {children}
     </p>
   );
@@ -93,16 +93,16 @@ function SettingRow({
     <div className="grid grid-cols-[minmax(0,200px)_1fr] gap-x-6 gap-y-1 items-start">
       <div className="min-w-0">
         {id ? (
-          <label htmlFor={id} className={settingsFieldLabelClass} style={{ fontFamily: FONT_GEIST }}>
+          <label htmlFor={id} className={settingsFieldLabelClass} style={{ fontFamily: FONT_SANS }}>
             {label}
           </label>
         ) : (
-          <span className={settingsFieldLabelClass} style={{ fontFamily: FONT_GEIST }}>
+          <span className={settingsFieldLabelClass} style={{ fontFamily: FONT_SANS }}>
             {label}
           </span>
         )}
         {hint && (
-          <div className={hintCls} style={{ fontFamily: FONT_GEIST }}>
+          <div className={hintCls} style={{ fontFamily: FONT_SANS }}>
             {hint}
           </div>
         )}
@@ -176,7 +176,7 @@ function Field({
       aria-label={label}
       onChange={(e) => (type === 'number' ? onChange(Number(e.target.value) || 0) : onChange(e.target.value))}
       className={settingsInputCls}
-      style={{ fontFamily: FONT_GEIST }}
+      style={{ fontFamily: FONT_SANS }}
     />
   );
   if (inline) {
@@ -447,7 +447,7 @@ export default function SettingsPage() {
                     className="m-0 text-[13px] font-normal text-oxford/50"
                     role="status"
                     aria-live="polite"
-                    style={{ fontFamily: FONT_GEIST }}
+                    style={{ fontFamily: FONT_SANS }}
                   >
                     Saved
                   </p>
@@ -552,9 +552,9 @@ export default function SettingsPage() {
                           Fund thesis lives in Supabase. Set <code className="type-meta bg-oxford/[0.06] px-1">USE_SUPABASE_STORAGE=1</code> and apply migrations so scouts and reviewers can load your mandate.
                         </DescText>
                       ) : thesisLoading ? (
-                        <p className={`m-0 ${settingsDescClass}`} style={{ fontFamily: FONT_GEIST }}>Loading thesis…</p>
+                        <p className={`m-0 ${settingsDescClass}`} style={{ fontFamily: FONT_SANS }}>Loading thesis…</p>
                       ) : thesisLoadError ? (
-                        <p className="m-0 text-[13px] text-red-800/90" style={{ fontFamily: FONT_GEIST }}>{thesisLoadError}</p>
+                        <p className="m-0 text-[13px] text-red-800/90" style={{ fontFamily: FONT_SANS }}>{thesisLoadError}</p>
                       ) : (
                         <div className="grid grid-cols-1 min-w-0 gap-8 lg:grid-cols-2 lg:gap-x-10 lg:items-start">
 
@@ -565,20 +565,20 @@ export default function SettingsPage() {
                             </DescText>
                             {thesisSummary ? (
                               <>
-                                <p className="m-0 text-[12px] text-oxford/55" style={{ fontFamily: FONT_GEIST }}>
+                                <p className="m-0 text-[12px] text-oxford/55" style={{ fontFamily: FONT_SANS }}>
                                   Active: version {thesisSummary.active_version_number}
                                   {(thesisSummary.mode ?? 'rule_based') === 'embedding'
                                     ? ' · AI-enhanced'
                                     : ' · Rule-based'}
                                 </p>
                                 {thesisSummary.embedding?.status === 'pending' && (
-                                  <p className="m-0 text-[13px] text-oxford/60 leading-relaxed" style={{ fontFamily: FONT_GEIST }}>
+                                  <p className="m-0 text-[13px] text-oxford/60 leading-relaxed" style={{ fontFamily: FONT_SANS }}>
                                     Using rule-based scoring. AI-enhanced alignment is available when an OpenAI key is configured.
                                   </p>
                                 )}
                                 <div
                                   className="min-h-[8rem] max-h-[min(20rem,40vh)] overflow-y-auto border border-oxford/10 p-3 text-[12px] text-oxford/70 whitespace-pre-wrap break-words"
-                                  style={{ fontFamily: FONT_GEIST }}
+                                  style={{ fontFamily: FONT_SANS }}
                                 >
                                   {JSON.stringify(thesisSummary.parsed_json, null, 2)}
                                 </div>
@@ -662,7 +662,7 @@ export default function SettingsPage() {
                                   <span className="type-meta uppercase text-oxford/40">Apply to existing pipeline</span>
                                   <DescText>Re-run your mandate against previously reviewed startups.</DescText>
                                   {thesisReprocessToast && (
-                                    <p className="m-0 text-[13px] text-oxford/70" role="status" aria-live="polite" style={{ fontFamily: FONT_GEIST }}>
+                                    <p className="m-0 text-[13px] text-oxford/70" role="status" aria-live="polite" style={{ fontFamily: FONT_SANS }}>
                                       {thesisReprocessToast}
                                     </p>
                                   )}
@@ -704,7 +704,7 @@ export default function SettingsPage() {
                               onChange={(e) => setThesisDraft(e.target.value)}
                               rows={12}
                               className="min-h-[12rem] w-full min-w-0 resize-y border border-oxford/15 bg-paper p-3 text-[13px] text-oxford/85 outline-none focus:border-oxford/40"
-                              style={{ fontFamily: FONT_GEIST }}
+                              style={{ fontFamily: FONT_SANS }}
                               placeholder="Fund mandate: sectors, stage, geography, exclusions, check size, risk posture…"
                             />
                             <button
@@ -743,7 +743,7 @@ export default function SettingsPage() {
                     {agentsStatus && !agentsStatus.agents_will_run && (
                       <div className="border border-oxford/12 bg-oxford/[0.03] px-4 py-3">
                         <p className="type-label-section text-oxford/70 mb-1">Pipeline may not be running</p>
-                        <p className="m-0 text-[12px] text-oxford/50" style={{ fontFamily: FONT_GEIST }}>
+                        <p className="m-0 text-[12px] text-oxford/50" style={{ fontFamily: FONT_SANS }}>
                           Worker: {agentsStatus.worker_ready ? 'ready' : 'not ready'} · Supabase: {agentsStatus.supabase_configured ? 'ok' : 'missing'} · OpenAI: {agentsStatus.openai_configured ? 'ok' : 'missing'}
                         </p>
                       </div>
@@ -802,7 +802,7 @@ export default function SettingsPage() {
                               setAgent('confidence_threshold', v.trim() === '' ? 0.5 : Number.isFinite(n) ? n : v);
                             }}
                             className={settingsInputCls}
-                            style={{ fontFamily: FONT_GEIST }}
+                            style={{ fontFamily: FONT_SANS }}
                             aria-label="Decision threshold 0 to 1"
                           />
                         </SettingRow>
@@ -1027,7 +1027,7 @@ export default function SettingsPage() {
                     ) : (
                       <section className="flex flex-col gap-6">
                         <SettingSectionTitle>Usage today</SettingSectionTitle>
-                        <p className="m-0 text-[13px] font-normal text-oxford/[0.35] italic leading-relaxed max-w-xl" style={{ fontFamily: FONT_GEIST }}>
+                        <p className="m-0 text-[13px] font-normal text-oxford/[0.35] italic leading-relaxed max-w-xl" style={{ fontFamily: FONT_SANS }}>
                           No usage recorded yet.
                         </p>
                       </section>
@@ -1063,7 +1063,7 @@ export default function SettingsPage() {
                             type="button"
                             onClick={() => navigator.clipboard?.writeText(userId).then(() => { setUserIdCopied(true); setTimeout(() => setUserIdCopied(false), 2000); })}
                             className="border border-solid border-oxford/20 bg-transparent py-[3px] px-2 text-[13px] font-normal text-oxford/[0.75] hover:text-oxford hover:border-oxford/40 hover:bg-oxford/[0.03] transition-colors duration-150 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset"
-                            style={{ fontFamily: FONT_GEIST }}
+                            style={{ fontFamily: FONT_SANS }}
                           >
                             {userIdCopied ? 'Copied' : 'Copy'}
                           </button>
@@ -1096,7 +1096,7 @@ export default function SettingsPage() {
             aria-labelledby="thesis-reprocess-title"
             className="max-w-md w-full border border-oxford/15 bg-paper p-5 shadow-lg"
             onClick={(e) => e.stopPropagation()}
-            style={{ fontFamily: FONT_GEIST }}
+            style={{ fontFamily: FONT_SANS }}
           >
             <h2 id="thesis-reprocess-title" className="type-label-section text-oxford m-0 mb-3">
               Reprocess startups?

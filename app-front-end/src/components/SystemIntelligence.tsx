@@ -194,7 +194,7 @@ function EscalationCard({
       <div className="flex items-start justify-between gap-3 w-full min-w-0">
         <p
           className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-[1.5] text-oxford"
-          style={{ fontFamily: '"Geist Sans", system-ui, sans-serif' }}
+          style={{ fontFamily: '"Instrument Sans", system-ui, sans-serif' }}
         >
           {escalation.startup_name ?? escalation.scout?.name ?? escalation.id}
         </p>
@@ -266,7 +266,7 @@ function EscalationCard({
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Add a note before deciding..."
             className="min-h-[80px] w-full resize-none rounded-none border border-solid border-field-border bg-paper p-3 text-[14px] font-normal leading-[1.6] text-oxford/70 outline-none transition-[border-color] duration-150 placeholder:text-[14px] placeholder:font-normal placeholder:text-oxford/30 focus:border-field-border-strong focus:outline-none"
-            style={{ fontFamily: '"Geist Sans", system-ui, sans-serif' }}
+            style={{ fontFamily: '"Instrument Sans", system-ui, sans-serif' }}
           />
           <div className="flex gap-2">
             <button

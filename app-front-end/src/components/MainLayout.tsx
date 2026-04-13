@@ -532,28 +532,35 @@ export default function MainLayout({
                       </>
                     )}
                   </span>
-                  <span className="mx-2 text-oxford/18">·</span>
-                  Lookup{' '}
-                  <span className={
-                    !lookupWorking                      ? 'text-oxford/25' :
-                    lookupPhaseLabel === 'Scouting'    ? 'text-oxford/65' :
-                    lookupPhaseLabel === 'Reviewing'   ? 'text-oxford/75' :
-                    /* Deciding */                        'text-oxford/80'
-                  }>
-                    {lookupStateLabel}
-                  </span>
                 </p>
               </section>
-              <div className="mt-2 lg:mt-3 border border-hairline">
+              <div className="mt-2 lg:mt-3 min-w-0 border-l border-solid border-[var(--section-divider)] pl-3 md:pl-4">
                 <button
                   type="button"
-                  className="w-full flex items-center justify-between px-2.5 py-1.5 lg:px-3 lg:py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45 hover:text-oxford/65 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset border-b border-hairline"
+                  className="flex w-full min-w-0 items-center gap-3 py-1.5 text-left btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
                   aria-expanded={lookupExpanded}
                   aria-controls="lookup-panel"
                   onClick={() => setLookupExpanded((open) => !open)}
                 >
-                  <span>On-demand lookup</span>
-                  <span className="tabular-nums text-oxford/30" aria-hidden>{lookupExpanded ? '−' : '+'}</span>
+                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/55">
+                    Lookup
+                  </span>
+                  <span
+                    className={`min-w-0 flex-1 truncate text-right font-mono text-[10px] uppercase tracking-[0.1em] ${
+                      !lookupWorking
+                        ? 'text-oxford/30'
+                        : lookupPhaseLabel === 'Scouting'
+                          ? 'text-oxford/60'
+                          : lookupPhaseLabel === 'Reviewing'
+                            ? 'text-oxford/72'
+                            : 'text-oxford/80'
+                    }`}
+                  >
+                    {lookupStateLabel}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-oxford/28" aria-hidden>
+                    {lookupExpanded ? '−' : '+'}
+                  </span>
                 </button>
                 <AnimatePresence initial={false}>
                   {lookupExpanded && (
@@ -568,29 +575,36 @@ export default function MainLayout({
                       })}
                       className="overflow-hidden"
                     >
-                      <div className="px-2.5 py-2 lg:px-3 lg:py-3">
-                        <div className="flex items-center gap-1.5 lg:gap-2">
-                          <input
-                            type="text"
-                            value={lookupInput}
-                            onChange={(e) => setLookupInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') void handleLookupSubmit();
-                            }}
-                            placeholder="Company name, website, or context"
-                            className="h-6 lg:h-8 flex-1 rounded-none border border-field-border bg-transparent px-2 lg:px-2.5 text-[11px] lg:text-[12px] text-oxford placeholder:text-oxford/30 outline-none focus:border-field-border-strong"
-                          />
+                      <div className="pb-2 pt-1">
+                        <p className="mb-2 max-w-[42ch] font-sans text-[12px] leading-[1.55] text-oxford/55">
+                          Run the full pipeline on any company. Results appear in your queue when ready.
+                        </p>
+                        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+                          <label className="min-w-0 flex-1">
+                            <span className="sr-only">Company to look up</span>
+                            <input
+                              type="text"
+                              value={lookupInput}
+                              onChange={(e) => setLookupInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') void handleLookupSubmit();
+                              }}
+                              placeholder="Company name or URL"
+                              autoComplete="off"
+                              className="h-9 w-full rounded-none border-0 border-b border-oxford/15 bg-transparent px-0 text-[12px] text-oxford placeholder:text-oxford/28 outline-none focus:border-oxford/35"
+                            />
+                          </label>
                           <button
                             type="button"
                             onClick={() => void handleLookupSubmit()}
                             disabled={lookupBusy || !lookupInput.trim()}
-                            className="h-6 lg:h-8 px-2 lg:px-3 font-mono text-[9px] lg:text-[10px] uppercase tracking-[0.1em] border border-oxford/30 text-oxford/70 hover:text-oxford hover:border-oxford/50 disabled:text-oxford/25 disabled:border-hairline-strong btn-interaction"
+                            className="h-9 shrink-0 self-stretch px-0 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/55 underline decoration-oxford/20 underline-offset-4 transition-colors hover:text-oxford hover:decoration-oxford/40 disabled:pointer-events-none disabled:text-oxford/22 disabled:no-underline btn-interaction sm:self-auto"
                           >
-                            {lookupBusy ? 'Queueing...' : 'Queue'}
+                            {lookupBusy ? 'Queueing…' : 'Run lookup'}
                           </button>
                         </div>
                         {lookupMessage ? (
-                          <p className="mt-1.5 font-mono text-[10px] text-oxford/45">{lookupMessage}</p>
+                          <p className="mt-2 font-mono text-[10px] leading-[1.5] text-oxford/42">{lookupMessage}</p>
                         ) : null}
                       </div>
                     </motion.div>

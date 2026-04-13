@@ -69,7 +69,7 @@ export const tokens = {
     display: '"Cormorant Garamond", Georgia, "Times New Roman", serif',
     /** Wordmark / type-hero only — Libre Baskerville. */
     wordmark: '"Libre Baskerville", Georgia, serif',
-    body: '"Geist Sans", system-ui, -apple-system, sans-serif',
+    body: '"Instrument Sans", system-ui, -apple-system, sans-serif',
     mono: '"Space Mono", ui-monospace, monospace',
   },
   /**

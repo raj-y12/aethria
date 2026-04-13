@@ -31,7 +31,7 @@
   /* Typography roles — aligned with web-front-end font stack */
   --font-display: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
   --font-wordmark: 'Libre Baskerville', 'Georgia', serif;
-  --font-sans: 'Geist Sans', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Instrument Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'Space Mono', ui-monospace, monospace;
   /* Clerk — match app palette and typography (oxford, paper, Geist Sans / Space Mono) */
   --clerk-color-primary: #002147;
@@ -45,7 +45,7 @@
   --clerk-color-input: #F2F0EA;
   --clerk-color-input-foreground: #002147;
   --clerk-color-ring: #002147;
-  --clerk-font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
+  --clerk-font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
   --clerk-font-family-buttons: "Space Mono", ui-monospace, monospace;
   --clerk-border-radius: 0;
   /* Motion tokens — single source for duration/easing in CSS */
@@ -86,14 +86,14 @@
   border: 1px solid rgba(0, 33, 71, 0.06) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif !important;
 }
 .cl-card {
   background-color: #F2F0EA !important;
   color: #002147 !important;
   border: 1px solid rgba(0, 33, 71, 0.06) !important;
   border-radius: 0 !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif !important;
 }
 .cl-scrollBox {
   background-color: #F2F0EA !important;
@@ -105,12 +105,12 @@
   --clerk-color-primary: #002147;
   --clerk-color-background: #F2F0EA;
   --clerk-color-foreground: #002147;
-  --clerk-font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
+  --clerk-font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
   --clerk-font-family-buttons: "Space Mono", ui-monospace, monospace;
   --clerk-border-radius: 0;
   background-color: #F2F0EA !important;
   color: #002147 !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif !important;
 }
 .cl-userProfile-root .cl-formFieldInput,
 .cl-userProfile-root .cl-formFieldLabel,
@@ -124,7 +124,7 @@
 .cl-userProfile-root p,
 .cl-userProfile-root span {
   color: #002147 !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif !important;
 }
 .cl-userProfile-root .cl-formFieldLabel,
 .cl-userProfile-root .cl-profileSectionTitle,
@@ -194,7 +194,7 @@
 .cl-userProfile-root h1,
 .cl-userProfile-root h2,
 .cl-userProfile-root h3 {
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif !important;
   color: #002147 !important;
   font-weight: 500 !important;
 }
@@ -203,7 +203,7 @@
 .aethria-clerk-profile {
   background-color: #F2F0EA !important;
   color: #002147 !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif !important;
 }
 .aethria-clerk-profile .cl-userProfile-root {
   background-color: transparent !important;
@@ -214,7 +214,7 @@
 [data-clerk-portal] > div {
   background-color: #F2F0EA !important;
   color: #002147 !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif !important;
 }
 [data-clerk-portal] [role="dialog"] {
   background-color: #F2F0EA !important;
@@ -256,7 +256,7 @@
     overflow-x: hidden;
     background-color: var(--color-paper);
     color: #002147;
-    font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
+    font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
     font-size: 14px;
     font-weight: 400;
     line-height: var(--phi); /* golden ratio — 1.618034 */
@@ -268,9 +268,9 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-    font-weight: 500;
-    letter-spacing: -0.02em;
+    font-family: 'Instrument Sans', system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.015em;
     color: #002147;
   }
 
@@ -343,18 +343,18 @@
     letter-spacing: -0.02em;
   }
   .type-title {
-    font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
+    font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
     font-size: 23px;  /* 14px × φ ≈ 23px */
     line-height: 1.382; /* 2 − 1/φ ≈ 1.382 */
     letter-spacing: -0.02em;
   }
   .type-body {
-    font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
+    font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
     font-size: 14px;
     line-height: var(--phi); /* 1.618 — the golden ratio */
   }
   .type-body-sm {
-    font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
+    font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
     font-size: 13px;
     line-height: var(--phi); /* 1.618 */
   }

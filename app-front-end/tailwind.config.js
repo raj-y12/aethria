@@ -44,8 +44,8 @@ export default {
       fontFamily: {
         display: ['"Libre Baskerville"', 'Georgia', 'serif'],
         cormorant: ['"Cormorant Garamond"', 'Georgia', 'serif'],
-        sans: ['"Geist Sans"', 'system-ui', '-apple-system', 'sans-serif'],
-        body: ['"Geist Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+        body: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['"Space Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       borderRadius: { DEFAULT: '0', none: '0' },
