@@ -297,7 +297,6 @@ export default function MainLayout({
     return ids;
   }, [watchlistAnalytics]);
 
-  const hasThesis = !!fundThesisSummary?.active_version_id;
   const fundName = useMemo(() => {
     // Prefer parsed_json name fields from the thesis itself
     const pj = fundThesisSummary?.parsed_json;
