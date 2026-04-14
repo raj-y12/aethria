@@ -35,10 +35,10 @@ const SETTINGS_SAVE_BTN_CLASS =
 
 const SETTINGS_TAB_NAV_CLASS = `${PANEL_TAB_BAR_CLASS} pt-phi-3 pb-0`;
 const SETTINGS_TAB_BTN_CLASS =
-  'py-phi-3 px-phi-4 type-label-tab border-b border-oxford/15 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction transition-[border-color,color]';
+  'py-phi-3 px-phi-4 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction transition-[border-color,color]';
 const SETTINGS_TAB_ACTIVE_CLASS = 'border-oxford text-oxford';
 const SETTINGS_TAB_INACTIVE_CLASS =
-  'border-hairline text-oxford/40 hover:border-oxford/40 hover:text-oxford/60';
+  'border-transparent text-oxford/40 hover:border-oxford/30 hover:text-oxford/60';
 
 const settingsDescClass =
   'max-w-xl leading-phi m-0 type-body text-oxford/60';
@@ -433,12 +433,12 @@ export default function SettingsPage() {
             ease: tokens.motion.ease,
           })}
         >
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden w-full min-w-0 rounded-none border border-hairline bg-paper">
           <PanelShell
+            className="flex-1"
             title="SETTINGS"
             titleClassName={SETTINGS_HEADER_LABEL_CLASS}
             headerPaddingClass="py-[10px]"
-            headerBorderClass=""
+            headerBorderClass="border-b border-hairline"
             actions={
               <div className="flex items-center gap-3">
                 {saveSuccess && (
@@ -1072,7 +1072,6 @@ export default function SettingsPage() {
               </div>
             </div>
           </PanelShell>
-        </div>
         </motion.div>
       </main>
 

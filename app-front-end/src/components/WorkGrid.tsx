@@ -46,7 +46,7 @@ import {
   UI_FILTER_SEGMENT_INACTIVE,
   UI_FILTER_TOOLBAR_LABEL,
 } from '../design-system/ui-text';
-import { usePrefersReducedMotion } from '../hooks';
+import { usePrefersReducedMotion, useMediaQuery } from '../hooks';
 import DecisionBadge from './DecisionBadge';
 import VerdictBandBadge from './VerdictBandBadge';
 import EmptyState from './EmptyState';
@@ -65,9 +65,6 @@ function getReviewerVerdict(s: Startup): ReviewerVerdictBand | null {
   return getReviewerQualityBand(s.review);
 }
 
-/** Same footprint as DecisionBadge (type-label-tab, py-1 px-2, border) for grid pills. */
-const WORK_GRID_PILL_BASE =
-  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-label-tab py-0.5 px-1.5 lg:py-1 lg:px-2 uppercase shadow-none';
 
 /** Selects: hairline bottom border only (toolbar chrome). */
 const FILTER_SELECT_CLASS =
@@ -167,16 +164,6 @@ function getPartnerEconomicBadgeVariant(s: Startup): 'YES' | 'NO' | 'MAYBE' | nu
   return 'MAYBE';
 }
 
-type DecisionBadgeKind = ReturnType<typeof getDecisionBadgeVariant>;
-
-function isPartnerEconomicDecisionBadge(v: DecisionBadgeKind): v is 'YES' | 'NO' | 'MAYBE' {
-  return v === 'YES' || v === 'NO' || v === 'MAYBE';
-}
-
-/** Awaiting review, awaiting decision, or human review — shown below economic/verdict badges. */
-function isWorkflowQueueBadge(v: DecisionBadgeKind): boolean {
-  return v === 'awaiting' || v === 'undecided' || v === 'escalation';
-}
 
 const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchlistIds }: WorkGridProps): JSX.Element => {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('ALL');
@@ -187,6 +174,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
   /** Opacity fade on filter change only (not on first paint). */
   const [listFilterFadeEnabled, setListFilterFadeEnabled] = useState(false);
   const reduceMotion = usePrefersReducedMotion();
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
 
   const ordered = useMemo(() => {
     const filtered = startups.filter((s) => {
@@ -335,7 +323,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
               </label>
               <button
                 type="button"
-                className={`${FILTER_TOOLBAR_BORDER_BTN_BASE} shrink-0 transition-[border-color,color] ${
+                className={`${FILTER_TOOLBAR_BORDER_BTN_BASE} shrink-0 lg:hidden transition-[border-color,color] ${
                   showAdvancedFilters
                     ? 'border-oxford text-oxford'
                     : 'border-transparent text-oxford/40 hover:border-oxford/40 hover:text-oxford/80'
@@ -343,8 +331,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                 onClick={() => setShowAdvancedFilters((v) => !v)}
                 aria-expanded={showAdvancedFilters}
               >
-                <span className="sm:hidden">{showAdvancedFilters ? 'Fewer' : 'More'}</span>
-                <span className="hidden sm:inline">{showAdvancedFilters ? 'Fewer' : 'More'}</span>
+                {showAdvancedFilters ? 'Fewer' : 'More'}
               </button>
               {/* Count — mobile only, sits at the far right */}
               <span
@@ -362,7 +349,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
             {ordered.length} results
           </div>
         </div>
-        {showAdvancedFilters && (
+        {(showAdvancedFilters || isDesktop) && (
           <div className="mt-phi-3 flex flex-col gap-phi-3 pt-phi-3 border-t border-oxford/[0.06] sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-phi-5 sm:gap-y-phi-2">
             <label className="flex min-w-0 flex-1 items-center gap-phi-3 sm:max-w-[12rem] sm:flex-none">
               <span className={`shrink-0 ${UI_FILTER_TOOLBAR_LABEL}`}>Decision</span>
@@ -439,8 +426,6 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
         const economicBadgeVariant = getPartnerEconomicBadgeVariant(startup);
         const showPartnerDecisionPlusEscalation =
           badgeVariant === 'escalation' && economicBadgeVariant != null;
-        const showBottomWorkflowBadges =
-          showPartnerDecisionPlusEscalation || isWorkflowQueueBadge(badgeVariant);
         const reviewBand = getReviewerVerdict(startup);
 
         return (
@@ -533,33 +518,18 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                     </span>
                   ) : null}
                   <div className="flex w-full min-w-0 max-w-full flex-col gap-phi-2 lg:items-end">
-                    {/* Source, verdict, partner economic — workflow queue badges on second row */}
+                    {/* Verdict band + decision in a single row */}
                     <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-phi-2 justify-start sm:justify-end">
-                      <span
-                        className={`${WORK_GRID_PILL_BASE} ${
-                          getSourceBadge(startup) === 'LOOKUP'
-                            ? 'bg-lookup-surface text-lookup-ink'
-                            : 'border border-field-border bg-transparent text-oxford/60'
-                        }`}
-                      >
-                        {getSourceBadge(startup) === 'LOOKUP' ? 'LOOKUP' : 'SCOUT'}
-                      </span>
                       {reviewBand ? <VerdictBandBadge band={reviewBand} /> : null}
                       {showPartnerDecisionPlusEscalation ? (
-                        <DecisionBadge variant={economicBadgeVariant!} />
-                      ) : isPartnerEconomicDecisionBadge(badgeVariant) ? (
-                        <DecisionBadge variant={badgeVariant} />
-                      ) : null}
-                    </div>
-                    {showBottomWorkflowBadges ? (
-                      <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-phi-2 justify-start sm:justify-end">
-                        {showPartnerDecisionPlusEscalation ? (
+                        <>
+                          <DecisionBadge variant={economicBadgeVariant!} />
                           <DecisionBadge variant="escalation" />
-                        ) : (
-                          <DecisionBadge variant={badgeVariant} />
-                        )}
-                      </div>
-                    ) : null}
+                        </>
+                      ) : (
+                        <DecisionBadge variant={badgeVariant} />
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

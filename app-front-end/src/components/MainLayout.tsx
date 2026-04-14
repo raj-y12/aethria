@@ -460,79 +460,90 @@ export default function MainLayout({
       {/* Paper canvas. Fixed height so only WorkGrid scrolls.
           On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-3 lg:pl-[calc(9rem+21px)] lg:pr-[21px] lg:pt-[21px]">
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-phi-3 lg:pb-phi-5 gap-phi-3 lg:gap-phi-5">
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[5fr_8fr] min-h-0 overflow-hidden pb-phi-3 lg:pb-phi-5 gap-phi-3 lg:gap-phi-5">
           <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
             {/* Pipeline summary + lookup */}
             <header className="flex-none mb-phi-3 min-w-0 lg:px-0">
               <section
                 aria-label="Pipeline summary and agent status"
-                className="flex min-w-0 flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-1 border-b border-hairline pb-phi-3"
+                className="border-b border-hairline pb-phi-3"
               >
-                <p className="min-w-0 type-meta tracking-label uppercase text-oxford/40">
-                  <span className="text-oxford/60">{startups.length}</span> total
-                  <span className="mx-phi-2 text-oxford/25">·</span>
-                  <span className="text-oxford/60">{openCount}</span> open
-                  <span className="mx-phi-2 text-oxford/25">·</span>
-                  <span className={pendingEscalations > 0 ? 'text-escalation' : 'text-oxford/60'}>{pendingEscalations}</span> esc
-                  <span className="mx-phi-2 text-oxford/25">·</span>
-                  <span className="text-oxford/60">{resolvedCount}</span> decided
-                  {signals.length > 0 && (
-                    <>
+                <div className="flex min-w-0 items-start justify-between gap-phi-4">
+                  <div className="min-w-0 flex-1">
+                    {fundName ? (
+                      <p className="type-body font-semibold tracking-tight text-oxford leading-snug truncate">{fundName}</p>
+                    ) : null}
+                    {thesisCriteria.length > 0 ? (
+                      <p className={`type-meta tracking-badge uppercase text-oxford/40 truncate ${fundName ? 'mt-phi-1' : ''}`}>
+                        {thesisCriteria.join(' · ')}
+                      </p>
+                    ) : null}
+                    <p className={`type-meta tracking-label uppercase text-oxford/40 ${(fundName || thesisCriteria.length > 0) ? 'mt-phi-2' : ''}`}>
+                      <span className="text-oxford/60">{startups.length}</span> total
                       <span className="mx-phi-2 text-oxford/25">·</span>
-                      <span className="text-oxford/60">{signals.length}</span> sig
-                    </>
-                  )}
-                </p>
-                <p className="shrink-0 text-right type-meta tracking-label uppercase text-oxford/40">
-                  Pipeline{' '}
-                  <span className="relative inline-flex items-center gap-phi-2">
-                    {/* Live dot — shown when pipeline is On or Working */}
-                    {(pipelineStateLabel === 'On' || pipelineStateLabel === 'Working') && (
-                      <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60"
-                        style={{ animation: pipelineStateLabel === 'On'
-                          ? 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite'
-                          : 'aethria-pulse 1.2s cubic-bezier(0.16,1,0.3,1) infinite'
-                        }}
-                        aria-hidden
-                      />
-                    )}
-                    <span className={
-                      pipelineStateLabel === 'Issue'   ? 'text-escalation' :
-                      pipelineStateLabel === 'Off'     ? 'text-oxford/25' :
-                      pipelineStateLabel === 'On'      ? 'text-oxford/80' :
-                      /* Working */                      'text-oxford/60'
-                    }>
-                      {pipelineStateLabel}
+                      <span className="text-oxford/60">{openCount}</span> open
+                      <span className="mx-phi-2 text-oxford/25">·</span>
+                      <span className={pendingEscalations > 0 ? 'text-escalation' : 'text-oxford/60'}>{pendingEscalations}</span> esc
+                      <span className="mx-phi-2 text-oxford/25">·</span>
+                      <span className="text-oxford/60">{resolvedCount}</span> decided
+                      {signals.length > 0 && (
+                        <>
+                          <span className="mx-phi-2 text-oxford/25">·</span>
+                          <span className="text-oxford/60">{signals.length}</span> sig
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-right type-meta tracking-label uppercase text-oxford/40 pt-px">
+                    Pipeline{' '}
+                    <span className="relative inline-flex items-center gap-phi-2">
+                      {/* Live dot — shown when pipeline is On or Working */}
+                      {(pipelineStateLabel === 'On' || pipelineStateLabel === 'Working') && (
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60"
+                          style={{ animation: pipelineStateLabel === 'On'
+                            ? 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite'
+                            : 'aethria-pulse 1.2s cubic-bezier(0.16,1,0.3,1) infinite'
+                          }}
+                          aria-hidden
+                        />
+                      )}
+                      <span className={
+                        pipelineStateLabel === 'Issue'   ? 'text-escalation' :
+                        pipelineStateLabel === 'Off'     ? 'text-oxford/25' :
+                        pipelineStateLabel === 'On'      ? 'text-oxford/80' :
+                        /* Working */                      'text-oxford/60'
+                      }>
+                        {pipelineStateLabel}
+                      </span>
+                      {pipelineStateLabel === 'Issue' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setShowPipelineIssueHelp((open) => !open)}
+                            className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
+                            aria-label="Why pipeline has an issue"
+                            aria-expanded={showPipelineIssueHelp}
+                          >
+                            ?
+                          </button>
+                          {showPipelineIssueHelp && (
+                            <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
+                              Pipeline has a problem and may not process updates right now.
+                              <button
+                                type="button"
+                                onClick={() => navigate('/settings')}
+                                className="mt-phi-2 block type-meta tracking-badge uppercase text-oxford/60 hover:text-oxford btn-interaction"
+                              >
+                                Open settings →
+                              </button>
+                            </span>
+                          )}
+                        </>
+                      )}
                     </span>
-                    {pipelineStateLabel === 'Issue' && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setShowPipelineIssueHelp((open) => !open)}
-                          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
-                          aria-label="Why pipeline has an issue"
-                          aria-expanded={showPipelineIssueHelp}
-                        >
-                          ?
-                        </button>
-                        {showPipelineIssueHelp && (
-                          <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
-                            Pipeline has a problem and may not process updates right now.
-                            <button
-                              type="button"
-                              onClick={() => navigate('/settings')}
-                              className="mt-phi-2 block type-meta tracking-badge uppercase text-oxford/60 hover:text-oxford btn-interaction"
-                            >
-                              Open settings →
-                            </button>
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </span>
-                </p>
+                  </p>
+                </div>
               </section>
               <div className="mt-phi-2 lg:mt-phi-3 min-w-0 border-l border-[var(--section-divider)] pl-phi-3 md:pl-phi-4">
                 <button
@@ -613,45 +624,6 @@ export default function MainLayout({
               </div>
             </header>
 
-            {/* Fund thesis — mobile only (desktop shows it in the right column) */}
-            <div className="flex-none mb-phi-2 block lg:hidden">
-              <article
-                className="w-full border border-hairline bg-paper px-phi-3 py-phi-2"
-                style={{ boxSizing: 'border-box' }}
-                aria-label="Fund thesis preview"
-              >
-                <div className="flex items-center justify-between gap-phi-2">
-                  <p className="type-meta tracking-label uppercase text-oxford/40">
-                    Active Mandate · Fund Thesis
-                  </p>
-                  {hasThesis && (
-                    <span className="inline-flex items-center gap-phi-1">
-                      <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
-                        style={{ opacity: 0.6 }}
-                        aria-hidden
-                      />
-                      <span className="type-meta tracking-badge uppercase text-oxford/40">Live</span>
-                    </span>
-                  )}
-                </div>
-                <p className="mt-phi-1 type-body-sm font-semibold tracking-tight text-oxford">
-                  {fundName || 'No fund configured'}
-                </p>
-                {thesisCriteria.length > 0 && (
-                  <div className="mt-phi-2 flex flex-wrap gap-phi-1">
-                    {thesisCriteria.map((item) => (
-                      <span
-                        key={item}
-                        className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40"
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </article>
-            </div>
 
             {rightPanel === 'system' ? (
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden w-full min-w-0 rounded-none border border-hairline bg-paper">
@@ -705,43 +677,7 @@ export default function MainLayout({
           </div>
 
           {/* Right zone: Judgements or memo only — never System. */}
-          <div className="hidden lg:flex min-w-0 min-h-0 flex-col gap-phi-3">
-            <article
-              className="w-full border border-hairline bg-paper p-phi-5"
-              style={{ boxSizing: 'border-box' }}
-              aria-label="Fund thesis preview"
-            >
-              <div className="flex items-center justify-between gap-phi-2">
-                <p className="type-label-section text-oxford/40">
-                  Active Mandate · Fund Thesis
-                </p>
-                {hasThesis && (
-                  <span className="inline-flex items-center gap-phi-2">
-                    <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
-                      style={{ opacity: 0.6 }}
-                      aria-hidden
-                    />
-                    <span className="type-meta tracking-badge uppercase text-oxford/40">Live</span>
-                  </span>
-                )}
-              </div>
-              <p className="mt-phi-3 type-body font-semibold tracking-tight text-oxford">
-                {fundName || 'No fund configured'}
-              </p>
-              {thesisCriteria.length > 0 ? (
-                <div className="mt-phi-3 flex flex-wrap gap-phi-2">
-                  {thesisCriteria.map((item) => (
-                    <span
-                      key={item}
-                      className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </article>
+          <div className="hidden lg:flex min-w-0 min-h-0 flex-col">
             <aside
               className="min-w-0 min-h-0 flex-1 border border-hairline bg-paper overflow-hidden"
               aria-live="polite"
@@ -824,15 +760,17 @@ export default function MainLayout({
                 />
               </PanelShell>
               ) : (
-              <div className="flex-1 flex items-center justify-center p-8">
-                <p className="type-label-tab text-oxford/25" style={{ transition: 'opacity var(--motion-micro) var(--motion-ease)' }}>
-                  Click a deal to open the memo here
+              <div className="flex-1 flex flex-col items-center justify-center gap-phi-3 p-8 select-none">
+                <p className="font-display font-normal text-[clamp(1.25rem,2vw,1.75rem)] leading-none text-oxford/[0.10] tracking-[0.01em]">
+                  Aethria
+                </p>
+                <p className="type-meta tracking-badge uppercase text-oxford/[0.18]">
+                  Select a company to open the investment memo
                 </p>
               </div>
               )}
             </aside>
           </div>
-        </div>
         </div>
       </main>
 

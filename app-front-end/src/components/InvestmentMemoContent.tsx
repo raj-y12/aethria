@@ -390,15 +390,15 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         .memoCompany{
           font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
           font-weight: 600;
-          font-size: clamp(1.375rem, 2.2vw, 1.625rem);
-          line-height: 1.2;
-          letter-spacing: -0.01em;
+          font-size: clamp(1.75rem, 3.2vw, 2.5rem);
+          line-height: 1.1;
+          letter-spacing: -0.02em;
           margin: 0;
           max-width: 100%;
           color: #002147;
         }
         .memoHeaderDivider{
-          margin-top: 21px;
+          margin-top: clamp(18px, 2vw, 28px);
           margin-bottom: clamp(34px, 5vw, 55px);
         }
         .memoBody{
@@ -446,9 +446,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoVerdict{
           font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
-          font-weight: 600;
-          font-size: clamp(1.75rem, 4vw, 2.25rem);
-          line-height: 1.08;
+          font-weight: 700;
+          font-size: clamp(2rem, 4.5vw, 2.75rem);
+          line-height: 1.0;
           letter-spacing: -0.03em;
           text-transform: uppercase;
           margin: 0;
@@ -964,6 +964,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           }
           .memoOverviewKey{
             padding-top: 0;
+          }
+        }
+        /* In the embedded right-panel on wide screens, restore the 2-col key/value layout
+           so the memo reads as a document rather than a stacked list. */
+        @media (min-width: 1024px){
+          .memoPanel--embedded .memoSection--stackedRows .memoOverviewRow{
+            grid-template-columns: minmax(6rem, 7.5rem) minmax(0, 1fr);
+            row-gap: 4px;
+          }
+          .memoPanel--embedded .memoSection--stackedRows .memoOverviewKey{
+            padding-top: 3px;
           }
         }
       `}</style>
