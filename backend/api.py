@@ -1022,6 +1022,16 @@ def patch_settings(request: Request, body: dict):
             for k, v in body[section].items():
                 current[section][k] = v
     _save_settings(current, user_id)
+
+    # If any agents are enabled after the patch, ensure the persistent background loop is running.
+    # This covers the case where the user toggles agents in the UI and clicks "Save".
+    ac = current.get("agent_config") or {}
+    if ac.get("scouts_enabled") or ac.get("reviewers_enabled") or ac.get("partners_enabled"):
+        await _ensure_user_loop(user_id)
+    else:
+        # If all agents were just turned off, make sure the loop is stopped.
+        await _stop_user_loop(user_id)
+
     # Meta-Agent settings are derived from environment; PATCH does not
     # persist or validate them, but we still include the live view.
     meta_agent = get_meta_agent_settings()

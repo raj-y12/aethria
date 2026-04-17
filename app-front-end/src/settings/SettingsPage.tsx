@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactNode, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useClerk } from '@clerk/react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { UserProfile } from '@clerk/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SystemBar from '../components/SystemBar';
@@ -193,6 +194,7 @@ function Field({
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { signOut } = useClerk();
+  const queryClient = useQueryClient();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -322,6 +324,8 @@ export default function SettingsPage() {
     if (result.error) { setValidationErrors(result.error.errors); return; }
     setSaveSuccess(true);
     if (result.data) setSettings(result.data);
+    // Invalidate React Query cache so other components (like logout guard) pick up the change.
+    await queryClient.invalidateQueries({ queryKey: ['settings'] });
   };
 
   const setCost = <K extends keyof Settings['cost_budget']>(k: K, v: Settings['cost_budget'][K]) =>
