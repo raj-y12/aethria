@@ -90,14 +90,16 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
         Agents continued working. Here is what happened.
       </motion.p>
 
-      {/* Stats — inline, stacked */}
+      {/* Stats — horizontal row */}
       <div
         style={{
           display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '28px',
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          gap: 'clamp(32px, 6vw, 80px)',
           marginBottom: '64px',
+          flexWrap: 'wrap',
         }}
       >
         {stats.map((stat, i) => (
