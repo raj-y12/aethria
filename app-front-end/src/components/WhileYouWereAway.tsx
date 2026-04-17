@@ -14,7 +14,7 @@ const STATS = (s: ActivitySummary) => [
   { label: 'Evaluated by reviewers', value: s.reviewed, accent: false },
   { label: 'Decisions rendered', value: s.decided, accent: false },
   { label: 'Escalations flagged', value: s.escalations, accent: true },
-].filter((r) => r.value > 0);
+];
 
 export default function WhileYouWereAway({ summary, onDismiss }: Props) {
   const stats = STATS(summary);

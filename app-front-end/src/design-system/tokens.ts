@@ -1,7 +1,7 @@
 /**
  * Aethria design tokens — aligned with brand_assets and web-front-end.
  *
- * Palette: oxford #002147, paper #F2F0EA, paperBright #faf8f4, inverse on oxford #FFFFFF, charcoal #2f333b.
+ * Palette: oxford #002147, paper #F2F0EA, paperBright #F2F0EA, inverse on oxford #FFFFFF, charcoal #2f333b.
  * Burgundy #7D2B3A (accent) is escalation-only — see color.accent. Heritage gold #b8976a is decorative only (dividers, chrome) — color.heritageGold.
  * Typography: Libre Baskerville (wordmark / type-hero only). Geist Sans (all UI body, titles, prominent copy). Space Mono (metadata/labels, 0.08–0.14em).
  * Brand scale: section-label 11px/0.12em, tab/meta 10px/0.12–0.14em, body 14px/1.618.
@@ -42,7 +42,7 @@ export const tokens = {
     oxford: '#002147',
     paper: '#F2F0EA',
     /** Softer paper lift for gradients and panels (aligned with web-front-end). */
-    paperBright: '#faf8f4',
+    paperBright: '#F2F0EA',
     charcoal: '#2f333b',
     ivory: '#FFFFFF',
     bone: '#f2f4f8',

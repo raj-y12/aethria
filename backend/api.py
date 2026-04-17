@@ -2009,7 +2009,7 @@ async def get_system_health(request: Request):
 async def get_activity_summary(request: Request):
     """
     Return aggregated pipeline activity since the user's last visit.
-    Also updates last_seen_at to now so the next call only sees new activity.
+    Does NOT update last_seen_at — that only happens on POST /api/activity/seen (dismiss).
     """
     user_id: str = getattr(request.state, "user_id", None)
     if not user_id:
@@ -2030,8 +2030,8 @@ async def get_activity_summary(request: Request):
         last_seen_at = None
 
     if not last_seen_at:
-        # First visit — treat as "no prior activity"
-        last_seen_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        # First visit — include all historical pipeline activity
+        last_seen_at = "1970-01-01T00:00:00Z"
 
     # 2. Query pipeline_activity since last_seen_at
     try:
@@ -2054,7 +2054,18 @@ async def get_activity_summary(request: Request):
         totals["decided"]     += int(r.get("decisions_made", 0) or 0)
         totals["escalations"] += int(r.get("escalations_count", 0) or 0)
 
-    # 4. Update last_seen_at = now
+    # last_seen_at is NOT updated here — only updated when the user explicitly
+    # dismisses the modal via POST /api/activity/seen
+    return JSONResponse(content=totals)
+
+
+@app.post("/api/activity/seen")
+async def mark_activity_seen(request: Request):
+    """Mark the current time as last_seen_at. Called when the user dismisses the summary modal."""
+    user_id: str = getattr(request.state, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    svc = get_service_client()
     try:
         svc.table("user_state").upsert(
             {
@@ -2065,5 +2076,4 @@ async def get_activity_summary(request: Request):
         ).execute()
     except Exception as e:
         logging.getLogger("api").warning("Could not update user_state last_seen_at: %s", e)
-
-    return JSONResponse(content=totals)
+    return JSONResponse(content={"ok": True})

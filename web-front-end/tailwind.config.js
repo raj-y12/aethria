@@ -9,8 +9,8 @@ export default {
       colors: {
         oxford: '#002147',
         paper: '#f2f0ea',
-        ivory: '#fcfcfc',
-        canvas: '#fcfcfc',
+        ivory: '#f2f0ea',
+        canvas: '#f2f0ea',
         mist: '#f2f4f8',
         graphite: '#2f333b',
       },

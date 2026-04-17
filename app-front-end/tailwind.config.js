@@ -18,7 +18,7 @@ export default {
       colors: {
         oxford: '#002147',
         paper: '#F2F0EA',
-        'paper-bright': '#faf8f4',
+        'paper-bright': '#F2F0EA',
         /** Structural hairlines — prefer over raw oxford/[0.06] in new code. */
         hairline: 'rgba(0, 33, 71, 0.06)',
         'hairline-strong': 'rgba(0, 33, 71, 0.12)',

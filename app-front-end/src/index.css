@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&display=swap');
 /*
  * Aethria — High-fidelity institutional design (aligned with web-front-end).
- * Palette: oxford #002147, paper #F2F0EA, paperBright #faf8f4, memo surfaces #FFFFFF, accent #7D2B3A (escalations only), heritageGold #b8976a (decorative only).
+ * Palette: oxford #002147, paper #F2F0EA, paperBright #F2F0EA, memo surfaces #FFFFFF, accent #7D2B3A (escalations only), heritageGold #b8976a (decorative only).
  * Geist Sans is bundled via @fontsource in main.tsx (body + titles). Display: Libre Baskerville (wordmark / type-hero only). Metadata: Space Mono.
  * Frames: 1px rgba(0,33,71,0.06). No rounded corners.
  * Text hierarchy: Oxford opacity ladder 100, 80, 60, 40, 25. Line-height: 1.5 labels, 1.6 body.
@@ -10,8 +10,8 @@
   /* Primary palette — aligned with web-front-end tokens */
   --color-oxford: #002147;
   --color-paper: #f2f0ea;
-  --color-paper-bright: #faf8f4;
-  --color-ivory: #fcfcfc;
+  --color-paper-bright: #f2f0ea;
+  --color-ivory: #f2f0ea;
   --color-charcoal: #2f333b;
   --color-heritage-gold: #b8976a;
   --color-heritage-gold-soft: rgba(184, 151, 106, 0.35);

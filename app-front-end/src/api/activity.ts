@@ -17,3 +17,7 @@ export async function fetchActivitySummary(): Promise<ActivitySummary> {
   if (!res.ok) throw new Error('activity summary request failed');
   return res.json() as Promise<ActivitySummary>;
 }
+
+export async function markActivitySeen(): Promise<void> {
+  await authedFetch(`${API_BASE}/api/activity/seen`, { method: 'POST' });
+}

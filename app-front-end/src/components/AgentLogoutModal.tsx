@@ -39,109 +39,89 @@ export default function AgentLogoutModal({
   const modal = (
     <AnimatePresence>
       {open && (
-        /* Backdrop */
         <motion.div
-          key="agent-logout-backdrop"
+          key="agent-logout-takeover"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-oxford/60 backdrop-blur-[2px]"
-          onClick={onCancel}
-          aria-hidden="true"
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-phi-6 bg-paper-bright"
+          role="dialog"
+          aria-modal="true"
         >
-          {/* Panel — stop propagation so clicks inside don't close */}
-          <motion.div
-            key="agent-logout-panel"
-            initial={{ opacity: 0, y: 8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.99 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full max-w-sm mx-4 bg-paper border border-hairline"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="agent-logout-title"
-            onClick={(e) => e.stopPropagation()}
+          {/* Eyebrow */}
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
+            className="type-meta uppercase tracking-[0.16em] text-oxford/40 mb-phi-3"
           >
-            {/* Header stripe */}
-            <div className="border-b border-hairline px-phi-5 py-phi-3 flex items-center justify-between">
-              <p
-                id="agent-logout-title"
-                className="type-label-section text-oxford/80 uppercase tracking-[0.12em]"
-              >
-                Agents are still running
-              </p>
-              <button
-                type="button"
-                onClick={onCancel}
-                className="type-meta uppercase tracking-[0.12em] text-oxford/40 hover:text-oxford btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
-                aria-label="Cancel and close"
-              >
-                ✕
-              </button>
-            </div>
+            System Notification
+          </motion.p>
 
-            {/* Body */}
-            <div className="px-phi-5 py-phi-5 flex flex-col gap-phi-4">
-              {/* Live indicator */}
-              <div className="flex items-center gap-phi-2">
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/70"
-                  style={{ animation: 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite' }}
-                  aria-hidden
-                />
-                <p className="type-meta uppercase tracking-[0.12em] text-oxford/50">
-                  Pipeline active
-                </p>
-              </div>
+          {/* Title */}
+          <motion.h1
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+            className="type-display text-center text-[clamp(28px,4vw,52px)] font-medium text-oxford leading-[1.1] m-0 max-w-[15ch]"
+          >
+            Your agents are still running
+          </motion.h1>
 
-              <p className="type-body-sm leading-phi text-oxford/60 max-w-[34ch]">
-                Your agents will continue running in the background after you log out. You can turn
-                them off now, or leave them running and log out.
-              </p>
+          {/* Subtitle */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.18 }}
+            className="type-body text-center text-oxford/50 mt-phi-3 mb-phi-8 max-w-[34ch]"
+          >
+            The background pipeline will persist in the cloud after you log out. You can turn them off now, or leave them running.
+          </motion.p>
 
-              {/* Action buttons */}
-              <div className="flex flex-col gap-phi-2 pt-phi-2 border-t border-hairline">
-                {/* Primary: Keep running */}
-                <button
-                  id="agent-logout-keep"
-                  type="button"
-                  onClick={onKeepRunning}
-                  disabled={busy}
-                  className="w-full min-h-[40px] flex items-center justify-between px-phi-4 py-phi-2 bg-oxford text-paper type-meta uppercase tracking-[0.12em] btn-interaction hover:bg-oxford/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-offset-2 focus-visible:ring-offset-paper transition-colors"
-                >
-                  <span>Keep running</span>
-                  <span className="text-paper/50 text-[10px]">Agents stay on</span>
-                </button>
+          {/* Actions — vertical stack, centered */}
+          <div className="flex flex-col items-center gap-phi-4 w-full max-w-xs">
+            {/* Primary: Keep Running */}
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
+              onClick={onKeepRunning}
+              disabled={busy}
+              className="w-full px-phi-7 py-[14px] bg-oxford text-paper-bright type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
+            >
+              Continue running & Log out
+            </motion.button>
 
-                {/* Secondary: Turn off + logout */}
-                <button
-                  id="agent-logout-turnoff"
-                  type="button"
-                  onClick={() => void handleTurnOff()}
-                  disabled={busy}
-                  className="w-full min-h-[40px] flex items-center justify-between px-phi-4 py-phi-2 border border-oxford/30 text-oxford type-meta uppercase tracking-[0.12em] btn-interaction hover:border-oxford/60 hover:bg-oxford/[0.03] disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-offset-2 focus-visible:ring-offset-paper transition-colors"
-                >
-                  <span>{busy ? 'Turning off…' : 'Turn off agents'}</span>
-                  <span className="text-oxford/40 text-[10px]">Then log out</span>
-                </button>
+            {/* Secondary: Turn Off */}
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
+              onClick={() => void handleTurnOff()}
+              disabled={busy}
+              className="w-full text-oxford/50 hover:text-oxford type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-colors disabled:opacity-50"
+            >
+              {busy ? 'Turning off agents…' : 'Stop agents then log out'}
+            </motion.button>
 
-                {/* Tertiary: Cancel */}
-                <button
-                  id="agent-logout-cancel"
-                  type="button"
-                  onClick={onCancel}
-                  disabled={busy}
-                  className="w-full min-h-[36px] flex items-center justify-center px-phi-4 py-phi-2 text-oxford/40 type-meta uppercase tracking-[0.12em] btn-interaction hover:text-oxford/70 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </motion.div>
+            {/* Cancel */}
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.39 }}
+              onClick={onCancel}
+              disabled={busy}
+              className="mt-phi-4 type-meta uppercase tracking-[0.12em] text-oxford/30 hover:text-oxford/50 btn-interaction cursor-pointer transition-colors disabled:opacity-50 border-b border-oxford/10 pb-0.5"
+            >
+              Cancel
+            </motion.button>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
+
+
   );
 
   if (typeof document === 'undefined') return null;

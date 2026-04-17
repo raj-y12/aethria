@@ -28,9 +28,7 @@ import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './Inves
 import { queueOnDemandLookup, fetchStartupDetail, fetchLookupJobStatus } from '../api/startups';
 import {
   fetchAgentsStatus,
-  fetchLoopStatus,
 } from '../api/agents';
-import { useAgentsEnabled } from '../hooks/useAgentsEnabled';
 import { fetchFundThesisSummary } from '../api/fundThesis';
 import { getQueryConfig } from '../lib/queryIntent';
 
@@ -305,13 +303,6 @@ export default function MainLayout({
     ...getQueryConfig('SEMI_DYNAMIC', { liveGate }),
   });
 
-  const { data: loopStatus } = useQuery({
-    queryKey: ['loop-status'],
-    queryFn: () => fetchLoopStatus().catch(() => null),
-    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 30_000 }),
-  });
-
-  const agentsEnabled = useAgentsEnabled();
 
   const fundThesisQuery = useQuery({
     queryKey: ['fund-thesis', 'summary'],
@@ -606,33 +597,6 @@ export default function MainLayout({
                       </>
                     )}
                   </span>
-                  {/* Persistent Agent Indicator */}
-                  {agentsEnabled && (
-                    <>
-                      <span className="mx-phi-2 text-oxford/25">·</span>
-                      <span className="flex items-center gap-phi-2">
-                        <span className="type-meta tracking-label uppercase text-oxford/30">Loop</span>
-                        <span
-                          className={`h-1.5 w-1.5 shrink-0 rounded-none ${
-                            loopStatus?.loop_alive ? 'bg-oxford/60' : 'bg-oxford/15'
-                          }`}
-                          style={{
-                            animation: loopStatus?.loop_alive
-                              ? 'aethria-pulse 3.0s cubic-bezier(0.16,1,0.3,1) infinite'
-                              : 'none',
-                          }}
-                          aria-hidden
-                        />
-                        <span
-                          className={`type-meta tracking-label uppercase ${
-                            loopStatus?.loop_alive ? 'text-oxford/80' : 'text-oxford/25'
-                          }`}
-                        >
-                          {loopStatus?.loop_alive ? 'Active' : 'Standby'}
-                        </span>
-                      </span>
-                    </>
-                  )}
                 </p>
               </section>
               <div className="mt-phi-2 lg:mt-phi-3 min-w-0 border-l border-[var(--section-divider)] pl-phi-3 md:pl-phi-4">

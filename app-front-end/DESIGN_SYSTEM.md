@@ -23,8 +23,8 @@ Institutional, editorial UI. Modelled after a private equity firm's internal dea
 |---|---|---|
 | `oxford` | `#002147` | Primary text, borders at full opacity |
 | `paper` | `#F2F0EA` | Page & panel background |
-| `paper-bright` | `#faf8f4` | Raised surface, sheet overlay |
-| `ivory` | `#fcfcfc` | Memo/document surface (white-adjacent) |
+| `paper-bright` | `#F2F0EA` | Raised surface, sheet overlay (unified) |
+| `ivory` | `#F2F0EA` | Document surface (unified) |
 | `charcoal` | `#2f333b` | Secondary prose text |
 | `gold` | `#b8976a` | Heritage decorative accent — section rules, diamonds |
 | `gold-soft` | `rgba(184,151,106,0.35)` | Gold tint surfaces |
