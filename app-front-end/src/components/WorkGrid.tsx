@@ -535,15 +535,11 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
                   <div className="flex w-full min-w-0 max-w-full flex-col gap-phi-2 lg:items-end">
                     {/* Source, verdict, partner economic — workflow queue badges on second row */}
                     <div className="flex min-w-0 w-full max-w-full flex-row flex-wrap items-center gap-phi-2 justify-start sm:justify-end">
-                      <span
-                        className={`${WORK_GRID_PILL_BASE} ${
-                          getSourceBadge(startup) === 'LOOKUP'
-                            ? 'bg-lookup-surface text-lookup-ink'
-                            : 'border border-field-border bg-transparent text-oxford/60'
-                        }`}
-                      >
-                        {getSourceBadge(startup) === 'LOOKUP' ? 'LOOKUP' : 'SCOUT'}
-                      </span>
+                      {getSourceBadge(startup) === 'LOOKUP' && (
+                        <span className={`${WORK_GRID_PILL_BASE} bg-lookup-surface text-lookup-ink`}>
+                          LOOKUP
+                        </span>
+                      )}
                       {reviewBand ? <VerdictBandBadge band={reviewBand} /> : null}
                       {showPartnerDecisionPlusEscalation ? (
                         <DecisionBadge variant={economicBadgeVariant!} />
