@@ -23,7 +23,7 @@ function AppShell() {
     systemPanelOpen: !isSettingsRoute && isSystemPanelOpen,
   });
   const agentsEnabled = useAgentsEnabled();
-  const { summary, showSummary, dismissSummary } = useActivitySummary();
+  const { summary, showSummary, loading, dismissSummary } = useActivitySummary();
 
   // Warn the user before closing the tab if agents are actively running.
   useEffect(() => {
