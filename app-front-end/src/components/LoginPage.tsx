@@ -171,231 +171,146 @@ export default function LoginPage() {
   const panelAnim = { opacity: 1, y: 0 };
 
   return (
-    <div className="flex min-h-[100dvh] w-full flex-col bg-paper">
-      <motion.header
-        className="flex shrink-0 items-center justify-end gap-4 border-b border-hairline bg-paper px-4 py-4 sm:px-8 sm:py-5 lg:px-10 xl:px-14"
-        initial={reduceMotion ? false : { opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={transitionOrReduced(reduceMotion, {
-          duration: tokens.motion.duration.medium,
-          ease: tokens.motion.ease,
-        })}
-      >
-        <span className="type-meta text-right uppercase tracking-[0.14em] text-oxford/50">
-          Investment intelligence
-        </span>
-      </motion.header>
+    <div className="flex flex-col items-center justify-center min-h-[100dvh] w-full bg-paper p-phi-6 overflow-hidden">
+      <div className="relative w-full max-w-[48rem] flex flex-col items-center">
+        {/* Structural Accent: The Vertical Spine */}
+        <motion.div
+          initial={reduceMotion ? { opacity: 1, scaleY: 1 } : { opacity: 0, scaleY: 0 }}
+          animate={{ opacity: 1, scaleY: 1 }}
+          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+          className="absolute left-1/2 -ml-px top-[-20vh] bottom-[-20vh] w-[0.5px] bg-oxford/[0.08]"
+          aria-hidden="true"
+        />
 
-      <div className="flex min-h-0 flex-1 flex-col lg:min-h-[calc(100dvh-10rem)] lg:flex-row">
-        {/* Oxford — ~70% width on large screens */}
-        <motion.aside
-          className="relative flex min-h-[38vh] shrink-0 flex-col justify-center bg-oxford px-6 py-10 text-paper sm:px-10 lg:min-h-0 lg:basis-[70%] lg:max-w-[70%] lg:flex-[0_0_70%] lg:py-16 xl:pl-20 xl:pr-12"
-          initial={reduceMotion ? { x: 0, opacity: 1 } : { x: '-8%', opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={transitionOrReduced(reduceMotion, {
-            duration: tokens.motion.duration.long,
-            ease: tokens.motion.ease,
-          })}
-        >
-          <div className="mx-auto w-full max-w-[32rem] lg:mx-0 lg:max-w-[36rem]">
-            <motion.div
-              initial={reduceMotion ? panelAnim : panelIn}
-              animate={panelAnim}
-              transition={transitionOrReduced(reduceMotion, {
-                delay: 0.06,
-                duration: tokens.motion.duration.medium,
-                ease: tokens.motion.ease,
-              })}
-            >
-              <div className="inline-flex w-full min-w-0 flex-col items-start" aria-live="polite">
-                <AnimatePresence mode="wait">
-                  {signedInGreeting ? (
-                    <motion.div
-                      key="hero-welcome"
-                      className="inline-flex max-w-full flex-col items-stretch"
-                      initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -10 }}
-                      transition={transitionOrReduced(reduceMotion, {
-                        duration: tokens.motion.duration.medium,
-                        ease: tokens.motion.ease,
-                      })}
-                    >
-                      <h1 className="font-display max-w-full text-[clamp(1.35rem,3.4vw,2.65rem)] font-normal leading-[1.18] tracking-[-0.02em] text-paper">
-                        {`Welcome back, ${signedInGreeting}.`}
-                      </h1>
-                      <motion.span
-                        className="mt-2 block h-[3px] w-full max-w-full origin-left bg-paper"
-                        initial={reduceMotion ? { scaleX: 1 } : { scaleX: 0 }}
-                        animate={{ scaleX: 1 }}
-                        transition={transitionOrReduced(reduceMotion, {
-                          delay: 0.12,
-                          duration: tokens.motion.duration.long,
-                          ease: tokens.motion.ease,
-                        })}
-                        aria-hidden
-                      />
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="hero-brand"
-                      className="inline-flex flex-col items-start"
-                      initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -10 }}
-                      transition={transitionOrReduced(reduceMotion, {
-                        duration: tokens.motion.duration.medium,
-                        ease: tokens.motion.ease,
-                      })}
-                    >
-                      <h1 className="flex flex-wrap items-baseline gap-0 font-display text-[clamp(2rem,5vw,3.5rem)] font-normal leading-[1.1] tracking-[-0.02em] text-paper">
-                        <span className="inline-flex flex-col items-stretch self-start">
-                          <span className="inline-block w-max">A</span>
-                          <motion.span
-                            className="mt-2 block h-[3px] w-full origin-left bg-paper"
-                            initial={reduceMotion ? { scaleX: 1 } : { scaleX: 0 }}
-                            animate={{ scaleX: 1 }}
-                            transition={transitionOrReduced(reduceMotion, {
-                              delay: 0.28,
-                              duration: tokens.motion.duration.long,
-                              ease: tokens.motion.ease,
-                            })}
-                            aria-hidden
-                          />
-                        </span>
-                        <span>ethria</span>
-                      </h1>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                <AnimatePresence mode="wait">
-                  <motion.p
-                    key={signedInGreeting ? 'sub-success' : 'sub-tagline'}
-                    initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
-                    transition={transitionOrReduced(reduceMotion, {
-                      delay: signedInGreeting ? 0.08 : 0,
-                      duration: tokens.motion.duration.medium,
-                      ease: tokens.motion.ease,
-                    })}
-                    className="mt-6 max-w-[26rem] font-display text-[clamp(1.05rem,2.2vw,1.25rem)] italic leading-relaxed text-paper/70"
-                  >
-                    {signedInGreeting ? 'Entering your workspace…' : 'Judgment at institutional standard.'}
-                  </motion.p>
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          </div>
-        </motion.aside>
+        {/* Brand Monolith */}
+        <div className="relative z-10 w-full mb-phi-9 flex flex-col items-center">
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
+            className="type-meta uppercase tracking-[0.25em] text-oxford/30 mb-phi-3"
+          >
+            Confidential · Institutional Access
+          </motion.p>
 
-        {/* Paper — ~30% */}
-        <motion.section
-          className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10 lg:min-w-0 lg:basis-[30%] lg:max-w-[30%] lg:flex-[0_0_30%] lg:py-16 xl:pr-16"
-          data-login-page
-          initial={reduceMotion ? panelAnim : panelIn}
-          animate={panelAnim}
-          transition={transitionOrReduced(reduceMotion, {
-            delay: 0.12,
-            duration: tokens.motion.duration.medium,
-            ease: tokens.motion.ease,
-          })}
-        >
-          <div className="mx-auto w-full max-w-[min(100%,17.5rem)] font-mono uppercase tracking-[0.1em]">
-            <p className="mb-5 inline-block border border-oxford/15 bg-paper px-2 py-1.5 text-[10px] leading-normal text-oxford/50">
-              Secure access
-            </p>
+          <AnimatePresence mode="wait">
+            {signedInGreeting ? (
+              <motion.div
+                key="welcome-header"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                className="flex flex-col items-center"
+              >
+                <h1 className="font-wordmark text-center text-[clamp(28px,5vw,56px)] font-normal text-oxford leading-[1.1] m-0">
+                  Welcome back, {signedInGreeting}.
+                </h1>
+                <p className="type-body text-oxford/40 mt-phi-3 italic">
+                  Entering workspace…
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="brand-header"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
+                className="flex flex-col items-center"
+              >
+                <h1 className="font-wordmark text-center text-[clamp(44px,8vw,80px)] font-normal text-oxford leading-[0.9] m-0 tracking-normal">
+                  Aethria
+                </h1>
+                <p className="type-meta uppercase tracking-[0.14em] text-oxford/35 mt-phi-4">
+                  Deal flow operating system
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
+        {/* Auth Interface */}
+        {!signedInGreeting && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.55 }}
+            className="relative z-10 w-full max-w-[280px]"
+          >
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 void handleSubmit();
               }}
-              className="flex flex-col gap-0"
+              className="flex flex-col"
               noValidate
-              aria-label="Sign in"
             >
-              <div className="flex flex-col gap-4">
-                <input
-                  type="text"
-                  autoComplete="username"
-                  placeholder="Username or email"
-                  aria-label="Username or email"
-                  value={username}
-                  disabled={signedInGreeting !== null}
-                  onChange={(e) => setUsername(e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(e, 'username')}
-                  className="w-full min-h-[44px] touch-manipulation border-0 border-b-[0.5px] border-oxford/25 bg-transparent pb-0.5 pt-2 font-mono text-[11px] leading-[1.45] text-oxford outline-none placeholder:text-oxford/35 btn-interaction disabled:cursor-not-allowed disabled:opacity-40"
-                />
-                <input
-                  ref={passwordRef}
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="Password"
-                  aria-label="Password"
-                  value={password}
-                  disabled={signedInGreeting !== null}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(e, 'password')}
-                  className="w-full min-h-[44px] touch-manipulation border-0 border-b-[0.5px] border-oxford/25 bg-transparent pb-0.5 pt-2 font-mono text-[11px] leading-[1.45] text-oxford outline-none placeholder:text-oxford/35 btn-interaction disabled:cursor-not-allowed disabled:opacity-40"
-                />
-              </div>
+              <div className="flex flex-col gap-phi-5 mb-phi-8">
+                <div className="flex flex-col">
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    placeholder="IDENTIFIER"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, 'username')}
+                    className="w-full bg-transparent border-0 border-b border-oxford/10 py-phi-3 font-mono text-[10px] text-oxford outline-none placeholder:text-oxford/20 focus:border-oxford/40 transition-colors tracking-widest"
+                  />
+                </div>
 
-              <style>{`
-                [data-login-page] input::placeholder {
-                  font-family: "Space Mono", ui-monospace, monospace;
-                  font-size: 10px;
-                  line-height: 1.45;
-                  font-weight: 400;
-                  text-transform: uppercase;
-                  letter-spacing: 0.1em;
-                }
-              `}</style>
+                <div className="flex flex-col">
+                  <input
+                    ref={passwordRef}
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="CREDENTIAL"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, 'password')}
+                    className="w-full bg-transparent border-0 border-b border-oxford/10 py-phi-3 font-mono text-[10px] text-oxford outline-none placeholder:text-oxford/20 focus:border-oxford/40 transition-colors tracking-widest"
+                  />
+                </div>
+              </div>
 
               {error && (
                 <motion.p
-                  className="mt-3 text-[10px] leading-snug text-escalation"
-                  role="alert"
-                  initial={reduceMotion ? panelAnim : { opacity: 0, y: 6 }}
-                  animate={panelAnim}
-                  transition={transitionOrReduced(reduceMotion, {
-                    duration: tokens.motion.duration.short,
-                    ease: tokens.motion.ease,
-                  })}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="type-meta text-[9px] text-escalation text-center mb-phi-6 uppercase tracking-widest opacity-80"
                 >
                   {error}
                 </motion.p>
               )}
 
-              <div className="mt-7">
-                <button
-                  type="submit"
-                  disabled={loading || signedInGreeting !== null}
-                  className="flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-none border-0 bg-oxford px-4 py-2.5 font-mono text-[10px] leading-none tracking-[0.14em] text-paper hover:bg-oxford/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/45 focus-visible:ring-offset-2 focus-visible:ring-offset-paper disabled:cursor-not-allowed disabled:opacity-50 btn-interaction"
-                  aria-busy={loading || signedInGreeting !== null}
-                >
-                  {signedInGreeting ? 'Redirecting…' : loading ? 'Signing in…' : 'Log in'}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-phi-4 bg-oxford text-paper type-meta text-[10px] uppercase tracking-[0.2em] btn-interaction transition-opacity hover:opacity-90 disabled:opacity-40"
+              >
+                {loading ? 'Authenticating…' : 'Establish Session'}
+              </button>
             </form>
-          </div>
-        </motion.section>
-      </div>
+          </motion.div>
+        )}
 
-      <motion.footer
-        className="flex min-h-[4.75rem] shrink-0 items-center justify-center border-t border-hairline bg-paper px-4 py-5 sm:min-h-[5.25rem] sm:px-8 sm:py-6 lg:px-10"
-        initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={transitionOrReduced(reduceMotion, {
-          delay: 0.2,
-          duration: tokens.motion.duration.medium,
-          ease: tokens.motion.ease,
-        })}
-      >
-        <p className="type-label-tab w-full text-center text-oxford/40">
-          Versioned pipeline · Human-in-the-loop escalations · Immutable audit trail
-        </p>
-      </motion.footer>
+        {/* Footer Ledger */}
+        <motion.footer
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1, delay: 1 }}
+          className="fixed bottom-0 left-0 w-full p-phi-6 flex justify-center pointer-events-none"
+        >
+          <div className="flex items-center gap-phi-4 opacity-25">
+             <span className="type-meta text-[8px] uppercase tracking-[0.2em] text-oxford">
+              Protocol 4.1
+            </span>
+            <div className="w-px h-2 bg-oxford/40" />
+            <span className="type-meta text-[8px] uppercase tracking-[0.2em] text-oxford">
+              Secure Perimeter
+            </span>
+          </div>
+        </motion.footer>
+      </div>
     </div>
   );
 }

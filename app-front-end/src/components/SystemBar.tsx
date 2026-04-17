@@ -155,7 +155,7 @@ export default function SystemBar({
       <div className="flex flex-col items-center gap-4 h-full min-h-0">
         {/* Wordmark */}
         <div className="shrink-0 text-center">
-          <p className="font-display font-normal text-[15px] leading-none tracking-[0.02em] text-white/65">
+          <p className="font-wordmark font-normal text-[15px] leading-none tracking-[0.02em] text-white/65">
             Aethria
           </p>
         </div>

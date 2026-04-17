@@ -16,7 +16,7 @@ export default function MobileHeader({ onMenuToggle }: MobileHeaderProps) {
     >
       <Link
         to="/v1"
-        className="font-display text-[20px] font-normal leading-[1.4] text-white hover:opacity-90 btn-interaction"
+        className="font-wordmark text-[20px] font-normal leading-[1.4] text-white hover:opacity-90 btn-interaction"
         aria-label="Aethria"
       >
         Aethria

@@ -42,8 +42,9 @@ export default {
         registerTint: 'var(--color-register-tint)',
       },
       fontFamily: {
-        display: ['"Libre Baskerville"', 'Georgia', 'serif'],
-        cormorant: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+        display: ['var(--font-display)', 'Georgia', 'serif'],
+        wordmark: ['var(--font-wordmark)', 'Georgia', 'serif'],
+        cormorant: ['var(--font-cormorant)', 'Georgia', 'serif'],
         // Instrument Sans is the canonical app + web UI font (loaded via @fontsource in main.tsx).
         sans: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],
         body: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],
