@@ -1,13 +1,16 @@
 import { useState, useLayoutEffect, useEffect } from 'react';
 import { useLocation, Navigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
+import { AnimatePresence } from 'framer-motion';
 import { setTokenGetter } from './api/auth';
 import MainLayout from './components/MainLayout';
 import GrainOverlay from './components/GrainOverlay';
 import LoadingAnimation from './components/LoadingAnimation';
 import SettingsPage from './settings/SettingsPage';
+import WhileYouWereAway from './components/WhileYouWereAway';
 import { useSystemData } from './hooks/useSystemData';
 import { useAgentsEnabled } from './hooks/useAgentsEnabled';
+import { useActivitySummary } from './hooks/useActivitySummary';
 import LoginPage from './components/LoginPage';
 
 const APP_ROOT = '/v1';
@@ -21,6 +24,7 @@ function AppShell() {
     systemPanelOpen: !isSettingsRoute && isSystemPanelOpen,
   });
   const agentsEnabled = useAgentsEnabled();
+  const { summary, showSummary, dismissSummary } = useActivitySummary();
 
   // Warn the user before closing the tab if agents are actively running.
   useEffect(() => {
@@ -51,6 +55,11 @@ function AppShell() {
           onSystemPanelOpenChange={setIsSystemPanelOpen}
         />
       )}
+      <AnimatePresence>
+        {showSummary && summary && (
+          <WhileYouWereAway summary={summary} onDismiss={dismissSummary} />
+        )}
+      </AnimatePresence>
     </>
   );
 }

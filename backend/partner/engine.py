@@ -69,9 +69,10 @@ class PartnerEngine:
         self.fund_thesis: Optional[Dict[str, Any]] = fund_thesis
         # Max undecided to process per cycle (ramp: process a solid batch when backlog is high)
         self.batch_max = int(os.getenv("PARTNER_BATCH_MAX", "20"))
-        
+
         self.logger = logging.getLogger("partner.engine")
         self.running = False
+        self.last_cycle_escalations: int = 0
     
     def _build_entry(self, startup) -> Optional[Dict[str, Any]]:
         """Build an entry dict from a startup object (scout + review fields only)."""
@@ -296,7 +297,8 @@ class PartnerEngine:
         self.logger.info(f"Found {len(undecided)} entries awaiting partner decision")
         
         decided_count = 0
-        
+        self.last_cycle_escalations = 0
+
         # Process each entry
         for entry in undecided:
             entry_id = entry["id"]
@@ -329,6 +331,8 @@ class PartnerEngine:
 
                 if success and decision:
                     decided_count += 1
+                    if decision.get("human_review_required"):
+                        self.last_cycle_escalations += 1
                     recommendation = decision.get("recommendation", "UNKNOWN")
                     confidence = decision.get("confidence", 0)
                     self.logger.info(

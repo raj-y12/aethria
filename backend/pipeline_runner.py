@@ -204,11 +204,20 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
             user_id[:12],
             pipeline_run_id,
         )
+        _activity_startups_before = 0
         if scouts_enabled:
+            try:
+                _r = get_service_client().table("startups").select("startup_id", count="exact").eq("user_id", user_id).execute()
+                _activity_startups_before = int(getattr(_r, "count", None) or 0)
+            except Exception:
+                pass
             await scout_engine.run_cycle(pipeline_run_id=pipeline_run_id)
         else:
             logger.info("[%s] Scout stage skipped (disabled in settings)", user_id[:12])
 
+        _activity_reviewed_count = 0
+        _activity_decided_count = 0
+        _activity_escalations_count = 0
         if reviewers_enabled:
             unreviewed_before = _safe_stage_count(storage, "count_unreviewed", user_id)
             if (unreviewed_before or 0) > 0:
@@ -218,6 +227,7 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
                     unreviewed_before,
                 )
             reviewed_count = await reviewer_engine.run_cycle(pipeline_run_id=pipeline_run_id)
+            _activity_reviewed_count = reviewed_count or 0
             reviewer_stats = getattr(reviewer_engine, "last_cycle_stats", {}) or {}
             unreviewed_after = _safe_stage_count(storage, "count_unreviewed", user_id)
             if reviewed_count > 0 or (unreviewed_before or 0) > 0 or (unreviewed_after or 0) > 0:
@@ -243,6 +253,8 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
                     undecided_before,
                 )
             decided_count = await partner_engine.run_cycle(pipeline_run_id=pipeline_run_id)
+            _activity_decided_count = decided_count or 0
+            _activity_escalations_count = getattr(partner_engine, "last_cycle_escalations", 0)
             undecided_after = _safe_stage_count(storage, "count_undecided", user_id)
             if decided_count > 0 or (undecided_before or 0) > 0 or (undecided_after or 0) > 0:
                 _visible_info(
@@ -277,6 +289,23 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
             await meta_agent.run_cycle()
         except Exception as meta_err:
             logger.warning("[%s] Meta-agent cycle skipped: %s", user_id[:12], meta_err)
+
+        # Persist activity metrics for the "While you were away" summary
+        try:
+            _startups_after = 0
+            if scouts_enabled:
+                _r2 = get_service_client().table("startups").select("startup_id", count="exact").eq("user_id", user_id).execute()
+                _startups_after = int(getattr(_r2, "count", None) or 0)
+            _activity_startups_found = max(0, _startups_after - _activity_startups_before)
+            get_service_client().table("pipeline_activity").insert({
+                "user_id": user_id,
+                "startups_found": _activity_startups_found,
+                "reviewed_count": _activity_reviewed_count,
+                "decisions_made": _activity_decided_count,
+                "escalations_count": _activity_escalations_count,
+            }).execute()
+        except Exception as _act_err:
+            logger.warning("[%s] Could not persist pipeline_activity: %s", user_id[:12], _act_err)
 
         logger.info("[%s] Pipeline cycle completed", user_id[:12])
     except Exception as e:

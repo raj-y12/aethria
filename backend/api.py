@@ -2003,3 +2003,67 @@ async def get_system_health(request: Request):
     storage = _get_storage(request)
     user_id = getattr(request.state, "user_id", None)
     return _get_system_health(storage, user_id=user_id)
+
+
+@app.get("/api/activity/summary")
+async def get_activity_summary(request: Request):
+    """
+    Return aggregated pipeline activity since the user's last visit.
+    Also updates last_seen_at to now so the next call only sees new activity.
+    """
+    user_id: str = getattr(request.state, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    svc = get_service_client()
+
+    # 1. Read last_seen_at
+    try:
+        state_row = (
+            svc.table("user_state")
+            .select("last_seen_at")
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        last_seen_at = (state_row.data or {}).get("last_seen_at")
+    except Exception:
+        last_seen_at = None
+
+    if not last_seen_at:
+        # First visit — treat as "no prior activity"
+        last_seen_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+    # 2. Query pipeline_activity since last_seen_at
+    try:
+        rows = (
+            svc.table("pipeline_activity")
+            .select("startups_found,reviewed_count,decisions_made,escalations_count")
+            .eq("user_id", user_id)
+            .gt("timestamp", last_seen_at)
+            .execute()
+        )
+        activity_rows = rows.data or []
+    except Exception:
+        activity_rows = []
+
+    # 3. Aggregate totals
+    totals = {"found": 0, "reviewed": 0, "decided": 0, "escalations": 0}
+    for r in activity_rows:
+        totals["found"]       += int(r.get("startups_found", 0) or 0)
+        totals["reviewed"]    += int(r.get("reviewed_count", 0) or 0)
+        totals["decided"]     += int(r.get("decisions_made", 0) or 0)
+        totals["escalations"] += int(r.get("escalations_count", 0) or 0)
+
+    # 4. Update last_seen_at = now
+    try:
+        svc.table("user_state").upsert(
+            {
+                "user_id": user_id,
+                "last_seen_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            },
+            on_conflict="user_id",
+        ).execute()
+    except Exception as e:
+        logging.getLogger("api").warning("Could not update user_state last_seen_at: %s", e)
+
+    return JSONResponse(content=totals)
