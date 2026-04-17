@@ -76,6 +76,21 @@ _logger_agents = logging.getLogger("api.agents")
 _logger_visible = logging.getLogger("uvicorn.error")
 _LOOKUP_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{8,128}$")
 
+# Per-user persistent agent loops: user_id -> asyncio.Task
+# Protected by _loops_lock to prevent duplicate tasks per user.
+_per_user_loops: Dict[str, asyncio.Task] = {}
+_loops_lock: Optional[asyncio.Lock] = None  # initialised inside lifespan (event loop must exist)
+AGENT_LOOP_INTERVAL_SECONDS = int(os.getenv("AGENT_LOOP_INTERVAL_SECONDS", "300"))
+
+
+def _safe_table_execute(fn, *, default_data, warn_label: str):
+    """Best-effort supabase query wrapper for non-critical API enrichments."""
+    try:
+        return fn()
+    except Exception as e:
+        _logger_agents.warning("%s failed; returning fallback: %s", warn_label, e)
+        return default_data
+
 
 async def _agent_worker() -> None:
     """Background worker: full scout/reviewer/partner cycles only (not on-demand lookup)."""
@@ -124,15 +139,157 @@ async def _lookup_worker() -> None:
             break
 
 
+# ---------------------------------------------------------------------------
+# Per-user persistent loop helpers
+# ---------------------------------------------------------------------------
+
+def _is_user_agents_enabled(user_id: str) -> bool:
+    """Sync check — safe to call from inside the async loop (no await)."""
+    try:
+        s = load_settings(user_id)
+        ac = s.get("agent_config") or {}
+        return bool(ac.get("scouts_enabled") or ac.get("reviewers_enabled") or ac.get("partners_enabled"))
+    except Exception:
+        return False
+
+
+async def _update_agent_run_status(user_id: str, status: str) -> None:
+    """Best-effort: write agents_status (and last_started_at when running) into settings doc."""
+    try:
+        s = load_settings(user_id)
+        ac = s.setdefault("agent_config", {})
+        ac["agents_status"] = status
+        if status == "running":
+            ac["agents_last_started_at"] = datetime.now(timezone.utc).isoformat()
+        save_settings(s, user_id)
+    except Exception as e:
+        _logger_agents.debug("[%s] Could not update agent status: %s", user_id[:12], e)
+
+
+async def _user_agent_loop(user_id: str) -> None:
+    """
+    Persistent background loop for a single user.
+    Runs until agents are disabled in settings or the task is cancelled.
+    """
+    _logger_agents.info("[AGENT LOOP] Started persistent loop for user %s", user_id[:12])
+    _logger_visible.info("[AGENT LOOP] Started for user %s", user_id[:12])
+    try:
+        while True:
+            # Re-check enabled flag at the top of every iteration (settings can change)
+            if not _is_user_agents_enabled(user_id):
+                _logger_agents.info("[AGENT LOOP] Agents disabled — stopping loop for user %s", user_id[:12])
+                await _update_agent_run_status(user_id, "stopped")
+                break
+            try:
+                await run_one_pipeline_cycle(user_id)
+                await _update_agent_run_status(user_id, "running")
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                _logger_agents.exception("[AGENT LOOP] Cycle error for user %s: %s", user_id[:12], exc)
+                await _update_agent_run_status(user_id, "error")
+            await asyncio.sleep(AGENT_LOOP_INTERVAL_SECONDS)
+    except asyncio.CancelledError:
+        _logger_agents.info("[AGENT LOOP] Cancelled for user %s", user_id[:12])
+        raise
+    finally:
+        # Remove self from registry when done (cancelled or naturally stopped)
+        _per_user_loops.pop(user_id, None)
+        _logger_agents.info("[AGENT LOOP] Exiting loop for user %s", user_id[:12])
+
+
+async def _ensure_user_loop(user_id: str) -> None:
+    """Start a persistent loop for user_id if one is not already alive."""
+    global _loops_lock
+    if _loops_lock is None:
+        return
+    async with _loops_lock:
+        task = _per_user_loops.get(user_id)
+        if task is not None and not task.done():
+            _logger_agents.debug("[AGENT LOOP] Loop already alive for user %s — skipping", user_id[:12])
+            return
+        t = asyncio.create_task(
+            _user_agent_loop(user_id),
+            name=f"agent_loop_{user_id[:12]}",
+        )
+        _per_user_loops[user_id] = t
+        _logger_agents.info("[AGENT LOOP] Registered loop task for user %s", user_id[:12])
+
+
+async def _stop_user_loop(user_id: str) -> None:
+    """Cancel and remove the loop for user_id (idempotent)."""
+    global _loops_lock
+    if _loops_lock is None:
+        return
+    async with _loops_lock:
+        task = _per_user_loops.pop(user_id, None)
+    if task and not task.done():
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    _logger_agents.info("[AGENT LOOP] Stopped loop for user %s", user_id[:12])
+
+
+async def _resume_all_user_loops() -> None:
+    """
+    Called once at server startup.
+    Queries Supabase settings for all users with any agent enabled
+    and resumes their persistent loops (handles server restarts gracefully).
+    """
+    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    if not use_supabase:
+        return
+    try:
+        client = get_service_client()
+        rows_resp = client.table("settings").select("user_id,data").execute()
+        rows = getattr(rows_resp, "data", None) or []
+        resumed = 0
+        for row in rows:
+            uid = (row.get("user_id") or "").strip()
+            if not uid:
+                continue
+            data = row.get("data") or {}
+            ac = (data.get("agent_config") or {}) if isinstance(data, dict) else {}
+            if ac.get("scouts_enabled") or ac.get("reviewers_enabled") or ac.get("partners_enabled"):
+                await _ensure_user_loop(uid)
+                resumed += 1
+        if resumed:
+            _logger_agents.info("[AGENT LOOP] Resumed %d per-user loop(s) on startup", resumed)
+            _logger_visible.info("[AGENT LOOP] Resumed %d per-user agent loop(s) after server restart", resumed)
+        else:
+            _logger_agents.info("[AGENT LOOP] No active users to resume on startup")
+    except Exception as exc:
+        _logger_agents.warning("[AGENT LOOP] Could not resume user loops on startup: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Lifespan
+# ---------------------------------------------------------------------------
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    global _agent_queue, _agent_worker_task, _lookup_queue, _lookup_worker_task
+    global _agent_queue, _agent_worker_task, _lookup_queue, _lookup_worker_task, _loops_lock
+    _loops_lock = asyncio.Lock()
     _agent_queue = asyncio.Queue()
     _lookup_queue = asyncio.Queue()
     _agent_worker_task = asyncio.create_task(_agent_worker())
     _lookup_worker_task = asyncio.create_task(_lookup_worker())
     _logger_agents.info("Pipeline agent worker + on-demand lookup worker started")
+    # Resume persistent per-user loops for users that had agents enabled before restart
+    await _resume_all_user_loops()
     yield
+    # Cancel all per-user loops first
+    loop_tasks = list(_per_user_loops.values())
+    for t in loop_tasks:
+        t.cancel()
+    for t in loop_tasks:
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
+    # Cancel queue workers
     for t in (_lookup_worker_task, _agent_worker_task):
         if t:
             t.cancel()
@@ -1045,35 +1202,47 @@ def api_get_fund_thesis(request: Request):
     except FundThesisIncompleteError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    vr = (
-        client.table("fund_thesis_versions")
-        .select("id,version_number,is_active,created_at")
-        .eq("user_id", uid)
-        .eq("thesis_id", active.thesis_id)
-        .order("version_number", desc=True)
-        .limit(50)
-        .execute()
+    vr_rows = _safe_table_execute(
+        lambda: (
+            client.table("fund_thesis_versions")
+            .select("id,version_number,is_active,created_at")
+            .eq("user_id", uid)
+            .eq("thesis_id", active.thesis_id)
+            .order("version_number", desc=True)
+            .limit(50)
+            .execute()
+        ),
+        default_data=[],
+        warn_label=f"[{uid[:12]}] fund-thesis versions query",
     )
-    versions = getattr(vr, "data", None) or []
+    versions = getattr(vr_rows, "data", None) or []
 
-    er = (
-        client.table("fund_thesis_embeddings")
-        .select("model,created_at")
-        .eq("version_id", active.version_id)
-        .eq("user_id", uid)
-        .limit(1)
-        .execute()
+    er_resp = _safe_table_execute(
+        lambda: (
+            client.table("fund_thesis_embeddings")
+            .select("model,created_at")
+            .eq("version_id", active.version_id)
+            .eq("user_id", uid)
+            .limit(1)
+            .execute()
+        ),
+        default_data=[],
+        warn_label=f"[{uid[:12]}] fund-thesis embeddings query",
     )
-    erows = getattr(er, "data", None) or []
+    erows = getattr(er_resp, "data", None) or []
     emb_row = erows[0] if erows else {}
 
-    lr = (
-        client.table("fund_thesis_pipeline_link")
-        .select("id,thesis_version_id,pipeline_run_id,affected_startups_count,created_at")
-        .eq("user_id", uid)
-        .order("created_at", desc=True)
-        .limit(20)
-        .execute()
+    lr_resp = _safe_table_execute(
+        lambda: (
+            client.table("fund_thesis_pipeline_link")
+            .select("id,thesis_version_id,pipeline_run_id,affected_startups_count,created_at")
+            .eq("user_id", uid)
+            .order("created_at", desc=True)
+            .limit(20)
+            .execute()
+        ),
+        default_data=[],
+        warn_label=f"[{uid[:12]}] fund-thesis pipeline links query",
     )
 
     has_emb = thesis_has_embeddings(active)
@@ -1095,7 +1264,7 @@ def api_get_fund_thesis(request: Request):
             "created_at": emb_row.get("created_at"),
         },
         "versions": versions,
-        "recent_pipeline_links": getattr(lr, "data", None) or [],
+        "recent_pipeline_links": getattr(lr_resp, "data", None) or [],
     }
 
 
@@ -1373,10 +1542,97 @@ async def trigger_agents(request: Request):
     await _agent_queue.put({"type": "cycle", "user_id": user_id})
     _logger_agents.info("trigger_agents queued user=%s", user_id[:12])
     _logger_visible.info("trigger_agents queued user=%s", user_id[:12])
+    # Also ensure the persistent loop is alive for this user
+    await _ensure_user_loop(user_id)
     return JSONResponse(
         status_code=202,
         content={"status": "queued", "user_id": user_id},
     )
+
+
+@app.post("/api/agents/toggle")
+async def toggle_agents(request: Request):
+    """
+    Enable or disable the persistent background loop for the current user.
+
+    Body: { "enabled": true | false }
+
+    When enabled=true:
+      - Starts the loop if not already alive.
+      - Does NOT override individual scouts/reviewers/partners toggles.
+
+    When enabled=false:
+      - Disables all three individual agent toggles (scouts, reviewers, partners).
+      - Loop naturally stops on next iteration check (or is cancelled if running).
+    """
+    user_id = request.state.user_id
+
+    body: Dict[str, Any] = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    enabled = bool(body.get("enabled", False))
+
+    try:
+        s = load_settings(user_id)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Could not load settings: {e}") from e
+
+    ac = s.setdefault("agent_config", {})
+    if enabled:
+        # Mark status; individual toggles already saved by PATCH /api/settings
+        ac["agents_status"] = "running"
+        ac["agents_last_started_at"] = datetime.now(timezone.utc).isoformat()
+    else:
+        # Turn off all individual agent stages
+        ac["scouts_enabled"] = False
+        ac["reviewers_enabled"] = False
+        ac["partners_enabled"] = False
+        ac["agents_status"] = "stopped"
+
+    try:
+        save_settings(s, user_id)
+    except Exception as e:
+        _logger_agents.warning("toggle_agents: could not save settings for user %s: %s", user_id[:12], e)
+
+    if enabled:
+        await _ensure_user_loop(user_id)
+        _logger_agents.info("toggle_agents enabled user=%s", user_id[:12])
+        _logger_visible.info("[AGENT LOOP] Enabled by user %s — loop is active", user_id[:12])
+    else:
+        await _stop_user_loop(user_id)
+        _logger_agents.info("toggle_agents disabled user=%s", user_id[:12])
+        _logger_visible.info("[AGENT LOOP] Disabled by user %s — loop stopped", user_id[:12])
+
+    return {"ok": True, "enabled": enabled, "user_id": user_id}
+
+
+@app.get("/api/agents/loop-status")
+async def get_loop_status(request: Request):
+    """
+    Return the live persistent-loop state for the current user.
+    Used by the frontend to show accurate 'agents running' state.
+    """
+    user_id = request.state.user_id
+    task = _per_user_loops.get(user_id)
+    loop_alive = task is not None and not task.done()
+
+    try:
+        s = load_settings(user_id)
+        ac = s.get("agent_config") or {}
+    except Exception:
+        ac = {}
+
+    return {
+        "loop_alive": loop_alive,
+        "agents_enabled": bool(
+            ac.get("scouts_enabled") or ac.get("reviewers_enabled") or ac.get("partners_enabled")
+        ),
+        "agents_status": ac.get("agents_status", "stopped"),
+        "agents_last_started_at": ac.get("agents_last_started_at"),
+    }
 
 
 
@@ -1402,8 +1658,12 @@ def _parse_lookup_input(lookup_input: str) -> Dict[str, Optional[str]]:
     website: Optional[str] = None
     company_name = raw
     input_type = "context_query"
-
     domain_like = re.match(r"^(https?://)?([a-z0-9-]+\.)+[a-z]{2,}([/:?#].*)?$", lowered)
+    embedded_url_or_domain = re.search(
+        r"(?i)\b((?:https?://)?(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/:?#][^\s]*)?)\b",
+        raw,
+    )
+
     if domain_like:
         parsed = urlparse(raw if lowered.startswith(("http://", "https://")) else f"https://{raw}")
         host = (parsed.netloc or parsed.path or "").lower().strip()
@@ -1414,8 +1674,24 @@ def _parse_lookup_input(lookup_input: str) -> Dict[str, Optional[str]]:
             company_name = label.title() if label else raw
             input_type = "website"
     else:
-        token_count = len([t for t in re.split(r"\s+", raw) if t])
-        input_type = "company_name" if token_count <= 3 else "context_query"
+        if embedded_url_or_domain:
+            token = embedded_url_or_domain.group(1).strip()
+            parsed = urlparse(token if token.lower().startswith(("http://", "https://")) else f"https://{token}")
+            host = (parsed.netloc or parsed.path or "").lower().strip()
+            host = host[4:] if host.startswith("www.") else host
+            website = host or None
+            # Strip the detected website token so company_name remains clean.
+            candidate_name = re.sub(re.escape(token), " ", raw, flags=re.IGNORECASE).strip(" ,|-")
+            if candidate_name:
+                company_name = candidate_name
+                input_type = "context_query" if len(candidate_name.split()) > 3 else "company_name"
+            elif website:
+                label = website.split(".")[0].replace("-", " ").strip()
+                company_name = label.title() if label else raw
+                input_type = "website"
+        else:
+            token_count = len([t for t in re.split(r"\s+", raw) if t])
+            input_type = "company_name" if token_count <= 3 else "context_query"
 
     return {
         "company_name": company_name.strip() if company_name else raw,

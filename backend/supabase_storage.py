@@ -673,7 +673,7 @@ class SupabaseStartupsStorage:
             )
             return int(r.count or 0) if hasattr(r, "count") and r.count is not None else 0
         except Exception as e:
-            self.logger.warning("count_undecided failed: %s", e)
+            self.logger.debug("count_undecided failed; falling back to local count: %s", e)
             return sum(
                 1
                 for s in self.get_all_startups(skip_invalid=True)

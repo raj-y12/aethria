@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useUser, useClerk } from '@clerk/react';
 import { motion } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
+import { useAgentsEnabled } from '../hooks/useAgentsEnabled';
+import AgentLogoutModal from './AgentLogoutModal';
+import { toggleAgents } from '../api/agents';
 
 interface SystemBarProps {
   agentConfig?: unknown;
@@ -70,13 +73,28 @@ export default function SystemBar({
   const navigate = useNavigate();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const agentsEnabled = useAgentsEnabled();
   const [time, setTime] = useState(new Date());
   const displayName = user?.username ?? user?.primaryEmailAddress?.emailAddress ?? 'Account';
   const [hasEnteredOnce, setHasEnteredOnce] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const handleLogout = () => {
+  const doLogout = () => {
     localStorage.removeItem('aethria_last_activity');
     signOut?.().then(() => navigate('/sign-in', { replace: true }));
+  };
+
+  const handleLogout = () => {
+    if (agentsEnabled) {
+      setShowLogoutModal(true);
+    } else {
+      doLogout();
+    }
+  };
+
+  const handleTurnOffAndLogout = async () => {
+    await toggleAgents(false);
+    doLogout();
   };
 
   useEffect(() => {
@@ -116,7 +134,7 @@ export default function SystemBar({
     'hidden lg:flex fixed top-0 bottom-0 left-0 z-50 flex-col justify-between w-36 bg-oxford border-r border-r-white/[0.07]';
   const baseStyle = { padding: '24px 18px 20px' };
 
-  return (
+  return (<>
     <motion.header
       className={baseClass}
       style={baseStyle}
@@ -164,12 +182,12 @@ export default function SystemBar({
           </span>
           {navLink ? (
             <div className="flex flex-col items-center gap-1 w-full px-0.5">
-              <a
-                href={navLink.href}
+              <Link
+                to={navLink.href}
                 className="type-meta text-center leading-[1.4] tracking-[0.12em] uppercase text-white/55 hover:text-white btn-interaction"
               >
                 {navLink.label}
-              </a>
+              </Link>
             </div>
           ) : null}
         </div>
@@ -214,5 +232,16 @@ export default function SystemBar({
         </div>
       </div>
     </motion.header>
-  );
+
+    {/* Agent logout modal — rendered outside the bar via portal */}
+    <AgentLogoutModal
+      open={showLogoutModal}
+      onCancel={() => setShowLogoutModal(false)}
+      onKeepRunning={() => {
+        setShowLogoutModal(false);
+        doLogout();
+      }}
+      onTurnOffAndLogout={handleTurnOffAndLogout}
+    />
+  </>);
 }

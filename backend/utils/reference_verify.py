@@ -44,6 +44,10 @@ _SOFT_ACCEPT_HOST_SUFFIXES = (
     "linkedin.co",
     "twitter.com",
     "x.com",
+    # Directory/funding profiles often block probes or rate-limit HEAD/GET.
+    # Soft-accept keeps on-demand lookup from failing purely on probe transport noise.
+    "crunchbase.com",
+    "pitchbook.com",
 )
 
 

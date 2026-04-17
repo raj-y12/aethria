@@ -1,30 +1,38 @@
-import { useState, useLayoutEffect, useEffect, useRef } from 'react';
+import { useState, useLayoutEffect, useEffect } from 'react';
 import { useLocation, Navigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
 import { setTokenGetter } from './api/auth';
-import { triggerAgents } from './api/agents';
 import MainLayout from './components/MainLayout';
 import GrainOverlay from './components/GrainOverlay';
 import LoadingAnimation from './components/LoadingAnimation';
 import SettingsPage from './settings/SettingsPage';
 import { useSystemData } from './hooks/useSystemData';
+import { useAgentsEnabled } from './hooks/useAgentsEnabled';
 import LoginPage from './components/LoginPage';
 
 const APP_ROOT = '/v1';
+const SETTINGS_ROOT = `${APP_ROOT}/settings`;
 
 function AppShell() {
   const { pathname } = useLocation();
-  const isSettingsRoute = pathname.startsWith('/settings');
+  const isSettingsRoute = pathname.startsWith(SETTINGS_ROOT);
   const [isSystemPanelOpen, setIsSystemPanelOpen] = useState(false);
   const systemData = useSystemData({
     systemPanelOpen: !isSettingsRoute && isSystemPanelOpen,
   });
-  const hasTriggeredAgents = useRef(false);
+  const agentsEnabled = useAgentsEnabled();
+
+  // Warn the user before closing the tab if agents are actively running.
   useEffect(() => {
-    if (hasTriggeredAgents.current) return;
-    hasTriggeredAgents.current = true;
-    triggerAgents().catch(() => {});
-  }, []);
+    if (!agentsEnabled) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers show a generic message; setting returnValue is required for the dialog to appear.
+      e.returnValue = 'Agents are currently running. Are you sure you want to leave?';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [agentsEnabled]);
 
   useEffect(() => {
     if (!isSettingsRoute) return;
@@ -93,7 +101,7 @@ function App() {
 
   const isSignInRoute = pathname.startsWith('/sign-in');
   const isAppRoute = pathname === APP_ROOT || pathname.startsWith(APP_ROOT + '/');
-  const isSettingsRoute = pathname.startsWith('/settings');
+  const isSettingsRoute = pathname.startsWith(SETTINGS_ROOT);
 
   // Sign-in page: show login (LoginPage does full-page redirect to /v1 on success)
   if (isSignInRoute) {

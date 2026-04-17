@@ -48,7 +48,7 @@ def _safe_stage_count(storage: SupabaseStartupsStorage, method_name: str, user_i
         method = getattr(storage, method_name)
         return int(method())
     except Exception as e:
-        logger.warning(
+        logger.debug(
             "[%s] %s unavailable: %s",
             user_id[:12],
             method_name,
@@ -122,7 +122,7 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
     if not (scouts_enabled or reviewers_enabled or partners_enabled):
         logger.info("[%s] Agents disabled in settings, skipping", user_id[:12])
         return
-    _visible_info(
+    logger.debug(
         "[%s] agent gates: scouts=%s reviewers=%s partners=%s",
         user_id[:12],
         scouts_enabled,
@@ -211,40 +211,46 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
 
         if reviewers_enabled:
             unreviewed_before = _safe_stage_count(storage, "count_unreviewed", user_id)
-            _visible_info(
-                "[%s] Reviewer stage start: unreviewed_before=%s",
-                user_id[:12],
-                unreviewed_before,
-            )
+            if (unreviewed_before or 0) > 0:
+                _visible_info(
+                    "[%s] Reviewer stage start: unreviewed_before=%s",
+                    user_id[:12],
+                    unreviewed_before,
+                )
             reviewed_count = await reviewer_engine.run_cycle(pipeline_run_id=pipeline_run_id)
             reviewer_stats = getattr(reviewer_engine, "last_cycle_stats", {}) or {}
-            _visible_info(
-                "[%s] Reviewer stage done: reviewed=%s unreviewed_after=%s threshold=%s candidates_seen=%s skipped_low_confidence=%s reason=%s",
-                user_id[:12],
-                reviewed_count,
-                _safe_stage_count(storage, "count_unreviewed", user_id),
-                reviewer_stats.get("confidence_threshold"),
-                reviewer_stats.get("candidates_seen"),
-                reviewer_stats.get("skipped_low_confidence"),
-                reviewer_stats.get("reason"),
-            )
+            unreviewed_after = _safe_stage_count(storage, "count_unreviewed", user_id)
+            if reviewed_count > 0 or (unreviewed_before or 0) > 0 or (unreviewed_after or 0) > 0:
+                _visible_info(
+                    "[%s] Reviewer stage done: reviewed=%s unreviewed_after=%s threshold=%s candidates_seen=%s skipped_low_confidence=%s reason=%s",
+                    user_id[:12],
+                    reviewed_count,
+                    unreviewed_after,
+                    reviewer_stats.get("confidence_threshold"),
+                    reviewer_stats.get("candidates_seen"),
+                    reviewer_stats.get("skipped_low_confidence"),
+                    reviewer_stats.get("reason"),
+                )
         else:
             logger.info("[%s] Reviewer stage skipped (disabled in settings)", user_id[:12])
 
         if partners_enabled:
             undecided_before = _safe_stage_count(storage, "count_undecided", user_id)
-            _visible_info(
-                "[%s] Partner stage start: undecided_before=%s",
-                user_id[:12],
-                undecided_before,
-            )
+            if (undecided_before or 0) > 0:
+                _visible_info(
+                    "[%s] Partner stage start: undecided_before=%s",
+                    user_id[:12],
+                    undecided_before,
+                )
             decided_count = await partner_engine.run_cycle(pipeline_run_id=pipeline_run_id)
-            _visible_info(
-                "[%s] Partner stage done: decided=%s undecided_after=%s",
-                user_id[:12],
-                decided_count,
-                _safe_stage_count(storage, "count_undecided", user_id),
-            )
+            undecided_after = _safe_stage_count(storage, "count_undecided", user_id)
+            if decided_count > 0 or (undecided_before or 0) > 0 or (undecided_after or 0) > 0:
+                _visible_info(
+                    "[%s] Partner stage done: decided=%s undecided_after=%s",
+                    user_id[:12],
+                    decided_count,
+                    undecided_after,
+                )
         else:
             logger.info("[%s] Partner stage skipped (disabled in settings)", user_id[:12])
 
@@ -428,20 +434,37 @@ async def run_on_demand_lookup(
                 f'Scout could not complete lookup for "{company}". Try a different name or website.',
             )
             return None
-        reviewed = await reviewer_engine.run_startup(
-            startup_id,
-            ignore_confidence_threshold=True,
-            pipeline_run_id=lookup_run_id,
-            bypass_agent_enabled_gate=True,
-        )
+        # Supabase can be briefly stale right after insert; retry reviewer handoff once or twice.
+        reviewed = False
+        review_attempts = 3
+        for attempt in range(1, review_attempts + 1):
+            reviewed = await reviewer_engine.run_startup(
+                startup_id,
+                ignore_confidence_threshold=True,
+                pipeline_run_id=lookup_run_id,
+                bypass_agent_enabled_gate=True,
+            )
+            if reviewed:
+                break
+            if attempt < review_attempts:
+                await asyncio.sleep(0.8 * attempt)
         if not reviewed:
             logger.warning("[%s] On-demand lookup not reviewed: %s", user_id[:12], startup_id)
+            # Do not mark lookup as failed when scout persisted a startup successfully.
+            # This is a partial completion state; UI should keep polling/matching rows.
             return startup_id
-        decided = await partner_engine.run_startup(
-            startup_id,
-            pipeline_run_id=lookup_run_id,
-            bypass_agent_enabled_gate=True,
-        )
+        decided = False
+        partner_attempts = 2
+        for attempt in range(1, partner_attempts + 1):
+            decided = await partner_engine.run_startup(
+                startup_id,
+                pipeline_run_id=lookup_run_id,
+                bypass_agent_enabled_gate=True,
+            )
+            if decided:
+                break
+            if attempt < partner_attempts:
+                await asyncio.sleep(0.6 * attempt)
         if not decided:
             logger.warning("[%s] On-demand lookup not decided yet: %s", user_id[:12], startup_id)
         logger.info("[%s] On-demand lookup completed for %s (%s)", user_id[:12], company, startup_id)

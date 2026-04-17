@@ -11,6 +11,14 @@ from typing import Any, Dict, List, Optional
 from tenant_context import require_user_id
 
 logger = logging.getLogger(__name__)
+_TRANSIENT_ERRNOS = (35, 11)  # EAGAIN variants across platforms
+
+
+def _is_transient_transport_error(err: Exception) -> bool:
+    if isinstance(err, OSError) and getattr(err, "errno", None) in _TRANSIENT_ERRNOS:
+        return True
+    msg = str(err).lower()
+    return "resource temporarily unavailable" in msg or "readerror" in msg
 
 # Deterministic bootstrap mandate (no LLM). Shallow-copied when persisting.
 DEFAULT_THESIS_PARSED_JSON: Dict[str, Any] = {
@@ -243,7 +251,10 @@ def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
             .execute()
         )
     except Exception as e:
-        logger.warning("get_active_thesis fund_thesis query failed: %s", e)
+        if _is_transient_transport_error(e):
+            logger.debug("get_active_thesis fund_thesis transient failure: %s", e)
+        else:
+            logger.warning("get_active_thesis fund_thesis query failed: %s", e)
         raise FundThesisMissingError("fund_thesis query failed") from e
 
     rows = getattr(tr, "data", None) or []
@@ -265,7 +276,10 @@ def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
             .execute()
         )
     except Exception as e:
-        logger.warning("get_active_thesis version query failed: %s", e)
+        if _is_transient_transport_error(e):
+            logger.debug("get_active_thesis version transient failure: %s", e)
+        else:
+            logger.warning("get_active_thesis version query failed: %s", e)
         raise FundThesisMissingError("fund_thesis_versions query failed") from e
 
     vrows = getattr(vr, "data", None) or []
@@ -295,7 +309,10 @@ def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
             .execute()
         )
     except Exception as e:
-        logger.warning("get_active_thesis embedding query failed (continuing without vector): %s", e)
+        if _is_transient_transport_error(e):
+            logger.debug("get_active_thesis embedding transient failure (continuing without vector): %s", e)
+        else:
+            logger.warning("get_active_thesis embedding query failed (continuing without vector): %s", e)
         embedding = []
         model = "none"
     else:

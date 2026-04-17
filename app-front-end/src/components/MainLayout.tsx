@@ -31,6 +31,8 @@ import { fetchFundThesisSummary } from '../api/fundThesis';
 import { getQueryConfig } from '../lib/queryIntent';
 
 const SYSTEM_MEMO_HEADER_PADDING = 'py-[10px]';
+const MAIN_LAYOUT_STATE_KEY = 'aethria.mainLayout.v1';
+const SETTINGS_PATH = '/v1/settings';
 
 const PANEL_CHROME_ACTION_BTN_CLASS =
   `${UI_PANEL_CHROME_LABEL} rounded-none border-0 bg-transparent p-0 cursor-pointer hover:text-oxford/80 transition-colors duration-150 ease-out btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset`;
@@ -39,6 +41,34 @@ interface MainLayoutProps {
   data: SystemData;
   startupsError?: string | null;
   onSystemPanelOpenChange?: (open: boolean) => void;
+}
+
+type PersistedMainLayoutState = {
+  rightPanel: 'memo' | 'feed' | 'system' | null;
+  selectedStartupId: string | null;
+};
+
+function readPersistedMainLayoutState(): PersistedMainLayoutState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(MAIN_LAYOUT_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PersistedMainLayoutState>;
+    const panel = parsed.rightPanel;
+    const rightPanel =
+      panel === 'memo' || panel === 'feed' || panel === 'system' || panel == null
+        ? panel
+        : null;
+    return {
+      rightPanel,
+      selectedStartupId:
+        typeof parsed.selectedStartupId === 'string' && parsed.selectedStartupId.trim()
+          ? parsed.selectedStartupId.trim()
+          : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export default function MainLayout({
@@ -58,8 +88,12 @@ export default function MainLayout({
     calibrationState,
     liveGate,
   } = data;
+  const persistedStateRef = useRef<PersistedMainLayoutState | null>(readPersistedMainLayoutState());
+  const hydratedFromStorageRef = useRef(false);
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
-  const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>(null);
+  const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>(
+    persistedStateRef.current?.rightPanel ?? null
+  );
   const initialFirstMemoOpened = useRef(false);
   const [lookupExpanded, setLookupExpanded] = useState(false);
   const [lookupInput, setLookupInput] = useState('');
@@ -131,7 +165,7 @@ export default function MainLayout({
     const value = lookupInput.trim();
     if (!value || lookupBusy) return;
     setLookupBusy(true);
-    setLookupMessage('Queueing lookup...');
+    setLookupMessage('Submitting lookup request...');
     try {
       const lookupId = crypto.randomUUID();
       const queued = await queueOnDemandLookup(value, lookupId);
@@ -140,10 +174,12 @@ export default function MainLayout({
         queryLabel: value,
         autoOpened: false,
       });
-      setLookupMessage(`Queued lookup for ${queued.companyName}. Processing now...`);
+      setLookupMessage(
+        `Lookup queued for ${queued.companyName}. We are now finding and validating the company profile.`
+      );
       setLookupInput('');
     } catch {
-      setLookupMessage('Failed to queue lookup. Please retry.');
+      setLookupMessage('Could not submit lookup request. Please retry in a few seconds.');
     } finally {
       setLookupBusy(false);
     }
@@ -181,9 +217,28 @@ export default function MainLayout({
     if (!pendingLookup || pendingLookupMatch) return;
     const row = lookupFailureQuery.data;
     if (!row?.failed) return;
-    setLookupMessage(row.message ?? 'On-demand lookup could not be completed.');
+    setLookupMessage(
+      row.message ??
+        `Lookup failed for ${pendingLookup.queryLabel}. Try adding the company website to disambiguate (example: "Aethria aethria.com").`
+    );
     setPendingLookup(null);
   }, [pendingLookup, pendingLookupMatch, lookupFailureQuery.data]);
+
+  useEffect(() => {
+    if (hydratedFromStorageRef.current) return;
+    const persisted = persistedStateRef.current;
+    if (!persisted?.selectedStartupId || startups.length === 0) {
+      hydratedFromStorageRef.current = true;
+      return;
+    }
+    const startup = startups.find((s) => s.id === persisted.selectedStartupId) ?? null;
+    if (startup) {
+      setSelectedStartup(startup);
+      if (!persisted.rightPanel) setRightPanel('memo');
+      initialFirstMemoOpened.current = true;
+    }
+    hydratedFromStorageRef.current = true;
+  }, [startups]);
 
   useEffect(() => {
     if (initialFirstMemoOpened.current || startups.length === 0) return;
@@ -196,16 +251,22 @@ export default function MainLayout({
     if (!pendingLookup) return;
     const matched = pendingLookupMatch;
     if (!matched) {
-      setLookupMessage(`Processing ${pendingLookup.queryLabel}...`);
+      setLookupMessage(
+        `Searching sources for ${pendingLookup.queryLabel} and confirming the exact company identity...`
+      );
       return;
     }
     const hasDecision = !!matched.partner?.recommendation;
     if (hasDecision) {
-      setLookupMessage(`Lookup complete: ${matched.scout.name}. Opening memo...`);
+      setLookupMessage(
+        `Lookup complete: ${matched.scout.name} was analyzed successfully. Opening memo now...`
+      );
     } else if (matched.review) {
-      setLookupMessage(`Found ${matched.scout.name}. Partner decision in progress...`);
+      setLookupMessage(
+        `Found ${matched.scout.name}. Review is complete and the partner decision is now running...`
+      );
     } else {
-      setLookupMessage(`Found ${matched.scout.name}. Review in progress...`);
+      setLookupMessage(`Found ${matched.scout.name}. Running analyst review and scoring...`);
     }
     if (hasDecision && !pendingLookup.autoOpened) {
       setSelectedStartup(matched);
@@ -254,7 +315,7 @@ export default function MainLayout({
   const fundThesisQuery = useQuery({
     queryKey: ['fund-thesis', 'summary'],
     queryFn: () => fetchFundThesisSummary().catch(() => null),
-    ...getQueryConfig('STATIC'),
+    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 30_000 }),
     placeholderData: (prev) => prev ?? null,
   });
   const fundThesisSummary = fundThesisQuery.data ?? null;
@@ -274,14 +335,25 @@ export default function MainLayout({
     ? 'Off'
     : pipelineHealthIssue
       ? 'Issue'
-      : lookupWorking
-        ? 'Working'
-        : 'On';
+      : 'On';
   const lookupStateLabel = lookupWorking ? (lookupPhaseLabel ?? 'Working') : 'Idle';
 
   useEffect(() => {
     onSystemPanelOpenChange?.(rightPanel === 'system');
   }, [rightPanel, onSystemPanelOpenChange]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const snapshot: PersistedMainLayoutState = {
+      rightPanel,
+      selectedStartupId: selectedStartup?.id ?? null,
+    };
+    try {
+      window.localStorage.setItem(MAIN_LAYOUT_STATE_KEY, JSON.stringify(snapshot));
+    } catch {
+      // ignore storage write failures (private mode/quota)
+    }
+  }, [rightPanel, selectedStartup?.id]);
 
   useEffect(() => {
     if (!pipelineHealthIssue && showPipelineIssueHelp) {
@@ -429,12 +501,13 @@ export default function MainLayout({
 
                 {/* Settings */}
                 <div className="flex flex-col items-start gap-phi-1 mt-phi-3">
-                  <a
-                    href="/settings"
+                  <button
+                    type="button"
+                    onClick={() => navigate(SETTINGS_PATH)}
                     className="type-label-section text-white/70 hover:text-white btn-interaction"
                   >
                     Settings
-                  </a>
+                  </button>
                 </div>
               </div>
               </motion.section>
@@ -449,7 +522,7 @@ export default function MainLayout({
         onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
         onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
         onClose={() => setRightPanel(null)}
-        navLink={{ href: '/settings', label: 'Settings' }}
+        navLink={{ href: SETTINGS_PATH, label: 'Settings' }}
       />
       {startupsError && (
         <div className="flex-none px-6 py-2 bg-warning border-b border-oxford/25 type-label-tab text-oxford">
@@ -522,7 +595,7 @@ export default function MainLayout({
                             Pipeline has a problem and may not process updates right now.
                             <button
                               type="button"
-                              onClick={() => navigate('/settings')}
+                              onClick={() => navigate(SETTINGS_PATH)}
                               className="mt-phi-2 block type-meta tracking-badge uppercase text-oxford/60 hover:text-oxford btn-interaction"
                             >
                               Open settings →

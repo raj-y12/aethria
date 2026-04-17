@@ -7,9 +7,11 @@ import SystemBar from '../components/SystemBar';
 import MobileHeader from '../components/MobileHeader';
 import PanelShell, { PANEL_TAB_BAR_CLASS } from '../components/PanelShell';
 import LoadingAnimation from '../components/LoadingAnimation';
+import AgentLogoutModal from '../components/AgentLogoutModal';
 import { fetchSettings, patchSettings, type AgentBudgetStatus, type Settings, type FundIdentity } from '../api/settings';
 import { fetchMe } from '../api/me';
-import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
+import { fetchAgentsStatus, toggleAgents, type AgentsStatus } from '../api/agents';
+import { useAgentsEnabled } from '../hooks/useAgentsEnabled';
 import {
   fetchFundThesisSummary,
   patchFundThesisActiveVersion,
@@ -205,11 +207,27 @@ export default function SettingsPage() {
   const reduceMotion = usePrefersReducedMotion();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const displayName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('authUser') : null;
-  const handleLogout = () => {
+  const agentsEnabled = useAgentsEnabled();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const doLogout = () => {
     localStorage.removeItem('aethria_last_activity');
     sessionStorage.removeItem('auth');
     sessionStorage.removeItem('authUser');
     signOut?.().then(() => navigate('/sign-in', { replace: true }));
+  };
+
+  const handleLogout = () => {
+    if (agentsEnabled) {
+      setShowLogoutModal(true);
+    } else {
+      doLogout();
+    }
+  };
+
+  const handleTurnOffAndLogout = async () => {
+    await toggleAgents(false);
+    doLogout();
   };
 
   const tabs: { id: TabId; label: string }[] = [
@@ -1173,6 +1191,15 @@ export default function SettingsPage() {
           </div>
         </div>
       ) : null}
+    <AgentLogoutModal
+      open={showLogoutModal}
+      onCancel={() => setShowLogoutModal(false)}
+      onKeepRunning={() => {
+        setShowLogoutModal(false);
+        doLogout();
+      }}
+      onTurnOffAndLogout={handleTurnOffAndLogout}
+    />
     </div>
   );
 }

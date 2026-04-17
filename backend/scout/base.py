@@ -9,6 +9,7 @@ import logging
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urlparse
 from openai import OpenAI
 
 from scout.schema import ScoutOutput, validate_scout_output, generate_id
@@ -17,6 +18,7 @@ from utils.reference_verify import (
     finalize_scout_references,
     filter_references_to_allowlist,
     hostname_from_user_hint,
+    registrable_domain,
 )
 from utils.retrieval_grounding import (
     log_pre_filter_cited_urls,
@@ -31,6 +33,28 @@ from utils.settings_loader import (
 
 
 logger = logging.getLogger(__name__)
+
+_LOW_QUALITY_DIRECTORY_DOMAINS = {
+    "pitchbook.com",
+    "crunchbase.com",
+    "tracxn.com",
+    "cbinsights.com",
+}
+
+_LOOKUP_NAME_STOPWORDS = {
+    "inc",
+    "llc",
+    "ltd",
+    "corp",
+    "co",
+    "company",
+    "technologies",
+    "technology",
+    "intelligence",
+    "investment",
+    "investments",
+    "systems",
+}
 
 
 class Scout(ABC):
@@ -223,14 +247,29 @@ class Scout(ABC):
     ) -> Optional[Dict[str, Any]]:
         """Allowlist filter + reference finalize. Returns None if fail-closed with no references."""
         out = dict(data)
+        allowlist_urls = set(source_pack.get("url_allowlist") or set())
         if explicit_website and str(explicit_website).strip():
-            out["lookup_website"] = str(explicit_website).strip()
+            site = str(explicit_website).strip()
+            out["lookup_website"] = site
+            # On explicit on-demand lookup, always include the user-provided website as a
+            # primary reference so valid lookups do not fail due to weak third-party citations.
+            refs = out.get("references")
+            ref_list = [str(r).strip() for r in refs if isinstance(r, str) and str(r).strip()] if isinstance(refs, list) else []
+            normalized_site = site if site.lower().startswith(("http://", "https://")) else f"https://{site}"
+            if not any(normalized_site in r for r in ref_list):
+                company_name = str(out.get("name") or "").strip() or "Company"
+                ref_list.insert(0, f"{company_name} official website - {normalized_site}")
+            out["references"] = ref_list
+            # Explicit website is a trusted disambiguation hint from the user; include it in
+            # the citation allowlist so grounding does not drop the canonical company reference.
+            allowlist_urls.add(normalized_site)
         if grounded_enabled:
             log_pre_filter_cited_urls(out.get("references"))
-            out = self._apply_allowlist(out, source_pack["url_allowlist"])
+            out = self._apply_allowlist(out, allowlist_urls)
             if fail_closed and not out.get("references"):
                 self.logger.warning(
-                    "grounded_citations: fail-closed; no allowlisted references survived"
+                    "grounded_citations: fail-closed; no allowlisted references survived (explicit_website=%s)",
+                    bool(explicit_website and str(explicit_website).strip()),
                 )
                 return None
         return finalize_scout_references(
@@ -242,8 +281,88 @@ class Scout(ABC):
         try:
             validate_scout_output(data)
             return True
-        except Exception:
+        except Exception as e:
+            self.logger.warning(f"[_scout_validates] Validation failed: {e}")
             return False
+
+    def _rank_company_lookup_sources(
+        self,
+        sources: list[Dict[str, str]],
+        *,
+        company_name: str,
+        website_hint: Optional[str],
+    ) -> list[Dict[str, str]]:
+        """Prefer primary/company-owned sources for named lookups."""
+        anchor_host = hostname_from_user_hint(website_hint)
+        anchor_reg = registrable_domain(anchor_host) if anchor_host else None
+        company_tokens = [t for t in company_name.lower().replace(".", " ").replace("-", " ").split() if len(t) >= 3][:3]
+
+        def score(source: Dict[str, str]) -> int:
+            url = str(source.get("url") or "").strip()
+            title = str(source.get("title") or "").lower()
+            snippet = str(source.get("snippet") or "").lower()
+            try:
+                host = (urlparse(url).hostname or "").lower().strip(".")
+            except Exception:
+                host = ""
+            host_reg = registrable_domain(host) if host else ""
+
+            s = 0
+            token_match = any(tok in host for tok in company_tokens) or any(
+                tok in title or tok in snippet for tok in company_tokens
+            )
+            if anchor_reg and host_reg == anchor_reg:
+                s += 8
+            if any(tok in host for tok in company_tokens):
+                s += 3
+            if any(tok in title or tok in snippet for tok in company_tokens):
+                s += 2
+            if "/blog" in url or "/docs" in url or "/about" in url:
+                s += 1
+            # Directory/funding DB sources are useful corroboration, but weak as sole identity proof.
+            # Keep them neutral when they match the requested company/domain signals.
+            if host_reg in _LOW_QUALITY_DIRECTORY_DOMAINS and not (anchor_reg and token_match):
+                s -= 6
+            return s
+
+        return sorted(sources, key=score, reverse=True)
+
+    @staticmethod
+    def _lookup_anchor_tokens(company_name: str) -> list[str]:
+        tokens: list[str] = []
+        for raw in (company_name or "").lower().replace("/", " ").replace("-", " ").replace(".", " ").split():
+            t = "".join(ch for ch in raw if ch.isalnum())
+            if len(t) < 3:
+                continue
+            if t in _LOOKUP_NAME_STOPWORDS:
+                continue
+            tokens.append(t)
+        return tokens[:4]
+
+    def _matches_lookup_identity(
+        self,
+        candidate_name: str,
+        *,
+        expected_company: str,
+        website_hint: Optional[str],
+    ) -> bool:
+        cand = (candidate_name or "").lower()
+        if not cand:
+            return False
+        cand_tokens = set(self._lookup_anchor_tokens(cand))
+        expected_tokens = self._lookup_anchor_tokens(expected_company)
+
+        if expected_tokens:
+            if not any(tok in cand or tok in cand_tokens for tok in expected_tokens):
+                return False
+
+        host = hostname_from_user_hint(website_hint)
+        if host:
+            host_token = registrable_domain(host).split(".")[0].strip().lower()
+            if host_token and len(host_token) >= 4 and host_token not in _LOOKUP_NAME_STOPWORDS:
+                if host_token not in cand and host_token not in cand_tokens:
+                    return False
+        return True
 
     def _repair_scout_json_sync(
         self,
@@ -271,7 +390,8 @@ class Scout(ABC):
             "references must still include at least one real http(s) URL proving the company exists."
         )
         note = (context_note or "").strip()
-        payload = json.dumps(incomplete, ensure_ascii=False)[:14000]
+        payload_str = json.dumps(incomplete, ensure_ascii=False)
+        payload = payload_str[:14000]
         user = (
             (f"Context: {note}\n\n" if note else "")
             + "The following JSON is INVALID or incomplete — fix it into a single valid Scout payload.\n\n"
@@ -369,7 +489,7 @@ class Scout(ABC):
             to_repair = d2
         return None
 
-    def _call_llm_sync(self) -> Optional[dict]:
+    def _call_llm_sync(self) -> Optional[Dict[str, Any]]:
         """
         Synchronous LLM call (runs in thread pool).
         Uses the model set during initialization.
@@ -398,6 +518,11 @@ class Scout(ABC):
                         source_pack.get("provider"),
                     )
                     return None
+                if not source_pack["sources"]:
+                    self.logger.warning(
+                        "grounded_citations: enabled but retrieval returned no sources provider=%s; continuing without strict citation-source constraints",
+                        source_pack.get("provider"),
+                    )
 
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -417,7 +542,7 @@ class Scout(ABC):
                                     "3) Format each reference as: [S#] Title - https://...\n"
                                     "4) If no suitable source is available, return nothing.\n\n"
                                 )
-                                if grounded_enabled
+                                if grounded_enabled and bool(source_pack.get("sources"))
                                 else ""
                             )
                             + "Find one REAL VC-BACKABLE STARTUP (Seed to Series C, typically private, technology-driven), "
@@ -488,7 +613,7 @@ class Scout(ABC):
             self.logger.error(f"LLM call failed: {e}")
             return None
     
-    def _call_llm_for_company_sync(self, company_name: str, website: Optional[str] = None) -> Optional[dict]:
+    def _call_llm_for_company_sync(self, company_name: str, website: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Synchronous LLM call for a specific company name (runs in thread pool).
         """
@@ -508,12 +633,23 @@ class Scout(ABC):
                     user_id=self._tenant_user_id,
                     max_results=6,
                 )
+                source_pack["sources"] = self._rank_company_lookup_sources(
+                    list(source_pack.get("sources") or []),
+                    company_name=company,
+                    website_hint=site or None,
+                )
                 if fail_closed and not source_pack["sources"]:
                     self.logger.warning(
                         "grounded_citations: fail-closed company=%s no retrieval sources",
                         company,
                     )
                     return None
+                if not source_pack["sources"]:
+                    self.logger.warning(
+                        "grounded_citations: company lookup enabled but retrieval returned no sources company=%s provider=%s; continuing without strict citation-source constraints",
+                        company,
+                        source_pack.get("provider"),
+                    )
 
             user_prompt = (
                 f'Analyze this specific company: "{company}". '
@@ -534,7 +670,7 @@ class Scout(ABC):
                         "3) Format references as [S#] Title - https://...\n"
                         "4) If sources are insufficient, return nothing.\n\n"
                     )
-                    if grounded_enabled
+                    if grounded_enabled and bool(source_pack.get("sources"))
                     else ""
                 )
                 + "Output ONLY valid JSON matching the ScoutOutput schema "
@@ -558,6 +694,10 @@ class Scout(ABC):
                 '  "references": ["string", ...]\n'
                 "}\n\n"
                 "CRITICAL: references must contain verifiable sources proving this company exists. "
+                "Prefer primary sources first: official company domain, official docs/blog, product pages, or company-owned GitHub/LinkedIn profile. "
+                "Do not rely only on directory/paywalled sources (PitchBook/Crunchbase/Tracxn/CBInsights) if primary sources are available. "
+                "Do NOT switch to similarly named companies (for example, different spelling variants). "
+                "If the evidence appears to point to a different company identity than requested, return nothing. "
                 "If confidence is low or data is incomplete, still return best-effort fields and set unknowns to null. "
                 "You MUST include every top-level key from the schema (name through references); never return a partial object. "
                 "Do not invent references. Output only JSON."
@@ -587,7 +727,7 @@ class Scout(ABC):
             data = json.loads(content)
             if site:
                 data["lookup_website"] = site
-            return self._finalize_scout_payload_from_llm(
+            finalized = self._finalize_scout_payload_from_llm(
                 data,
                 source_pack,
                 grounded_enabled=grounded_enabled,
@@ -595,6 +735,21 @@ class Scout(ABC):
                 explicit_website=site or None,
                 context_note=f'company lookup: "{company}"',
             )
+            if finalized is None:
+                return None
+            if not self._matches_lookup_identity(
+                str(finalized.get("name") or ""),
+                expected_company=company,
+                website_hint=site or None,
+            ):
+                self.logger.warning(
+                    "company lookup identity mismatch: expected=%s got=%s website_hint=%s",
+                    company,
+                    finalized.get("name"),
+                    site or "",
+                )
+                return None
+            return finalized
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse JSON from LLM (company lookup): {e}")
             return None
@@ -602,7 +757,7 @@ class Scout(ABC):
             self.logger.error(f"LLM company lookup failed: {e}")
             return None
 
-    async def _call_llm(self) -> Optional[dict]:
+    async def _call_llm(self) -> Optional[Dict[str, Any]]:
         """
         Async wrapper for LLM call (runs sync call in thread pool).
         Uses the model set during initialization.

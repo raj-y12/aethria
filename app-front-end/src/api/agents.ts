@@ -28,6 +28,14 @@ export interface AgentsStatus {
   thesis_error?: string | null;
 }
 
+/** Live state of the per-user persistent background loop. */
+export interface LoopStatus {
+  loop_alive: boolean;
+  agents_enabled: boolean;
+  agents_status: 'running' | 'stopped' | 'error';
+  agents_last_started_at: string | null;
+}
+
 export async function fetchAgentsStatus(): Promise<AgentsStatus | null> {
   try {
     const res = await authedFetch(`${API_BASE}/api/agents/status`, { headers: { Accept: 'application/json' } });
@@ -35,6 +43,37 @@ export async function fetchAgentsStatus(): Promise<AgentsStatus | null> {
     return (await res.json()) as AgentsStatus;
   } catch {
     return null;
+  }
+}
+
+export async function fetchLoopStatus(): Promise<LoopStatus | null> {
+  try {
+    const res = await authedFetch(`${API_BASE}/api/agents/loop-status`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as LoopStatus;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Enable or disable the persistent background agent loop.
+ * enabled=true  → starts loop (does not override individual agent toggles)
+ * enabled=false → disables all agents + stops loop
+ */
+export async function toggleAgents(enabled: boolean): Promise<{ ok: boolean }> {
+  try {
+    const res = await authedFetch(`${API_BASE}/api/agents/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!res.ok) return { ok: false };
+    return (await res.json()) as { ok: boolean };
+  } catch {
+    return { ok: false };
   }
 }
 

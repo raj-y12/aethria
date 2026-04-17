@@ -7,3 +7,5 @@ export { useMediaQuery } from './useMediaQuery';
 export { usePrefersReducedMotion } from './usePrefersReducedMotion';
 export { useSystemData } from './useSystemData';
 export { useQueryLiveGate } from './useQueryLiveGate';
+export { useAgentsEnabled } from './useAgentsEnabled';
+
