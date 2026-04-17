@@ -167,7 +167,7 @@ function EscalationCard({
     sector || conviction != null
       ? [
           sector || null,
-          conviction != null ? `Conviction ${conviction}/10` : null,
+          conviction != null ? `${Math.round(conviction * 100)}% confidence` : null,
         ]
           .filter(Boolean)
           .join(' · ')

@@ -535,6 +535,7 @@ def _backend_to_frontend(raw: dict) -> dict:
             "thesis_deviation_points": review.get("thesis_deviation_points") or None,
             "thesis_alignment_confidence": review.get("thesis_alignment_confidence"),
             "fund_thesis_alignment_score": review.get("fund_thesis_alignment_score"),
+            "reviews": review.get("reviews") or None,
         }
     else:
         out["review"] = None
@@ -1493,49 +1494,23 @@ async def trigger_meta_cycle(request: Request):
 async def get_escalations(request: Request):
     """
     Returns all startups where human_review_required=True and human_resolution is None.
-    Shapes each result as an escalation summary for the System Intelligence panel.
+    Shapes each result as EscalationItem (frontend type) with nested scout/review/partner.
     """
     storage = _get_storage(request)
     pending_raw = _get_pending_escalations(storage)
     items: List[Dict[str, Any]] = []
-    now = datetime.now(timezone.utc)
     for item in pending_raw:
-        scout = item.get("scout_info") or {}
-        partner = item.get("partner_info") or {}
-        startup_id = item.get("startup_id") or scout.get("startup_id") or item.get("id")
-        name = scout.get("name", "")
-        sector = scout.get("sector", "")
-        decision = partner.get("decision")
-        conviction = partner.get("conviction_level") or partner.get("confidence")
-        rationale = partner.get("rationale")
-        llm_reason = partner.get("llm_fallback_reason")
-        human_required = bool(partner.get("human_review_required", False))
-        partnered_at = partner.get("partnered_at")
-        days_pending = None
-        escalated_at = None
-        try:
-            if partnered_at:
-                dt = datetime.fromisoformat(str(partnered_at))
-                if not dt.tzinfo:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                escalated_at = dt.isoformat()
-                days_pending = (now - dt).days
-        except Exception:
-            days_pending = None
-            escalated_at = None
-
+        fe = _backend_to_frontend(item)
+        startup_id = fe["id"]
         items.append(
             {
+                "id": startup_id,
                 "startup_id": startup_id,
-                "startup_name": name,
-                "sector": sector,
-                "partner_decision": decision,
-                "conviction_level": conviction,
-                "rationale": rationale,
-                "llm_fallback_reason": llm_reason,
-                "human_review_required": human_required,
-                "escalated_at": escalated_at,
-                "days_pending": days_pending,
+                "startup_name": fe["scout"].get("name", ""),
+                "scout": fe["scout"],
+                "review": fe.get("review"),
+                "partner": fe.get("partner"),
+                "created_at": fe["timestamps"].get("partnered_at"),
                 "human_resolution": item.get("human_resolution"),
             }
         )

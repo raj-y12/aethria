@@ -13,9 +13,7 @@ import { memoReferenceHref, memoReferenceLabel } from '../lib/memoReferenceHref'
 import {
   getScoreBand,
   DECISION_LABELS,
-  QUALITY_LABELS,
   SCORE_DIMENSIONS,
-  getReviewerQualityBand,
 } from '../design-system/semantics';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
@@ -62,9 +60,7 @@ function reviewHasThesisAlignment(r: Review | null | undefined): boolean {
 export interface InvestmentMemoContentProps {
   startup: Startup | null;
   onClose?: () => void;
-  /** When true, used in side panel (no outer padding; panel provides it). */
   embedded?: boolean;
-  /** After persisted memo becomes ready; use to refetch startup detail. */
   onMemoPipelineReady?: () => void;
 }
 
@@ -85,7 +81,12 @@ function normalizeParagraphs(value: unknown): string[] {
   return [];
 }
 
-/** Partner economic headline: INVEST / PASS / MONITOR. */
+function normalizeListItemText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/^\s*[•·*-]\s+/, "")
+    .trim();
+}
+
 function partnerDecisionHeadline(startup: Startup): string {
   const rec = startup.partner?.recommendation;
   if (rec == null) return '—';
@@ -167,10 +168,6 @@ function pipelineReplayOneLiner(steps: PipelineReplayStep[]): string {
   return tail ? `${flow} · ${tail}` : flow;
 }
 
-/**
- * Memo body only. Used in full-screen modal and in the right-side panel.
- * When embedded, ref can be used to call downloadPDF() from the parent (e.g. panel header).
- */
 const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, InvestmentMemoContentProps>(function InvestmentMemoContent(
   { startup, onClose, embedded = false, onMemoPipelineReady },
   ref
@@ -178,6 +175,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const reduceMotion = usePrefersReducedMotion();
   const wrapperCls = embedded ? 'memoPanel memoPanel--embedded' : 'memoPanel';
   const [selectedDimensionIdx, setSelectedDimensionIdx] = useState(0);
+  const [selectedReviewerIdx, setSelectedReviewerIdx] = useState(0);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pipelineLogOpen, setPipelineLogOpen] = useState(false);
 
@@ -231,7 +229,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     setMemoPartial(null);
     setMemoGateError(null);
 
-    // Partner decision already present — pipeline is done, no need to poll.
     if (startup.partner?.recommendation) {
       setMemoPipeline('ready');
       return;
@@ -275,12 +272,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     };
   }, [startup?.id, startup?.partner?.recommendation, onMemoPipelineReady]);
 
-  const showJudgment = !!displayStartup?.review && !!displayStartup?.partner?.recommendation;
+  const showJudgment = !!displayStartup?.partner?.recommendation;
   const decisionHeadline = displayStartup && showJudgment ? partnerDecisionHeadline(displayStartup) : '';
-  const dossierQualityBand = useMemo(
-    () => (displayStartup && showJudgment ? getReviewerQualityBand(displayStartup.review) : null),
-    [displayStartup, showJudgment]
-  );
   const decisionBadgeVariant = useMemo(
     () => (displayStartup && showJudgment ? getPartnerEconomicBadgeVariant(displayStartup) : null),
     [displayStartup, showJudgment]
@@ -294,6 +287,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
   useEffect(() => {
     setSelectedDimensionIdx(0);
+    setSelectedReviewerIdx(0);
     setSourcesOpen(false);
     setPipelineLogOpen(false);
   }, [startup?.id]);
@@ -323,13 +317,19 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [pipelineReplaySteps]
   );
 
+  const REVIEWER_LABELS: Record<string, string> = {
+    DefaultReviewer: 'Default',
+    SkepticalReviewer: 'Skeptical',
+    OpportunistReviewer: 'Opportunist',
+  };
+
   return (
     <div className={wrapperCls}>
       <style>{`
+        /* === Layout === */
         .memoPanel{
-          --memo-section-title-size: 12px;
-          --memo-subtitle-size: 11px;
           --memo-body-size: 14px;
+          --memo-label-size: 11px;
           width: 60%;
           min-width: 0;
           flex: 0 0 60%;
@@ -344,7 +344,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           width: 100%;
           min-width: 0;
           flex: 1 1 auto;
-          /* Let the parent panel own scrolling in embedded mode. */
           height: auto;
           overflow: visible;
         }
@@ -353,31 +352,24 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           min-height: 0;
           overflow-y: auto;
           overflow-x: hidden;
-          padding-left: clamp(34px, 5vw, 55px);
-          padding-right: clamp(34px, 5vw, 55px);
-          padding-top: clamp(34px, 4vw, 55px);
-          padding-bottom: clamp(34px, 5vw, 55px);
+          padding: clamp(34px, 4vw, 55px) clamp(34px, 5vw, 55px);
           color: #002147;
           background: var(--color-paper);
         }
         .memoPanel--embedded .memoScroll{
-          /* PanelShell already applies content padding; avoid double-padding in embedded mode. */
-          padding-left: 0px;
-          padding-right: 0px;
-          padding-top: 0px;
-          padding-bottom: 0px;
-          /* PanelShell already scrolls in embedded mode; avoid nested scrollbars. */
+          padding: 0;
           overflow: visible;
           flex: 0 0 auto;
           min-height: auto;
         }
+
+        /* === Action buttons === */
         .memoHeaderActions{
           display: flex;
           flex-wrap: wrap;
           justify-content: flex-end;
           align-items: center;
           gap: 10px 18px;
-          margin-top: 0;
           margin-bottom: 10px;
         }
         .memoAction{
@@ -386,351 +378,16 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           background: transparent;
           padding: 4px 0;
           cursor: pointer;
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 12px;
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 11px;
           font-variant-caps: all-small-caps;
           letter-spacing: 0.12em;
-          color: rgba(0,33,71,0.5);
+          color: rgba(0,33,71,0.45);
           transition: color 150ms ease;
         }
         .memoAction:hover{ color: #002147; }
-        .memoCompany{
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
-          font-weight: 600;
-          font-size: clamp(1.375rem, 2.2vw, 1.625rem);
-          line-height: 1.2;
-          letter-spacing: -0.01em;
-          margin: 0;
-          max-width: 100%;
-          color: #002147;
-        }
-        .memoHeaderDivider{
-          margin-top: 21px;
-          margin-bottom: clamp(34px, 5vw, 55px);
-        }
-        .memoBody{
-          max-width: 42rem;
-        }
-        .memoPanel--embedded .memoBody{
-          max-width: none;
-          width: 100%;
-        }
-        .memoPanel--embedded .memoCompany{
-          max-width: none;
-        }
-        .memoBody > section + section{
-          margin-top: clamp(44px, 6vw, 72px);
-        }
-        .memoLeadSection{
-          padding-top: 12px;
-        }
-        .memoMeta{
-          margin-top: 13px;
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 12px;
-          letter-spacing: 0.08em;
-          color: rgba(0,33,71,0.50);
-          text-transform: uppercase;
-        }
-        .memoDivider{
-          height: 1px;
-          width: 100%;
-          background: rgba(0,33,71,0.08);
-        }
-        .memoDivider.memoHeaderDivider{
-          background: rgba(0,33,71,0.1);
-        }
-        .memoLabel{
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: var(--memo-section-title-size);
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          line-height: 1.45;
-          color: rgba(0,33,71,0.45);
-          margin: 0 0 16px 0;
-          padding-bottom: 0;
-          border-bottom: none;
-        }
-        .memoVerdict{
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
-          font-weight: 600;
-          font-size: clamp(1.75rem, 4vw, 2.25rem);
-          line-height: 1.08;
-          letter-spacing: -0.03em;
-          text-transform: uppercase;
-          margin: 0;
-          padding-top: 0px;
-          padding-bottom: 0px;
-          color: #002147;
-        }
-        .memoVerdictMeta{
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          gap: 0 18px;
-          margin-top: 16px;
-          margin-bottom: 28px;
-        }
-        .memoVerdictMetaTag{
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: var(--memo-subtitle-size);
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          line-height: 1.5;
-          color: rgba(0,33,71,0.40);
-        }
-        .memoVerdictMetaTag--alert{
-          color: rgba(125,43,58,0.65);
-        }
-        .memoReasoningList{
-          margin: 0;
-          padding: 0;
-          list-style: none;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-        .memoReasoningItem{
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
-          font-size: var(--memo-body-size);
-          line-height: 1.65;
-          color: rgba(0,33,71,0.70);
-        }
-        .memoScoresRow{
-          display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
-          gap: clamp(13px, 2.2vw, 21px);
-        }
-        .memoScoreCol{
-          appearance: none;
-          border: none;
-          background: transparent;
-          padding: 0;
-          text-align: center;
-          cursor: pointer;
-          min-width: 0;
-        }
-        .memoScoreCol .memoScoreName,
-        .memoScoreCol .memoScoreValue{
-          transition: opacity 180ms ease, color 180ms ease;
-        }
-        .memoScoreCol:not([aria-pressed="true"]) .memoScoreName,
-        .memoScoreCol:not([aria-pressed="true"]) .memoScoreValue{
-          opacity: 0.48;
-        }
-        .memoScoreCol[aria-pressed="true"] .memoScoreName,
-        .memoScoreCol[aria-pressed="true"] .memoScoreValue{
-          opacity: 1;
-        }
-        .memoScoreCol:focus{ outline: none; }
-        .memoScoreCol:focus-visible{
-          outline: 2px solid rgba(0,33,71,0.25);
-          outline-offset: 4px;
-        }
-        .memoScoreName{
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 12px;
-          font-variant-caps: all-small-caps;
-          letter-spacing: 0.03em;
-          color: rgba(0,33,71,0.55);
-          margin: 0 0 8px 0;
-        }
-        .memoScoreValue{
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-weight: 700;
-          font-size: clamp(1rem, 1.8vw, 1.5rem);
-          line-height: 1.05;
-          margin: 0 0 8px 0;
-          color: #002147;
-        }
-        .memoScoreValueRow{
-          display: flex;
-          align-items: baseline;
-          justify-content: center;
-          gap: 0;
-        }
-        .memoScoreLegend{
-          margin-top: 5px;
-          margin-bottom: 13px;
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 12px;
-          line-height: 1.5;
-          letter-spacing: 0.06em;
-          color: rgba(0,33,71,0.40);
-        }
-        .memoScoreUnderline{
-          height: 2px;
-          width: 100%;
-          background: rgba(0,33,71,0.15);
-          margin-top: 8px;
-        }
-        .memoScoreWhy{
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
-          font-size: 13px;
-          line-height: 1.6;
-          color: rgba(0,33,71,0.70);
-          margin: 0;
-          overflow: hidden;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-        }
-        .memoDimensionPanel{
-          margin-top: 12px;
-          padding: 0;
-          background: transparent;
-          border: none;
-        }
-        .memoDimensionPanelName{
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 12px;
-          text-transform: uppercase;
-          letter-spacing: 0.11em;
-          color: rgba(0,33,71,0.55);
-          margin: 0 0 10px 0;
-        }
-        .memoDimensionPanelText{
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
-          font-size: 14px;
-          line-height: 1.6;
-          color: rgba(0,33,71,0.78);
-          margin: 0;
-          white-space: normal;
-        }
-        .memoList{
-          margin: 0;
-          padding: 0;
-          list-style: none;
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
-          font-size: var(--memo-body-size);
-          line-height: 1.65;
-          color: rgba(0,33,71,0.75);
-        }
-        .memoListItem{
-          display: flex;
-          gap: 12px;
-        }
-        .memoListItem + .memoListItem{ margin-top: 0.625rem; }
-        .memoBullet{
-          flex-shrink: 0;
-          color: rgba(0,33,71,0.28);
-          font-weight: 400;
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 12px;
-          margin-top: 0.15em;
-        }
-        .memoLink{
-          color: #002147;
-          text-decoration: none;
-          border-bottom: 1px solid rgba(0,33,71,0.22);
-          transition: border-color 120ms ease, color 120ms ease;
-        }
-        .memoLink:hover{
-          border-bottom-color: rgba(0,33,71,0.45);
-          color: rgba(0,33,71,0.88);
-        }
-        .memoSummaryCallout{
-          background: transparent;
-          padding: 0;
-          margin: 0;
-          border: none;
-        }
-        .memoSourcesToggle{
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          appearance: none;
-          border: none;
-          border-top: 1px solid rgba(0,33,71,0.08);
-          background: transparent;
-          padding: 14px 0 0 0;
-          cursor: pointer;
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: var(--memo-subtitle-size);
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: rgba(0,33,71,0.40);
-          transition: color 120ms ease;
-        }
-        .memoSourcesToggle:hover{ color: rgba(0,33,71,0.65); }
-        .memoSourcesPlus{
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: 14px;
-          color: rgba(0,33,71,0.35);
-          line-height: 1;
-        }
-        .memoSourcesBody{
-          padding-top: 16px;
-          padding-bottom: 4px;
-        }
-        .memoScoresSummary{
-          margin: 14px 0 0 0;
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
-          font-style: italic;
-          font-size: 13px;
-          line-height: 1.6;
-          color: rgba(0,33,71,0.5);
-        }
-        .memoOverviewRow{
-          display: grid;
-          grid-template-columns: minmax(6.5rem, 8rem) minmax(0, 1fr);
-          column-gap: clamp(20px, 3vw, 32px);
-          row-gap: 4px;
-          align-items: start;
-        }
-        .memoOverviewRow + .memoOverviewRow{ margin-top: 1.375rem; }
-        .memoSection--stackedRows .memoOverviewRow{
-          grid-template-columns: 1fr;
-          row-gap: 6px;
-        }
-        .memoSection--stackedRows .memoOverviewKey{
-          padding-top: 0;
-        }
-        .memoOverviewKey{
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: var(--memo-subtitle-size);
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: rgba(0,33,71,0.40);
-          margin: 0;
-          padding-top: 3px;
-        }
-        .memoOverviewVal{
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
-          font-size: var(--memo-body-size);
-          line-height: 1.65;
-          color: rgba(0,33,71,0.78);
-          margin: 0;
-        }
-        .memoEmpty{
-          height: 100%;
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: var(--color-paper);
-        }
-        .memoEmptyInner{
-          text-align: center;
-          padding: 48px;
-        }
-        .memoEmptyWordmark{
-          font-family: "Libre Baskerville", Georgia, serif;
-          font-weight: 400;
-          font-size: 24px;
-          line-height: 1.4;
-          color: rgba(0,33,71,0.25);
-          margin: 0;
-        }
-        .memoEmptyHint{
-          margin-top: 12px;
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
-          font-size: 13px;
-          line-height: 1.6;
-          color: rgba(0,33,71,0.2);
-        }
 
+        /* === Gate strip (error/generating) === */
         .memoGateStrip{
           position: sticky;
           top: 0;
@@ -741,35 +398,480 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           border-bottom: 1px solid rgba(0,33,71,0.08);
           pointer-events: none;
         }
-        .memoGateStripInner{
-          pointer-events: auto;
-          max-width: 100%;
-        }
+        .memoGateStripInner{ pointer-events: auto; }
         .memoGateTitle{
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
+          font-family: "Instrument Sans", system-ui, sans-serif;
           font-size: 14px;
           line-height: 1.5;
           color: rgba(0,33,71,0.78);
           margin: 8px 0 0 0;
         }
         .memoGateDetail{
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
+          font-family: "Instrument Sans", system-ui, sans-serif;
           font-size: 13px;
           line-height: 1.6;
-          color: rgba(0,33,71,0.58);
+          color: rgba(0,33,71,0.55);
           margin: 5px 0 0 0;
           max-width: 38rem;
         }
-        .memoGateStrip--error .memoGateTitle{
-          color: rgba(125, 43, 58, 0.95);
-        }
-        .memoGateStrip--error .memoPipelineKicker{
-          color: rgba(125, 43, 58, 0.72);
-        }
-
-        .memoPipelineSection{
+        .memoPipelineKicker{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: var(--memo-label-size);
+          letter-spacing: 0.11em;
+          text-transform: uppercase;
+          color: rgba(0,33,71,0.50);
           margin: 0;
         }
+        .memoGateStrip--error .memoGateTitle{ color: rgba(125,43,58,0.95); }
+        .memoGateStrip--error .memoPipelineKicker{ color: rgba(125,43,58,0.72); }
+
+        /* === Document body === */
+        .memoBody{
+          max-width: 42rem;
+        }
+        .memoPanel--embedded .memoBody{
+          max-width: none;
+          width: 100%;
+        }
+        .memoDocSection{
+          margin-top: clamp(32px, 4.5vw, 48px);
+        }
+
+        /* === Empty state === */
+        .memoEmpty{
+          height: 100%;
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--color-paper);
+        }
+        .memoEmptyInner{ text-align: center; padding: 48px; }
+        .memoEmptyWordmark{
+          font-family: "Libre Baskerville", Georgia, serif;
+          font-weight: 400;
+          font-size: 24px;
+          line-height: 1.4;
+          color: rgba(0,33,71,0.22);
+          margin: 0;
+        }
+        .memoEmptyHint{
+          margin-top: 12px;
+          font-family: "Instrument Sans", system-ui, sans-serif;
+          font-size: 13px;
+          color: rgba(0,33,71,0.18);
+        }
+
+        /* === Document header === */
+        .memoDocHeader{
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 10px;
+        }
+        .memoDocHeaderMain{ flex: 1 1 auto; min-width: 0; }
+        .memoCompany{
+          font-family: "Instrument Sans", system-ui, sans-serif;
+          font-weight: 600;
+          font-size: clamp(1.375rem, 2.2vw, 1.625rem);
+          line-height: 1.2;
+          letter-spacing: -0.01em;
+          margin: 0 0 6px 0;
+          color: #002147;
+        }
+        .memoDocTagline{
+          font-family: "Instrument Sans", system-ui, sans-serif;
+          font-size: 14px;
+          line-height: 1.55;
+          color: rgba(0,33,71,0.55);
+          margin: 0 0 8px 0;
+          font-style: italic;
+        }
+        .memoMeta{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 11px;
+          letter-spacing: 0.08em;
+          color: rgba(0,33,71,0.40);
+          text-transform: uppercase;
+        }
+        .memoDocHeaderRight{
+          width: 100%;
+          text-align: left;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
+        .memoDocRecommendation{
+          font-family: "Instrument Sans", system-ui, sans-serif;
+          font-size: clamp(1.375rem, 5vw, 2rem);
+          font-weight: 600;
+          letter-spacing: -0.03em;
+          text-transform: uppercase;
+          margin: 0;
+          line-height: 1;
+        }
+        .memoDocRecommendation--invest{ color: rgba(14, 88, 44, 0.88); }
+        .memoDocRecommendation--monitor{ color: rgba(115, 76, 0, 0.85); }
+        .memoDocRecommendation--pass{ color: rgba(125, 43, 58, 0.88); }
+        .memoDocConfidence{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 11px;
+          letter-spacing: 0.10em;
+          text-transform: uppercase;
+          color: rgba(0,33,71,0.38);
+          margin: 0;
+        }
+        .memoDocEscalation{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 10px;
+          letter-spacing: 0.10em;
+          text-transform: uppercase;
+          color: rgba(125,43,58,0.60);
+          margin: 0;
+        }
+        .memoDocStatusLine{
+          display: flex;
+          align-items: baseline;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .memoDocJudgmentTop{
+          margin-bottom: 12px;
+        }
+        .memoDocLookupBadge{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 10px;
+          letter-spacing: 0.10em;
+          text-transform: uppercase;
+          color: rgba(0,33,71,0.30);
+          margin: 0;
+        }
+
+        /* === Header divider === */
+        .memoDocDivider{
+          height: 1px;
+          background: rgba(0,33,71,0.08);
+          margin: clamp(20px, 3vw, 30px) 0 0 0;
+        }
+
+        /* === Section heading === */
+        .memoDocSectionHead{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: var(--memo-label-size);
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          color: rgba(0,33,71,0.40);
+          margin: 0 0 20px 0;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-weight: 400;
+        }
+        .memoDocContestedKicker{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 10px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: rgba(125,43,58,0.65);
+        }
+        .memoDocSubsection{ margin-top: 22px; }
+        .memoDocSubhead{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: rgba(0,33,71,0.35);
+          margin: 0 0 10px 0;
+        }
+
+        /* === Prose text === */
+        .memoDocProse{
+          font-family: "Instrument Sans", system-ui, sans-serif;
+          font-size: var(--memo-body-size);
+          line-height: 1.72;
+          color: rgba(0,33,71,0.72);
+          margin: 0 0 14px 0;
+        }
+        .memoDocProse:last-child{ margin-bottom: 0; }
+        .memoDocThesis{
+          font-style: italic;
+          color: rgba(0,33,71,0.80);
+          font-size: 14.5px;
+        }
+
+        /* === Definition list (key-value rows) === */
+        .memoDocDL{ display: flex; flex-direction: column; }
+        .memoDocDLRow{
+          display: grid;
+          grid-template-columns: minmax(7.5rem, 9rem) minmax(0, 1fr);
+          column-gap: clamp(18px, 2.5vw, 28px);
+          align-items: start;
+          padding: 9px 0;
+        }
+        .memoDocDLRow + .memoDocDLRow{ margin-top: 2px; }
+        .memoDocDT{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.10em;
+          color: rgba(0,33,71,0.36);
+          margin: 0;
+          padding-top: 2px;
+        }
+        .memoDocDD{
+          font-family: "Instrument Sans", system-ui, sans-serif;
+          font-size: var(--memo-body-size);
+          line-height: 1.65;
+          color: rgba(0,33,71,0.75);
+          margin: 0;
+        }
+
+        /* === Assessment scorecard === */
+        .memoDocScoreLegend{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 10px;
+          letter-spacing: 0.06em;
+          color: rgba(0,33,71,0.30);
+          margin: 0 0 16px 0;
+        }
+        .memoDocScorecardRow{
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: clamp(10px, 1.8vw, 18px);
+          margin-bottom: 4px;
+        }
+        .memoDocScoreBtn{
+          appearance: none;
+          border: none;
+          background: transparent;
+          padding: 0;
+          cursor: pointer;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 5px;
+          min-width: 0;
+        }
+        .memoDocScoreBtn:focus{ outline: none; }
+        .memoDocScoreBtn:focus-visible{
+          outline: 2px solid rgba(0,33,71,0.22);
+          outline-offset: 4px;
+        }
+        .memoDocScoreDim{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 9px;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: rgba(0,33,71,0.30);
+          transition: color 150ms ease;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100%;
+        }
+        .memoDocScoreVal{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: clamp(0.9375rem, 1.5vw, 1.1875rem);
+          font-weight: 700;
+          color: rgba(0,33,71,0.42);
+          transition: color 150ms ease;
+          line-height: 1.1;
+        }
+        .memoDocScoreBtn[aria-pressed="true"] .memoDocScoreDim{ color: rgba(0,33,71,0.55); }
+        .memoDocScoreBtn[aria-pressed="true"] .memoDocScoreVal{ color: #002147; }
+        .memoDocScoreUnderline{
+          height: 2px;
+          width: 100%;
+          background: rgba(0,33,71,0.18);
+        }
+        .memoDocScoreColSpacer{ height: 2px; }
+        .memoDocDimDetail{
+          padding: 14px 0 2px 0;
+          margin-top: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+        .memoDocDimName{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.10em;
+          color: rgba(0,33,71,0.42);
+        }
+        .memoDocDimText{
+          font-family: "Instrument Sans", system-ui, sans-serif;
+          font-size: 13px;
+          line-height: 1.62;
+          color: rgba(0,33,71,0.68);
+        }
+        .memoDocScoreNote{
+          font-family: "Instrument Sans", system-ui, sans-serif;
+          font-style: italic;
+          font-size: 13px;
+          line-height: 1.6;
+          color: rgba(0,33,71,0.40);
+          margin: 14px 0 0 0;
+        }
+
+        /* === Thesis alignment tiles === */
+        .memoDocAlignTiles{
+          display: flex;
+          flex-wrap: wrap;
+          gap: clamp(20px, 3vw, 36px);
+          margin-bottom: 20px;
+        }
+        .memoDocAlignTile{
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .memoDocAlignTileLabel{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.10em;
+          color: rgba(0,33,71,0.36);
+          margin: 0;
+        }
+        .memoDocAlignTileVal{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: clamp(1rem, 1.6vw, 1.25rem);
+          font-weight: 600;
+          color: #002147;
+          margin: 0;
+          line-height: 1.2;
+        }
+
+        /* === Reviewer comparison table === */
+        .memoDocReviewerTable{
+          border-top: 1px solid rgba(0,33,71,0.08);
+        }
+        .memoDocReviewerRow{
+          display: grid;
+          grid-template-columns: 6.5rem 5rem minmax(0, 1fr);
+          gap: 0 clamp(12px, 2vw, 20px);
+          align-items: center;
+          padding: 13px 0;
+          border-bottom: 1px solid rgba(0,33,71,0.06);
+          appearance: none;
+          border-left: none;
+          border-right: none;
+          background: transparent;
+          width: 100%;
+          cursor: pointer;
+          text-align: left;
+          transition: background 120ms ease;
+        }
+        .memoDocReviewerRow:hover{ background: rgba(0,33,71,0.025); }
+        .memoDocReviewerRow:focus{ outline: none; }
+        .memoDocReviewerRow:focus-visible{
+          outline: 2px solid rgba(0,33,71,0.22);
+          outline-offset: 2px;
+        }
+        .memoDocReviewerRowLabel{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: rgba(0,33,71,0.42);
+          transition: color 150ms ease;
+        }
+        .memoDocReviewerRow[aria-pressed="true"] .memoDocReviewerRowLabel{ color: rgba(0,33,71,0.72); }
+        .memoDocReviewerRowVerdict{
+          font-family: "Instrument Sans", system-ui, sans-serif;
+          font-size: 13px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.02em;
+          color: rgba(0,33,71,0.45);
+          transition: color 150ms ease;
+        }
+        .memoDocReviewerRow[aria-pressed="true"] .memoDocReviewerRowVerdict{ color: #002147; }
+        .memoDocReviewerRowScores{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 10px;
+          letter-spacing: 0.04em;
+          color: rgba(0,33,71,0.32);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          transition: color 150ms ease;
+        }
+        .memoDocReviewerRow[aria-pressed="true"] .memoDocReviewerRowScores{ color: rgba(0,33,71,0.50); }
+        .memoDocReviewerDetail{
+          padding: 16px 0 4px 0;
+        }
+        .memoDocReviewerDetailText{
+          font-family: "Instrument Sans", system-ui, sans-serif;
+          font-size: 13px;
+          line-height: 1.65;
+          color: rgba(0,33,71,0.65);
+          margin: 0;
+        }
+
+        /* === Shared list === */
+        .memoList{
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          font-family: "Instrument Sans", system-ui, sans-serif;
+          font-size: var(--memo-body-size);
+          line-height: 1.65;
+          color: rgba(0,33,71,0.72);
+        }
+        .memoListItem{
+          display: flex;
+          gap: 12px;
+        }
+        .memoListItem + .memoListItem{ margin-top: 0.625rem; }
+        .memoBullet{
+          flex-shrink: 0;
+          color: rgba(0,33,71,0.25);
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 12px;
+          margin-top: 0.12em;
+        }
+        .memoLink{
+          color: #002147;
+          text-decoration: none;
+          border-bottom: 1px solid rgba(0,33,71,0.20);
+          transition: border-color 120ms ease;
+        }
+        .memoLink:hover{ border-bottom-color: rgba(0,33,71,0.45); }
+
+        /* === Sources toggle === */
+        .memoSourcesToggle{
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          appearance: none;
+          border: none;
+          border-top: 1px solid rgba(0,33,71,0.08);
+          background: transparent;
+          padding: 13px 0 0 0;
+          cursor: pointer;
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: var(--memo-label-size);
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: rgba(0,33,71,0.36);
+          transition: color 120ms ease;
+        }
+        .memoSourcesToggle:hover{ color: rgba(0,33,71,0.60); }
+        .memoSourcesPlus{
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: 13px;
+          color: rgba(0,33,71,0.30);
+          line-height: 1;
+        }
+        .memoSourcesBody{ padding-top: 14px; padding-bottom: 4px; }
+
+        /* === Pipeline run log === */
+        .memoPipelineSection{ margin: 0; }
         .memoPipelineToggle{
           width: 100%;
           display: flex;
@@ -785,7 +887,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           border-bottom: 1px solid rgba(0,33,71,0.06);
           transition: opacity 120ms ease;
         }
-        .memoPipelineToggle:hover{ opacity: 0.75; }
+        .memoPipelineToggle:hover{ opacity: 0.72; }
         .memoPipelineToggleTitle{
           display: flex;
           flex-direction: column;
@@ -793,20 +895,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           min-width: 0;
           flex: 1;
         }
-        .memoPipelineKicker{
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: var(--memo-subtitle-size);
-          font-weight: 400;
-          letter-spacing: 0.11em;
-          text-transform: uppercase;
-          color: rgba(0,33,71,0.50);
-          margin: 0;
-        }
         .memoPipelineOneLiner{
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
+          font-family: "Instrument Sans", system-ui, sans-serif;
           font-size: var(--memo-body-size);
           line-height: 1.45;
-          color: rgba(0,33,71,0.52);
+          color: rgba(0,33,71,0.48);
           margin: 0;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -814,164 +907,76 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         .memoPipelinePlus{
           flex-shrink: 0;
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-family: "Space Mono", ui-monospace, monospace;
           font-size: 12px;
-          color: rgba(0,33,71,0.45);
+          color: rgba(0,33,71,0.40);
           line-height: 1.5;
           padding-top: 2px;
         }
-        .memoReplayList{
-          list-style: none;
-          margin: 0;
-          padding: 4px 0 2px 0;
-        }
+        .memoReplayList{ list-style: none; margin: 0; padding: 4px 0 2px 0; }
         .memoReplayItem{
           padding: 16px 0;
           border-top: 1px solid rgba(0,33,71,0.06);
         }
-        .memoReplayItem:first-child{
-          border-top: none;
-          padding-top: 12px;
-        }
+        .memoReplayItem:first-child{ border-top: none; padding-top: 12px; }
         .memoReplayKicker{
           display: flex;
           flex-wrap: wrap;
           align-items: baseline;
           gap: 6px 10px;
           margin: 0 0 4px 0;
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
+          font-family: "Instrument Sans", system-ui, sans-serif;
           font-size: var(--memo-body-size);
           font-weight: 600;
           line-height: 1.35;
-          color: rgba(0,33,71,0.78);
+          color: rgba(0,33,71,0.75);
         }
         .memoReplayBadge{
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: var(--memo-subtitle-size);
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: var(--memo-label-size);
           font-weight: 400;
           letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: rgba(0,33,71,0.42);
+          color: rgba(0,33,71,0.38);
         }
-        .memoReplayBadge--pending{
-          color: rgba(0,33,71,0.32);
-        }
+        .memoReplayBadge--pending{ color: rgba(0,33,71,0.28); }
         .memoReplayWhen{
-          font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size: var(--memo-subtitle-size);
+          font-family: "Space Mono", ui-monospace, monospace;
+          font-size: var(--memo-label-size);
           letter-spacing: 0.08em;
-          color: rgba(0,33,71,0.4);
+          color: rgba(0,33,71,0.36);
           margin: 0 0 6px 0;
         }
         .memoReplayDetail{
-          font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
+          font-family: "Instrument Sans", system-ui, sans-serif;
           font-size: var(--memo-body-size);
           line-height: 1.55;
-          color: rgba(0,33,71,0.62);
+          color: rgba(0,33,71,0.58);
           margin: 0;
         }
 
-        .memoList--afterKey{
-          margin-top: 6px;
-        }
-        .memoStackedVals .memoOverviewVal + .memoOverviewVal{
-          margin-top: 0.5rem;
-        }
-        .memoThesisSection{
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-        }
-        .memoThesisScoresRow{
-          display: grid;
-          width: 100%;
-          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-          align-items: stretch;
-          gap: clamp(13px, 2.2vw, 21px);
-        }
-        .memoThesisScoreTile{
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          min-width: 0;
-          width: 100%;
-          text-align: left;
-          padding: 0;
-          background: transparent;
-          border: none;
-          box-sizing: border-box;
-        }
-        .memoThesisScoreTile .memoScoreName{
-          margin: 0 0 8px 0;
-          width: 100%;
-          padding: 0;
-          box-sizing: border-box;
-          font-size: 12px;
-          font-weight: 400;
-          letter-spacing: 0.03em;
-        }
-        .memoThesisScoreTile .memoScoreValueRow{
-          justify-content: center;
-          width: 100%;
-          flex: 0 0 auto;
-        }
-        .memoThesisScoreTile .memoScoreValue{
-          margin: 0 0 10px 0;
-          opacity: 1;
-          font-size: clamp(1rem, 1.8vw, 1.5rem);
-          font-weight: 700;
-          line-height: 1.05;
-        }
-        .memoThesisScoreTile .memoScoreUnderline{
-          margin-top: auto;
-          align-self: stretch;
-        }
-        .memoThesisLists{
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        .memoThesisListBlock{
-          padding-top: 12px;
-          border-top: none;
-        }
-        .memoThesisListBlock .memoOverviewKey{
-          margin-bottom: 8px;
-          padding-top: 0;
-        }
-        .memoScoreColSpacer{
-          height: 2px;
-          margin-top: 8px;
-        }
-        .memoGeneratingSection{
-          margin-top: 2.25rem;
-        }
+        /* === Generating state === */
+        .memoGeneratingSection{ margin-top: 2.25rem; }
+        .memoSummaryCallout{ background: transparent; padding: 0; margin: 0; border: none; }
         .memoSummaryCallout.memoGenCallout{
           background: var(--color-register-tint);
           padding: 14px 0 16px 0;
-          border: none;
         }
-        .memoGenCallout .memoPipelineKicker{
-          margin-bottom: 8px;
-        }
-        .memoGenCallout .memoGateTitle{
-          margin-top: 0;
-        }
-        .memoGenCallout .memoGateDetail{
-          margin-bottom: 0;
-        }
+        .memoGenCallout .memoPipelineKicker{ margin-bottom: 8px; }
+        .memoGenCallout .memoGateTitle{ margin-top: 0; }
+        .memoGenCallout .memoGateDetail{ margin-bottom: 0; }
+
         @media (max-width: 1100px){
           .memoPanel{ width: 100%; flex-basis: auto; }
-          .memoScoresRow{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .memoDocScorecardRow{ grid-template-columns: repeat(3, minmax(0,1fr)); }
         }
         @media (max-width: 640px){
-          .memoOverviewRow{
-            grid-template-columns: 1fr;
-            row-gap: 6px;
-          }
-          .memoOverviewKey{
-            padding-top: 0;
-          }
+          .memoDocHeader{ flex-direction: column; gap: 10px; }
+          .memoDocHeaderRight{ text-align: left; align-items: flex-start; }
+          .memoDocDLRow{ grid-template-columns: 1fr; row-gap: 5px; }
+          .memoDocDT{ padding-top: 0; }
+          .memoDocReviewerRow{ grid-template-columns: 1fr 1fr; }
+          .memoDocReviewerRowScores{ display: none; }
         }
       `}</style>
 
@@ -986,456 +991,515 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         <div className="memoScroll relative" role="region" aria-label="Investment memo">
           {onClose && (
             <div className="memoHeaderActions">
-              <button type="button" onClick={handleDownloadPDF} className={actionBtnCls}>
-                IC PACK (PDF)
-              </button>
-              <button type="button" onClick={handleDownloadMarkdown} className={actionBtnCls}>
-                IC PACK (MD)
-              </button>
-              <button type="button" onClick={onClose} className={actionBtnCls}>
-                CLOSE
-              </button>
+              <button type="button" onClick={handleDownloadPDF} className={actionBtnCls}>IC Pack (PDF)</button>
+              <button type="button" onClick={handleDownloadMarkdown} className={actionBtnCls}>IC Pack (MD)</button>
+              <button type="button" onClick={onClose} className={actionBtnCls}>Close</button>
             </div>
           )}
+
           {memoPipeline === 'failed' && (
             <div className="memoGateStrip memoGateStrip--error">
-                <motion.div
-                  className="memoGateStripInner"
-                  initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={transitionOrReduced(reduceMotion, {
-                    duration: 0.28,
-                    ease: [0.16, 1, 0.3, 1],
-                  })}
-                  role="alert"
-                >
-                  <p className="memoPipelineKicker">Pipeline</p>
-                  <p className="memoGateTitle">Memo unavailable</p>
-                  <p className="memoGateDetail">{memoGateError}</p>
-                </motion.div>
+              <motion.div
+                className="memoGateStripInner"
+                initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={transitionOrReduced(reduceMotion, { duration: 0.28, ease: [0.16, 1, 0.3, 1] })}
+                role="alert"
+              >
+                <p className="memoPipelineKicker">Pipeline</p>
+                <p className="memoGateTitle">Memo unavailable</p>
+                <p className="memoGateDetail">{memoGateError}</p>
+              </motion.div>
             </div>
           )}
 
           <motion.div
             className="memoBody"
             key={contentKey}
-            initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+            initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={transitionOrReduced(reduceMotion, {
-              duration: 0.28,
-              ease: [0.16, 1, 0.3, 1],
-            })}
+            transition={transitionOrReduced(reduceMotion, { duration: 0.26, ease: [0.16, 1, 0.3, 1] })}
           >
-            {/* Header block */}
-            <h1 id="memo-title" className="memoCompany">
-              {companyName || '—'}
-            </h1>
-            <div className="memoMeta">{sectorCategory}</div>
-            <div className="memoDivider memoHeaderDivider" aria-hidden />
 
-            {/* Investment Judgment block */}
-            {showJudgment && (
-              <section>
-                <p className="memoLabel">INVESTMENT JUDGMENT</p>
-                <p className="memoVerdict">{decisionHeadline}.</p>
-                <div className="memoVerdictMeta">
-                  {showLookupBadge ? (
-                    <span className="memoVerdictMetaTag">LOOKUP</span>
-                  ) : null}
-                  {dossierQualityBand != null ? (
-                    <span className="memoVerdictMetaTag">
-                      {QUALITY_LABELS[dossierQualityBand] ?? dossierQualityBand}
-                    </span>
-                  ) : null}
-                  {displayStartup?.partner?.confidence != null ? (
-                    <span className="memoVerdictMetaTag">
-                      {`${Math.round((displayStartup.partner.confidence) * 100)}% CONFIDENCE`}
-                    </span>
-                  ) : null}
-                  {showEscalationBadge ? (
-                    <span className="memoVerdictMetaTag memoVerdictMetaTag--alert">ESCALATION REQUIRED</span>
-                  ) : null}
-                </div>
-                {reasoningParagraphs.filter((p) => String(p ?? '').trim().length > 0).length > 0 && (
-                  <ul className="memoReasoningList">
-                    {reasoningParagraphs.filter((p) => String(p ?? '').trim().length > 0).map((p, i) => (
-                      <li key={i} className="memoReasoningItem">
-                        <span>{p}</span>
-                      </li>
-                    ))}
-                  </ul>
+            {/* ── Document header ── */}
+            <div className="memoDocHeader">
+              <div className="memoDocHeaderMain">
+                <h1 className="memoCompany" id="memo-title">{companyName || '—'}</h1>
+                {displayStartup.scout.one_line?.trim() && (
+                  <p className="memoDocTagline">{displayStartup.scout.one_line}</p>
                 )}
-              </section>
-            )}
+                <p className="memoMeta">{sectorCategory}</p>
+              </div>
+            </div>
 
-            {/* Partner narrative fields — thesis, market, product */}
-            {showJudgment && (displayStartup?.partner?.thesis || displayStartup?.partner?.why_this_matters || displayStartup?.partner?.market_insight || displayStartup?.partner?.product_edge) && (
-              <section className="memoSection--stackedRows">
-                <p className="memoLabel">PARTNER ANALYSIS</p>
-                {displayStartup.partner?.thesis ? (
-                  <div className="memoOverviewRow">
-                    <p className="memoOverviewKey">THESIS</p>
-                    <p className="memoOverviewVal">{displayStartup.partner.thesis}</p>
-                  </div>
-                ) : null}
-                {displayStartup.partner?.why_this_matters ? (
-                  <div className="memoOverviewRow">
-                    <p className="memoOverviewKey">WHY NOW</p>
-                    <p className="memoOverviewVal">{displayStartup.partner.why_this_matters}</p>
-                  </div>
-                ) : null}
-                {displayStartup.partner?.market_insight ? (
-                  <div className="memoOverviewRow">
-                    <p className="memoOverviewKey">MARKET</p>
-                    <p className="memoOverviewVal">{displayStartup.partner.market_insight}</p>
-                  </div>
-                ) : null}
-                {displayStartup.partner?.product_edge ? (
-                  <div className="memoOverviewRow">
-                    <p className="memoOverviewKey">EDGE</p>
-                    <p className="memoOverviewVal">{displayStartup.partner.product_edge}</p>
-                  </div>
-                ) : null}
-                {displayStartup.partner?.traction_signals ? (
-                  <div className="memoOverviewRow">
-                    <p className="memoOverviewKey">TRACTION</p>
-                    <p className="memoOverviewVal">{displayStartup.partner.traction_signals}</p>
-                  </div>
-                ) : null}
-              </section>
-            )}
+            <div className="memoDocDivider" aria-hidden />
 
-            {displayStartup.review?.overall_summary && (
-                <section>
-                  <p className="memoLabel">SUMMARY</p>
-                  <div className="memoSummaryCallout">
-                    <p className="memoOverviewVal">{displayStartup.review.overall_summary}</p>
-                  </div>
-                </section>
-            )}
-
-            {/* Dimension Scores block */}
-            <section className={showJudgment ? undefined : 'memoLeadSection'}>
-              {showJudgment && <div className="memoDivider" style={{ marginBottom: 'clamp(28px, 4vw, 40px)' }} aria-hidden />}
-              <p className="memoLabel">DIMENSION SCORES</p>
-              <p className="memoScoreLegend">1-3: WEAK · 4-5: CONCERNING · 6-7: PROMISING · 8-10: STRONG</p>
-              <div className="memoScoresRow">
-                {scoreBlocks.map((b, idx) => {
-                  const isSelected = idx === selectedDimensionIdx;
-                  const displayScore = b.score != null ? `${Math.round(b.score)}/10` : '—';
-                  return (
-                    <button
-                      key={b.id}
-                      type="button"
-                      className="memoScoreCol"
-                      onClick={() => setSelectedDimensionIdx(idx)}
-                      aria-pressed={isSelected}
-                    >
-                      <p className="memoScoreName">{b.name}</p>
-                      <div className="memoScoreValueRow">
-                        <p
-                          className="memoScoreValue"
-                          style={{
-                            transition: reduceMotion ? 'opacity 0ms' : 'opacity 180ms ease',
-                          }}
-                        >
-                          {displayScore}
-                        </p>
+            {/* ── Investment Judgment ── */}
+            {showJudgment && (() => {
+              const paras = reasoningParagraphs.filter((p) => String(p ?? '').trim());
+              if (!paras.length) return null;
+              return (
+                <section className="memoDocSection" aria-labelledby="memo-judgment">
+                  <h2 className="memoDocSectionHead" id="memo-judgment">Investment Judgment</h2>
+                  {decisionBadgeVariant && (
+                    <div className="memoDocJudgmentTop">
+                      {showLookupBadge && <span className="memoDocLookupBadge">ON-DEMAND LOOKUP</span>}
+                      <p className={`memoDocRecommendation memoDocRecommendation--${decisionBadgeVariant.toLowerCase()}`}>
+                        {decisionHeadline}.
+                      </p>
+                      <div className="memoDocStatusLine">
+                        {displayStartup.partner?.confidence != null && (
+                          <p className="memoDocConfidence">
+                            {Math.round(displayStartup.partner.confidence * 100)}% confidence
+                          </p>
+                        )}
+                        {showEscalationBadge && (
+                          <p className="memoDocEscalation">Escalation required</p>
+                        )}
                       </div>
-                      {isSelected ? <div className="memoScoreUnderline" /> : <div className="memoScoreColSpacer" aria-hidden />}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {scoreBlocks.length > 0 && (
-                <div className="memoDimensionPanel">
-                  <motion.div
-                    key={`${contentKey}:${selectedDimensionIdx}`}
-                    initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={transitionOrReduced(reduceMotion, {
-                      duration: 0.18,
-                      ease: [0.16, 1, 0.3, 1],
-                    })}
-                  >
-                    <p className="memoDimensionPanelName">
-                      {scoreBlocks[selectedDimensionIdx]?.name ?? '—'}
-                    </p>
-                    <p className="memoDimensionPanelText">
-                      {(() => {
-                        const selected = scoreBlocks[selectedDimensionIdx];
-                        if (!selected) return '—';
-                        const reasoning = selected.reasoning?.trim();
-                        if (reasoning) return reasoning;
-                        if (selected.score != null) return getScoreBand(selected.score).meaning || '—';
-                        return '—';
-                      })()}
-                    </p>
-                  </motion.div>
-                </div>
-              )}
-
-              {scoresSummary ? <div className="memoScoresSummary">{scoresSummary}</div> : null}
-            </section>
-
-            {reviewHasThesisAlignment(displayStartup.review) && (
-              <section>
-                <p className="memoLabel">THESIS ALIGNMENT</p>
-                <div className="memoThesisSection">
-                  {displayStartup.review &&
-                  (displayStartup.review.thesis_alignment_score != null ||
-                    displayStartup.review.thesis_matches_fund != null ||
-                    displayStartup.review.thesis_alignment_confidence != null) ? (
-                    (() => {
-                      const r = displayStartup.review!;
-                      const rawAlign = r.thesis_alignment_score;
-                      const ten =
-                        rawAlign != null ? (rawAlign <= 1 ? rawAlign * 10 : rawAlign) : null;
-                      const fund = r.thesis_matches_fund;
-                      const confRaw = r.thesis_alignment_confidence;
-                      const confPct =
-                        confRaw != null ? `${(confRaw * 100).toFixed(0)}%` : null;
-                      return (
-                        <div className="memoThesisScoresRow">
-                          {ten != null ? (
-                            <div className="memoThesisScoreTile" aria-label="Thesis alignment score">
-                              <p className="memoScoreName">Alignment</p>
-                              <div className="memoScoreValueRow">
-                                <p className="memoScoreValue">{`${ten.toFixed(0)}/10`}</p>
-                              </div>
-                              <div className="memoScoreUnderline" aria-hidden />
-                            </div>
-                          ) : null}
-                          {fund != null ? (
-                            <div
-                              className="memoThesisScoreTile"
-                              aria-label={fund ? 'Aligned with fund mandate' : 'Not aligned with fund mandate'}
-                            >
-                              <p className="memoScoreName">Mandate</p>
-                              <div className="memoScoreValueRow">
-                                <p className="memoScoreValue">{fund ? 'ALIGNED' : 'MISALIGNED'}</p>
-                              </div>
-                              <div className="memoScoreUnderline" aria-hidden />
-                            </div>
-                          ) : null}
-                          {confPct != null ? (
-                            <div className="memoThesisScoreTile" aria-label={`Confidence ${confPct}`}>
-                              <p className="memoScoreName">Confidence</p>
-                              <div className="memoScoreValueRow">
-                                <p className="memoScoreValue">{confPct}</p>
-                              </div>
-                              <div className="memoScoreUnderline" aria-hidden />
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })()
-                  ) : null}
-                  {(displayStartup.review?.thesis_fit_points?.length ?? 0) > 0 ||
-                  (displayStartup.review?.thesis_deviation_points?.length ?? 0) > 0 ? (
-                    <div className="memoThesisLists">
-                      {(displayStartup.review?.thesis_fit_points?.length ?? 0) > 0 ? (
-                        <div className="memoThesisListBlock">
-                          <p className="memoOverviewKey">FITS</p>
-                          <ul className="memoList memoList--afterKey">
-                            {(displayStartup.review?.thesis_fit_points ?? []).map((item, i) => (
-                              <li key={i} className="memoListItem">
-                                <span className="memoBullet" aria-hidden>·</span>
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                      {(displayStartup.review?.thesis_deviation_points?.length ?? 0) > 0 ? (
-                        <div className="memoThesisListBlock">
-                          <p className="memoOverviewKey">GAPS</p>
-                          <ul className="memoList memoList--afterKey">
-                            {(displayStartup.review?.thesis_deviation_points ?? []).map((item, i) => (
-                              <li key={i} className="memoListItem">
-                                <span className="memoBullet" aria-hidden>·</span>
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
                     </div>
-                  ) : null}
-                </div>
-              </section>
-            )}
+                  )}
+                  {paras.map((p, i) => <p key={i} className="memoDocProse">{p}</p>)}
+                </section>
+              );
+            })()}
 
-            {/* Overview block */}
-            <section className="memoSection--stackedRows">
-              <p className="memoLabel">OVERVIEW</p>
-              <div className="memoOverviewRow">
-                <p className="memoOverviewKey">PROBLEM</p>
-                <p className="memoOverviewVal">{displayStartup.scout.problem?.trim() || '—'}</p>
-              </div>
-              <div className="memoOverviewRow">
-                <p className="memoOverviewKey">SOLUTION</p>
-                <p className="memoOverviewVal">{displayStartup.scout.solution?.trim() || '—'}</p>
-              </div>
-              <div className="memoOverviewRow">
-                <p className="memoOverviewKey">TARGET</p>
-                <p className="memoOverviewVal">{displayStartup.scout.target_users?.trim() || '—'}</p>
-              </div>
-              <div className="memoOverviewRow">
-                <p className="memoOverviewKey">WHY NOW</p>
-                <p className="memoOverviewVal">{displayStartup.scout.why_now?.trim() || '—'}</p>
-              </div>
-            </section>
+            {/* ── Executive Summary ── */}
+            {showJudgment && (() => {
+              const summary = displayStartup.review?.overall_summary?.trim();
+              if (!summary) return null;
+              return (
+                <section className="memoDocSection" aria-labelledby="memo-exec-summary">
+                  <h2 className="memoDocSectionHead" id="memo-exec-summary">Executive Summary</h2>
+                  {summary && <p className="memoDocProse">{summary}</p>}
+                </section>
+              );
+            })()}
 
-            {(displayStartup.scout.primary_thesis ||
-              (displayStartup.scout.key_assumptions && displayStartup.scout.key_assumptions.length > 0) ||
-              displayStartup.scout.biggest_unknown) && (
-                <section className="memoSection--stackedRows">
-                  <p className="memoLabel">HYPOTHESIS</p>
-                  {displayStartup.scout.primary_thesis ? (
-                    <div className="memoOverviewRow">
-                      <p className="memoOverviewKey">THESIS</p>
-                      <p className="memoOverviewVal">{displayStartup.scout.primary_thesis}</p>
+
+            {/* ── Company Overview ── */}
+            {(() => {
+              const rows = [
+                { key: 'Problem', val: displayStartup.scout.problem?.trim() },
+                { key: 'Solution', val: displayStartup.scout.solution?.trim() },
+                { key: 'Target Market', val: displayStartup.scout.target_users?.trim() },
+              ].filter((r) => r.val);
+              if (!rows.length) return null;
+              return (
+                <section className="memoDocSection" aria-labelledby="memo-overview">
+                  <h2 className="memoDocSectionHead" id="memo-overview">Company Overview</h2>
+                  <dl className="memoDocDL">
+                    {rows.map((r) => (
+                      <div key={r.key} className="memoDocDLRow">
+                        <dt className="memoDocDT">{r.key}</dt>
+                        <dd className="memoDocDD">{r.val}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              );
+            })()}
+
+            {/* ── The Case ── */}
+            {(() => {
+              const rows = [
+                { key: 'Why Now', val: (displayStartup.partner?.why_this_matters || displayStartup.scout.why_now)?.trim() },
+                { key: 'Market', val: displayStartup.partner?.market_insight?.trim() },
+                { key: 'Product Edge', val: displayStartup.partner?.product_edge?.trim() },
+                { key: 'Traction', val: displayStartup.partner?.traction_signals?.trim() },
+              ].filter((r) => r.val);
+              if (!rows.length) return null;
+              return (
+                <section className="memoDocSection" aria-labelledby="memo-case">
+                  <h2 className="memoDocSectionHead" id="memo-case">The Case</h2>
+                    <dl className="memoDocDL">
+                      {rows.map((r) => (
+                        <div key={r.key} className="memoDocDLRow">
+                          <dt className="memoDocDT">{r.key}</dt>
+                          <dd className="memoDocDD">{r.val}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                </section>
+              );
+            })()}
+
+            {/* ── Investment Thesis ── */}
+            {(() => {
+              const thesis = (displayStartup.partner?.thesis || displayStartup.scout.primary_thesis)?.trim();
+              const assumptions = displayStartup.scout.key_assumptions?.filter((a) => String(a ?? '').trim());
+              const biggest = displayStartup.scout.biggest_unknown?.trim();
+              if (!thesis && !assumptions?.length && !biggest) return null;
+              return (
+                <section className="memoDocSection" aria-labelledby="memo-thesis">
+                  <h2 className="memoDocSectionHead" id="memo-thesis">Investment Thesis</h2>
+                    {thesis && <p className="memoDocProse memoDocThesis">{thesis}</p>}
+                    {assumptions && assumptions.length > 0 && (
+                      <div className="memoDocSubsection">
+                        <p className="memoDocSubhead">Key Assumptions</p>
+                        <ul className="memoList">
+                          {assumptions.map((item, i) => (
+                            <li key={i} className="memoListItem">
+                              <span className="memoBullet" aria-hidden>·</span>
+                              <span>{normalizeListItemText(item)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {biggest && (
+                      <div className="memoDocSubsection">
+                        <p className="memoDocSubhead">Biggest Unknown</p>
+                        <p className="memoDocProse">{biggest}</p>
+                      </div>
+                    )}
+                </section>
+              );
+            })()}
+
+            {/* ── Assessment ── */}
+            {(() => {
+              const isMissing = (s: string) => /^\[MISSING/i.test(String(s ?? '').trim());
+              const teamItems = (displayStartup.review?.team_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
+              const compItems = (displayStartup.review?.competition_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
+              const bizItems = (displayStartup.review?.business_model_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
+              const hasScores = displayStartup.review && scoreBlocks.length > 0;
+              if (!hasScores && !teamItems.length && !compItems.length && !bizItems.length) return null;
+              return (
+                <section className="memoDocSection" aria-labelledby="memo-assessment">
+                  <h2 className="memoDocSectionHead" id="memo-assessment">Assessment</h2>
+
+                    {hasScores && (
+                      <>
+                        <p className="memoDocScoreLegend">1–3 Weak · 4–5 Concerning · 6–7 Promising · 8–10 Strong</p>
+                        <div className="memoDocScorecardRow">
+                          {scoreBlocks.map((b, idx) => {
+                            const isSelected = idx === selectedDimensionIdx;
+                            return (
+                              <button
+                                key={b.id}
+                                type="button"
+                                className="memoDocScoreBtn"
+                                onClick={() => setSelectedDimensionIdx(idx)}
+                                aria-pressed={isSelected}
+                              >
+                                <span className="memoDocScoreDim">{b.name}</span>
+                                <span className="memoDocScoreVal">{b.score != null ? `${b.score}/10` : '—'}</span>
+                                {isSelected ? <div className="memoDocScoreUnderline" /> : <div className="memoDocScoreColSpacer" aria-hidden />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <motion.div
+                          key={`${contentKey}:dim:${selectedDimensionIdx}`}
+                          className="memoDocDimDetail"
+                          initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={transitionOrReduced(reduceMotion, { duration: 0.18, ease: [0.16, 1, 0.3, 1] })}
+                        >
+                          <span className="memoDocDimName">{scoreBlocks[selectedDimensionIdx]?.name}</span>
+                          <span className="memoDocDimText">
+                            {(() => {
+                              const sel = scoreBlocks[selectedDimensionIdx];
+                              if (!sel) return '—';
+                              if (sel.reasoning?.trim()) return sel.reasoning;
+                              if (sel.score != null) return getScoreBand(sel.score).meaning || '—';
+                              return '—';
+                            })()}
+                          </span>
+                        </motion.div>
+                        {scoresSummary && <p className="memoDocScoreNote">{scoresSummary}</p>}
+                      </>
+                    )}
+
+                    {teamItems.length > 0 && (
+                      <div className="memoDocSubsection">
+                        <p className="memoDocSubhead">Team</p>
+                        <ul className="memoList">
+                          {teamItems.map((item, i) => (
+                            <li key={i} className="memoListItem">
+                              <span className="memoBullet" aria-hidden>·</span>
+                              <span>{normalizeListItemText(item)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {compItems.length > 0 && (
+                      <div className="memoDocSubsection">
+                        <p className="memoDocSubhead">Competitive Landscape</p>
+                        <ul className="memoList">
+                          {compItems.map((item, i) => (
+                            <li key={i} className="memoListItem">
+                              <span className="memoBullet" aria-hidden>·</span>
+                              <span>{normalizeListItemText(item)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {bizItems.length > 0 && (
+                      <div className="memoDocSubsection">
+                        <p className="memoDocSubhead">Business Model</p>
+                        <ul className="memoList">
+                          {bizItems.map((item, i) => (
+                            <li key={i} className="memoListItem">
+                              <span className="memoBullet" aria-hidden>·</span>
+                              <span>{normalizeListItemText(item)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                </section>
+              );
+            })()}
+
+            {/* ── Thesis Alignment ── */}
+            {reviewHasThesisAlignment(displayStartup.review) && (() => {
+              const r = displayStartup.review!;
+              const rawAlign = r.thesis_alignment_score;
+              const ten = rawAlign != null ? (rawAlign <= 1 ? rawAlign * 10 : rawAlign) : null;
+              const fund = r.thesis_matches_fund;
+              const confRaw = r.thesis_alignment_confidence;
+              const confPct = confRaw != null ? `${(confRaw * 100).toFixed(0)}%` : null;
+              const tiles = [
+                ten != null ? { label: 'Alignment', val: `${ten.toFixed(0)}/10` } : null,
+                fund != null ? { label: 'Mandate', val: fund ? 'Aligned' : 'Misaligned' } : null,
+                confPct != null ? { label: 'Confidence', val: confPct } : null,
+              ].filter(Boolean) as { label: string; val: string }[];
+              const fitPoints = r.thesis_fit_points ?? [];
+              const gapPoints = r.thesis_deviation_points ?? [];
+              return (
+                <section className="memoDocSection" aria-labelledby="memo-align">
+                  <h2 className="memoDocSectionHead" id="memo-align">Thesis Alignment</h2>
+                    {tiles.length > 0 && (
+                      <div className="memoDocAlignTiles">
+                        {tiles.map((t) => (
+                          <div key={t.label} className="memoDocAlignTile">
+                            <p className="memoDocAlignTileLabel">{t.label}</p>
+                            <p className="memoDocAlignTileVal">{t.val}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {(fitPoints.length > 0 || gapPoints.length > 0) && (
+                      <dl className="memoDocDL">
+                        {fitPoints.length > 0 && (
+                          <div className="memoDocDLRow">
+                            <dt className="memoDocDT">Fits</dt>
+                            <dd className="memoDocDD">
+                              <ul className="memoList">
+                                {fitPoints.map((item, i) => (
+                                  <li key={i} className="memoListItem">
+                                    <span className="memoBullet" aria-hidden>·</span>
+                                    <span>{normalizeListItemText(item)}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </dd>
+                          </div>
+                        )}
+                        {gapPoints.length > 0 && (
+                          <div className="memoDocDLRow">
+                            <dt className="memoDocDT">Gaps</dt>
+                            <dd className="memoDocDD">
+                              <ul className="memoList">
+                                {gapPoints.map((item, i) => (
+                                  <li key={i} className="memoListItem">
+                                    <span className="memoBullet" aria-hidden>·</span>
+                                    <span>{normalizeListItemText(item)}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </dd>
+                          </div>
+                        )}
+                      </dl>
+                    )}
+                </section>
+              );
+            })()}
+
+            {/* ── Reviewer Panel ── */}
+            {(displayStartup.review?.reviews?.length ?? 0) > 0 && (() => {
+              const reviews = displayStartup.review!.reviews!;
+              const isContested = displayStartup.review?.reviewer_disagreement === true;
+              const selected = reviews[selectedReviewerIdx] ?? reviews[0];
+              return (
+                <section className="memoDocSection" aria-labelledby="memo-reviewers">
+                    <h2 className="memoDocSectionHead" id="memo-reviewers">
+                      Reviewer Panel
+                      {isContested && (
+                        <span className="memoDocContestedKicker">Contested</span>
+                      )}
+                    </h2>
+                    <div className="memoDocReviewerTable" role="table" aria-label="Per-reviewer scores and verdicts">
+                      {reviews.map((rv, idx) => {
+                        const isSelected = idx === selectedReviewerIdx;
+                        const scoreRow = `Mkt ${rv.market_score}  ·  Prd ${rv.product_score}  ·  Tch ${rv.technical_score}  ·  Exc ${rv.execution_score}  ·  Def ${rv.defensibility_score}`;
+                        return (
+                          <button
+                            key={rv.reviewer_type}
+                            type="button"
+                            className="memoDocReviewerRow"
+                            aria-pressed={isSelected}
+                            onClick={() => setSelectedReviewerIdx(idx)}
+                          >
+                            <span className="memoDocReviewerRowLabel">
+                              {REVIEWER_LABELS[rv.reviewer_type] ?? rv.reviewer_type}
+                            </span>
+                            <span className="memoDocReviewerRowVerdict">{rv.verdict}</span>
+                            <span className="memoDocReviewerRowScores">{scoreRow}</span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  ) : null}
-                  {displayStartup.scout.key_assumptions && displayStartup.scout.key_assumptions.length > 0 ? (
-                    <div className="memoOverviewRow">
-                      <p className="memoOverviewKey">ASSUMPTIONS</p>
-                      <ul className="memoList memoList--afterKey">
-                        {displayStartup.scout.key_assumptions.map((item, i) => (
+                    {selected?.overall_summary && (
+                      <motion.div
+                        key={`${contentKey}:reviewer:${selectedReviewerIdx}`}
+                        className="memoDocReviewerDetail"
+                        initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={transitionOrReduced(reduceMotion, { duration: 0.18, ease: [0.16, 1, 0.3, 1] })}
+                      >
+                        <p className="memoDocReviewerDetailText">{selected.overall_summary}</p>
+                      </motion.div>
+                    )}
+                </section>
+              );
+            })()}
+
+            {/* ── Risk Factors ── */}
+            {(() => {
+              const combined = [
+                ...(displayStartup.review?.diligence_red_flags ?? []),
+                ...(displayStartup.review?.key_risks ?? []),
+                ...(displayStartup.partner?.risks ?? []),
+              ].map((r) => String(r ?? '').trim()).filter(Boolean);
+              const seen = new Set<string>();
+              const uniqueRisks = combined.filter((r) => {
+                if (seen.has(r)) return false;
+                seen.add(r);
+                return true;
+              });
+              const mitigation = (displayStartup.review?.risk_mitigation ?? []).filter((s) => String(s ?? '').trim());
+              if (!uniqueRisks.length && !mitigation.length) return null;
+              return (
+                <section className="memoDocSection" aria-labelledby="memo-risks">
+                  <h2 className="memoDocSectionHead" id="memo-risks">Risk Factors</h2>
+                    {uniqueRisks.length > 0 && (
+                      <ul className="memoList">
+                        {uniqueRisks.map((r, i) => (
                           <li key={i} className="memoListItem">
-                            <span className="memoBullet" aria-hidden>·</span>
-                            <span>{item}</span>
+                            <span className="memoBullet">·</span>
+                            <span>{normalizeListItemText(r)}</span>
                           </li>
                         ))}
                       </ul>
-                    </div>
-                  ) : null}
-                  {displayStartup.scout.biggest_unknown ? (
-                    <div className="memoOverviewRow">
-                      <p className="memoOverviewKey">BIGGEST UNKNOWN</p>
-                      <p className="memoOverviewVal">{displayStartup.scout.biggest_unknown}</p>
-                    </div>
-                  ) : null}
+                    )}
+                    {mitigation.length > 0 && (
+                      <div className="memoDocSubsection">
+                        <p className="memoDocSubhead">Mitigation Checklist</p>
+                        <ul className="memoList">
+                          {mitigation.map((item, i) => (
+                            <li key={i} className="memoListItem">
+                              <span className="memoBullet">·</span>
+                              <span>{normalizeListItemText(item)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                 </section>
-            )}
+              );
+            })()}
 
-            {(displayStartup.review?.diligence_red_flags?.length || displayStartup.review?.key_risks?.length) && (
-                <section>
-                  <p className="memoLabel">RED FLAGS</p>
-                  <ul className="memoList">
-                    {[...(displayStartup.review?.diligence_red_flags ?? []), ...(displayStartup.review?.key_risks ?? [])]
-                      .map((r) => String(r ?? '').trim())
-                      .filter(Boolean)
-                      .map((r, i) => (
-                        <li key={i} className="memoListItem">
-                          <span className="memoBullet">·</span>
-                          <span>{r}</span>
-                        </li>
-                      ))}
-                  </ul>
-                </section>
-            )}
-
-            {nextStepText ? (
-                <section>
-                  <p className="memoLabel">NEXT STEP</p>
+            {/* ── Next Steps ── */}
+            {nextStepText && (
+              <section className="memoDocSection" aria-labelledby="memo-next">
+                <h2 className="memoDocSectionHead" id="memo-next">Next Steps</h2>
                   {nextStepItems.length > 0 ? (
                     <ul className="memoList">
                       {nextStepItems.map((item, idx) => (
                         <li key={idx} className="memoListItem">
                           <span className="memoBullet">{idx + 1}.</span>
-                          <span>{item}</span>
+                          <span>{normalizeListItemText(item)}</span>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="memoOverviewVal">{nextStepText}</p>
+                    <p className="memoDocProse">{nextStepText}</p>
                   )}
-                </section>
-            ) : null}
-
-            {/* Partner risks */}
-            {showJudgment && (displayStartup?.partner?.risks?.length ?? 0) > 0 && (
-              <section>
-                <p className="memoLabel">KEY RISKS</p>
-                <ul className="memoList">
-                  {(displayStartup.partner!.risks ?? []).map((r, i) => (
-                    <li key={i} className="memoListItem">
-                      <span className="memoBullet">·</span>
-                      <span>{r}</span>
-                    </li>
-                  ))}
-                </ul>
               </section>
             )}
 
-            {displayStartup.partner?.llm_fallback_reason ? (
-                <section>
-                  <p className="memoLabel">DECISION CONTEXT</p>
-                  <div className="memoOverviewRow">
-                    <p className="memoOverviewKey">LLM TRIGGER</p>
-                    <p className="memoOverviewVal">{displayStartup.partner.llm_fallback_reason}</p>
+            {/* ── Decision Context (LLM trigger) ── */}
+            {displayStartup.partner?.llm_fallback_reason && (
+              <div className="memoDocSection">
+                <dl className="memoDocDL">
+                  <div className="memoDocDLRow">
+                    <dt className="memoDocDT">Decision context</dt>
+                    <dd className="memoDocDD">{displayStartup.partner.llm_fallback_reason}</dd>
                   </div>
-                </section>
-            ) : null}
-
-            {displayStartup.scout.references && displayStartup.scout.references.length > 0 && (
-                <section>
-                  <button
-                    type="button"
-                    className="memoSourcesToggle"
-                    onClick={() => setSourcesOpen((v) => !v)}
-                    aria-expanded={sourcesOpen}
-                  >
-                    <span>SOURCES</span>
-                    <span className="memoSourcesPlus">{sourcesOpen ? '−' : '+'}</span>
-                  </button>
-                  <motion.div
-                    initial={false}
-                    animate={
-                      reduceMotion
-                        ? { height: sourcesOpen ? 'auto' : 0, opacity: sourcesOpen ? 1 : 0 }
-                        : sourcesOpen
-                          ? { height: 'auto', opacity: 1 }
-                          : { height: 0, opacity: 0 }
-                    }
-                    transition={transitionOrReduced(reduceMotion, {
-                      duration: 0.2,
-                      ease: [0.16, 1, 0.3, 1],
-                    })}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <div className="memoSourcesBody">
-                      <ul className="memoList">
-                        {displayStartup.scout.references
-                          .map((r) => String(r ?? '').trim())
-                          .filter(Boolean)
-                          .map((ref, i) => {
-                            const href = memoReferenceHref(ref);
-                            const label = memoReferenceLabel(ref);
-                            return (
-                              <li key={i} className="memoListItem">
-                                <span className="memoBullet">·</span>
-                                {href ? (
-                                  <a className="memoLink" href={href} target="_blank" rel="noreferrer">
-                                    {label}
-                                  </a>
-                                ) : (
-                                  <span className="memoOverviewVal">{label}</span>
-                                )}
-                              </li>
-                            );
-                          })}
-                      </ul>
-                    </div>
-                  </motion.div>
-                </section>
+                </dl>
+              </div>
             )}
 
+            {/* ── Sources ── */}
+            {(displayStartup.scout.references?.length ?? 0) > 0 && (
+              <section style={{ marginTop: 'clamp(24px, 3.5vw, 36px)' }}>
+                <button
+                  type="button"
+                  className="memoSourcesToggle"
+                  onClick={() => setSourcesOpen((v) => !v)}
+                  aria-expanded={sourcesOpen}
+                >
+                  <span>Sources</span>
+                  <span className="memoSourcesPlus">{sourcesOpen ? '−' : '+'}</span>
+                </button>
+                <motion.div
+                  initial={false}
+                  animate={
+                    reduceMotion
+                      ? { height: sourcesOpen ? 'auto' : 0, opacity: sourcesOpen ? 1 : 0 }
+                      : sourcesOpen ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }
+                  }
+                  transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.16, 1, 0.3, 1] })}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <div className="memoSourcesBody">
+                    <ul className="memoList">
+                      {(displayStartup.scout.references ?? [])
+                        .map((r) => String(r ?? '').trim())
+                        .filter(Boolean)
+                        .map((ref, i) => {
+                          const href = memoReferenceHref(ref);
+                          const label = memoReferenceLabel(ref);
+                          return (
+                            <li key={i} className="memoListItem">
+                              <span className="memoBullet">·</span>
+                              {href ? (
+                                <a className="memoLink" href={href} target="_blank" rel="noreferrer">{label}</a>
+                              ) : (
+                                <span>{label}</span>
+                              )}
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  </div>
+                </motion.div>
+              </section>
+            )}
+
+            {/* ── Run Log ── */}
             {pipelineReplaySteps.length > 0 && (
-              <section className="memoPipelineSection" aria-label="Run log">
+              <section
+                className="memoPipelineSection"
+                aria-label="Run log"
+                style={{ marginTop: 'clamp(18px, 2.5vw, 28px)' }}
+              >
                 <button
                   type="button"
                   className="memoPipelineToggle"
@@ -1455,14 +1519,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   animate={
                     reduceMotion
                       ? { height: pipelineLogOpen ? 'auto' : 0, opacity: pipelineLogOpen ? 1 : 0 }
-                      : pipelineLogOpen
-                        ? { height: 'auto', opacity: 1 }
-                        : { height: 0, opacity: 0 }
+                      : pipelineLogOpen ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }
                   }
-                  transition={transitionOrReduced(reduceMotion, {
-                    duration: 0.2,
-                    ease: [0.16, 1, 0.3, 1],
-                  })}
+                  transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.16, 1, 0.3, 1] })}
                   style={{ overflow: 'hidden' }}
                 >
                   <ol className="memoReplayList">
@@ -1483,6 +1542,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </section>
             )}
 
+            {/* ── Generating state ── */}
             {memoPipeline === 'generating' && (
               <section className="memoGeneratingSection" aria-live="polite">
                 <div className="memoSummaryCallout memoGenCallout">
@@ -1490,9 +1550,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <motion.p
                     className="memoGateTitle"
                     animate={reduceMotion ? { opacity: 1 } : { opacity: [0.55, 1, 0.55] }}
-                    transition={
-                      reduceMotion ? { duration: 0 } : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }
-                    }
+                    transition={reduceMotion ? { duration: 0 } : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
                   >
                     Generating full investment memo…
                   </motion.p>
@@ -1502,6 +1560,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </div>
               </section>
             )}
+
           </motion.div>
         </div>
       )}
