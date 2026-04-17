@@ -18,7 +18,7 @@
  *
  * Partner decision (recommended / recorded action):
  *   • `partner` null: partner has not run → no `decision`.
- *   • `partner.decision`: 'YES' | 'NO' | 'MAYBE' | 'PASS' | 'WATCH' (PASS/WATCH
+ *   • `partner.recommendation`: 'INVEST' | 'PASS' | 'MONITOR'
  *     are legacy; frontend maps PASS→Pass, WATCH with decision→Hold via badge).
  *   • `partner.human_review_required`: boolean — escalation / needs human eyes;
  *     orthogonal to verdict quality.
@@ -100,10 +100,10 @@ function sortKey(s: Startup): string {
 
 function getDecisionFilterValue(s: Startup): Exclude<DecisionFilter, 'ALL'> {
   if (s.partner?.human_review_required) return 'ESCALATION';
-  const decision = s.partner?.decision;
-  if (decision === 'YES') return 'YES';
-  if (decision === 'NO' || decision === 'PASS') return 'NO';
-  if (decision === 'MAYBE' || decision === 'WATCH') return 'MAYBE';
+  const rec = s.partner?.recommendation;
+  if (rec === 'INVEST') return 'YES';
+  if (rec === 'PASS') return 'NO';
+  if (rec === 'MONITOR') return 'MAYBE';
   if (s.review) return 'UNDECIDED';
   return 'AWAITING_REVIEW';
 }
@@ -149,28 +149,28 @@ const FUNDING_STAGE_BADGE_CLASS: Record<FundingStageTier, string> = {
   'series-c-plus': 'text-oxford border-oxford/60',
 };
 
-function getDecisionBadgeVariant(s: Startup): 'YES' | 'NO' | 'MAYBE' | 'awaiting' | 'undecided' | 'escalation' {
+function getDecisionBadgeVariant(s: Startup): 'INVEST' | 'PASS' | 'MONITOR' | 'awaiting' | 'undecided' | 'escalation' {
   if (s.partner != null && s.partner.human_review_required === true) return 'escalation';
-  const d = s.partner?.decision;
-  if (!d) return s.review ? 'undecided' : 'awaiting';
-  if (d === 'YES') return 'YES';
-  if (d === 'NO' || d === 'PASS') return 'NO';
-  return 'MAYBE';
+  const rec = s.partner?.recommendation;
+  if (!rec) return s.review ? 'undecided' : 'awaiting';
+  if (rec === 'INVEST') return 'INVEST';
+  if (rec === 'PASS') return 'PASS';
+  return 'MONITOR';
 }
 
-/** Partner economic decision only (YES/NO/MAYBE variants), or null if no partner decision recorded. */
-function getPartnerEconomicBadgeVariant(s: Startup): 'YES' | 'NO' | 'MAYBE' | null {
-  const d = s.partner?.decision;
-  if (d == null) return null;
-  if (d === 'YES') return 'YES';
-  if (d === 'NO' || d === 'PASS') return 'NO';
-  return 'MAYBE';
+/** Partner economic decision only (INVEST/PASS/MONITOR variants), or null if no partner decision recorded. */
+function getPartnerEconomicBadgeVariant(s: Startup): 'INVEST' | 'PASS' | 'MONITOR' | null {
+  const rec = s.partner?.recommendation;
+  if (rec == null) return null;
+  if (rec === 'INVEST') return 'INVEST';
+  if (rec === 'PASS') return 'PASS';
+  return 'MONITOR';
 }
 
 type DecisionBadgeKind = ReturnType<typeof getDecisionBadgeVariant>;
 
-function isPartnerEconomicDecisionBadge(v: DecisionBadgeKind): v is 'YES' | 'NO' | 'MAYBE' {
-  return v === 'YES' || v === 'NO' || v === 'MAYBE';
+function isPartnerEconomicDecisionBadge(v: DecisionBadgeKind): v is 'INVEST' | 'PASS' | 'MONITOR' {
+  return v === 'INVEST' || v === 'PASS' || v === 'MONITOR';
 }
 
 /** Awaiting review, awaiting decision, or human review — shown below economic/verdict badges. */

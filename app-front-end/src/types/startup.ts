@@ -83,26 +83,28 @@ export interface Review {
   fund_thesis_alignment_score?: number | null;
 }
 
+export interface PartnerSnapshot {
+  one_liner: string;
+  stage?: string | null;
+  key_signal?: string | null;
+}
+
 export interface Partner {
-  decision: 'YES' | 'NO' | 'MAYBE' | 'PASS' | 'WATCH';
-  confidence?: number;
-  rationale?: string;
+  recommendation: 'INVEST' | 'PASS' | 'MONITOR';
+  confidence?: number;            // 0.0–1.0
+  thesis?: string;
+  why_this_matters?: string;
+  snapshot?: PartnerSnapshot;
+  market_insight?: string;
+  product_edge?: string;
+  traction_signals?: string | null;
+  risks?: string[];
+  decision_rationale?: string;
   next_action?: string;
   next_step?: string;
   human_review_required?: boolean;
   /** When PartnerDecisionEngine fell back to LLM. */
   llm_fallback_reason?: string | null;
-  /** Frozen memo snapshot taken at the time of decision, when available. */
-  memo_at_decision?: string | null;
-  /**
-   * Snapshot of portfolio composition at decision time, used to explain
-   * diversification / concentration trade-offs in memos.
-   */
-  portfolio_context_at_decision?: {
-    sector_counts: Record<string, number>;
-    stage_counts: Record<string, number>;
-    total_portfolio_size: number;
-  } | null;
   /** Hash of the Partner agent prompt used when issuing this decision. */
   prompt_version?: string | null;
 }

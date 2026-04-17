@@ -770,7 +770,7 @@ export default function SettingsPage() {
                           checked={settings.agent_config.partners_enabled}
                           onChange={(v) => setAgent('partners_enabled', v)}
                           label="Partners"
-                          hint="Automated decision engine — YES / MAYBE / NO with written rationale"
+                          hint="Automated decision engine — INVEST / MONITOR / PASS with written rationale"
                         />
                       </div>
                     </section>

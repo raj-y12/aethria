@@ -540,15 +540,26 @@ def _backend_to_frontend(raw: dict) -> dict:
         out["review"] = None
 
     if partner:
+        # Backward compat: old schema used 'decision' (YES/NO/MAYBE), new uses 'recommendation' (INVEST/PASS/MONITOR)
+        _rec_compat = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}
+        raw_rec = partner.get("recommendation") or _rec_compat.get(partner.get("decision") or "", None)
+        raw_conf = partner.get("confidence")
+        if raw_conf is None and partner.get("conviction_level") is not None:
+            raw_conf = (partner["conviction_level"] or 0) / 10.0
         out["partner"] = {
-            "decision": partner.get("decision", "NO"),
-            "confidence": partner.get("conviction_level"),
-            "rationale": partner.get("rationale"),
+            "recommendation": raw_rec,
+            "confidence": raw_conf,
+            "decision_rationale": partner.get("decision_rationale") or partner.get("rationale"),
+            "thesis": partner.get("thesis"),
+            "why_this_matters": partner.get("why_this_matters"),
+            "snapshot": partner.get("snapshot"),
+            "market_insight": partner.get("market_insight"),
+            "product_edge": partner.get("product_edge"),
+            "traction_signals": partner.get("traction_signals"),
+            "risks": partner.get("risks"),
             "next_action": partner.get("next_action"),
             "human_review_required": partner.get("human_review_required", False),
             "llm_fallback_reason": partner.get("llm_fallback_reason"),
-            "memo_at_decision": partner.get("memo_at_decision"),
-            "portfolio_context_at_decision": partner.get("portfolio_context_at_decision"),
             "prompt_version": partner.get("prompt_version"),
         }
     else:
@@ -613,10 +624,18 @@ def _list_projection_to_frontend(row: Dict[str, Any]) -> Dict[str, Any]:
         }
     else:
         out["review"] = None
-    if row.get("partner_decision"):
+    _rec_compat = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}
+    # partner_info JSON has 'recommendation' (new schema); partner_decision column has YES/NO/MAYBE (legacy)
+    pi = row.get("partner_info") or {}
+    raw_rec = (pi.get("recommendation") if isinstance(pi, dict) else None) or (
+        _rec_compat.get(row.get("partner_decision") or "", None)
+    )
+    if raw_rec:
         out["partner"] = {
-            "decision": row.get("partner_decision"),
-            "human_review_required": bool(row.get("partner_human_review_required")),
+            "recommendation": raw_rec,
+            "human_review_required": bool(row.get("partner_human_review_required") or (
+                pi.get("human_review_required", False) if isinstance(pi, dict) else False
+            )),
         }
     else:
         out["partner"] = None
@@ -657,7 +676,7 @@ def _thin_list_from_full_frontend(obj: Dict[str, Any]) -> Dict[str, Any]:
     thin_part: Optional[Dict[str, Any]] = None
     if part:
         thin_part = {
-            "decision": part.get("decision"),
+            "recommendation": part.get("recommendation"),
             "human_review_required": part.get("human_review_required", False),
         }
     return {**obj, "scout": scout, "review": thin_rev, "partner": thin_part}
@@ -768,10 +787,21 @@ def get_startup_memo(request: Request, startup_id: str):
                 "error": None,
             }
 
+        # Partner decision exists or pipeline explicitly marked ready → no markdown needed
+        if state_status == "ready" or startup.partner_info is not None:
+            partial = _memo_partial_payload(startup)
+            return {
+                "status": "ready",
+                "memo": None,
+                "partial": partial,
+                "pipeline_run_id": pr_str,
+                "error": None,
+            }
+
         return {
             "status": "generating",
             "memo": None,
-            "partial": None,
+            "partial": _memo_partial_payload(startup) if startup.scout_info else None,
             "pipeline_run_id": pr_str,
             "error": None,
         }

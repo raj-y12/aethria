@@ -1,77 +1,92 @@
 """
 Strict output schema for Partner decisions.
-All Partners must emit JSON matching this structure exactly.
-Validates against versioned partner rules policy (resources/config via policy_resolver).
+All Partner outputs must emit JSON matching this structure exactly.
 """
-from typing import TypedDict, Literal, List
+from typing import TypedDict, Literal, List, Optional, Dict, Any
+
+
+class PartnerSnapshot(TypedDict, total=False):
+    one_liner: str
+    stage: Optional[str]
+    key_signal: Optional[str]
 
 
 class PartnerOutput(TypedDict, total=False):
-    """
-    Strict schema for Partner investment decisions (legacy - use PartnerInfo from models.py).
-    Supports assumption_risks for hypothesis-aware decisions.
-    """
-    decision: Literal["YES", "NO", "MAYBE"]
-    confidence: int  # 1-10 (legacy - maps to conviction_level)
-    conviction_level: int  # 1-10 (canonical)
-    rationale: str
+    """Strict schema for Partner investment decisions."""
+    thesis: str
+    why_this_matters: str
+    snapshot: PartnerSnapshot
+    market_insight: str
+    product_edge: str
+    traction_signals: Optional[str]
+    risks: List[str]
+    recommendation: Literal["INVEST", "PASS", "MONITOR"]
+    decision_rationale: str
+    confidence: float  # 0.0–1.0
     next_action: str
     human_review_required: bool
-    partner_agent_id: str  # Optional: Agent identifier for performance tracking
-    assumption_risks: List[str]  # Critical unknowns or assumption concerns from Reviewer assumption_feedback / hypothesis
+    # Metadata — set by engine, not validated here
+    partner_agent_id: Optional[str]
+    llm_fallback_reason: Optional[str]
+    prompt_version: Optional[str]
 
 
-# Canonical decisions per partner policy JSON (active.json version pointer)
-VALID_DECISIONS = ["YES", "NO", "MAYBE"]
+VALID_RECOMMENDATIONS = ["INVEST", "PASS", "MONITOR"]
 
 
 def validate_partner_output(data: dict) -> PartnerOutput:
     """
-    Validate that a dictionary matches the PartnerOutput schema.
-    Ensures decision is YES/NO/MAYBE.
-    conviction_level (or confidence) must be 1-10.
-    assumption_risks defaults to [] if missing.
+    Validate that a dict matches the PartnerOutput schema.
     Raises ValueError if validation fails.
     """
-    required_fields = {
-        "decision": str,
-        "rationale": str,
-        "next_action": str,
-        "human_review_required": bool,
-    }
-
-    for field, field_type in required_fields.items():
+    required_str_fields = ["thesis", "why_this_matters", "market_insight", "product_edge",
+                           "recommendation", "decision_rationale", "next_action"]
+    for field in required_str_fields:
         if field not in data:
             raise ValueError(f"Missing required field: {field}")
-        if not isinstance(data[field], field_type):
-            raise ValueError(
-                f"Field '{field}' must be of type {field_type.__name__}, "
-                f"got {type(data[field]).__name__}"
-            )
-    if not data["rationale"].strip():
-        raise ValueError("rationale must be a non-empty string")
-    if not data["next_action"].strip():
-        raise ValueError("next_action must be a non-empty string")
+        if not isinstance(data[field], str):
+            raise ValueError(f"Field '{field}' must be a string, got {type(data[field]).__name__}")
 
-    if data["decision"] not in VALID_DECISIONS:
+    for field in ["thesis", "why_this_matters", "market_insight", "product_edge",
+                  "decision_rationale", "next_action"]:
+        if not data[field].strip():
+            raise ValueError(f"Field '{field}' must be non-empty")
+
+    if data["recommendation"] not in VALID_RECOMMENDATIONS:
         raise ValueError(
-            f"decision must be one of {VALID_DECISIONS}, got {data['decision']}"
+            f"recommendation must be one of {VALID_RECOMMENDATIONS}, got {data['recommendation']!r}"
         )
 
-    conviction = data.get("conviction_level") or data.get("confidence")
-    if conviction is None:
-        raise ValueError("Either conviction_level or confidence must be present")
-    if not isinstance(conviction, int) or not (1 <= conviction <= 10):
-        raise ValueError(f"conviction_level/confidence must be between 1 and 10, got {conviction}")
+    if "confidence" not in data:
+        raise ValueError("Missing required field: confidence")
+    try:
+        conf = float(data["confidence"])
+    except (TypeError, ValueError):
+        raise ValueError(f"confidence must be a number, got {data['confidence']!r}")
+    if not (0.0 <= conf <= 1.0):
+        raise ValueError(f"confidence must be between 0.0 and 1.0, got {conf}")
 
-    if "assumption_risks" in data:
-        ar = data["assumption_risks"]
-        if not isinstance(ar, list):
-            raise ValueError("assumption_risks must be a list")
-        for item in ar:
-            if not isinstance(item, str):
-                raise ValueError("All items in assumption_risks must be strings")
-    else:
-        data = {**data, "assumption_risks": []}
+    if "snapshot" not in data:
+        raise ValueError("Missing required field: snapshot")
+    snap = data["snapshot"]
+    if not isinstance(snap, dict):
+        raise ValueError(f"snapshot must be a dict, got {type(snap).__name__}")
+    if "one_liner" not in snap or not isinstance(snap["one_liner"], str):
+        raise ValueError("snapshot.one_liner must be a string")
 
-    return PartnerOutput(**data)
+    if "risks" not in data:
+        raise ValueError("Missing required field: risks")
+    if not isinstance(data["risks"], list):
+        raise ValueError(f"risks must be a list, got {type(data['risks']).__name__}")
+    for item in data["risks"]:
+        if not isinstance(item, str):
+            raise ValueError("All items in risks must be strings")
+
+    if "human_review_required" not in data:
+        raise ValueError("Missing required field: human_review_required")
+    if not isinstance(data["human_review_required"], bool):
+        raise ValueError(
+            f"human_review_required must be bool, got {type(data['human_review_required']).__name__}"
+        )
+
+    return PartnerOutput(**{k: v for k, v in data.items() if k in PartnerOutput.__annotations__})

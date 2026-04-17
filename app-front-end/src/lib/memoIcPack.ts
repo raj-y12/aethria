@@ -105,11 +105,11 @@ function parseNextStepItems(raw: string): string[] {
 function buildJudgmentLines(startup: Startup): string[] {
   if (!startup.partner) return [];
   const p = startup.partner;
-  const decisionLabel = DECISION_LABELS[p.decision] ?? p.decision;
+  const decisionLabel = DECISION_LABELS[p.recommendation] ?? p.recommendation;
   const band = getReviewerQualityBand(startup.review);
   const dossier =
     band != null ? ` Dossier read: ${band} (${QUALITY_LABELS[band] ?? band}).` : '';
-  const rationale = (p.rationale ?? '').trim();
+  const rationale = (p.decision_rationale ?? '').trim();
   const head = `${decisionLabel}.${dossier}`.replace(/\.\s*\./g, '.').trim();
   const combined = rationale ? `${head} ${rationale}` : head;
   return judgmentToParagraphs(combined);
@@ -153,9 +153,9 @@ export function getPipelineReplaySteps(startup: Startup): PipelineReplayStep[] {
       label: 'Partner',
       atIso: startup.timestamps?.partnered_at,
       atDisplay: fmtDate(startup.timestamps?.partnered_at),
-      detail: startup.partner?.decision
+      detail: startup.partner?.recommendation
         ? [
-            DECISION_LABELS[startup.partner.decision] ?? startup.partner.decision,
+            DECISION_LABELS[startup.partner.recommendation] ?? startup.partner.recommendation,
             shortPrompt(startup.partner.prompt_version)
               ? `Prompt ${shortPrompt(startup.partner.prompt_version)}`
               : '',
@@ -163,7 +163,7 @@ export function getPipelineReplaySteps(startup: Startup): PipelineReplayStep[] {
             .filter(Boolean)
             .join(' · ')
         : 'Pending',
-      done: !!startup.partner?.decision,
+      done: !!startup.partner?.recommendation,
     },
   ];
 
@@ -303,12 +303,12 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
     const nextRaw = getNextStepText(startup);
     const nextItems = parseNextStepItems(nextRaw);
     const rec: string[] = [
-      `Recommendation: ${DECISION_LABELS[p.decision] ?? p.decision} (${p.decision})`,
+      `Recommendation: ${DECISION_LABELS[p.recommendation] ?? p.recommendation} (${p.recommendation})`,
     ];
     if (startup.review?.verdict) rec.push(`Reviewer quality band: ${startup.review.verdict}`);
-    if (p.confidence != null) rec.push(`Partner conviction (0–10): ${p.confidence}`);
+    if (p.confidence != null) rec.push(`Partner confidence: ${Math.round(p.confidence * 100)}%`);
     if (p.human_review_required) rec.push('Flag: Human review was required before resolution.');
-    if (p.rationale?.trim()) rec.push(`Rationale: ${p.rationale.trim()}`);
+    if (p.decision_rationale?.trim()) rec.push(`Rationale: ${p.decision_rationale.trim()}`);
     if (nextItems.length) {
       nextItems.forEach((item, idx) => rec.push(`Next step ${idx + 1}: ${item}`));
     } else if (nextRaw) rec.push(`Next step: ${nextRaw}`);

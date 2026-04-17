@@ -85,16 +85,16 @@ function normalizeParagraphs(value: unknown): string[] {
   return [];
 }
 
-/** Partner economic headline: ADVANCE / PASS / HOLD (display-only; stored codes unchanged). */
+/** Partner economic headline: INVEST / PASS / MONITOR. */
 function partnerDecisionHeadline(startup: Startup): string {
-  const d = startup.partner?.decision;
-  if (d == null) return '—';
-  const label = DECISION_LABELS[d] ?? String(d);
+  const rec = startup.partner?.recommendation;
+  if (rec == null) return '—';
+  const label = DECISION_LABELS[rec] ?? String(rec);
   return label.toUpperCase();
 }
 
 function toJudgmentReasoning(startup: Startup): string[] {
-  const rationale = startup.partner?.rationale;
+  const rationale = startup.partner?.decision_rationale;
   if (!rationale) return [];
   return normalizeParagraphs(rationale);
 }
@@ -139,12 +139,12 @@ function parseNextStepItems(raw: string): string[] {
   return [];
 }
 
-function getPartnerEconomicBadgeVariant(startup: Startup): 'YES' | 'NO' | 'MAYBE' | null {
-  const d = startup.partner?.decision;
-  if (d == null) return null;
-  if (d === 'YES') return 'YES';
-  if (d === 'NO' || d === 'PASS') return 'NO';
-  return 'MAYBE';
+function getPartnerEconomicBadgeVariant(startup: Startup): 'INVEST' | 'PASS' | 'MONITOR' | null {
+  const rec = startup.partner?.recommendation;
+  if (rec == null) return null;
+  if (rec === 'INVEST') return 'INVEST';
+  if (rec === 'PASS') return 'PASS';
+  return 'MONITOR';
 }
 
 function formatSectorAndCategory(startup: Startup): string {
@@ -229,8 +229,15 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
       return;
     }
     setMemoPartial(null);
-    setMemoPipeline('idle');
     setMemoGateError(null);
+
+    // Partner decision already present — pipeline is done, no need to poll.
+    if (startup.partner?.recommendation) {
+      setMemoPipeline('ready');
+      return;
+    }
+
+    setMemoPipeline('idle');
     let cancelled = false;
     let t: ReturnType<typeof setTimeout> | undefined;
 
@@ -266,9 +273,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
       cancelled = true;
       if (t) clearTimeout(t);
     };
-  }, [startup?.id, onMemoPipelineReady]);
+  }, [startup?.id, startup?.partner?.recommendation, onMemoPipelineReady]);
 
-  const showJudgment = !!displayStartup?.review && !!displayStartup?.partner?.decision;
+  const showJudgment = !!displayStartup?.review && !!displayStartup?.partner?.recommendation;
   const decisionHeadline = displayStartup && showJudgment ? partnerDecisionHeadline(displayStartup) : '';
   const dossierQualityBand = useMemo(
     () => (displayStartup && showJudgment ? getReviewerQualityBand(displayStartup.review) : null),
@@ -1040,6 +1047,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       {QUALITY_LABELS[dossierQualityBand] ?? dossierQualityBand}
                     </span>
                   ) : null}
+                  {displayStartup?.partner?.confidence != null ? (
+                    <span className="memoVerdictMetaTag">
+                      {`${Math.round((displayStartup.partner.confidence) * 100)}% CONFIDENCE`}
+                    </span>
+                  ) : null}
                   {showEscalationBadge ? (
                     <span className="memoVerdictMetaTag memoVerdictMetaTag--alert">ESCALATION REQUIRED</span>
                   ) : null}
@@ -1053,6 +1065,43 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     ))}
                   </ul>
                 )}
+              </section>
+            )}
+
+            {/* Partner narrative fields — thesis, market, product */}
+            {showJudgment && (displayStartup?.partner?.thesis || displayStartup?.partner?.why_this_matters || displayStartup?.partner?.market_insight || displayStartup?.partner?.product_edge) && (
+              <section className="memoSection--stackedRows">
+                <p className="memoLabel">PARTNER ANALYSIS</p>
+                {displayStartup.partner?.thesis ? (
+                  <div className="memoOverviewRow">
+                    <p className="memoOverviewKey">THESIS</p>
+                    <p className="memoOverviewVal">{displayStartup.partner.thesis}</p>
+                  </div>
+                ) : null}
+                {displayStartup.partner?.why_this_matters ? (
+                  <div className="memoOverviewRow">
+                    <p className="memoOverviewKey">WHY NOW</p>
+                    <p className="memoOverviewVal">{displayStartup.partner.why_this_matters}</p>
+                  </div>
+                ) : null}
+                {displayStartup.partner?.market_insight ? (
+                  <div className="memoOverviewRow">
+                    <p className="memoOverviewKey">MARKET</p>
+                    <p className="memoOverviewVal">{displayStartup.partner.market_insight}</p>
+                  </div>
+                ) : null}
+                {displayStartup.partner?.product_edge ? (
+                  <div className="memoOverviewRow">
+                    <p className="memoOverviewKey">EDGE</p>
+                    <p className="memoOverviewVal">{displayStartup.partner.product_edge}</p>
+                  </div>
+                ) : null}
+                {displayStartup.partner?.traction_signals ? (
+                  <div className="memoOverviewRow">
+                    <p className="memoOverviewKey">TRACTION</p>
+                    <p className="memoOverviewVal">{displayStartup.partner.traction_signals}</p>
+                  </div>
+                ) : null}
               </section>
             )}
 
@@ -1307,23 +1356,28 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </section>
             ) : null}
 
-            {(displayStartup.partner?.llm_fallback_reason || displayStartup.partner?.portfolio_context_at_decision) ? (
+            {/* Partner risks */}
+            {showJudgment && (displayStartup?.partner?.risks?.length ?? 0) > 0 && (
+              <section>
+                <p className="memoLabel">KEY RISKS</p>
+                <ul className="memoList">
+                  {(displayStartup.partner!.risks ?? []).map((r, i) => (
+                    <li key={i} className="memoListItem">
+                      <span className="memoBullet">·</span>
+                      <span>{r}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {displayStartup.partner?.llm_fallback_reason ? (
                 <section>
                   <p className="memoLabel">DECISION CONTEXT</p>
-                  {displayStartup.partner?.llm_fallback_reason ? (
-                    <div className="memoOverviewRow">
-                      <p className="memoOverviewKey">LLM FALLBACK</p>
-                      <p className="memoOverviewVal">{displayStartup.partner.llm_fallback_reason}</p>
-                    </div>
-                  ) : null}
-                  {displayStartup.partner?.portfolio_context_at_decision ? (
-                    <div className="memoOverviewRow">
-                      <p className="memoOverviewKey">PORTFOLIO SIZE</p>
-                      <p className="memoOverviewVal">
-                        {displayStartup.partner.portfolio_context_at_decision.total_portfolio_size}
-                      </p>
-                    </div>
-                  ) : null}
+                  <div className="memoOverviewRow">
+                    <p className="memoOverviewKey">LLM TRIGGER</p>
+                    <p className="memoOverviewVal">{displayStartup.partner.llm_fallback_reason}</p>
+                  </div>
                 </section>
             ) : null}
 

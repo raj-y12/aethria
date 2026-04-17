@@ -211,8 +211,8 @@ function EscalationCard({
       {sectorConvictionLine ? (
         <p className="mt-phi-3 type-body-sm text-oxford/60">{sectorConvictionLine}</p>
       ) : null}
-      {escalation.partner?.rationale && (
-        <p className="type-body-sm text-oxford/60 mt-phi-3 line-clamp-3">{escalation.partner.rationale}</p>
+      {escalation.partner?.decision_rationale && (
+        <p className="type-body-sm text-oxford/60 mt-phi-3 line-clamp-3">{escalation.partner.decision_rationale}</p>
       )}
       {escalation.partner?.llm_fallback_reason && (
         <p className="type-body-sm text-oxford/40 mt-phi-2">{escalation.partner.llm_fallback_reason}</p>
@@ -439,9 +439,9 @@ function MetaAgentTab({ reports, weights, calibration }: {
                 <div className="flex flex-wrap items-center gap-phi-2">
                   <span className="type-label-section text-oxford/60">Decisions</span>
                   <span className="text-oxford/25" aria-hidden>·</span>
-                  <DecisionBadge variant="YES" />
-                  <DecisionBadge variant="MAYBE" />
-                  <DecisionBadge variant="NO" />
+                  <DecisionBadge variant="INVEST" />
+                  <DecisionBadge variant="MONITOR" />
+                  <DecisionBadge variant="PASS" />
                   <span className="ml-phi-2 type-body-sm text-oxford/60">You decide; scouts and reviewer run automatically.</span>
                 </div>
                 <p><span className="type-label-section text-oxford/60">Escalation</span> · Reviewer disagreement or low confidence → human resolution. Count in status strip.</p>

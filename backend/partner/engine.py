@@ -14,7 +14,6 @@ from tenant_context import require_user_id
 from utils.storage import Storage
 from utils.settings_loader import is_partners_enabled
 from portfolio.store import PortfolioStore
-from memo_generator import MemoGenerator
 from pipeline_state import pipeline_stage_log, upsert_pipeline_state
 
 
@@ -74,100 +73,12 @@ class PartnerEngine:
         self.logger = logging.getLogger("partner.engine")
         self.running = False
     
-    def _get_undecided_entries(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-        """
-        Get entries that have reviews but no partner decision.
-        Includes Scout hypothesis (primary_thesis, key_assumptions, biggest_unknown) and
-        Reviewer assumption_feedback for hypothesis-aware decisions. Defaults missing
-        fields for backward compatibility with older Reviewer/Scout outputs.
-        Generates a pre-decision memo for each startup for LLM context.
-        
-        Args:
-            limit: Optional limit on number of entries
-        
-        Returns:
-            List of entries ready for partner decision (scout + review dicts + memo)
-        """
-        undecided_startups = self.storage.get_undecided(limit=limit)
-        memo_gen = MemoGenerator()
-        result: List[Dict[str, Any]] = []
-        for startup in undecided_startups:
-            if startup.review_info is None:
-                continue
-            scout_info = startup.scout_info
-            review_info = startup.review_info
-            try:
-                memo = memo_gen.generate_memo(
-                    startup,
-                    for_display=False,
-                    tenant_user_id=self.tenant_user_id,
-                    fund_thesis=self.fund_thesis,
-                )
-            except Exception as e:
-                self.logger.warning(f"Memo generation failed for {startup.startup_id}: {e}")
-                memo = ""
-            result.append({
-                "id": startup.startup_id,
-                "scout": {
-                    "id": startup.startup_id,
-                    "name": scout_info.name,
-                    "one_line": scout_info.one_line,
-                    "sector": scout_info.sector,
-                    "problem": scout_info.problem,
-                    "solution": scout_info.solution,
-                    "target_users": scout_info.target_users,
-                    "why_now": scout_info.why_now,
-                    "confidence": scout_info.confidence_score,
-                    "primary_thesis": getattr(scout_info, "primary_thesis", None),
-                    "key_assumptions": getattr(scout_info, "key_assumptions", None),
-                    "biggest_unknown": getattr(scout_info, "biggest_unknown", None),
-                    "funding_stage": getattr(scout_info, "funding_stage", None),
-                },
-                "review": {
-                    "market_score": review_info.market_score,
-                    "product_score": review_info.product_score,
-                    "technical_score": review_info.technical_score,
-                    "execution_score": review_info.execution_score,
-                    "defensibility_score": getattr(review_info, "defensibility_score", None),
-                    "overall_summary": review_info.overall_summary,
-                    "key_risks": review_info.key_risks,
-                    "verdict": review_info.verdict,
-                    "assumption_feedback": getattr(review_info, "assumption_feedback", []) or [],
-                    "team_analysis": getattr(review_info, "team_analysis", None) or [],
-                    "competition_analysis": getattr(review_info, "competition_analysis", None) or [],
-                    "business_model_analysis": getattr(review_info, "business_model_analysis", None) or [],
-                    "investment_thesis": getattr(review_info, "investment_thesis", None) or [],
-                    "risk_mitigation": getattr(review_info, "risk_mitigation", None) or [],
-                    "score_reasoning": getattr(review_info, "score_reasoning", None) or {},
-                    "reviewer_disagreement": getattr(review_info, "reviewer_disagreement", False),
-                    "score_variance": getattr(review_info, "score_variance", None),
-                    "derived_verdict": getattr(review_info, "derived_verdict", None),
-                    "thesis_alignment_score": getattr(review_info, "thesis_alignment_score", None),
-                    "thesis_matches_fund": getattr(review_info, "thesis_matches_fund", None),
-                    "thesis_fit_points": getattr(review_info, "thesis_fit_points", None) or [],
-                    "thesis_deviation_points": getattr(review_info, "thesis_deviation_points", None) or [],
-                    "thesis_alignment_confidence": getattr(review_info, "thesis_alignment_confidence", None),
-                },
-                "memo": memo,
-            })
-        return result
-
-    def _entry_from_startup(self, startup) -> Optional[Dict[str, Any]]:
-        if startup is None or startup.review_info is None:
+    def _build_entry(self, startup) -> Optional[Dict[str, Any]]:
+        """Build an entry dict from a startup object (scout + review fields only)."""
+        if startup.review_info is None:
             return None
         scout_info = startup.scout_info
         review_info = startup.review_info
-        memo_gen = MemoGenerator()
-        try:
-            memo = memo_gen.generate_memo(
-                startup,
-                for_display=False,
-                tenant_user_id=self.tenant_user_id,
-                fund_thesis=self.fund_thesis,
-            )
-        except Exception as e:
-            self.logger.warning("Memo generation failed for %s: %s", startup.startup_id, e)
-            memo = ""
         return {
             "id": startup.startup_id,
             "scout": {
@@ -210,45 +121,112 @@ class PartnerEngine:
                 "thesis_deviation_points": getattr(review_info, "thesis_deviation_points", None) or [],
                 "thesis_alignment_confidence": getattr(review_info, "thesis_alignment_confidence", None),
             },
-            "memo": memo,
         }
+
+    def _get_undecided_entries(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get entries that have reviews but no partner decision.
+        Returns scout + review dicts — no memo generation.
+        """
+        undecided_startups = self.storage.get_undecided(limit=limit)
+        result: List[Dict[str, Any]] = []
+        for startup in undecided_startups:
+            entry = self._build_entry(startup)
+            if entry is not None:
+                result.append(entry)
+        return result
+
+    def _entry_from_startup(self, startup) -> Optional[Dict[str, Any]]:
+        if startup is None:
+            return None
+        return self._build_entry(startup)
 
     def _supabase_client_uid(self) -> Tuple[Any, Optional[str]]:
         return getattr(self.storage, "_client", None), getattr(self.storage, "_user_id", None)
 
-    async def _decide_and_save_with_display_memo(
+    def _retry_json_fix(self, decision: dict) -> dict:
+        """
+        One-shot LLM retry to fix JSON structure when validate_partner_output fails.
+        Returns the original dict unchanged if no LLM client is available.
+        """
+        import json as _json
+        client = getattr(self.decision_engine, "client", None)
+        model = getattr(self.decision_engine, "model", "gpt-4o-mini")
+        if client is None:
+            return decision
+        try:
+            raw = _json.dumps(decision, ensure_ascii=False, default=str)
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You fix malformed JSON to match a required schema. "
+                            "Return ONLY valid JSON — no prose, no markdown."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            "Fix this JSON so it has all required fields: "
+                            "recommendation (INVEST/PASS/MONITOR), confidence (float 0-1), "
+                            "thesis, why_this_matters, snapshot (with one_liner), market_insight, "
+                            "product_edge, traction_signals (str or null), risks (list of str), "
+                            "decision_rationale, next_action, human_review_required (bool).\n\n"
+                            f"Input:\n{raw}"
+                        ),
+                    },
+                ],
+                response_format={"type": "json_object"},
+                max_completion_tokens=2048,
+            )
+            content = response.choices[0].message.content or ""
+            from partner.decision import _parse_llm_json_object
+            fixed = _parse_llm_json_object(content)
+            if fixed:
+                return fixed
+        except Exception as e:
+            self.logger.warning("JSON fix retry failed: %s", e)
+        return decision
+
+    async def _decide_and_save(
         self,
         entry_id: str,
         scout_output: dict,
         review_output: dict,
-        context_memo: str,
         pipeline_run_id: Optional[str],
     ) -> Tuple[bool, Optional[Dict[str, Any]]]:
         """
-        Run partner decision, generate display memo, single DB write, pipeline state to ready/failed.
+        Run partner decision, validate JSON, write to Supabase, update pipeline state.
+        No memo generation.
         """
         pr = (pipeline_run_id or "").strip() or None
         client, uid = self._supabase_client_uid()
 
-        if pr and client and uid:
-            upsert_pipeline_state(
-                client,
-                user_id=uid,
-                startup_id=entry_id,
-                pipeline_run_id=pr,
-                status="generating_memo",
-            )
-            pipeline_stage_log(
-                pr, startup_id=entry_id, user_id=self.tenant_user_id, stage="generating_memo", phase="STARTED"
-            )
-
         decision = self.decision_engine.decide(
             scout_output,
             review_output,
-            context_memo=context_memo,
             fund_thesis=self.fund_thesis,
         )
-        validate_partner_output(decision)
+
+        # JSON validation with one retry
+        try:
+            validate_partner_output(decision)
+        except ValueError as ve:
+            self.logger.warning("Partner output validation failed for %s: %s — retrying", entry_id, ve)
+            decision = self._retry_json_fix(decision)
+            try:
+                validate_partner_output(decision)
+            except ValueError as ve2:
+                self.logger.error("Partner output invalid after retry for %s: %s", entry_id, ve2)
+                if pr and client and uid:
+                    upsert_pipeline_state(
+                        client, user_id=uid, startup_id=entry_id,
+                        pipeline_run_id=pr, status="failed",
+                        error=f"invalid output: {ve2}"[:500],
+                    )
+                return False, decision
 
         if self.cost_controller:
             tokens_used = 0
@@ -259,9 +237,7 @@ class PartnerEngine:
                     if isinstance(total, int):
                         tokens_used = total
                     else:
-                        prompt_tokens = usage.get("prompt_tokens", 0) or 0
-                        completion_tokens = usage.get("completion_tokens", 0) or 0
-                        tokens_used = int(prompt_tokens) + int(completion_tokens)
+                        tokens_used = int(usage.get("prompt_tokens", 0) or 0) + int(usage.get("completion_tokens", 0) or 0)
             self.cost_controller.record_usage("partner", "partner", tokens_used=tokens_used)
 
         from utils.adapters import partner_output_to_partner_info
@@ -269,98 +245,29 @@ class PartnerEngine:
         partner_info = partner_output_to_partner_info(decision)
         partner_info.partner_agent_id = self.agent_id
 
-        st = self.storage.get_startup(entry_id)
-        if st is None:
-            if pr and client and uid:
-                upsert_pipeline_state(
-                    client,
-                    user_id=uid,
-                    startup_id=entry_id,
-                    pipeline_run_id=pr,
-                    status="failed",
-                    error="startup missing before memo write",
-                )
-            return False, decision
-
-        st.partner_info = partner_info
-
-        # Generate display memo — failure here must NOT block persisting the decision.
-        memo_gen = MemoGenerator()
-        display_memo: Optional[str] = None
-        try:
-            generated = memo_gen.generate_memo(
-                st,
-                for_display=True,
-                tenant_user_id=self.tenant_user_id,
-                fund_thesis=self.fund_thesis,
-            )
-            if (generated or "").strip():
-                display_memo = generated
-            else:
-                self.logger.warning(
-                    "Display memo empty for %s; decision will be persisted without memo", entry_id
-                )
-        except Exception as e:
-            self.logger.warning(
-                "Display memo generation failed for %s: %s; decision will still be persisted", entry_id, e
-            )
-
-        if display_memo is not None and pr and client and uid:
-            pipeline_stage_log(
-                pr, startup_id=entry_id, user_id=self.tenant_user_id, stage="generating_memo", phase="DONE"
-            )
-            pipeline_stage_log(
-                pr, startup_id=entry_id, user_id=self.tenant_user_id, stage="writing_memo", phase="STARTED"
-            )
-            upsert_pipeline_state(
-                client,
-                user_id=uid,
-                startup_id=entry_id,
-                pipeline_run_id=pr,
-                status="writing_memo",
-            )
-
         try:
             success = self.storage.add_partner_decision(
                 entry_id,
                 partner_info,
-                investment_memo_markdown=display_memo,
                 pipeline_run_id=pr,
             )
         except Exception as e:
             self.logger.error("Partner persist failed for %s: %s", entry_id, e, exc_info=True)
             if pr and client and uid:
                 upsert_pipeline_state(
-                    client,
-                    user_id=uid,
-                    startup_id=entry_id,
-                    pipeline_run_id=pr,
-                    status="failed",
+                    client, user_id=uid, startup_id=entry_id,
+                    pipeline_run_id=pr, status="failed",
                     error=f"persist: {e}"[:500],
                 )
             return False, decision
 
         if not success and pr and client and uid:
             upsert_pipeline_state(
-                client,
-                user_id=uid,
-                startup_id=entry_id,
-                pipeline_run_id=pr,
-                status="failed",
+                client, user_id=uid, startup_id=entry_id,
+                pipeline_run_id=pr, status="failed",
                 error="add_partner_decision returned false",
             )
             return False, decision
-
-        # Decision persisted. If memo was skipped, mark pipeline ready so frontend
-        # doesn't poll forever on "generating" status.
-        if success and display_memo is None and pr and client and uid:
-            upsert_pipeline_state(
-                client,
-                user_id=uid,
-                startup_id=entry_id,
-                pipeline_run_id=pr,
-                status="ready",
-            )
 
         return success, decision
 
@@ -395,7 +302,6 @@ class PartnerEngine:
             entry_id = entry["id"]
             scout_output = entry["scout"]
             review_output = entry["review"]
-            context_memo = entry.get("memo", "")
             
             try:
                 company_name = scout_output.get("name", "Unknown")
@@ -414,29 +320,23 @@ class PartnerEngine:
                         )
                         continue
 
-                success, decision = await self._decide_and_save_with_display_memo(
+                success, decision = await self._decide_and_save(
                     entry_id,
                     scout_output,
                     review_output,
-                    context_memo,
                     pipeline_run_id,
                 )
 
                 if success and decision:
                     decided_count += 1
-                    decision_type = decision.get("decision", "UNKNOWN")
-                    conviction = decision.get("conviction_level") or decision.get("confidence", 0)
-                    assumption_risks = decision.get("assumption_risks") or []
+                    recommendation = decision.get("recommendation", "UNKNOWN")
+                    confidence = decision.get("confidence", 0)
                     self.logger.info(
-                        f"Decision for entry {entry_id}: {decision_type} "
-                        f"(conviction: {conviction}/10)"
+                        f"Decision for entry {entry_id}: {recommendation} "
+                        f"(confidence: {confidence})"
                     )
-                    if assumption_risks:
-                        self.logger.info(
-                            f"Entry {entry_id} assumption_risks: {assumption_risks}"
-                        )
 
-                    if self.deal_memory and decision_type == "YES":
+                    if self.deal_memory and recommendation == "INVEST":
                         try:
                             self.deal_memory.record_successful_thesis(
                                 scout_output.get("primary_thesis", "")
@@ -491,11 +391,10 @@ class PartnerEngine:
             self.logger.info("Startup is not ready for partner decision: %s", startup_id)
             return False
         try:
-            success, _ = await self._decide_and_save_with_display_memo(
+            success, _ = await self._decide_and_save(
                 startup_id,
                 entry["scout"],
                 entry["review"],
-                entry.get("memo", ""),
                 pipeline_run_id,
             )
             return bool(success)

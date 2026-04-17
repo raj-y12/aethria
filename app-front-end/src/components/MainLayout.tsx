@@ -199,7 +199,7 @@ export default function MainLayout({
       setLookupMessage(`Processing ${pendingLookup.queryLabel}...`);
       return;
     }
-    const hasDecision = !!matched.partner?.decision;
+    const hasDecision = !!matched.partner?.recommendation;
     if (hasDecision) {
       setLookupMessage(`Lookup complete: ${matched.scout.name}. Opening memo...`);
     } else if (matched.review) {
@@ -226,7 +226,7 @@ export default function MainLayout({
   useRestoreFocus(judgementsAsOverlay, { current: null }, !verdictOrMemoOpen);
   useFocusTrap(judgementsAsOverlay, judgementsPanelRef);
 
-  const resolvedCount = startups.filter((s) => s.partner?.decision != null).length;
+  const resolvedCount = startups.filter((s) => s.partner?.recommendation != null).length;
   const openCount = Math.max(0, startups.length - resolvedCount);
   const pendingEscalations = data.settings?.system_health?.pending_escalations ?? 0;
   const agentConfig = data.settings?.agent_config;

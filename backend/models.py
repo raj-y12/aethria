@@ -110,22 +110,32 @@ class ReviewInfo(BaseModel):
     confidence_adjusted_score: Optional[float] = None
 
 
+class PartnerSnapshot(BaseModel):
+    """Snapshot fields embedded in PartnerInfo."""
+    one_liner: str
+    stage: Optional[str] = None
+    key_signal: Optional[str] = None
+
+
 class PartnerInfo(BaseModel):
-    """Partner decision information."""
-    decision: Literal["YES", "NO", "MAYBE"]
-    rationale: str
-    next_action: str  # e.g., "Request Cap Table", "Technical Code Review", "Pass - Market too crowded"
-    conviction_level: int = Field(ge=1, le=10)  # 1-10 conviction
+    """Partner decision information — strict JSON output schema."""
+    thesis: str
+    why_this_matters: str
+    snapshot: PartnerSnapshot
+    market_insight: str
+    product_edge: str
+    traction_signals: Optional[str] = None
+    risks: List[str]
+    recommendation: Literal["INVEST", "PASS", "MONITOR"]
+    decision_rationale: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    next_action: str
     human_review_required: bool = False
+    # Metadata set by engine — not from LLM output
     partner_agent_id: Optional[str] = None
     partnered_at: datetime = Field(default_factory=datetime.now)
-    # Optional LLM fallback metadata and portfolio/memo snapshots
     llm_fallback_reason: Optional[str] = None
-    memo_at_decision: Optional[str] = None
-    portfolio_context_at_decision: Optional[Dict[str, Any]] = None
     prompt_version: Optional[str] = None
-    # True when LLM deep dive was triggered by grey zone confidence_adjusted_score
-    grey_zone_deep_dive: Optional[bool] = None
 
 
 class Financials(BaseModel):

@@ -14,7 +14,7 @@ interface LogEntry {
   timestamp: string;
   message: string;
   kind: 'scanned' | 'reviewed' | 'decision' | 'meta_cycle' | 'signal_detected' | 'escalation_resolved';
-  decision?: string; // YES | NO | MAYBE | PASS | WATCH — for kind 'decision'
+  decision?: string; // INVEST | PASS | MONITOR — for kind 'decision'
 }
 
 interface LiveIntelligenceFeedProps {
@@ -63,7 +63,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
           kind: 'reviewed',
         });
       }
-      if (s.timestamps?.partnered_at && s.partner?.decision) {
+      if (s.timestamps?.partnered_at && s.partner?.recommendation) {
         const d = s.timestamps.partnered_at;
         out.push({
           id: `${s.id}-dec`,
@@ -76,7 +76,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
           }),
           message: s.scout.name,
           kind: 'decision',
-          decision: s.partner.decision,
+          decision: s.partner.recommendation,
         });
       }
     });
@@ -165,11 +165,9 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
                   e.kind === 'decision' && e.decision ? (
                     <DecisionBadge
                       variant={
-                        e.decision === 'YES'
-                          ? 'YES'
-                          : e.decision === 'NO' || e.decision === 'PASS'
-                            ? 'NO'
-                            : 'MAYBE'
+                        e.decision === 'INVEST' || e.decision === 'PASS' || e.decision === 'MONITOR'
+                          ? e.decision
+                          : 'undecided'
                       }
                     />
                   ) : undefined

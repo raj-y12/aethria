@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from uuid import uuid4
-from models import ScoutInfo, ReviewInfo, PartnerInfo, Financials
+from models import ScoutInfo, ReviewInfo, PartnerInfo, PartnerSnapshot, Financials
 
 
 def _parse_timestamp(value: Any) -> Optional[datetime]:
@@ -118,40 +118,53 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
 
 def partner_output_to_partner_info(partner_output: Dict[str, Any]) -> PartnerInfo:
     """
-    Convert old PartnerOutput to new PartnerInfo Pydantic model.
-    Maps legacy decisions: INVEST → YES, WATCH → MAYBE, PASS → NO.
-    Preserves next_action, human_review_required, rationale, conviction_level.
-    Uses partnered_at from input when available; otherwise datetime.now().
-    
+    Convert PartnerOutput dict to PartnerInfo Pydantic model.
+    Maps new schema fields directly. Uses partnered_at from input when available.
+
     Args:
-        partner_output: Old PartnerOutput dict (may include partnered_at from storage)
-    
+        partner_output: PartnerOutput dict from decision engine
+
     Returns:
         PartnerInfo Pydantic model
     """
-    decision_map = {
-        "INVEST": "YES",
-        "WATCH": "MAYBE",
-        "PASS": "NO",
-    }
-    old_decision = partner_output.get("decision", "PASS")
-    new_decision = decision_map.get(old_decision, old_decision if old_decision in ("YES", "NO", "MAYBE") else "NO")
-    conviction = partner_output.get("conviction_level") or partner_output.get("confidence", 5)
-    conviction = max(1, min(10, conviction))
     partnered = _parse_timestamp(partner_output.get("partnered_at"))
     if partnered is None:
         partnered = datetime.now()
+
+    snap_raw = partner_output.get("snapshot") or {}
+    snapshot = PartnerSnapshot(
+        one_liner=str(snap_raw.get("one_liner") or ""),
+        stage=snap_raw.get("stage"),
+        key_signal=snap_raw.get("key_signal"),
+    )
+
+    recommendation = partner_output.get("recommendation", "PASS")
+    if recommendation not in ("INVEST", "PASS", "MONITOR"):
+        recommendation = "PASS"
+
+    try:
+        confidence = max(0.0, min(1.0, float(partner_output.get("confidence", 0.5) or 0.5)))
+    except (TypeError, ValueError):
+        confidence = 0.5
+
+    risks_raw = partner_output.get("risks")
+    risks = [str(r) for r in risks_raw if isinstance(r, str)] if isinstance(risks_raw, list) else []
+
     return PartnerInfo(
-        decision=new_decision,
-        rationale=partner_output.get("rationale", ""),
-        next_action=partner_output.get("next_action", ""),
-        conviction_level=conviction,
-        human_review_required=partner_output.get("human_review_required", False),
+        thesis=str(partner_output.get("thesis") or ""),
+        why_this_matters=str(partner_output.get("why_this_matters") or ""),
+        snapshot=snapshot,
+        market_insight=str(partner_output.get("market_insight") or ""),
+        product_edge=str(partner_output.get("product_edge") or ""),
+        traction_signals=partner_output.get("traction_signals"),
+        risks=risks,
+        recommendation=recommendation,
+        decision_rationale=str(partner_output.get("decision_rationale") or ""),
+        confidence=confidence,
+        next_action=str(partner_output.get("next_action") or ""),
+        human_review_required=bool(partner_output.get("human_review_required", False)),
         partner_agent_id=partner_output.get("partner_agent_id"),
         partnered_at=partnered,
         llm_fallback_reason=partner_output.get("llm_fallback_reason"),
-        memo_at_decision=partner_output.get("memo_at_decision"),
-        portfolio_context_at_decision=partner_output.get("portfolio_context_at_decision"),
         prompt_version=partner_output.get("prompt_version"),
-        grey_zone_deep_dive=partner_output.get("grey_zone_deep_dive"),
     )

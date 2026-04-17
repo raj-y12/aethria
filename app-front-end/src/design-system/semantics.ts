@@ -44,13 +44,11 @@ export function getReviewerQualityBand(review: Review | null | undefined): Revie
   return null;
 }
 
-/** Investment decision from Partner (YES/NO/MAYBE). Legacy PASS/WATCH map for compatibility. */
+/** Investment decision from Partner (INVEST/PASS/MONITOR). */
 export const DECISION_LABELS: Record<string, string> = {
-  YES: 'Advance',
-  NO: 'Pass',
-  MAYBE: 'Hold',
+  INVEST: 'Invest',
   PASS: 'Pass',
-  WATCH: 'Hold',
+  MONITOR: 'Monitor',
 };
 
 /** Dimension display order: primary drivers first, then supporting. */

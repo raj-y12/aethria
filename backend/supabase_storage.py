@@ -23,7 +23,7 @@ _LIST_SELECT = (
     "startup_id, display_name, list_one_line, list_sector, list_scout_type, list_origin_type, "
     "list_lookup_id, list_lookup_query, list_lookup_website, list_confidence, list_score, list_verdict, "
     "list_consensus_verdict, list_reviewer_disagreement, list_reviewed_at, list_partnered_at, "
-    "short_summary, partner_decision, partner_human_review_required, created_at, updated_at"
+    "short_summary, partner_decision, partner_human_review_required, partner_info, created_at, updated_at"
 )
 _MEMO_PARTIAL_SELECT = (
     "startup_id, scout_info, review_info, partner_info, investment_memo_markdown"
@@ -388,10 +388,7 @@ class SupabaseStartupsStorage:
                 )
             raise
         self.logger.info("Added partner decision for startup %s", startup_id)
-        if pr and investment_memo_markdown is not None:
-            pipeline_stage_log(
-                pr, startup_id=startup_id, user_id=self._user_id, stage="writing_memo", phase="DONE"
-            )
+        if pr:
             upsert_pipeline_state(
                 self._client,
                 user_id=self._user_id,
