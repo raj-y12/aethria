@@ -2,8 +2,6 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
-import { tokens } from '../design-system/tokens';
-import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 
 function friendlyIdentifier(id: string): string {
@@ -164,11 +162,6 @@ export default function LoginPage() {
   if (!isLoaded) {
     return null;
   }
-
-  const panelIn = reduceMotion
-    ? { opacity: 1, y: 0 }
-    : { opacity: 0, y: 14 };
-  const panelAnim = { opacity: 1, y: 0 };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[100dvh] w-full bg-paper p-phi-6 overflow-hidden">
