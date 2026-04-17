@@ -1008,7 +1008,7 @@ def get_settings(request: Request):
 
 
 @app.patch("/api/settings")
-def patch_settings(request: Request, body: dict):
+async def patch_settings(request: Request, body: dict):
     """Update current user's settings. Validates server-side; returns 422 on validation errors."""
     errors = _validate_settings(body)
     if errors:
