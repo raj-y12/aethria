@@ -19,13 +19,15 @@ const STATS = (s: ActivitySummary) => [
 export default function WhileYouWereAway({ summary, onDismiss }: Props) {
   const stats = STATS(summary);
 
+  const ease = [0.16, 1, 0.3, 1] as const;
+
   return (
     <motion.div
       key="while-you-were-away"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      exit={{ opacity: 0, transition: { duration: 0.25, delay: 0.48, ease } }}
+      transition={{ duration: 0.4, ease }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -42,7 +44,8 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
       <motion.p
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
+        exit={{ opacity: 0, y: 10, transition: { duration: 0.35, delay: 0.42, ease } }}
+        transition={{ duration: 0.45, ease, delay: 0.05 }}
         style={{
           fontFamily: "'Space Mono', ui-monospace, monospace",
           fontSize: '10px',
@@ -59,7 +62,8 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
       <motion.h1
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+        exit={{ opacity: 0, y: 12, transition: { duration: 0.35, delay: 0.35, ease } }}
+        transition={{ duration: 0.5, ease, delay: 0.1 }}
         style={{
           fontFamily: "'Cormorant Garamond', Georgia, serif",
           fontSize: 'clamp(36px, 5vw, 64px)',
@@ -77,7 +81,8 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
       <motion.p
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.18 }}
+        exit={{ opacity: 0, transition: { duration: 0.3, delay: 0.28, ease } }}
+        transition={{ duration: 0.5, ease, delay: 0.18 }}
         style={{
           fontFamily: "'Instrument Sans', system-ui, sans-serif",
           fontSize: '14px',
@@ -107,7 +112,12 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
             key={stat.label}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.22 + i * 0.07 }}
+            exit={{
+              opacity: 0,
+              y: 10,
+              transition: { duration: 0.3, delay: (stats.length - 1 - i) * 0.06, ease },
+            }}
+            transition={{ duration: 0.45, ease, delay: 0.22 + i * 0.07 }}
             style={{ textAlign: 'center' }}
           >
             <div
@@ -141,24 +151,21 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
       <motion.button
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: 0.22 + stats.length * 0.07 }}
+        exit={{ opacity: 0, transition: { duration: 0.2, delay: 0, ease } }}
+        transition={{ duration: 0.4, ease, delay: 0.22 + stats.length * 0.07 }}
         onClick={onDismiss}
-        style={{
-          padding: '14px 48px',
-          backgroundColor: '#002147',
-          color: '#F2F0EA',
-          border: 'none',
-          fontFamily: "'Space Mono', ui-monospace, monospace",
-          fontSize: '11px',
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          cursor: 'pointer',
-          transition: 'opacity 0.15s',
-        }}
-        onHoverStart={(e) => ((e.target as HTMLButtonElement).style.opacity = '0.8')}
-        onHoverEnd={(e) => ((e.target as HTMLButtonElement).style.opacity = '1')}
+        className="group btn-aethria-solid"
+        style={{ padding: '0 48px' }} // Maintaining width for the full-screen CTA
       >
-        Enter System
+        <span className="flex items-center justify-center">
+          <span>Enter System</span>
+          <span
+            className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
+            aria-hidden
+          >
+            {'\u00A0→'}
+          </span>
+        </span>
       </motion.button>
     </motion.div>
   );

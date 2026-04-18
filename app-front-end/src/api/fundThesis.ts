@@ -62,6 +62,7 @@ export interface FundThesisRuntime {
     drift_vs_previous: number | null;
   };
   version_timeline?: FundThesisVersionRow[];
+  parsed_json?: Record<string, unknown>;
 }
 
 export async function fetchFundThesisSummary(): Promise<FundThesisSummary | null> {

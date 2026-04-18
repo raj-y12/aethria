@@ -60,6 +60,7 @@ from pipeline_runner import (
 from fund_thesis import (
     FundThesisIncompleteError,
     FundThesisMissingError,
+    _bootstrap_default_thesis_or_raise,
     compute_thesis_alignment_stats,
     get_active_thesis,
     thesis_has_embeddings,
@@ -1208,6 +1209,9 @@ def api_get_fund_thesis(request: Request):
     try:
         active = get_active_thesis(client, uid)
         if active is None:
+            _bootstrap_default_thesis_or_raise(client, uid)
+            active = get_active_thesis(client, uid)
+        if active is None:
             raise HTTPException(status_code=404, detail="No fund thesis yet. POST /api/fund-thesis/versions with raw_text.")
     except FundThesisIncompleteError as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -1383,6 +1387,7 @@ def get_fund_thesis_runtime(request: Request):
         "embedding_dimensions": dim,
         "alignment_stats": stats,
         "version_timeline": version_timeline,
+        "parsed_json": active.parsed_json,
     }
     return JSONResponse(status_code=200, content=payload)
 

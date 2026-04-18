@@ -17,8 +17,12 @@ export default {
     extend: {
       colors: {
         oxford: '#002147',
-        paper: '#F2F0EA',
-        'paper-bright': '#F2F0EA',
+        paper: '#f2f0ea',
+        'paper-bright': '#f2f0ea',
+        ivory: '#f2f0ea',
+        canvas: '#f2f0ea',
+        mist: '#f2f4f8',
+        graphite: '#2f333b',
         /** Structural hairlines — prefer over raw oxford/[0.06] in new code. */
         hairline: 'rgba(0, 33, 71, 0.06)',
         'hairline-strong': 'rgba(0, 33, 71, 0.12)',
@@ -42,9 +46,9 @@ export default {
         registerTint: 'var(--color-register-tint)',
       },
       fontFamily: {
-        display: ['var(--font-display)', 'Georgia', 'serif'],
-        wordmark: ['var(--font-wordmark)', 'Georgia', 'serif'],
-        cormorant: ['var(--font-cormorant)', 'Georgia', 'serif'],
+        display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+        wordmark: ['"Libre Baskerville"', 'Georgia', 'serif'],
+        cormorant: ['"Cormorant Garamond"', 'Georgia', 'serif'],
         // Instrument Sans is the canonical app + web UI font (loaded via @fontsource in main.tsx).
         sans: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],
         body: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],

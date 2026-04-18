@@ -238,6 +238,23 @@
   .app-chrome-frame-raised {
     @apply rounded-none border border-hairline bg-paper-bright;
   }
+  .btn-aethria {
+    @apply inline-flex items-center justify-center cursor-pointer rounded-none border border-oxford bg-transparent text-oxford font-mono text-[10px] uppercase tracking-[0.12em] whitespace-nowrap transition-colors duration-150 ease-in-out btn-interaction;
+    height: 40px;
+    padding: 0 20px;
+  }
+  .btn-aethria:hover {
+    @apply bg-oxford text-paper;
+  }
+  .btn-aethria-solid {
+    @apply inline-flex items-center justify-center cursor-pointer rounded-none bg-oxford text-paper font-mono text-[10px] uppercase tracking-[0.12em] whitespace-nowrap transition-opacity duration-150 ease-in-out btn-interaction;
+    height: 40px;
+    padding: 0 20px;
+  }
+  .btn-aethria-solid:hover {
+    @apply opacity-90;
+    background-color: rgba(0, 33, 71, 0.85);
+  }
 }
 
 @layer base {
@@ -255,7 +272,7 @@
   body {
     overflow-x: hidden;
     background-color: var(--color-paper);
-    color: var(--color-oxford);
+    color: var(--color-charcoal);
     font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
     font-size: 14px;
     font-weight: 400;
@@ -268,7 +285,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Instrument Sans', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-display);
     font-weight: 500;
     letter-spacing: -0.02em;
     color: var(--color-oxford);
@@ -411,27 +428,21 @@
   .paper-dot-grid {
     background-color: var(--color-paper);
     background-image: radial-gradient(rgba(0, 33, 71, 0.055) 1px, transparent 1px);
-    background-size: 21px 21px; /* φ-5 spacing — golden ratio grid */
+    background-size: 28px 28px;
     background-repeat: repeat;
   }
 
-  /** Roman numeral section marker — Cormorant Garamond italic, oxford/22 */
+  /** Roman numeral section marker — Space Mono (aligned with web-front-end) */
   .section-numeral {
-    font-family: var(--font-display);
-    font-style: italic;
-    font-weight: 400;
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    color: rgba(0, 33, 71, 0.22);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: rgba(0, 33, 71, 0.2);
   }
   /** Section numeral on dark backgrounds (oxford surface) */
   .section-numeral--on-dark {
-    font-family: var(--font-display);
-    font-style: italic;
-    font-weight: 400;
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    color: rgba(242, 240, 234, 0.28);
+    font-size: 9px;
+    color: rgba(242, 240, 234, 0.25);
   }
 
   /** Full-width rule with centred 4×4 diamond — Lazard-style section break */

@@ -1,6 +1,7 @@
 import { useState, useLayoutEffect, useEffect } from 'react';
 import { useLocation, Navigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
+import { AnimatePresence } from 'framer-motion';
 import { setTokenGetter } from './api/auth';
 import MainLayout from './components/MainLayout';
 import GrainOverlay from './components/GrainOverlay';
@@ -42,26 +43,27 @@ function AppShell() {
     setIsSystemPanelOpen(false);
   }, [isSettingsRoute]);
 
-  // Gate: show nothing while we check for activity (resolves in <2s)
-  if (loading) return null;
-
-  // Gate: show summary screen before the rest of the app
-  if (showSummary && summary) {
-    return <WhileYouWereAway summary={summary} onDismiss={dismissSummary} />;
-  }
-
   return (
     <>
-      <GrainOverlay opacity={0.02} />
-      {isSettingsRoute ? (
-        <SettingsPage />
-      ) : (
-        <MainLayout
-          data={systemData}
-          startupsError={systemData.startupsError}
-          onSystemPanelOpenChange={setIsSystemPanelOpen}
-        />
+      {!loading && (
+        <>
+          <GrainOverlay opacity={0.02} />
+          {isSettingsRoute ? (
+            <SettingsPage />
+          ) : (
+            <MainLayout
+              data={systemData}
+              startupsError={systemData.startupsError}
+              onSystemPanelOpenChange={setIsSystemPanelOpen}
+            />
+          )}
+        </>
       )}
+      <AnimatePresence>
+        {showSummary && summary && (
+          <WhileYouWereAway summary={summary} onDismiss={dismissSummary} />
+        )}
+      </AnimatePresence>
     </>
   );
 }

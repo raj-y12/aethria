@@ -278,9 +278,19 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-phi-4 bg-oxford text-paper type-meta text-[10px] uppercase tracking-[0.2em] btn-interaction transition-opacity hover:opacity-90 disabled:opacity-40"
+                className="group w-full btn-aethria-solid disabled:opacity-40"
               >
-                {loading ? 'Authenticating…' : 'Establish Session'}
+                <span className="flex items-center justify-center">
+                  <span>{loading ? 'Authenticating…' : 'Establish Session'}</span>
+                  {!loading && (
+                    <span
+                      className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
+                      aria-hidden
+                    >
+                      {'\u00A0→'}
+                    </span>
+                  )}
+                </span>
               </button>
             </form>
           </motion.div>

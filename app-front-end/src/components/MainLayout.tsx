@@ -388,26 +388,22 @@ export default function MainLayout({
     scoutRegionRaw.length > 0
       ? scoutRegionRaw.charAt(0).toUpperCase() + scoutRegionRaw.slice(1).toLowerCase()
       : '';
-  const thesisCriteria = useMemo(() => {
-    const pj = fundThesisSummary?.parsed_json;
-    const fromParsed: string[] = [];
-    if (pj && typeof pj === 'object') {
-      for (const key of ['stage', 'stage_focus', 'geography', 'geographic_focus', 'geographies', 'sectors', 'focus_areas', 'investment_criteria', 'themes', 'focus', 'sector']) {
-        const val = (pj as Record<string, unknown>)[key];
-        if (Array.isArray(val)) {
-          for (const item of val) {
-            if (typeof item === 'string' && item.trim()) { fromParsed.push(item.trim()); if (fromParsed.length >= 4) break; }
-          }
-        } else if (typeof val === 'string' && val.trim()) {
-          fromParsed.push(val.trim());
-        }
-        if (fromParsed.length >= 4) break;
-      }
-    }
-    const fromSettings = [fundStage, fundGeo, scoutRegion].filter(Boolean);
-    // Prefer parsed thesis data; fill remaining slots from settings
-    const combined = [...fromParsed, ...fromSettings];
-    return combined.filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 4);
+  const thesisTags = useMemo(() => {
+    const pj = fundThesisSummary?.parsed_json as Record<string, unknown> | undefined;
+    const toStrings = (v: unknown): string[] => {
+      if (Array.isArray(v)) return v.filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.trim());
+      if (typeof v === 'string' && v.trim()) return [v.trim()];
+      return [];
+    };
+    const sectors = pj ? toStrings(pj.sectors ?? pj.sector ?? pj.focus_areas) : toStrings(undefined);
+    const stages = pj ? toStrings(pj.stage_focus ?? pj.stage) : toStrings(fundStage);
+    const geos = pj ? toStrings(pj.geography ?? pj.geographies ?? pj.geographic_focus) : toStrings(undefined);
+    // Fall back to settings if parsed_json has nothing
+    return {
+      sectors,
+      stages: stages.length ? stages : fundStage ? [fundStage] : [],
+      geos: geos.length ? geos : fundGeo ? [fundGeo] : scoutRegion ? [scoutRegion] : [],
+    };
   }, [fundThesisSummary, fundStage, fundGeo, scoutRegion]);
 
   return (
@@ -703,15 +699,10 @@ export default function MainLayout({
                 <p className="mt-phi-1 type-body-sm font-semibold tracking-tight text-oxford">
                   {fundName || 'No fund configured'}
                 </p>
-                {thesisCriteria.length > 0 && (
+                {(thesisTags.sectors.length > 0 || thesisTags.stages.length > 0 || thesisTags.geos.length > 0) && (
                   <div className="mt-phi-2 flex flex-wrap gap-phi-1">
-                    {thesisCriteria.map((item) => (
-                      <span
-                        key={item}
-                        className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40"
-                      >
-                        {item}
-                      </span>
+                    {[...thesisTags.sectors, ...thesisTags.stages, ...thesisTags.geos].map((t) => (
+                      <span key={t} className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40">{t}</span>
                     ))}
                   </div>
                 )}
@@ -794,18 +785,13 @@ export default function MainLayout({
               <p className="mt-phi-3 type-body font-semibold tracking-tight text-oxford">
                 {fundName || 'No fund configured'}
               </p>
-              {thesisCriteria.length > 0 ? (
+              {(thesisTags.sectors.length > 0 || thesisTags.stages.length > 0 || thesisTags.geos.length > 0) && (
                 <div className="mt-phi-3 flex flex-wrap gap-phi-2">
-                  {thesisCriteria.map((item) => (
-                    <span
-                      key={item}
-                      className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40"
-                    >
-                      {item}
-                    </span>
+                  {[...thesisTags.sectors, ...thesisTags.stages, ...thesisTags.geos].map((t) => (
+                    <span key={t} className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40">{t}</span>
                   ))}
                 </div>
-              ) : null}
+              )}
             </article>
             <aside
               className="min-w-0 min-h-0 flex-1 border border-hairline bg-paper overflow-hidden"

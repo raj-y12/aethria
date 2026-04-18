@@ -619,8 +619,52 @@ function FundThesisRuntimeTab() {
   }
 
   const st = data.alignment_stats;
+  const pj = data.parsed_json ?? {};
+  const sectors = Array.isArray(pj.sectors) ? (pj.sectors as string[]) : [];
+  const stages = Array.isArray(pj.stage_focus) ? (pj.stage_focus as string[]) : [];
+  const geos = Array.isArray(pj.geography) ? (pj.geography as string[]) : [];
+  const excls = Array.isArray(pj.exclusions) ? (pj.exclusions as string[]) : [];
+
   return (
     <div className="space-y-phi-5">
+      {(sectors.length > 0 || stages.length > 0 || geos.length > 0 || excls.length > 0) && (
+        <section className="flex flex-col gap-phi-3">
+          <h3 className="type-label-section text-oxford/60">Mandate</h3>
+          {sectors.length > 0 && (
+            <div className="flex flex-wrap items-baseline gap-x-phi-2 gap-y-1">
+              <span className="type-meta uppercase text-oxford/40 shrink-0 w-20">Sector</span>
+              {sectors.map((t) => (
+                <span key={t} className="type-meta px-phi-2 py-[2px] border border-oxford/20 text-oxford/60">{t}</span>
+              ))}
+            </div>
+          )}
+          {stages.length > 0 && (
+            <div className="flex flex-wrap items-baseline gap-x-phi-2 gap-y-1">
+              <span className="type-meta uppercase text-oxford/40 shrink-0 w-20">Stage</span>
+              {stages.map((t) => (
+                <span key={t} className="type-meta px-phi-2 py-[2px] border border-oxford/20 text-oxford/60">{t}</span>
+              ))}
+            </div>
+          )}
+          {geos.length > 0 && (
+            <div className="flex flex-wrap items-baseline gap-x-phi-2 gap-y-1">
+              <span className="type-meta uppercase text-oxford/40 shrink-0 w-20">Geography</span>
+              {geos.map((t) => (
+                <span key={t} className="type-meta px-phi-2 py-[2px] border border-oxford/20 text-oxford/60">{t}</span>
+              ))}
+            </div>
+          )}
+          {excls.length > 0 && (
+            <div className="flex flex-wrap items-baseline gap-x-phi-2 gap-y-1">
+              <span className="type-meta uppercase text-oxford/40 shrink-0 w-20">Excl.</span>
+              {excls.map((t) => (
+                <span key={t} className="type-meta px-phi-2 py-[2px] border border-escalation/30 text-escalation/70">{t}</span>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+      <div className="border-t border-hairline" />
       <section>
         <h3 className="type-label-section text-oxford/60 mb-phi-3">Runtime</h3>
         <p className="type-body-sm text-oxford/60m-0">
