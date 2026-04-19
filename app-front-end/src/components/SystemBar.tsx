@@ -85,15 +85,16 @@ export default function SystemBar({
   };
 
   const handleLogout = () => {
-    if (agentsEnabled) {
-      setShowLogoutModal(true);
-    } else {
-      doLogout();
-    }
+    setShowLogoutModal(true);
   };
 
   const handleTurnOffAndLogout = async () => {
     await toggleAgents(false);
+    doLogout();
+  };
+
+  const handleTurnOnAndStay = async () => {
+    await toggleAgents(true);
     doLogout();
   };
 
@@ -236,12 +237,14 @@ export default function SystemBar({
     {/* Agent logout modal — rendered outside the bar via portal */}
     <AgentLogoutModal
       open={showLogoutModal}
+      agentsEnabled={agentsEnabled}
       onCancel={() => setShowLogoutModal(false)}
       onKeepRunning={() => {
         setShowLogoutModal(false);
         doLogout();
       }}
       onTurnOffAndLogout={handleTurnOffAndLogout}
+      onTurnOnAndStay={handleTurnOnAndStay}
     />
   </>);
 }

@@ -38,7 +38,7 @@ export default function LoadingAnimation({
           reduceMotion ? (
             <div
               key={i}
-              className="absolute top-1/2 left-1/2 rounded-none bg-oxford"
+              className="absolute top-1/2 left-1/2 rounded-full bg-oxford"
               style={{
                 width: POINT_SIZE,
                 height: POINT_SIZE,
@@ -50,7 +50,7 @@ export default function LoadingAnimation({
           ) : (
             <motion.div
               key={i}
-              className="absolute top-1/2 left-1/2 rounded-none bg-oxford"
+              className="absolute top-1/2 left-1/2 rounded-full bg-oxford"
               style={{
                 width: POINT_SIZE,
                 height: POINT_SIZE,

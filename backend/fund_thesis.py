@@ -56,7 +56,11 @@ class FundThesisError(Exception):
 
 
 class FundThesisMissingError(FundThesisError):
-    """No fund thesis row or no active version for this user."""
+    """No fund thesis row or no active version for this user (definitely absent, not a query error)."""
+
+
+class FundThesisQueryError(FundThesisError):
+    """Transient or unexpected error while querying thesis tables; state is unknown."""
 
 
 class FundThesisIncompleteError(FundThesisError):
@@ -255,7 +259,7 @@ def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
             logger.debug("get_active_thesis fund_thesis transient failure: %s", e)
         else:
             logger.warning("get_active_thesis fund_thesis query failed: %s", e)
-        raise FundThesisMissingError("fund_thesis query failed") from e
+        raise FundThesisQueryError("fund_thesis query failed") from e
 
     rows = getattr(tr, "data", None) or []
     if not rows:
@@ -280,7 +284,7 @@ def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
             logger.debug("get_active_thesis version transient failure: %s", e)
         else:
             logger.warning("get_active_thesis version query failed: %s", e)
-        raise FundThesisMissingError("fund_thesis_versions query failed") from e
+        raise FundThesisQueryError("fund_thesis_versions query failed") from e
 
     vrows = getattr(vr, "data", None) or []
     if not vrows:
@@ -359,10 +363,59 @@ def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
 def _bootstrap_default_thesis_or_raise(client: Any, uid: str) -> None:
     """
     Persist first thesis + version without OpenAI (hardcoded parsed_json, no embedding API).
-    Idempotent with concurrent get_active_thesis.
+    Fully idempotent: if versions already exist but active_version_id is null, re-links to the
+    most recent version instead of creating a new one (prevents spurious version inflation).
     """
     from fund_thesis_ops import create_fund_thesis_version_for_user
+    from datetime import datetime, timezone
 
+    # Check current state before doing any writes.
+    try:
+        tr = client.table("fund_thesis").select("id,active_version_id").eq("user_id", uid).limit(1).execute()
+        trows = getattr(tr, "data", None) or []
+    except Exception as e:
+        raise FundThesisMissingError(f"bootstrap fund_thesis query failed: {e}") from e
+
+    if trows:
+        thesis_id = str(trows[0].get("id") or "").strip()
+        av = trows[0].get("active_version_id")
+        active_vid = str(av).strip() if av else ""
+
+        if thesis_id and active_vid:
+            # active_version_id already set — nothing to do (concurrent request beat us here).
+            logger.debug("[FundThesis] Bootstrap skipped; active_version_id already set for user_id=%s", uid[:24])
+            return
+
+        if thesis_id:
+            # Thesis row exists but no active_version_id — find the most recent version.
+            try:
+                vr = (
+                    client.table("fund_thesis_versions")
+                    .select("id,version_number")
+                    .eq("thesis_id", thesis_id)
+                    .eq("user_id", uid)
+                    .order("version_number", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                vrows = getattr(vr, "data", None) or []
+            except Exception as e:
+                raise FundThesisMissingError(f"bootstrap versions query failed: {e}") from e
+
+            if vrows:
+                # Versions exist — re-link active_version_id without creating a new version.
+                latest_vid = str(vrows[0]["id"])
+                now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                try:
+                    client.table("fund_thesis").update(
+                        {"active_version_id": latest_vid, "updated_at": now_iso}
+                    ).eq("id", thesis_id).eq("user_id", uid).execute()
+                    logger.info("[FundThesis] Re-linked active_version_id to v%s for user_id=%s", vrows[0].get("version_number"), uid[:24])
+                    return
+                except Exception as e:
+                    raise FundThesisMissingError(f"bootstrap re-link failed: {e}") from e
+
+    # No fund_thesis row or no versions at all — create the default from scratch.
     raw = generate_default_thesis_raw_text()
     try:
         create_fund_thesis_version_for_user(
@@ -395,12 +448,16 @@ def _bootstrap_default_thesis_or_raise(client: Any, uid: str) -> None:
 def get_active_thesis(client: Any, user_id: str) -> Optional[ActiveThesis]:
     """
     Resolve fund_thesis row and active version from Supabase (read-only).
-    Returns None when no thesis exists for the user.
+    Returns None only when no thesis definitively exists for the user.
+    Raises FundThesisQueryError on transient/unexpected DB errors so callers
+    can distinguish "missing" from "unknown state" and avoid spurious bootstraps.
     Embeddings are optional ([] if absent).
     """
     uid = require_user_id(user_id, context="get_active_thesis")
     try:
         return _resolve_active_thesis_unsafe(client, uid)
+    except FundThesisQueryError:
+        raise
     except FundThesisMissingError:
         return None
 

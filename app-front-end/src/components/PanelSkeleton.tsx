@@ -14,7 +14,7 @@ function SkeletonLine({ className = '' }: { className?: string }) {
 }
 
 function SkeletonBlock({ className = '' }: { className?: string }) {
-  return <div className={`skeleton-shimmer rounded-none ${className}`} />;
+  return <div className={`skeleton-shimmer ${className}`} />;
 }
 
 export function WorkGridSkeleton() {
@@ -22,12 +22,12 @@ export function WorkGridSkeleton() {
     <div className="w-full space-y-3 px-0 pt-2 pb-6 lg:pb-8">
       {[1, 2, 3, 4].map((i) => (
         <div key={i} className="flex gap-4 border border-hairline bg-paper p-4">
-          <SkeletonBlock className="w-12 h-12 shrink-0" />
+          <SkeletonBlock className="w-12 h-12 shrink-0 rounded-full" />
           <div className="flex-1 min-w-0 space-y-2">
             <SkeletonLine className="w-3/4 max-w-[200px]" />
             <SkeletonLine className="w-1/2 max-w-[120px]" />
           </div>
-          <SkeletonBlock className="w-16 h-5 shrink-0" />
+          <SkeletonBlock className="w-16 h-5 shrink-0 rounded-none" />
         </div>
       ))}
     </div>
@@ -52,14 +52,14 @@ export function SystemIntelligenceSkeleton() {
     <div className="space-y-6 p-4 sm:p-5">
       <div className="flex gap-2">
         {[1, 2, 3].map((i) => (
-          <SkeletonBlock key={i} className="h-8 w-20" />
+          <SkeletonBlock key={i} className="h-8 w-20 rounded-none" />
         ))}
       </div>
       <div className="space-y-3">
         <SkeletonLine className="w-32" />
         <SkeletonLine className="w-full" />
         <SkeletonLine className="w-5/6" />
-        <SkeletonBlock className="h-20 w-full mt-4" />
+        <SkeletonBlock className="h-20 w-full mt-4 rounded-none" />
       </div>
     </div>
   );

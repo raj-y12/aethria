@@ -1,12 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
-import {
-  PANEL_TAB_BAR_CLASS,
-  PANEL_TAB_ACTIVE_CLASS,
-  PANEL_TAB_INACTIVE_CLASS,
-} from './PanelShell';
-import SignalEventRow from './SignalEventRow';
 import type {
   SignalItem, EscalationItem, RejectionAnalytics, WatchlistAnalytics,
   ConcentrationAnalytics, MetaCycleReport, ScoutWeights, CalibrationState,
@@ -14,23 +8,18 @@ import type {
 import { resolveEscalation } from '../api/escalations';
 import { triggerMetaCycle } from '../api/meta';
 import { transitionOrReduced } from '../design-system/motion';
+import { UI_FILTER_TOOLBAR_LABEL } from '../design-system/ui-text';
 import { usePrefersReducedMotion } from '../hooks';
 import EmptyState from './EmptyState';
-import DecisionBadge from './DecisionBadge';
 import { fetchFundThesisRuntime, type FundThesisRuntime } from '../api/fundThesis';
-
-/** Match pipeline tab strip: bottom border on the nav hairline (items-end + -mb-px, same language as `PanelShell`). */
-const SYSTEM_INTEL_TAB_BUTTON_CLASS =
-  'py-phi-3 px-phi-4 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction transition-[border-color,color]';
-const SYSTEM_INTEL_TAB_BAR_CLASS = `${PANEL_TAB_BAR_CLASS} items-end pt-phi-3 pb-0`;
 
 type Tab = 'signals' | 'escalations' | 'analytics' | 'thesis' | 'meta';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'escalations', label: 'Escalations' },
   { key: 'signals', label: 'Signals' },
   { key: 'analytics', label: 'Analytics' },
-  { key: 'thesis', label: 'Fund thesis' },
-  { key: 'meta', label: 'Meta-Agent' },
+  { key: 'thesis', label: 'Thesis' },
+  { key: 'meta', label: 'Meta' },
 ];
 
 interface SystemIntelligenceProps {
@@ -43,34 +32,44 @@ interface SystemIntelligenceProps {
   scoutWeights: ScoutWeights;
   calibrationState: CalibrationState;
   onEscalationResolved?: () => void;
-  /** Open the work-grid memo for this escalation’s startup (closes System, selects startup). */
   onOpenEscalationMemo?: (escalation: EscalationItem) => void;
+  onClose?: () => void;
 }
 
-function formatRelativeTime(isoDate: string): string {
-  const diff = new Date(isoDate).getTime() - Date.now();
-  if (diff <= 0) return 'overdue';
-  const hours = Math.floor(diff / 3600000);
-  const mins = Math.floor((diff % 3600000) / 60000);
-  if (hours > 0) return `in ${hours}h ${mins}m`;
-  return `in ${mins}m`;
-}
-
-function BarFill({ pct, delay = 0 }: { pct: number; delay?: number }) {
+function TacticalBar({ pct, delay = 0 }: { pct: number; delay?: number }) {
   const reduceMotion = usePrefersReducedMotion();
   return (
-    <div className="w-full h-1.5 bg-oxford/25">
+    <div className="w-full h-[1px] bg-oxford/10 relative overflow-hidden">
       <motion.div
-        className="h-full bg-oxford/50"
-        initial={reduceMotion ? { width: `${Math.min(100, Math.max(0, pct))}%` } : { width: 0 }}
-        animate={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+        className="absolute inset-0 h-full bg-oxford/40 origin-left"
+        initial={reduceMotion ? { scaleX: Math.min(1, Math.max(0, pct / 100)) } : { scaleX: 0 }}
+        animate={{ scaleX: Math.min(1, Math.max(0, pct / 100)) }}
         transition={transitionOrReduced(reduceMotion, {
-          duration: tokens.motion.duration.short,
+          duration: 1.2,
           delay: reduceMotion ? 0 : delay,
-          ease: tokens.motion.ease,
+          ease: [0.16, 1, 0.3, 1],
         })}
       />
     </div>
+  );
+}
+
+/* ─── ROW WRAPPER ─── */
+function RowWrapper({ children, index, onClick, isSelected }: { children: React.ReactNode; index: number; onClick?: () => void; isSelected?: boolean }) {
+  const reduceMotion = usePrefersReducedMotion();
+  return (
+    <motion.div
+      initial={reduceMotion ? {} : { opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: Math.min(index * 0.04, 0.4), duration: 0.6, ease: tokens.motion.ease }}
+      className={`group relative border-b border-oxford/[0.06] py-phi-5 px-phi-4 transition-all duration-700 ease-smooth ${onClick ? 'cursor-pointer' : ''
+        } ${isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.02]'}`}
+      onClick={onClick}
+    >
+      <div className="grid grid-cols-1 gap-phi-5 items-start lg:grid-cols-[76px_minmax(0,1fr)_max-content] 2xl:grid-cols-[100px_minmax(0,1fr)_max-content]">
+        {children}
+      </div>
+    </motion.div>
   );
 }
 
@@ -78,76 +77,85 @@ function BarFill({ pct, delay = 0 }: { pct: number; delay?: number }) {
 function SignalsTab({ signals }: { signals: SignalItem[] }) {
   if (signals.length === 0) {
     return (
-      <EmptyState
-        label="Signals"
-        body="News, funding, and other updates for companies in your pipeline appear here as they are detected."
-      />
+      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
+        <EmptyState label="Signals" body="No high-priority events detected in the last cycle." />
+      </div>
     );
   }
   return (
-    <div className="space-y-0">
+    <div className="flex flex-col relative">
       {signals.map((sig, i) => (
-        <SignalEventRow
-          key={sig.id ?? i}
-          layout="stacked"
-          timestamp={
-            sig.detected_at
-              ? new Date(sig.detected_at).toLocaleTimeString('en-GB', {
-                  hour12: false,
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                })
-              : '—'
-          }
-          label={`${sig.startup_id?.slice(0, 8) ?? 'Unknown'} · ${sig.signal_type.replace('_', ' ')}`}
-          body={<span className="line-clamp-2">{sig.description}</span>}
-          meta={`${sig.tracker_agent_id ?? sig.source ?? ''} · ${sig.detected_at ? new Date(sig.detected_at).toLocaleDateString('en-GB') : ''}`}
-        />
+        <RowWrapper key={sig.id ?? i} index={i}>
+          {/* Index */}
+          <div className="flex flex-col gap-phi-3 min-w-0">
+            <span className="font-mono type-label-section text-oxford/20 group-hover:text-oxford/50 transition-colors duration-500 tabular-nums">
+              {(i + 1).toString().padStart(2, '0')}
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <span className="type-meta text-oxford/30 uppercase tracking-tighter">Time</span>
+              <span className="font-mono type-meta text-oxford/50 tabular-nums">
+                {sig.detected_at ? new Date(sig.detected_at).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '--:--'}
+              </span>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex min-w-0 flex-col gap-phi-4">
+            <div className="flex items-center gap-2">
+              <span className="type-meta text-oxford/40 uppercase tracking-widest">{sig.signal_type.replace(/_/g, ' ')}</span>
+              <span className="w-1.5 h-1.5 border border-oxford/20 rotate-45" />
+              <span className="type-label-tab text-oxford/40">{sig.startup_id?.slice(0, 8) ?? 'Unknown'}</span>
+            </div>
+            <p className="type-body text-oxford/60 leading-relaxed italic border-l-2 border-oxford/[0.06] pl-phi-4 max-w-2xl">
+              {sig.description}
+            </p>
+          </div>
+
+          {/* Meta */}
+          <div className="flex min-w-0 flex-col items-start gap-phi-5 lg:items-end">
+            <div className="flex flex-col items-start lg:items-end gap-phi-2">
+              <span className="type-meta text-oxford/30 uppercase tracking-widest">Source</span>
+              <span className="type-meta text-oxford/50 uppercase tracking-tighter">
+                {sig.tracker_agent_id ?? sig.source ?? 'System'}
+              </span>
+            </div>
+            <div className="flex w-full flex-col items-start gap-phi-1 border-t border-oxford/[0.06] pt-phi-4 lg:w-auto lg:items-end">
+              <span className="type-meta text-oxford/30 uppercase">Date</span>
+              <span className="font-mono type-meta text-oxford/50 tabular-nums">
+                {sig.detected_at ? new Date(sig.detected_at).toLocaleDateString('en-GB') : ''}
+              </span>
+            </div>
+          </div>
+        </RowWrapper>
       ))}
     </div>
   );
 }
 
 /* ─── ESCALATIONS ─── */
-function EscalationsTab({
-  escalations,
-  onResolved,
-  onOpenMemo,
-}: {
-  escalations: EscalationItem[];
-  onResolved?: () => void;
-  onOpenMemo?: (escalation: EscalationItem) => void;
+function EscalationsTab({ escalations, onResolved, onOpenMemo }: {
+  escalations: EscalationItem[]; onResolved?: () => void; onOpenMemo?: (escalation: EscalationItem) => void;
 }) {
   const pending = escalations.filter((e) => !e.human_resolution);
   if (pending.length === 0) {
-    return <p className="text-center py-12 type-label-section text-oxford/25">No pending escalations</p>;
+    return (
+      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
+        <p className="type-meta text-oxford/20 uppercase tracking-[0.2em]">All escalations resolved</p>
+      </div>
+    );
   }
   return (
-    <div className="space-y-0">
-      {pending.map((esc) => (
-        <EscalationCard key={esc.id} escalation={esc} onResolved={onResolved} onOpenMemo={onOpenMemo} />
+    <div className="flex flex-col relative">
+      {pending.map((esc, i) => (
+        <EscalationRow key={esc.id} index={i} escalation={esc} onResolved={onResolved} onOpenMemo={onOpenMemo} />
       ))}
     </div>
   );
 }
 
-function escalationConvictionScore(partner: EscalationItem['partner']): number | null {
-  const c = partner?.confidence;
-  if (c == null || typeof c !== 'number' || Number.isNaN(c)) return null;
-  return c;
-}
-
-function EscalationCard({
-  escalation,
-  onResolved,
-  onOpenMemo,
-}: {
-  escalation: EscalationItem;
-  onResolved?: () => void;
-  onOpenMemo?: (escalation: EscalationItem) => void;
+function EscalationRow({ index, escalation, onResolved, onOpenMemo }: {
+  index: number; escalation: EscalationItem; onResolved?: () => void; onOpenMemo?: (escalation: EscalationItem) => void;
 }) {
-  const reduceMotion = usePrefersReducedMotion();
   const [resolving, setResolving] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [resolved, setResolved] = useState(false);
@@ -157,132 +165,119 @@ function EscalationCard({
     try {
       await resolveEscalation(escalation.id, resolving as 'YES' | 'NO' | 'MAYBE', notes);
       setResolved(true);
-      setTimeout(() => onResolved?.(), 1500);
+      setTimeout(() => onResolved?.(), 1200);
     } catch { /* silent */ }
   }, [resolving, notes, escalation.id, onResolved]);
 
-  const conviction = escalationConvictionScore(escalation.partner);
-  const sector = escalation.scout?.sector?.trim() ?? '';
-  const sectorConvictionLine =
-    sector || conviction != null
-      ? [
-          sector || null,
-          conviction != null ? `${Math.round(conviction * 100)}% confidence` : null,
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      : null;
+  const confidence = escalation.partner?.confidence ?? 0;
+  const displayIndex = (index + 1).toString().padStart(2, '0');
 
   if (resolved) {
     return (
-      <motion.div
-        initial={{ opacity: 1, height: 'auto' }}
-        animate={{ opacity: 0, height: 0 }}
-        transition={transitionOrReduced(reduceMotion, {
-          duration: tokens.motion.duration.short,
-          ease: tokens.motion.ease,
-        })}
-        className="overflow-hidden"
-      >
-        <p className="py-phi-5 text-center type-label-tab text-oxford/60">Resolved</p>
+      <motion.div initial={{ opacity: 1 }} animate={{ opacity: 0 }} className="py-phi-5 border-b border-oxford/[0.06] flex items-center justify-center">
+        <span className="type-meta text-oxford/40 uppercase tracking-widest">Resolved</span>
       </motion.div>
     );
   }
 
   return (
-    <div className="border-b border-hairline py-phi-4">
-      <div className="flex items-start justify-between gap-phi-3 w-full min-w-0">
-        <p className="min-w-0 flex-1 truncate type-body font-semibold text-oxford">
-          {escalation.startup_name ?? escalation.scout?.name ?? escalation.id}
-        </p>
-        {onOpenMemo ? (
-          <button
-            type="button"
-            onClick={() => onOpenMemo(escalation)}
-            className="shrink-0 inline-flex min-h-7 items-center cursor-pointer rounded-none border border-field-border bg-transparent px-phi-3 py-phi-2 type-label-tab text-oxford/60 btn-interaction hover:bg-oxford/[0.04] hover:border-oxford/35 hover:text-oxford active:translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-offset-0"
-          >
-            → MEMO
-          </button>
-        ) : null}
-      </div>
-      <p className="mt-phi-2 inline-flex w-fit min-h-6 items-center rounded-none border border-hairline bg-transparent px-phi-2 py-phi-1 type-label-tab text-oxford/40">
-        Awaiting human review
-      </p>
-      {sectorConvictionLine ? (
-        <p className="mt-phi-3 type-body-sm text-oxford/60">{sectorConvictionLine}</p>
-      ) : null}
-      {escalation.partner?.decision_rationale && (
-        <p className="type-body-sm text-oxford/60 mt-phi-3 line-clamp-3">{escalation.partner.decision_rationale}</p>
-      )}
-      {escalation.partner?.llm_fallback_reason && (
-        <p className="type-body-sm text-oxford/40 mt-phi-2">{escalation.partner.llm_fallback_reason}</p>
-      )}
-      {!resolving ? (
-        <div className="mt-phi-4 flex flex-wrap items-center gap-phi-1">
-          {(
-            [
-              {
-                d: 'YES' as const,
-                label: 'ADVANCE',
-                toneClass:
-                  'border-oxford/25 text-oxford/80 hover:bg-oxford/[0.06] hover:border-oxford/40',
-              },
-              {
-                d: 'NO' as const,
-                label: 'PASS',
-                toneClass:
-                  'border-hairline text-oxford/60 hover:bg-oxford/[0.04] hover:border-oxford/25',
-              },
-              {
-                d: 'MAYBE' as const,
-                label: 'HOLD',
-                toneClass:
-                  'border-hairline text-oxford/60 hover:bg-oxford/[0.04] hover:border-oxford/25',
-              },
-            ] as const
-          ).map(({ d, label, toneClass }) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => setResolving(d)}
-              className={`${toneClass} rounded-none border bg-transparent py-phi-2 px-phi-4 type-label-tab btn-interaction active:translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-offset-0`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="mt-phi-4 space-y-phi-3">
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Add a note before deciding..."
-            className="min-h-[80px] w-full resize-none rounded-none border border-field-border bg-paper p-phi-3 type-body text-oxford/60 outline-none transition-[border-color] duration-150 placeholder:text-oxford/25 focus:border-field-border-strong focus:outline-none"
+    <RowWrapper index={index}>
+      {/* Index */}
+      <div className="flex flex-col gap-phi-3 min-w-0">
+        <span className="font-mono type-label-section text-oxford/20 group-hover:text-oxford/50 transition-colors duration-500 tabular-nums">
+          {displayIndex}
+        </span>
+        <div className="relative w-0.5 h-8 bg-oxford/5 overflow-hidden">
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: `${confidence * 100}%` }}
+            className="absolute bottom-0 left-0 w-full bg-oxford/30"
           />
-          <div className="flex gap-phi-2">
-            <button
-              type="button"
-              onClick={handleResolve}
-              disabled={notes.trim().length < 10}
-              className={`flex-1 py-phi-3 type-label-tab text-paper btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset ${
-                notes.trim().length >= 10
-                  ? 'cursor-pointer bg-oxford hover:bg-oxford/80'
-                  : 'cursor-not-allowed bg-oxford/25'
-              }`}
-            >
-              Confirm {resolving === 'YES' ? 'Advance' : resolving === 'NO' ? 'Pass' : 'Hold'}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setResolving(null); setNotes(''); }}
-              className="py-phi-3 px-phi-4 type-label-tab text-oxford/60 border border-hairline-strong hover:text-oxford hover:border-oxford/40 hover:bg-oxford/[0.03] btn-interaction"
-            >
-              Cancel
-            </button>
-          </div>
         </div>
-      )}
-    </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="type-meta text-oxford/30 uppercase tracking-tighter">Confidence</span>
+          <span className="font-mono type-meta text-oxford/50 tabular-nums">{Math.round(confidence * 100)}%</span>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex min-w-0 flex-col gap-phi-3">
+        <div className="flex items-baseline gap-phi-4 flex-wrap">
+          <h3 className="font-sans font-semibold text-base text-oxford tracking-tight">
+            {escalation.startup_name ?? escalation.scout?.name ?? 'Unknown'}
+          </h3>
+          <span className="type-meta text-oxford/40 uppercase tracking-widest">{escalation.scout?.sector || 'Multi-sector'}</span>
+        </div>
+
+        {!resolving ? (
+          <div className="mt-phi-2 flex items-center gap-phi-4">
+            {[
+              { d: 'YES' as const, label: 'Invest' },
+              { d: 'NO' as const, label: 'Pass' },
+              { d: 'MAYBE' as const, label: 'Monitor' },
+            ].map(({ d, label }) => (
+              <button
+                key={d}
+                onClick={() => setResolving(d)}
+                className="type-meta text-oxford/40 hover:text-oxford transition-colors uppercase tracking-[0.18em] underline underline-offset-8 decoration-oxford/10 hover:decoration-oxford/40 btn-interaction"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-phi-4 space-y-phi-4">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add a note explaining your decision..."
+              autoFocus
+              className="w-full bg-transparent border-0 border-b border-oxford/10 py-2 type-body text-oxford placeholder:text-oxford/20 outline-none focus:border-oxford/30 transition-colors"
+            />
+            <div className="flex gap-phi-4">
+              <button
+                onClick={handleResolve}
+                disabled={notes.trim().length < 5}
+                className="type-meta text-oxford hover:text-escalation transition-colors disabled:opacity-20 uppercase tracking-[0.14em]"
+              >
+                Confirm — {resolving}
+              </button>
+              <button
+                onClick={() => { setResolving(null); setNotes(''); }}
+                className="type-meta text-oxford/20 hover:text-oxford transition-colors uppercase tracking-[0.14em]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex min-w-0 flex-col items-start gap-phi-5 lg:items-end">
+        {onOpenMemo && (
+          <button onClick={() => onOpenMemo(escalation)} className="type-meta text-oxford/40 hover:text-oxford transition-colors uppercase tracking-[0.14em] btn-interaction">
+            View Memo →
+          </button>
+        )}
+        <span className="type-label-tab text-escalation bg-escalation/5 px-2 py-0.5 border border-escalation/10 uppercase tracking-widest text-[9px]">
+          Escalation
+        </span>
+      </div>
+    </RowWrapper>
+  );
+}
+
+/* ─── SECTION WRAPPER ─── */
+function TabSection({ title, label, children }: { title: string; label?: string; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-phi-4 px-phi-4 py-phi-5 border-b border-oxford/[0.06] last:border-0">
+      <div className="flex items-center justify-between border-b border-oxford/[0.06] pb-phi-3">
+        <h3 className="type-meta text-oxford/50 uppercase tracking-[0.18em]">{title}</h3>
+        {label && <span className="type-meta text-oxford/30">{label}</span>}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -293,285 +288,67 @@ function AnalyticsTab({ rejection, watchlist, concentration }: {
   const maxRedFlag = Math.max(...rejection.most_common_red_flags.map((r) => r.count), 1);
   const sectors = Object.entries(concentration.by_sector).sort((a, b) => b[1].count - a[1].count).slice(0, 8);
   const maxSector = Math.max(...sectors.map(([, v]) => v.count), 1);
-  const hasNoData =
-    rejection.most_common_red_flags.length === 0 &&
-    watchlist.total === 0 &&
-    sectors.length === 0;
-
-  if (hasNoData) {
-    return (
-      <EmptyState
-        label="Analytics"
-        body="Rejection patterns, watchlist, and sector concentration fill in after reviewers have worked the queue."
-      />
-    );
-  }
 
   return (
-    <div className="space-y-0">
-      {/* Rejection Patterns */}
-      <section className="pb-phi-5">
-        <h3 className="type-label-section text-oxford/60 mb-phi-4">Rejection patterns</h3>
-        {rejection.most_common_red_flags.slice(0, 6).map((rf, i) => (
-          <div key={rf.flag} className="flex items-center gap-phi-2 mb-phi-2">
-            <span className="type-label-section text-oxford/60 w-32 truncate shrink-0">{rf.flag}</span>
-            <div className="flex-1"><BarFill pct={(rf.count / maxRedFlag) * 100} delay={i * 0.05} /></div>
-            <span className="type-meta text-oxford/40 tabular-nums w-6 text-right">{rf.count}</span>
-          </div>
-        ))}
-        {rejection.most_common_red_flags.length === 0 && (
-          <p className="type-label-tab text-oxford/25">No rejection data yet</p>
-        )}
-      </section>
-
-      <div className="border-t border-hairline" />
-
-      {/* Watchlist Health */}
-      <section className="py-phi-5">
-        <h3 className="type-label-section text-oxford/60 mb-phi-4">Watchlist health</h3>
-        {watchlist.total === 0 ? (
-          <div className="py-phi-5 flex items-center justify-center">
-            <p className="type-label-section text-oxford/25 text-center">
-              NO WATCHLIST ENTRIES
-            </p>
-          </div>
+    <div className="flex flex-col">
+      <TabSection title="Rejection Patterns" label="Historical">
+        {rejection.most_common_red_flags.length === 0 ? (
+          <p className="type-meta text-oxford/20 uppercase tracking-[0.18em]">No rejection data yet</p>
         ) : (
-          <div className="flex gap-phi-6">
-            {[
-              { label: 'Total', value: watchlist.total },
-              { label: 'Stale', value: watchlist.stale },
-              { label: 'Avg days', value: Math.round(watchlist.avg_days) },
-            ].map((s) => (
-              <div key={s.label} className="text-center">
-                <p className="type-title text-oxford tabular-nums">{s.value}</p>
-                <p className="type-label-section text-oxford/60">{s.label}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-phi-5 gap-y-phi-4">
+            {rejection.most_common_red_flags.slice(0, 6).map((rf, i) => (
+              <div key={rf.flag} className="flex flex-col gap-2">
+                <div className="flex justify-between items-baseline">
+                  <span className="type-meta text-oxford/40 uppercase tracking-widest">{rf.flag.replace(/_/g, ' ')}</span>
+                  <span className="font-mono type-meta text-oxford/60 tabular-nums">{rf.count}</span>
+                </div>
+                <TacticalBar pct={(rf.count / maxRedFlag) * 100} delay={i * 0.05} />
               </div>
             ))}
           </div>
         )}
-      </section>
+      </TabSection>
 
-      <div className="border-t border-hairline" />
-
-      {/* Sector Concentration */}
-      <section className="pt-phi-5">
-        <h3 className="type-label-section text-oxford/60 mb-phi-4">Pipeline concentration</h3>
-        <p className="type-meta text-oxford/40 mb-phi-4">Share of pipeline by sector (count · % of total)</p>
-        {sectors.map(([sector, data], i) => (
-          <div key={sector} className="flex items-center gap-phi-2 mb-phi-2">
-            <span className="type-label-section text-oxford/60 w-36 truncate shrink-0">
-              {sector}
-              {sector === concentration.most_concentrated_sector && (
-                <span className="type-meta text-oxford/40 ml-1">concentrated</span>
-              )}
-            </span>
-            <div className="flex-1"><BarFill pct={(data.count / maxSector) * 100} delay={i * 0.05} /></div>
-            <span className="type-meta text-oxford/40 tabular-nums whitespace-nowrap min-w-[5rem] text-right" title={`${data.count} companies, ${data.pct_of_total}% of pipeline`}>{data.count} · {data.pct_of_total}%</span>
-          </div>
-        ))}
-        {sectors.length === 0 && <p className="type-label-tab text-oxford/25">No pipeline data yet</p>}
-        {concentration.last_updated && (
-          <p className="type-meta text-oxford/25 mt-phi-4">Updated {new Date(concentration.last_updated).toLocaleString('en-GB')}</p>
-        )}
-      </section>
-    </div>
-  );
-}
-
-/* ─── META-AGENT ─── */
-function MetaAgentTab({ reports, weights, calibration }: {
-  reports: MetaCycleReport[]; weights: ScoutWeights; calibration: CalibrationState;
-}) {
-  const reduceMotion = usePrefersReducedMotion();
-  const [legendOpen, setLegendOpen] = useState(false);
-  const [triggering, setTriggering] = useState(false);
-  const [triggerResult, setTriggerResult] = useState<string | null>(null);
-
-  const handleTrigger = useCallback(async () => {
-    setTriggering(true);
-    try {
-      const result = await triggerMetaCycle();
-      setTriggerResult(`Cycle ${result.cycle_number} triggered`);
-      setTimeout(() => setTriggerResult(null), 3000);
-    } catch {
-      setTriggerResult('Failed');
-      setTimeout(() => setTriggerResult(null), 3000);
-    } finally {
-      setTriggering(false);
-    }
-  }, []);
-
-  const latest = reports.length > 0 ? reports[reports.length - 1] : null;
-  const weightEntries: [string, number][] = [
-    ['Market', weights.MarketDrivenScout],
-    ['Builder', weights.BuilderTechnicalScout],
-    ['Pain', weights.PainPointScout],
-    ['Contrarian', weights.ContrarianScout],
-  ];
-
-  return (
-    <div className="space-y-0">
-      {/* Pipeline legend — collapsible, hidden by default */}
-      <section className="flex-none border-b border-hairline pb-phi-4 mb-phi-4">
-        <button
-          type="button"
-          onClick={() => setLegendOpen((o) => !o)}
-          className="w-full flex items-center justify-between py-phi-3 px-0 type-label-tab text-oxford/40 hover:text-oxford/80 btn-interaction text-left"
-          aria-expanded={legendOpen}
-        >
-          <span>Pipeline legend</span>
-          <span className="tabular-nums" aria-hidden>{legendOpen ? '−' : '+'}</span>
-        </button>
-        <AnimatePresence initial={false}>
-          {legendOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={transitionOrReduced(reduceMotion, {
-                duration: tokens.motion.duration.micro,
-                ease: tokens.motion.ease,
-              })}
-              className="overflow-hidden"
-            >
-              <div className="pb-phi-3 pt-0 space-y-phi-3 type-body-sm text-oxford/60 max-w-2xl">
-                <p><span className="type-label-section text-oxford/60">Order</span> · Escalations first, then recency and score.</p>
-                <div className="flex flex-wrap items-center gap-phi-2">
-                  <span className="type-label-section text-oxford/60">Decisions</span>
-                  <span className="text-oxford/25" aria-hidden>·</span>
-                  <DecisionBadge variant="INVEST" />
-                  <DecisionBadge variant="MONITOR" />
-                  <DecisionBadge variant="PASS" />
-                  <span className="ml-phi-2 type-body-sm text-oxford/60">You decide; scouts and reviewer run automatically.</span>
-                </div>
-                <p><span className="type-label-section text-oxford/60">Escalation</span> · Reviewer disagreement or low confidence → human resolution. Count in status strip.</p>
-                <p><span className="type-label-section text-oxford/60">Pipeline</span> · Scouts surface companies, reviewer scores, partner decides advances and escalations.</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </section>
-
-      {/* Scout Weights */}
-      <section className="pb-phi-5">
-        <h3 className="type-label-section text-oxford/60 mb-phi-4">Scout allocation</h3>
-        {weightEntries.map(([name, w], i) => (
-          <div key={name} className="flex items-center gap-phi-2 mb-phi-3">
-            <span className="type-label-section text-oxford/60 w-20 shrink-0">{name}</span>
-            <div className="flex-1"><BarFill pct={w * 100} delay={i * 0.05} /></div>
-            <span className="type-meta text-oxford/40 tabular-nums w-8 text-right">{Math.round(w * 100)}%</span>
-          </div>
-        ))}
-      </section>
-
-      <div className="border-t border-hairline" />
-
-      {/* Calibration State */}
-      <section className="py-phi-5">
-        <h3 className="type-label-section text-oxford/60 mb-phi-4">Calibration state</h3>
-        {calibration.confidence_threshold_override == null && calibration.reviewer_weak_threshold_override == null ? (
-          <p className="type-label-tab text-oxford/40">Running at defaults</p>
-        ) : (
-          <div className="space-y-phi-2">
-            {calibration.confidence_threshold_override != null && (
-              <p className="type-body-sm text-oxford/60">
-                Confidence threshold: {calibration.confidence_threshold_override}
-              </p>
-            )}
-            {calibration.reviewer_weak_threshold_override != null && (
-              <p className="type-body-sm text-oxford/60">
-                Weak threshold: {calibration.reviewer_weak_threshold_override}
-              </p>
-            )}
-          </div>
-        )}
-        {calibration.last_calibrated_at && (
-          <p className="type-meta text-oxford/25 mt-phi-3">
-            Last calibrated: {new Date(calibration.last_calibrated_at).toLocaleString('en-GB')}
-          </p>
-        )}
-        {calibration.calibration_history.length > 0 && (
-          <div className="mt-phi-4 space-y-phi-2">
-            {calibration.calibration_history.slice(-5).reverse().map((h, i) => (
-              <p key={i} className="type-body-sm text-oxford/40">
-                {h.direction === 'tightened' ? '↑' : h.direction === 'loosened' ? '↓' : '→'} {h.parameter} · {h.reasoning.slice(0, 60)}
-              </p>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <div className="border-t border-hairline" />
-
-      {/* Last Cycle Report */}
-      <section className="py-phi-5">
-        <h3 className="type-label-section text-oxford/60 mb-phi-4">Last meta cycle</h3>
-        {latest ? (
-          <>
-            <p className="type-meta text-oxford/40 mb-phi-4">
-              Cycle {latest.cycle_number} · {new Date(latest.ran_at).toLocaleString('en-GB')}
-            </p>
-            <div className="flex gap-phi-6 mb-phi-5">
-              {[
-                { label: 'Mutations', value: latest.mutations_applied.length },
-                { label: 'Reweightings', value: latest.weight_updates.length },
-                { label: 'Calibrations', value: latest.calibration_changes.length },
-              ].map((s) => (
-                <div key={s.label} className="text-center">
-                  <p className="type-title text-oxford tabular-nums">{s.value}</p>
-                  <p className="type-label-section text-oxford/60">{s.label}</p>
-                </div>
-              ))}
+      <TabSection title="Watchlist" label="Health">
+        <div className="flex flex-wrap gap-phi-6">
+          {[
+            { label: 'Total', value: watchlist.total },
+            { label: 'Stale', value: watchlist.stale },
+            { label: 'Avg Days', value: Math.round(watchlist.avg_days) },
+          ].map((s) => (
+            <div key={s.label} className="flex flex-col gap-1">
+              <span className="font-mono font-semibold text-4xl text-oxford tracking-tighter tabular-nums">{s.value}</span>
+              <span className="type-meta text-oxford/30 uppercase tracking-[0.14em]">{s.label}</span>
             </div>
-            {latest.mutations_applied.map((m, i) => (
-              <div key={i} className="mb-2">
-                <p className="type-label-section text-oxford/60">{m.agent_target}</p>
-                <p className="type-body-sm text-oxford/60line-clamp-2">{m.reasoning}</p>
-                <p className="type-meta text-oxford/40">{m.previous_prompt_hash} → {m.new_prompt_hash}</p>
+          ))}
+        </div>
+      </TabSection>
+
+      <TabSection title="Sector Concentration" label="Distribution">
+        {sectors.length === 0 ? (
+          <p className="type-meta text-oxford/20 uppercase tracking-[0.18em]">No concentration data yet</p>
+        ) : (
+          <div className="flex flex-col gap-phi-4">
+            {sectors.map(([sector, data], i) => (
+              <div key={sector} className="grid grid-cols-[100px_1fr_44px] gap-phi-4 items-center">
+                <span className="type-meta text-oxford/60 uppercase tracking-widest truncate">{sector}</span>
+                <TacticalBar pct={(data.count / maxSector) * 100} delay={i * 0.05} />
+                <span className="font-mono type-meta text-oxford/40 tabular-nums text-right">{data.pct_of_total}%</span>
               </div>
             ))}
-            {latest.no_action_reasons.length > 0 && (
-              <div className="mt-phi-4 space-y-phi-2">
-                {latest.no_action_reasons.map((r, i) => (
-                  <p key={i} className="type-body-sm text-oxford/40">{r}</p>
-                ))}
-              </div>
-            )}
-            <p className="type-meta text-oxford/40 mt-phi-4">
-              Next cycle {formatRelativeTime(latest.next_cycle_at)}
-            </p>
-          </>
-        ) : (
-          <EmptyState
-            label="Last meta cycle"
-            body="The meta-agent runs once there is enough signal from reviews and decisions. Cycle summary and mutations will show here after the first run completes."
-          />
+          </div>
         )}
-      </section>
-
-      <div className="border-t border-hairline" />
-
-      {/* Manual Trigger */}
-      <section className="pt-phi-5">
-        <button
-          onClick={handleTrigger}
-          disabled={triggering || !!triggerResult}
-          className="w-full py-phi-3 type-label-tab text-oxford/60 border border-hairline-strong hover:text-oxford hover:border-oxford/40 hover:bg-oxford/[0.03] btn-interaction disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {triggering ? 'Triggering…' : triggerResult ?? 'Trigger meta cycle'}
-        </button>
-      </section>
+      </TabSection>
     </div>
   );
 }
 
-/* ─── FUND THESIS RUNTIME ─── */
-function FundThesisRuntimeTab() {
+/* ─── FUND THESIS ─── */
+function InstitutionalMandateTab() {
   const [data, setData] = useState<FundThesisRuntime | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    setErr(null);
     fetchFundThesisRuntime()
       .then(setData)
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Failed to load'));
@@ -579,146 +356,173 @@ function FundThesisRuntimeTab() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 90_000);
+    const t = setInterval(load, 120_000);
     return () => clearInterval(t);
   }, [load]);
 
   if (err) {
-    return <p className="type-body-sm text-escalation/80">{err}</p>;
-  }
-  if (!data) {
-    return <p className="type-label-tab text-oxford/40">Loading…</p>;
-  }
-  if (data.error === 'incomplete') {
     return (
-      <EmptyState
-        label="Fund thesis"
-        body={
-          data.detail?.trim()
-            ? data.detail
-            : 'Thesis data could not be loaded. Check Supabase connectivity and migrations.'
-        }
-      />
-    );
-  }
-  if (data.mode === 'missing' || data.thesis_ready === false) {
-    return (
-      <EmptyState
-        label="Fund thesis"
-        body="No active thesis yet. Add one under Settings → Fund thesis."
-      />
-    );
-  }
-  if (data.thesis_ready !== true && data.mode !== 'rule_based' && data.mode !== 'embedding') {
-    return (
-      <EmptyState
-        label="Fund thesis"
-        body="Thesis is not ready. Open Settings → Fund thesis."
-      />
+      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
+        <EmptyState label="Fund Thesis" body="Could not load thesis data. Check your API connection and try again." />
+      </div>
     );
   }
 
-  const st = data.alignment_stats;
+  if (!data) return (
+    <div className="px-phi-4 py-10">
+      <p className="type-meta text-oxford/20 uppercase tracking-widest">Loading...</p>
+    </div>
+  );
+
+  if (data.mode === 'missing' || (!data.parsed_json && data.thesis_ready === false)) {
+    return (
+      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
+        <EmptyState label="Fund Thesis" body="No active thesis configured. Set up your investment mandate in Settings to enable thesis-aligned scouting." />
+      </div>
+    );
+  }
+
   const pj = data.parsed_json ?? {};
   const sectors = Array.isArray(pj.sectors) ? (pj.sectors as string[]) : [];
   const stages = Array.isArray(pj.stage_focus) ? (pj.stage_focus as string[]) : [];
-  const geos = Array.isArray(pj.geography) ? (pj.geography as string[]) : [];
-  const excls = Array.isArray(pj.exclusions) ? (pj.exclusions as string[]) : [];
 
   return (
-    <div className="space-y-phi-5">
-      {(sectors.length > 0 || stages.length > 0 || geos.length > 0 || excls.length > 0) && (
-        <section className="flex flex-col gap-phi-3">
-          <h3 className="type-label-section text-oxford/60">Mandate</h3>
-          {sectors.length > 0 && (
-            <div className="flex flex-wrap items-baseline gap-x-phi-2 gap-y-1">
-              <span className="type-meta uppercase text-oxford/40 shrink-0 w-20">Sector</span>
-              {sectors.map((t) => (
-                <span key={t} className="type-meta px-phi-2 py-[2px] border border-oxford/20 text-oxford/60">{t}</span>
-              ))}
+    <div className="flex flex-col">
+      <TabSection title="Portfolio Mandate" label={`v${data.active_version_number ?? '01'}`}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-phi-5">
+          <div className="flex flex-col gap-phi-5">
+            <div className="flex flex-col gap-2">
+              <span className="type-meta text-oxford/30 uppercase tracking-widest">Target Sectors</span>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {sectors.map(s => <span key={s} className="type-meta border border-oxford/10 px-2 py-1 text-oxford/60">{s}</span>)}
+              </div>
             </div>
-          )}
-          {stages.length > 0 && (
-            <div className="flex flex-wrap items-baseline gap-x-phi-2 gap-y-1">
-              <span className="type-meta uppercase text-oxford/40 shrink-0 w-20">Stage</span>
-              {stages.map((t) => (
-                <span key={t} className="type-meta px-phi-2 py-[2px] border border-oxford/20 text-oxford/60">{t}</span>
-              ))}
+            <div className="flex flex-col gap-2">
+              <span className="type-meta text-oxford/30 uppercase tracking-widest">Stage Focus</span>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {stages.map(s => <span key={s} className="type-meta border border-oxford/10 px-2 py-1 text-oxford/60">{s}</span>)}
+              </div>
             </div>
-          )}
-          {geos.length > 0 && (
-            <div className="flex flex-wrap items-baseline gap-x-phi-2 gap-y-1">
-              <span className="type-meta uppercase text-oxford/40 shrink-0 w-20">Geography</span>
-              {geos.map((t) => (
-                <span key={t} className="type-meta px-phi-2 py-[2px] border border-oxford/20 text-oxford/60">{t}</span>
-              ))}
-            </div>
-          )}
-          {excls.length > 0 && (
-            <div className="flex flex-wrap items-baseline gap-x-phi-2 gap-y-1">
-              <span className="type-meta uppercase text-oxford/40 shrink-0 w-20">Excl.</span>
-              {excls.map((t) => (
-                <span key={t} className="type-meta px-phi-2 py-[2px] border border-escalation/30 text-escalation/70">{t}</span>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-      <div className="border-t border-hairline" />
-      <section>
-        <h3 className="type-label-section text-oxford/60 mb-phi-3">Runtime</h3>
-        <p className="type-body-sm text-oxford/60m-0">
-          Active version{' '}
-          <code className="type-meta bg-oxford/[0.06] px-phi-1 rounded-none break-all">{data.active_version_id}</code>
-          {data.active_version_number != null ? ` · v${data.active_version_number}` : ''}
-        </p>
-        <p className="type-body-sm type-body-sm text-oxford/60 mt-phi-2">
-          Last updated:{' '}
-          {data.fund_thesis_updated_at
-            ? new Date(data.fund_thesis_updated_at).toLocaleString('en-GB')
-            : '—'}
-        </p>
-        <p className="type-body-sm type-body-sm text-oxford/60 mt-phi-2">
-          Thesis mode:{' '}
-          {data.thesis_mode === 'embedding' ? 'AI-enhanced' : 'Rule-based'}
-        </p>
-        <p className="type-body-sm type-body-sm text-oxford/60 mt-phi-2">
-          Embeddings: {data.embedding?.dimension ?? data.embedding_dimensions ?? '—'} dims ·{' '}
-          {data.embedding?.model ?? data.embedding_model ?? '—'}
-        </p>
-      </section>
-      <div className="border-t border-hairline" />
-      <section>
-        <h3 className="type-label-section text-oxford/60 mb-phi-3">Alignment (reviewed deals, current version)</h3>
-        <ul className="type-body-sm text-oxford/60 pl-4 list-disc space-y-phi-2">
-          <li>
-            Matching mandate:{' '}
-            {st?.pct_matching_thesis != null ? `${st.pct_matching_thesis}%` : '—'} of scored reviews
-          </li>
-          <li>Avg alignment score: {st?.avg_alignment_score ?? '—'}</li>
-          <li>Drift vs prior version: {st?.drift_vs_previous ?? '—'}</li>
-          <li>Reviews tagged with this version: {st?.reviewed_with_thesis_count ?? 0}</li>
-        </ul>
-      </section>
-      <div className="border-t border-hairline" />
-      <section>
-        <h3 className="type-label-section text-oxford/60 mb-phi-4">Version timeline</h3>
-        {(data.version_timeline ?? []).length === 0 ? (
-          <p className="type-label-tab text-oxford/40">No versions</p>
-        ) : (
-          <ul className="space-y-phi-3">
-            {(data.version_timeline ?? []).map((v) => (
-              <li key={v.id} className="type-body-sm text-oxford/60 border-b border-hairline pb-phi-3">
-                <span className="type-label-section text-oxford/60">v{v.version_number}</span>
-                {v.is_active ? <span className="ml-phi-2 type-meta text-oxford">active</span> : null}
-                <span className="block type-meta text-oxford/40 mt-phi-1">
-                  {v.created_at ? new Date(v.created_at).toLocaleString('en-GB') : ''}
-                </span>
-              </li>
+          </div>
+          <div className="flex flex-col gap-phi-3 p-phi-4 bg-oxford/[0.02] border border-oxford/[0.06]">
+            <span className="type-meta text-oxford/30 uppercase tracking-widest">Agent Directive</span>
+            <p className="type-body text-oxford/60 leading-relaxed italic">
+              Scouts are calibrated to prioritize {sectors[0] || 'core sector'} opportunities within {stages[0] || 'targeted stage'} cycles.
+              Mandate mode: <span className="text-oxford/80">{data.thesis_mode === 'embedding' ? 'AI Enhanced' : 'Rule Based'}</span>.
+            </p>
+          </div>
+        </div>
+      </TabSection>
+
+      <TabSection title="Alignment">
+        <div className="grid grid-cols-3 gap-phi-4">
+          <div className="border-l border-oxford/10 pl-phi-3 py-1">
+            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.pct_matching_thesis ?? '--'}%</span>
+            <span className="type-meta text-oxford/30 uppercase text-[9px]">Mandate match</span>
+          </div>
+          <div className="border-l border-oxford/10 pl-phi-3 py-1">
+            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.avg_alignment_score ?? '--'}</span>
+            <span className="type-meta text-oxford/30 uppercase text-[9px]">Mean alignment</span>
+          </div>
+          <div className="border-l border-oxford/10 pl-phi-3 py-1">
+            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.drift_vs_previous ?? '0.00'}</span>
+            <span className="type-meta text-oxford/30 uppercase text-[9px]">Drift</span>
+          </div>
+        </div>
+      </TabSection>
+    </div>
+  );
+}
+
+/* ─── META AGENT ─── */
+function MetaCommandTab({ reports, weights, calibration }: {
+  reports: MetaCycleReport[]; weights: ScoutWeights; calibration: CalibrationState;
+}) {
+  const [triggering, setTriggering] = useState(false);
+  const handleTrigger = async () => {
+    setTriggering(true);
+    try { await triggerMetaCycle(); } finally { setTriggering(false); }
+  };
+
+  const lastReport = reports.length > 0 ? reports[0] : null;
+
+  return (
+    <div className="flex flex-col">
+      {lastReport ? (
+        <TabSection title="Last Cycle" label={`Cycle ${lastReport.cycle_number}`}>
+          <div className="flex flex-wrap gap-phi-6">
+            {[
+              { label: 'Ran', value: new Date(lastReport.ran_at).toLocaleDateString('en-GB') },
+              { label: 'Mutations', value: (lastReport.mutations_applied ?? []).length },
+              { label: 'Weight updates', value: (lastReport.weight_updates ?? []).length },
+            ].map((s) => (
+              <div key={s.label} className="flex flex-col gap-1">
+                <span className="font-mono font-semibold text-2xl text-oxford tracking-tighter tabular-nums">{s.value}</span>
+                <span className="type-meta text-oxford/30 uppercase tracking-[0.14em]">{s.label}</span>
+              </div>
             ))}
-          </ul>
+          </div>
+          {lastReport.no_action_reasons.length > 0 && (
+            <div className="mt-phi-4 border-l-2 border-oxford/[0.06] pl-phi-4">
+              {lastReport.no_action_reasons.map((r, i) => (
+                <p key={i} className="type-meta text-oxford/40 leading-relaxed">{r}</p>
+              ))}
+            </div>
+          )}
+        </TabSection>
+      ) : (
+        <TabSection title="Last Cycle">
+          <p className="type-meta text-oxford/20 uppercase tracking-[0.18em]">No cycles run yet</p>
+        </TabSection>
+      )}
+      <TabSection title="Scout Allocation" label="Weights">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-phi-5 gap-y-phi-4">
+          {[
+            ['Market Scout', weights.MarketDrivenScout],
+            ['Technical Scout', weights.BuilderTechnicalScout],
+            ['Pain Point Scout', weights.PainPointScout],
+            ['Contrarian Scout', weights.ContrarianScout],
+          ].map(([name, w], i) => (
+            <div key={name} className="flex flex-col gap-2">
+              <div className="flex justify-between items-baseline">
+                <span className="type-meta text-oxford/40 uppercase tracking-widest">{name}</span>
+                <span className="font-mono type-meta text-oxford/60 tabular-nums">{Math.round(w * 100)}%</span>
+              </div>
+              <TacticalBar pct={w * 100} delay={i * 0.1} />
+            </div>
+          ))}
+        </div>
+      </TabSection>
+
+      <TabSection title="Calibration Log">
+        {calibration.calibration_history.length === 0 ? (
+          <p className="type-meta text-oxford/20 uppercase tracking-[0.18em]">No calibration history yet</p>
+        ) : (
+          <div className="flex flex-col border border-oxford/[0.06] bg-oxford/[0.01]">
+            {calibration.calibration_history.slice(-5).reverse().map((h, i) => (
+              <div key={i} className="grid grid-cols-[100px_1fr] gap-phi-4 border-b border-oxford/[0.06] last:border-0 p-phi-4 items-start">
+                <span className={`type-meta text-[9px] uppercase px-1 py-0.5 border ${h.direction === 'tightened' ? 'border-escalation/20 text-escalation/60' : 'border-oxford/10 text-oxford/40'} text-center`}>
+                  {h.direction}
+                </span>
+                <div className="flex flex-col gap-1">
+                  <span className="type-meta text-oxford/60 uppercase tracking-tight">{h.parameter.replace(/_/g, ' ')}</span>
+                  <p className="type-meta text-oxford/30 leading-relaxed font-mono">{h.reasoning}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-      </section>
+      </TabSection>
+
+      <div className="px-phi-4 py-phi-5 flex justify-end">
+        <button
+          onClick={handleTrigger}
+          disabled={triggering}
+          className="type-meta border border-oxford/20 px-phi-5 py-phi-3 text-oxford/40 hover:text-oxford hover:border-oxford/60 transition-colors uppercase tracking-[0.18em] btn-interaction"
+        >
+          {triggering ? 'Running...' : 'Run Correction Cycle'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -729,62 +533,70 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
   const reduceMotion = usePrefersReducedMotion();
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      {/* Tab bar — same as PanelShell / SettingsPage */}
-      <nav className={SYSTEM_INTEL_TAB_BAR_CLASS} aria-label="Tabs">
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.key;
-          return (
+    <div className="w-full font-sans bg-paper selection:bg-oxford selection:text-paper min-h-full">
+      <div className="sticky top-0 z-20 bg-paper/90 backdrop-blur-md border-b border-oxford/[0.06] px-phi-4 py-phi-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-phi-4">
+            <span className={UI_FILTER_TOOLBAR_LABEL}>System</span>
+            <div className="flex items-center gap-1">
+              {TABS.map((tab) => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`type-label-tab px-3 py-1.5 transition-all duration-300 border-b ${isActive ? 'border-oxford text-oxford bg-oxford/5' : 'border-transparent text-oxford/30 hover:text-oxford/60'
+                      }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {props.onClose && (
             <button
-              key={tab.key}
               type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`${SYSTEM_INTEL_TAB_BUTTON_CLASS} ${
-                isActive ? PANEL_TAB_ACTIVE_CLASS : PANEL_TAB_INACTIVE_CLASS
-              }`}
-              aria-selected={isActive}
+              onClick={props.onClose}
+              className="type-label-tab text-oxford/40 hover:text-oxford transition-colors border-l border-oxford/10 pl-phi-4"
+              aria-label="Hide system intelligence"
             >
-              {tab.label}
+              Close
             </button>
-          );
-        })}
-      </nav>
-
-      {/* Content */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-phi-5">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={transitionOrReduced(reduceMotion, {
-              duration: tokens.motion.duration.short,
-              ease: tokens.motion.ease,
-            })}
-          >
-            {activeTab === 'signals' && <SignalsTab signals={props.signals} />}
-            {activeTab === 'escalations' && (
-              <EscalationsTab
-                escalations={props.escalations}
-                onResolved={props.onEscalationResolved}
-                onOpenMemo={props.onOpenEscalationMemo}
-              />
-            )}
-            {activeTab === 'analytics' && (
-              <AnalyticsTab
-                rejection={props.rejectionAnalytics}
-                watchlist={props.watchlistAnalytics}
-                concentration={props.concentrationAnalytics}
-              />
-            )}
-            {activeTab === 'thesis' && <FundThesisRuntimeTab />}
-            {activeTab === 'meta' && (
-              <MetaAgentTab reports={props.metaReports} weights={props.scoutWeights} calibration={props.calibrationState} />
-            )}
-          </motion.div>
-        </AnimatePresence>
+          )}
+        </div>
       </div>
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={transitionOrReduced(reduceMotion, { duration: 0.3, ease: 'circOut' })}
+        >
+          {activeTab === 'signals' && <SignalsTab signals={props.signals} />}
+          {activeTab === 'escalations' && (
+            <EscalationsTab
+              escalations={props.escalations}
+              onResolved={props.onEscalationResolved}
+              onOpenMemo={props.onOpenEscalationMemo}
+            />
+          )}
+          {activeTab === 'analytics' && (
+            <AnalyticsTab
+              rejection={props.rejectionAnalytics}
+              watchlist={props.watchlistAnalytics}
+              concentration={props.concentrationAnalytics}
+            />
+          )}
+          {activeTab === 'thesis' && <InstitutionalMandateTab />}
+          {activeTab === 'meta' && (
+            <MetaCommandTab reports={props.metaReports} weights={props.scoutWeights} calibration={props.calibrationState} />
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

@@ -60,6 +60,7 @@ from pipeline_runner import (
 from fund_thesis import (
     FundThesisIncompleteError,
     FundThesisMissingError,
+    FundThesisQueryError,
     _bootstrap_default_thesis_or_raise,
     compute_thesis_alignment_stats,
     get_active_thesis,
@@ -1213,6 +1214,10 @@ def api_get_fund_thesis(request: Request):
             active = get_active_thesis(client, uid)
         if active is None:
             raise HTTPException(status_code=404, detail="No fund thesis yet. POST /api/fund-thesis/versions with raw_text.")
+    except FundThesisQueryError as e:
+        # Transient DB error — surface as 503 so callers can retry. Do NOT bootstrap
+        # here, as doing so on query errors is what causes spurious version creation.
+        raise HTTPException(status_code=503, detail=f"Thesis query failed: {e}")
     except FundThesisIncompleteError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
@@ -1299,6 +1304,8 @@ def get_fund_thesis_runtime(request: Request):
                     "has_embeddings": False,
                 },
             )
+    except FundThesisQueryError:
+        raise HTTPException(status_code=503, detail="Thesis query failed; please retry")
     except FundThesisIncompleteError as e:
         return JSONResponse(
             status_code=200,

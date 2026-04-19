@@ -12,6 +12,7 @@ import InvestmentMemo from './InvestmentMemo';
 import LiveIntelligenceFeed from './LiveIntelligenceFeed';
 import GhostTransition from './GhostTransition';
 import SystemIntelligence from './SystemIntelligence';
+import AgentDispatch from './AgentDispatch';
 import {
   useScrollLock,
   useEscapeKey,
@@ -97,7 +98,6 @@ export default function MainLayout({
     persistedStateRef.current?.rightPanel ?? null
   );
   const initialFirstMemoOpened = useRef(false);
-  const [lookupExpanded, setLookupExpanded] = useState(false);
   const [lookupInput, setLookupInput] = useState('');
   const [lookupBusy, setLookupBusy] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
@@ -221,7 +221,7 @@ export default function MainLayout({
     if (!row?.failed) return;
     setLookupMessage(
       row.message ??
-        `Lookup failed for ${pendingLookup.queryLabel}. Try adding the company website to disambiguate (example: "Aethria aethria.com").`
+      `Lookup failed for ${pendingLookup.queryLabel}. Try adding the company website to disambiguate (example: "Aethria aethria.com").`
     );
     setPendingLookup(null);
   }, [pendingLookup, pendingLookupMatch, lookupFailureQuery.data]);
@@ -435,9 +435,8 @@ export default function MainLayout({
                         setRightPanel((panel) => (panel === 'feed' ? null : 'feed'));
                         setMobileMenuOpen(false);
                       }}
-                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-0 uppercase tracking-[0.12em] btn-interaction ${
-                        rightPanel === 'feed' ? 'text-white' : 'text-white/55 hover:text-white'
-                      }`}
+                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-0 uppercase tracking-[0.12em] btn-interaction ${rightPanel === 'feed' ? 'text-white' : 'text-white/55 hover:text-white'
+                        }`}
                       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
                       aria-pressed={rightPanel === 'feed'}
                     >
@@ -453,11 +452,10 @@ export default function MainLayout({
                         setRightPanel((p) => (p === 'system' ? null : p));
                         setMobileMenuOpen(false);
                       }}
-                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-0 uppercase tracking-[0.12em] btn-interaction ${
-                        rightPanel !== 'system' && rightPanel !== 'feed'
-                          ? 'text-white'
-                          : 'text-white/55 hover:text-white'
-                      }`}
+                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-0 uppercase tracking-[0.12em] btn-interaction ${rightPanel !== 'system' && rightPanel !== 'feed'
+                        ? 'text-white'
+                        : 'text-white/55 hover:text-white'
+                        }`}
                       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
                       aria-pressed={rightPanel !== 'system' && rightPanel !== 'feed'}
                     >
@@ -473,9 +471,8 @@ export default function MainLayout({
                         setRightPanel((panel) => (panel === 'system' ? null : 'system'));
                         setMobileMenuOpen(false);
                       }}
-                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-0 uppercase tracking-[0.12em] btn-interaction ${
-                        rightPanel === 'system' ? 'text-white' : 'text-white/55 hover:text-white'
-                      }`}
+                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-0 uppercase tracking-[0.12em] btn-interaction ${rightPanel === 'system' ? 'text-white' : 'text-white/55 hover:text-white'
+                        }`}
                       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
                       aria-pressed={rightPanel === 'system'}
                     >
@@ -487,17 +484,17 @@ export default function MainLayout({
                     </button>
                   </div>
 
-                {/* Settings */}
-                <div className="flex flex-col items-start gap-phi-1 mt-phi-3">
-                  <button
-                    type="button"
-                    onClick={() => navigate(SETTINGS_PATH)}
-                    className="type-label-section text-white/70 hover:text-white btn-interaction"
-                  >
-                    Settings
-                  </button>
+                  {/* Settings */}
+                  <div className="flex flex-col items-start gap-phi-1 mt-phi-3">
+                    <button
+                      type="button"
+                      onClick={() => navigate(SETTINGS_PATH)}
+                      className="type-label-section text-white/70 hover:text-white btn-interaction"
+                    >
+                      Settings
+                    </button>
+                  </div>
                 </div>
-              </div>
               </motion.section>
             )}
           </AnimatePresence>
@@ -520,216 +517,132 @@ export default function MainLayout({
 
       {/* Paper canvas. Fixed height so only WorkGrid scrolls.
           On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-4 pt-3 lg:pl-[calc(9rem+21px)] lg:pr-[21px] lg:pt-[21px]">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-4 pt-phi-3 lg:pl-[calc(9rem+var(--space-4))] lg:pr-phi-4 lg:pt-phi-4">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-phi-3 lg:pb-phi-5 gap-phi-3 lg:gap-phi-5">
-          <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
-            {/* Pipeline summary + lookup */}
-            <header className="flex-none mb-phi-3 min-w-0 lg:px-0">
-              <section
-                aria-label="Pipeline summary and agent status"
-                className="flex min-w-0 flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-1 border-b border-hairline pb-phi-3"
-              >
-                <p className="min-w-0 type-meta tracking-label uppercase text-oxford/40">
-                  <span className="text-oxford/60">{startups.length}</span> total
-                  <span className="mx-phi-2 text-oxford/25">·</span>
-                  <span className="text-oxford/60">{openCount}</span> open
-                  <span className="mx-phi-2 text-oxford/25">·</span>
-                  <span className={pendingEscalations > 0 ? 'text-escalation' : 'text-oxford/60'}>{pendingEscalations}</span> esc
-                  <span className="mx-phi-2 text-oxford/25">·</span>
-                  <span className="text-oxford/60">{resolvedCount}</span> decided
-                  {signals.length > 0 && (
-                    <>
-                      <span className="mx-phi-2 text-oxford/25">·</span>
-                      <span className="text-oxford/60">{signals.length}</span> sig
-                    </>
-                  )}
-                </p>
-                <p className="shrink-0 text-right type-meta tracking-label uppercase text-oxford/40">
-                  Pipeline{' '}
-                  <span className="relative inline-flex items-center gap-phi-2">
-                    {/* Live dot — shown when pipeline is On (implies enabled and no issue) */}
-                    {pipelineStateLabel === 'On' && (
-                      <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60"
-                        style={{ animation: pipelineStateLabel === 'On'
-                          ? 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite'
-                          : 'aethria-pulse 1.2s cubic-bezier(0.16,1,0.3,1) infinite'
-                        }}
-                        aria-hidden
-                      />
-                    )}
-                    <span className={
-                      pipelineStateLabel === 'Issue'   ? 'text-escalation' :
-                      pipelineStateLabel === 'Off'     ? 'text-oxford/25' :
-                      pipelineStateLabel === 'On'      ? 'text-oxford/80' :
-                      /* Working */                      'text-oxford/60'
-                    }>
-                      {pipelineStateLabel}
-                    </span>
-                    {pipelineStateLabel === 'Issue' && (
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-phi-4 lg:pb-phi-5 gap-phi-4 lg:gap-phi-5">
+            <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
+              {/* Pipeline summary + lookup */}
+              <header className="flex-none mb-phi-4 min-w-0 lg:px-0">
+                <section
+                  aria-label="Pipeline summary and agent status"
+                  className="flex min-w-0 flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-1 pb-phi-3 px-phi-4"
+                >
+                  <p className="min-w-0 type-meta tracking-label uppercase text-oxford/40">
+                    <span className="text-oxford/60">{startups.length}</span> total
+                    <span className="mx-phi-2 text-oxford/25">·</span>
+                    <span className="text-oxford/60">{openCount}</span> open
+                    <span className="mx-phi-2 text-oxford/25">·</span>
+                    <span className={pendingEscalations > 0 ? 'text-escalation' : 'text-oxford/60'}>{pendingEscalations}</span> esc
+                    <span className="mx-phi-2 text-oxford/25">·</span>
+                    <span className="text-oxford/60">{resolvedCount}</span> decided
+                    {signals.length > 0 && (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => setShowPipelineIssueHelp((open) => !open)}
-                          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
-                          aria-label="Why pipeline has an issue"
-                          aria-expanded={showPipelineIssueHelp}
-                        >
-                          ?
-                        </button>
-                        {showPipelineIssueHelp && (
-                          <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
-                            Pipeline has a problem and may not process updates right now.
-                            <button
-                              type="button"
-                              onClick={() => navigate(SETTINGS_PATH)}
-                              className="mt-phi-2 block type-meta tracking-badge uppercase text-oxford/60 hover:text-oxford btn-interaction"
-                            >
-                              Open settings →
-                            </button>
-                          </span>
-                        )}
+                        <span className="mx-phi-2 text-oxford/25">·</span>
+                        <span className="text-oxford/60">{signals.length}</span> sig
                       </>
                     )}
-                  </span>
-                </p>
-              </section>
-              <div className="mt-phi-2 lg:mt-phi-3 min-w-0 border-l border-[var(--section-divider)] pl-phi-3 md:pl-phi-4">
-                <button
-                  type="button"
-                  className="flex w-full min-w-0 items-center gap-phi-3 py-phi-2 text-left btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
-                  aria-expanded={lookupExpanded}
-                  aria-controls="lookup-panel"
-                  onClick={() => setLookupExpanded((open) => !open)}
-                >
-                  <span className="shrink-0 type-meta tracking-label uppercase text-oxford/40">
-                    Lookup
-                  </span>
-                  <span
-                    className={`min-w-0 flex-1 truncate text-right type-meta tracking-badge uppercase ${
-                      !lookupWorking
-                        ? 'text-oxford/25'
-                        : lookupPhaseLabel === 'Scouting'
-                          ? 'text-oxford/60'
-                          : lookupPhaseLabel === 'Reviewing'
-                            ? 'text-oxford/80'
-                            : 'text-oxford font-semibold'
-                    }`}
-                  >
-                    {lookupStateLabel}
-                  </span>
-                  <span className="shrink-0 tabular-nums text-oxford/25" aria-hidden>
-                    {lookupExpanded ? '−' : '+'}
-                  </span>
-                </button>
-                <AnimatePresence initial={false}>
-                  {lookupExpanded && (
-                    <motion.div
-                      id="lookup-panel"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={transitionOrReduced(reduceMotion, {
-                        duration: tokens.motion.duration.micro,
-                        ease: tokens.motion.ease,
-                      })}
-                      className="overflow-hidden"
-                    >
-                      <div className="pb-phi-2 pt-phi-1">
-                        <p className="mb-phi-2 max-w-[42ch] type-body-sm leading-phi text-oxford/40">
-                          Run the full pipeline on any company. Results appear in your queue when ready.
-                        </p>
-                        <div className="flex min-w-0 flex-col gap-phi-2 sm:flex-row sm:items-end sm:gap-phi-3">
-                          <label className="min-w-0 flex-1">
-                            <span className="sr-only">Company to look up</span>
-                            <input
-                              type="text"
-                              value={lookupInput}
-                              onChange={(e) => setLookupInput(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') void handleLookupSubmit();
-                              }}
-                              placeholder="Company name or URL"
-                              autoComplete="off"
-                              className="h-9 w-full rounded-none border-0 border-b border-field-border bg-transparent px-0 type-body-sm text-oxford placeholder:text-oxford/25 outline-none focus:border-field-border-strong"
-                            />
-                          </label>
+                  </p>
+                  <p className="shrink-0 text-right type-meta tracking-label uppercase text-oxford/40">
+                    Pipeline{' '}
+                    <span className="relative inline-flex items-center gap-phi-2">
+                      {/* Live dot — shown when pipeline is On (implies enabled and no issue) */}
+                      {pipelineStateLabel === 'On' && (
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60"
+                          style={{
+                            animation: pipelineStateLabel === 'On'
+                              ? 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite'
+                              : 'aethria-pulse 1.2s cubic-bezier(0.16,1,0.3,1) infinite'
+                          }}
+                          aria-hidden
+                        />
+                      )}
+                      <span className={
+                        pipelineStateLabel === 'Issue' ? 'text-escalation' :
+                          pipelineStateLabel === 'Off' ? 'text-oxford/25' :
+                            pipelineStateLabel === 'On' ? 'text-oxford/80' :
+                      /* Working */                      'text-oxford/60'
+                      }>
+                        {pipelineStateLabel}
+                      </span>
+                      {pipelineStateLabel === 'Issue' && (
+                        <>
                           <button
                             type="button"
-                            onClick={() => void handleLookupSubmit()}
-                            disabled={lookupBusy || !lookupInput.trim()}
-                            className="h-9 shrink-0 self-stretch px-0 type-meta tracking-label uppercase text-oxford/40 underline decoration-oxford/20 underline-offset-4 transition-colors hover:text-oxford hover:decoration-oxford/40 disabled:pointer-events-none disabled:text-oxford/25 disabled:no-underline btn-interaction sm:self-auto"
+                            onClick={() => setShowPipelineIssueHelp((open) => !open)}
+                            className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
+                            aria-label="Why pipeline has an issue"
+                            aria-expanded={showPipelineIssueHelp}
                           >
-                            {lookupBusy ? 'Queueing…' : 'Run lookup'}
+                            ?
                           </button>
-                        </div>
-                        {lookupMessage ? (
-                          <p className="mt-phi-2 type-meta leading-label text-oxford/40">{lookupMessage}</p>
-                        ) : null}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </header>
-
-            {/* Fund thesis — mobile only (desktop shows it in the right column) */}
-            <div className="flex-none mb-phi-2 block lg:hidden">
-              <article
-                className="w-full border border-hairline bg-paper px-phi-3 py-phi-2"
-                style={{ boxSizing: 'border-box' }}
-                aria-label="Fund thesis preview"
-              >
-                <div className="flex items-center justify-between gap-phi-2">
-                  <p className="type-meta tracking-label uppercase text-oxford/40">
-                    Active Mandate · Fund Thesis
-                  </p>
-                  {hasThesis && (
-                    <span className="inline-flex items-center gap-phi-1">
-                      <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
-                        style={{ opacity: 0.6 }}
-                        aria-hidden
-                      />
-                      <span className="type-meta tracking-badge uppercase text-oxford/40">Live</span>
+                          {showPipelineIssueHelp && (
+                            <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
+                              Pipeline has a problem and may not process updates right now.
+                              <button
+                                type="button"
+                                onClick={() => navigate(SETTINGS_PATH)}
+                                className="mt-phi-2 block type-meta tracking-badge uppercase text-oxford/60 hover:text-oxford btn-interaction"
+                              >
+                                Open settings →
+                              </button>
+                            </span>
+                          )}
+                        </>
+                      )}
                     </span>
-                  )}
-                </div>
-                <p className="mt-phi-1 type-body-sm font-semibold tracking-tight text-oxford">
-                  {fundName || 'No fund configured'}
-                </p>
-                {(thesisTags.sectors.length > 0 || thesisTags.stages.length > 0 || thesisTags.geos.length > 0) && (
-                  <div className="mt-phi-2 flex flex-wrap gap-phi-1">
-                    {[...thesisTags.sectors, ...thesisTags.stages, ...thesisTags.geos].map((t) => (
-                      <span key={t} className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40">{t}</span>
-                    ))}
-                  </div>
-                )}
-              </article>
-            </div>
+                  </p>
+                </section>
+                <AgentDispatch
+                  input={lookupInput}
+                  setInput={setLookupInput}
+                  onSubmit={() => void handleLookupSubmit()}
+                  isBusy={lookupBusy}
+                  message={lookupMessage}
+                  lookupPhase={lookupPhaseLabel}
+                />
+              </header>
 
-            {rightPanel === 'system' ? (
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden w-full min-w-0 rounded-none border border-hairline bg-paper">
-                <PanelShell
-                  className="min-h-0 flex-1"
-                  title="SYSTEM"
-                  titleClassName={UI_PANEL_CHROME_LABEL}
-                  headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
-                  headerBorderClass=""
-                  actions={
-                    <button
-                      type="button"
-                      onClick={() => setRightPanel(null)}
-                      className={PANEL_CHROME_ACTION_BTN_CLASS}
-                      aria-label="Hide system intelligence"
-                    >
-                      CLOSE
-                    </button>
-                  }
-                  contentOverflowHidden
-                  contentClassName="flex-1 min-h-0 overflow-hidden"
+              {/* Fund thesis — mobile only (desktop shows it in the right column) */}
+              <div className="flex-none mb-phi-2 block lg:hidden">
+                <article
+                  className="w-full border border-hairline bg-paper px-phi-3 py-phi-2"
+                  style={{ boxSizing: 'border-box' }}
+                  aria-label="Fund thesis preview"
                 >
+                  <div className="flex items-center justify-between gap-phi-2">
+                    <p className="type-meta tracking-label uppercase text-oxford/40">
+                      Active Mandate · Fund Thesis
+                    </p>
+                    {hasThesis && (
+                      <span className="inline-flex items-center gap-phi-1">
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
+                          style={{ opacity: 0.6 }}
+                          aria-hidden
+                        />
+                        <span className="type-meta tracking-badge uppercase text-oxford/40">Live</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-phi-1 type-body-sm font-semibold tracking-tight text-oxford">
+                    {fundName || 'No fund configured'}
+                  </p>
+                  {(thesisTags.sectors.length > 0 || thesisTags.stages.length > 0 || thesisTags.geos.length > 0) && (
+                    <div className="mt-phi-2 flex flex-wrap gap-phi-1">
+                      {[...thesisTags.sectors, ...thesisTags.stages, ...thesisTags.geos].map((t) => (
+                        <span key={t} className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40">{t}</span>
+                      ))}
+                    </div>
+                  )}
+                </article>
+              </div>
+
+              <div
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain w-full min-w-0 rounded-none bg-paper"
+                style={{ scrollbarGutter: 'stable both-edges' }}
+              >
+                {rightPanel === 'system' ? (
                   <SystemIntelligence
                     signals={signals}
                     escalations={escalations}
@@ -739,151 +652,147 @@ export default function MainLayout({
                     metaReports={metaReports}
                     scoutWeights={scoutWeights}
                     calibrationState={calibrationState}
+                    onEscalationResolved={() => void queryClient.invalidateQueries({ queryKey: ['escalations'] })}
                     onOpenEscalationMemo={handleOpenEscalationMemo}
+                    onClose={() => setRightPanel(null)}
                   />
-                </PanelShell>
-              </div>
-            ) : (
-              <div
-                className="flex-1 min-h-0 overflow-y-auto overscroll-contain w-full min-w-0 rounded-none bg-paper"
-                style={{ scrollbarGutter: 'stable both-edges' }}
-              >
-                <GhostTransition disableLift>
-                  <WorkGrid
-                    startups={startups}
-                    onStartupClick={handleStartupClick}
-                    selectedId={selectedStartup?.id ?? null}
-                    watchlistIds={watchlistIds}
-                  />
-                </GhostTransition>
-              </div>
-            )}
-          </div>
-
-          {/* Right zone: Judgements or memo only — never System. */}
-          <div className="hidden lg:flex min-w-0 min-h-0 flex-col gap-phi-3">
-            <article
-              className="w-full border border-hairline bg-paper p-phi-5"
-              style={{ boxSizing: 'border-box' }}
-              aria-label="Fund thesis preview"
-            >
-              <div className="flex items-center justify-between gap-phi-2">
-                <p className="type-label-section text-oxford/40">
-                  Active Mandate · Fund Thesis
-                </p>
-                {hasThesis && (
-                  <span className="inline-flex items-center gap-phi-2">
-                    <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
-                      style={{ opacity: 0.6 }}
-                      aria-hidden
+                ) : (
+                  <GhostTransition disableLift>
+                    <WorkGrid
+                      startups={startups}
+                      onStartupClick={handleStartupClick}
+                      selectedId={selectedStartup?.id ?? null}
+                      watchlistIds={watchlistIds}
                     />
-                    <span className="type-meta tracking-badge uppercase text-oxford/40">Live</span>
-                  </span>
+                  </GhostTransition>
                 )}
               </div>
-              <p className="mt-phi-3 type-body font-semibold tracking-tight text-oxford">
-                {fundName || 'No fund configured'}
-              </p>
-              {(thesisTags.sectors.length > 0 || thesisTags.stages.length > 0 || thesisTags.geos.length > 0) && (
-                <div className="mt-phi-3 flex flex-wrap gap-phi-2">
-                  {[...thesisTags.sectors, ...thesisTags.stages, ...thesisTags.geos].map((t) => (
-                    <span key={t} className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40">{t}</span>
-                  ))}
+            </div>
+
+            {/* Right zone: Judgements or memo only — never System. */}
+            <div className="hidden lg:flex min-w-0 min-h-0 flex-col gap-phi-3">
+              <article
+                className="w-full border border-hairline bg-paper p-phi-5"
+                style={{ boxSizing: 'border-box' }}
+                aria-label="Fund thesis preview"
+              >
+                <div className="flex items-center justify-between gap-phi-2">
+                  <p className="type-label-section text-oxford/40">
+                    Active Mandate · Fund Thesis
+                  </p>
+                  {hasThesis && (
+                    <span className="inline-flex items-center gap-phi-2">
+                      <span
+                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
+                        style={{ opacity: 0.6 }}
+                        aria-hidden
+                      />
+                      <span className="type-meta tracking-badge uppercase text-oxford/40">Live</span>
+                    </span>
+                  )}
                 </div>
-              )}
-            </article>
-            <aside
-              className="min-w-0 min-h-0 flex-1 border border-hairline bg-paper overflow-hidden"
-              aria-live="polite"
-              aria-label={
-                rightPanel === 'feed'
-                  ? 'Judgements'
-                  : selectedStartup
-                  ? 'Investment memo'
-                  : 'Detail'
-              }
-            >
-              {rightPanel === 'feed' ? (
-              <PanelShell
-                className="min-h-0 flex-1"
-                title="JUDGEMENTS"
-                titleClassName={UI_PANEL_CHROME_LABEL}
-                headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
-                headerBorderClass=""
-                actions={
-                  <button
-                    type="button"
-                    onClick={handleCloseJudgements}
-                    className={PANEL_CHROME_ACTION_BTN_CLASS}
-                    aria-label="Hide judgements"
-                  >
-                    CLOSE
-                  </button>
-                }
-                contentOverflowHidden
-                contentClassName="flex-1 min-h-0 overflow-hidden"
-              >
-                <LiveIntelligenceFeed
-                  startups={startups}
-                  signals={signals}
-                  metaReports={metaReports}
-                />
-              </PanelShell>
-              ) : selectedStartup ? (
-              <PanelShell
-                className="min-h-0 min-w-0 flex-1 w-full"
-                title=""
-                showTitle={false}
-                headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
-                headerBorderClass=""
-                headerJustifyClass="justify-end"
-                actions={
-                  <div className="flex items-center gap-phi-2">
-                    <button
-                      type="button"
-                      onClick={() => memoContentRef.current?.downloadPDF()}
-                      className={PANEL_CHROME_ACTION_BTN_CLASS}
-                    >
-                      IC PACK (PDF)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => memoContentRef.current?.downloadMarkdown()}
-                      className={PANEL_CHROME_ACTION_BTN_CLASS}
-                    >
-                      IC PACK (MD)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCloseMemo}
-                      className={PANEL_CHROME_ACTION_BTN_CLASS}
-                      aria-label="Close memo"
-                    >
-                      CLOSE
-                    </button>
-                  </div>
-                }
-                contentClassName="flex-1 min-h-0 overflow-y-auto px-6 py-6 sm:px-8 sm:py-8"
-              >
-                <InvestmentMemoContent
-                  key={memoStartup!.id}
-                  ref={memoContentRef}
-                  startup={memoStartup!}
-                  embedded
-                  onMemoPipelineReady={handleMemoPipelineReady}
-                />
-              </PanelShell>
-              ) : (
-              <div className="flex-1 flex items-center justify-center p-8">
-                <p className="type-label-tab text-oxford/25" style={{ transition: 'opacity var(--motion-micro) var(--motion-ease)' }}>
-                  Click a deal to open the memo here
+                <p className="mt-phi-3 type-body font-semibold tracking-tight text-oxford">
+                  {fundName || 'No fund configured'}
                 </p>
-              </div>
-              )}
-            </aside>
+                {(thesisTags.sectors.length > 0 || thesisTags.stages.length > 0 || thesisTags.geos.length > 0) && (
+                  <div className="mt-phi-3 flex flex-wrap gap-phi-2">
+                    {[...thesisTags.sectors, ...thesisTags.stages, ...thesisTags.geos].map((t) => (
+                      <span key={t} className="border border-hairline px-phi-2 py-phi-1 type-meta text-oxford/40">{t}</span>
+                    ))}
+                  </div>
+                )}
+              </article>
+              <aside
+                className="min-w-0 min-h-0 flex-1 border border-hairline bg-paper overflow-hidden"
+                aria-live="polite"
+                aria-label={
+                  rightPanel === 'feed'
+                    ? 'Judgements'
+                    : selectedStartup
+                      ? 'Investment memo'
+                      : 'Detail'
+                }
+              >
+                {rightPanel === 'feed' ? (
+                  <PanelShell
+                    className="min-h-0 flex-1"
+                    title="JUDGEMENTS"
+                    titleClassName={UI_PANEL_CHROME_LABEL}
+                    headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
+                    headerBorderClass=""
+                    actions={
+                      <button
+                        type="button"
+                        onClick={handleCloseJudgements}
+                        className={PANEL_CHROME_ACTION_BTN_CLASS}
+                        aria-label="Hide judgements"
+                      >
+                        CLOSE
+                      </button>
+                    }
+                    contentOverflowHidden
+                    contentClassName="flex-1 min-h-0 overflow-hidden"
+                  >
+                    <LiveIntelligenceFeed
+                      startups={startups}
+                      signals={signals}
+                      metaReports={metaReports}
+                    />
+                  </PanelShell>
+                ) : selectedStartup ? (
+                  <PanelShell
+                    className="min-h-0 min-w-0 flex-1 w-full"
+                    title=""
+                    showTitle={false}
+                    headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
+                    headerBorderClass=""
+                    headerJustifyClass="justify-end"
+                    actions={
+                      <div className="flex items-center gap-phi-2">
+                        <button
+                          type="button"
+                          onClick={() => memoContentRef.current?.downloadPDF()}
+                          className={PANEL_CHROME_ACTION_BTN_CLASS}
+                        >
+                          IC PACK (PDF)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => memoContentRef.current?.downloadMarkdown()}
+                          className={PANEL_CHROME_ACTION_BTN_CLASS}
+                        >
+                          IC PACK (MD)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCloseMemo}
+                          className={PANEL_CHROME_ACTION_BTN_CLASS}
+                          aria-label="Close memo"
+                        >
+                          CLOSE
+                        </button>
+                      </div>
+                    }
+                    contentClassName="flex-1 min-h-0 overflow-y-auto px-6 py-6 sm:px-8 sm:py-8"
+                  >
+                    <InvestmentMemoContent
+                      key={memoStartup!.id}
+                      ref={memoContentRef}
+                      startup={memoStartup!}
+                      embedded
+                      onMemoPipelineReady={handleMemoPipelineReady}
+                    />
+                  </PanelShell>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center p-8">
+                    <p className="type-label-tab text-oxford/25" style={{ transition: 'opacity var(--motion-micro) var(--motion-ease)' }}>
+                      Click a deal to open the memo here
+                    </p>
+                  </div>
+                )}
+              </aside>
+            </div>
           </div>
-        </div>
         </div>
       </main>
 
