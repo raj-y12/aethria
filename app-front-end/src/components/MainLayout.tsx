@@ -315,8 +315,6 @@ export default function MainLayout({
     : pipelineHealthIssue
       ? 'Issue'
       : 'On';
-  const lookupStateLabel = lookupWorking ? (lookupPhaseLabel ?? 'Working') : 'Idle';
-
   useEffect(() => {
     onSystemPanelOpenChange?.(rightPanel === 'system');
   }, [rightPanel, onSystemPanelOpenChange]);

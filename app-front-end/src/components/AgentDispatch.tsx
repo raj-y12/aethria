@@ -1,8 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { tokens } from '../design-system/tokens';
-import { transitionOrReduced } from '../design-system/motion';
-import { usePrefersReducedMotion } from '../hooks';
 
 interface AgentDispatchProps {
   input: string;
@@ -51,7 +48,6 @@ export default function AgentDispatch({
   lookupPhase,
 }: AgentDispatchProps) {
   const [expanded, setExpanded] = useState(false);
-  const reduceMotion = usePrefersReducedMotion();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -186,7 +182,7 @@ export default function AgentDispatch({
                     exit={{ opacity: 0, y: 10 }}
                     className="mt-6 border-t border-oxford/5 pt-4 flex gap-4"
                   >
-                    {['Scouting', 'Reviewing', 'Deciding'].map((phase, i) => {
+                    {['Scouting', 'Reviewing', 'Deciding'].map((phase) => {
                       const isActive = lookupPhase === phase;
                       const isPast = (lookupPhase === 'Reviewing' && phase === 'Scouting') ||
                         (lookupPhase === 'Deciding' && (phase === 'Scouting' || phase === 'Reviewing'));

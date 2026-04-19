@@ -336,12 +336,12 @@ function MetaCommandTab({ reports, weights, calibration }: {
       )}
       <TabSection title="Scout Allocation" label="Weights">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-phi-5 gap-y-phi-4">
-          {[
+          {([
             ['Market Scout', weights.MarketDrivenScout],
             ['Technical Scout', weights.BuilderTechnicalScout],
             ['Pain Point Scout', weights.PainPointScout],
             ['Contrarian Scout', weights.ContrarianScout],
-          ].map(([name, w], i) => (
+          ] as [string, number][]).map(([name, w], i) => (
             <div key={name} className="flex flex-col gap-2">
               <div className="flex justify-between items-baseline">
                 <span className="type-meta text-oxford/40 uppercase tracking-widest">{name}</span>

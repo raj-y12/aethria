@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Startup } from '../types/startup';
 import { getReviewerQualityBand } from '../design-system/semantics';
 import { tokens } from '../design-system/tokens';
-import { transitionOrReduced } from '../design-system/motion';
 import {
   UI_FILTER_TOOLBAR_LABEL,
 } from '../design-system/ui-text';
