@@ -2,10 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import type {
-  SignalItem, EscalationItem, RejectionAnalytics, WatchlistAnalytics,
+  SignalItem, RejectionAnalytics, WatchlistAnalytics,
   ConcentrationAnalytics, MetaCycleReport, ScoutWeights, CalibrationState,
 } from '../types/startup';
-import { resolveEscalation } from '../api/escalations';
 import { triggerMetaCycle } from '../api/meta';
 import { transitionOrReduced } from '../design-system/motion';
 import { UI_FILTER_TOOLBAR_LABEL } from '../design-system/ui-text';
@@ -13,9 +12,8 @@ import { usePrefersReducedMotion } from '../hooks';
 import EmptyState from './EmptyState';
 import { fetchFundThesisRuntime, type FundThesisRuntime } from '../api/fundThesis';
 
-type Tab = 'signals' | 'escalations' | 'analytics' | 'thesis' | 'meta';
+type Tab = 'signals' | 'analytics' | 'thesis' | 'meta';
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'escalations', label: 'Escalations' },
   { key: 'signals', label: 'Signals' },
   { key: 'analytics', label: 'Analytics' },
   { key: 'thesis', label: 'Thesis' },
@@ -24,15 +22,12 @@ const TABS: { key: Tab; label: string }[] = [
 
 interface SystemIntelligenceProps {
   signals: SignalItem[];
-  escalations: EscalationItem[];
   rejectionAnalytics: RejectionAnalytics;
   watchlistAnalytics: WatchlistAnalytics;
   concentrationAnalytics: ConcentrationAnalytics;
   metaReports: MetaCycleReport[];
   scoutWeights: ScoutWeights;
   calibrationState: CalibrationState;
-  onEscalationResolved?: () => void;
-  onOpenEscalationMemo?: (escalation: EscalationItem) => void;
   onClose?: () => void;
 }
 
@@ -129,142 +124,6 @@ function SignalsTab({ signals }: { signals: SignalItem[] }) {
         </RowWrapper>
       ))}
     </div>
-  );
-}
-
-/* ─── ESCALATIONS ─── */
-function EscalationsTab({ escalations, onResolved, onOpenMemo }: {
-  escalations: EscalationItem[]; onResolved?: () => void; onOpenMemo?: (escalation: EscalationItem) => void;
-}) {
-  const pending = escalations.filter((e) => !e.human_resolution);
-  if (pending.length === 0) {
-    return (
-      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
-        <p className="type-meta text-oxford/20 uppercase tracking-[0.2em]">All escalations resolved</p>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col relative">
-      {pending.map((esc, i) => (
-        <EscalationRow key={esc.id} index={i} escalation={esc} onResolved={onResolved} onOpenMemo={onOpenMemo} />
-      ))}
-    </div>
-  );
-}
-
-function EscalationRow({ index, escalation, onResolved, onOpenMemo }: {
-  index: number; escalation: EscalationItem; onResolved?: () => void; onOpenMemo?: (escalation: EscalationItem) => void;
-}) {
-  const [resolving, setResolving] = useState<string | null>(null);
-  const [notes, setNotes] = useState('');
-  const [resolved, setResolved] = useState(false);
-
-  const handleResolve = useCallback(async () => {
-    if (!resolving) return;
-    try {
-      await resolveEscalation(escalation.id, resolving as 'YES' | 'NO' | 'MAYBE', notes);
-      setResolved(true);
-      setTimeout(() => onResolved?.(), 1200);
-    } catch { /* silent */ }
-  }, [resolving, notes, escalation.id, onResolved]);
-
-  const confidence = escalation.partner?.confidence ?? 0;
-  const displayIndex = (index + 1).toString().padStart(2, '0');
-
-  if (resolved) {
-    return (
-      <motion.div initial={{ opacity: 1 }} animate={{ opacity: 0 }} className="py-phi-5 border-b border-oxford/[0.06] flex items-center justify-center">
-        <span className="type-meta text-oxford/40 uppercase tracking-widest">Resolved</span>
-      </motion.div>
-    );
-  }
-
-  return (
-    <RowWrapper index={index}>
-      {/* Index */}
-      <div className="flex flex-col gap-phi-3 min-w-0">
-        <span className="font-mono type-label-section text-oxford/20 group-hover:text-oxford/50 transition-colors duration-500 tabular-nums">
-          {displayIndex}
-        </span>
-        <div className="relative w-0.5 h-8 bg-oxford/5 overflow-hidden">
-          <motion.div
-            initial={{ height: 0 }}
-            animate={{ height: `${confidence * 100}%` }}
-            className="absolute bottom-0 left-0 w-full bg-oxford/30"
-          />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="type-meta text-oxford/30 uppercase tracking-tighter">Confidence</span>
-          <span className="font-mono type-meta text-oxford/50 tabular-nums">{Math.round(confidence * 100)}%</span>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex min-w-0 flex-col gap-phi-3">
-        <div className="flex items-baseline gap-phi-4 flex-wrap">
-          <h3 className="font-sans font-semibold text-base text-oxford tracking-tight">
-            {escalation.startup_name ?? escalation.scout?.name ?? 'Unknown'}
-          </h3>
-          <span className="type-meta text-oxford/40 uppercase tracking-widest">{escalation.scout?.sector || 'Multi-sector'}</span>
-        </div>
-
-        {!resolving ? (
-          <div className="mt-phi-2 flex items-center gap-phi-4">
-            {[
-              { d: 'YES' as const, label: 'Invest' },
-              { d: 'NO' as const, label: 'Pass' },
-              { d: 'MAYBE' as const, label: 'Monitor' },
-            ].map(({ d, label }) => (
-              <button
-                key={d}
-                onClick={() => setResolving(d)}
-                className="type-meta text-oxford/40 hover:text-oxford transition-colors uppercase tracking-[0.18em] underline underline-offset-8 decoration-oxford/10 hover:decoration-oxford/40 btn-interaction"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-phi-4 space-y-phi-4">
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add a note explaining your decision..."
-              autoFocus
-              className="w-full bg-transparent border-0 border-b border-oxford/10 py-2 type-body text-oxford placeholder:text-oxford/20 outline-none focus:border-oxford/30 transition-colors"
-            />
-            <div className="flex gap-phi-4">
-              <button
-                onClick={handleResolve}
-                disabled={notes.trim().length < 5}
-                className="type-meta text-oxford hover:text-escalation transition-colors disabled:opacity-20 uppercase tracking-[0.14em]"
-              >
-                Confirm — {resolving}
-              </button>
-              <button
-                onClick={() => { setResolving(null); setNotes(''); }}
-                className="type-meta text-oxford/20 hover:text-oxford transition-colors uppercase tracking-[0.14em]"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div className="flex min-w-0 flex-col items-start gap-phi-5 lg:items-end">
-        {onOpenMemo && (
-          <button onClick={() => onOpenMemo(escalation)} className="type-meta text-oxford/40 hover:text-oxford transition-colors uppercase tracking-[0.14em] btn-interaction">
-            View Memo →
-          </button>
-        )}
-        <span className="type-label-tab text-escalation bg-escalation/5 px-2 py-0.5 border border-escalation/10 uppercase tracking-widest text-[9px]">
-          Escalation
-        </span>
-      </div>
-    </RowWrapper>
   );
 }
 
@@ -529,7 +388,7 @@ function MetaCommandTab({ reports, weights, calibration }: {
 
 /* ─── MAIN COMPONENT ─── */
 export default function SystemIntelligence(props: SystemIntelligenceProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('escalations');
+  const [activeTab, setActiveTab] = useState<Tab>('signals');
   const reduceMotion = usePrefersReducedMotion();
 
   return (
@@ -577,13 +436,6 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
           transition={transitionOrReduced(reduceMotion, { duration: 0.3, ease: 'circOut' })}
         >
           {activeTab === 'signals' && <SignalsTab signals={props.signals} />}
-          {activeTab === 'escalations' && (
-            <EscalationsTab
-              escalations={props.escalations}
-              onResolved={props.onEscalationResolved}
-              onOpenMemo={props.onOpenEscalationMemo}
-            />
-          )}
           {activeTab === 'analytics' && (
             <AnalyticsTab
               rejection={props.rejectionAnalytics}

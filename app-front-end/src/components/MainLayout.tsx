@@ -23,7 +23,7 @@ import {
 } from '../hooks';
 import { transitionOrReduced } from '../design-system/motion';
 import { UI_PANEL_CHROME_LABEL } from '../design-system/ui-text';
-import type { Startup, EscalationItem } from '../types/startup';
+import type { Startup } from '../types/startup';
 import type { SystemData } from '../hooks/useSystemData';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './InvestmentMemoContent';
 import { queueOnDemandLookup, fetchStartupDetail, fetchLookupJobStatus } from '../api/startups';
@@ -81,7 +81,6 @@ export default function MainLayout({
 }: MainLayoutProps) {
   const {
     startups,
-    escalations,
     signals,
     metaReports,
     rejectionAnalytics,
@@ -141,18 +140,6 @@ export default function MainLayout({
     setRightPanel('memo');
     setSelectedStartup(startup);
   }, []);
-
-  const handleOpenEscalationMemo = useCallback(
-    (esc: EscalationItem) => {
-      const id = esc.startup_id ?? esc.id;
-      const startup = startups.find((s) => s.id === id);
-      if (!startup) return;
-      restoreRefVerdictMemo.current = document.activeElement as HTMLElement | null;
-      setSelectedStartup(startup);
-      /* Leave rightPanel unchanged so System stays on the left; memo uses selectedStartup on the right. */
-    },
-    [startups]
-  );
 
   const handleCloseMemo = useCallback(() => {
     setSelectedStartup(null);
@@ -645,15 +632,12 @@ export default function MainLayout({
                 {rightPanel === 'system' ? (
                   <SystemIntelligence
                     signals={signals}
-                    escalations={escalations}
                     rejectionAnalytics={rejectionAnalytics}
                     watchlistAnalytics={watchlistAnalytics}
                     concentrationAnalytics={concentrationAnalytics}
                     metaReports={metaReports}
                     scoutWeights={scoutWeights}
                     calibrationState={calibrationState}
-                    onEscalationResolved={() => void queryClient.invalidateQueries({ queryKey: ['escalations'] })}
-                    onOpenEscalationMemo={handleOpenEscalationMemo}
                     onClose={() => setRightPanel(null)}
                   />
                 ) : (

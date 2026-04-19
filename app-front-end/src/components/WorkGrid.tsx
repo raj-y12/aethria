@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Startup } from '../types/startup';
 import { getReviewerQualityBand } from '../design-system/semantics';
@@ -11,6 +11,10 @@ import { usePrefersReducedMotion } from '../hooks';
 import DecisionBadge from './DecisionBadge';
 import VerdictBandBadge from './VerdictBandBadge';
 import EmptyState from './EmptyState';
+import { resolveEscalation } from '../api/escalations';
+
+interface RowDecisionState { decision: string | null; notes: string; resolved: boolean; }
+const emptyRowState = (): RowDecisionState => ({ decision: null, notes: '', resolved: false });
 
 const ORIENT_DISMISSED_KEY = 'aethria_dashboard_orient_dismissed';
 const COACH_MARK_DURATION_MS = 4000;
@@ -76,7 +80,23 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('ALL');
   const [sortFilter, setSortFilter] = useState<SortFilter>('NEWEST');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [rowDecisions, setRowDecisions] = useState<Record<string, RowDecisionState>>({});
   const reduceMotion = usePrefersReducedMotion();
+
+  const getRS = (id: string): RowDecisionState => rowDecisions[id] ?? emptyRowState();
+
+  const setRS = useCallback((id: string, patch: Partial<RowDecisionState>) => {
+    setRowDecisions(prev => ({ ...prev, [id]: { ...(prev[id] ?? emptyRowState()), ...patch } }));
+  }, []);
+
+  const handleConfirm = useCallback(async (startupId: string) => {
+    const rs = rowDecisions[startupId] ?? emptyRowState();
+    if (!rs.decision || rs.notes.trim().length < 5) return;
+    try {
+      await resolveEscalation(startupId, rs.decision as 'YES' | 'NO' | 'MAYBE', rs.notes);
+      setRS(startupId, { resolved: true });
+    } catch { /* silent */ }
+  }, [rowDecisions, setRS]);
 
   const ordered = useMemo(() => {
     const filtered = startups.filter((s) => {
@@ -283,6 +303,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
 
               <div className="grid grid-cols-1 gap-phi-5 items-start lg:grid-cols-[76px_minmax(0,1fr)_max-content] 2xl:grid-cols-[100px_minmax(0,1fr)_max-content]">
                 {/* 01: Metadata Index */}
+
                 <div className="flex flex-col gap-phi-3 min-w-0">
                   <span className="type-label-section text-oxford/20 group-hover:text-oxford/50 transition-colors duration-500 tabular-nums">
                     Ref_{displayIndex}
@@ -364,6 +385,76 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                   </motion.span>
                 </div>
               </div>
+
+              {/* Inline decision panel — visible only when selected */}
+              <AnimatePresence>
+                {isSelected && (() => {
+                  const rs = getRS(startup.id);
+                  return (
+                    <motion.div
+                      key="decision-panel"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeOut' }}
+                      className="overflow-hidden"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="mt-phi-4 pt-phi-4 border-t border-oxford/[0.06]">
+                        {rs.resolved ? (
+                          <span className="type-meta text-oxford/40 uppercase tracking-widest">Decision recorded</span>
+                        ) : !rs.decision ? (
+                          <div className="flex items-center gap-phi-6">
+                            <span className="type-meta text-oxford/25 uppercase tracking-widest">Resolve:</span>
+                            {[
+                              { d: 'YES' as const, label: 'Invest' },
+                              { d: 'NO' as const, label: 'Pass' },
+                              { d: 'MAYBE' as const, label: 'Monitor' },
+                            ].map(({ d, label }) => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => setRS(startup.id, { decision: d })}
+                                className="type-meta text-oxford/40 hover:text-oxford transition-colors uppercase tracking-[0.18em] underline underline-offset-8 decoration-oxford/10 hover:decoration-oxford/40 btn-interaction"
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-phi-4">
+                            <textarea
+                              value={rs.notes}
+                              onChange={(e) => setRS(startup.id, { notes: e.target.value })}
+                              placeholder="Add a note explaining your decision..."
+                              autoFocus
+                              rows={2}
+                              className="w-full bg-transparent border-0 border-b border-oxford/10 py-2 type-body text-oxford placeholder:text-oxford/20 outline-none focus:border-oxford/30 transition-colors resize-none"
+                            />
+                            <div className="flex gap-phi-4">
+                              <button
+                                type="button"
+                                onClick={() => handleConfirm(startup.id)}
+                                disabled={rs.notes.trim().length < 5}
+                                className="type-meta text-oxford hover:text-escalation transition-colors disabled:opacity-20 uppercase tracking-[0.14em]"
+                              >
+                                Confirm — {rs.decision}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRS(startup.id, emptyRowState())}
+                                className="type-meta text-oxford/20 hover:text-oxford transition-colors uppercase tracking-[0.14em]"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })()}
+              </AnimatePresence>
             </motion.div>
           );
         })}
