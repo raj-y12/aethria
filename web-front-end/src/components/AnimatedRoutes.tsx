@@ -7,7 +7,7 @@ import RequestAccessPage from '../RequestAccessPage';
 
 const DURATION = 0.3;
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
-const PAPER = '#F2F0EA';
+const PAPER = '#f2f0ea';
 const OXFORD = '#002147';
 
 // Private routes: any file in src/private/*.tsx is exposed at /<filename-lowercase>.

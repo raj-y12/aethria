@@ -1,6 +1,7 @@
 import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
+import './InvestmentMemoContent.css';
 import type { Startup, Review } from '../types/startup';
 import {
   buildMemoPDF,
@@ -188,9 +189,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [startup, memoPartial]
   );
 
-  const handleDownloadPDF = useCallback(() => {
+  const handleDownloadPDF = useCallback(async () => {
     if (!displayStartup) return;
-    const doc = buildMemoPDF(displayStartup);
+    const doc = await buildMemoPDF(displayStartup);
     doc.save(`${icPackSafeBaseName(displayStartup)}-ic-pack.pdf`);
   }, [displayStartup]);
 
@@ -325,660 +326,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
   return (
     <div className={wrapperCls}>
-      <style>{`
-        /* === Layout === */
-        .memoPanel{
-          --memo-body-size: 14px;
-          --memo-label-size: 11px;
-          width: 60%;
-          min-width: 0;
-          flex: 0 0 60%;
-          background: var(--color-paper);
-          min-height: 0;
-          height: 100%;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-        .memoPanel--embedded{
-          width: 100%;
-          min-width: 0;
-          flex: 1 1 auto;
-          height: auto;
-          overflow: visible;
-        }
-        .memoScroll{
-          flex: 1 1 auto;
-          min-height: 0;
-          overflow-y: auto;
-          overflow-x: hidden;
-          padding: clamp(34px, 4vw, 55px) clamp(34px, 5vw, 55px);
-          color: #002147;
-          background: var(--color-paper);
-        }
-        .memoPanel--embedded .memoScroll{
-          padding: 0;
-          overflow: visible;
-          flex: 0 0 auto;
-          min-height: auto;
-        }
-
-        /* === Action buttons === */
-        .memoHeaderActions{
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-          align-items: center;
-          gap: 10px 18px;
-          margin-bottom: 10px;
-        }
-        .memoAction{
-          appearance: none;
-          border: none;
-          background: transparent;
-          padding: 4px 0;
-          cursor: pointer;
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 11px;
-          font-variant-caps: all-small-caps;
-          letter-spacing: 0.12em;
-          color: rgba(0,33,71,0.45);
-          transition: color 150ms ease;
-        }
-        .memoAction:hover{ color: #002147; }
-
-        /* === Gate strip (error/generating) === */
-        .memoGateStrip{
-          position: sticky;
-          top: 0;
-          z-index: 30;
-          margin: 0 0 10px 0;
-          padding: 8px 0 14px 0;
-          background: var(--color-paper);
-          border-bottom: 1px solid rgba(0,33,71,0.08);
-          pointer-events: none;
-        }
-        .memoGateStripInner{ pointer-events: auto; }
-        .memoGateTitle{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: 14px;
-          line-height: 1.5;
-          color: rgba(0,33,71,0.78);
-          margin: 8px 0 0 0;
-        }
-        .memoGateDetail{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: 13px;
-          line-height: 1.6;
-          color: rgba(0,33,71,0.55);
-          margin: 5px 0 0 0;
-          max-width: 38rem;
-        }
-        .memoPipelineKicker{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: var(--memo-label-size);
-          letter-spacing: 0.11em;
-          text-transform: uppercase;
-          color: rgba(0,33,71,0.50);
-          margin: 0;
-        }
-        .memoGateStrip--error .memoGateTitle{ color: rgba(125,43,58,0.95); }
-        .memoGateStrip--error .memoPipelineKicker{ color: rgba(125,43,58,0.72); }
-
-        /* === Document body === */
-        .memoBody{
-          max-width: 42rem;
-        }
-        .memoPanel--embedded .memoBody{
-          max-width: none;
-          width: 100%;
-        }
-        .memoDocSection{
-          margin-top: clamp(32px, 4.5vw, 48px);
-        }
-
-        /* === Empty state === */
-        .memoEmpty{
-          height: 100%;
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: var(--color-paper);
-        }
-        .memoEmptyInner{ text-align: center; padding: 48px; }
-        .memoEmptyWordmark{
-          font-family: "Libre Baskerville", Georgia, serif;
-          font-weight: 400;
-          font-size: 24px;
-          line-height: 1.4;
-          color: rgba(0,33,71,0.22);
-          margin: 0;
-        }
-        .memoEmptyHint{
-          margin-top: 12px;
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: 13px;
-          color: rgba(0,33,71,0.18);
-        }
-
-        /* === Document header === */
-        .memoDocHeader{
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 10px;
-        }
-        .memoDocHeaderMain{ flex: 1 1 auto; min-width: 0; }
-        .memoCompany{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-weight: 600;
-          font-size: clamp(1.375rem, 2.2vw, 1.625rem);
-          line-height: 1.2;
-          letter-spacing: -0.01em;
-          margin: 0 0 6px 0;
-          color: #002147;
-        }
-        .memoDocTagline{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: 14px;
-          line-height: 1.55;
-          color: rgba(0,33,71,0.55);
-          margin: 0 0 8px 0;
-          font-style: italic;
-        }
-        .memoMeta{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 11px;
-          letter-spacing: 0.08em;
-          color: rgba(0,33,71,0.40);
-          text-transform: uppercase;
-        }
-        .memoDocHeaderRight{
-          width: 100%;
-          text-align: left;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 4px;
-        }
-        .memoDocRecommendation{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: clamp(1.375rem, 5vw, 2rem);
-          font-weight: 600;
-          letter-spacing: -0.03em;
-          text-transform: uppercase;
-          margin: 0;
-          line-height: 1;
-        }
-        .memoDocRecommendation--invest{ color: rgba(14, 88, 44, 0.88); }
-        .memoDocRecommendation--monitor{ color: rgba(115, 76, 0, 0.85); }
-        .memoDocRecommendation--pass{ color: rgba(125, 43, 58, 0.88); }
-        .memoDocConfidence{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 11px;
-          letter-spacing: 0.10em;
-          text-transform: uppercase;
-          color: rgba(0,33,71,0.38);
-          margin: 0;
-        }
-        .memoDocEscalation{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 10px;
-          letter-spacing: 0.10em;
-          text-transform: uppercase;
-          color: rgba(125,43,58,0.60);
-          margin: 0;
-        }
-        .memoDocStatusLine{
-          display: flex;
-          align-items: baseline;
-          gap: 12px;
-          flex-wrap: wrap;
-        }
-        .memoDocJudgmentTop{
-          margin-bottom: 12px;
-        }
-        .memoDocLookupBadge{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 10px;
-          letter-spacing: 0.10em;
-          text-transform: uppercase;
-          color: rgba(0,33,71,0.30);
-          margin: 0;
-        }
-
-        /* === Header divider === */
-        .memoDocDivider{
-          height: 1px;
-          background: rgba(0,33,71,0.08);
-          margin: clamp(20px, 3vw, 30px) 0 0 0;
-        }
-
-        /* === Section heading === */
-        .memoDocSectionHead{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: var(--memo-label-size);
-          text-transform: uppercase;
-          letter-spacing: 0.14em;
-          color: rgba(0,33,71,0.40);
-          margin: 0 0 20px 0;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          font-weight: 400;
-        }
-        .memoDocContestedKicker{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 10px;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: rgba(125,43,58,0.65);
-        }
-        .memoDocSubsection{ margin-top: 22px; }
-        .memoDocSubhead{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 10px;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: rgba(0,33,71,0.35);
-          margin: 0 0 10px 0;
-        }
-
-        /* === Prose text === */
-        .memoDocProse{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: var(--memo-body-size);
-          line-height: 1.72;
-          color: rgba(0,33,71,0.72);
-          margin: 0 0 14px 0;
-        }
-        .memoDocProse:last-child{ margin-bottom: 0; }
-        .memoDocThesis{
-          font-style: italic;
-          color: rgba(0,33,71,0.80);
-          font-size: 14.5px;
-        }
-
-        /* === Definition list (key-value rows) === */
-        .memoDocDL{ display: flex; flex-direction: column; }
-        .memoDocDLRow{
-          display: grid;
-          grid-template-columns: minmax(7.5rem, 9rem) minmax(0, 1fr);
-          column-gap: clamp(18px, 2.5vw, 28px);
-          align-items: start;
-          padding: 9px 0;
-        }
-        .memoDocDLRow + .memoDocDLRow{ margin-top: 2px; }
-        .memoDocDT{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 10px;
-          text-transform: uppercase;
-          letter-spacing: 0.10em;
-          color: rgba(0,33,71,0.36);
-          margin: 0;
-          padding-top: 2px;
-        }
-        .memoDocDD{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: var(--memo-body-size);
-          line-height: 1.65;
-          color: rgba(0,33,71,0.75);
-          margin: 0;
-        }
-
-        /* === Assessment scorecard === */
-        .memoDocScoreLegend{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 10px;
-          letter-spacing: 0.06em;
-          color: rgba(0,33,71,0.30);
-          margin: 0 0 16px 0;
-        }
-        .memoDocScorecardRow{
-          display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
-          gap: clamp(10px, 1.8vw, 18px);
-          margin-bottom: 4px;
-        }
-        .memoDocScoreBtn{
-          appearance: none;
-          border: none;
-          background: transparent;
-          padding: 0;
-          cursor: pointer;
-          text-align: center;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 5px;
-          min-width: 0;
-        }
-        .memoDocScoreBtn:focus{ outline: none; }
-        .memoDocScoreBtn:focus-visible{
-          outline: 2px solid rgba(0,33,71,0.22);
-          outline-offset: 4px;
-        }
-        .memoDocScoreDim{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 9px;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          color: rgba(0,33,71,0.30);
-          transition: color 150ms ease;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 100%;
-        }
-        .memoDocScoreVal{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: clamp(0.9375rem, 1.5vw, 1.1875rem);
-          font-weight: 700;
-          color: rgba(0,33,71,0.42);
-          transition: color 150ms ease;
-          line-height: 1.1;
-        }
-        .memoDocScoreBtn[aria-pressed="true"] .memoDocScoreDim{ color: rgba(0,33,71,0.55); }
-        .memoDocScoreBtn[aria-pressed="true"] .memoDocScoreVal{ color: #002147; }
-        .memoDocScoreUnderline{
-          height: 2px;
-          width: 100%;
-          background: rgba(0,33,71,0.18);
-        }
-        .memoDocScoreColSpacer{ height: 2px; }
-        .memoDocDimDetail{
-          padding: 14px 0 2px 0;
-          margin-top: 8px;
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-        }
-        .memoDocDimName{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 10px;
-          text-transform: uppercase;
-          letter-spacing: 0.10em;
-          color: rgba(0,33,71,0.42);
-        }
-        .memoDocDimText{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: 13px;
-          line-height: 1.62;
-          color: rgba(0,33,71,0.68);
-        }
-        .memoDocScoreNote{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-style: italic;
-          font-size: 13px;
-          line-height: 1.6;
-          color: rgba(0,33,71,0.40);
-          margin: 14px 0 0 0;
-        }
-
-        /* === Thesis alignment tiles === */
-        .memoDocAlignTiles{
-          display: flex;
-          flex-wrap: wrap;
-          gap: clamp(20px, 3vw, 36px);
-          margin-bottom: 20px;
-        }
-        .memoDocAlignTile{
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .memoDocAlignTileLabel{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 10px;
-          text-transform: uppercase;
-          letter-spacing: 0.10em;
-          color: rgba(0,33,71,0.36);
-          margin: 0;
-        }
-        .memoDocAlignTileVal{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: clamp(1rem, 1.6vw, 1.25rem);
-          font-weight: 600;
-          color: #002147;
-          margin: 0;
-          line-height: 1.2;
-        }
-
-        /* === Reviewer comparison table === */
-        .memoDocReviewerTable{
-          border-top: 1px solid rgba(0,33,71,0.08);
-        }
-        .memoDocReviewerRow{
-          display: grid;
-          grid-template-columns: 6.5rem 5rem minmax(0, 1fr);
-          gap: 0 clamp(12px, 2vw, 20px);
-          align-items: center;
-          padding: 13px 0;
-          border-bottom: 1px solid rgba(0,33,71,0.06);
-          appearance: none;
-          border-left: none;
-          border-right: none;
-          background: transparent;
-          width: 100%;
-          cursor: pointer;
-          text-align: left;
-          transition: background 120ms ease;
-        }
-        .memoDocReviewerRow:hover{ background: rgba(0,33,71,0.025); }
-        .memoDocReviewerRow:focus{ outline: none; }
-        .memoDocReviewerRow:focus-visible{
-          outline: 2px solid rgba(0,33,71,0.22);
-          outline-offset: 2px;
-        }
-        .memoDocReviewerRowLabel{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 10px;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          color: rgba(0,33,71,0.42);
-          transition: color 150ms ease;
-        }
-        .memoDocReviewerRow[aria-pressed="true"] .memoDocReviewerRowLabel{ color: rgba(0,33,71,0.72); }
-        .memoDocReviewerRowVerdict{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: 13px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.02em;
-          color: rgba(0,33,71,0.45);
-          transition: color 150ms ease;
-        }
-        .memoDocReviewerRow[aria-pressed="true"] .memoDocReviewerRowVerdict{ color: #002147; }
-        .memoDocReviewerRowScores{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 10px;
-          letter-spacing: 0.04em;
-          color: rgba(0,33,71,0.32);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          transition: color 150ms ease;
-        }
-        .memoDocReviewerRow[aria-pressed="true"] .memoDocReviewerRowScores{ color: rgba(0,33,71,0.50); }
-        .memoDocReviewerDetail{
-          padding: 16px 0 4px 0;
-        }
-        .memoDocReviewerDetailText{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: 13px;
-          line-height: 1.65;
-          color: rgba(0,33,71,0.65);
-          margin: 0;
-        }
-
-        /* === Shared list === */
-        .memoList{
-          margin: 0;
-          padding: 0;
-          list-style: none;
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: var(--memo-body-size);
-          line-height: 1.65;
-          color: rgba(0,33,71,0.72);
-        }
-        .memoListItem{
-          display: flex;
-          gap: 12px;
-        }
-        .memoListItem + .memoListItem{ margin-top: 0.625rem; }
-        .memoBullet{
-          flex-shrink: 0;
-          color: rgba(0,33,71,0.25);
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 12px;
-          margin-top: 0.12em;
-        }
-        .memoLink{
-          color: #002147;
-          text-decoration: none;
-          border-bottom: 1px solid rgba(0,33,71,0.20);
-          transition: border-color 120ms ease;
-        }
-        .memoLink:hover{ border-bottom-color: rgba(0,33,71,0.45); }
-
-        /* === Sources toggle === */
-        .memoSourcesToggle{
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          appearance: none;
-          border: none;
-          border-top: 1px solid rgba(0,33,71,0.08);
-          background: transparent;
-          padding: 13px 0 0 0;
-          cursor: pointer;
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: var(--memo-label-size);
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: rgba(0,33,71,0.36);
-          transition: color 120ms ease;
-        }
-        .memoSourcesToggle:hover{ color: rgba(0,33,71,0.60); }
-        .memoSourcesPlus{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 13px;
-          color: rgba(0,33,71,0.30);
-          line-height: 1;
-        }
-        .memoSourcesBody{ padding-top: 14px; padding-bottom: 4px; }
-
-        /* === Pipeline run log === */
-        .memoPipelineSection{ margin: 0; }
-        .memoPipelineToggle{
-          width: 100%;
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 12px;
-          appearance: none;
-          border: none;
-          background: transparent;
-          padding: 0 0 12px 0;
-          cursor: pointer;
-          text-align: left;
-          border-bottom: 1px solid rgba(0,33,71,0.06);
-          transition: opacity 120ms ease;
-        }
-        .memoPipelineToggle:hover{ opacity: 0.72; }
-        .memoPipelineToggleTitle{
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          min-width: 0;
-          flex: 1;
-        }
-        .memoPipelineOneLiner{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: var(--memo-body-size);
-          line-height: 1.45;
-          color: rgba(0,33,71,0.48);
-          margin: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .memoPipelinePlus{
-          flex-shrink: 0;
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: 12px;
-          color: rgba(0,33,71,0.40);
-          line-height: 1.5;
-          padding-top: 2px;
-        }
-        .memoReplayList{ list-style: none; margin: 0; padding: 4px 0 2px 0; }
-        .memoReplayItem{
-          padding: 16px 0;
-          border-top: 1px solid rgba(0,33,71,0.06);
-        }
-        .memoReplayItem:first-child{ border-top: none; padding-top: 12px; }
-        .memoReplayKicker{
-          display: flex;
-          flex-wrap: wrap;
-          align-items: baseline;
-          gap: 6px 10px;
-          margin: 0 0 4px 0;
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: var(--memo-body-size);
-          font-weight: 600;
-          line-height: 1.35;
-          color: rgba(0,33,71,0.75);
-        }
-        .memoReplayBadge{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: var(--memo-label-size);
-          font-weight: 400;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: rgba(0,33,71,0.38);
-        }
-        .memoReplayBadge--pending{ color: rgba(0,33,71,0.28); }
-        .memoReplayWhen{
-          font-family: "Space Mono", ui-monospace, monospace;
-          font-size: var(--memo-label-size);
-          letter-spacing: 0.08em;
-          color: rgba(0,33,71,0.36);
-          margin: 0 0 6px 0;
-        }
-        .memoReplayDetail{
-          font-family: "Instrument Sans", system-ui, sans-serif;
-          font-size: var(--memo-body-size);
-          line-height: 1.55;
-          color: rgba(0,33,71,0.58);
-          margin: 0;
-        }
-
-        /* === Generating state === */
-        .memoGeneratingSection{ margin-top: 2.25rem; }
-        .memoSummaryCallout{ background: transparent; padding: 0; margin: 0; border: none; }
-        .memoSummaryCallout.memoGenCallout{
-          background: var(--color-register-tint);
-          padding: 14px 0 16px 0;
-        }
-        .memoGenCallout .memoPipelineKicker{ margin-bottom: 8px; }
-        .memoGenCallout .memoGateTitle{ margin-top: 0; }
-        .memoGenCallout .memoGateDetail{ margin-bottom: 0; }
-
-        @media (max-width: 1100px){
-          .memoPanel{ width: 100%; flex-basis: auto; }
-          .memoDocScorecardRow{ grid-template-columns: repeat(3, minmax(0,1fr)); }
-        }
-        @media (max-width: 640px){
-          .memoDocHeader{ flex-direction: column; gap: 10px; }
-          .memoDocHeaderRight{ text-align: left; align-items: flex-start; }
-          .memoDocDLRow{ grid-template-columns: 1fr; row-gap: 5px; }
-          .memoDocDT{ padding-top: 0; }
-          .memoDocReviewerRow{ grid-template-columns: 1fr 1fr; }
-          .memoDocReviewerRowScores{ display: none; }
-        }
-      `}</style>
+      {/* Styles extracted to InvestmentMemoContent.css */}
 
       {!displayStartup ? (
         <div className="memoEmpty">
@@ -1334,7 +682,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         <span className="memoDocContestedKicker">Contested</span>
                       )}
                     </h2>
-                    <div className="memoDocReviewerTable" role="table" aria-label="Per-reviewer scores and verdicts">
+                    <div className="memoDocReviewerTable" role="group" aria-label="Per-reviewer scores and verdicts">
                       {reviews.map((rv, idx) => {
                         const isSelected = idx === selectedReviewerIdx;
                         const scoreRow = `Mkt ${rv.market_score}  ·  Prd ${rv.product_score}  ·  Tch ${rv.technical_score}  ·  Exc ${rv.execution_score}  ·  Def ${rv.defensibility_score}`;
@@ -1462,12 +810,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   initial={false}
                   animate={
                     reduceMotion
-                      ? { height: sourcesOpen ? 'auto' : 0, opacity: sourcesOpen ? 1 : 0 }
-                      : sourcesOpen ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }
+                      ? { gridTemplateRows: sourcesOpen ? '1fr' : '0fr', opacity: sourcesOpen ? 1 : 0 }
+                      : sourcesOpen ? { gridTemplateRows: '1fr', opacity: 1 } : { gridTemplateRows: '0fr', opacity: 0 }
                   }
                   transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.16, 1, 0.3, 1] })}
-                  style={{ overflow: 'hidden' }}
+                  style={{ display: 'grid' }}
                 >
+                  <div className="min-h-0 overflow-hidden">
                   <div className="memoSourcesBody">
                     <ul className="memoList">
                       {(displayStartup.scout.references ?? [])
@@ -1488,6 +837,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                           );
                         })}
                     </ul>
+                  </div>
                   </div>
                 </motion.div>
               </section>
@@ -1518,12 +868,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   initial={false}
                   animate={
                     reduceMotion
-                      ? { height: pipelineLogOpen ? 'auto' : 0, opacity: pipelineLogOpen ? 1 : 0 }
-                      : pipelineLogOpen ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }
+                      ? { gridTemplateRows: pipelineLogOpen ? '1fr' : '0fr', opacity: pipelineLogOpen ? 1 : 0 }
+                      : pipelineLogOpen ? { gridTemplateRows: '1fr', opacity: 1 } : { gridTemplateRows: '0fr', opacity: 0 }
                   }
                   transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.16, 1, 0.3, 1] })}
-                  style={{ overflow: 'hidden' }}
+                  style={{ display: 'grid' }}
                 >
+                  <div className="min-h-0 overflow-hidden">
                   <ol className="memoReplayList">
                     {pipelineReplaySteps.map((step) => (
                       <li key={step.id} className="memoReplayItem">
@@ -1538,6 +889,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       </li>
                     ))}
                   </ol>
+                  </div>
                 </motion.div>
               </section>
             )}

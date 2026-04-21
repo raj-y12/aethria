@@ -161,7 +161,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
   return (
     <div className="w-full font-sans bg-paper selection:bg-oxford selection:text-paper">
       {/* Editorial Toolbar — Museum Grade */}
-      <div className="sticky top-0 z-20 bg-paper/90 backdrop-blur-md border-b border-oxford/[0.06] px-phi-4 py-phi-4">
+      <div className="sticky top-0 z-20 bg-paper border-b border-oxford/[0.06] px-phi-4 py-phi-4">
         <div className="flex flex-col gap-phi-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-phi-4">
@@ -201,19 +201,21 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
           <AnimatePresence>
             {showAdvancedFilters && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden grid grid-cols-1 sm:grid-cols-3 gap-phi-5 pt-phi-4 border-t border-oxford/[0.06]"
+                initial={{ gridTemplateRows: '0fr', opacity: 0 }}
+                animate={{ gridTemplateRows: '1fr', opacity: 1 }}
+                exit={{ gridTemplateRows: '0fr', opacity: 0 }}
+                style={{ display: 'grid' }}
+                className="border-t border-oxford/[0.06]"
               >
+              <div className="min-h-0 overflow-hidden grid grid-cols-1 sm:grid-cols-3 gap-phi-5 pt-phi-4">
                 <div className="space-y-2">
-                  <span className="type-meta text-oxford/25 uppercase tracking-widest">Economic Decision</span>
+                  <span className="type-meta text-oxford/45 uppercase tracking-widest">Economic Decision</span>
                   <div className="flex flex-wrap gap-2">
                     {['ALL', 'YES', 'NO', 'MAYBE', 'ESCALATION'].map((d) => (
                       <button
                         key={d}
                         onClick={() => setDecisionFilter(d as DecisionFilter)}
-                        className={`type-meta px-2 py-1 border border-oxford/10 transition-colors ${
+                        className={`type-meta px-3 min-h-[44px] border border-oxford/10 transition-colors ${
                           decisionFilter === d ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
                         }`}
                       >
@@ -223,13 +225,13 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <span className="type-meta text-oxford/25 uppercase tracking-widest">Intelligence Band</span>
+                  <span className="type-meta text-oxford/45 uppercase tracking-widest">Intelligence Band</span>
                   <div className="flex flex-wrap gap-2">
                     {['ALL', 'STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'].map((r) => (
                       <button
                         key={r}
                         onClick={() => setReviewFilter(r as ReviewFilter)}
-                        className={`type-meta px-2 py-1 border border-oxford/10 transition-colors ${
+                        className={`type-meta px-3 min-h-[44px] border border-oxford/10 transition-colors ${
                           reviewFilter === r ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
                         }`}
                       >
@@ -251,6 +253,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                     Reset All Filters
                   </button>
                 </div>
+              </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -309,10 +312,10 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                   </span>
                   <div className="relative w-0.5 h-16 bg-oxford/5 overflow-hidden">
                     <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: `${confidence * 100}%` }}
+                      initial={{ scaleY: 0 }}
+                      animate={{ scaleY: confidence }}
                       transition={{ duration: 1.2, delay: 0.2, ease: "easeOut" }}
-                      className="absolute bottom-0 left-0 w-full bg-oxford/30"
+                      className="absolute bottom-0 left-0 w-full h-full bg-oxford/30 origin-bottom"
                     />
                   </div>
                   <div className="flex flex-col gap-0.5">
@@ -392,19 +395,20 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                   return (
                     <motion.div
                       key="decision-panel"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
+                      initial={{ gridTemplateRows: '0fr', opacity: 0 }}
+                      animate={{ gridTemplateRows: '1fr', opacity: 1 }}
+                      exit={{ gridTemplateRows: '0fr', opacity: 0 }}
                       transition={{ duration: 0.25, ease: 'easeOut' }}
-                      className="overflow-hidden"
+                      style={{ display: 'grid' }}
                       onClick={(e) => e.stopPropagation()}
                     >
+                      <div className="min-h-0 overflow-hidden">
                       <div className="mt-phi-4 pt-phi-4 border-t border-oxford/[0.06]">
                         {rs.resolved ? (
                           <span className="type-meta text-oxford/40 uppercase tracking-widest">Decision recorded</span>
                         ) : !rs.decision ? (
                           <div className="flex items-center gap-phi-6">
-                            <span className="type-meta text-oxford/25 uppercase tracking-widest">Resolve:</span>
+                            <span className="type-meta text-oxford/45 uppercase tracking-widest">Resolve:</span>
                             {[
                               { d: 'YES' as const, label: 'Invest' },
                               { d: 'NO' as const, label: 'Pass' },
@@ -414,7 +418,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                                 key={d}
                                 type="button"
                                 onClick={() => setRS(startup.id, { decision: d })}
-                                className="type-meta text-oxford/40 hover:text-oxford transition-colors uppercase tracking-[0.18em] underline underline-offset-8 decoration-oxford/10 hover:decoration-oxford/40 btn-interaction"
+                                className="type-meta text-oxford/40 hover:text-oxford transition-colors uppercase tracking-[0.18em] underline underline-offset-8 decoration-oxford/10 hover:decoration-oxford/40 btn-interaction inline-flex items-center min-h-[44px]"
                               >
                                 {label}
                               </button>
@@ -435,20 +439,21 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                                 type="button"
                                 onClick={() => handleConfirm(startup.id)}
                                 disabled={rs.notes.trim().length < 5}
-                                className="type-meta text-oxford hover:text-escalation transition-colors disabled:opacity-20 uppercase tracking-[0.14em]"
+                                className="type-meta text-oxford hover:text-escalation transition-colors disabled:opacity-20 uppercase tracking-[0.14em] inline-flex items-center min-h-[44px]"
                               >
                                 Confirm — {rs.decision}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setRS(startup.id, emptyRowState())}
-                                className="type-meta text-oxford/20 hover:text-oxford transition-colors uppercase tracking-[0.14em]"
+                                className="type-meta text-oxford/45 hover:text-oxford transition-colors uppercase tracking-[0.14em] inline-flex items-center min-h-[44px]"
                               >
                                 Cancel
                               </button>
                             </div>
                           </div>
                         )}
+                      </div>
                       </div>
                     </motion.div>
                   );

@@ -2,8 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion, useInView, useReducedMotion } from 'framer-motion';
 import { SCROLL_EASE } from '../motionTokens';
 
-const PAPER = '#f2f0ea';
-
 type Metric = {
   label: string;
   note: string;
@@ -76,8 +74,8 @@ function RomanReveal({ show, text }: { show: boolean; text: string }) {
   }, [show]);
   return (
     <span
-      className="font-mono text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] transition-opacity duration-500 tabular-nums md:text-[44px]"
-      style={{ opacity: visible ? 1 : 0 }}
+      className="text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[var(--color-oxford)] transition-opacity duration-500 tabular-nums md:text-[44px]"
+      style={{ fontFamily: '"JetBrains Mono", monospace', opacity: visible ? 1 : 0 }}
     >
       {text}
     </span>
@@ -95,19 +93,19 @@ function StatColumn({ metric, index, run }: { metric: Metric; index: number; run
     numberNode = <RomanReveal show={run} text={metric.displayRoman ?? ''} />;
   } else if (metric.kind === 'int') {
     numberNode = (
-      <span className="font-mono text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] tabular-nums md:text-[44px]">
+      <span className="text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[var(--color-oxford)] tabular-nums md:text-[44px]" style={{ fontFamily: '"JetBrains Mono", monospace' }}>
         {n6}
       </span>
     );
   } else if (metric.kind === 'percent') {
     numberNode = (
-      <span className="font-mono text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] tabular-nums md:text-[44px]">
+      <span className="text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[var(--color-oxford)] tabular-nums md:text-[44px]" style={{ fontFamily: '"JetBrains Mono", monospace' }}>
         {n100}%
       </span>
     );
   } else {
     numberNode = (
-      <span className="font-mono text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[#002147] tabular-nums md:text-[44px]">
+      <span className="text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[var(--color-oxford)] tabular-nums md:text-[44px]" style={{ fontFamily: '"JetBrains Mono", monospace' }}>
         {dec.toFixed(2)}%
       </span>
     );
@@ -182,12 +180,13 @@ export default function HomeStatsSection() {
     <section
       ref={sectionRef}
       className="paper-dot-grid relative w-full border-b border-solid border-[var(--section-divider)]"
-      style={{ backgroundColor: PAPER, color: 'var(--color-charcoal)' }}
+      style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-charcoal)' }}
       aria-label="Operating metrics"
     >
       <div className="page-margin-x relative z-[1] py-12 md:py-[80px]">
         <motion.p
           className="section-numeral mb-6"
+          aria-hidden
           variants={statsHeaderVariants}
           initial={reduce ? false : 'hidden'}
           animate={inView || reduce ? 'visible' : 'hidden'}

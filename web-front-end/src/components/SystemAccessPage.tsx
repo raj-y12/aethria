@@ -28,6 +28,16 @@ export default function SystemAccessPage({
     return () => clearTimeout(t);
   }, []);
 
+  // Fallback: navigate even if CSS transitions are disabled or never fire.
+  useEffect(() => {
+    if (!exiting) return;
+    const fallback = setTimeout(
+      () => navigate('/home', { replace: true }),
+      EXIT_DURATION_MS + 300,
+    );
+    return () => clearTimeout(fallback);
+  }, [exiting, navigate]);
+
   useEffect(() => {
     const full = status;
     let index = 0;

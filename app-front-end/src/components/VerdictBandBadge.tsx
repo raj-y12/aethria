@@ -32,7 +32,7 @@ export default function VerdictBandBadge({ band }: { band: ReviewerQualityBand }
   // WEAK — dot indicator, no box
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-phi-1 whitespace-nowrap type-meta tracking-label uppercase text-oxford/25"
+      className="inline-flex shrink-0 items-center gap-phi-1 whitespace-nowrap type-meta tracking-label uppercase text-oxford/45"
       aria-label={band}
     >
       <span className="w-[4px] h-[4px] shrink-0 bg-oxford/20" aria-hidden />

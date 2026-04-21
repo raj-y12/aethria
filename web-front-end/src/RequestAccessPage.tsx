@@ -1,16 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import GrainOverlay from './components/GrainOverlay';
 import DeskClock from './components/DeskClock';
 
 const PROCESSING_DURATION_MS = 1200;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URL_REGEX = /^https?:\/\/.+/;
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 const WAITLIST_URL = API_BASE ? `${API_BASE.replace(/\/$/, '')}/api/waitlist` : '/api/waitlist';
 const APP_URL = import.meta.env.VITE_APP_URL ?? '';
-
-const OXFORD = '#002147';
-const PAPER = '#f2f0ea';
 
 export default function RequestAccessPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -28,10 +26,14 @@ export default function RequestAccessPage() {
   const [formOut, setFormOut] = useState(false);
   const [ellipsisStep, setEllipsisStep] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const t = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(t);
+    return () => {
+      cancelAnimationFrame(t);
+      abortRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -78,17 +80,25 @@ export default function RequestAccessPage() {
       setError('Please enter a valid email address.');
       return;
     }
+    const trimmedLinkedin = linkedin.trim();
+    if (trimmedLinkedin && !URL_REGEX.test(trimmedLinkedin)) {
+      setError('LinkedIn URL must start with https://');
+      return;
+    }
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
     setLoading(true);
     try {
       const res = await fetch(WAITLIST_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: abortRef.current.signal,
         body: JSON.stringify({
           name: trimmedName,
           email: trimmedEmail,
           role: trimmedRole,
           firm: trimmedFirm,
-          linkedin: linkedin.trim() || undefined,
+          linkedin: trimmedLinkedin || undefined,
         }),
       });
       if (!res.ok) {
@@ -105,6 +115,7 @@ export default function RequestAccessPage() {
       setLoading(false);
       setProcessing(true);
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
@@ -119,20 +130,22 @@ export default function RequestAccessPage() {
   return (
     <div
       className="relative flex min-h-[100dvh] w-full flex-col overflow-x-hidden"
-      style={{ backgroundColor: PAPER }}
+      style={{ backgroundColor: 'var(--color-paper)' }}
     >
       <header
         className="inst-site-header sticky top-0 z-[100] w-full shrink-0 border-b border-solid border-[var(--section-divider)] bg-[#f2f0ea]"
         style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
       >
         <div className="page-margin-x grid min-h-[52px] grid-cols-[1fr_1fr] items-center gap-2 sm:gap-4 md:grid-cols-[1fr_auto_1fr]">
-          <Link
-            data-cursor-expand
-            to="/"
-            className="font-wordmark justify-self-start py-2 text-[15px] font-normal normal-case leading-none tracking-normal text-[#002147] transition-opacity hover:opacity-80 sm:text-[16px]"
-          >
-            Aethria
-          </Link>
+          <nav aria-label="Site navigation">
+            <Link
+              data-cursor-expand
+              to="/"
+              className="font-wordmark justify-self-start py-2 text-[15px] font-normal normal-case leading-none tracking-normal text-[#002147] transition-opacity hover:opacity-80 sm:text-[16px]"
+            >
+              Aethria
+            </Link>
+          </nav>
           <p className="hidden justify-self-center text-center font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.35)] md:block">
             Deal flow operating system
           </p>
@@ -144,7 +157,7 @@ export default function RequestAccessPage() {
       {/* ── Left: Oxford monolith ─────────────────────────────────────── */}
       <div
         className="relative flex w-full shrink-0 flex-col justify-center overflow-hidden px-8 py-12 sm:px-12 sm:py-16 lg:sticky lg:top-[53px] lg:h-[calc(100dvh-53px)] lg:w-[42%] lg:px-14 lg:py-16"
-        style={{ backgroundColor: OXFORD }}
+        style={{ backgroundColor: 'var(--color-oxford)' }}
       >
         <GrainOverlay opacity={0.032} variant="dark" />
 
@@ -176,7 +189,7 @@ export default function RequestAccessPage() {
       {/* ── Right: form panel ─────────────────────────────────────────── */}
       <div
         className="paper-dot-grid relative flex flex-1 flex-col"
-        style={{ backgroundColor: PAPER }}
+        style={{ backgroundColor: 'var(--color-paper)' }}
       >
         <GrainOverlay opacity={0.022} variant="light" />
 
@@ -215,6 +228,9 @@ export default function RequestAccessPage() {
                           onChange={(e) => setName(e.target.value)}
                           className={`form-input-aethria ${nameEmpty ? 'form-input-aethria-error' : ''}`}
                           autoComplete="name"
+                          maxLength={100}
+                          aria-invalid={nameEmpty ? 'true' : undefined}
+                          aria-describedby={nameEmpty ? 'form-validation-error' : undefined}
                         />
                       </div>
                     </div>
@@ -230,6 +246,9 @@ export default function RequestAccessPage() {
                           onChange={(e) => setEmail(e.target.value)}
                           className={`form-input-aethria ${emailEmpty ? 'form-input-aethria-error' : ''}`}
                           autoComplete="email"
+                          maxLength={320}
+                          aria-invalid={emailEmpty ? 'true' : undefined}
+                          aria-describedby={emailEmpty ? 'form-validation-error' : undefined}
                         />
                       </div>
                     </div>
@@ -249,6 +268,9 @@ export default function RequestAccessPage() {
                           onChange={(e) => setRole(e.target.value)}
                           className={`form-input-aethria ${roleEmpty ? 'form-input-aethria-error' : ''}`}
                           autoComplete="organization-title"
+                          maxLength={100}
+                          aria-invalid={roleEmpty ? 'true' : undefined}
+                          aria-describedby={roleEmpty ? 'form-validation-error' : undefined}
                         />
                       </div>
                     </div>
@@ -264,6 +286,9 @@ export default function RequestAccessPage() {
                           onChange={(e) => setFirm(e.target.value)}
                           className={`form-input-aethria ${firmEmpty ? 'form-input-aethria-error' : ''}`}
                           autoComplete="organization"
+                          maxLength={200}
+                          aria-invalid={firmEmpty ? 'true' : undefined}
+                          aria-describedby={firmEmpty ? 'form-validation-error' : undefined}
                         />
                       </div>
                     </div>
@@ -284,6 +309,7 @@ export default function RequestAccessPage() {
                         placeholder="https://linkedin.com/in/..."
                         className="form-input-aethria placeholder:font-mono placeholder:text-[10px] placeholder:opacity-40"
                         autoComplete="off"
+                        maxLength={2000}
                       />
                     </div>
                   </div>
@@ -291,7 +317,8 @@ export default function RequestAccessPage() {
                   {/* Errors */}
                   {validationError && (
                     <p
-                      className="font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.5)]"
+                      id="form-validation-error"
+                      className="font-mono text-[9px] uppercase tracking-[0.12em] text-[var(--color-oxford)]"
                       role="alert"
                     >
                       Complete name, email, role, and firm
@@ -368,7 +395,7 @@ export default function RequestAccessPage() {
                   )}
                   <Link
                     to="/home"
-                    className="font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(0,33,71,0.38)] transition-opacity hover:text-[rgba(0,33,71,0.7)]"
+                    className="inline-flex min-h-[44px] items-center font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(0,33,71,0.38)] transition-opacity hover:text-[rgba(0,33,71,0.7)]"
                   >
                     ← Back to home
                   </Link>

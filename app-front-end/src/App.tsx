@@ -1,4 +1,4 @@
-import { useState, useLayoutEffect, useEffect } from 'react';
+import { useState, useLayoutEffect, useEffect, lazy, Suspense } from 'react';
 import { useLocation, Navigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
 import { AnimatePresence } from 'framer-motion';
@@ -6,7 +6,7 @@ import { setTokenGetter } from './api/auth';
 import MainLayout from './components/MainLayout';
 import GrainOverlay from './components/GrainOverlay';
 import LoadingAnimation from './components/LoadingAnimation';
-import SettingsPage from './settings/SettingsPage';
+const SettingsPage = lazy(() => import('./settings/SettingsPage'));
 import WhileYouWereAway from './components/WhileYouWereAway';
 import { useSystemData } from './hooks/useSystemData';
 import { useAgentsEnabled } from './hooks/useAgentsEnabled';
@@ -49,7 +49,9 @@ function AppShell() {
         <>
           <GrainOverlay opacity={0.02} />
           {isSettingsRoute ? (
-            <SettingsPage />
+            <Suspense fallback={<LoadingAnimation />}>
+              <SettingsPage />
+            </Suspense>
           ) : (
             <MainLayout
               data={systemData}

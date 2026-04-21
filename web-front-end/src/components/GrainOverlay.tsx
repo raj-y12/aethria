@@ -22,7 +22,6 @@ export default function GrainOverlay({
         backgroundRepeat: 'repeat',
         opacity,
         mixBlendMode: variant === 'dark' ? 'overlay' : 'multiply',
-        willChange: 'transform',
         transform: 'translateZ(0)',
       }}
       aria-hidden

@@ -10,9 +10,6 @@ import HomeStatsSection from './components/HomeStatsSection';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SCROLL_EASE } from './motionTokens';
 
-const OXFORD = '#002147';
-const PAPER = '#f2f0ea';
-
 export default function HomePage() {
   const reduce = useReducedMotion();
 
@@ -90,7 +87,7 @@ export default function HomePage() {
   return (
     <div
       className="min-h-[100dvh] flex flex-col relative overflow-x-hidden w-full"
-      style={{ backgroundColor: PAPER, color: 'var(--color-charcoal)' }}
+      style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-charcoal)' }}
     >
       <div
         className="pointer-events-none fixed inset-0 z-[1] opacity-[0.55]"
@@ -107,13 +104,15 @@ export default function HomePage() {
         style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
       >
         <div className="page-margin-x grid min-h-[52px] grid-cols-[1fr_1fr] items-center gap-2 sm:gap-4 md:grid-cols-[1fr_auto_1fr]">
-          <Link
-            data-cursor-expand
-            to="/"
-            className="font-wordmark justify-self-start py-2 text-[15px] font-normal normal-case leading-none tracking-normal text-[#002147] transition-opacity hover:opacity-80 sm:text-[16px]"
-          >
-            Aethria
-          </Link>
+          <nav aria-label="Site navigation">
+            <Link
+              data-cursor-expand
+              to="/"
+              className="font-wordmark inline-flex min-h-[44px] items-center justify-self-start text-[15px] font-normal normal-case leading-none tracking-normal text-[#002147] transition-opacity hover:opacity-80 sm:text-[16px]"
+            >
+              Aethria
+            </Link>
+          </nav>
           <p className="hidden justify-self-center text-center font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.35)] md:block">
             Deal flow operating system
           </p>
@@ -127,10 +126,11 @@ export default function HomePage() {
           <div className="flex min-w-0 flex-col md:flex-row md:items-stretch">
             <section
               className="home-hero-left paper-dot-grid page-margin-x order-2 flex w-full shrink-0 flex-col justify-center py-16 md:py-24 md:w-[32%] lg:w-[28%]"
-              style={{ backgroundColor: PAPER }}
+              style={{ backgroundColor: 'var(--color-paper)' }}
             >
               <motion.p
                 className="section-numeral mb-6"
+                aria-hidden
                 initial={reduce ? false : { opacity: 0, y: 10 }}
                 whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
                 viewport={heroViewport}
@@ -188,7 +188,7 @@ export default function HomePage() {
             data-cursor-expand
             className="home-monolith-in order-1 relative flex w-full md:flex-1 min-h-[min(54vh,440px)] md:min-h-[min(74vh,840px)] items-center justify-start overflow-hidden px-6 py-24 sm:px-10 md:px-14 lg:px-16 xl:px-20 shrink-0"
             style={{
-              backgroundColor: OXFORD,
+              backgroundColor: 'var(--color-oxford)',
             }}
           >
             <div className="home-monolith-ambient" aria-hidden />
@@ -196,7 +196,7 @@ export default function HomePage() {
             <motion.h1
               data-cursor="headline"
               className="home-monolith-headline relative z-[1] w-full min-w-0 text-left text-[clamp(2.5rem,5.5vw,4.65rem)] leading-[0.98] max-w-[min(100%,15ch)] md:max-w-[17ch]"
-              style={{ color: PAPER }}
+              style={{ color: 'var(--color-paper)' }}
               initial={reduce ? false : { opacity: 0, x: -28 }}
               whileInView={reduce ? undefined : { opacity: 1, x: 0 }}
               viewport={{ once: true, amount: 0.45 }}
@@ -227,11 +227,11 @@ export default function HomePage() {
         <section
           className="paper-dot-grid w-full border-b border-solid border-[var(--section-divider)] pb-8"
           aria-labelledby="pipeline-heading"
-          style={{ backgroundColor: PAPER, color: 'var(--color-charcoal)' }}
+          style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-charcoal)' }}
         >
           <div className="w-full border-b border-solid border-[var(--section-divider)] pt-16 md:pt-24">
             <ScrollReveal className="page-margin-x" y={16} amount={0.2}>
-              <p className="section-numeral mb-6">III</p>
+              <p className="section-numeral mb-6" aria-hidden="true">III</p>
               <div className="flex min-w-0 flex-row items-stretch">
                 <div className="flex min-w-0 flex-1 flex-col pr-0 md:pr-10">
                   <h2
@@ -327,7 +327,7 @@ export default function HomePage() {
             amount={0.2}
           >
             <div className="w-full max-w-lg">
-              <p className="section-numeral mb-6">IV</p>
+              <p className="section-numeral mb-6" aria-hidden="true">IV</p>
               <h2
                 id="graph-section-heading"
                 className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#002147] md:text-[36px] md:tracking-normal"
@@ -363,14 +363,14 @@ export default function HomePage() {
         {/* Section V — live indicators */}
         <motion.section
           className="home-closing home-closing-ledger paper-dot-grid section-divider-top relative w-full overflow-hidden border-b border-solid border-[var(--section-divider)]"
-          style={{ backgroundColor: PAPER }}
+          style={{ backgroundColor: 'var(--color-paper)' }}
           variants={closingSectionVariants}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, amount: 0.16, margin: '0px 0px -8% 0px' }}
         >
           <div className="page-margin-x relative z-[1] mx-auto w-full max-w-[1200px] py-16 md:py-24">
-            <motion.p className="section-numeral mb-8 md:mb-12" variants={closingChildVariants}>
+            <motion.p className="section-numeral mb-8 md:mb-12" aria-hidden variants={closingChildVariants}>
               V
             </motion.p>
 
@@ -387,9 +387,8 @@ export default function HomePage() {
                   Aethria discovers, scores, and recommends. You advance, pass, or hold.
                 </p>
 
-                <div
-                  className="conviction-cap-lines mt-9 flex flex-col gap-[12px]"
-                  role="list"
+                <ul
+                  className="conviction-cap-lines mt-9 flex list-none flex-col gap-[12px] p-0 m-0"
                   aria-label="Product capabilities"
                 >
                   {[
@@ -399,11 +398,11 @@ export default function HomePage() {
                     'ESCALATIONS · HUMAN-IN-LOOP PATHS',
                     'PORTFOLIO SIGNALS · CONCENTRATION ANALYTICS',
                   ].map((line) => (
-                    <p key={line} className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.4)]">
+                    <li key={line} className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.4)]">
                       {line}
-                    </p>
+                    </li>
                   ))}
-                </div>
+                </ul>
 
                 <Link
                   to="/request-access"
@@ -448,7 +447,7 @@ export default function HomePage() {
             amount={0.18}
           >
             <div className="w-full max-w-lg">
-              <p className="section-numeral mb-6 text-[rgba(242,240,234,0.22)]">VII</p>
+              <p className="section-numeral mb-6 text-[rgba(242,240,234,0.22)]" aria-hidden="true">VII</p>
               <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(242,240,234,0.38)]">
                 Configuration layer
               </p>

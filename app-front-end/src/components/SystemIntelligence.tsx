@@ -152,7 +152,7 @@ function AnalyticsTab({ rejection, watchlist, concentration }: {
     <div className="flex flex-col">
       <TabSection title="Rejection Patterns" label="Historical">
         {rejection.most_common_red_flags.length === 0 ? (
-          <p className="type-meta text-oxford/20 uppercase tracking-[0.18em]">No rejection data yet</p>
+          <p className="type-meta text-oxford/45 uppercase tracking-[0.18em]">No rejection data yet</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-phi-5 gap-y-phi-4">
             {rejection.most_common_red_flags.slice(0, 6).map((rf, i) => (
@@ -185,7 +185,7 @@ function AnalyticsTab({ rejection, watchlist, concentration }: {
 
       <TabSection title="Sector Concentration" label="Distribution">
         {sectors.length === 0 ? (
-          <p className="type-meta text-oxford/20 uppercase tracking-[0.18em]">No concentration data yet</p>
+          <p className="type-meta text-oxford/45 uppercase tracking-[0.18em]">No concentration data yet</p>
         ) : (
           <div className="flex flex-col gap-phi-4">
             {sectors.map(([sector, data], i) => (
@@ -229,7 +229,7 @@ function InstitutionalMandateTab() {
 
   if (!data) return (
     <div className="px-phi-4 py-10">
-      <p className="type-meta text-oxford/20 uppercase tracking-widest">Loading...</p>
+      <p className="type-meta text-oxford/45 uppercase tracking-widest">Loading...</p>
     </div>
   );
 
@@ -331,7 +331,7 @@ function MetaCommandTab({ reports, weights, calibration }: {
         </TabSection>
       ) : (
         <TabSection title="Last Cycle">
-          <p className="type-meta text-oxford/20 uppercase tracking-[0.18em]">No cycles run yet</p>
+          <p className="type-meta text-oxford/45 uppercase tracking-[0.18em]">No cycles run yet</p>
         </TabSection>
       )}
       <TabSection title="Scout Allocation" label="Weights">
@@ -355,7 +355,7 @@ function MetaCommandTab({ reports, weights, calibration }: {
 
       <TabSection title="Calibration Log">
         {calibration.calibration_history.length === 0 ? (
-          <p className="type-meta text-oxford/20 uppercase tracking-[0.18em]">No calibration history yet</p>
+          <p className="type-meta text-oxford/45 uppercase tracking-[0.18em]">No calibration history yet</p>
         ) : (
           <div className="flex flex-col border border-oxford/[0.06] bg-oxford/[0.01]">
             {calibration.calibration_history.slice(-5).reverse().map((h, i) => (
@@ -393,7 +393,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
 
   return (
     <div className="w-full font-sans bg-paper selection:bg-oxford selection:text-paper min-h-full">
-      <div className="sticky top-0 z-20 bg-paper/90 backdrop-blur-md border-b border-oxford/[0.06] px-phi-4 py-phi-4">
+      <div className="sticky top-0 z-20 bg-paper border-b border-oxford/[0.06] px-phi-4 py-phi-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-phi-4">
             <span className={UI_FILTER_TOOLBAR_LABEL}>System</span>

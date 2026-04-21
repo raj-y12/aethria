@@ -34,7 +34,7 @@ const inputCls =
 const selectCls = `${inputCls} cursor-pointer pr-8 bg-no-repeat bg-[length:10px] bg-[center_right_2px] appearance-none`;
 const selectStyle: CSSProperties = { backgroundImage: SELECT_CHEVRON };
 const labelCls = 'type-meta uppercase tracking-[0.14em] text-oxford/35';
-const hintCls = 'type-meta text-oxford/25 mt-0.5';
+const hintCls = 'type-meta text-oxford/45 mt-0.5';
 const btnCls = 'type-meta uppercase tracking-[0.12em] text-oxford/40 hover:text-oxford disabled:opacity-30 transition-colors btn-interaction cursor-pointer bg-transparent border-0 p-0';
 const outlineBtnCls = 'type-meta uppercase tracking-[0.12em] text-oxford/50 hover:text-oxford disabled:opacity-30 transition-colors btn-interaction cursor-pointer bg-transparent border-0 p-0';
 
@@ -190,13 +190,16 @@ export default function SettingsPage() {
     <AnimatePresence>
       {mobileMenuOpen && (
         <motion.section id="mobile-menu"
-          initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+          initial={{ gridTemplateRows: '0fr', opacity: 0 }} animate={{ gridTemplateRows: '1fr', opacity: 1 }} exit={{ gridTemplateRows: '0fr', opacity: 0 }}
           transition={transitionOrReduced(reduceMotion, { duration: tokens.motion.duration.micro, ease: tokens.motion.ease })}
-          className="px-4 pb-0 border-b border-hairline bg-oxford overflow-hidden" aria-label="Menu">
+          style={{ display: 'grid' }}
+          className="border-b border-hairline bg-oxford" aria-label="Menu">
+          <div className="min-h-0 overflow-hidden px-4 pb-0">
           <div className="flex flex-col items-start gap-3 py-3">
             <Link to="/v1" className="type-label-section text-white/70 hover:text-white btn-interaction" onClick={() => setMobileMenuOpen(false)}>Overview</Link>
             {displayName && <span className="type-label-section text-white/60">{displayName}</span>}
             <button type="button" onClick={handleLogout} className="type-label-section text-white/50 hover:text-white btn-interaction">Log out</button>
+          </div>
           </div>
         </motion.section>
       )}

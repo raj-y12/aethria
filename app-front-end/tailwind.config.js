@@ -46,13 +46,13 @@ export default {
         registerTint: 'var(--color-register-tint)',
       },
       fontFamily: {
-        display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+        display: ['"EB Garamond"', 'Georgia', 'serif'],
         wordmark: ['"Libre Baskerville"', 'Georgia', 'serif'],
-        cormorant: ['"Cormorant Garamond"', 'Georgia', 'serif'],
-        // Instrument Sans is the canonical app + web UI font (loaded via @fontsource in main.tsx).
-        sans: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],
-        body: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['"Space Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        cormorant: ['"EB Garamond"', 'Georgia', 'serif'],
+        // Geist Sans is the canonical app + web UI font (loaded via @fontsource in main.tsx).
+        sans: ['"Geist Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+        body: ['"Geist Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       /**
        * Type scale — golden ratio (φ = 1.618034), anchored at 14px.

@@ -1,7 +1,7 @@
 /**
  * IC-style memo export: shared sections for PDF + Markdown, pipeline replay metadata.
  */
-import { jsPDF } from 'jspdf';
+import type { jsPDF } from 'jspdf';
 import type { Startup } from '../types/startup';
 import {
   DECISION_LABELS,
@@ -373,8 +373,9 @@ function addPDFSection(
   return y + PDF_LINE_HEIGHT;
 }
 
-export function buildMemoPDF(startup: Startup): jsPDF {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+export async function buildMemoPDF(startup: Startup): Promise<jsPDF> {
+  const { jsPDF: JsPDF } = await import('jspdf');
+  const doc = new JsPDF({ unit: 'mm', format: 'a4' });
   let y = PDF_MARGIN;
 
   doc.setFontSize(PDF_FONT_SIZE_SMALL);

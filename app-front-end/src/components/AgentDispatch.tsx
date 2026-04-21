@@ -97,7 +97,7 @@ export default function AgentDispatch({
                 {!isBusy && !message && (
                   <button
                     onClick={() => setExpanded(false)}
-                    className="type-meta text-oxford/25 hover:text-oxford/50 uppercase tracking-widest transition-colors"
+                    className="type-meta text-oxford/45 hover:text-oxford/70 uppercase tracking-widest transition-colors"
                   >
                     Close
                   </button>
@@ -152,7 +152,7 @@ export default function AgentDispatch({
                       <motion.p
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="type-meta text-oxford/20"
+                        className="type-meta text-oxford/40"
                       >
                         AWAITING_COMMAND...
                       </motion.p>
@@ -165,7 +165,7 @@ export default function AgentDispatch({
                     type="button"
                     onClick={onSubmit}
                     disabled={!input.trim()}
-                    className="group flex items-center gap-2 px-0 type-meta tracking-[0.12em] uppercase text-oxford/40 hover:text-oxford transition-colors disabled:opacity-20"
+                    className="group flex items-center gap-2 px-0 min-h-[44px] type-meta tracking-[0.12em] uppercase text-oxford/40 hover:text-oxford transition-colors disabled:opacity-20"
                   >
                     Run_Analysis
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
@@ -199,7 +199,7 @@ export default function AgentDispatch({
                               />
                             )}
                           </div>
-                          <span className={`type-meta text-[9px] tracking-widest uppercase ${isActive ? 'text-oxford/60' : 'text-oxford/20'}`}>
+                          <span className={`type-meta tracking-widest uppercase ${isActive ? 'text-oxford/60' : 'text-oxford/45'}`}>
                             {phase}
                           </span>
                         </div>

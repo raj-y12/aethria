@@ -17,7 +17,7 @@ export default {
       fontFamily: {
         display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
         sans: ['"Instrument Sans"', 'system-ui', 'sans-serif'],
-        mono: ['"Space Mono"', 'monospace'],
+        mono: ['"JetBrains Mono"', 'monospace'],
         wordmark: ['var(--font-wordmark)', 'Georgia', 'serif'],
       },
       borderRadius: {

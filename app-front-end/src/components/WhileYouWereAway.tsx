@@ -47,7 +47,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
         exit={{ opacity: 0, y: 10, transition: { duration: 0.35, delay: 0.42, ease } }}
         transition={{ duration: 0.45, ease, delay: 0.05 }}
         style={{
-          fontFamily: "'Space Mono', ui-monospace, monospace",
+          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
           fontSize: '10px',
           letterSpacing: '0.16em',
           textTransform: 'uppercase',
@@ -65,7 +65,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
         exit={{ opacity: 0, y: 12, transition: { duration: 0.35, delay: 0.35, ease } }}
         transition={{ duration: 0.5, ease, delay: 0.1 }}
         style={{
-          fontFamily: "'Cormorant Garamond', Georgia, serif",
+          fontFamily: "'EB Garamond', Georgia, serif",
           fontSize: 'clamp(36px, 5vw, 64px)',
           fontWeight: 500,
           color: '#002147',
@@ -84,7 +84,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
         exit={{ opacity: 0, transition: { duration: 0.3, delay: 0.28, ease } }}
         transition={{ duration: 0.5, ease, delay: 0.18 }}
         style={{
-          fontFamily: "'Instrument Sans', system-ui, sans-serif",
+          fontFamily: "'Geist Sans', system-ui, sans-serif",
           fontSize: '14px',
           color: 'rgba(0, 33, 71, 0.5)',
           marginTop: '12px',
@@ -122,7 +122,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
           >
             <div
               style={{
-                fontFamily: "'Space Mono', ui-monospace, monospace",
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
                 fontSize: 'clamp(40px, 6vw, 72px)',
                 fontWeight: 700,
                 lineHeight: 1,
@@ -134,7 +134,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
             </div>
             <div
               style={{
-                fontFamily: "'Instrument Sans', system-ui, sans-serif",
+                fontFamily: "'Geist Sans', system-ui, sans-serif",
                 fontSize: '13px',
                 color: 'rgba(0, 33, 71, 0.5)',
                 marginTop: '6px',

@@ -1,8 +1,6 @@
 /*
- * Aethria Website — Oxford & paper. Editorial display (Cormorant Garamond) + Instrument Sans + Space Mono.
+ * Aethria Website — Oxford & paper. Editorial display (EB Garamond) + Figtree + JetBrains Mono.
  */
-
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -12,7 +10,6 @@
 :root {
   --color-oxford: #002147;
   --color-paper: #f2f0ea;
-  --color-paper-bright: #f2f0ea;
   --color-ivory: #f2f0ea;
   --color-charcoal: #2f333b;
   --color-accent: #b8976a;
@@ -21,16 +18,16 @@
   --color-brass-line: rgba(184, 151, 106, 0.55);
 
   /* Roles: wordmark = logo only · display = editorial headings (h1–h6 base) · sans = body & UI · mono = labels, caps, data */
-  --font-sans: 'Instrument Sans', system-ui, -apple-system, sans-serif;
-  --font-mono: 'Space Mono', ui-monospace, monospace;
-  --font-display: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
+  --font-sans: 'Figtree', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'EB Garamond', 'Georgia', 'Times New Roman', serif;
   --font-wordmark: 'Libre Baskerville', 'Georgia', serif;
 
   --page-margin-x: 64px;
   --page-margin-x-mobile: 24px;
 
   --section-padding-y: 96px;
-  --section-padding-y-mobile: 96px;
+  --section-padding-y-mobile: 56px;
   /* All marketing section top/bottom borders + matching 1px hairlines use this (1px solid). */
   --section-divider: rgba(0, 33, 71, 0.1);
   --section-diamond: rgba(0, 33, 71, 0.2);
@@ -180,16 +177,6 @@ hr.doc-section-separator::before {
     border-color: rgba(0, 33, 71, var(--frame-opacity));
   }
 
-  input:focus,
-  input:focus-visible,
-  select:focus,
-  select:focus-visible,
-  textarea:focus,
-  textarea:focus-visible {
-    outline: none;
-    box-shadow: none;
-  }
-
   html {
     scroll-behavior: smooth;
     background-color: var(--color-paper);
@@ -210,9 +197,11 @@ hr.doc-section-separator::before {
     min-height: -webkit-fill-available;
   }
 
-  /* Custom cursor: hide OS cursor when active (desktop only; toggled via class) */
-  .has-custom-cursor * {
-    cursor: none !important;
+  /* Custom cursor: hide OS cursor when active (fine-pointer devices only) */
+  @media (pointer: fine) {
+    .has-custom-cursor * {
+      cursor: none !important;
+    }
   }
 
   .font-display {
@@ -292,6 +281,13 @@ hr.doc-section-separator::before {
     color: #ffffff;
   }
 
+  a:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--color-oxford);
+    outline-offset: 2px;
+    border-radius: 0;
+  }
+
   /* iPhone: remove tap highlight, improve touch targets */
   a,
   button {
@@ -313,7 +309,7 @@ hr.doc-section-separator::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 40px;
+  min-height: 44px;
   padding: 0 20px;
   background: transparent;
   border: 1px solid var(--color-oxford);
@@ -368,7 +364,7 @@ hr.doc-section-separator::before {
   left: 0;
   bottom: 0;
   width: 100%;
-  height: 1px;
+  height: 2px;
   background-color: var(--color-oxford);
   transform-origin: left;
   transform: scaleX(0);
@@ -382,7 +378,10 @@ hr.doc-section-separator::before {
   opacity: 1;
 }
 
-.form-input-aethria:focus {
+.form-input-aethria:focus,
+.form-input-aethria:focus-visible {
+  outline: none;
+  box-shadow: none;
   border-bottom-color: rgba(0, 33, 71, 0.15);
 }
 
@@ -402,7 +401,7 @@ hr.doc-section-separator::before {
   font-size: 9px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(0, 33, 71, 0.5);
+  color: rgba(0, 33, 71, 0.72);
   margin-bottom: 10px;
   display: block;
 }
@@ -483,7 +482,7 @@ hr.doc-section-separator::before {
 .inst-metrics-strip {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, transparent 38%),
-    var(--color-paper-bright);
+    var(--color-paper);
   border-color: rgba(0, 33, 71, 0.09);
 }
 
@@ -659,6 +658,10 @@ hr.doc-section-separator::before {
     animation: none !important;
   }
 
+  .signal-dot {
+    animation: none !important;
+  }
+
   .signal-pill,
   .signal-pill:hover {
     transform: none !important;
@@ -669,10 +672,6 @@ hr.doc-section-separator::before {
 .home-closing .conviction-cap-lines {
   opacity: 1;
   transform: none;
-}
-
-.conviction-watermark {
-  will-change: transform;
 }
 
 /* Dashboard preview blur hover */

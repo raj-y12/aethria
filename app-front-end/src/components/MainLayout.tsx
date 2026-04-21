@@ -401,16 +401,18 @@ export default function MainLayout({
             {mobileMenuOpen && (
               <motion.section
                 id="mobile-menu"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ gridTemplateRows: '0fr', opacity: 0 }}
+                animate={{ gridTemplateRows: '1fr', opacity: 1 }}
+                exit={{ gridTemplateRows: '0fr', opacity: 0 }}
                 transition={transitionOrReduced(reduceMotion, {
                   duration: tokens.motion.duration.micro,
                   ease: tokens.motion.ease,
                 })}
-                className="px-4 pb-0 border-b border-hairline type-label-tab bg-oxford overflow-hidden text-white/70"
+                style={{ display: 'grid' }}
+                className="border-b border-hairline type-label-tab bg-oxford text-white/70"
                 aria-label="Menu"
               >
+                <div className="min-h-0 overflow-hidden px-4 pb-0">
                 <div className="flex flex-col items-start gap-phi-3 py-phi-3">
                   {/* Mode toggles: Deals / Judgements / System — same mono scale as desktop spine */}
                   <div className="flex flex-col items-stretch gap-phi-1 w-full">
@@ -480,6 +482,7 @@ export default function MainLayout({
                     </button>
                   </div>
                 </div>
+                </div>
               </motion.section>
             )}
           </AnimatePresence>
@@ -544,7 +547,7 @@ export default function MainLayout({
                       )}
                       <span className={
                         pipelineStateLabel === 'Issue' ? 'text-escalation' :
-                          pipelineStateLabel === 'Off' ? 'text-oxford/25' :
+                          pipelineStateLabel === 'Off' ? 'text-oxford/45' :
                             pipelineStateLabel === 'On' ? 'text-oxford/80' :
                       /* Working */                      'text-oxford/60'
                       }>
@@ -767,7 +770,7 @@ export default function MainLayout({
                   </PanelShell>
                 ) : (
                   <div className="flex-1 flex items-center justify-center p-8">
-                    <p className="type-label-tab text-oxford/25" style={{ transition: 'opacity var(--motion-micro) var(--motion-ease)' }}>
+                    <p className="type-label-tab text-oxford/45" style={{ transition: 'opacity var(--motion-micro) var(--motion-ease)' }}>
                       Click a deal to open the memo here
                     </p>
                   </div>

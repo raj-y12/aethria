@@ -237,6 +237,7 @@ export default function DashboardPreview() {
                     <p
                       key={`dim-score-${row.label}`}
                       className="min-w-0 text-center font-mono text-base font-bold leading-tight text-[var(--color-oxford)] sm:text-xl md:text-2xl"
+                      style={{ fontFamily: '"JetBrains Mono", monospace' }}
                     >
                       {row.score}
                     </p>
