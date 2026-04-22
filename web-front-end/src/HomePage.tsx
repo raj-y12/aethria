@@ -87,20 +87,12 @@ export default function HomePage() {
   return (
     <div
       className="min-h-[100dvh] flex flex-col relative overflow-x-hidden w-full"
-      style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-charcoal)' }}
+      style={{ backgroundColor: 'var(--surface-base)', color: 'var(--text-primary)' }}
     >
-      <div
-        className="pointer-events-none fixed inset-0 z-[1] opacity-[0.55]"
-        style={{
-          background:
-            'radial-gradient(ellipse 90% 55% at 0% 0%, rgba(0, 33, 71, 0.04), transparent 52%), radial-gradient(ellipse 70% 50% at 100% 10%, rgba(184, 151, 106, 0.06), transparent 48%)',
-        }}
-        aria-hidden
-      />
       <GrainOverlay opacity={0.028} variant="light" />
 
       <header
-        className="inst-site-header sticky top-0 z-[100] w-full shrink-0 border-b border-solid border-[var(--section-divider)] bg-[#f2f0ea]"
+        className="inst-site-header sticky top-0 z-[100] w-full shrink-0 border-b border-solid border-[var(--section-divider)] bg-[var(--surface-base)]"
         style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
       >
         <div className="page-margin-x grid min-h-[52px] grid-cols-[1fr_1fr] items-center gap-2 sm:gap-4 md:grid-cols-[1fr_auto_1fr]">
@@ -108,12 +100,12 @@ export default function HomePage() {
             <Link
               data-cursor-expand
               to="/"
-              className="font-wordmark inline-flex min-h-[44px] items-center justify-self-start text-[15px] font-normal normal-case leading-none tracking-normal text-[#002147] transition-opacity hover:opacity-80 sm:text-[16px]"
+              className="font-wordmark inline-flex min-h-[44px] items-center justify-self-start text-[15px] font-normal normal-case leading-none tracking-normal text-[var(--text-primary)] transition-opacity hover:opacity-80 sm:text-[16px]"
             >
               Aethria
             </Link>
           </nav>
-          <p className="hidden justify-self-center text-center font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.35)] md:block">
+          <p className="hidden justify-self-center text-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)] md:block">
             Deal flow operating system
           </p>
           <DeskClock className="min-w-0 justify-self-end text-right" />
@@ -139,7 +131,7 @@ export default function HomePage() {
                 I
               </motion.p>
               <motion.p
-                className="mb-6 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)]"
+                className="mb-6 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)]"
                 initial={reduce ? false : { opacity: 0, y: 8 }}
                 whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
                 viewport={heroViewport}
@@ -149,7 +141,7 @@ export default function HomePage() {
               </motion.p>
 
               <motion.p
-                className="font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.75)] max-w-[36ch] md:max-w-none"
+                className="max-w-[36ch] font-sans text-[16px] leading-[1.65] text-[var(--text-secondary)] md:max-w-none"
                 variants={subtextVariants}
                 initial="hidden"
                 whileInView="visible"
@@ -169,7 +161,7 @@ export default function HomePage() {
                 <Link
                   to="/request-access"
                   data-cursor-expand
-                  className="group font-mono inline-flex w-full min-h-[44px] cursor-pointer items-center justify-center rounded-none bg-[#002147] px-6 py-3 text-[11px] uppercase tracking-[0.14em] text-[#f2f0ea] transition-colors duration-[250ms] ease hover:bg-[rgba(0,33,71,0.9)] md:w-fit"
+                  className="group font-mono inline-flex w-full min-h-[44px] cursor-pointer items-center justify-center rounded-none bg-[var(--surface-strong)] px-6 py-3 text-[11px] uppercase tracking-[0.14em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,33,71,0.9)] md:w-fit"
                 >
                   <span className="flex items-center justify-center">
                     <span>Request access</span>
@@ -208,7 +200,7 @@ export default function HomePage() {
               </span>
             </motion.h1>
             <p
-              className="absolute z-[2] font-mono text-[8px] sm:text-[9px] tracking-[0.2em] uppercase text-[rgba(242,240,234,0.28)] right-[max(1.25rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] md:right-8 md:bottom-7"
+              className="absolute z-[2] right-[max(1.25rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] font-mono text-[10px] tracking-[0.18em] uppercase text-[var(--text-inverse-secondary)] md:right-8 md:bottom-7 md:text-[11px]"
               aria-hidden
             >
               Protocol 4.1 · Oxford surface
@@ -245,14 +237,14 @@ export default function HomePage() {
                   </p>
                 </div>
                 <div
-                  className="hidden w-[260px] shrink-0 flex-col items-end justify-center bg-[#002147] lg:flex"
+                className="hidden w-[clamp(14rem,25vw,16.5rem)] shrink-0 flex-col items-end justify-center bg-[#002147] lg:flex"
                   style={{ paddingRight: 'max(16px, env(safe-area-inset-right))' }}
                 >
                   <div className="flex flex-col items-end gap-2 text-right">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(242,240,234,0.55)]">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-inverse-secondary)]">
                       Phases I — IV
                     </p>
-                    <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(242,240,234,0.3)]">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-inverse-muted)]">
                       Single audit trail
                     </p>
                   </div>
@@ -301,12 +293,12 @@ export default function HomePage() {
                   className="flex min-w-0 flex-col border-l-0 border-solid border-[var(--section-divider)] px-0 py-8 first:pt-6 last:pb-6 sm:px-1 lg:border-l lg:px-8 lg:py-8 lg:first:pt-8 lg:last:pb-8"
                 >
                   <div className="flex flex-row items-baseline justify-between gap-3">
-                    <span className="font-mono text-[10px] tracking-[0.12em] text-[rgba(0,33,71,0.35)]">{phase}</span>
-                    <span className="font-mono text-[10px] tracking-[0.12em] text-[rgba(0,33,71,0.55)]">{label}</span>
+                    <span className="font-mono text-[11px] tracking-[0.12em] text-[var(--text-muted)]">{phase}</span>
+                    <span className="font-mono text-[11px] tracking-[0.12em] text-[var(--label-muted)]">{label}</span>
                   </div>
                   <div className="mt-0 h-px w-full shrink-0 bg-[var(--section-divider)]" aria-hidden />
                   <p className="mt-4 font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.78)]">{body}</p>
-                  <p className="mt-6 font-sans text-[13px] italic leading-snug text-[rgba(0,33,71,0.4)] lowercase">
+                  <p className="mt-6 font-sans text-[14px] italic leading-snug text-[var(--text-muted)] lowercase">
                     {signal}
                   </p>
                 </motion.div>
@@ -349,7 +341,7 @@ export default function HomePage() {
               <IntelligenceMap variant="dark" />
             </ScrollReveal>
             <motion.p
-              className="shrink-0 py-3 text-center font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(242,240,234,0.25)]"
+              className="shrink-0 py-3 text-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-inverse-muted)]"
               initial={reduce ? false : { opacity: 0 }}
               whileInView={reduce ? undefined : { opacity: 1 }}
               viewport={{ once: true, amount: 0.3 }}
@@ -398,7 +390,7 @@ export default function HomePage() {
                     'ESCALATIONS · HUMAN-IN-LOOP PATHS',
                     'PORTFOLIO SIGNALS · CONCENTRATION ANALYTICS',
                   ].map((line) => (
-                    <li key={line} className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.4)]">
+                    <li key={line} className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
                       {line}
                     </li>
                   ))}
@@ -407,7 +399,7 @@ export default function HomePage() {
                 <Link
                   to="/request-access"
                   data-cursor-expand
-                  className="group mt-11 inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-none bg-[#002147] px-6 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-[#f2f0ea] transition-colors duration-[250ms] ease hover:bg-[rgba(0,33,71,0.9)] sm:w-fit"
+                  className="group mt-11 inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-none bg-[var(--surface-strong)] px-6 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,33,71,0.9)] sm:w-fit"
                 >
                   <span className="flex items-center justify-center">
                     <span>Request access</span>
@@ -424,7 +416,7 @@ export default function HomePage() {
                 className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center py-6 md:py-10 lg:py-12"
                 variants={closingChildVariants}
               >
-                <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)]">
+                <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)]">
                   Live indicators
                 </p>
                 <LiveSignalPills />
@@ -581,15 +573,15 @@ export default function HomePage() {
             <div className="my-12 h-px w-full shrink-0 bg-[var(--section-divider)]" aria-hidden />
 
             <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-12">
-              <div className="flex flex-col gap-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.4)] md:flex-row md:flex-wrap md:items-center md:gap-x-10 md:gap-y-3">
-                <span className="text-[rgba(0,33,71,0.45)]">© {new Date().getFullYear()} Aethria</span>
+              <div className="flex flex-col gap-4 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)] md:flex-row md:flex-wrap md:items-center md:gap-x-10 md:gap-y-3">
+                <span className="text-[var(--label-muted)]">© {new Date().getFullYear()} Aethria</span>
                 <span className="break-words">Confidential · For qualified recipients</span>
                 <span>Investment intelligence</span>
               </div>
               <Link
                 to="/request-access"
                 data-cursor-expand
-                className="home-footer-tag inline-flex min-h-[44px] shrink-0 items-center font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.55)] transition-opacity hover:opacity-70"
+                className="home-footer-tag inline-flex min-h-[44px] shrink-0 items-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)] transition-opacity hover:opacity-70"
               >
                 Request access
               </Link>

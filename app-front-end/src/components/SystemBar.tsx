@@ -24,7 +24,7 @@ function SpineRule() {
   return <div className="w-full max-w-[5.5rem] mx-auto h-px bg-white/[0.08]" aria-hidden />;
 }
 
-/** Single 10px mono scale site-wide; 1px active rule (not border-b-2). */
+/** Spine controls keep >=44px touch target and clear focus states. */
 function SpineNavButton({
   label,
   active,
@@ -40,8 +40,8 @@ function SpineNavButton({
     <button
       type="button"
       onClick={onClick}
-      className={`type-meta w-full min-h-[40px] flex items-center justify-center cursor-pointer uppercase tracking-[0.14em] btn-interaction transition-colors ${
-        active ? 'text-white' : 'text-white/40 hover:text-white/70'
+      className={`type-meta w-full min-h-[44px] flex items-center justify-center cursor-pointer tracking-[0.1em] btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 ${
+        active ? 'text-white' : 'text-white/55 hover:text-white/80'
       }`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
       aria-pressed={ariaPressed}
@@ -176,7 +176,7 @@ export default function SystemBar({
         {/* Account */}
         <div className="w-full flex flex-col items-center gap-2 shrink-0">
           <span
-            className="type-meta truncate max-w-full text-center uppercase tracking-[0.14em] text-white/45"
+            className="type-meta truncate max-w-full text-center tracking-[0.1em] text-white/60"
             title={displayName}
           >
             {displayName}
@@ -185,7 +185,7 @@ export default function SystemBar({
             <div className="flex flex-col items-center gap-1 w-full px-0.5">
               <Link
                 to={navLink.href}
-                className="type-meta text-center leading-[1.4] tracking-[0.12em] uppercase text-white/55 hover:text-white btn-interaction"
+                className="type-meta inline-flex min-h-[44px] items-center justify-center text-center leading-[1.4] tracking-[0.1em] text-white/65 hover:text-white btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
               >
                 {navLink.label}
               </Link>
@@ -226,7 +226,7 @@ export default function SystemBar({
           <button
             type="button"
             onClick={handleLogout}
-            className="type-meta uppercase tracking-[0.12em] text-white/40 hover:text-white bg-transparent border-0 p-0 cursor-pointer btn-interaction"
+            className="type-meta inline-flex min-h-[44px] items-center tracking-[0.1em] text-white/60 hover:text-white bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
           >
             Log out
           </button>

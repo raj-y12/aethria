@@ -58,8 +58,8 @@ const FilterButton = ({ active, label, onClick }: { active: boolean; label: stri
   <button
     type="button"
     onClick={onClick}
-    className={`type-label-tab px-3 py-1.5 transition-all duration-300 border-b ${
-      active ? 'border-oxford text-oxford bg-oxford/5' : 'border-transparent text-oxford/30 hover:text-oxford/60'
+    className={`type-label-tab min-h-[44px] px-3 py-1.5 transition-[color,border-color,background-color] duration-300 border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+      active ? 'border-oxford text-oxford bg-oxford/5' : 'border-transparent text-oxford/45 hover:text-oxford/70'
     }`}
   >
     {label}
@@ -177,7 +177,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 <select
                   value={sortFilter}
                   onChange={(e) => setSortFilter(e.target.value as SortFilter)}
-                  className="appearance-none bg-transparent type-meta uppercase tracking-widest text-oxford/40 hover:text-oxford transition-colors pr-6 outline-none cursor-pointer"
+                  className="appearance-none min-h-[44px] bg-transparent type-meta tracking-wide text-oxford/55 hover:text-oxford transition-colors pr-6 outline-none cursor-pointer"
                 >
                   <option value="NEWEST">Chronological ↓</option>
                   <option value="OLDEST">Chronological ↑</option>
@@ -190,8 +190,9 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="type-label-tab text-oxford/40 hover:text-oxford transition-colors border-l border-oxford/10 pl-phi-4"
+                className="type-label-tab min-h-[44px] text-oxford/55 hover:text-oxford transition-colors pl-phi-4"
               >
                 {showAdvancedFilters ? 'Collapse' : 'Refine'}
               </button>
@@ -201,13 +202,13 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
           <AnimatePresence>
             {showAdvancedFilters && (
               <motion.div
-                initial={{ gridTemplateRows: '0fr', opacity: 0 }}
-                animate={{ gridTemplateRows: '1fr', opacity: 1 }}
-                exit={{ gridTemplateRows: '0fr', opacity: 0 }}
-                style={{ display: 'grid' }}
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2, ease: tokens.motion.ease }}
                 className="border-t border-oxford/[0.06]"
               >
-              <div className="min-h-0 overflow-hidden grid grid-cols-1 sm:grid-cols-3 gap-phi-5 pt-phi-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-phi-5 pt-phi-4">
                 <div className="space-y-2">
                   <span className="type-meta text-oxford/45 uppercase tracking-widest">Economic Decision</span>
                   <div className="flex flex-wrap gap-2">
@@ -248,7 +249,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                       setReviewFilter('ALL');
                       setSortFilter('NEWEST');
                     }}
-                    className="type-label-tab text-oxford/40 hover:text-accent transition-colors underline underline-offset-4"
+                    className="type-label-tab min-h-[44px] text-oxford/55 hover:text-accent transition-colors underline underline-offset-4"
                   >
                     Reset All Filters
                   </button>
@@ -285,10 +286,21 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 hidden: { opacity: 0, x: -12 },
                 visible: { opacity: 1, x: 0, transition: { duration: 0.55, ease: tokens.motion.ease } },
               }}
-              className={`group relative border-b border-oxford/[0.06] py-phi-5 px-phi-4 cursor-pointer transition-all duration-700 ease-smooth ${
+              className={`group relative border-b border-oxford/[0.06] py-phi-5 px-phi-4 cursor-pointer transition-colors duration-500 ease-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
                 isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.02]'
               }`}
               onClick={() => onStartupClick(startup)}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onStartupClick(startup);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
+              aria-label={`Open memo for ${startup.scout.name}`}
             >
               {/* Selected Spine */}
               <AnimatePresence>
@@ -348,10 +360,10 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                   </div>
 
                   {/* One Line Reveal */}
-                  <div className={`overflow-hidden transition-all duration-200 ease-out ${
+                  <div className={`overflow-hidden transition-[max-height,opacity,margin] duration-200 ease-out ${
                     isSelected ? 'max-h-32 opacity-100 mt-phi-2' : 'max-h-0 opacity-0 group-hover:max-h-32 group-hover:opacity-100 group-hover:mt-phi-2'
                   }`}>
-                    <p className="type-body text-oxford/60 max-w-2xl leading-relaxed italic border-l-2 border-oxford/[0.06] pl-phi-4">
+                    <p className="type-body text-oxford/65 max-w-2xl leading-relaxed italic bg-oxford/[0.02] px-phi-3 py-phi-2">
                       {startup.scout.one_line || 'No intelligence summary provided.'}
                     </p>
                   </div>
@@ -395,14 +407,12 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                   return (
                     <motion.div
                       key="decision-panel"
-                      initial={{ gridTemplateRows: '0fr', opacity: 0 }}
-                      animate={{ gridTemplateRows: '1fr', opacity: 1 }}
-                      exit={{ gridTemplateRows: '0fr', opacity: 0 }}
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
                       transition={{ duration: 0.25, ease: 'easeOut' }}
-                      style={{ display: 'grid' }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="min-h-0 overflow-hidden">
                       <div className="mt-phi-4 pt-phi-4 border-t border-oxford/[0.06]">
                         {rs.resolved ? (
                           <span className="type-meta text-oxford/40 uppercase tracking-widest">Decision recorded</span>
@@ -418,7 +428,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                                 key={d}
                                 type="button"
                                 onClick={() => setRS(startup.id, { decision: d })}
-                                className="type-meta text-oxford/40 hover:text-oxford transition-colors uppercase tracking-[0.18em] underline underline-offset-8 decoration-oxford/10 hover:decoration-oxford/40 btn-interaction inline-flex items-center min-h-[44px]"
+                                className="type-meta text-oxford/55 hover:text-oxford transition-colors tracking-[0.12em] underline underline-offset-8 decoration-oxford/10 hover:decoration-oxford/40 btn-interaction inline-flex items-center min-h-[44px]"
                               >
                                 {label}
                               </button>
@@ -439,21 +449,20 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                                 type="button"
                                 onClick={() => handleConfirm(startup.id)}
                                 disabled={rs.notes.trim().length < 5}
-                                className="type-meta text-oxford hover:text-escalation transition-colors disabled:opacity-20 uppercase tracking-[0.14em] inline-flex items-center min-h-[44px]"
+                                className="type-meta text-oxford hover:text-escalation transition-colors disabled:opacity-20 tracking-[0.12em] inline-flex items-center min-h-[44px]"
                               >
                                 Confirm — {rs.decision}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setRS(startup.id, emptyRowState())}
-                                className="type-meta text-oxford/45 hover:text-oxford transition-colors uppercase tracking-[0.14em] inline-flex items-center min-h-[44px]"
+                                className="type-meta text-oxford/55 hover:text-oxford transition-colors tracking-[0.12em] inline-flex items-center min-h-[44px]"
                               >
                                 Cancel
                               </button>
                             </div>
                           </div>
                         )}
-                      </div>
                       </div>
                     </motion.div>
                   );

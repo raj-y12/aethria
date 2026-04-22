@@ -240,36 +240,47 @@ export default function LoginPage() {
             >
               <div className="flex flex-col gap-phi-5 mb-phi-8">
                 <div className="flex flex-col">
+                  <label htmlFor="login-identifier" className="sr-only">
+                    Email or username
+                  </label>
                   <input
+                    id="login-identifier"
                     type="text"
                     autoComplete="username"
-                    placeholder="IDENTIFIER"
+                    placeholder="Email or username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     onKeyDown={(e) => handleKeyDown(e, 'username')}
-                    className="w-full bg-transparent border-0 border-b border-oxford/10 py-phi-3 font-mono text-[10px] text-oxford outline-none placeholder:text-oxford/20 focus:border-oxford/40 transition-colors tracking-widest"
+                    aria-describedby={error ? 'login-error' : undefined}
+                    className="w-full bg-transparent border-0 border-b border-oxford/10 py-phi-3 font-mono text-[11px] text-oxford outline-none placeholder:text-oxford/35 focus:border-oxford/40 transition-colors tracking-[0.1em]"
                   />
                 </div>
 
                 <div className="flex flex-col">
+                  <label htmlFor="login-password" className="sr-only">
+                    Password
+                  </label>
                   <input
                     ref={passwordRef}
+                    id="login-password"
                     type="password"
                     autoComplete="current-password"
-                    placeholder="CREDENTIAL"
+                    placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={(e) => handleKeyDown(e, 'password')}
-                    className="w-full bg-transparent border-0 border-b border-oxford/10 py-phi-3 font-mono text-[10px] text-oxford outline-none placeholder:text-oxford/20 focus:border-oxford/40 transition-colors tracking-widest"
+                    aria-describedby={error ? 'login-error' : undefined}
+                    className="w-full bg-transparent border-0 border-b border-oxford/10 py-phi-3 font-mono text-[11px] text-oxford outline-none placeholder:text-oxford/35 focus:border-oxford/40 transition-colors tracking-[0.1em]"
                   />
                 </div>
               </div>
 
               {error && (
                 <motion.p
+                  id="login-error"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="type-meta text-[9px] text-escalation text-center mb-phi-6 uppercase tracking-widest opacity-80"
+                  className="type-meta text-[11px] text-escalation text-center mb-phi-6 tracking-[0.06em] opacity-90"
                 >
                   {error}
                 </motion.p>
@@ -304,11 +315,11 @@ export default function LoginPage() {
           className="fixed bottom-0 left-0 w-full p-phi-6 flex justify-center pointer-events-none"
         >
           <div className="flex items-center gap-phi-4 opacity-25">
-             <span className="type-meta text-[8px] uppercase tracking-[0.2em] text-oxford">
+            <span className="type-meta text-[11px] tracking-[0.08em] text-oxford/70">
               Protocol 4.1
             </span>
             <div className="w-px h-2 bg-oxford/40" />
-            <span className="type-meta text-[8px] uppercase tracking-[0.2em] text-oxford">
+            <span className="type-meta text-[11px] tracking-[0.08em] text-oxford/70">
               Secure Perimeter
             </span>
           </div>

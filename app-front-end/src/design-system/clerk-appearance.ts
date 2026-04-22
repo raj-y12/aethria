@@ -5,24 +5,26 @@
  */
 import { tokens } from './tokens';
 
-const OXford = tokens.color.oxford;
+const OXFORD = tokens.color.oxford;
 const PAPER = tokens.color.paper;
 const IVORY = tokens.color.ivory;
-const BORDER = 'rgba(0, 33, 71, 0.06)';
+const OXFORD_RGB = '0, 33, 71';
+const oxfordAlpha = (alpha: number): string => `rgba(${OXFORD_RGB}, ${alpha})`;
+const BORDER = oxfordAlpha(0.06);
 
 export const clerkAppearance = {
   variables: {
-    colorPrimary: OXford,
+    colorPrimary: OXFORD,
     colorBackground: PAPER,
-    colorForeground: OXford,
+    colorForeground: OXFORD,
     colorPrimaryForeground: IVORY,
-    colorMutedForeground: 'rgba(0, 33, 71, 0.6)',
-    colorMuted: 'rgba(0, 33, 71, 0.06)',
+    colorMutedForeground: oxfordAlpha(0.6),
+    colorMuted: oxfordAlpha(0.06),
     colorBorder: BORDER,
     colorInput: PAPER,
-    colorInputForeground: OXford,
-    colorRing: OXford,
-    colorNeutral: OXford,
+    colorInputForeground: OXFORD,
+    colorRing: OXFORD,
+    colorNeutral: OXFORD,
     colorShadow: 'transparent',
     fontFamily: tokens.font.body,
     fontFamilyButtons: tokens.font.mono,
@@ -34,18 +36,18 @@ export const clerkAppearance = {
 export const userProfileAppearance = {
   variables: {
     ...clerkAppearance.variables,
-    colorModalBackdrop: 'rgba(0, 33, 71, 0.4)',
+    colorModalBackdrop: oxfordAlpha(0.4),
     fontFamily: tokens.font.body,
     fontFamilyButtons: tokens.font.mono,
     borderRadius: '0',
-    colorText: OXford,
-    colorTextSecondary: 'rgba(0, 33, 71, 0.6)',
+    colorText: OXFORD,
+    colorTextSecondary: oxfordAlpha(0.6),
   },
   elements: {
     rootBox: {
       backgroundColor: PAPER,
       fontFamily: tokens.font.body,
-      color: OXford,
+      color: OXFORD,
     },
     card: {
       backgroundColor: PAPER,
@@ -54,7 +56,7 @@ export const userProfileAppearance = {
       boxShadow: 'none',
     },
     navbar: {
-      backgroundColor: 'rgba(0, 33, 71, 0.04)',
+      backgroundColor: oxfordAlpha(0.04),
       borderRight: tokens.frameBorder,
     },
     navbarButton: {
@@ -62,10 +64,10 @@ export const userProfileAppearance = {
       fontSize: tokens.type.labelTab.size,
       letterSpacing: tokens.type.labelTab.letterSpacing,
       textTransform: 'uppercase',
-      color: 'rgba(0, 33, 71, 0.6)',
+      color: oxfordAlpha(0.6),
     },
     navbarButtonIcon: {
-      color: 'rgba(0, 33, 71, 0.4)',
+      color: oxfordAlpha(0.4),
     },
     pageScrollBox: {
       backgroundColor: PAPER,
@@ -75,29 +77,29 @@ export const userProfileAppearance = {
       fontSize: tokens.type.labelSection.size,
       letterSpacing: tokens.type.labelSection.letterSpacing,
       textTransform: 'uppercase',
-      color: 'rgba(0, 33, 71, 0.6)',
+      color: oxfordAlpha(0.6),
     },
     profileSectionTitleText: {
       fontFamily: tokens.font.mono,
       fontSize: tokens.type.labelSection.size,
       letterSpacing: tokens.type.labelSection.letterSpacing,
       textTransform: 'uppercase',
-      color: 'rgba(0, 33, 71, 0.6)',
+      color: oxfordAlpha(0.6),
     },
     formFieldLabel: {
       fontFamily: tokens.font.mono,
       fontSize: tokens.type.labelTab.size,
       letterSpacing: tokens.type.labelTab.letterSpacing,
       textTransform: 'uppercase',
-      color: 'rgba(0, 33, 71, 0.6)',
+      color: oxfordAlpha(0.6),
     },
     formFieldInput: {
       fontFamily: tokens.font.body,
       fontSize: tokens.type.bodySm.size,
-      color: OXford,
+      color: OXFORD,
       backgroundColor: 'transparent',
       border: 'none',
-      borderBottom: '1px solid rgba(0, 33, 71, 0.25)',
+      borderBottom: `1px solid ${oxfordAlpha(0.25)}`,
       borderRadius: 0,
     },
     formButtonPrimary: {
@@ -105,7 +107,7 @@ export const userProfileAppearance = {
       fontSize: tokens.type.labelTab.size,
       letterSpacing: tokens.type.labelTab.letterSpacing,
       textTransform: 'uppercase',
-      backgroundColor: OXford,
+      backgroundColor: OXFORD,
       color: IVORY,
       borderRadius: 0,
     },
@@ -113,7 +115,7 @@ export const userProfileAppearance = {
       fontFamily: tokens.font.mono,
       fontSize: tokens.type.labelTab.size,
       letterSpacing: tokens.type.labelTab.letterSpacing,
-      color: 'rgba(0, 33, 71, 0.6)',
+      color: oxfordAlpha(0.6),
     },
     badge: {
       fontFamily: tokens.font.mono,
@@ -157,17 +159,17 @@ export const userButtonAppearance = {
       fontFamily: tokens.font.body,
       fontSize: tokens.type.bodySm.size,
       letterSpacing: '0',
-      color: OXford,
+      color: OXFORD,
     },
     userButtonPopoverActionButton: {
       fontFamily: tokens.font.mono,
       fontSize: tokens.type.labelTab.size,
       letterSpacing: tokens.type.labelTab.letterSpacing,
       textTransform: 'uppercase',
-      color: 'rgba(0, 33, 71, 0.8)',
+      color: oxfordAlpha(0.8),
     },
     userButtonPopoverActionButtonIcon: {
-      color: 'rgba(0, 33, 71, 0.4)',
+      color: oxfordAlpha(0.4),
     },
   },
 };

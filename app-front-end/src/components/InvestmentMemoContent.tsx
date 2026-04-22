@@ -808,15 +808,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </button>
                 <motion.div
                   initial={false}
-                  animate={
-                    reduceMotion
-                      ? { gridTemplateRows: sourcesOpen ? '1fr' : '0fr', opacity: sourcesOpen ? 1 : 0 }
-                      : sourcesOpen ? { gridTemplateRows: '1fr', opacity: 1 } : { gridTemplateRows: '0fr', opacity: 0 }
-                  }
+                  animate={sourcesOpen ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
                   transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.16, 1, 0.3, 1] })}
-                  style={{ display: 'grid' }}
                 >
-                  <div className="min-h-0 overflow-hidden">
+                  <div className={`min-h-0 overflow-hidden ${sourcesOpen ? '' : 'hidden'}`}>
                   <div className="memoSourcesBody">
                     <ul className="memoList">
                       {(displayStartup.scout.references ?? [])
@@ -866,15 +861,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </button>
                 <motion.div
                   initial={false}
-                  animate={
-                    reduceMotion
-                      ? { gridTemplateRows: pipelineLogOpen ? '1fr' : '0fr', opacity: pipelineLogOpen ? 1 : 0 }
-                      : pipelineLogOpen ? { gridTemplateRows: '1fr', opacity: 1 } : { gridTemplateRows: '0fr', opacity: 0 }
-                  }
+                  animate={pipelineLogOpen ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
                   transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.16, 1, 0.3, 1] })}
-                  style={{ display: 'grid' }}
                 >
-                  <div className="min-h-0 overflow-hidden">
+                  <div className={`min-h-0 overflow-hidden ${pipelineLogOpen ? '' : 'hidden'}`}>
                   <ol className="memoReplayList">
                     {pipelineReplaySteps.map((step) => (
                       <li key={step.id} className="memoReplayItem">

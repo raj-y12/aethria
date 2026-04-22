@@ -32,7 +32,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        backgroundColor: '#F2F0EA',
+        backgroundColor: 'var(--color-paper)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -48,10 +48,10 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
         transition={{ duration: 0.45, ease, delay: 0.05 }}
         style={{
           fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-          fontSize: '10px',
-          letterSpacing: '0.16em',
+          fontSize: '11px',
+          letterSpacing: '0.1em',
           textTransform: 'uppercase',
-          color: 'rgba(0, 33, 71, 0.4)',
+          color: 'rgba(var(--color-oxford-rgb), 0.55)',
           marginBottom: '16px',
         }}
       >
@@ -68,7 +68,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
           fontFamily: "'EB Garamond', Georgia, serif",
           fontSize: 'clamp(36px, 5vw, 64px)',
           fontWeight: 500,
-          color: '#002147',
+          color: 'var(--color-oxford)',
           lineHeight: 1.1,
           margin: 0,
           textAlign: 'center',
@@ -86,7 +86,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
         style={{
           fontFamily: "'Geist Sans', system-ui, sans-serif",
           fontSize: '14px',
-          color: 'rgba(0, 33, 71, 0.5)',
+          color: 'rgba(var(--color-oxford-rgb), 0.6)',
           marginTop: '12px',
           marginBottom: '55px',
           textAlign: 'center',
@@ -126,7 +126,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
                 fontSize: 'clamp(40px, 6vw, 72px)',
                 fontWeight: 700,
                 lineHeight: 1,
-                color: stat.accent ? '#7D2B3A' : '#002147',
+                color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
                 letterSpacing: '-0.03em',
               }}
             >
@@ -136,7 +136,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
               style={{
                 fontFamily: "'Geist Sans', system-ui, sans-serif",
                 fontSize: '13px',
-                color: 'rgba(0, 33, 71, 0.5)',
+                color: 'rgba(var(--color-oxford-rgb), 0.6)',
                 marginTop: '6px',
                 letterSpacing: '0.01em',
               }}

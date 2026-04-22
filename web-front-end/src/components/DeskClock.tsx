@@ -24,7 +24,7 @@ export default function DeskClock({ className = '' }: { className?: string }) {
 
   return (
     <div
-      className={`font-mono text-[9px] tracking-[0.12em] uppercase tabular-nums text-[rgba(0,33,71,0.55)] sm:text-[10px] ${className}`}
+      className={`font-mono text-[11px] tracking-[0.12em] uppercase tabular-nums text-[var(--label-muted)] sm:text-[12px] ${className}`}
       aria-label={`Desk time London ${lon}, New York ${nyc}`}
     >
       <div className="hidden whitespace-nowrap sm:block">

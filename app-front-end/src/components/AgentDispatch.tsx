@@ -64,7 +64,7 @@ export default function AgentDispatch({
   const tacticalLog = message ? formatTacticalLog(message) : null;
 
   return (
-    <div className="relative w-full border-l border-oxford/20 px-phi-4 mt-phi-2 lg:mt-phi-3 group">
+    <div className="relative w-full border-t border-oxford/10 px-phi-4 pt-phi-2 mt-phi-2 lg:mt-phi-3 group">
       <AnimatePresence mode="wait">
         {!expanded ? (
           <motion.button
@@ -74,9 +74,9 @@ export default function AgentDispatch({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
             onClick={() => setExpanded(true)}
-            className="flex w-full items-center justify-between py-phi-2 text-left btn-interaction group/trigger"
+            className="flex w-full min-h-[44px] items-center justify-between py-phi-2 text-left btn-interaction group/trigger"
           >
-            <span className="type-meta tracking-[0.18em] uppercase text-oxford/40 group-hover/trigger:text-oxford/70 transition-colors">
+            <span className="type-meta tracking-[0.1em] text-oxford/55 group-hover/trigger:text-oxford/80 transition-colors">
               Dispatch
             </span>
             <span className="shrink-0 tabular-nums text-oxford/20" aria-hidden>+</span>
@@ -91,13 +91,13 @@ export default function AgentDispatch({
           >
             <div className="pb-phi-4 pt-phi-2">
               <div className="flex items-center justify-between mb-phi-4">
-                <span className="type-meta tracking-[0.18em] uppercase text-oxford/40">
+                <span className="type-meta tracking-[0.1em] text-oxford/55">
                   Agent_Dispatch
                 </span>
                 {!isBusy && !message && (
                   <button
                     onClick={() => setExpanded(false)}
-                    className="type-meta text-oxford/45 hover:text-oxford/70 uppercase tracking-widest transition-colors"
+                    className="type-meta min-h-[44px] inline-flex items-center text-oxford/55 hover:text-oxford/80 tracking-[0.1em] transition-colors"
                   >
                     Close
                   </button>
@@ -143,7 +143,7 @@ export default function AgentDispatch({
                         initial="initial"
                         animate="animate"
                         exit="exit"
-                        className="type-meta text-oxford/60 flex items-center gap-2"
+                        className="type-meta text-oxford/70 flex items-center gap-2"
                       >
                         <span className="w-1.5 h-1.5 bg-oxford/40 rounded-none animate-pulse" />
                         {tacticalLog}
@@ -152,7 +152,7 @@ export default function AgentDispatch({
                       <motion.p
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="type-meta text-oxford/40"
+                        className="type-meta text-oxford/55"
                       >
                         AWAITING_COMMAND...
                       </motion.p>
@@ -165,7 +165,7 @@ export default function AgentDispatch({
                     type="button"
                     onClick={onSubmit}
                     disabled={!input.trim()}
-                    className="group flex items-center gap-2 px-0 min-h-[44px] type-meta tracking-[0.12em] uppercase text-oxford/40 hover:text-oxford transition-colors disabled:opacity-20"
+                    className="group flex items-center gap-2 px-0 min-h-[44px] type-meta tracking-[0.1em] text-oxford/55 hover:text-oxford transition-colors disabled:opacity-20"
                   >
                     Run_Analysis
                     <span className="group-hover:translate-x-1 transition-transform">→</span>

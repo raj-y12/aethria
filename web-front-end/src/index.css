@@ -40,6 +40,21 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+
+  /* Semantic roles for consistent contrast and token usage */
+  --surface-base: var(--color-paper);
+  --surface-strong: var(--color-oxford);
+  --surface-strong-hover: rgba(0, 33, 71, 0.88);
+  --text-primary: rgba(0, 33, 71, 0.9);
+  --text-secondary: rgba(0, 33, 71, 0.74);
+  --text-tertiary: rgba(0, 33, 71, 0.62);
+  --text-muted: rgba(0, 33, 71, 0.5);
+  --text-subtle: rgba(0, 33, 71, 0.42);
+  --text-inverse: rgba(242, 240, 234, 0.94);
+  --text-inverse-secondary: rgba(242, 240, 234, 0.78);
+  --text-inverse-muted: rgba(242, 240, 234, 0.66);
+  --label-strong: rgba(0, 33, 71, 0.74);
+  --label-muted: rgba(0, 33, 71, 0.56);
 }
 
 @media (max-width: 768px) {
@@ -143,14 +158,14 @@ hr.doc-section-separator::before {
 
 .section-numeral {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.12em;
-  color: rgba(0, 33, 71, 0.2);
+  color: var(--text-subtle);
 }
 
 .section-numeral--on-dark {
-  font-size: 9px;
-  color: rgba(242, 240, 234, 0.25);
+  font-size: 10px;
+  color: var(--text-inverse-muted);
 }
 
 /* Institutional tape (homepage) */
@@ -288,6 +303,13 @@ hr.doc-section-separator::before {
     border-radius: 0;
   }
 
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--color-oxford);
+    outline-offset: 2px;
+  }
+
   /* iPhone: remove tap highlight, improve touch targets */
   a,
   button {
@@ -380,7 +402,8 @@ hr.doc-section-separator::before {
 
 .form-input-aethria:focus,
 .form-input-aethria:focus-visible {
-  outline: none;
+  outline: 2px solid var(--color-oxford);
+  outline-offset: 2px;
   box-shadow: none;
   border-bottom-color: rgba(0, 33, 71, 0.15);
 }
@@ -398,10 +421,10 @@ hr.doc-section-separator::before {
 
 .form-label-aethria {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(0, 33, 71, 0.72);
+  color: var(--label-strong);
   margin-bottom: 10px;
   display: block;
 }
@@ -534,10 +557,10 @@ hr.doc-section-separator::before {
 
 .pipeline-section-label {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(0, 33, 71, 0.32);
+  color: var(--label-muted);
 }
 
 .intelligence-map-shell {
@@ -580,7 +603,7 @@ hr.doc-section-separator::before {
     padding-right: max(var(--page-margin-x-mobile), var(--safe-right));
   }
   .home-signal-text {
-    font-size: 9px;
+    font-size: 12px;
     white-space: nowrap;
     text-align: center;
     line-height: 1.6;
@@ -640,7 +663,11 @@ hr.doc-section-separator::before {
   border-radius: 0;
   background-color: var(--color-paper);
   opacity: 0.4;
-  animation: signal-dot-breathe 2s ease-in-out infinite;
+  animation: none;
+}
+
+.home-signal-strip:hover .signal-dot {
+  animation: signal-dot-breathe 2.4s ease-in-out infinite;
 }
 
 @keyframes signal-dot-breathe {
@@ -665,6 +692,21 @@ hr.doc-section-separator::before {
   .signal-pill,
   .signal-pill:hover {
     transform: none !important;
+  }
+
+  .system-access-hero {
+    opacity: 1 !important;
+    animation: none !important;
+  }
+
+  .system-access-hero-underline {
+    transform: scaleX(1) !important;
+    animation: none !important;
+  }
+
+  .system-access-status {
+    opacity: 0.65 !important;
+    animation: none !important;
   }
 }
 
@@ -697,7 +739,7 @@ hr.doc-section-separator::before {
   display: inline-flex;
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(0, 33, 71, 0.55);
@@ -794,14 +836,8 @@ hr.doc-section-separator::before {
 /* SystemAccessPage — same timing as EnterSystemPage: hero 1.5s, underline 2.5s, subline 1s, status 1.2s, waitlist 1.4s */
 
 @keyframes system-access-hero-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes system-access-underline-in {

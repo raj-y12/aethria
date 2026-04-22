@@ -57,15 +57,15 @@ export default function LoadingAnimation({
                 marginLeft: -POINT_SIZE / 2,
                 marginTop: -POINT_SIZE / 2,
               }}
-              initial={{ x: 0, y: 0, opacity: 0.25, backgroundColor: 'rgba(0, 33, 71, 0.25)' }}
+              initial={{ x: 0, y: 0, opacity: 0.25, backgroundColor: 'rgba(var(--color-oxford-rgb), 0.25)' }}
               animate={{
                 x: [0, v.x, 0],
                 y: [0, v.y, 0],
                 opacity: [0.25, 1, 0.25],
                 backgroundColor: [
-                  'rgba(0, 33, 71, 0.25)',
-                  'rgb(0, 33, 71)',
-                  'rgba(0, 33, 71, 0.25)',
+                  'rgba(var(--color-oxford-rgb), 0.25)',
+                  'rgb(var(--color-oxford-rgb))',
+                  'rgba(var(--color-oxford-rgb), 0.25)',
                 ],
               }}
               transition={{

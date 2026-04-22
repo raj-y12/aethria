@@ -10,7 +10,26 @@ const API_BASE = import.meta.env.VITE_API_URL ?? '';
 const WAITLIST_URL = API_BASE ? `${API_BASE.replace(/\/$/, '')}/api/waitlist` : '/api/waitlist';
 const APP_URL = import.meta.env.VITE_APP_URL ?? '';
 
+const EASE_OUT_EXPO = 'cubic-bezier(0.16, 1, 0.3, 1)';
+const TRANSITION_PAGE_ENTER = `opacity 0.6s ${EASE_OUT_EXPO}, transform 0.6s ${EASE_OUT_EXPO}`;
+const TRANSITION_FORM_OUT = 'opacity 0.22s ease, transform 0.22s ease';
+const TRANSITION_SUCCESS_REVEAL = `opacity 0.55s ${EASE_OUT_EXPO}, transform 0.55s ${EASE_OUT_EXPO}`;
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return reduced;
+}
+
 export default function RequestAccessPage() {
+  const reduce = usePrefersReducedMotion();
   const [submitted, setSubmitted] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -29,19 +48,20 @@ export default function RequestAccessPage() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    const t = requestAnimationFrame(() => setMounted(true));
+    if (reduce) { setMounted(true); return; }
+    // Double-rAF: ensures the browser paints opacity:0 before the transition fires
+    let r2: number;
+    const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => setMounted(true)); });
     return () => {
-      cancelAnimationFrame(t);
+      cancelAnimationFrame(r1);
+      cancelAnimationFrame(r2);
       abortRef.current?.abort();
     };
-  }, []);
+  }, [reduce]);
 
   useEffect(() => {
     if (!processing) return;
-    const t = setTimeout(() => {
-      setProcessing(false);
-      setFormOut(true);
-    }, PROCESSING_DURATION_MS);
+    const t = setTimeout(() => { setProcessing(false); setFormOut(true); }, PROCESSING_DURATION_MS);
     return () => clearTimeout(t);
   }, [processing]);
 
@@ -49,17 +69,12 @@ export default function RequestAccessPage() {
     if (!formOut) return;
     const t1 = setTimeout(() => setSubmitted(true), 200);
     const t2 = setTimeout(() => setShowSuccess(true), 300);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [formOut]);
 
   useEffect(() => {
     if (!loading) return;
-    const interval = setInterval(() => {
-      setEllipsisStep((prev) => (prev + 1) % 4);
-    }, 220);
+    const interval = setInterval(() => setEllipsisStep((p) => (p + 1) % 4), 220);
     return () => clearInterval(interval);
   }, [loading]);
 
@@ -67,24 +82,11 @@ export default function RequestAccessPage() {
     e.preventDefault();
     setError(null);
     setValidationError(false);
-    const trimmedName = name.trim();
-    const trimmedEmail = email.trim();
-    const trimmedRole = role.trim();
-    const trimmedFirm = firm.trim();
-    const allFilled = trimmedName && trimmedEmail && trimmedRole && trimmedFirm;
-    if (!allFilled) {
-      setValidationError(true);
-      return;
-    }
-    if (!EMAIL_REGEX.test(trimmedEmail)) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-    const trimmedLinkedin = linkedin.trim();
-    if (trimmedLinkedin && !URL_REGEX.test(trimmedLinkedin)) {
-      setError('LinkedIn URL must start with https://');
-      return;
-    }
+    const n = name.trim(), em = email.trim(), r = role.trim(), f = firm.trim();
+    if (!n || !em || !r || !f) { setValidationError(true); return; }
+    if (!EMAIL_REGEX.test(em)) { setError('Please enter a valid email address.'); return; }
+    const li = linkedin.trim();
+    if (li && !URL_REGEX.test(li)) { setError('LinkedIn URL must start with https://'); return; }
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     setLoading(true);
@@ -93,21 +95,12 @@ export default function RequestAccessPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: abortRef.current.signal,
-        body: JSON.stringify({
-          name: trimmedName,
-          email: trimmedEmail,
-          role: trimmedRole,
-          firm: trimmedFirm,
-          linkedin: trimmedLinkedin || undefined,
-        }),
+        body: JSON.stringify({ name: n, email: em, role: r, firm: f, linkedin: li || undefined }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        const msg =
-          typeof data.detail === 'string'
-            ? data.detail
-            : (data.detail as { message?: string })?.message ||
-              `Request failed (${res.status}). Please try again.`;
+        const msg = typeof data.detail === 'string' ? data.detail
+          : (data.detail as { message?: string })?.message || `Request failed (${res.status}).`;
         throw new Error(msg);
       }
       const resData = await res.json().catch(() => ({}));
@@ -122,302 +115,207 @@ export default function RequestAccessPage() {
     }
   };
 
-  const nameEmpty = validationError && !name.trim();
-  const emailEmpty = validationError && !email.trim();
-  const roleEmpty = validationError && !role.trim();
-  const firmEmpty = validationError && !firm.trim();
+  const ne = validationError && !name.trim();
+  const ee = validationError && !email.trim();
+  const re = validationError && !role.trim();
+  const fe = validationError && !firm.trim();
 
   return (
     <div
-      className="relative flex min-h-[100dvh] w-full flex-col overflow-x-hidden"
-      style={{ backgroundColor: 'var(--color-paper)' }}
+      className="relative flex min-h-[100dvh] w-full flex-col"
+      style={{ backgroundColor: 'var(--surface-base)' }}
     >
+      <GrainOverlay opacity={0.022} variant="light" />
+
+      {/* Header */}
       <header
-        className="inst-site-header sticky top-0 z-[100] w-full shrink-0 border-b border-solid border-[var(--section-divider)] bg-[#f2f0ea]"
+        className="sticky top-0 z-[100] w-full shrink-0 border-b border-[var(--section-divider)] bg-[var(--surface-base)]"
         style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
       >
         <div className="page-margin-x grid min-h-[52px] grid-cols-[1fr_1fr] items-center gap-2 sm:gap-4 md:grid-cols-[1fr_auto_1fr]">
           <nav aria-label="Site navigation">
             <Link
-              data-cursor-expand
               to="/"
-              className="font-wordmark justify-self-start py-2 text-[15px] font-normal normal-case leading-none tracking-normal text-[#002147] transition-opacity hover:opacity-80 sm:text-[16px]"
+              className="font-wordmark inline-flex min-h-[44px] items-center text-[15px] font-normal leading-none tracking-normal text-[var(--text-primary)] transition-opacity hover:opacity-75 sm:text-[16px]"
             >
               Aethria
             </Link>
           </nav>
-          <p className="hidden justify-self-center text-center font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.35)] md:block">
+          <p className="hidden justify-self-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)] md:block">
             Deal flow operating system
           </p>
           <DeskClock className="min-w-0 justify-self-end text-right" />
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col overflow-x-hidden lg:flex-row">
-      {/* ── Left: Oxford monolith ─────────────────────────────────────── */}
-      <div
-        className="relative flex w-full shrink-0 flex-col justify-center overflow-hidden px-8 py-12 sm:px-12 sm:py-16 lg:sticky lg:top-[53px] lg:h-[calc(100dvh-53px)] lg:w-[42%] lg:px-14 lg:py-16"
-        style={{ backgroundColor: 'var(--color-oxford)' }}
-      >
-        <GrainOverlay opacity={0.032} variant="dark" />
-
-        {/* Centre: editorial headline */}
+      {/* Body */}
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10 sm:py-20">
         <div
-          className="relative z-10 my-12 lg:my-0"
+          className="w-full max-w-[min(100%,30rem)]"
           style={{
             opacity: mounted ? 1 : 0,
-            transform: mounted ? 'translateY(0)' : 'translateY(20px)',
-            transition: 'opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1)',
+            transform: mounted ? 'translateY(0)' : 'translateY(14px)',
+            transition: reduce ? 'none' : TRANSITION_PAGE_ENTER,
           }}
         >
-          <h1
-            className="home-monolith-headline mb-5 text-[clamp(1.5rem,3vw,2rem)] leading-[1.15] text-[#f2f0ea]"
-          >
-            The deal pipeline,{' '}
-            <em style={{ fontStyle: 'italic', color: 'rgba(242,240,234,0.55)' }}>automated.</em>
-          </h1>
-          <p className="max-w-[34ch] font-sans text-[13px] leading-[1.7] text-[rgba(242,240,234,0.45)]">
-            Autonomous discovery, structured review, and partner-ready memos — before the committee opens the file.
-          </p>
-        </div>
+          {!submitted ? (
+            <div
+              style={{
+                opacity: formOut ? 0 : 1,
+                transform: formOut ? 'translateY(-8px)' : 'translateY(0)',
+                transition: reduce ? 'none' : TRANSITION_FORM_OUT,
+              }}
+            >
+              {/* Header */}
+              <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--label-muted)]">
+                Early access · 2026
+              </p>
+              <h1 className="mb-4 font-display text-[clamp(1.75rem,4vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[var(--text-primary)]">
+                Request access.
+              </h1>
+              <p className="mb-10 max-w-[42ch] font-sans text-[16px] leading-[1.65] text-[var(--text-secondary)]">
+                Join the waitlist. We'll reach out when a spot opens.
+              </p>
 
-        <p className="relative z-10 mt-8 font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(242,240,234,0.22)]">
-          Early access · 2026
-        </p>
-      </div>
-
-      {/* ── Right: form panel ─────────────────────────────────────────── */}
-      <div
-        className="paper-dot-grid relative flex flex-1 flex-col"
-        style={{ backgroundColor: 'var(--color-paper)' }}
-      >
-        <GrainOverlay opacity={0.022} variant="light" />
-
-        <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-8 py-12 sm:px-12 sm:py-16 lg:px-16 lg:py-20">
-          <div className="w-full max-w-[26rem]">
-            {!submitted ? (
-              <div
-                style={{
-                  opacity: formOut ? 0 : mounted ? 1 : 0,
-                  transform: formOut ? 'translateY(-8px)' : 'translateY(0)',
-                  transition: 'opacity 0.25s ease, transform 0.25s ease',
-                }}
-              >
-                {/* Form header */}
-                <div className="mb-10">
-                  <p className="mb-3 font-mono text-[9px] uppercase tracking-[0.16em] text-[rgba(0,33,71,0.35)]">
-                    Access request
-                  </p>
-                  <p className="font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.62)]">
-                    Join the waitlist. We'll reach out when a spot opens — no spam.
-                  </p>
+              <form onSubmit={handleSubmit} className="flex flex-col gap-7" noValidate>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <Field id="r-name" label="Name" type="text" value={name} onChange={setName} error={ne} autoComplete="name" maxLength={100} />
+                  <Field id="r-email" label="Email" type="email" value={email} onChange={setEmail} error={ee} autoComplete="email" maxLength={320} />
                 </div>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <Field id="r-role" label="Role" type="text" value={role} onChange={setRole} error={re} autoComplete="organization-title" maxLength={100} />
+                  <Field id="r-firm" label="Firm" type="text" value={firm} onChange={setFirm} error={fe} autoComplete="organization" maxLength={200} />
+                </div>
+                <Field
+                  id="r-linkedin"
+                  label="LinkedIn"
+                  optional
+                  type="url"
+                  value={linkedin}
+                  onChange={setLinkedin}
+                  autoComplete="off"
+                  maxLength={2000}
+                  placeholder="https://linkedin.com/in/..."
+                />
 
-                <form onSubmit={handleSubmit} className="flex flex-col gap-7" noValidate>
-                  {/* Name + Email */}
-                  <div className="grid grid-cols-1 gap-7 sm:grid-cols-2">
-                    <div className="flex flex-col">
-                      <label htmlFor="waitlist-name" className="form-label-aethria">
-                        Name
-                      </label>
-                      <div className="form-input-wrapper">
-                        <input
-                          id="waitlist-name"
-                          type="text"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          className={`form-input-aethria ${nameEmpty ? 'form-input-aethria-error' : ''}`}
-                          autoComplete="name"
-                          maxLength={100}
-                          aria-invalid={nameEmpty ? 'true' : undefined}
-                          aria-describedby={nameEmpty ? 'form-validation-error' : undefined}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col">
-                      <label htmlFor="waitlist-email" className="form-label-aethria">
-                        Email
-                      </label>
-                      <div className="form-input-wrapper">
-                        <input
-                          id="waitlist-email"
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className={`form-input-aethria ${emailEmpty ? 'form-input-aethria-error' : ''}`}
-                          autoComplete="email"
-                          maxLength={320}
-                          aria-invalid={emailEmpty ? 'true' : undefined}
-                          aria-describedby={emailEmpty ? 'form-validation-error' : undefined}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Role + Firm */}
-                  <div className="grid grid-cols-1 gap-7 sm:grid-cols-2">
-                    <div className="flex flex-col">
-                      <label htmlFor="waitlist-role" className="form-label-aethria">
-                        Role
-                      </label>
-                      <div className="form-input-wrapper">
-                        <input
-                          id="waitlist-role"
-                          type="text"
-                          value={role}
-                          onChange={(e) => setRole(e.target.value)}
-                          className={`form-input-aethria ${roleEmpty ? 'form-input-aethria-error' : ''}`}
-                          autoComplete="organization-title"
-                          maxLength={100}
-                          aria-invalid={roleEmpty ? 'true' : undefined}
-                          aria-describedby={roleEmpty ? 'form-validation-error' : undefined}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col">
-                      <label htmlFor="waitlist-firm" className="form-label-aethria">
-                        Firm
-                      </label>
-                      <div className="form-input-wrapper">
-                        <input
-                          id="waitlist-firm"
-                          type="text"
-                          value={firm}
-                          onChange={(e) => setFirm(e.target.value)}
-                          className={`form-input-aethria ${firmEmpty ? 'form-input-aethria-error' : ''}`}
-                          autoComplete="organization"
-                          maxLength={200}
-                          aria-invalid={firmEmpty ? 'true' : undefined}
-                          aria-describedby={firmEmpty ? 'form-validation-error' : undefined}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* LinkedIn */}
-                  <div className="flex flex-col">
-                    <label htmlFor="waitlist-linkedin" className="form-label-aethria">
-                      LinkedIn{' '}
-                      <span className="font-normal opacity-55">(optional)</span>
-                    </label>
-                    <div className="form-input-wrapper">
-                      <input
-                        id="waitlist-linkedin"
-                        type="url"
-                        value={linkedin}
-                        onChange={(e) => setLinkedin(e.target.value)}
-                        placeholder="https://linkedin.com/in/..."
-                        className="form-input-aethria placeholder:font-mono placeholder:text-[10px] placeholder:opacity-40"
-                        autoComplete="off"
-                        maxLength={2000}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Errors */}
-                  {validationError && (
-                    <p
-                      id="form-validation-error"
-                      className="font-mono text-[9px] uppercase tracking-[0.12em] text-[var(--color-oxford)]"
-                      role="alert"
-                    >
-                      Complete name, email, role, and firm
-                    </p>
-                  )}
-                  {error && (
-                    <p
-                      className="font-sans text-[13px] leading-relaxed text-[rgba(0,33,71,0.72)]"
-                      role="alert"
-                    >
-                      {error}
-                    </p>
-                  )}
-
-                  {/* Submit */}
-                  <button
-                    type="submit"
-                    disabled={loading || processing}
-                    className="group mt-1 inline-flex min-h-[46px] w-full cursor-pointer items-center justify-center rounded-none bg-[#002147] px-6 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-[#f2f0ea] transition-colors duration-[250ms] ease-out hover:bg-[rgba(0,33,71,0.88)] disabled:cursor-not-allowed disabled:opacity-65"
+                {validationError && (
+                  <p
+                    id="form-validation-error"
+                    role="alert"
+                    className="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-[var(--text-primary)]"
                   >
-                    <span className="flex items-center justify-center gap-0">
-                      <span>
-                        {loading
-                          ? `Submitting${'.'.repeat(ellipsisStep)}`
-                          : processing
-                            ? 'Processing entry'
-                            : 'Submit application'}
-                      </span>
-                      <span
-                        className={`inline-block shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease-out ${
-                          loading || processing ? 'w-6' : 'w-2 group-hover:w-6'
-                        }`}
-                        aria-hidden
-                      >
-                        {'\u00A0→'}
-                      </span>
-                    </span>
-                  </button>
-                </form>
-              </div>
-            ) : (
-              /* ── Success state ──────────────────────────────────────── */
-              <div
-                className="flex flex-col items-start"
-                style={{
-                  opacity: showSuccess ? 1 : 0,
-                  transform: showSuccess ? 'translateY(0)' : 'translateY(12px)',
-                  transition: 'opacity 0.55s cubic-bezier(0.16,1,0.3,1), transform 0.55s cubic-bezier(0.16,1,0.3,1)',
-                }}
-              >
-                <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.16em] text-[rgba(0,33,71,0.35)]">
-                  Entry recorded
-                </p>
-                <h2
-                  className="mb-5 font-display text-[clamp(1.5rem,3vw,1.875rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#002147]"
+                    Complete all required fields
+                  </p>
+                )}
+                {error && (
+                  <p role="alert" className="font-sans text-[15px] font-medium leading-relaxed text-[var(--text-primary)]">
+                    {error}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || processing}
+                  className="group mt-1 inline-flex min-h-[46px] w-full cursor-pointer items-center justify-center bg-[var(--surface-strong)] px-6 py-3 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--text-inverse)] transition-colors duration-200 hover:bg-[var(--surface-strong-hover)] disabled:cursor-not-allowed disabled:opacity-55"
                 >
-                  You're on the list.
-                </h2>
-
-                <p className="max-w-[30ch] font-sans text-[13px] leading-[1.75] text-[rgba(0,33,71,0.55)]">
-                  {position != null
-                    ? `Position #${position}. We'll reach out when a spot opens.`
-                    : "We'll reach out when a spot opens."}
-                </p>
-
-                <div className="mt-10 flex flex-col items-start gap-4">
-                  {APP_URL && (
-                    <a
-                      href={`${APP_URL.replace(/\/$/, '')}/dashboard`}
-                      className="inline-flex min-h-[44px] items-center justify-center border border-[rgba(0,33,71,0.2)] bg-transparent px-6 font-mono text-[10px] uppercase tracking-[0.12em] text-[#002147] transition-colors duration-200 hover:border-[#002147] hover:bg-[#002147] hover:text-[#f2f0ea]"
-                    >
-                      Proceed to sign in →
-                    </a>
-                  )}
-                  <Link
-                    to="/home"
-                    className="inline-flex min-h-[44px] items-center font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(0,33,71,0.38)] transition-opacity hover:text-[rgba(0,33,71,0.7)]"
+                  <span>
+                    {loading ? `Submitting${'.'.repeat(ellipsisStep)}` : processing ? 'Processing' : 'Submit application'}
+                  </span>
+                  <span
+                    className={`inline-block shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-200 ${loading || processing ? 'w-6' : 'w-2 group-hover:w-6'}`}
+                    aria-hidden
                   >
-                    ← Back to home
-                  </Link>
-                </div>
+                    {'\u00A0→'}
+                  </span>
+                </button>
+              </form>
+            </div>
+          ) : (
+            /* Success */
+            <div
+              style={{
+                opacity: showSuccess ? 1 : 0,
+                transform: showSuccess ? 'translateY(0)' : 'translateY(12px)',
+                transition: reduce ? 'none' : TRANSITION_SUCCESS_REVEAL,
+              }}
+            >
+              <div className="mb-6 h-px w-12 bg-[var(--surface-strong)]" aria-hidden />
+              <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--label-strong)]">
+                Entry recorded
+              </p>
+              <h2 className="mb-5 font-display text-[clamp(1.75rem,4vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[var(--text-primary)]">
+                You're on the list.
+              </h2>
+              <p className="max-w-[42ch] font-sans text-[16px] leading-[1.65] text-[var(--text-secondary)]">
+                {position != null ? (
+                  <span className="block font-medium text-[var(--text-primary)]">Position #{position}</span>
+                ) : null}
+                <span className="mt-1 block">We'll reach out when a spot opens.</span>
+              </p>
+              <div className="mt-10 flex flex-col items-start gap-4">
+                {APP_URL && (
+                  <a
+                    href={`${APP_URL.replace(/\/$/, '')}/dashboard`}
+                    className="group inline-flex min-h-[44px] items-center justify-center bg-[var(--surface-strong)] px-6 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--text-inverse)] transition-colors duration-200 hover:bg-[var(--surface-strong-hover)]"
+                  >
+                    <span>Sign in</span>
+                    <span className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-200 group-hover:w-6" aria-hidden>{'\u00A0→'}</span>
+                  </a>
+                )}
+                <Link
+                  to="/"
+                  className="inline-flex min-h-[44px] items-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-subtle)] transition-opacity hover:text-[var(--text-secondary)]"
+                >
+                  ← Back to home
+                </Link>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
+      </main>
 
-        {/* Bottom rule */}
-        <div
-          className="relative z-10 flex shrink-0 items-center justify-between px-8 py-4 sm:px-12 lg:px-16"
-          style={{ borderTop: '1px solid var(--section-divider)' }}
-        >
-          <span className="font-sans text-[12px] text-[rgba(0,33,71,0.38)]">
-            © {new Date().getFullYear()} Aethria
-          </span>
-          <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.25)]">
-            Investment intelligence
-          </span>
-        </div>
-      </div>
+      {/* Footer */}
+      <footer
+        className="relative z-10 flex shrink-0 items-center justify-between px-6 py-4 sm:px-10"
+        style={{ borderTop: '1px solid var(--section-divider)' }}
+      >
+        <span className="font-sans text-[12px] text-[var(--text-subtle)]">© {new Date().getFullYear()} Aethria</span>
+        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+          Investment intelligence
+        </span>
+      </footer>
+    </div>
+  );
+}
+
+function Field({
+  id, label, optional, type, value, onChange, error, autoComplete, maxLength, placeholder,
+}: {
+  id: string; label: string; optional?: boolean; type: string;
+  value: string; onChange: (v: string) => void; error?: boolean;
+  autoComplete?: string; maxLength?: number; placeholder?: string;
+}) {
+  return (
+    <div className="flex flex-col">
+      <label htmlFor={id} className="form-label-aethria">
+        {label}
+        {optional && <span className="ml-1 font-normal normal-case opacity-45 tracking-normal">(optional)</span>}
+      </label>
+      <div className="form-input-wrapper">
+        <input
+          id={id}
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={`form-input-aethria${error ? ' form-input-aethria-error' : ''}${placeholder ? ' placeholder:font-mono placeholder:text-[11px] placeholder:opacity-60' : ''}`}
+          autoComplete={autoComplete}
+          maxLength={maxLength}
+          required={!optional}
+          aria-required={!optional ? 'true' : undefined}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={error ? 'form-validation-error' : undefined}
+        />
       </div>
     </div>
   );

@@ -401,18 +401,17 @@ export default function MainLayout({
             {mobileMenuOpen && (
               <motion.section
                 id="mobile-menu"
-                initial={{ gridTemplateRows: '0fr', opacity: 0 }}
-                animate={{ gridTemplateRows: '1fr', opacity: 1 }}
-                exit={{ gridTemplateRows: '0fr', opacity: 0 }}
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
                 transition={transitionOrReduced(reduceMotion, {
                   duration: tokens.motion.duration.micro,
                   ease: tokens.motion.ease,
                 })}
-                style={{ display: 'grid' }}
                 className="border-b border-hairline type-label-tab bg-oxford text-white/70"
                 aria-label="Menu"
               >
-                <div className="min-h-0 overflow-hidden px-4 pb-0">
+                <div className="px-4 pb-0">
                 <div className="flex flex-col items-start gap-phi-3 py-phi-3">
                   {/* Mode toggles: Deals / Judgements / System — same mono scale as desktop spine */}
                   <div className="flex flex-col items-stretch gap-phi-1 w-full">

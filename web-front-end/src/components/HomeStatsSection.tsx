@@ -131,8 +131,8 @@ function StatColumn({ metric, index, run }: { metric: Metric; index: number; run
     >
       <div>{numberNode}</div>
       <div className="my-3 h-px w-full bg-[var(--section-divider)]" aria-hidden />
-      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.45)]">{metric.label}</p>
-      <p className="mt-2 font-sans text-[13px] leading-[1.6] text-[rgba(0,33,71,0.55)]">{metric.note}</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)]">{metric.label}</p>
+      <p className="mt-2 font-sans text-[14px] leading-[1.6] text-[var(--text-muted)]">{metric.note}</p>
     </motion.div>
   );
 }

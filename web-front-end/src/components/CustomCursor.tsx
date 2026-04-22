@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const DESKTOP_CURSOR_MEDIA = '(pointer: fine) and (min-width: 769px)';
 
@@ -35,10 +35,13 @@ function shouldInvertCursor(start: Element | null): boolean {
 
 export default function CustomCursor() {
   const [active, setActive] = useState(false);
-  const [pos, setPos] = useState({ x: -100, y: -100 });
-  const [mode, setMode] = useState<CursorMode>('default');
-  const [invert, setInvert] = useState(false);
-  const [hasMoved, setHasMoved] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const dotRef = useRef<HTMLDivElement | null>(null);
+  const ringRef = useRef<HTMLDivElement | null>(null);
+  const posRef = useRef({ x: -100, y: -100 });
+  const movedRef = useRef(false);
+  const modeRef = useRef<CursorMode>('default');
+  const invertRef = useRef(false);
 
   // Enable only on non-touch, desktop-like pointers
   useEffect(() => {
@@ -55,16 +58,27 @@ export default function CustomCursor() {
     return () => mq.removeEventListener('change', update);
   }, []);
 
-  // Mouse tracking + hover mode detection + background-based inversion
+  // Mouse tracking + hover mode detection + background-based inversion.
+  // Use refs + requestAnimationFrame to avoid rerendering on every pointer movement.
   useEffect(() => {
     if (!active) return;
 
-    const handleMove = (e: MouseEvent) => {
-      setPos({ x: e.clientX, y: e.clientY });
-      setHasMoved(true);
+    let rafId = 0;
 
-      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-      setInvert(shouldInvertCursor(el));
+    const renderCursor = () => {
+      const root = rootRef.current;
+      const dot = dotRef.current;
+      const ring = ringRef.current;
+      if (!root || !ring) {
+        rafId = requestAnimationFrame(renderCursor);
+        return;
+      }
+
+      const { x, y } = posRef.current;
+      if (movedRef.current) root.style.visibility = 'visible';
+
+      const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      invertRef.current = shouldInvertCursor(el);
 
       const hoverTarget =
         el?.closest('a,button') ||
@@ -75,65 +89,80 @@ export default function CustomCursor() {
       const headlineTarget =
         el?.dataset.cursor === 'headline' ? el : el?.closest('[data-cursor="headline"]');
 
-      if (headlineTarget) {
-        setMode('headline');
-      } else if (hoverTarget) {
-        setMode('hover');
-      } else {
-        setMode('default');
+      modeRef.current = headlineTarget ? 'headline' : hoverTarget ? 'hover' : 'default';
+
+      const showDot = modeRef.current === 'default';
+      const ringSize = modeRef.current === 'headline' ? 80 : modeRef.current === 'hover' ? 56 : 36;
+      const ringOpacity = modeRef.current === 'default' ? 0.35 : 0.6;
+      const fg = invertRef.current ? PAPER : INK;
+
+      if (dot) {
+        dot.style.display = showDot ? 'block' : 'none';
+        dot.style.transform = `translate(${x - 4}px, ${y - 4}px)`;
+        dot.style.backgroundColor = fg;
       }
+
+      ring.style.width = `${ringSize}px`;
+      ring.style.height = `${ringSize}px`;
+      ring.style.borderColor = fg;
+      ring.style.opacity = `${ringOpacity}`;
+      ring.style.transform = `translate(${x - ringSize / 2}px, ${y - ringSize / 2}px)`;
+
+      rafId = requestAnimationFrame(renderCursor);
+    };
+
+    const handleMove = (e: MouseEvent) => {
+      posRef.current = { x: e.clientX, y: e.clientY };
+      movedRef.current = true;
     };
 
     document.documentElement.classList.add('has-custom-cursor');
     window.addEventListener('mousemove', handleMove);
+    rafId = requestAnimationFrame(renderCursor);
 
     return () => {
       document.documentElement.classList.remove('has-custom-cursor');
       window.removeEventListener('mousemove', handleMove);
+      cancelAnimationFrame(rafId);
     };
   }, [active]);
 
   if (!active) return null;
 
-  const showDot = mode === 'default';
-  const ringSize = mode === 'headline' ? 80 : mode === 'hover' ? 56 : 36;
-  const ringOpacity = mode === 'default' ? 0.35 : 0.6;
-  const fg = invert ? PAPER : INK;
-
   return (
     <div
+      ref={rootRef}
       className="fixed pointer-events-none z-[10000]"
       style={{
         left: 0,
         top: 0,
         width: 0,
         height: 0,
-        visibility: hasMoved ? 'visible' : 'hidden',
+        visibility: 'hidden',
       }}
       aria-hidden
     >
-      {/* Small filled dot */}
-      {showDot && (
-        <div
-          className="absolute rounded-none transition-[transform,background-color,border-color] duration-150 ease-out"
-          style={{
-            width: 8,
-            height: 8,
-            backgroundColor: fg,
-            transform: `translate(${pos.x - 4}px, ${pos.y - 4}px)`,
-          }}
-        />
-      )}
+      <div
+        ref={dotRef}
+        className="absolute rounded-none transition-[transform,background-color,border-color] duration-150 ease-out"
+        style={{
+          width: 8,
+          height: 8,
+          backgroundColor: INK,
+          transform: 'translate(-100px, -100px)',
+        }}
+      />
 
       {/* Hollow ring */}
       <div
+        ref={ringRef}
         className="absolute rounded-none transition-[transform,border-color,opacity] duration-300 ease-out"
         style={{
-          width: ringSize,
-          height: ringSize,
-          border: `1px solid ${fg}`,
-          opacity: ringOpacity,
-          transform: `translate(${pos.x - ringSize / 2}px, ${pos.y - ringSize / 2}px)`,
+          width: 36,
+          height: 36,
+          border: `1px solid ${INK}`,
+          opacity: 0.35,
+          transform: 'translate(-100px, -100px)',
         }}
       />
     </div>

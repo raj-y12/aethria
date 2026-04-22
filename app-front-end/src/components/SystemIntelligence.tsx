@@ -57,7 +57,7 @@ function RowWrapper({ children, index, onClick, isSelected }: { children: React.
       initial={reduceMotion ? {} : { opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: Math.min(index * 0.04, 0.4), duration: 0.6, ease: tokens.motion.ease }}
-      className={`group relative border-b border-oxford/[0.06] py-phi-5 px-phi-4 transition-all duration-700 ease-smooth ${onClick ? 'cursor-pointer' : ''
+      className={`group relative border-b border-oxford/[0.06] py-phi-5 px-phi-4 transition-colors duration-500 ease-smooth ${onClick ? 'cursor-pointer' : ''
         } ${isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.02]'}`}
       onClick={onClick}
     >
@@ -101,7 +101,7 @@ function SignalsTab({ signals }: { signals: SignalItem[] }) {
               <span className="w-1.5 h-1.5 border border-oxford/20 rotate-45" />
               <span className="type-label-tab text-oxford/40">{sig.startup_id?.slice(0, 8) ?? 'Unknown'}</span>
             </div>
-            <p className="type-body text-oxford/60 leading-relaxed italic border-l-2 border-oxford/[0.06] pl-phi-4 max-w-2xl">
+            <p className="type-body text-oxford/68 leading-relaxed italic bg-oxford/[0.02] px-phi-3 py-phi-2 max-w-2xl">
               {sig.description}
             </p>
           </div>
@@ -275,17 +275,17 @@ function InstitutionalMandateTab() {
 
       <TabSection title="Alignment">
         <div className="grid grid-cols-3 gap-phi-4">
-          <div className="border-l border-oxford/10 pl-phi-3 py-1">
+          <div className="border border-oxford/10 bg-oxford/[0.02] px-phi-3 py-2">
             <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.pct_matching_thesis ?? '--'}%</span>
-            <span className="type-meta text-oxford/30 uppercase text-[9px]">Mandate match</span>
+            <span className="type-meta text-oxford/50">Mandate match</span>
           </div>
-          <div className="border-l border-oxford/10 pl-phi-3 py-1">
+          <div className="border border-oxford/10 bg-oxford/[0.02] px-phi-3 py-2">
             <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.avg_alignment_score ?? '--'}</span>
-            <span className="type-meta text-oxford/30 uppercase text-[9px]">Mean alignment</span>
+            <span className="type-meta text-oxford/50">Mean alignment</span>
           </div>
-          <div className="border-l border-oxford/10 pl-phi-3 py-1">
+          <div className="border border-oxford/10 bg-oxford/[0.02] px-phi-3 py-2">
             <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.drift_vs_previous ?? '0.00'}</span>
-            <span className="type-meta text-oxford/30 uppercase text-[9px]">Drift</span>
+            <span className="type-meta text-oxford/50">Drift</span>
           </div>
         </div>
       </TabSection>
@@ -322,9 +322,9 @@ function MetaCommandTab({ reports, weights, calibration }: {
             ))}
           </div>
           {lastReport.no_action_reasons.length > 0 && (
-            <div className="mt-phi-4 border-l-2 border-oxford/[0.06] pl-phi-4">
+            <div className="mt-phi-4 bg-oxford/[0.02] px-phi-4 py-phi-3">
               {lastReport.no_action_reasons.map((r, i) => (
-                <p key={i} className="type-meta text-oxford/40 leading-relaxed">{r}</p>
+                <p key={i} className="type-meta text-oxford/55 leading-relaxed">{r}</p>
               ))}
             </div>
           )}
@@ -360,12 +360,12 @@ function MetaCommandTab({ reports, weights, calibration }: {
           <div className="flex flex-col border border-oxford/[0.06] bg-oxford/[0.01]">
             {calibration.calibration_history.slice(-5).reverse().map((h, i) => (
               <div key={i} className="grid grid-cols-[100px_1fr] gap-phi-4 border-b border-oxford/[0.06] last:border-0 p-phi-4 items-start">
-                <span className={`type-meta text-[9px] uppercase px-1 py-0.5 border ${h.direction === 'tightened' ? 'border-escalation/20 text-escalation/60' : 'border-oxford/10 text-oxford/40'} text-center`}>
+                <span className={`type-meta text-[11px] px-2 py-0.5 border ${h.direction === 'tightened' ? 'border-escalation/20 text-escalation/70' : 'border-oxford/10 text-oxford/55'} text-center`}>
                   {h.direction}
                 </span>
                 <div className="flex flex-col gap-1">
-                  <span className="type-meta text-oxford/60 uppercase tracking-tight">{h.parameter.replace(/_/g, ' ')}</span>
-                  <p className="type-meta text-oxford/30 leading-relaxed font-mono">{h.reasoning}</p>
+                  <span className="type-meta text-oxford/70 tracking-[0.06em]">{h.parameter.replace(/_/g, ' ')}</span>
+                  <p className="type-meta text-oxford/45 leading-relaxed font-mono">{h.reasoning}</p>
                 </div>
               </div>
             ))}
@@ -405,7 +405,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
                     key={tab.key}
                     type="button"
                     onClick={() => setActiveTab(tab.key)}
-                    className={`type-label-tab px-3 py-1.5 transition-all duration-300 border-b ${isActive ? 'border-oxford text-oxford bg-oxford/5' : 'border-transparent text-oxford/30 hover:text-oxford/60'
+                    className={`type-label-tab min-h-[44px] px-3 py-1.5 transition-[color,border-color,background-color] duration-300 border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${isActive ? 'border-oxford text-oxford bg-oxford/5' : 'border-transparent text-oxford/45 hover:text-oxford/70'
                       }`}
                   >
                     {tab.label}
@@ -418,7 +418,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
             <button
               type="button"
               onClick={props.onClose}
-              className="type-label-tab text-oxford/40 hover:text-oxford transition-colors border-l border-oxford/10 pl-phi-4"
+              className="type-label-tab min-h-[44px] text-oxford/55 hover:text-oxford transition-colors pl-phi-4"
               aria-label="Hide system intelligence"
             >
               Close
