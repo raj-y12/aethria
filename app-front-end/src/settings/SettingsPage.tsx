@@ -87,9 +87,9 @@ function ToggleRow({ id, checked, onChange, label, hint }: {
         {hint && <span className="type-meta text-oxford/30 leading-snug">{hint}</span>}
       </div>
       <button id={id} type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)}
-        className={`shrink-0 h-6 w-11 inline-flex items-center overflow-hidden rounded-none btn-interaction transition-colors duration-300 ${checked ? 'bg-oxford' : 'bg-oxford/[0.07]'}`}
+        className={`shrink-0 h-6 w-11 inline-flex items-center overflow-hidden rounded-[2px] btn-interaction transition-colors duration-300 ${checked ? 'bg-oxford' : 'bg-oxford/[0.07]'}`}
         style={{ transitionTimingFunction: tokens.motion.easeCss }}>
-        <span className={`h-4 w-4 rounded-none pointer-events-none block transition-transform duration-200 ${checked ? 'translate-x-5 bg-paper' : 'translate-x-1 bg-oxford/35'}`} aria-hidden />
+        <span className={`h-4 w-4 rounded-[2px] pointer-events-none block transition-transform duration-200 ${checked ? 'translate-x-5 bg-paper' : 'translate-x-1 bg-oxford/35'}`} aria-hidden />
       </button>
     </div>
   );

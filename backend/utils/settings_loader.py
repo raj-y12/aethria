@@ -74,7 +74,7 @@ def get_settings_path() -> Path:
     return root / settings_path if not Path(settings_path).is_absolute() else Path(settings_path)
 
 
-def load_settings(user_id: Optional[str] = None) -> dict:
+def load_settings(user_id: Optional[str] = None, *, use_cache: bool = True) -> dict:
     """Load settings for a user. Requires explicit user_id when USE_SUPABASE_STORAGE is enabled."""
     key = _settings_key(user_id, for_save=False)
     if _using_supabase() and not key:
@@ -83,7 +83,7 @@ def load_settings(user_id: Optional[str] = None) -> dict:
         )
     if not key:
         return json.loads(json.dumps(DEFAULT_SETTINGS))
-    cached = _SETTINGS_CACHE.get(key)
+    cached = _SETTINGS_CACHE.get(key) if use_cache else None
     now = time.monotonic()
     if cached and (now - cached[0]) <= _SETTINGS_CACHE_TTL_SECONDS:
         return json.loads(json.dumps(cached[1]))
@@ -126,15 +126,18 @@ def save_settings(settings: dict, user_id: Optional[str] = None) -> None:
 
 
 def is_scouts_enabled(user_id: Optional[str] = None) -> bool:
-    return load_settings(user_id).get("agent_config", {}).get("scouts_enabled", False)
+    # Always read fresh for stage gate checks to avoid stale toggles.
+    return load_settings(user_id, use_cache=False).get("agent_config", {}).get("scouts_enabled", False)
 
 
 def is_reviewers_enabled(user_id: Optional[str] = None) -> bool:
-    return load_settings(user_id).get("agent_config", {}).get("reviewers_enabled", False)
+    # Always read fresh for stage gate checks to avoid stale toggles.
+    return load_settings(user_id, use_cache=False).get("agent_config", {}).get("reviewers_enabled", False)
 
 
 def is_partners_enabled(user_id: Optional[str] = None) -> bool:
-    return load_settings(user_id).get("agent_config", {}).get("partners_enabled", False)
+    # Always read fresh for stage gate checks to avoid stale toggles.
+    return load_settings(user_id, use_cache=False).get("agent_config", {}).get("partners_enabled", False)
 
 
 def _agent_config_safe(user_id: Optional[str] = None) -> dict:

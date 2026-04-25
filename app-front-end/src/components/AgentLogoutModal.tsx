@@ -37,11 +37,15 @@ export default function AgentLogoutModal({
   onTurnOnAndStay,
 }: AgentLogoutModalProps) {
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const handleTurnOff = async () => {
     setBusy(true);
+    setActionError(null);
     try {
       await onTurnOffAndLogout();
+    } catch {
+      setActionError('Unable to update agent state right now. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -49,8 +53,11 @@ export default function AgentLogoutModal({
 
   const handleTurnOn = async () => {
     setBusy(true);
+    setActionError(null);
     try {
       await onTurnOnAndStay();
+    } catch {
+      setActionError('Unable to update agent state right now. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -103,6 +110,15 @@ export default function AgentLogoutModal({
 
           {/* Actions — vertical stack, centered */}
           <div className="flex flex-col items-center gap-phi-4 w-full max-w-xs">
+            {actionError ? (
+              <p
+                className="type-meta text-center text-oxford/70 border border-oxford/15 px-3 py-2 w-full"
+                role="status"
+                aria-live="polite"
+              >
+                {actionError}
+              </p>
+            ) : null}
             {agentsEnabled ? (
               <>
                 {/* Primary: Keep Running */}

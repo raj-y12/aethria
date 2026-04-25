@@ -149,7 +149,7 @@ async def _lookup_worker() -> None:
 def _is_user_agents_enabled(user_id: str) -> bool:
     """Sync check — safe to call from inside the async loop (no await)."""
     try:
-        s = load_settings(user_id)
+        s = load_settings(user_id, use_cache=False)
         ac = s.get("agent_config") or {}
         return bool(ac.get("scouts_enabled") or ac.get("reviewers_enabled") or ac.get("partners_enabled"))
     except Exception:

@@ -116,7 +116,8 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
         return
 
     try:
-        settings = load_settings(user_id)
+        # Read fresh settings at cycle boundaries so stage toggles apply immediately.
+        settings = load_settings(user_id, use_cache=False)
     except Exception as e:
         logger.warning("[%s] Pipeline skipped (settings unavailable): %s", user_id[:12], e)
         return

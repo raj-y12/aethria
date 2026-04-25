@@ -8,6 +8,8 @@ Requires migrations 20260401000001_startups_list_projection_and_indexes.sql and
 from __future__ import annotations
 
 import logging
+import random
+import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from models import Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
@@ -18,6 +20,9 @@ from utils.storage import _merge_startup_dict_patch
 logger = logging.getLogger(__name__)
 
 TABLE = "startups"
+_TRANSIENT_ERRNOS = (35, 11)
+_RETRY_ATTEMPTS = 4
+_BASE_RETRY_DELAY_SECONDS = 0.08
 
 _LIST_SELECT = (
     "startup_id, display_name, list_one_line, list_sector, list_scout_type, list_origin_type, "
@@ -73,6 +78,26 @@ class SupabaseStartupsStorage:
         self._client = client
         self._user_id = user_id
         self.logger = logger
+
+    def _is_transient_error(self, exc: BaseException) -> bool:
+        if isinstance(exc, OSError) and getattr(exc, "errno", None) in _TRANSIENT_ERRNOS:
+            return True
+        return isinstance(exc, ConnectionError)
+
+    def _execute_with_retry(self, fn: Callable[[], Any]) -> Any:
+        last_exc: BaseException | None = None
+        for attempt in range(_RETRY_ATTEMPTS + 1):
+            try:
+                return fn()
+            except Exception as exc:
+                last_exc = exc
+                if attempt < _RETRY_ATTEMPTS and self._is_transient_error(exc):
+                    sleep_for = (_BASE_RETRY_DELAY_SECONDS * (2**attempt)) + random.uniform(0, 0.04)
+                    time.sleep(sleep_for)
+                    continue
+                raise
+        assert last_exc is not None
+        raise last_exc
 
     def _fetch_page_raw(self, offset: int, limit: int) -> List[dict]:
         try:
@@ -137,15 +162,17 @@ class SupabaseStartupsStorage:
         Returns [] when the query succeeded but the tenant has no rows.
         """
         try:
-            r = (
-                self._client.table(TABLE)
-                .select(_LIST_SELECT)
-                .eq("user_id", self._user_id)
-                .order("updated_at", desc=True)
-                .execute()
+            r = self._execute_with_retry(
+                lambda: (
+                    self._client.table(TABLE)
+                    .select(_LIST_SELECT)
+                    .eq("user_id", self._user_id)
+                    .order("updated_at", desc=True)
+                    .execute()
+                )
             )
         except Exception as e:
-            self.logger.warning("List projection select failed (run latest migrations?): %s", e)
+            self.logger.warning("List projection select failed: %s", e)
             return None
         return list((r.data or []) if hasattr(r, "data") else [])
 

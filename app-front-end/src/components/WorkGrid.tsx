@@ -373,9 +373,19 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                           </div>
                         ) : (
                           <>
-                            <div className="flex flex-wrap items-center gap-phi-4">
-                              <span className="type-meta text-oxford/25 uppercase tracking-widest shrink-0">Decision</span>
-                              <div className="flex flex-wrap gap-phi-2">
+                            <div className="bg-oxford/[0.02] px-phi-2 py-phi-2">
+                              <div className="flex flex-wrap items-center justify-between gap-phi-3">
+                                <div className="flex items-center gap-phi-2">
+                                  <span className="type-meta text-oxford/35 uppercase tracking-[0.16em] shrink-0">Decision</span>
+                                  <span className="type-meta text-oxford/25">Select outcome</span>
+                                </div>
+                                {rs.decision && (
+                                  <span className="type-meta text-oxford/45 uppercase tracking-[0.12em]">
+                                    {rs.decision === 'YES' ? 'Invest selected' : rs.decision === 'NO' ? 'Pass selected' : 'Monitor selected'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-phi-2 grid grid-cols-1 sm:grid-cols-3 gap-phi-1.5">
                                 {([
                                   { d: 'YES' as const, label: 'Invest' },
                                   { d: 'NO' as const, label: 'Pass' },
@@ -385,15 +395,15 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                                   const activeClass = d === 'YES'
                                     ? 'bg-oxford border-oxford text-paper'
                                     : d === 'NO'
-                                    ? 'border-oxford/40 text-oxford/60 bg-oxford/[0.04]'
-                                    : 'border-oxford/35 text-oxford/60 bg-oxford/[0.03]';
+                                    ? 'border-oxford/45 text-oxford/75 bg-paper'
+                                    : 'border-oxford/35 text-oxford/75 bg-paper';
                                   return (
                                     <button
                                       key={d}
                                       type="button"
                                       onClick={() => setRS(startup.id, { decision: isActive ? null : d, notes: isActive ? '' : rs.notes })}
                                       aria-pressed={isActive}
-                                      className={`type-meta tracking-[0.1em] uppercase border px-phi-3 py-phi-1 transition-all duration-150 btn-interaction inline-flex items-center justify-center min-h-[36px] min-w-[56px] ${isActive ? activeClass : 'border-oxford/15 text-oxford/35 hover:border-oxford/35 hover:text-oxford/65 bg-transparent'}`}
+                                      className={`type-meta tracking-[0.1em] uppercase border px-phi-2.5 py-phi-1 transition-all duration-150 btn-interaction inline-flex items-center justify-center min-h-[34px] ${isActive ? activeClass : 'border-oxford/15 text-oxford/45 hover:border-oxford/35 hover:text-oxford/75 bg-transparent'}`}
                                     >
                                       {label}
                                     </button>

@@ -30,25 +30,29 @@ function SpineNavButton({
   active,
   onClick,
   ariaPressed,
+  shortcut,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
   ariaPressed: boolean;
+  shortcut?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={shortcut ? `${label} (${shortcut})` : label}
       className={`type-meta w-full min-h-[44px] flex items-center justify-center cursor-pointer tracking-[0.1em] btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 ${
-        active ? 'text-white' : 'text-white/55 hover:text-white/80'
+        active ? 'text-white font-semibold' : 'text-white/55 hover:text-white/85'
       }`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
       aria-pressed={ariaPressed}
+      aria-current={active ? 'page' : undefined}
     >
       {/* Underline always present — full-white when active, dim when inactive */}
       <span
-        className={`inline-block pb-0.5 border-b transition-[border-color,color] ${
+        className={`inline-block pb-0.5 border-b-2 transition-[border-color,color] ${
           active ? 'border-white' : 'border-transparent hover:border-white/50'
         }`}
       >
@@ -78,6 +82,8 @@ export default function SystemBar({
   const displayName = user?.username ?? user?.primaryEmailAddress?.emailAddress ?? 'Account';
   const [hasEnteredOnce, setHasEnteredOnce] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [agentActionPending, setAgentActionPending] = useState(false);
+  const [agentActionError, setAgentActionError] = useState<string | null>(null);
 
   const doLogout = () => {
     localStorage.removeItem('aethria_last_activity');
@@ -88,14 +94,25 @@ export default function SystemBar({
     setShowLogoutModal(true);
   };
 
-  const handleTurnOffAndLogout = async () => {
-    await toggleAgents(false);
-    doLogout();
+  const toggleAgentsAndLogout = async (enabled: boolean) => {
+    setAgentActionPending(true);
+    setAgentActionError(null);
+    try {
+      await toggleAgents(enabled);
+      doLogout();
+    } catch {
+      setAgentActionError('Unable to update agent state. Please retry.');
+    } finally {
+      setAgentActionPending(false);
+    }
   };
 
-  const handleTurnOnAndStay = async () => {
-    await toggleAgents(true);
-    doLogout();
+  const handleTurnOffAndLogout = async () => {
+    await toggleAgentsAndLogout(false);
+  };
+
+  const handleTurnOnAndLogout = async () => {
+    await toggleAgentsAndLogout(true);
   };
 
   useEffect(() => {
@@ -104,6 +121,38 @@ export default function SystemBar({
     const t = setInterval(tick, 60_000);
     return () => clearInterval(t);
   }, []);
+
+  const workspaceChrome =
+    onShowDeals != null && onShowFeed != null && onShowSystem != null && onClose != null;
+
+  useEffect(() => {
+    if (!workspaceChrome) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      if (target?.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
+        return;
+      }
+
+      if (event.key === '1') {
+        event.preventDefault();
+        onShowDeals?.();
+      } else if (event.key === '2') {
+        event.preventDefault();
+        if (rightPanel === 'feed') onClose?.();
+        else onShowFeed?.();
+      } else if (event.key === '3') {
+        event.preventDefault();
+        if (rightPanel === 'system') onClose?.();
+        else onShowSystem?.();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [workspaceChrome, onShowDeals, onShowFeed, onShowSystem, onClose, rightPanel]);
 
   useEffect(() => {
     // One-time entrance "swoop" when the bar first appears after login.
@@ -128,12 +177,9 @@ export default function SystemBar({
     })
     .toUpperCase();
 
-  const workspaceChrome =
-    onShowDeals != null && onShowFeed != null && onShowSystem != null && onClose != null;
-
   const baseClass =
-    'hidden lg:flex fixed top-0 bottom-0 left-0 z-50 flex-col justify-between w-36 bg-oxford border-r border-r-white/[0.07]';
-  const baseStyle = { padding: '24px 18px 20px' };
+    'hidden md:flex fixed top-0 bottom-0 left-0 z-50 flex-col justify-between w-32 lg:w-36 bg-oxford border-r border-r-white/[0.07]';
+  const baseStyle = { padding: '22px 14px 18px' };
 
   return (<>
     <motion.header
@@ -199,22 +245,25 @@ export default function SystemBar({
           <>
             <div className="flex flex-col items-center gap-0.5 w-full shrink-0">
               <SpineNavButton
-                label="Judgements"
+                label="Signals"
                 active={rightPanel === 'feed'}
                 ariaPressed={rightPanel === 'feed'}
                 onClick={() => (rightPanel === 'feed' ? onClose!() : onShowFeed!())}
+                shortcut="2"
               />
               <SpineNavButton
                 label="Deals"
                 active={rightPanel !== 'system' && rightPanel !== 'feed'}
                 ariaPressed={rightPanel !== 'system' && rightPanel !== 'feed'}
                 onClick={() => onShowDeals!()}
+                shortcut="1"
               />
               <SpineNavButton
                 label="System"
                 active={rightPanel === 'system'}
                 ariaPressed={rightPanel === 'system'}
                 onClick={() => (rightPanel === 'system' ? onClose!() : onShowSystem!())}
+                shortcut="3"
               />
             </div>
             <SpineRule />
@@ -223,12 +272,18 @@ export default function SystemBar({
 
         {/* Log out */}
         <div className="mt-auto flex flex-col items-center gap-2 pt-1 shrink-0">
+          {agentActionError ? (
+            <p className="type-meta text-center text-white/75 px-1" role="status" aria-live="polite">
+              {agentActionError}
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={handleLogout}
-            className="type-meta inline-flex min-h-[44px] items-center tracking-[0.1em] text-white/60 hover:text-white bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+            disabled={agentActionPending}
+            className="type-meta inline-flex min-h-[44px] items-center tracking-[0.1em] text-white/60 hover:text-white bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
           >
-            Log out
+            {agentActionPending ? 'Updating…' : 'Log out'}
           </button>
         </div>
       </div>
@@ -244,7 +299,7 @@ export default function SystemBar({
         doLogout();
       }}
       onTurnOffAndLogout={handleTurnOffAndLogout}
-      onTurnOnAndStay={handleTurnOnAndStay}
+      onTurnOnAndStay={handleTurnOnAndLogout}
     />
   </>);
 }
