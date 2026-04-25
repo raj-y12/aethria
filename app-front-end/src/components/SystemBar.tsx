@@ -21,7 +21,7 @@ interface SystemBarProps {
 }
 
 function SpineRule() {
-  return <div className="w-full max-w-[5.5rem] mx-auto h-px bg-white/[0.08]" aria-hidden />;
+  return <div className="w-full max-w-[5.75rem] mx-auto h-px bg-white/[0.06]" aria-hidden />;
 }
 
 /** Spine controls keep >=44px touch target and clear focus states. */
@@ -50,10 +50,9 @@ function SpineNavButton({
       aria-pressed={ariaPressed}
       aria-current={active ? 'page' : undefined}
     >
-      {/* Underline always present — full-white when active, dim when inactive */}
       <span
-        className={`inline-block pb-0.5 border-b-2 transition-[border-color,color] ${
-          active ? 'border-white' : 'border-transparent hover:border-white/50'
+        className={`inline-block px-2 py-1 transition-[color,background-color] ${
+          active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
         }`}
       >
         {label}
@@ -178,8 +177,8 @@ export default function SystemBar({
     .toUpperCase();
 
   const baseClass =
-    'hidden md:flex fixed top-0 bottom-0 left-0 z-50 flex-col justify-between w-32 lg:w-36 bg-oxford border-r border-r-white/[0.07]';
-  const baseStyle = { padding: '22px 14px 18px' };
+    'hidden md:flex fixed top-0 bottom-0 left-0 z-50 flex-col justify-between w-36 lg:w-40 bg-oxford';
+  const baseStyle = { padding: '26px 16px 20px' };
 
   return (<>
     <motion.header
