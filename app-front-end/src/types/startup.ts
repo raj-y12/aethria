@@ -36,6 +36,23 @@ export interface SingleReview {
   overall_summary: string;
   key_risks: string[];
   prompt_version: string;
+  score_source?: string;
+  improvement_to_9?: string[];
+  market_reasoning?: string[];
+  market_weaknesses?: string[];
+  market_confidence?: 'low' | 'medium' | 'high';
+  product_reasoning?: string[];
+  product_weaknesses?: string[];
+  product_confidence?: 'low' | 'medium' | 'high';
+  technical_reasoning?: string[];
+  technical_weaknesses?: string[];
+  technical_confidence?: 'low' | 'medium' | 'high';
+  execution_reasoning?: string[];
+  execution_weaknesses?: string[];
+  execution_confidence?: 'low' | 'medium' | 'high';
+  defensibility_reasoning?: string[];
+  defensibility_weaknesses?: string[];
+  defensibility_confidence?: 'low' | 'medium' | 'high';
 }
 
 export interface Review {
@@ -72,6 +89,30 @@ export interface Review {
   score_variance?: Record<string, number>;
   /** Mean of core dimension scores (list view / blended reviewer output). */
   aggregate_score?: number | null;
+  overall_score?: number | null;
+  overall_label?: string | null;
+  score_source?: string | null;
+  improvement_to_9?: string[] | null;
+  market_score_label?: string | null;
+  product_score_label?: string | null;
+  technical_score_label?: string | null;
+  execution_score_label?: string | null;
+  defensibility_score_label?: string | null;
+  market_reasoning?: string[] | null;
+  market_weaknesses?: string[] | null;
+  market_confidence?: 'low' | 'medium' | 'high' | null;
+  product_reasoning?: string[] | null;
+  product_weaknesses?: string[] | null;
+  product_confidence?: 'low' | 'medium' | 'high' | null;
+  technical_reasoning?: string[] | null;
+  technical_weaknesses?: string[] | null;
+  technical_confidence?: 'low' | 'medium' | 'high' | null;
+  execution_reasoning?: string[] | null;
+  execution_weaknesses?: string[] | null;
+  execution_confidence?: 'low' | 'medium' | 'high' | null;
+  defensibility_reasoning?: string[] | null;
+  defensibility_weaknesses?: string[] | null;
+  defensibility_confidence?: 'low' | 'medium' | 'high' | null;
   /** Fund thesis alignment (reviewer / rule-based); surfaced in memo progressive load. */
   fund_thesis_version_id?: string | null;
   thesis_alignment_score?: number | null;

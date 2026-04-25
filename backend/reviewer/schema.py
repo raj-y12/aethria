@@ -25,6 +25,23 @@ class ReviewerOutput(TypedDict, total=False):
     investment_thesis: list[str]  # Bullet points why to invest + core assumptions
     risk_mitigation: list[str]  # Actionable strategies per diligence_red_flags
     score_reasoning: Dict[str, str]  # Optional: per-dimension concise reasoning, e.g. {"market_score": "...", "product_score": "..."}
+    score_source: str
+    improvement_to_9: list[str]
+    market_reasoning: list[str]
+    market_weaknesses: list[str]
+    market_confidence: Literal["low", "medium", "high"]
+    product_reasoning: list[str]
+    product_weaknesses: list[str]
+    product_confidence: Literal["low", "medium", "high"]
+    technical_reasoning: list[str]
+    technical_weaknesses: list[str]
+    technical_confidence: Literal["low", "medium", "high"]
+    execution_reasoning: list[str]
+    execution_weaknesses: list[str]
+    execution_confidence: Literal["low", "medium", "high"]
+    defensibility_reasoning: list[str]
+    defensibility_weaknesses: list[str]
+    defensibility_confidence: Literal["low", "medium", "high"]
     thesis_alignment_score: float
     thesis_matches_fund: bool
     thesis_fit_points: list[str]
@@ -34,6 +51,28 @@ class ReviewerOutput(TypedDict, total=False):
 
 
 def validate_reviewer_output(data: dict) -> ReviewerOutput:
+    def _validate_string_list(field: str, min_items: int, max_items: int) -> None:
+        val = data.get(field)
+        if val is None:
+            data[field] = []
+            return
+        if not isinstance(val, list):
+            raise ValueError(f"{field} must be a list")
+        cleaned = [str(item).strip() for item in val if str(item).strip()]
+        if cleaned and (len(cleaned) < min_items or len(cleaned) > max_items):
+            raise ValueError(f"{field} must contain {min_items}-{max_items} items when present")
+        data[field] = cleaned
+
+    def _validate_confidence(field: str) -> None:
+        val = data.get(field)
+        if val is None:
+            data[field] = "medium"
+            return
+        v = str(val).strip().lower()
+        if v not in ("low", "medium", "high"):
+            raise ValueError(f"{field} must be one of ['low', 'medium', 'high']")
+        data[field] = v
+
     """
     Validate that a dictionary matches the ReviewerOutput schema.
     Raises ValueError if validation fails.
@@ -135,6 +174,18 @@ def validate_reviewer_output(data: dict) -> ReviewerOutput:
         for k, v in sr.items():
             if not isinstance(k, str) or not isinstance(v, str):
                 raise ValueError("score_reasoning keys and values must be strings")
+
+    if "score_source" in data and data["score_source"] is not None:
+        if not isinstance(data["score_source"], str):
+            raise ValueError("score_source must be a string")
+        data["score_source"] = data["score_source"].strip()
+
+    for dim in ("market", "product", "technical", "execution", "defensibility"):
+        _validate_string_list(f"{dim}_reasoning", min_items=2, max_items=4)
+        _validate_string_list(f"{dim}_weaknesses", min_items=1, max_items=3)
+        _validate_confidence(f"{dim}_confidence")
+
+    _validate_string_list("improvement_to_9", min_items=1, max_items=5)
 
     # Optional fund thesis fields (when mandate present in reviewer prompt)
     if "thesis_alignment_score" in data and data["thesis_alignment_score"] is not None:

@@ -1,7 +1,6 @@
 import { useState, useLayoutEffect, useEffect, lazy, Suspense } from 'react';
 import { useLocation, Navigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
-import { AnimatePresence } from 'framer-motion';
 import { setTokenGetter } from './api/auth';
 import MainLayout from './components/MainLayout';
 import GrainOverlay from './components/GrainOverlay';
@@ -43,29 +42,28 @@ function AppShell() {
     setIsSystemPanelOpen(false);
   }, [isSettingsRoute]);
 
+  if (loading) {
+    return <LoadingAnimation />;
+  }
+
+  if (showSummary && summary) {
+    return <WhileYouWereAway summary={summary} onDismiss={dismissSummary} />;
+  }
+
   return (
     <>
-      {!loading && (
-        <>
-          <GrainOverlay opacity={0.02} />
-          {isSettingsRoute ? (
-            <Suspense fallback={<LoadingAnimation />}>
-              <SettingsPage />
-            </Suspense>
-          ) : (
-            <MainLayout
-              data={systemData}
-              startupsError={systemData.startupsError}
-              onSystemPanelOpenChange={setIsSystemPanelOpen}
-            />
-          )}
-        </>
+      <GrainOverlay opacity={0.02} />
+      {isSettingsRoute ? (
+        <Suspense fallback={<LoadingAnimation />}>
+          <SettingsPage />
+        </Suspense>
+      ) : (
+        <MainLayout
+          data={systemData}
+          startupsError={systemData.startupsError}
+          onSystemPanelOpenChange={setIsSystemPanelOpen}
+        />
       )}
-      <AnimatePresence>
-        {showSummary && summary && (
-          <WhileYouWereAway summary={summary} onDismiss={dismissSummary} />
-        )}
-      </AnimatePresence>
     </>
   );
 }

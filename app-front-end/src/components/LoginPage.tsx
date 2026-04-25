@@ -1,8 +1,14 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { motion, AnimatePresence, animate, useMotionValue, useTransform } from 'framer-motion';
 import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { usePrefersReducedMotion } from '../hooks';
+import type { ActivitySummary } from '../api/activity';
+
+const API_BASE =
+  typeof window !== 'undefined' ? (import.meta.env.VITE_API_URL ?? '') : 'http://localhost:8000';
+
+const EASE = [0.16, 1, 0.3, 1] as const;
 
 function friendlyIdentifier(id: string): string {
   const t = id.trim();
@@ -12,142 +18,187 @@ function friendlyIdentifier(id: string): string {
   return t.length > 36 ? `${t.slice(0, 33)}…` : t;
 }
 
-const REDIRECT_AFTER_MS = 2200;
+const STATS_CONFIG = (s: ActivitySummary) => [
+  { label: 'Discovered', value: s.found, accent: false },
+  { label: 'Evaluated', value: s.reviewed, accent: false },
+  { label: 'Decided', value: s.decided, accent: false },
+  { label: 'Escalated', value: s.escalations, accent: true },
+];
+
+/** Counts up from 0 to `to` on mount using a spring-eased motion value. */
+function CountUp({ to, delay, reduceMotion }: { to: number; delay: number; reduceMotion: boolean }) {
+  const val = useMotionValue(reduceMotion ? to : 0);
+  const display = useTransform(val, (v) => Math.round(v).toLocaleString());
+  useEffect(() => {
+    if (reduceMotion) return;
+    const ctrl = animate(val, to, { duration: 0.9, delay, ease: [0.25, 1, 0.5, 1] });
+    return ctrl.stop;
+  }, [to, delay, reduceMotion, val]);
+  return <motion.span>{display}</motion.span>;
+}
+
+/** Input with an animated underline that expands from center on focus. */
+const AnimatedInput = React.forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement> & { focused: boolean }
+>(({ focused, className, ...props }, ref) => (
+  <div className="relative">
+    <input ref={ref} className={className} {...props} />
+    <div className="absolute bottom-0 left-0 right-0 h-px bg-oxford/10" />
+    <motion.div
+      className="absolute bottom-0 left-1/2 h-px -translate-x-1/2 bg-oxford/40"
+      animate={{ width: focused ? '100%' : '0%' }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+    />
+  </div>
+));
+
+type Phase = 'form' | 'welcome';
 
 export default function LoginPage() {
   const reduceMotion = usePrefersReducedMotion();
   const navigate = useNavigate();
   const { isLoaded, isSignedIn } = useUser();
   const { signIn } = useSignIn();
-  const { setActive } = useClerk();
+  const clerk = useClerk();
+
+  const [phase, setPhase] = useState<Phase>('form');
+  const [welcomeName, setWelcomeName] = useState('');
+  const [activity, setActivity] = useState<ActivitySummary | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  /** When set, hero shows "Welcome back, …" then we redirect. */
-  const [signedInGreeting, setSignedInGreeting] = useState<string | null>(null);
+  const [usernameFocused, setUsernameFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+
   const passwordRef = useRef<HTMLInputElement>(null);
   const hasRedirectedRef = useRef(false);
-  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Set before session activates so the isSignedIn effect cannot navigate away before the welcome beat. */
-  const holdAutoRedirectForWelcomeRef = useRef(false);
+  const formShakeRef = useRef<HTMLDivElement>(null);
 
+  // Auto-redirect already signed-in users
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
+    if (phase === 'welcome') return;
     if (hasRedirectedRef.current) return;
-    if (signedInGreeting !== null) return;
-    if (holdAutoRedirectForWelcomeRef.current) return;
     hasRedirectedRef.current = true;
     navigate('/v1', { replace: true });
-  }, [isLoaded, isSignedIn, navigate, signedInGreeting]);
+  }, [isLoaded, isSignedIn, navigate, phase]);
 
+  // Shake the input fields when an error is set
   useEffect(() => {
-    return () => {
-      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
-    };
+    if (!error || reduceMotion || !formShakeRef.current) return;
+    animate(
+      formShakeRef.current,
+      { x: [0, -7, 7, -5, 5, -2, 2, 0] },
+      { duration: 0.38, ease: 'easeInOut' }
+    );
+  }, [error, reduceMotion]);
+
+  const handleEnterSystem = useCallback(() => {
+    sessionStorage.setItem('aethria_just_logged_in', '1');
+    window.location.replace('/v1');
   }, []);
 
-  const handleSubmit = useCallback(
-    async (e?: React.MouseEvent) => {
-      e?.preventDefault();
-      if (loading || signedInGreeting !== null) return;
-      setError(null);
-      setLoading(true);
-      const trimmedUsername = username.trim();
-      const trimmedPassword = password;
-      let skipLoadingReset = false;
+  const handleSubmit = useCallback(async () => {
+    if (loading || phase === 'welcome') return;
+    setError(null);
+    setLoading(true);
 
-      if (!trimmedUsername || !trimmedPassword) {
-        setError('Enter both username and password to continue.');
-        setLoading(false);
-        return;
-      }
-      if (!signIn) {
-        setError('Sign-in is not ready. Refresh the page and try again.');
-        setLoading(false);
-        return;
-      }
-      if (isSignedIn) {
-        setLoading(false);
-        navigate('/v1', { replace: true });
-        return;
-      }
-      try {
-        const result = await signIn.password({
-          identifier: trimmedUsername,
-          password: trimmedPassword,
-        });
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername || !password) {
+      setError('Enter both username and password to continue.');
+      setLoading(false);
+      return;
+    }
+    if (!signIn) {
+      setError('Sign-in is not ready. Refresh the page and try again.');
+      setLoading(false);
+      return;
+    }
+    if (isSignedIn) {
+      navigate('/v1', { replace: true });
+      return;
+    }
 
-        if (result.error) {
-          const msg = result.error.message ?? '';
-          if (
-            msg.toLowerCase().includes('already signed in') ||
-            (result.error as { code?: string }).code === 'session_exists'
-          ) {
-            navigate('/v1', { replace: true });
-            return;
-          }
-          setError(
-            typeof result.error.message === 'string'
-              ? result.error.message
-              : 'Invalid username or password.'
-          );
-          return;
-        }
+    try {
+      const result = await signIn.password({ identifier: trimmedUsername, password });
 
-        if (signIn.status === 'complete') {
-          const name = friendlyIdentifier(trimmedUsername);
-          holdAutoRedirectForWelcomeRef.current = true;
-          setSignedInGreeting(name);
-          try {
-            if (typeof signIn.finalize === 'function') {
-              await signIn.finalize();
-            } else if (setActive && (signIn as { createdSessionId?: string }).createdSessionId) {
-              await setActive({ session: (signIn as { createdSessionId: string }).createdSessionId });
-            }
-          } catch {
-            holdAutoRedirectForWelcomeRef.current = false;
-            setSignedInGreeting(null);
-            setError('Sign-in could not be completed. Please try again.');
-            return;
-          }
-          skipLoadingReset = true;
-          const delay = reduceMotion ? 600 : REDIRECT_AFTER_MS;
-          redirectTimerRef.current = setTimeout(() => {
-            holdAutoRedirectForWelcomeRef.current = false;
-            window.location.replace('/v1');
-          }, delay);
-          return;
-        }
-
-        setError('Sign-in could not be completed. Please try again.');
-      } catch (err: unknown) {
-        const e = err as { errors?: { message?: string }[]; message?: string };
-        const msg =
-          Array.isArray(e?.errors) && e.errors[0]?.message
-            ? String(e.errors[0].message)
-            : e?.message
-              ? String(e.message)
-              : '';
-        if (msg.toLowerCase().includes('already signed in') || msg.toLowerCase().includes('session_exists')) {
+      if (result.error) {
+        const msg = (result.error as { message?: string }).message ?? '';
+        if (msg.toLowerCase().includes('already signed in')) {
           navigate('/v1', { replace: true });
           return;
         }
         setError(
-          Array.isArray(e?.errors) && e.errors[0]?.message
-            ? String(e.errors[0].message)
-            : e?.message
-              ? String(e.message)
-              : 'Something went wrong. Please try again.'
+          typeof (result.error as { message?: string }).message === 'string'
+            ? String((result.error as { message?: string }).message)
+            : 'Invalid username or password.'
         );
-        setPassword('');
-        passwordRef.current?.focus();
-      } finally {
-        if (!skipLoadingReset) setLoading(false);
+        setLoading(false);
+        return;
       }
-    },
-    [loading, signedInGreeting, username, password, signIn, navigate, isSignedIn, setActive, reduceMotion]
-  );
+
+      if (signIn.status === 'complete') {
+        const name = friendlyIdentifier(trimmedUsername);
+        setWelcomeName(name);
+        setPhase('welcome');
+        setActivityLoading(true);
+
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const signInAny = signIn as any;
+          if (typeof signInAny.finalize === 'function') {
+            await signInAny.finalize();
+          } else if (clerk.setActive && signInAny.createdSessionId) {
+            await clerk.setActive({ session: signInAny.createdSessionId });
+          }
+          const token = await clerk.session?.getToken();
+          if (token) {
+            const res = await fetch(`${API_BASE}/api/activity/summary`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) setActivity((await res.json()) as ActivitySummary);
+          }
+        } catch {
+          /* activity is optional */
+        } finally {
+          setActivityLoading(false);
+        }
+        return;
+      }
+
+      setError('Sign-in could not be completed. Please try again.');
+      setLoading(false);
+    } catch (err: unknown) {
+      const e = err as { errors?: { message?: string }[]; message?: string };
+      const msg =
+        Array.isArray(e?.errors) && e.errors[0]?.message
+          ? String(e.errors[0].message)
+          : e?.message
+            ? String(e.message)
+            : '';
+      if (
+        msg.toLowerCase().includes('already signed in') ||
+        msg.toLowerCase().includes('session_exists')
+      ) {
+        navigate('/v1', { replace: true });
+        return;
+      }
+      setError(
+        Array.isArray(e?.errors) && e.errors[0]?.message
+          ? String(e.errors[0].message)
+          : e?.message
+            ? String(e.message)
+            : 'Something went wrong. Please try again.'
+      );
+      setPassword('');
+      passwordRef.current?.focus();
+      setLoading(false);
+    }
+  }, [loading, phase, username, password, signIn, navigate, isSignedIn, clerk]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, field: 'username' | 'password') => {
@@ -159,172 +210,342 @@ export default function LoginPage() {
     [handleSubmit]
   );
 
-  if (!isLoaded) {
-    return null;
-  }
+  if (!isLoaded) return null;
+
+  const stats = activity ? STATS_CONFIG(activity) : null;
+  const enterDelay = stats ? 0.22 + stats.length * 0.07 + 0.1 : 0.2;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[100dvh] w-full bg-paper p-phi-6 overflow-hidden">
-      <div className="relative w-full max-w-[48rem] flex flex-col items-center">
-        {/* Structural Accent: The Vertical Spine */}
-        <motion.div
-          initial={reduceMotion ? { opacity: 1, scaleY: 1 } : { opacity: 0, scaleY: 0 }}
-          animate={{ opacity: 1, scaleY: 1 }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-          className="absolute left-1/2 -ml-px top-[-20vh] bottom-[-20vh] w-[0.5px] bg-oxford/[0.08]"
-          aria-hidden="true"
-        />
+    <div
+      className="flex flex-col items-center justify-center min-h-[100dvh] w-full bg-paper overflow-hidden"
+      style={{ padding: 'clamp(24px, 5vw, 56px)' }}
+    >
+      <div className="relative z-10 w-full max-w-[40rem] flex flex-col items-center">
 
-        {/* Brand Monolith */}
-        <div className="relative z-10 w-full mb-phi-9 flex flex-col items-center">
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
-            className="type-meta uppercase tracking-[0.25em] text-oxford/30 mb-phi-3"
-          >
-            Confidential · Institutional Access
-          </motion.p>
-
-          <AnimatePresence mode="wait">
-            {signedInGreeting ? (
-              <motion.div
-                key="welcome-header"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className="flex flex-col items-center"
-              >
-                <h1 className="font-wordmark text-center text-[clamp(28px,5vw,56px)] font-normal text-oxford leading-[1.1] m-0">
-                  Welcome back, {signedInGreeting}.
-                </h1>
-                <p className="type-body text-oxford/40 mt-phi-3 italic">
-                  Entering workspace…
-                </p>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="brand-header"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
-                className="flex flex-col items-center"
-              >
-                <h1 className="font-wordmark text-center text-[clamp(44px,8vw,80px)] font-normal text-oxford leading-[0.9] m-0 tracking-normal">
-                  Aethria
-                </h1>
-                <p className="type-meta uppercase tracking-[0.14em] text-oxford/35 mt-phi-4">
-                  Deal flow operating system
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Auth Interface */}
-        {!signedInGreeting && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.55 }}
-            className="relative z-10 w-full max-w-[280px]"
-          >
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void handleSubmit();
+        {/* Eyebrow */}
+        <AnimatePresence mode="wait">
+          {phase === 'welcome' ? (
+            <motion.p
+              key="eyebrow-report"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
+              transition={{ duration: 0.5, ease: EASE, delay: 0.05 }}
+              style={{
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontSize: '11px',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: 'rgba(var(--color-oxford-rgb), 0.55)',
+                marginBottom: '16px',
               }}
-              className="flex flex-col"
-              noValidate
             >
-              <div className="flex flex-col gap-phi-5 mb-phi-8">
-                <div className="flex flex-col">
-                  <label htmlFor="login-identifier" className="sr-only">
-                    Email or username
-                  </label>
-                  <input
-                    id="login-identifier"
-                    type="text"
-                    autoComplete="username"
-                    placeholder="Email or username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(e, 'username')}
-                    aria-describedby={error ? 'login-error' : undefined}
-                    className="w-full bg-transparent border-0 border-b border-oxford/10 py-phi-3 font-mono text-[11px] text-oxford outline-none placeholder:text-oxford/35 focus:border-oxford/40 transition-colors tracking-[0.1em]"
-                  />
-                </div>
+              System Report
+            </motion.p>
+          ) : (
+            <motion.p
+              key="eyebrow-access"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
+              transition={{ duration: 0.7, ease: EASE, delay: 0.15 }}
+              className="type-meta uppercase tracking-[0.22em] text-oxford/30 mb-phi-3"
+            >
+              Confidential · Institutional Access
+            </motion.p>
+          )}
+        </AnimatePresence>
 
-                <div className="flex flex-col">
-                  <label htmlFor="login-password" className="sr-only">
-                    Password
-                  </label>
-                  <input
-                    ref={passwordRef}
-                    id="login-password"
-                    type="password"
-                    autoComplete="current-password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(e, 'password')}
-                    aria-describedby={error ? 'login-error' : undefined}
-                    className="w-full bg-transparent border-0 border-b border-oxford/10 py-phi-3 font-mono text-[11px] text-oxford outline-none placeholder:text-oxford/35 focus:border-oxford/40 transition-colors tracking-[0.1em]"
-                  />
-                </div>
-              </div>
+        {/* Heading */}
+        <AnimatePresence mode="wait">
+          {phase === 'welcome' ? (
+            <motion.div
+              key="welcome-header"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.25, ease: EASE } }}
+              transition={{ duration: 0.5, ease: EASE }}
+              className="flex flex-col items-center"
+            >
+              <h1
+                style={{
+                  fontFamily: "'EB Garamond', Georgia, serif",
+                  fontSize: 'clamp(36px, 5vw, 64px)',
+                  fontWeight: 500,
+                  color: 'var(--color-oxford)',
+                  lineHeight: 1.1,
+                  margin: 0,
+                  textAlign: 'center',
+                }}
+              >
+                Welcome back, {welcomeName}.
+              </h1>
+              <p
+                style={{
+                  fontFamily: "'Geist Sans', system-ui, sans-serif",
+                  fontSize: '14px',
+                  color: 'rgba(var(--color-oxford-rgb), 0.6)',
+                  marginTop: '12px',
+                  marginBottom: '55px',
+                  textAlign: 'center',
+                }}
+              >
+                Agents continued working. Here is what happened.
+              </p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="brand-header"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.25, ease: EASE } }}
+              transition={{ duration: 0.5, ease: EASE, delay: 0.3 }}
+              className="flex flex-col items-center mb-phi-9"
+            >
+              <h1 className="font-wordmark text-center text-[clamp(48px,8vw,80px)] font-normal text-oxford leading-[0.9] m-0 tracking-normal">
+                Aethria
+              </h1>
+              <p className="type-meta uppercase tracking-[0.14em] text-oxford/35 mt-phi-4">
+                Deal flow operating system
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-              {error && (
+        {/* Body */}
+        <AnimatePresence mode="wait">
+          {phase === 'welcome' ? (
+            <motion.div
+              key="activity-view"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, ease: EASE, delay: 0.08 }}
+              className="w-full flex flex-col items-center"
+            >
+              {/* Loading pulse */}
+              {activityLoading && (
                 <motion.p
-                  id="login-error"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="type-meta text-[11px] text-escalation text-center mb-phi-6 tracking-[0.06em] opacity-90"
+                  animate={reduceMotion ? { opacity: 1 } : { opacity: [0.35, 0.8, 0.35] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{
+                    fontFamily: "'Geist Sans', system-ui, sans-serif",
+                    fontSize: '14px',
+                    color: 'rgba(var(--color-oxford-rgb), 0.4)',
+                    marginBottom: '64px',
+                    textAlign: 'center',
+                  }}
                 >
-                  {error}
+                  Preparing workspace…
                 </motion.p>
               )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="group w-full btn-aethria-solid disabled:opacity-40"
-              >
-                <span className="flex items-center justify-center">
-                  <span>{loading ? 'Authenticating…' : 'Establish Session'}</span>
-                  {!loading && (
+              {/* Stats — numbers count up on reveal */}
+              {!activityLoading && stats && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    justifyContent: 'center',
+                    gap: 'clamp(32px, 6vw, 80px)',
+                    marginBottom: '64px',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {stats.map((stat, i) => (
+                    <motion.div
+                      key={stat.label}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.45, ease: EASE, delay: 0.22 + i * 0.07 }}
+                      style={{ textAlign: 'center' }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                          fontSize: 'clamp(40px, 6vw, 72px)',
+                          fontWeight: 700,
+                          lineHeight: 1,
+                          color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
+                          letterSpacing: '-0.03em',
+                        }}
+                      >
+                        <CountUp to={stat.value} delay={0.22 + i * 0.07} reduceMotion={reduceMotion} />
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: "'Geist Sans', system-ui, sans-serif",
+                          fontSize: '13px',
+                          color: 'rgba(var(--color-oxford-rgb), 0.6)',
+                          marginTop: '6px',
+                          letterSpacing: '0.01em',
+                        }}
+                      >
+                        {stat.label}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+
+              {/* No activity */}
+              {!activityLoading && !stats && (
+                <p
+                  style={{
+                    fontFamily: "'Geist Sans', system-ui, sans-serif",
+                    fontSize: '14px',
+                    color: 'rgba(var(--color-oxford-rgb), 0.6)',
+                    marginBottom: '64px',
+                    textAlign: 'center',
+                  }}
+                >
+                  Everything is up to date.
+                </p>
+              )}
+
+              {/* CTA */}
+              {!activityLoading && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.4, ease: EASE, delay: enterDelay }}
+                  whileTap={reduceMotion ? {} : { scale: 0.97 }}
+                  onClick={handleEnterSystem}
+                  className="group btn-aethria-solid"
+                  style={{ padding: '0 48px' }}
+                >
+                  <span className="flex items-center justify-center">
+                    <span>Enter System</span>
                     <span
                       className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
                       aria-hidden
                     >
-                      {'\u00A0→'}
+                      {' →'}
                     </span>
-                  )}
-                </span>
-              </button>
-            </form>
-          </motion.div>
-        )}
+                  </span>
+                </motion.button>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="form-view"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12, transition: { duration: 0.28, ease: EASE } }}
+              transition={{ duration: 0.6, ease: EASE, delay: 0.5 }}
+              className="w-full max-w-[280px]"
+            >
+              <form
+                onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
+                className="flex flex-col"
+                noValidate
+              >
+                {/* Inputs — shake ref wraps both so both move on error */}
+                <div ref={formShakeRef} className="flex flex-col gap-phi-5 mb-phi-8">
+                  <div className="flex flex-col">
+                    <label htmlFor="login-identifier" className="sr-only">
+                      Email or username
+                    </label>
+                    <AnimatedInput
+                      id="login-identifier"
+                      type="text"
+                      autoComplete="username"
+                      placeholder="Email or username"
+                      value={username}
+                      focused={usernameFocused}
+                      onChange={(e) => setUsername(e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e as React.KeyboardEvent, 'username')}
+                      onFocus={() => setUsernameFocused(true)}
+                      onBlur={() => setUsernameFocused(false)}
+                      aria-describedby={error ? 'login-error' : undefined}
+                      className="w-full bg-transparent border-0 py-phi-3 font-mono text-[11px] text-oxford outline-none placeholder:text-oxford/35 tracking-[0.1em]"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label htmlFor="login-password" className="sr-only">
+                      Password
+                    </label>
+                    <AnimatedInput
+                      ref={passwordRef}
+                      id="login-password"
+                      type="password"
+                      autoComplete="current-password"
+                      placeholder="Password"
+                      value={password}
+                      focused={passwordFocused}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e as React.KeyboardEvent, 'password')}
+                      onFocus={() => setPasswordFocused(true)}
+                      onBlur={() => setPasswordFocused(false)}
+                      aria-describedby={error ? 'login-error' : undefined}
+                      className="w-full bg-transparent border-0 py-phi-3 font-mono text-[11px] text-oxford outline-none placeholder:text-oxford/35 tracking-[0.1em]"
+                    />
+                  </div>
+                </div>
 
-        {/* Footer Ledger */}
-        <motion.footer
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 1 }}
-          className="fixed bottom-0 left-0 w-full p-phi-6 flex justify-center pointer-events-none"
-        >
-          <div className="flex items-center gap-phi-4 opacity-25">
-            <span className="type-meta text-[11px] tracking-[0.08em] text-oxford/70">
-              Protocol 4.1
-            </span>
-            <div className="w-px h-2 bg-oxford/40" />
-            <span className="type-meta text-[11px] tracking-[0.08em] text-oxford/70">
-              Secure Perimeter
-            </span>
-          </div>
-        </motion.footer>
+                {/* Error — slides down into view, keyed so re-triggering replays */}
+                <AnimatePresence>
+                  {error && (
+                    <motion.p
+                      key={error}
+                      id="login-error"
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2, ease: EASE }}
+                      className="type-meta text-[11px] text-escalation text-center mb-phi-6 tracking-[0.06em]"
+                    >
+                      {error}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+
+                {/* Submit — press scale + breathing pulse when loading */}
+                <motion.button
+                  type="submit"
+                  disabled={loading}
+                  whileTap={reduceMotion || loading ? {} : { scale: 0.97 }}
+                  transition={{ duration: 0.1 }}
+                  className="group w-full btn-aethria-solid disabled:opacity-40"
+                >
+                  <span className="flex items-center justify-center">
+                    {loading ? (
+                      <motion.span
+                        animate={reduceMotion ? {} : { opacity: [1, 0.4, 1] }}
+                        transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                      >
+                        Authenticating…
+                      </motion.span>
+                    ) : (
+                      <>
+                        <span>Establish Session</span>
+                        <span
+                          className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
+                          aria-hidden
+                        >
+                          {' →'}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </motion.button>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
+
+      {/* Footer */}
+      <motion.footer
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1, delay: 1 }}
+        className="fixed bottom-0 left-0 w-full p-phi-6 flex justify-center pointer-events-none"
+      >
+        <p className="type-meta text-[11px] tracking-[0.08em] text-oxford/22">
+          Protocol 4.1 · Secure Perimeter
+        </p>
+      </motion.footer>
     </div>
   );
 }

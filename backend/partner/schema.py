@@ -29,12 +29,40 @@ class PartnerOutput(TypedDict, total=False):
     partner_agent_id: Optional[str]
     llm_fallback_reason: Optional[str]
     prompt_version: Optional[str]
+    # Legacy compatibility fields
+    decision: Optional[Literal["YES", "NO", "MAYBE"]]
+    rationale: Optional[str]
+    conviction_level: Optional[int]
+    assumption_risks: Optional[List[str]]
 
 
 VALID_RECOMMENDATIONS = ["INVEST", "PASS", "MONITOR"]
 
 
 def validate_partner_output(data: dict) -> PartnerOutput:
+    data = dict(data)
+    legacy_decision_map = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}
+    if "recommendation" not in data and isinstance(data.get("decision"), str):
+        data["recommendation"] = legacy_decision_map.get(str(data["decision"]).strip().upper(), data["decision"])
+    if "decision_rationale" not in data and isinstance(data.get("rationale"), str):
+        data["decision_rationale"] = data["rationale"]
+    if "decision" in data and "recommendation" in data:
+        data.setdefault("thesis", "N/A")
+        data.setdefault("why_this_matters", "N/A")
+        data.setdefault("market_insight", "N/A")
+        data.setdefault("product_edge", "N/A")
+        data.setdefault("next_action", "N/A")
+        data.setdefault("snapshot", {"one_liner": "N/A"})
+        data.setdefault("risks", [])
+    if "confidence" not in data and data.get("conviction_level") is not None:
+        try:
+            conv = float(data["conviction_level"])
+            if not 1.0 <= conv <= 10.0:
+                raise ValueError("conviction_level must be between 1 and 10")
+            data["confidence"] = max(0.0, min(1.0, conv / 10.0))
+        except (TypeError, ValueError):
+            if isinstance(data.get("conviction_level"), (int, float)):
+                raise
     """
     Validate that a dict matches the PartnerOutput schema.
     Raises ValueError if validation fails.
@@ -47,10 +75,23 @@ def validate_partner_output(data: dict) -> PartnerOutput:
         if not isinstance(data[field], str):
             raise ValueError(f"Field '{field}' must be a string, got {type(data[field]).__name__}")
 
-    for field in ["thesis", "why_this_matters", "market_insight", "product_edge",
-                  "decision_rationale", "next_action"]:
+    for field in ["thesis", "why_this_matters", "market_insight", "product_edge"]:
         if not data[field].strip():
             raise ValueError(f"Field '{field}' must be non-empty")
+    if not data["decision_rationale"].strip():
+        raise ValueError("rationale must be a non-empty string")
+    if not data["next_action"].strip():
+        raise ValueError("next_action must be a non-empty string")
+
+    # Backfill legacy output keys for compatibility.
+    if "decision" not in data:
+        data["decision"] = {"INVEST": "YES", "PASS": "NO", "MONITOR": "MAYBE"}.get(
+            data["recommendation"], "MAYBE"
+        )
+    if "rationale" not in data:
+        data["rationale"] = data["decision_rationale"]
+    if "conviction_level" not in data:
+        data["conviction_level"] = max(1, min(10, int(round(conf * 9)) + 1))
 
     if data["recommendation"] not in VALID_RECOMMENDATIONS:
         raise ValueError(

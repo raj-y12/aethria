@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Optional, Tuple
 
 from openai import OpenAI
 from utils.prompt_version import hash_prompt
+from utils.scoring import compute_overall_score
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,14 @@ def _confidence_float_to_conviction_level(conf: Any) -> int:
         c = c / 10.0 if c <= 10.0 else 1.0
     c = max(0.0, min(1.0, c))
     return max(1, min(10, int(round(c * 9)) + 1))
+
+
+def _recommendation_to_legacy_decision(recommendation: str) -> str:
+    if recommendation == "INVEST":
+        return "YES"
+    if recommendation == "PASS":
+        return "NO"
+    return "MAYBE"
 
 
 def _log_safe_single_line(blob: str, max_len: int = 6000) -> str:
@@ -234,19 +243,37 @@ class PartnerDecisionEngine:
 
     @staticmethod
     def _avg_score_and_dims(review_output: Dict[str, Any]) -> Tuple[float, int]:
-        """Mean of four core scores; include defensibility in denominator when present and numeric."""
-        m = float(review_output.get("market_score", 0) or 0)
-        p = float(review_output.get("product_score", 0) or 0)
-        t = float(review_output.get("technical_score", 0) or 0)
-        e = float(review_output.get("execution_score", 0) or 0)
-        ds = review_output.get("defensibility_score")
-        if ds is not None:
-            try:
-                dsv = float(ds)
-                return (m + p + t + e + dsv) / 5.0, 5
-            except (TypeError, ValueError):
-                pass
-        return (m + p + t + e) / 4.0, 4
+        """Canonical mean of four core scores only (defensibility is separate)."""
+        canonical = compute_overall_score(review_output)
+        if canonical is None:
+            return 0.0, 4
+        return float(canonical), 4
+
+    @staticmethod
+    def _canonical_recommendation(avg_score: float) -> str:
+        if avg_score >= 8.0:
+            return "INVEST"
+        if avg_score >= 6.0:
+            return "MONITOR"
+        return "PASS"
+
+    def _enforce_canonical_recommendation(
+        self,
+        result: Dict[str, Any],
+        avg_score: float,
+        assumption_risks: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        forced = self._canonical_recommendation(avg_score)
+        result["recommendation"] = forced
+        result["decision"] = _recommendation_to_legacy_decision(forced)
+        result["assumption_risks"] = list(assumption_risks or [])
+        if forced == "PASS":
+            result["next_action"] = self._next_action_for_llm_decision("PASS", self._get_rules().get("next_actions", {}))
+        elif forced == "MONITOR":
+            result["next_action"] = self._next_action_for_llm_decision("MONITOR", self._get_rules().get("next_actions", {}))
+        else:
+            result["next_action"] = self._next_action_for_llm_decision("INVEST", self._get_rules().get("next_actions", {}))
+        return result
 
     @staticmethod
     def _optional_thesis_alignment_score(review_output: Dict[str, Any]) -> Optional[float]:
@@ -366,16 +393,15 @@ class PartnerDecisionEngine:
     ) -> Dict[str, Any]:
         thesis_adjusted = False
         tas = self._optional_thesis_alignment_score(review_output)
-        if result.get("recommendation") == "INVEST" and tas is not None and tas < 0.4:
-            result["recommendation"] = "MONITOR"
-            r = (result.get("decision_rationale") or "").rstrip()
-            if "Low thesis alignment." not in r:
-                result["decision_rationale"] = r + " Low thesis alignment."
-            thesis_adjusted = True
-        elif result.get("recommendation") == "PASS" and tas is not None and tas < 0.3:
+        if result.get("recommendation") == "PASS" and tas is not None and tas < 0.3:
             r = (result.get("decision_rationale") or "").rstrip()
             if "Clear thesis mismatch." not in r:
                 result["decision_rationale"] = r + " Clear thesis mismatch."
+            thesis_adjusted = True
+        elif tas is not None and tas < 0.4:
+            r = (result.get("decision_rationale") or "").rstrip()
+            if "Low thesis alignment." not in r:
+                result["decision_rationale"] = r + " Low thesis alignment."
             thesis_adjusted = True
         self.logger.info(
             "partner_decide company=%s avg_score=%.2f avg_dims=%d thesis_soft=%s final=%s",
@@ -537,6 +563,7 @@ class PartnerDecisionEngine:
                 traction_signals=n_traction,
                 risks=merged_risks,
             )
+            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
             return self._finalize_thesis_soft_and_log(
                 result, review_output, scout_output, avg_score, avg_dims
             )
@@ -571,6 +598,7 @@ class PartnerDecisionEngine:
                 traction_signals=n_traction,
                 risks=merged_risks,
             )
+            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
             return self._finalize_thesis_soft_and_log(
                 result, review_output, scout_output, avg_score, avg_dims
             )
@@ -600,6 +628,7 @@ class PartnerDecisionEngine:
                     avg_score=avg_score,
                     avg_dims=avg_dims,
                 )
+                result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
                 return self._finalize_thesis_soft_and_log(
                     result, review_output, scout_output, avg_score, avg_dims
                 )
@@ -621,6 +650,7 @@ class PartnerDecisionEngine:
                 traction_signals=n_traction,
                 risks=merged_risks,
             )
+            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
             return self._finalize_thesis_soft_and_log(
                 result, review_output, scout_output, avg_score, avg_dims
             )
@@ -661,6 +691,7 @@ class PartnerDecisionEngine:
                 traction_signals=n_traction,
                 risks=merged_risks,
             )
+            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
             return self._finalize_thesis_soft_and_log(
                 result, review_output, scout_output, avg_score, avg_dims
             )
@@ -698,6 +729,7 @@ class PartnerDecisionEngine:
                 traction_signals=n_traction,
                 risks=merged_risks,
             )
+            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
             return self._finalize_thesis_soft_and_log(
                 result, review_output, scout_output, avg_score, avg_dims
             )
@@ -740,6 +772,7 @@ class PartnerDecisionEngine:
                     avg_score=avg_score,
                     avg_dims=avg_dims,
                 )
+                result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
                 return self._finalize_thesis_soft_and_log(
                     result, review_output, scout_output, avg_score, avg_dims
                 )
@@ -766,6 +799,7 @@ class PartnerDecisionEngine:
                 traction_signals=n_traction,
                 risks=merged_risks,
             )
+            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
             return self._finalize_thesis_soft_and_log(
                 result, review_output, scout_output, avg_score, avg_dims
             )
@@ -800,6 +834,7 @@ class PartnerDecisionEngine:
                     avg_score=avg_score,
                     avg_dims=avg_dims,
                 )
+                result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
                 return self._finalize_thesis_soft_and_log(
                     result, review_output, scout_output, avg_score, avg_dims
                 )
@@ -826,6 +861,7 @@ class PartnerDecisionEngine:
                 traction_signals=n_traction,
                 risks=merged_risks,
             )
+            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
             return self._finalize_thesis_soft_and_log(
                 result, review_output, scout_output, avg_score, avg_dims
             )
@@ -849,6 +885,7 @@ class PartnerDecisionEngine:
             traction_signals=n_traction,
             risks=merged_risks,
         )
+        result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
         return self._finalize_thesis_soft_and_log(
             result, review_output, scout_output, avg_score, avg_dims
         )
@@ -1056,27 +1093,45 @@ class PartnerDecisionEngine:
 
     def _create_decision(
         self,
-        recommendation: str,
-        conviction: int,
-        decision_rationale: str,
-        next_action: str,
-        human_review_required: bool,
-        thesis: str,
-        why_this_matters: str,
-        snapshot: Dict[str, Any],
-        market_insight: str,
-        product_edge: str,
-        traction_signals: Optional[str],
-        risks: List[str],
+        recommendation: Optional[str] = None,
+        conviction: Optional[int] = None,
+        decision_rationale: Optional[str] = None,
+        next_action: str = "",
+        human_review_required: bool = False,
+        thesis: str = "",
+        why_this_matters: str = "",
+        snapshot: Optional[Dict[str, Any]] = None,
+        market_insight: str = "",
+        product_edge: str = "",
+        traction_signals: Optional[str] = None,
+        risks: Optional[List[str]] = None,
+        **legacy_kwargs: Any,
     ) -> Dict[str, Any]:
         """
         Build a decision dict conforming to the new partner schema.
         Conviction (1–10) is normalized to confidence (0.0–1.0).
         """
-        conviction_clamped = max(1, min(10, conviction))
+        legacy_decision = legacy_kwargs.get("decision")
+        legacy_confidence = legacy_kwargs.get("confidence")
+        legacy_rationale = legacy_kwargs.get("rationale")
+        if recommendation is None and isinstance(legacy_decision, str):
+            recommendation = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}.get(
+                legacy_decision.strip().upper(), "MONITOR"
+            )
+        recommendation = recommendation or "MONITOR"
+        if conviction is None:
+            conviction = int(legacy_confidence) if isinstance(legacy_confidence, (int, float)) else 5
+        if decision_rationale is None and isinstance(legacy_rationale, str):
+            decision_rationale = legacy_rationale
+        decision_rationale = decision_rationale or ""
+        snapshot = snapshot or {"one_liner": "", "stage": None, "key_signal": None}
+        risks = risks or legacy_kwargs.get("assumption_risks") or []
+        conviction_clamped = max(1, min(10, int(conviction)))
         return {
             "recommendation": recommendation,
             "confidence": round(conviction_clamped / 10.0, 2),
+            "decision": _recommendation_to_legacy_decision(recommendation),
+            "conviction_level": conviction_clamped,
             "thesis": thesis,
             "why_this_matters": why_this_matters,
             "snapshot": snapshot,
@@ -1085,6 +1140,7 @@ class PartnerDecisionEngine:
             "traction_signals": traction_signals,
             "risks": risks[:5] if risks else [],
             "decision_rationale": decision_rationale,
+            "rationale": decision_rationale,
             "next_action": self._normalize_next_action(next_action),
             "human_review_required": human_review_required,
         }
@@ -1530,6 +1586,8 @@ No markdown. No extra fields. Strictly under 350 words total information density
         result = {
             "recommendation": recommendation,
             "confidence": round(conf_float, 2),
+            "decision": _recommendation_to_legacy_decision(recommendation),
+            "conviction_level": _confidence_float_to_conviction_level(conf_float),
             "thesis": str(llm_result.get("thesis") or scout_output.get("primary_thesis") or scout_output.get("one_line") or "").strip(),
             "why_this_matters": str(llm_result.get("why_this_matters") or scout_output.get("why_now") or "").strip(),
             "snapshot": snapshot,
@@ -1538,6 +1596,7 @@ No markdown. No extra fields. Strictly under 350 words total information density
             "traction_signals": llm_result.get("traction_signals"),
             "risks": llm_risks[:5],
             "decision_rationale": decision_rationale,
+            "rationale": decision_rationale,
             "next_action": next_act,
             "human_review_required": human_rev,
             "llm_fallback_reason": trigger_reason,

@@ -14,6 +14,7 @@ from openai import OpenAI
 
 from reviewer.schema import ReviewerOutput, validate_reviewer_output
 from utils.prompt_version import hash_prompt
+from utils.scoring import DEFAULT_SCORE_SOURCE
 
 
 logger = logging.getLogger(__name__)
@@ -299,6 +300,23 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
   "investment_thesis": ["string", "..."],    // Optional: bullet points why to invest + core assumptions
   "risk_mitigation": ["string", "..."],     // Optional: actionable strategies for each diligence_red_flags item
   "score_reasoning": {"market_score": "string", "product_score": "string", ...},  // Optional: concise reasoning per dimension for memo table
+  "market_reasoning": ["string", "..."],      // 2-4 bullets
+  "market_weaknesses": ["string", "..."],     // 1-3 bullets
+  "market_confidence": "low" | "medium" | "high",
+  "product_reasoning": ["string", "..."],     // 2-4 bullets
+  "product_weaknesses": ["string", "..."],    // 1-3 bullets
+  "product_confidence": "low" | "medium" | "high",
+  "technical_reasoning": ["string", "..."],   // 2-4 bullets
+  "technical_weaknesses": ["string", "..."],  // 1-3 bullets
+  "technical_confidence": "low" | "medium" | "high",
+  "execution_reasoning": ["string", "..."],   // 2-4 bullets
+  "execution_weaknesses": ["string", "..."],  // 1-3 bullets
+  "execution_confidence": "low" | "medium" | "high",
+  "defensibility_reasoning": ["string", "..."],  // 2-4 bullets
+  "defensibility_weaknesses": ["string", "..."], // 1-3 bullets
+  "defensibility_confidence": "low" | "medium" | "high",
+  "improvement_to_9": ["string", "..."],      // Specific steps that could lift this to 9/10 quality
+  "score_source": "string",                   // Explain score provenance
   "thesis_alignment_score": number,  // 0.0-1.0 fit to fund thesis mandate (required when FUND THESIS MANDATE section present)
   "thesis_matches_fund": boolean,     // true if clearly aligned with mandate
   "thesis_fit_points": ["string"],   // concise bullets: why it fits
@@ -314,6 +332,8 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 "Emphasize team in execution_score; if team/founder data is missing, say so and use [MISSING] in team_analysis. "
                 "Populate team_analysis, competition_analysis, business_model_analysis, investment_thesis, and risk_mitigation when you can; use [MISSING] or [MISSING: description] when info is absent. "
                 "Optionally include score_reasoning with one short sentence per dimension (e.g. market_score, product_score, technical_score, execution_score, defensibility_score) for the memo scores table.\n\n"
+                "For each dimension, include 2-4 reasoning bullets, 1-3 weaknesses bullets, and confidence as one of low/medium/high. "
+                "Include improvement_to_9 as actionable bullets and set score_source to reflect multi-reviewer aggregation.\n\n"
                 f"Output ONLY valid JSON matching this exact schema:\n\n{json_schema}\n\n"
                 "If founding team, revenue, competitors, or valuation data is missing, add the exact red-flag labels to diligence_red_flags. "
                 "Do not include any text before or after the JSON. Output only the JSON object."
@@ -354,6 +374,20 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     data[field] = []
             if "score_reasoning" not in data or not isinstance(data.get("score_reasoning"), dict):
                 data["score_reasoning"] = {}
+            if "score_source" not in data or not isinstance(data.get("score_source"), str):
+                data["score_source"] = DEFAULT_SCORE_SOURCE
+            if "improvement_to_9" not in data or not isinstance(data.get("improvement_to_9"), list):
+                data["improvement_to_9"] = []
+            for dim in ("market", "product", "technical", "execution", "defensibility"):
+                rk = f"{dim}_reasoning"
+                wk = f"{dim}_weaknesses"
+                ck = f"{dim}_confidence"
+                if rk not in data or not isinstance(data.get(rk), list):
+                    data[rk] = []
+                if wk not in data or not isinstance(data.get(wk), list):
+                    data[wk] = []
+                if ck not in data or str(data.get(ck)).lower() not in ("low", "medium", "high"):
+                    data[ck] = "medium"
             if ctx:
                 for key, default in (
                     ("thesis_alignment_score", None),

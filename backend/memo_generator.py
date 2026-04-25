@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional
 from datetime import datetime
 
 from models import Startup
+from utils.scoring import compute_overall_score, score_to_label
 
 _logger_memo = logging.getLogger("memo_generation")
 
@@ -278,11 +279,17 @@ class MemoGenerator:
                     reasoning = "—"
                 reasoning_esc = reasoning.replace("|", "\\|")
                 lines.append(f"| {dim_label} | {score_str} | {band} | {reasoning_esc} |")
-            avg_score = (
-                ri.market_score + ri.product_score + ri.technical_score + ri.execution_score
-            ) / 4.0
+            avg_score = compute_overall_score(ri.model_dump()) or 0.0
+            avg_label = score_to_label(avg_score)
             lines.append("")
-            lines.append(f"**Average (4 dimensions):** {avg_score:.1f}/10")
+            lines.append(f"**Overall score (4 dimensions):** {avg_score:.1f} — {avg_label}")
+            lines.append(
+                f"Market ({ri.market_score:.1f}), Product ({ri.product_score:.1f}), "
+                f"Technical ({ri.technical_score:.1f}), Execution ({ri.execution_score:.1f})"
+            )
+            def_val = ri.defensibility_score
+            if def_val is not None:
+                lines.append(f"Defensibility: {def_val:.1f} — {score_to_label(float(def_val))}")
             lines.append("")
             lines.append(f"**Quality assessment:** {ri.verdict}")
             lines.append("")
@@ -428,13 +435,10 @@ class MemoGenerator:
         lines.append("")
         lines.append(f"**Sector:** {startup.scout_info.sector}")
         if startup.review_info:
-            avg_score = (
-                startup.review_info.market_score
-                + startup.review_info.product_score
-                + startup.review_info.technical_score
-                + startup.review_info.execution_score
-            ) / 4.0
-            lines.append(f"**Review Score:** {avg_score:.1f}/10 ({startup.review_info.verdict})")
+            avg_score = compute_overall_score(startup.review_info.model_dump()) or 0.0
+            lines.append(
+                f"**Review Score:** {avg_score:.1f} — {score_to_label(avg_score)} ({startup.review_info.verdict})"
+            )
         if startup.partner_info:
             lines.append(f"**Decision:** {startup.partner_info.decision} (Conviction: {startup.partner_info.conviction_level}/10)")
             if startup.partner_info.human_review_required:

@@ -69,6 +69,7 @@ from fund_thesis import (
 from fund_thesis_ops import activate_fund_thesis_version, create_fund_thesis_version_for_user
 from models import Startup
 from core import policy_resolver
+from utils.scoring import compute_overall_score, enrich_scores, score_to_label
 
 _agent_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _agent_worker_task: Optional[asyncio.Task] = None
@@ -667,34 +668,59 @@ def _backend_to_frontend(raw: dict) -> dict:
     }
 
     if review:
+        review_enriched = enrich_scores(review)
         out["review"] = {
-            "market_score": review.get("market_score"),
-            "product_score": review.get("product_score"),
-            "technical_score": review.get("technical_score"),
-            "execution_score": review.get("execution_score"),
-            "defensibility_score": review.get("defensibility_score"),
-            "overall_summary": review.get("overall_summary"),
-            "key_risks": review.get("key_risks") or [],
-            "verdict": review.get("verdict"),
-            "score_reasoning": review.get("score_reasoning") or None,
-            "diligence_red_flags": review.get("diligence_red_flags") or [],
-            "assumption_feedback": review.get("assumption_feedback") or [],
-            "team_analysis": review.get("team_analysis") or None,
-            "competition_analysis": review.get("competition_analysis") or None,
-            "business_model_analysis": review.get("business_model_analysis") or None,
-            "investment_thesis": review.get("investment_thesis") or None,
-            "risk_mitigation": review.get("risk_mitigation") or None,
-            "consensus_verdict": review.get("consensus_verdict"),
-            "reviewer_disagreement": review.get("reviewer_disagreement"),
-            "score_variance": review.get("score_variance"),
-            "fund_thesis_version_id": review.get("fund_thesis_version_id"),
-            "thesis_alignment_score": review.get("thesis_alignment_score"),
-            "thesis_matches_fund": review.get("thesis_matches_fund"),
-            "thesis_fit_points": review.get("thesis_fit_points") or None,
-            "thesis_deviation_points": review.get("thesis_deviation_points") or None,
-            "thesis_alignment_confidence": review.get("thesis_alignment_confidence"),
-            "fund_thesis_alignment_score": review.get("fund_thesis_alignment_score"),
-            "reviews": review.get("reviews") or None,
+            "market_score": review_enriched.get("market_score"),
+            "product_score": review_enriched.get("product_score"),
+            "technical_score": review_enriched.get("technical_score"),
+            "execution_score": review_enriched.get("execution_score"),
+            "defensibility_score": review_enriched.get("defensibility_score"),
+            "market_score_label": review_enriched.get("market_score_label"),
+            "product_score_label": review_enriched.get("product_score_label"),
+            "technical_score_label": review_enriched.get("technical_score_label"),
+            "execution_score_label": review_enriched.get("execution_score_label"),
+            "defensibility_score_label": review_enriched.get("defensibility_score_label"),
+            "overall_score": review_enriched.get("overall_score"),
+            "overall_label": review_enriched.get("overall_label"),
+            "overall_summary": review_enriched.get("overall_summary"),
+            "key_risks": review_enriched.get("key_risks") or [],
+            "verdict": review_enriched.get("verdict"),
+            "score_reasoning": review_enriched.get("score_reasoning") or None,
+            "score_source": review_enriched.get("score_source"),
+            "improvement_to_9": review_enriched.get("improvement_to_9") or [],
+            "market_reasoning": review_enriched.get("market_reasoning") or [],
+            "market_weaknesses": review_enriched.get("market_weaknesses") or [],
+            "market_confidence": review_enriched.get("market_confidence"),
+            "product_reasoning": review_enriched.get("product_reasoning") or [],
+            "product_weaknesses": review_enriched.get("product_weaknesses") or [],
+            "product_confidence": review_enriched.get("product_confidence"),
+            "technical_reasoning": review_enriched.get("technical_reasoning") or [],
+            "technical_weaknesses": review_enriched.get("technical_weaknesses") or [],
+            "technical_confidence": review_enriched.get("technical_confidence"),
+            "execution_reasoning": review_enriched.get("execution_reasoning") or [],
+            "execution_weaknesses": review_enriched.get("execution_weaknesses") or [],
+            "execution_confidence": review_enriched.get("execution_confidence"),
+            "defensibility_reasoning": review_enriched.get("defensibility_reasoning") or [],
+            "defensibility_weaknesses": review_enriched.get("defensibility_weaknesses") or [],
+            "defensibility_confidence": review_enriched.get("defensibility_confidence"),
+            "diligence_red_flags": review_enriched.get("diligence_red_flags") or [],
+            "assumption_feedback": review_enriched.get("assumption_feedback") or [],
+            "team_analysis": review_enriched.get("team_analysis") or None,
+            "competition_analysis": review_enriched.get("competition_analysis") or None,
+            "business_model_analysis": review_enriched.get("business_model_analysis") or None,
+            "investment_thesis": review_enriched.get("investment_thesis") or None,
+            "risk_mitigation": review_enriched.get("risk_mitigation") or None,
+            "consensus_verdict": review_enriched.get("consensus_verdict"),
+            "reviewer_disagreement": review_enriched.get("reviewer_disagreement"),
+            "score_variance": review_enriched.get("score_variance"),
+            "fund_thesis_version_id": review_enriched.get("fund_thesis_version_id"),
+            "thesis_alignment_score": review_enriched.get("thesis_alignment_score"),
+            "thesis_matches_fund": review_enriched.get("thesis_matches_fund"),
+            "thesis_fit_points": review_enriched.get("thesis_fit_points") or None,
+            "thesis_deviation_points": review_enriched.get("thesis_deviation_points") or None,
+            "thesis_alignment_confidence": review_enriched.get("thesis_alignment_confidence"),
+            "fund_thesis_alignment_score": review_enriched.get("fund_thesis_alignment_score"),
+            "reviews": review_enriched.get("reviews") or None,
         }
     else:
         out["review"] = None
@@ -781,6 +807,8 @@ def _list_projection_to_frontend(row: Dict[str, Any]) -> Dict[str, Any]:
             "overall_summary": row.get("short_summary") or "",
             "reviewer_disagreement": bool(row.get("list_reviewer_disagreement")),
             "aggregate_score": agg,
+            "overall_score": agg,
+            "overall_label": score_to_label(agg) if isinstance(agg, (int, float)) else None,
         }
     else:
         out["review"] = None
@@ -822,16 +850,18 @@ def _thin_list_from_full_frontend(obj: Dict[str, Any]) -> Dict[str, Any]:
     rev = obj.get("review") or {}
     thin_rev: Optional[Dict[str, Any]] = None
     if rev:
+        overall = rev.get("overall_score")
+        if not isinstance(overall, (int, float)):
+            overall = compute_overall_score(rev)
         thin_rev = {
             "verdict": rev.get("verdict"),
             "consensus_verdict": rev.get("consensus_verdict") or rev.get("verdict"),
             "overall_summary": (rev.get("overall_summary") or "")[:400],
             "reviewer_disagreement": rev.get("reviewer_disagreement"),
-            "aggregate_score": None,
+            "aggregate_score": overall,
+            "overall_score": overall,
+            "overall_label": score_to_label(float(overall)) if isinstance(overall, (int, float)) else None,
         }
-        scores = [rev.get("market_score"), rev.get("product_score"), rev.get("technical_score"), rev.get("execution_score")]
-        if all(isinstance(x, (int, float)) for x in scores):
-            thin_rev["aggregate_score"] = sum(scores) / 4.0  # type: ignore[arg-type]
     part = obj.get("partner") or {}
     thin_part: Optional[Dict[str, Any]] = None
     if part:

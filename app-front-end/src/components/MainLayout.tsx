@@ -213,6 +213,26 @@ export default function MainLayout({
     setPendingLookup(null);
   }, [pendingLookup, pendingLookupMatch, lookupFailureQuery.data]);
 
+  // Keep WorkGrid fresh while on-demand lookup is in-flight so the new startup
+  // appears promptly instead of waiting for the normal list refresh interval.
+  useEffect(() => {
+    if (!pendingLookup || pendingLookupMatch) return;
+    if (!liveGate.tabVisible || !liveGate.userActive) return;
+
+    void queryClient.invalidateQueries({ queryKey: ['startups', 'list'] });
+    const intervalId = window.setInterval(() => {
+      void queryClient.invalidateQueries({ queryKey: ['startups', 'list'] });
+    }, 3_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [
+    pendingLookup,
+    pendingLookupMatch,
+    liveGate.tabVisible,
+    liveGate.userActive,
+    queryClient,
+  ]);
+
   useEffect(() => {
     if (hydratedFromStorageRef.current) return;
     const persisted = persistedStateRef.current;
@@ -506,7 +526,7 @@ export default function MainLayout({
           On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-4 pt-phi-3 lg:pl-[calc(9rem+var(--space-4))] lg:pr-phi-4 lg:pt-phi-4">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-phi-4 lg:pb-phi-5 gap-phi-4 lg:gap-phi-5">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[6fr_7fr] min-h-0 overflow-hidden pb-phi-3 lg:pb-phi-4 gap-phi-4 lg:gap-phi-5">
             <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
               {/* Pipeline summary + lookup */}
               <header className="flex-none mb-phi-4 min-w-0 lg:px-0">
@@ -631,6 +651,7 @@ export default function MainLayout({
               >
                 {rightPanel === 'system' ? (
                   <SystemIntelligence
+                    startups={startups}
                     signals={signals}
                     rejectionAnalytics={rejectionAnalytics}
                     watchlistAnalytics={watchlistAnalytics}

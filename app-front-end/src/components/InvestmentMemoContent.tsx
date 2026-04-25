@@ -18,24 +18,30 @@ import {
 } from '../design-system/semantics';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
+const SCORE_DERIVATION_FALLBACK =
+  'Score derived from multiple reviewer perspectives (optimistic, neutral, skeptical) and aggregated.';
 
-function buildScoreJustification(startup: Startup): string | null {
-  const r = startup.review;
-  if (!r) return null;
-  const scores: number[] = [];
-  if (r.market_score != null) scores.push(r.market_score);
-  if (r.product_score != null) scores.push(r.product_score);
-  if (r.technical_score != null) scores.push(r.technical_score);
-  if (r.execution_score != null) scores.push(r.execution_score);
-  if (scores.length === 0) return null;
-  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-  const hasLow = scores.some((s) => s <= 5);
-  const hasHigh = scores.some((s) => s >= 7);
-  if (hasLow && hasHigh)
-    return `Scores reflect mixed strength; execution and defensibility concerns offset market potential.`;
-  if (hasLow) return `Scores reflect moderate opportunity offset by high execution risk and unproven defensibility.`;
-  if (hasHigh) return `Scores support investment-grade opportunity across key dimensions.`;
-  return `Average ${avg.toFixed(1)}/10. Scores reflect promising but incomplete validation.`;
+function computeOverallScore(review: Review | null | undefined): number | null {
+  if (!review) return null;
+  if (typeof review.overall_score === 'number') return review.overall_score;
+  if (typeof review.aggregate_score === 'number') return review.aggregate_score;
+  const scores = [
+    review.market_score,
+    review.product_score,
+    review.technical_score,
+    review.execution_score,
+  ];
+  if (!scores.every((s) => typeof s === 'number')) return null;
+  const vals = scores as number[];
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function scoreLabelFor(review: Review | null | undefined, dimension: string, score: number | null): string | null {
+  const key = `${dimension}_label` as keyof Review;
+  const fromReview = review?.[key];
+  if (typeof fromReview === 'string' && fromReview.trim()) return fromReview;
+  if (score == null) return null;
+  return getScoreBand(score).label;
 }
 
 function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | null): Startup {
@@ -175,10 +181,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 ) {
   const reduceMotion = usePrefersReducedMotion();
   const wrapperCls = embedded ? 'memoPanel memoPanel--embedded' : 'memoPanel';
-  const [selectedDimensionIdx, setSelectedDimensionIdx] = useState(0);
+  const [activeDimensionId, setActiveDimensionId] = useState<string | null>(null);
   const [selectedReviewerIdx, setSelectedReviewerIdx] = useState(0);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pipelineLogOpen, setPipelineLogOpen] = useState(false);
+  const [scoreTooltipOpen, setScoreTooltipOpen] = useState(false);
 
   const [memoPartial, setMemoPartial] = useState<MemoPartialPayload | null>(null);
   const [memoPipeline, setMemoPipeline] = useState<'idle' | 'generating' | 'ready' | 'failed'>('idle');
@@ -287,10 +294,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   );
 
   useEffect(() => {
-    setSelectedDimensionIdx(0);
+    setActiveDimensionId(null);
     setSelectedReviewerIdx(0);
     setSourcesOpen(false);
     setPipelineLogOpen(false);
+    setScoreTooltipOpen(false);
   }, [startup?.id]);
 
   const scoreBlocks = useMemo(() => {
@@ -299,14 +307,35 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
       const score = displayStartup.review?.[id as keyof typeof displayStartup.review];
       const numeric = typeof score === 'number' ? score : null;
       const reasoning = displayStartup.review?.score_reasoning?.[id]?.trim() || '';
-      return { id, name, score: numeric, reasoning };
+      const dimBase = id.replace('_score', '');
+      const structuredReasoning = displayStartup.review?.[`${dimBase}_reasoning` as keyof Review];
+      const weaknesses = displayStartup.review?.[`${dimBase}_weaknesses` as keyof Review];
+      const confidence = displayStartup.review?.[`${dimBase}_confidence` as keyof Review];
+      return {
+        id,
+        name,
+        score: numeric,
+        label: scoreLabelFor(displayStartup.review, id, numeric),
+        reasoning,
+        structuredReasoning: Array.isArray(structuredReasoning) ? structuredReasoning : [],
+        weaknesses: Array.isArray(weaknesses) ? weaknesses : [],
+        confidence: typeof confidence === 'string' ? confidence : null,
+      };
     });
   }, [displayStartup]);
 
-  const scoresSummary = useMemo(() => {
+  const overallScore = useMemo(() => computeOverallScore(displayStartup?.review), [displayStartup?.review]);
+  const overallLabel = useMemo(() => {
     if (!displayStartup?.review) return null;
-    return buildScoreJustification(displayStartup);
-  }, [displayStartup]);
+    if (typeof displayStartup.review.overall_label === 'string' && displayStartup.review.overall_label.trim()) {
+      return displayStartup.review.overall_label.trim();
+    }
+    return overallScore != null ? getScoreBand(overallScore).label : null;
+  }, [displayStartup?.review, overallScore]);
+  const scoreSourceText = useMemo(() => {
+    const raw = displayStartup?.review?.score_source;
+    return typeof raw === 'string' && raw.trim() ? raw.trim() : SCORE_DERIVATION_FALLBACK;
+  }, [displayStartup?.review?.score_source]);
   const nextStepText = displayStartup ? getNextStepText(displayStartup) : '';
   const nextStepItems = useMemo(() => parseNextStepItems(nextStepText), [nextStepText]);
   const pipelineReplaySteps = useMemo(
@@ -518,46 +547,103 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <h2 className="memoDocSectionHead" id="memo-assessment">Assessment</h2>
 
                     {hasScores && (
-                      <>
+                      <div className="memoDocScoreScope">
+                        <div className="memoDocOverallScoreRow">
+                          <p className="memoDocOverallScore">
+                            {overallScore != null && overallLabel
+                              ? `${overallScore.toFixed(1)} — ${overallLabel}`
+                              : '—'}
+                          </p>
+                          <button
+                            type="button"
+                            className="memoDocTooltipBtn"
+                            aria-label="How this score is derived"
+                            aria-expanded={scoreTooltipOpen}
+                            aria-controls={`${contentKey}-score-tooltip`}
+                            onClick={() => setScoreTooltipOpen((v) => !v)}
+                          >
+                            ?
+                          </button>
+                        </div>
+                        {scoreTooltipOpen && (
+                          <p id={`${contentKey}-score-tooltip`} className="memoDocTooltipPanel" role="note">
+                            {scoreSourceText}
+                          </p>
+                        )}
                         <p className="memoDocScoreLegend">1–3 Weak · 4–5 Concerning · 6–7 Promising · 8–10 Strong</p>
-                        <div className="memoDocScorecardRow">
-                          {scoreBlocks.map((b, idx) => {
-                            const isSelected = idx === selectedDimensionIdx;
+                        <div className="memoDocScoreStack">
+                          {scoreBlocks.map((b) => {
+                            const expanded = activeDimensionId === b.id;
+                            const panelId = `${contentKey}-${b.id}-details`;
+                            const reasoningItems = b.structuredReasoning.length
+                              ? b.structuredReasoning
+                              : [b.reasoning || (b.score != null ? getScoreBand(b.score).meaning : 'No rationale available.')];
+                            const weaknessItems = b.weaknesses.length ? b.weaknesses : null;
                             return (
-                              <button
-                                key={b.id}
-                                type="button"
-                                className="memoDocScoreBtn"
-                                onClick={() => setSelectedDimensionIdx(idx)}
-                                aria-pressed={isSelected}
-                              >
-                                <span className="memoDocScoreDim">{b.name}</span>
-                                <span className="memoDocScoreVal">{b.score != null ? `${b.score}/10` : '—'}</span>
-                                {isSelected ? <div className="memoDocScoreUnderline" /> : <div className="memoDocScoreColSpacer" aria-hidden />}
-                              </button>
+                              <article key={b.id} className="memoDocScorePanel">
+                                <button
+                                  type="button"
+                                  className="memoDocScorePanelToggle"
+                                  onClick={() => setActiveDimensionId((prev) => (prev === b.id ? null : b.id))}
+                                  aria-expanded={expanded}
+                                  aria-controls={panelId}
+                                >
+                                  <span className="memoDocScorePanelTitle">{b.name}</span>
+                                  <span className="memoDocScorePanelValue">
+                                    {b.score != null ? `${b.score.toFixed(1)} — ${b.label ?? getScoreBand(b.score).label}` : '—'}
+                                  </span>
+                                  <span className="memoDocScorePanelMeta">
+                                    {(b.confidence ?? 'medium').toUpperCase()} confidence · {expanded ? '−' : '+'}
+                                  </span>
+                                </button>
+                                {expanded && (
+                                  <div
+                                    id={panelId}
+                                    className="memoDocExpandedBody"
+                                    role="region"
+                                  >
+                                    <p className="memoDocExpandedLabel">Reasoning</p>
+                                    <ul className="memoList">
+                                      {reasoningItems.map((item, i) => (
+                                        <li key={i} className="memoListItem">
+                                          <span className="memoBullet" aria-hidden>·</span>
+                                          <span>{normalizeListItemText(item)}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                    {weaknessItems && (
+                                      <>
+                                        <p className="memoDocExpandedLabel" style={{ marginTop: '12px' }}>Weaknesses</p>
+                                        <ul className="memoList">
+                                          {weaknessItems.map((item, i) => (
+                                            <li key={i} className="memoListItem">
+                                              <span className="memoBullet" aria-hidden>·</span>
+                                              <span>{normalizeListItemText(item)}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </article>
                             );
                           })}
                         </div>
-                        <motion.div
-                          key={`${contentKey}:dim:${selectedDimensionIdx}`}
-                          className="memoDocDimDetail"
-                          initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={transitionOrReduced(reduceMotion, { duration: 0.18, ease: [0.16, 1, 0.3, 1] })}
-                        >
-                          <span className="memoDocDimName">{scoreBlocks[selectedDimensionIdx]?.name}</span>
-                          <span className="memoDocDimText">
-                            {(() => {
-                              const sel = scoreBlocks[selectedDimensionIdx];
-                              if (!sel) return '—';
-                              if (sel.reasoning?.trim()) return sel.reasoning;
-                              if (sel.score != null) return getScoreBand(sel.score).meaning || '—';
-                              return '—';
-                            })()}
-                          </span>
-                        </motion.div>
-                        {scoresSummary && <p className="memoDocScoreNote">{scoresSummary}</p>}
-                      </>
+                        {(displayStartup.review?.improvement_to_9?.length ?? 0) > 0 && (
+                          <div className="memoDocSubsection">
+                            <p className="memoDocSubhead">What would make this a 9?</p>
+                            <ul className="memoList">
+                              {(displayStartup.review?.improvement_to_9 ?? []).map((item, i) => (
+                                <li key={i} className="memoListItem">
+                                  <span className="memoBullet" aria-hidden>·</span>
+                                  <span>{normalizeListItemText(item)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
                     )}
 
                     {teamItems.length > 0 && (

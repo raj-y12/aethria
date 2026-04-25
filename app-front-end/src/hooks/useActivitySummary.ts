@@ -14,6 +14,14 @@ export function useActivitySummary(): UseActivitySummaryResult {
   const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
+    // Skip if we just logged in — LoginPage already showed the activity summary
+    const justLoggedIn = sessionStorage.getItem('aethria_just_logged_in');
+    if (justLoggedIn) {
+      sessionStorage.removeItem('aethria_just_logged_in');
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     // Safety valve: never block the app for more than 3s
@@ -26,7 +34,9 @@ export function useActivitySummary(): UseActivitySummaryResult {
         if (cancelled) return;
         clearTimeout(timer);
         setSummary(data);
-        setShowSummary(true);
+        const hasActivity =
+          data.found > 0 || data.reviewed > 0 || data.decided > 0 || data.escalations > 0;
+        setShowSummary(hasActivity);
         setLoading(false);
       })
       .catch((err) => {

@@ -181,8 +181,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 >
                   <option value="NEWEST">Chronological ↓</option>
                   <option value="OLDEST">Chronological ↑</option>
-                  <option value="CONFIDENCE_HIGH">Intelligence ↓</option>
-                  <option value="CONFIDENCE_LOW">Intelligence ↑</option>
+                  <option value="CONFIDENCE_HIGH">Scout Signal ↓</option>
+                  <option value="CONFIDENCE_LOW">Scout Signal ↑</option>
                   <option value="NAME_AZ">Identity A–Z</option>
                 </select>
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-oxford/20">
@@ -307,35 +307,26 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 {isSelected && (
                   <motion.div
                     layoutId="selected-spine"
-                    className="absolute left-0 top-0 w-1.5 h-full bg-oxford/80"
+                    layout="position"
+                    className="pointer-events-none absolute left-0 top-0 w-1.5 h-full bg-oxford/80"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
+                    transition={{
+                      layout: { duration: 0.32, ease: tokens.motion.ease },
+                      opacity: { duration: 0.15, ease: 'easeOut' },
+                    }}
                   />
                 )}
               </AnimatePresence>
 
-              <div className="grid grid-cols-1 gap-phi-5 items-start lg:grid-cols-[76px_minmax(0,1fr)_max-content] 2xl:grid-cols-[100px_minmax(0,1fr)_max-content]">
+              <div className="grid grid-cols-1 gap-phi-5 items-start lg:grid-cols-[60px_minmax(0,1fr)_max-content] 2xl:grid-cols-[72px_minmax(0,1fr)_max-content]">
                 {/* 01: Metadata Index */}
 
-                <div className="flex flex-col gap-phi-3 min-w-0">
+                <div className="flex flex-col gap-phi-2 min-w-0">
                   <span className="type-label-section text-oxford/20 group-hover:text-oxford/50 transition-colors duration-500 tabular-nums">
                     Ref_{displayIndex}
                   </span>
-                  <div className="relative w-0.5 h-16 bg-oxford/5 overflow-hidden">
-                    <motion.div
-                      initial={{ scaleY: 0 }}
-                      animate={{ scaleY: confidence }}
-                      transition={{ duration: 1.2, delay: 0.2, ease: "easeOut" }}
-                      className="absolute bottom-0 left-0 w-full h-full bg-oxford/30 origin-bottom"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="type-meta text-oxford/30 uppercase tracking-tighter">Confidence</span>
-                    <span className="type-meta text-oxford/50 tabular-nums">
-                      {Math.round(confidence * 100)}%
-                    </span>
-                  </div>
                 </div>
 
                 {/* 02: Core Essence */}
@@ -356,6 +347,14 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                     <span className="w-1.5 h-1.5 border border-oxford/20 rotate-45" />
                     <span className="type-meta text-oxford/40 uppercase tabular-nums">
                       {getSourceBadge(startup)}
+                    </span>
+                    <span className="w-1.5 h-1.5 border border-oxford/20 rotate-45" />
+                    <span
+                      className="type-meta text-oxford/35 tabular-nums"
+                      title="Scout-stage confidence used for prioritization, not final investment conviction."
+                      aria-label={`Scout signal ${Math.round(confidence * 100)} percent`}
+                    >
+                      Scout signal {Math.round(confidence * 100)}%
                     </span>
                   </div>
 
@@ -413,55 +412,82 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                       transition={{ duration: 0.25, ease: 'easeOut' }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="mt-phi-4 pt-phi-4 border-t border-oxford/[0.06]">
+                      <div className="mt-phi-4 pt-phi-4 border-t border-oxford/[0.06] space-y-phi-4">
                         {rs.resolved ? (
-                          <span className="type-meta text-oxford/40 uppercase tracking-widest">Decision recorded</span>
-                        ) : !rs.decision ? (
-                          <div className="flex items-center gap-phi-6">
-                            <span className="type-meta text-oxford/45 uppercase tracking-widest">Resolve:</span>
-                            {[
-                              { d: 'YES' as const, label: 'Invest' },
-                              { d: 'NO' as const, label: 'Pass' },
-                              { d: 'MAYBE' as const, label: 'Monitor' },
-                            ].map(({ d, label }) => (
-                              <button
-                                key={d}
-                                type="button"
-                                onClick={() => setRS(startup.id, { decision: d })}
-                                className="type-meta text-oxford/55 hover:text-oxford transition-colors tracking-[0.12em] underline underline-offset-8 decoration-oxford/10 hover:decoration-oxford/40 btn-interaction inline-flex items-center min-h-[44px]"
-                              >
-                                {label}
-                              </button>
-                            ))}
+                          <div className="flex items-start gap-phi-4">
+                            <DecisionBadge variant={
+                              rs.decision === 'YES' ? 'INVEST' : rs.decision === 'NO' ? 'PASS' : 'MONITOR'
+                            } />
+                            {rs.notes && (
+                              <span className="type-meta text-oxford/40 leading-relaxed">{rs.notes}</span>
+                            )}
                           </div>
                         ) : (
-                          <div className="space-y-phi-4">
-                            <textarea
-                              value={rs.notes}
-                              onChange={(e) => setRS(startup.id, { notes: e.target.value })}
-                              placeholder="Add a note explaining your decision..."
-                              autoFocus
-                              rows={2}
-                              className="w-full bg-transparent border-0 border-b border-oxford/10 py-2 type-body text-oxford placeholder:text-oxford/20 outline-none focus:border-oxford/30 transition-colors resize-none"
-                            />
-                            <div className="flex gap-phi-4">
-                              <button
-                                type="button"
-                                onClick={() => handleConfirm(startup.id)}
-                                disabled={rs.notes.trim().length < 5}
-                                className="type-meta text-oxford hover:text-escalation transition-colors disabled:opacity-20 tracking-[0.12em] inline-flex items-center min-h-[44px]"
-                              >
-                                Confirm — {rs.decision}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setRS(startup.id, emptyRowState())}
-                                className="type-meta text-oxford/55 hover:text-oxford transition-colors tracking-[0.12em] inline-flex items-center min-h-[44px]"
-                              >
-                                Cancel
-                              </button>
+                          <>
+                            <div className="flex items-center gap-phi-4">
+                              <span className="type-meta text-oxford/25 uppercase tracking-widest shrink-0">Decision</span>
+                              <div className="flex gap-phi-2">
+                                {([
+                                  { d: 'YES' as const, label: 'Invest' },
+                                  { d: 'NO' as const, label: 'Pass' },
+                                  { d: 'MAYBE' as const, label: 'Monitor' },
+                                ] as const).map(({ d, label }) => {
+                                  const isActive = rs.decision === d;
+                                  const activeClass = d === 'YES'
+                                    ? 'bg-oxford border-oxford text-paper'
+                                    : d === 'NO'
+                                    ? 'border-oxford/40 text-oxford/60 bg-oxford/[0.04]'
+                                    : 'border-oxford/35 text-oxford/60 bg-oxford/[0.03]';
+                                  return (
+                                    <button
+                                      key={d}
+                                      type="button"
+                                      onClick={() => setRS(startup.id, { decision: isActive ? null : d, notes: isActive ? '' : rs.notes })}
+                                      className={`type-meta tracking-[0.1em] uppercase border px-phi-3 py-phi-2 transition-all duration-150 btn-interaction inline-flex items-center justify-center min-h-[32px] min-w-[64px] ${isActive ? activeClass : 'border-oxford/15 text-oxford/35 hover:border-oxford/35 hover:text-oxford/65 bg-transparent'}`}
+                                    >
+                                      {label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </div>
+                            <AnimatePresence>
+                              {rs.decision && (
+                                <motion.div
+                                  key="notes-row"
+                                  initial={{ opacity: 0, y: -4 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -4 }}
+                                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                                  className="flex items-end gap-phi-4"
+                                >
+                                  <textarea
+                                    value={rs.notes}
+                                    onChange={(e) => setRS(startup.id, { notes: e.target.value })}
+                                    placeholder="Rationale..."
+                                    autoFocus
+                                    rows={1}
+                                    className="flex-1 bg-transparent border-0 border-b border-oxford/10 py-phi-1 type-meta text-oxford/80 placeholder:text-oxford/20 outline-none focus:border-oxford/30 transition-colors resize-none tracking-[0.04em]"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleConfirm(startup.id)}
+                                    disabled={rs.notes.trim().length < 5}
+                                    className="type-meta text-oxford/65 hover:text-oxford transition-colors disabled:opacity-20 tracking-[0.12em] inline-flex items-center min-h-[32px] whitespace-nowrap"
+                                  >
+                                    Confirm →
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRS(startup.id, emptyRowState())}
+                                    className="type-meta text-oxford/30 hover:text-oxford/60 transition-colors tracking-[0.12em] inline-flex items-center min-h-[32px]"
+                                  >
+                                    ×
+                                  </button>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </>
                         )}
                       </div>
                     </motion.div>

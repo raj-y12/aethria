@@ -16,6 +16,7 @@ from fund_thesis import rule_based_thesis_alignment, thesis_context_has_embeddin
 from pipeline_state import upsert_pipeline_state
 from utils.storage import Storage
 from utils.settings_loader import is_reviewers_enabled, load_settings
+from utils.scoring import DEFAULT_SCORE_SOURCE, compute_overall_score, enrich_scores
 
 
 logger = logging.getLogger(__name__)
@@ -170,6 +171,8 @@ class ReviewerEngine:
             primary["confidence_adjusted_score"] = round(s_bar * (1.0 - delta / 10.0), 3)
         else:
             primary["confidence_adjusted_score"] = round(s_bar, 3)
+        primary["score_source"] = DEFAULT_SCORE_SOURCE
+        primary.update(enrich_scores(primary))
 
     @staticmethod
     def _derive_verdict_from_scores(primary: dict) -> None:
@@ -482,6 +485,23 @@ class ReviewerEngine:
                         investment_thesis=r.get("investment_thesis") or None,
                         risk_mitigation=r.get("risk_mitigation") or None,
                         score_reasoning=r.get("score_reasoning") or None,
+                        score_source=r.get("score_source"),
+                        improvement_to_9=r.get("improvement_to_9") or None,
+                        market_reasoning=r.get("market_reasoning") or None,
+                        market_weaknesses=r.get("market_weaknesses") or None,
+                        market_confidence=r.get("market_confidence"),
+                        product_reasoning=r.get("product_reasoning") or None,
+                        product_weaknesses=r.get("product_weaknesses") or None,
+                        product_confidence=r.get("product_confidence"),
+                        technical_reasoning=r.get("technical_reasoning") or None,
+                        technical_weaknesses=r.get("technical_weaknesses") or None,
+                        technical_confidence=r.get("technical_confidence"),
+                        execution_reasoning=r.get("execution_reasoning") or None,
+                        execution_weaknesses=r.get("execution_weaknesses") or None,
+                        execution_confidence=r.get("execution_confidence"),
+                        defensibility_reasoning=r.get("defensibility_reasoning") or None,
+                        defensibility_weaknesses=r.get("defensibility_weaknesses") or None,
+                        defensibility_confidence=r.get("defensibility_confidence"),
                         prompt_version=r.get("prompt_version"),
                     ))
                 
@@ -501,12 +521,7 @@ class ReviewerEngine:
                 if success:
                     reviewed_count += 1
                     verdict = review_output.get("verdict", "UNKNOWN")
-                    avg_score = (
-                        review_output.get("market_score", 0) +
-                        review_output.get("product_score", 0) +
-                        review_output.get("technical_score", 0) +
-                        review_output.get("execution_score", 0)
-                    ) / 4.0
+                    avg_score = compute_overall_score(review_output) or 0.0
                     
                     self.logger.info(
                         f"Reviewed entry {entry_id}: {verdict} "
@@ -703,6 +718,23 @@ class ReviewerEngine:
                     investment_thesis=r.get("investment_thesis") or None,
                     risk_mitigation=r.get("risk_mitigation") or None,
                     score_reasoning=r.get("score_reasoning") or None,
+                    score_source=r.get("score_source"),
+                    improvement_to_9=r.get("improvement_to_9") or None,
+                    market_reasoning=r.get("market_reasoning") or None,
+                    market_weaknesses=r.get("market_weaknesses") or None,
+                    market_confidence=r.get("market_confidence"),
+                    product_reasoning=r.get("product_reasoning") or None,
+                    product_weaknesses=r.get("product_weaknesses") or None,
+                    product_confidence=r.get("product_confidence"),
+                    technical_reasoning=r.get("technical_reasoning") or None,
+                    technical_weaknesses=r.get("technical_weaknesses") or None,
+                    technical_confidence=r.get("technical_confidence"),
+                    execution_reasoning=r.get("execution_reasoning") or None,
+                    execution_weaknesses=r.get("execution_weaknesses") or None,
+                    execution_confidence=r.get("execution_confidence"),
+                    defensibility_reasoning=r.get("defensibility_reasoning") or None,
+                    defensibility_weaknesses=r.get("defensibility_weaknesses") or None,
+                    defensibility_confidence=r.get("defensibility_confidence"),
                     prompt_version=r.get("prompt_version"),
                 ))
 

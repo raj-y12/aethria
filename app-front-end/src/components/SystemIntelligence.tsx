@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import type {
-  SignalItem, RejectionAnalytics, WatchlistAnalytics,
+  Startup, SignalItem, RejectionAnalytics, WatchlistAnalytics,
   ConcentrationAnalytics, MetaCycleReport, ScoutWeights, CalibrationState,
 } from '../types/startup';
 import { triggerMetaCycle } from '../api/meta';
@@ -12,15 +12,17 @@ import { usePrefersReducedMotion } from '../hooks';
 import EmptyState from './EmptyState';
 import { fetchFundThesisRuntime, type FundThesisRuntime } from '../api/fundThesis';
 
-type Tab = 'signals' | 'analytics' | 'thesis' | 'meta';
+type Tab = 'signals' | 'analytics' | 'decisions' | 'thesis' | 'meta';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'signals', label: 'Signals' },
   { key: 'analytics', label: 'Analytics' },
+  { key: 'decisions', label: 'Decisions' },
   { key: 'thesis', label: 'Thesis' },
   { key: 'meta', label: 'Meta' },
 ];
 
 interface SystemIntelligenceProps {
+  startups: Startup[];
   signals: SignalItem[];
   rejectionAnalytics: RejectionAnalytics;
   watchlistAnalytics: WatchlistAnalytics;
@@ -118,6 +120,78 @@ function SignalsTab({ signals }: { signals: SignalItem[] }) {
               <span className="type-meta text-oxford/30 uppercase">Date</span>
               <span className="font-mono type-meta text-oxford/50 tabular-nums">
                 {sig.detected_at ? new Date(sig.detected_at).toLocaleDateString('en-GB') : ''}
+              </span>
+            </div>
+          </div>
+        </RowWrapper>
+      ))}
+    </div>
+  );
+}
+
+/* ─── DECISIONS ─── */
+function DecisionsTab({ startups }: { startups: Startup[] }) {
+  const decisions = startups
+    .filter((startup) => startup.human_resolution?.decision)
+    .map((startup) => {
+      const raw = startup.human_resolution?.decision;
+      const mapped =
+        raw === 'YES'
+          ? 'Invest'
+          : raw === 'MAYBE'
+            ? 'Monitor'
+            : 'Pass';
+      return {
+        id: startup.id,
+        name: startup.scout?.name?.trim() || startup.id,
+        decision: mapped,
+        notes: startup.human_resolution?.notes?.trim() ?? '',
+        resolvedAt: startup.human_resolution?.resolved_at,
+      };
+    });
+
+  if (decisions.length === 0) {
+    return (
+      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
+        <EmptyState label="Decisions" body="No manual decisions yet. Resolve an escalation to see invest, monitor, or pass outcomes." />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col relative">
+      {decisions.map((item, i) => (
+        <RowWrapper key={item.id} index={i}>
+          <div className="flex flex-col gap-phi-3 min-w-0">
+            <span className="font-mono type-label-section text-oxford/20 group-hover:text-oxford/50 transition-colors duration-500 tabular-nums">
+              {(i + 1).toString().padStart(2, '0')}
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <span className="type-meta text-oxford/30 uppercase tracking-tighter">Decision</span>
+              <span className="type-meta text-oxford/70 uppercase tracking-[0.14em]">{item.decision}</span>
+            </div>
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-phi-4">
+            <div className="flex items-center gap-2">
+              <span className="type-meta text-oxford/40 uppercase tracking-widest">Startup</span>
+              <span className="w-1.5 h-1.5 border border-oxford/20 rotate-45" />
+              <span className="type-label-tab text-oxford/75 truncate">{item.name}</span>
+            </div>
+            {item.notes ? (
+              <p className="type-body text-oxford/68 leading-relaxed italic bg-oxford/[0.02] px-phi-3 py-phi-2 max-w-2xl">
+                {item.notes}
+              </p>
+            ) : (
+              <p className="type-meta text-oxford/40 uppercase tracking-[0.14em]">No notes provided</p>
+            )}
+          </div>
+
+          <div className="flex min-w-0 flex-col items-start gap-phi-5 lg:items-end">
+            <div className="flex flex-col items-start lg:items-end gap-phi-2">
+              <span className="type-meta text-oxford/30 uppercase tracking-widest">Resolved</span>
+              <span className="font-mono type-meta text-oxford/50 tabular-nums">
+                {item.resolvedAt ? new Date(item.resolvedAt).toLocaleDateString('en-GB') : '--'}
               </span>
             </div>
           </div>
@@ -443,6 +517,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
               concentration={props.concentrationAnalytics}
             />
           )}
+          {activeTab === 'decisions' && <DecisionsTab startups={props.startups} />}
           {activeTab === 'thesis' && <InstitutionalMandateTab />}
           {activeTab === 'meta' && (
             <MetaCommandTab reports={props.metaReports} weights={props.scoutWeights} calibration={props.calibrationState} />

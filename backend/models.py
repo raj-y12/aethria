@@ -63,6 +63,23 @@ class SingleReview(BaseModel):
     investment_thesis: Optional[List[str]] = None
     risk_mitigation: Optional[List[str]] = None
     score_reasoning: Optional[Dict[str, str]] = None
+    score_source: Optional[str] = None
+    improvement_to_9: Optional[List[str]] = None
+    market_reasoning: Optional[List[str]] = None
+    market_weaknesses: Optional[List[str]] = None
+    market_confidence: Optional[Literal["low", "medium", "high"]] = None
+    product_reasoning: Optional[List[str]] = None
+    product_weaknesses: Optional[List[str]] = None
+    product_confidence: Optional[Literal["low", "medium", "high"]] = None
+    technical_reasoning: Optional[List[str]] = None
+    technical_weaknesses: Optional[List[str]] = None
+    technical_confidence: Optional[Literal["low", "medium", "high"]] = None
+    execution_reasoning: Optional[List[str]] = None
+    execution_weaknesses: Optional[List[str]] = None
+    execution_confidence: Optional[Literal["low", "medium", "high"]] = None
+    defensibility_reasoning: Optional[List[str]] = None
+    defensibility_weaknesses: Optional[List[str]] = None
+    defensibility_confidence: Optional[Literal["low", "medium", "high"]] = None
     # Optional hash of the prompt used by this reviewer instance.
     prompt_version: Optional[str] = None
 
@@ -88,6 +105,30 @@ class ReviewInfo(BaseModel):
     investment_thesis: Optional[List[str]] = None  # Bullet points why to invest + core assumptions
     risk_mitigation: Optional[List[str]] = None  # Actionable strategies per diligence_red_flags
     score_reasoning: Optional[Dict[str, str]] = None  # Per-dimension concise reasoning, e.g. {"market_score": "...", "product_score": "..."}
+    score_source: Optional[str] = None
+    improvement_to_9: Optional[List[str]] = None
+    market_reasoning: Optional[List[str]] = None
+    market_weaknesses: Optional[List[str]] = None
+    market_confidence: Optional[Literal["low", "medium", "high"]] = None
+    product_reasoning: Optional[List[str]] = None
+    product_weaknesses: Optional[List[str]] = None
+    product_confidence: Optional[Literal["low", "medium", "high"]] = None
+    technical_reasoning: Optional[List[str]] = None
+    technical_weaknesses: Optional[List[str]] = None
+    technical_confidence: Optional[Literal["low", "medium", "high"]] = None
+    execution_reasoning: Optional[List[str]] = None
+    execution_weaknesses: Optional[List[str]] = None
+    execution_confidence: Optional[Literal["low", "medium", "high"]] = None
+    defensibility_reasoning: Optional[List[str]] = None
+    defensibility_weaknesses: Optional[List[str]] = None
+    defensibility_confidence: Optional[Literal["low", "medium", "high"]] = None
+    overall_score: Optional[float] = None
+    overall_label: Optional[str] = None
+    market_score_label: Optional[str] = None
+    product_score_label: Optional[str] = None
+    technical_score_label: Optional[str] = None
+    execution_score_label: Optional[str] = None
+    defensibility_score_label: Optional[str] = None
     # Multi-reviewer fields (Meta-Agent aware)
     reviews: Optional[List[SingleReview]] = None
     consensus_verdict: Optional[Literal["STRONG", "MEDIUM", "WEAK"]] = None
