@@ -33,6 +33,18 @@ interface SystemIntelligenceProps {
   onClose?: () => void;
 }
 
+const FilterButton = ({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`type-meta min-h-[36px] px-2 transition-[color,border-color,background-color] duration-200 border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+      active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/45 hover:text-oxford/70'
+    }`}
+  >
+    {label}
+  </button>
+);
+
 function TacticalBar({ pct, delay = 0 }: { pct: number; delay?: number }) {
   const reduceMotion = usePrefersReducedMotion();
   return (
@@ -58,12 +70,12 @@ function RowWrapper({ children, index, onClick, isSelected }: { children: React.
     <motion.div
       initial={reduceMotion ? {} : { opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: Math.min(index * 0.04, 0.4), duration: 0.6, ease: tokens.motion.ease }}
-      className={`group relative border-b border-oxford/[0.06] py-phi-5 px-phi-4 transition-colors duration-500 ease-smooth ${onClick ? 'cursor-pointer' : ''
+      transition={{ delay: Math.min(index * 0.03, 0.3), duration: 0.4, ease: tokens.motion.ease }}
+      className={`group relative border-b border-oxford/[0.06] py-phi-3 px-phi-3 transition-colors duration-200 ease-smooth ${onClick ? 'cursor-pointer' : ''
         } ${isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.02]'}`}
       onClick={onClick}
     >
-      <div className="grid grid-cols-1 gap-phi-5 items-start lg:grid-cols-[76px_minmax(0,1fr)_max-content] 2xl:grid-cols-[100px_minmax(0,1fr)_max-content]">
+      <div className="grid grid-cols-1 gap-phi-3 items-start lg:grid-cols-[26px_minmax(0,1fr)_auto]">
         {children}
       </div>
     </motion.div>
@@ -84,12 +96,12 @@ function SignalsTab({ signals }: { signals: SignalItem[] }) {
       {signals.map((sig, i) => (
         <RowWrapper key={sig.id ?? i} index={i}>
           {/* Index */}
-          <div className="flex flex-col gap-phi-3 min-w-0">
-            <span className="font-mono type-label-section text-oxford/20 group-hover:text-oxford/50 transition-colors duration-500 tabular-nums">
+          <div className="flex flex-col gap-phi-2 min-w-0">
+            <span className="type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums">
               {(i + 1).toString().padStart(2, '0')}
             </span>
             <div className="flex flex-col gap-0.5">
-              <span className="type-meta text-oxford/30 uppercase tracking-tighter">Time</span>
+              <span className="type-meta text-oxford/35">Time</span>
               <span className="font-mono type-meta text-oxford/50 tabular-nums">
                 {sig.detected_at ? new Date(sig.detected_at).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '--:--'}
               </span>
@@ -97,27 +109,27 @@ function SignalsTab({ signals }: { signals: SignalItem[] }) {
           </div>
 
           {/* Content */}
-          <div className="flex min-w-0 flex-col gap-phi-4">
+          <div className="flex min-w-0 flex-col gap-phi-2">
             <div className="flex items-center gap-2">
-              <span className="type-meta text-oxford/40 uppercase tracking-widest">{sig.signal_type.replace(/_/g, ' ')}</span>
-              <span className="w-1.5 h-1.5 border border-oxford/20 rotate-45" />
-              <span className="type-label-tab text-oxford/40">{sig.startup_id?.slice(0, 8) ?? 'Unknown'}</span>
+              <span className="type-meta text-oxford/40">{sig.signal_type.replace(/_/g, ' ')}</span>
+              <span className="type-meta text-oxford/20">·</span>
+              <span className="type-meta text-oxford/40">{sig.startup_id?.slice(0, 8) ?? 'Unknown'}</span>
             </div>
-            <p className="type-body text-oxford/68 leading-relaxed italic bg-oxford/[0.02] px-phi-3 py-phi-2 max-w-2xl">
+            <p className="type-note text-oxford/62 leading-relaxed max-w-2xl">
               {sig.description}
             </p>
           </div>
 
           {/* Meta */}
-          <div className="flex min-w-0 flex-col items-start gap-phi-5 lg:items-end">
+          <div className="flex min-w-0 flex-col items-start gap-phi-3 lg:items-end">
             <div className="flex flex-col items-start lg:items-end gap-phi-2">
-              <span className="type-meta text-oxford/30 uppercase tracking-widest">Source</span>
-              <span className="type-meta text-oxford/50 uppercase tracking-tighter">
+              <span className="type-meta text-oxford/35">Source</span>
+              <span className="type-meta text-oxford/50">
                 {sig.tracker_agent_id ?? sig.source ?? 'System'}
               </span>
             </div>
-            <div className="flex w-full flex-col items-start gap-phi-1 border-t border-oxford/[0.06] pt-phi-4 lg:w-auto lg:items-end">
-              <span className="type-meta text-oxford/30 uppercase">Date</span>
+            <div className="flex w-full flex-col items-start gap-phi-1 border-t border-oxford/[0.06] pt-phi-2 lg:w-auto lg:items-end">
+              <span className="type-meta text-oxford/35">Date</span>
               <span className="font-mono type-meta text-oxford/50 tabular-nums">
                 {sig.detected_at ? new Date(sig.detected_at).toLocaleDateString('en-GB') : ''}
               </span>
@@ -162,34 +174,34 @@ function DecisionsTab({ startups }: { startups: Startup[] }) {
     <div className="flex flex-col relative">
       {decisions.map((item, i) => (
         <RowWrapper key={item.id} index={i}>
-          <div className="flex flex-col gap-phi-3 min-w-0">
-            <span className="font-mono type-label-section text-oxford/20 group-hover:text-oxford/50 transition-colors duration-500 tabular-nums">
+          <div className="flex flex-col gap-phi-2 min-w-0">
+            <span className="type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums">
               {(i + 1).toString().padStart(2, '0')}
             </span>
             <div className="flex flex-col gap-0.5">
-              <span className="type-meta text-oxford/30 uppercase tracking-tighter">Decision</span>
-              <span className="type-meta text-oxford/70 uppercase tracking-[0.14em]">{item.decision}</span>
+              <span className="type-meta text-oxford/35">Decision</span>
+              <span className="type-meta text-oxford/70">{item.decision}</span>
             </div>
           </div>
 
-          <div className="flex min-w-0 flex-col gap-phi-4">
+          <div className="flex min-w-0 flex-col gap-phi-2">
             <div className="flex items-center gap-2">
-              <span className="type-meta text-oxford/40 uppercase tracking-widest">Startup</span>
-              <span className="w-1.5 h-1.5 border border-oxford/20 rotate-45" />
+              <span className="type-meta text-oxford/40">Startup</span>
+              <span className="type-meta text-oxford/20">·</span>
               <span className="type-label-tab text-oxford/75 truncate">{item.name}</span>
             </div>
             {item.notes ? (
-              <p className="type-body text-oxford/68 leading-relaxed italic bg-oxford/[0.02] px-phi-3 py-phi-2 max-w-2xl">
+              <p className="type-note text-oxford/62 leading-relaxed max-w-2xl">
                 {item.notes}
               </p>
             ) : (
-              <p className="type-meta text-oxford/40 uppercase tracking-[0.14em]">No notes provided</p>
+              <p className="type-meta text-oxford/40">No notes provided</p>
             )}
           </div>
 
           <div className="flex min-w-0 flex-col items-start gap-phi-5 lg:items-end">
             <div className="flex flex-col items-start lg:items-end gap-phi-2">
-              <span className="type-meta text-oxford/30 uppercase tracking-widest">Resolved</span>
+              <span className="type-meta text-oxford/35">Resolved</span>
               <span className="font-mono type-meta text-oxford/50 tabular-nums">
                 {item.resolvedAt ? new Date(item.resolvedAt).toLocaleDateString('en-GB') : '--'}
               </span>
@@ -204,9 +216,9 @@ function DecisionsTab({ startups }: { startups: Startup[] }) {
 /* ─── SECTION WRAPPER ─── */
 function TabSection({ title, label, children }: { title: string; label?: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-phi-4 px-phi-4 py-phi-5 border-b border-oxford/[0.06] last:border-0">
-      <div className="flex items-center justify-between border-b border-oxford/[0.06] pb-phi-3">
-        <h3 className="type-meta text-oxford/50 uppercase tracking-[0.18em]">{title}</h3>
+    <section className="flex flex-col gap-phi-3 px-phi-3 py-phi-4 border-b border-oxford/[0.06] last:border-0">
+      <div className="flex items-center justify-between border-b border-oxford/[0.06] pb-phi-2">
+        <h3 className="type-meta text-oxford/50">{title}</h3>
         {label && <span className="type-meta text-oxford/30">{label}</span>}
       </div>
       {children}
@@ -467,23 +479,20 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
 
   return (
     <div className="w-full font-sans bg-paper selection:bg-oxford selection:text-paper min-h-full">
-      <div className="sticky top-0 z-20 bg-paper border-b border-oxford/[0.06] px-phi-4 py-phi-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-phi-4">
+      <div className="sticky top-0 z-20 bg-paper border-b border-oxford/[0.06] px-phi-3 py-phi-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-phi-3">
             <span className={UI_FILTER_TOOLBAR_LABEL}>System</span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5">
               {TABS.map((tab) => {
                 const isActive = activeTab === tab.key;
                 return (
-                  <button
+                  <FilterButton
                     key={tab.key}
-                    type="button"
                     onClick={() => setActiveTab(tab.key)}
-                    className={`type-label-tab min-h-[44px] px-3 py-1.5 transition-[color,border-color,background-color] duration-300 border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${isActive ? 'border-oxford text-oxford bg-oxford/5' : 'border-transparent text-oxford/45 hover:text-oxford/70'
-                      }`}
-                  >
-                    {tab.label}
-                  </button>
+                    active={isActive}
+                    label={tab.label}
+                  />
                 );
               })}
             </div>
@@ -492,7 +501,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
             <button
               type="button"
               onClick={props.onClose}
-              className="type-label-tab min-h-[44px] text-oxford/55 hover:text-oxford transition-colors pl-phi-4"
+              className="type-meta min-h-[36px] text-oxford/55 hover:text-oxford transition-colors pl-phi-2"
               aria-label="Hide system intelligence"
             >
               Close

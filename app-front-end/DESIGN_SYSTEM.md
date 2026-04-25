@@ -6,10 +6,10 @@ Institutional, editorial UI. Modelled after a private equity firm's internal dea
 
 ## Philosophy
 
-- **No rounded corners.** Every surface is rectilinear. No `border-radius` anywhere.
+- **No rounded corners by default.** Every product surface is rectilinear. Any radius exception must be explicitly documented in this file.
 - **No shadows.** Depth is created via hairline borders and background tints, never box-shadow.
 - **No colour for colour's sake.** The palette has four roles: surface, text, structure (hairlines), and attention (escalation only).
-- **Typography carries hierarchy.** Three typefaces, each locked to a role. Font size follows the golden ratio (φ = 1.618034).
+- **Typography carries hierarchy.** Four type roles are locked to purpose. Font size follows the golden ratio (phi = 1.618034).
 - **Spacing is a Fibonacci sequence.** Every spacing decision maps to a named step — no arbitrary px values.
 - **Information density is intentional.** The UI is compact and tabular. Whitespace is earned, not decorative.
 
@@ -26,9 +26,9 @@ Institutional, editorial UI. Modelled after a private equity firm's internal dea
 | `paper-bright` | `#F2F0EA` | Raised surface, sheet overlay (unified) |
 | `ivory` | `#F2F0EA` | Document surface (unified) |
 | `charcoal` | `#2f333b` | Secondary prose text |
-| `gold` | `#b8976a` | Heritage decorative accent — section rules, diamonds |
+| `heritage-gold` | `#b8976a` | Heritage decorative accent — section rules, diamonds |
 | `gold-soft` | `rgba(184,151,106,0.35)` | Gold tint surfaces |
-| `escalation` | `#7D2B3A` | **Human-attention alerts only** — escalation dots, counts |
+| `escalation` | `#7D2B3A` | **Human-attention alerts only** — escalation dots, counts, critical intervention states |
 | `hairline` | `rgba(0,33,71,0.06)` | Default 1px borders (structural frames) |
 | `hairline-strong` | `rgba(0,33,71,0.12)` | Emphasized dividers |
 | `field-border` | `rgba(0,33,71,0.15)` | Input / select borders |
@@ -51,6 +51,12 @@ Use Tailwind's opacity modifier: `text-oxford/100`, `text-oxford/80`, etc.
 | `25` | Placeholder, disabled |
 | `10` | Faint rules, ghost text |
 
+### Cross-app semantic contract (mandatory)
+
+- `escalation` is always `#7D2B3A` and is never used as a decorative accent.
+- `heritage-gold` is decorative only and never used for critical status semantics.
+- In code, avoid introducing new raw hex values in class strings when a semantic token exists.
+
 ---
 
 ## Typography
@@ -59,28 +65,35 @@ Use Tailwind's opacity modifier: `text-oxford/100`, `text-oxford/80`, etc.
 
 | Family | Variable | Role | When to use |
 |---|---|---|---|
-| **Geist Sans** | `font-sans` / `font-body` | UI text, body, headings | Everything by default |
-| **Libre Baskerville** | `font-display` | Display / hero | Large hero text only (`type-hero`) |
-| **Cormorant Garamond** | `font-cormorant` | Wordmark | Logo / wordmark lockup only |
-| **Space Mono** | `font-mono` | Metadata, labels | Section labels, timestamps, badge text |
+| **Geist Sans** | `font-sans` / `font-body` | UI text, body, most headings | Everything by default in app product UI |
+| **EB Garamond** | `font-display` | Editorial display headings | Hero/editorial headings in both fronts |
+| **Libre Baskerville** | `font-wordmark` | Wordmark only | Logo lockups, brand mark word treatment |
+| **JetBrains Mono** | `font-mono` | Metadata, labels, tabular microtext | Section labels, timestamps, badge text, telemetry labels |
 
 ### Type scale (golden ratio, φ = 1.618034)
 
 | Class | Family | Size | Line-height | Tracking | Weight |
 |---|---|---|---|---|---|
-| `.type-hero` | Libre Baskerville | `37px` (14×φ²) | `1.2` | `-0.02em` | `400` |
+| `.type-hero` | EB Garamond | `37px` (14×φ²) | `1.2` | `-0.02em` | `400` |
 | `.type-title` | Geist Sans | `23px` (14×φ) | `1.382` (2−1/φ) | `-0.02em` | `500` |
 | `.type-body` | Geist Sans | `14px` | `1.618` (φ) | `0` | `400` |
 | `.type-body-sm` | Geist Sans | `13px` | `1.618` | `0` | `400` |
-| `.type-label-section` | Space Mono | `11px` | `1.5` | `0.12em` | `400` |
-| `.type-label-tab` | Space Mono | `10px` | `1.5` | `0.14em` | `400` |
-| `.type-meta` | Space Mono | `10px` | `1.5` | `0.12em` | `400` |
+| `.type-label-section` | JetBrains Mono | `11px` | `1.5` | `0.12em` | `400` |
+| `.type-label-tab` | JetBrains Mono | `10px` | `1.5` | `0.14em` | `400` |
+| `.type-meta` | JetBrains Mono | `10px` | `1.5` | `0.12em` | `400` |
 
 **Rules:**
 - No font sizes outside this scale.
 - Titles use `letter-spacing: -0.02em` (tighter, editorial).
 - Labels use `text-transform: uppercase` + wide tracking.
 - Base `font-size` on `<body>` is `14px`.
+- `type-display` and `type-display-xl` are editorial utility variants built from `font-display`.
+
+### Transitional typography allowances (current code reality)
+
+- Existing `11px/12px/15px` utility text appears in both fronts and is temporarily allowed during cleanup.
+- Existing clamp-based hero sizes are temporarily allowed for responsive editorial sections.
+- New component work should map to the canonical scale unless there is a documented accessibility or responsive reason.
 
 ---
 
@@ -142,8 +155,14 @@ Golden ratio Fibonacci sequence. Every layout value maps to a named step.
 - **Default border colour**: `hairline` = `rgba(0,33,71,0.06)`.
 - **Component frames**: `border border-hairline` → `.app-chrome-frame`.
 - **Raised surfaces**: `border border-hairline bg-paper-bright` → `.app-chrome-frame-raised`.
-- **No `border-radius` anywhere.** Tailwind's `rounded-*` resolves to `0`.
+- **No `border-radius` on product chrome.** Tailwind's `rounded-*` should resolve to `0` for all app shell/UI surfaces.
 - **No `box-shadow` anywhere.** Tailwind's `shadow-*` resolves to `none`.
+
+### Radius exceptions (explicitly allowed)
+
+- Animated loader dots and cursor primitives may use circular geometry when required for motion language.
+- Tiny mechanical toggles may use `2px` radius where square edges materially harm legibility/touch affordance.
+- No other radius usage is allowed without updating this section first.
 
 ### Utility classes
 ```
@@ -154,7 +173,7 @@ Golden ratio Fibonacci sequence. Every layout value maps to a named step.
 ### Section decoration (web-front-end pattern, use in editorial contexts)
 - `.doc-rule-with-diamond` — full-width 1px rule + centered 4×4 oxford diamond
 - `.paper-dot-grid` — `#F2F0EA` bg with `rgba(0,33,71,0.055)` 1px dots at 28px
-- `.section-numeral` — `Space Mono 9px`, tracking `0.12em`, `oxford/20`
+- `.section-numeral` — `JetBrains Mono 9px`, tracking `0.12em`, `oxford/20`
 
 ---
 
@@ -261,6 +280,10 @@ scrollbar-color: oxford transparent;
 /* webkit: 4px width, oxford thumb, no border-radius */
 ```
 
+### Reduced motion
+
+- Any continuous marquee, pulse, breathe, or reveal animation must provide a `prefers-reduced-motion: reduce` fallback.
+
 ### Market tape (web-front-end, editorial contexts)
 ```css
 animation: market-tape-marquee 96s linear infinite;
@@ -271,9 +294,38 @@ animation: market-tape-marquee 96s linear infinite;
 ## What makes the UI feel premium
 
 1. **Zero decoration.** No gradients, no shadows, no border-radius. Every element earns its place through structure.
-2. **Typographic hierarchy is everything.** Three distinct typefaces, each locked to a single role. Size follows the golden ratio — relationships feel inevitable, not arbitrary.
+2. **Typographic hierarchy is everything.** Typeface roles are strict and non-overlapping. Size follows the golden ratio — relationships feel inevitable, not arbitrary.
 3. **Spacing is a mathematical system.** The Fibonacci sequence means every gap is proportionally related to every other gap.
 4. **Colour restraint.** Entire UI runs on one colour (oxford blue) at different opacities over one warm neutral (paper). Nothing else. Escalation red appears ≤1% of the time.
 5. **Institutional references.** The aesthetic draws from Lazard/Goldman research documents: section diamonds, document rules, paper-dot grids, uppercase mono labels.
 6. **Density signals competence.** The interface is compact and data-forward. Information is not padded for comfort — it respects the user's expertise.
-7. **The golden ratio is structural.** Column split (38.2/61.8), spacing steps, type scale — φ is the hidden grid.
+7. **The golden ratio is structural.** Column split (38.2/61.8), spacing steps, type scale — phi is the hidden grid.
+
+---
+
+## Canonical vs Transitional
+
+### Canonical (new code must follow)
+
+- Use semantic tokens first (`oxford`, `paper`, `escalation`, `heritage-gold`, `hairline`).
+- Keep product UI surfaces square and shadowless.
+- Use typography roles exactly as defined in this document.
+- Prefer token utilities and design-system primitives over ad-hoc per-component styling.
+
+### Transitional (legacy code tolerated short-term)
+
+- Existing arbitrary color classes and raw rgba/hex in older marketing sections.
+- Existing non-canonical type utility sizes (`11px`, `12px`, `15px`, custom clamp ranges).
+- Existing isolated radius usage in loaders/toggles.
+
+These are migration debt, not precedent for new code.
+
+---
+
+## Enforcement Checklist
+
+- No new raw hex color in TSX class strings when token alternatives exist.
+- No new `rounded-*` classes outside documented exceptions.
+- No new `shadow-*` classes.
+- New typography utilities should map to canonical scale or include a comment explaining exception intent.
+- `escalation` red stays reserved for human-attention states only.

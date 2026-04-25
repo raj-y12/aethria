@@ -55,8 +55,8 @@ const FilterButton = ({ active, label, onClick }: { active: boolean; label: stri
   <button
     type="button"
     onClick={onClick}
-    className={`type-label-tab min-h-[44px] px-3 py-1.5 transition-[color,border-color,background-color] duration-300 border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-      active ? 'border-oxford text-oxford bg-oxford/5' : 'border-transparent text-oxford/45 hover:text-oxford/70'
+    className={`type-meta min-h-[36px] px-2 transition-[color,border-color,background-color] duration-200 border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+      active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/45 hover:text-oxford/70'
     }`}
   >
     {label}
@@ -144,24 +144,23 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
 
   return (
     <div className="w-full font-sans bg-paper selection:bg-oxford selection:text-paper">
-      {/* Editorial Toolbar — Museum Grade */}
-      <div className="sticky top-0 z-20 bg-paper border-b border-oxford/[0.06] px-phi-4 py-phi-4">
-        <div className="flex flex-col gap-phi-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-phi-4">
-              <span className={UI_FILTER_TOOLBAR_LABEL}>Archive</span>
-              <div className="flex items-center gap-1">
+      <div className="sticky top-0 z-20 bg-paper border-b border-oxford/[0.06] px-phi-3 py-phi-2">
+        <div className="flex flex-col gap-phi-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-phi-3">
+              <span className={UI_FILTER_TOOLBAR_LABEL}>Deals</span>
+              <div className="flex items-center gap-0.5">
                 <FilterButton active={sourceFilter === 'ALL'} label="Universe" onClick={() => setSourceFilter('ALL')} />
                 <FilterButton active={sourceFilter === 'SCOUT'} label="Scout" onClick={() => setSourceFilter('SCOUT')} />
                 <FilterButton active={sourceFilter === 'LOOKUP'} label="Lookup" onClick={() => setSourceFilter('LOOKUP')} />
               </div>
             </div>
-            <div className="flex items-center gap-phi-4">
+            <div className="flex items-center gap-phi-3">
               <div className="relative group">
                 <select
                   value={sortFilter}
                   onChange={(e) => setSortFilter(e.target.value as SortFilter)}
-                  className="appearance-none min-h-[44px] bg-transparent type-meta tracking-wide text-oxford/55 hover:text-oxford transition-colors pr-6 outline-none cursor-pointer"
+                  className="appearance-none min-h-[36px] bg-transparent type-meta tracking-wide text-oxford/55 hover:text-oxford transition-colors pr-6 outline-none cursor-pointer"
                 >
                   <option value="NEWEST">Chronological ↓</option>
                   <option value="OLDEST">Chronological ↑</option>
@@ -176,7 +175,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
               <button
                 type="button"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="type-label-tab min-h-[44px] text-oxford/55 hover:text-oxford transition-colors pl-phi-4"
+                className="type-meta min-h-[36px] text-oxford/55 hover:text-oxford transition-colors pl-phi-2"
               >
                 {showAdvancedFilters ? 'Collapse' : 'Refine'}
               </button>
@@ -192,15 +191,15 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 transition={{ duration: 0.2, ease: tokens.motion.ease }}
                 className="border-t border-oxford/[0.06]"
               >
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-phi-5 pt-phi-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-phi-4 pt-phi-3">
                 <div className="space-y-2">
-                  <span className="type-meta text-oxford/45 uppercase tracking-widest">Economic Decision</span>
+                  <span className="type-meta text-oxford/45">Decision</span>
                   <div className="flex flex-wrap gap-2">
                     {['ALL', 'YES', 'NO', 'MAYBE', 'ESCALATION'].map((d) => (
                       <button
                         key={d}
                         onClick={() => setDecisionFilter(d as DecisionFilter)}
-                        className={`type-meta px-3 min-h-[44px] border border-oxford/10 transition-colors ${
+                        className={`type-meta px-3 min-h-[36px] border border-oxford/10 transition-colors ${
                           decisionFilter === d ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
                         }`}
                       >
@@ -210,13 +209,13 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <span className="type-meta text-oxford/45 uppercase tracking-widest">Intelligence Band</span>
+                  <span className="type-meta text-oxford/45">Review band</span>
                   <div className="flex flex-wrap gap-2">
                     {['ALL', 'STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'].map((r) => (
                       <button
                         key={r}
                         onClick={() => setReviewFilter(r as ReviewFilter)}
-                        className={`type-meta px-3 min-h-[44px] border border-oxford/10 transition-colors ${
+                        className={`type-meta px-3 min-h-[36px] border border-oxford/10 transition-colors ${
                           reviewFilter === r ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
                         }`}
                       >
@@ -233,9 +232,9 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                       setReviewFilter('ALL');
                       setSortFilter('NEWEST');
                     }}
-                    className="type-label-tab min-h-[44px] text-oxford/55 hover:text-accent transition-colors underline underline-offset-4"
+                    className="type-meta min-h-[36px] text-oxford/55 hover:text-accent transition-colors underline underline-offset-4"
                   >
-                    Reset All Filters
+                    Reset filters
                   </button>
                 </div>
               </div>
@@ -245,7 +244,6 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
         </div>
       </div>
 
-      {/* The Intelligence River */}
       <motion.div
         key={`${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
         className="flex flex-col relative"
@@ -254,7 +252,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
         animate="visible"
         variants={reduceMotion ? {} : {
           hidden: {},
-          visible: { transition: { staggerChildren: 0.1, delayChildren: 0.15 } },
+          visible: { transition: { staggerChildren: 0.04, delayChildren: 0.05 } },
         }}
       >
         {ordered.map((startup) => {
@@ -273,7 +271,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: tokens.motion.ease } },
               }}
               transition={{ layout: { duration: reduceMotion ? 0 : 0.24, ease: tokens.motion.ease } }}
-              className={`group relative border-b border-oxford/[0.06] py-phi-3 px-phi-4 cursor-pointer transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+              className={`group relative border-b border-oxford/[0.06] py-phi-3 px-phi-3 cursor-pointer transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
                 isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.02]'
               }`}
               onClick={() => onStartupClick(startup)}

@@ -608,6 +608,28 @@
   flex-shrink: 0;
 }
 
+/* Conviction chip — quiet bordered tag, mirrors web-front-end .conviction-chip.
+ * Use for fund-thesis tags, sector/stage/geo callouts, any "labelled fact" pill. */
+.conviction-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.55);
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--section-divider);
+  background-color: transparent;
+  transition:
+    border-color var(--motion-micro) var(--motion-ease),
+    color var(--motion-micro) var(--motion-ease);
+}
+.conviction-chip:hover {
+  border-color: rgba(184, 151, 106, 0.45);
+  color: rgba(var(--color-oxford-rgb), 0.78);
+}
+
 /* Underline draw-in from left (used on active labels/headings) */
 @keyframes underline-draw {
   from { transform: scaleX(0); }

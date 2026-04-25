@@ -1,6 +1,6 @@
 /* === Layout === */
 .memoPanel{
-  --memo-body-size: 14px;
+  --memo-body-size: 15px;
   --memo-label-size: 11px;
   width: 60%;
   min-width: 0;
@@ -24,7 +24,7 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: clamp(34px, 4vw, 55px) clamp(34px, 5vw, 55px) clamp(54px, 7vw, 80px);
+  padding: clamp(40px, 4.6vw, 64px) clamp(36px, 5.4vw, 72px) clamp(64px, 8vw, 96px);
   color: var(--color-oxford);
   background: var(--color-paper);
 }
@@ -56,7 +56,7 @@
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11px;
   font-variant-caps: all-small-caps;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   color: rgba(var(--color-oxford-rgb),0.45);
   transition: color 150ms ease;
 }
@@ -107,7 +107,7 @@
 
 /* === Document body === */
 .memoBody{
-  max-width: 42rem;
+  max-width: 46rem;
 }
 .memoPanel--embedded .memoBody{
   max-width: none;
@@ -147,32 +147,31 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
 }
 .memoDocHeaderMain{ flex: 1 1 auto; min-width: 0; }
 .memoCompany{
   font-family: "Geist Sans", system-ui, sans-serif;
   font-weight: 600;
-  font-size: clamp(1.375rem, 2.2vw, 1.625rem);
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-  margin: 0 0 6px 0;
+  font-size: clamp(1.5rem, 2.4vw, 1.9rem);
+  line-height: 1.16;
+  letter-spacing: -0.015em;
+  margin: 0 0 8px 0;
   color: var(--color-oxford);
 }
 .memoDocTagline{
   font-family: "Geist Sans", system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.55;
-  color: rgba(var(--color-oxford-rgb),0.55);
-  margin: 0 0 8px 0;
+  font-size: 15px;
+  line-height: 1.62;
+  color: rgba(var(--color-oxford-rgb),0.60);
+  margin: 0 0 10px 0;
   font-style: italic;
 }
 .memoMeta{
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11px;
-  letter-spacing: 0.08em;
-  color: rgba(var(--color-oxford-rgb),0.40);
-  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(var(--color-oxford-rgb),0.44);
 }
 .memoDocHeaderRight{
   width: 100%;
@@ -187,7 +186,7 @@
   font-size: clamp(1.375rem, 5vw, 2rem);
   font-weight: 600;
   letter-spacing: -0.03em;
-  text-transform: uppercase;
+  text-transform: none;
   margin: 0;
   line-height: 1.04;
   color: rgba(var(--color-oxford-rgb),0.86);
@@ -198,16 +197,14 @@
 .memoDocConfidence{
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10px;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: rgba(var(--color-oxford-rgb),0.46);
   margin: 0;
 }
 .memoDocEscalation{
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10px;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: color-mix(in srgb, var(--color-accent) 60%, transparent);
   margin: 0;
 }
@@ -229,8 +226,7 @@
 .memoDocLookupBadge{
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10px;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: rgba(var(--color-oxford-rgb),0.30);
   margin: 0;
 }
@@ -246,10 +242,9 @@
 .memoDocSectionHead{
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: var(--memo-label-size);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: rgba(var(--color-oxford-rgb),0.40);
-  margin: 0 0 20px 0;
+  letter-spacing: 0.08em;
+  color: rgba(var(--color-oxford-rgb),0.44);
+  margin: 0 0 22px 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -266,9 +261,8 @@
 .memoDocSubhead{
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: rgba(var(--color-oxford-rgb),0.35);
+  letter-spacing: 0.08em;
+  color: rgba(var(--color-oxford-rgb),0.40);
   margin: 0 0 10px 0;
 }
 
@@ -276,15 +270,15 @@
 .memoDocProse{
   font-family: "Geist Sans", system-ui, sans-serif;
   font-size: var(--memo-body-size);
-  line-height: 1.72;
-  color: rgba(var(--color-oxford-rgb),0.72);
-  margin: 0 0 14px 0;
+  line-height: 1.78;
+  color: rgba(var(--color-oxford-rgb),0.76);
+  margin: 0 0 16px 0;
 }
 .memoDocProse:last-child{ margin-bottom: 0; }
 .memoDocThesis{
   font-style: italic;
   color: rgba(var(--color-oxford-rgb),0.80);
-  font-size: 14.5px;
+  font-size: 15px;
 }
 
 /* === Definition list (key-value rows) === */
@@ -300,17 +294,16 @@
 .memoDocDT{
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.10em;
-  color: rgba(var(--color-oxford-rgb),0.36);
+  letter-spacing: 0.07em;
+  color: rgba(var(--color-oxford-rgb),0.40);
   margin: 0;
   padding-top: 2px;
 }
 .memoDocDD{
   font-family: "Geist Sans", system-ui, sans-serif;
   font-size: var(--memo-body-size);
-  line-height: 1.65;
-  color: rgba(var(--color-oxford-rgb),0.75);
+  line-height: 1.72;
+  color: rgba(var(--color-oxford-rgb),0.78);
   margin: 0;
 }
 
@@ -623,8 +616,8 @@
   list-style: none;
   font-family: "Geist Sans", system-ui, sans-serif;
   font-size: var(--memo-body-size);
-  line-height: 1.65;
-  color: rgba(var(--color-oxford-rgb),0.72);
+  line-height: 1.72;
+  color: rgba(var(--color-oxford-rgb),0.76);
 }
 .memoListItem{
   display: flex;
@@ -663,9 +656,8 @@
   cursor: pointer;
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: var(--memo-label-size);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: rgba(var(--color-oxford-rgb),0.36);
+  letter-spacing: 0.08em;
+  color: rgba(var(--color-oxford-rgb),0.40);
   transition: color 120ms ease;
 }
 .memoSourcesToggle:hover{ color: rgba(var(--color-oxford-rgb),0.60); }

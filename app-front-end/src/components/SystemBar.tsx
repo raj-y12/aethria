@@ -21,7 +21,7 @@ interface SystemBarProps {
 }
 
 function SpineRule() {
-  return <div className="w-full max-w-[5.75rem] mx-auto h-px bg-white/[0.06]" aria-hidden />;
+  return <div className="w-full max-w-[6rem] mx-auto h-px bg-white/[0.07]" aria-hidden />;
 }
 
 /** Spine controls keep >=44px touch target and clear focus states. */
@@ -43,16 +43,16 @@ function SpineNavButton({
       type="button"
       onClick={onClick}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`type-meta w-full min-h-[44px] flex items-center justify-center cursor-pointer tracking-[0.1em] btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 ${
-        active ? 'text-white font-semibold' : 'text-white/55 hover:text-white/85'
+      className={`type-meta w-full min-h-[44px] flex items-center justify-start px-2 cursor-pointer tracking-[0.06em] btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 ${
+        active ? 'text-white' : 'text-white/55 hover:text-white/88'
       }`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
       aria-pressed={ariaPressed}
       aria-current={active ? 'page' : undefined}
     >
       <span
-        className={`inline-block px-2 py-1 transition-[color,background-color] ${
-          active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
+        className={`inline-block px-2 py-1 transition-[background-color,color] ${
+          active ? 'bg-white/[0.08]' : 'hover:bg-white/[0.05]'
         }`}
       >
         {label}
@@ -198,20 +198,19 @@ export default function SystemBar({
             })
       }
     >
-      <div className="flex flex-col items-center gap-4 h-full min-h-0">
-        {/* Wordmark */}
-        <div className="shrink-0 text-center">
-          <p className="font-wordmark font-normal text-[15px] leading-none tracking-[0.02em] text-white/65">
+      <div className="relative flex flex-col gap-4 h-full min-h-0">
+        <div className="shrink-0 px-2">
+          <p className="font-wordmark font-normal text-[16px] leading-none tracking-[0.01em] text-white/80">
             Aethria
           </p>
         </div>
 
         <SpineRule />
 
-        {/* Time + date — updates each minute; same 10px mono as rest of spine */}
-        <div className="flex flex-col items-center gap-1 shrink-0" aria-live="polite">
+        {/* Time + date */}
+        <div className="flex flex-col gap-1 shrink-0 px-2" aria-live="polite">
           <span className="type-meta tabular-nums leading-none text-white/55">{timeShort}</span>
-          <span className="type-meta leading-tight tracking-[0.14em] uppercase text-white/30">
+          <span className="type-meta leading-tight tracking-[0.08em] text-white/30">
             {dateShort}
           </span>
         </div>
@@ -219,22 +218,20 @@ export default function SystemBar({
         <SpineRule />
 
         {/* Account */}
-        <div className="w-full flex flex-col items-center gap-2 shrink-0">
+        <div className="w-full flex flex-col gap-2 shrink-0 px-2">
           <span
-            className="type-meta truncate max-w-full text-center tracking-[0.1em] text-white/60"
+            className="type-meta truncate max-w-full text-white/70"
             title={displayName}
           >
             {displayName}
           </span>
           {navLink ? (
-            <div className="flex flex-col items-center gap-1 w-full px-0.5">
-              <Link
-                to={navLink.href}
-                className="type-meta inline-flex min-h-[44px] items-center justify-center text-center leading-[1.4] tracking-[0.1em] text-white/65 hover:text-white btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
-              >
-                {navLink.label}
-              </Link>
-            </div>
+            <Link
+              to={navLink.href}
+              className="type-meta inline-flex min-h-[44px] items-center text-white/65 hover:text-white btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+            >
+              {navLink.label}
+            </Link>
           ) : null}
         </div>
 
@@ -242,20 +239,20 @@ export default function SystemBar({
 
         {workspaceChrome ? (
           <>
-            <div className="flex flex-col items-center gap-0.5 w-full shrink-0">
-              <SpineNavButton
-                label="Signals"
-                active={rightPanel === 'feed'}
-                ariaPressed={rightPanel === 'feed'}
-                onClick={() => (rightPanel === 'feed' ? onClose!() : onShowFeed!())}
-                shortcut="2"
-              />
+            <div className="flex flex-col gap-0.5 w-full shrink-0">
               <SpineNavButton
                 label="Deals"
                 active={rightPanel !== 'system' && rightPanel !== 'feed'}
                 ariaPressed={rightPanel !== 'system' && rightPanel !== 'feed'}
                 onClick={() => onShowDeals!()}
                 shortcut="1"
+              />
+              <SpineNavButton
+                label="Signals"
+                active={rightPanel === 'feed'}
+                ariaPressed={rightPanel === 'feed'}
+                onClick={() => (rightPanel === 'feed' ? onClose!() : onShowFeed!())}
+                shortcut="2"
               />
               <SpineNavButton
                 label="System"
@@ -270,9 +267,9 @@ export default function SystemBar({
         ) : null}
 
         {/* Log out */}
-        <div className="mt-auto flex flex-col items-center gap-2 pt-1 shrink-0">
+        <div className="mt-auto flex flex-col gap-2 pt-1 shrink-0 px-2">
           {agentActionError ? (
-            <p className="type-meta text-center text-white/75 px-1" role="status" aria-live="polite">
+            <p className="type-meta text-white/75" role="status" aria-live="polite">
               {agentActionError}
             </p>
           ) : null}
@@ -280,7 +277,7 @@ export default function SystemBar({
             type="button"
             onClick={handleLogout}
             disabled={agentActionPending}
-            className="type-meta inline-flex min-h-[44px] items-center tracking-[0.1em] text-white/60 hover:text-white bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
+            className="type-meta inline-flex min-h-[44px] items-center tracking-[0.06em] text-white/60 hover:text-white bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
           >
             {agentActionPending ? 'Updating…' : 'Log out'}
           </button>
