@@ -7,3 +7,5 @@ node_modules/
 __pycache__/
 *.py[cod]
 .cursorignore
+app-front-end/.superpowers/
+.worktrees/
