@@ -20,6 +20,9 @@ import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 const SCORE_DERIVATION_FALLBACK =
   'Score derived from multiple reviewer perspectives (optimistic, neutral, skeptical) and aggregated.';
+const MEMO_POLL_INITIAL_MS = 2000;
+const MEMO_POLL_MAX_MS = 15000;
+const MEMO_POLL_MAX_ATTEMPTS = 60;
 
 function computeOverallScore(review: Review | null | undefined): number | null {
   if (!review) return null;
@@ -246,12 +249,27 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     let cancelled = false;
     let t: ReturnType<typeof setTimeout> | undefined;
 
+    let attempt = 0;
+    const scheduleNextPoll = () => {
+      attempt += 1;
+      if (attempt >= MEMO_POLL_MAX_ATTEMPTS) {
+        setMemoPipeline('failed');
+        setMemoGateError('Memo generation timed out. Please retry in a moment.');
+        return;
+      }
+      const backoff = Math.min(
+        MEMO_POLL_INITIAL_MS * 2 ** Math.max(0, attempt - 1),
+        MEMO_POLL_MAX_MS
+      );
+      t = setTimeout(poll, backoff);
+    };
+
     const poll = async () => {
       try {
         const res = await fetchMemo(startup.id);
         if (cancelled) return;
         if (!res) {
-          t = setTimeout(poll, 2000);
+          scheduleNextPoll();
           return;
         }
         if (res.status === 'ready') {
@@ -268,9 +286,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         }
         setMemoPipeline('generating');
         if (res.partial) setMemoPartial(res.partial);
-        t = setTimeout(poll, 2000);
+        scheduleNextPoll();
       } catch {
-        if (!cancelled) t = setTimeout(poll, 2000);
+        if (!cancelled) scheduleNextPoll();
       }
     };
     void poll();
@@ -613,7 +631,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                                     </ul>
                                     {weaknessItems && (
                                       <>
-                                        <p className="memoDocExpandedLabel" style={{ marginTop: '12px' }}>Weaknesses</p>
+                                        <p className="memoDocExpandedLabel memoDocExpandedLabel--weaknesses">Weaknesses</p>
                                         <ul className="memoList">
                                           {weaknessItems.map((item, i) => (
                                             <li key={i} className="memoListItem">
@@ -882,12 +900,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
             {/* ── Sources ── */}
             {(displayStartup.scout.references?.length ?? 0) > 0 && (
-              <section style={{ marginTop: 'clamp(24px, 3.5vw, 36px)' }}>
+              <section className="memoSourcesSection">
                 <button
                   type="button"
                   className="memoSourcesToggle"
                   onClick={() => setSourcesOpen((v) => !v)}
                   aria-expanded={sourcesOpen}
+                  aria-controls={`${contentKey}-sources-panel`}
                 >
                   <span>Sources</span>
                   <span className="memoSourcesPlus">{sourcesOpen ? '−' : '+'}</span>
@@ -897,7 +916,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   animate={sourcesOpen ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
                   transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.16, 1, 0.3, 1] })}
                 >
-                  <div className={`min-h-0 overflow-hidden ${sourcesOpen ? '' : 'hidden'}`}>
+                  <div
+                    id={`${contentKey}-sources-panel`}
+                    className={`min-h-0 overflow-hidden ${sourcesOpen ? '' : 'hidden'}`}
+                  >
                   <div className="memoSourcesBody">
                     <ul className="memoList">
                       {(displayStartup.scout.references ?? [])
@@ -929,13 +951,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               <section
                 className="memoPipelineSection"
                 aria-label="Run log"
-                style={{ marginTop: 'clamp(18px, 2.5vw, 28px)' }}
               >
                 <button
                   type="button"
                   className="memoPipelineToggle"
                   onClick={() => setPipelineLogOpen((v) => !v)}
                   aria-expanded={pipelineLogOpen}
+                  aria-controls={`${contentKey}-pipeline-panel`}
                 >
                   <span className="memoPipelineToggleTitle">
                     <span className="memoPipelineKicker">Run log</span>
@@ -950,7 +972,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   animate={pipelineLogOpen ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
                   transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.16, 1, 0.3, 1] })}
                 >
-                  <div className={`min-h-0 overflow-hidden ${pipelineLogOpen ? '' : 'hidden'}`}>
+                  <div
+                    id={`${contentKey}-pipeline-panel`}
+                    className={`min-h-0 overflow-hidden ${pipelineLogOpen ? '' : 'hidden'}`}
+                  >
                   <ol className="memoReplayList">
                     {pipelineReplaySteps.map((step) => (
                       <li key={step.id} className="memoReplayItem">

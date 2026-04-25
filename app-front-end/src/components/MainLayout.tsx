@@ -718,83 +718,134 @@ export default function MainLayout({
                       : 'Detail'
                 }
               >
-                {rightPanel === 'feed' ? (
-                  <PanelShell
-                    className="min-h-0 flex-1"
-                    title="JUDGEMENTS"
-                    titleClassName={UI_PANEL_CHROME_LABEL}
-                    headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
-                    headerBorderClass=""
-                    actions={
-                      <button
-                        type="button"
-                        onClick={handleCloseJudgements}
-                        className={PANEL_CHROME_ACTION_BTN_CLASS}
-                        aria-label="Hide judgements"
+                <AnimatePresence mode="wait" initial={false}>
+                  {rightPanel === 'feed' ? (
+                    <motion.div
+                      key="desktop-feed-panel"
+                      initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
+                      transition={transitionOrReduced(reduceMotion, {
+                        duration: tokens.motion.duration.short,
+                        ease: tokens.motion.ease,
+                      })}
+                      className="h-full"
+                    >
+                      <PanelShell
+                        className="min-h-0 flex-1"
+                        title="JUDGEMENTS"
+                        titleClassName={UI_PANEL_CHROME_LABEL}
+                        headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
+                        headerBorderClass=""
+                        actions={
+                          <button
+                            type="button"
+                            onClick={handleCloseJudgements}
+                            className={PANEL_CHROME_ACTION_BTN_CLASS}
+                            aria-label="Hide judgements"
+                          >
+                            CLOSE
+                          </button>
+                        }
+                        contentOverflowHidden
+                        contentClassName="flex-1 min-h-0 overflow-hidden"
                       >
-                        CLOSE
-                      </button>
-                    }
-                    contentOverflowHidden
-                    contentClassName="flex-1 min-h-0 overflow-hidden"
-                  >
-                    <LiveIntelligenceFeed
-                      startups={startups}
-                      signals={signals}
-                      metaReports={metaReports}
-                    />
-                  </PanelShell>
-                ) : selectedStartup ? (
-                  <PanelShell
-                    className="min-h-0 min-w-0 flex-1 w-full"
-                    title=""
-                    showTitle={false}
-                    headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
-                    headerBorderClass=""
-                    headerJustifyClass="justify-end"
-                    actions={
-                      <div className="flex items-center gap-phi-2">
-                        <button
-                          type="button"
-                          onClick={() => memoContentRef.current?.downloadPDF()}
-                          className={PANEL_CHROME_ACTION_BTN_CLASS}
-                        >
-                          IC PACK (PDF)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => memoContentRef.current?.downloadMarkdown()}
-                          className={PANEL_CHROME_ACTION_BTN_CLASS}
-                        >
-                          IC PACK (MD)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleCloseMemo}
-                          className={PANEL_CHROME_ACTION_BTN_CLASS}
-                          aria-label="Close memo"
-                        >
-                          CLOSE
-                        </button>
+                        <LiveIntelligenceFeed
+                          startups={startups}
+                          signals={signals}
+                          metaReports={metaReports}
+                        />
+                      </PanelShell>
+                    </motion.div>
+                  ) : selectedStartup ? (
+                    <motion.div
+                      key="desktop-memo-shell"
+                      initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
+                      transition={transitionOrReduced(reduceMotion, {
+                        duration: tokens.motion.duration.short,
+                        ease: tokens.motion.ease,
+                      })}
+                      className="h-full"
+                    >
+                      <PanelShell
+                        className="min-h-0 min-w-0 flex-1 w-full"
+                        title=""
+                        showTitle={false}
+                        headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
+                        headerBorderClass=""
+                        headerJustifyClass="justify-end"
+                        actions={
+                          <div className="flex items-center gap-phi-2">
+                            <button
+                              type="button"
+                              onClick={() => memoContentRef.current?.downloadPDF()}
+                              className={PANEL_CHROME_ACTION_BTN_CLASS}
+                            >
+                              IC PACK (PDF)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => memoContentRef.current?.downloadMarkdown()}
+                              className={PANEL_CHROME_ACTION_BTN_CLASS}
+                            >
+                              IC PACK (MD)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCloseMemo}
+                              className={PANEL_CHROME_ACTION_BTN_CLASS}
+                              aria-label="Close memo"
+                            >
+                              CLOSE
+                            </button>
+                          </div>
+                        }
+                        contentClassName="flex-1 min-h-0 overflow-y-auto px-6 py-6 sm:px-8 sm:py-8"
+                      >
+                        <AnimatePresence mode="wait" initial={false}>
+                          <motion.div
+                            key={memoStartup!.id}
+                            initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
+                            transition={transitionOrReduced(reduceMotion, {
+                              duration: tokens.motion.duration.short,
+                              ease: tokens.motion.ease,
+                            })}
+                            className="h-full"
+                          >
+                            <InvestmentMemoContent
+                              ref={memoContentRef}
+                              startup={memoStartup!}
+                              embedded
+                              onMemoPipelineReady={handleMemoPipelineReady}
+                            />
+                          </motion.div>
+                        </AnimatePresence>
+                      </PanelShell>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="desktop-empty-detail"
+                      initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
+                      transition={transitionOrReduced(reduceMotion, {
+                        duration: tokens.motion.duration.short,
+                        ease: tokens.motion.ease,
+                      })}
+                      className="h-full"
+                    >
+                      <div className="flex-1 flex items-center justify-center p-8 h-full">
+                        <p className="type-label-tab text-oxford/45" style={{ transition: 'opacity var(--motion-micro) var(--motion-ease)' }}>
+                          Click a deal to open the memo here
+                        </p>
                       </div>
-                    }
-                    contentClassName="flex-1 min-h-0 overflow-y-auto px-6 py-6 sm:px-8 sm:py-8"
-                  >
-                    <InvestmentMemoContent
-                      key={memoStartup!.id}
-                      ref={memoContentRef}
-                      startup={memoStartup!}
-                      embedded
-                      onMemoPipelineReady={handleMemoPipelineReady}
-                    />
-                  </PanelShell>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center p-8">
-                    <p className="type-label-tab text-oxford/45" style={{ transition: 'opacity var(--motion-micro) var(--motion-ease)' }}>
-                      Click a deal to open the memo here
-                    </p>
-                  </div>
-                )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </aside>
             </div>
           </div>

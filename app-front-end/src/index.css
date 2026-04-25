@@ -380,6 +380,19 @@
     font-size: 13px;
     line-height: var(--phi); /* 1.618 */
   }
+  .type-body-emphasis {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.4;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .type-note {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    line-height: 1.6;
+    letter-spacing: 0;
+  }
   .type-label-section {
     font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 11px;

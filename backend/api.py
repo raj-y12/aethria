@@ -1572,7 +1572,11 @@ async def trigger_agents(request: Request):
             content={"status": "unavailable", "reason": "worker_not_ready"},
         )
     try:
-        thesis = get_active_thesis(get_service_client(), user_id)
+        svc = get_service_client()
+        thesis = get_active_thesis(svc, user_id)
+        if thesis is None:
+            _bootstrap_default_thesis_or_raise(svc, user_id)
+            thesis = get_active_thesis(svc, user_id)
         if thesis is None:
             _logger_agents.info(
                 "trigger_agents skipped user=%s reason=thesis_required",

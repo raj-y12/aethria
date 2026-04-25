@@ -36,7 +36,12 @@ from portfolio.engine import PortfolioEngine
 from portfolio.cost_control import CostController
 from memory import DealMemory
 from meta.agent import MetaAgent
-from fund_thesis import FundThesisIncompleteError, FundThesisMissingError, get_active_thesis
+from fund_thesis import (
+    FundThesisIncompleteError,
+    FundThesisMissingError,
+    _bootstrap_default_thesis_or_raise,
+    get_active_thesis,
+)
 
 logger = logging.getLogger("pipeline_runner")
 _visible_logger = logging.getLogger("uvicorn.error")
@@ -145,6 +150,9 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
     try:
         svc = get_service_client()
         active = get_active_thesis(svc, user_id)
+        if active is None:
+            _bootstrap_default_thesis_or_raise(svc, user_id)
+            active = get_active_thesis(svc, user_id)
         if active is None:
             logger.warning("[%s] Pipeline skipped (fund thesis): missing", user_id[:12])
             _visible_logger.warning("[%s] Pipeline skipped: fund thesis missing — create one in Settings", user_id[:12])

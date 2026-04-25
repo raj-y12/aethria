@@ -61,6 +61,11 @@
   transition: color 150ms ease;
 }
 .memoAction:hover{ color: var(--color-oxford); }
+.memoAction:focus{ outline: none; }
+.memoAction:focus-visible{
+  outline: 2px solid rgba(var(--color-oxford-rgb),0.22);
+  outline-offset: 2px;
+}
 
 /* === Gate strip (error/generating) === */
 .memoGateStrip{
@@ -97,8 +102,8 @@
   color: rgba(var(--color-oxford-rgb),0.50);
   margin: 0;
 }
-.memoGateStrip--error .memoGateTitle{ color: rgba(125,43,58,0.95); }
-.memoGateStrip--error .memoPipelineKicker{ color: rgba(125,43,58,0.72); }
+.memoGateStrip--error .memoGateTitle{ color: color-mix(in srgb, var(--color-accent) 95%, transparent); }
+.memoGateStrip--error .memoPipelineKicker{ color: color-mix(in srgb, var(--color-accent) 72%, transparent); }
 
 /* === Document body === */
 .memoBody{
@@ -127,14 +132,14 @@
   font-weight: 400;
   font-size: 24px;
   line-height: 1.4;
-  color: rgba(var(--color-oxford-rgb),0.22);
+  color: rgba(var(--color-oxford-rgb),0.32);
   margin: 0;
 }
 .memoEmptyHint{
   margin-top: 12px;
   font-family: "Geist Sans", system-ui, sans-serif;
   font-size: 13px;
-  color: rgba(var(--color-oxford-rgb),0.18);
+  color: rgba(var(--color-oxford-rgb),0.58);
 }
 
 /* === Document header === */
@@ -203,7 +208,7 @@
   font-size: 10px;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(125,43,58,0.60);
+  color: color-mix(in srgb, var(--color-accent) 60%, transparent);
   margin: 0;
 }
 .memoDocStatusLine{
@@ -255,7 +260,7 @@
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(125,43,58,0.65);
+  color: color-mix(in srgb, var(--color-accent) 65%, transparent);
 }
 .memoDocSubsection{ margin-top: 22px; }
 .memoDocSubhead{
@@ -343,8 +348,8 @@
   border: 1px solid var(--memo-score-line-strong);
   background: transparent;
   color: var(--memo-score-text-muted);
-  min-width: 40px;
-  min-height: 40px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 999px;
   cursor: pointer;
   font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -474,6 +479,9 @@
   color: var(--memo-score-text-muted);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+.memoDocExpandedLabel--weaknesses{
+  margin-top: 12px;
 }
 .memoDocScoreBtn[aria-pressed="true"] .memoDocScoreDim{ color: var(--memo-score-text-default); }
 .memoDocScoreBtn[aria-pressed="true"] .memoDocScoreVal{ color: var(--color-oxford); }
@@ -639,6 +647,9 @@
 .memoLink:hover{ border-bottom-color: rgba(var(--color-oxford-rgb),0.45); }
 
 /* === Sources toggle === */
+.memoSourcesSection{
+  margin-top: clamp(24px, 3.5vw, 36px);
+}
 .memoSourcesToggle{
   width: 100%;
   display: flex;
@@ -658,6 +669,11 @@
   transition: color 120ms ease;
 }
 .memoSourcesToggle:hover{ color: rgba(var(--color-oxford-rgb),0.60); }
+.memoSourcesToggle:focus{ outline: none; }
+.memoSourcesToggle:focus-visible{
+  outline: 2px solid rgba(var(--color-oxford-rgb),0.22);
+  outline-offset: 2px;
+}
 .memoSourcesPlus{
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 13px;
@@ -667,7 +683,10 @@
 .memoSourcesBody{ padding-top: 14px; padding-bottom: 4px; }
 
 /* === Pipeline run log === */
-.memoPipelineSection{ margin: 0; }
+.memoPipelineSection{
+  margin: 0;
+  margin-top: clamp(18px, 2.5vw, 28px);
+}
 .memoPipelineToggle{
   width: 100%;
   display: flex;
@@ -684,6 +703,11 @@
   transition: opacity 120ms ease;
 }
 .memoPipelineToggle:hover{ opacity: 0.72; }
+.memoPipelineToggle:focus{ outline: none; }
+.memoPipelineToggle:focus-visible{
+  outline: 2px solid rgba(var(--color-oxford-rgb),0.22);
+  outline-offset: 2px;
+}
 .memoPipelineToggleTitle{
   display: flex;
   flex-direction: column;

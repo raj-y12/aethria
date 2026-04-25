@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import type { Startup } from '../types/startup';
@@ -22,6 +22,15 @@ export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady }
   const reduceMotion = usePrefersReducedMotion();
   useFocusTrap(true, containerRef);
 
+  useEffect(() => {
+    if (!startup) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [startup, onClose]);
+
   if (!startup) return null;
 
   const content = (
@@ -33,8 +42,9 @@ export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady }
         duration: tokens.motion.duration.medium,
         ease: tokens.motion.ease,
       })}
-      className="fixed inset-0 z-[9999] flex items-start justify-center"
+      className="fixed inset-0 flex items-start justify-center"
       style={{
+        zIndex: tokens.layout.modalLayerZ,
         minHeight: '100dvh',
         width: '100vw',
         left: 0,
@@ -54,7 +64,11 @@ export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady }
     >
       <div
         ref={containerRef}
-        className={`relative z-10 mx-auto flex max-h-[85dvh] w-full max-w-[420px] flex-col overflow-y-auto overflow-x-hidden px-3 py-4 sm:max-h-[92dvh] sm:max-w-4xl sm:px-8 sm:py-9 lg:px-12 ${chrome.frame}`}
+        className={`relative z-10 mx-auto flex w-full flex-col overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-8 sm:py-9 lg:px-12 ${chrome.frame}`}
+        style={{
+          maxHeight: tokens.layout.modalMaxHeightDesktop,
+          width: `min(100%, clamp(${tokens.layout.modalMaxWidthMobile}, 70vw, ${tokens.layout.modalMaxWidthDesktop}))`,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <InvestmentMemoContent startup={startup} onClose={onClose} onMemoPipelineReady={onMemoPipelineReady} />

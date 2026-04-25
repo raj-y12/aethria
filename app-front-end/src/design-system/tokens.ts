@@ -87,6 +87,12 @@ export const tokens = {
     /** Golden ratio column split: sidebar 38.2% / content 61.8% */
     columnRatioSidebar: '38.2%',
     columnRatioContent: '61.8%',
+    /** Modal shell/overlay semantics. */
+    modalLayerZ: 9999,
+    modalMaxWidthMobile: '420px',
+    modalMaxWidthDesktop: '56rem',
+    modalMaxHeightMobile: '85dvh',
+    modalMaxHeightDesktop: '92dvh',
   },
   /**
    * Canonical type scale — golden ratio (φ = 1.618) modular scale anchored at 14px body.

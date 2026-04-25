@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Startup } from '../types/startup';
 import { getReviewerQualityBand } from '../design-system/semantics';
@@ -14,9 +14,6 @@ import { resolveEscalation } from '../api/escalations';
 
 interface RowDecisionState { decision: string | null; notes: string; resolved: boolean; }
 const emptyRowState = (): RowDecisionState => ({ decision: null, notes: '', resolved: false });
-
-const ORIENT_DISMISSED_KEY = 'aethria_dashboard_orient_dismissed';
-const COACH_MARK_DURATION_MS = 4000;
 
 type SourceFilter = 'ALL' | 'SCOUT' | 'LOOKUP';
 type DecisionFilter = 'ALL' | 'YES' | 'NO' | 'MAYBE' | 'ESCALATION' | 'UNDECIDED' | 'AWAITING_REVIEW';
@@ -97,8 +94,33 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
     } catch { /* silent */ }
   }, [rowDecisions, setRS]);
 
+  const stableIndex = useMemo(() => {
+    // Reference numbers are always chronological by discovery (oldest = 01), independent of sort
+    const byDiscovery = [...startups].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+    return new Map(byDiscovery.map((s, i) => [s.id, i + 1]));
+  }, [startups]);
+
   const ordered = useMemo(() => {
-    const filtered = startups.filter((s) => {
+    const sorted = [...startups];
+    switch (sortFilter) {
+      case 'OLDEST':
+        sorted.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+        break;
+      case 'CONFIDENCE_HIGH':
+        sorted.sort((a, b) => (b.scout.confidence ?? 0) - (a.scout.confidence ?? 0));
+        break;
+      case 'CONFIDENCE_LOW':
+        sorted.sort((a, b) => (a.scout.confidence ?? 0) - (b.scout.confidence ?? 0));
+        break;
+      case 'NAME_AZ':
+        sorted.sort((a, b) => (a.scout.name ?? '').localeCompare(b.scout.name ?? ''));
+        break;
+      case 'NEWEST':
+      default:
+        sorted.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+        break;
+    }
+    const filtered = sorted.filter((s) => {
       if (sourceFilter === 'LOOKUP' && getSourceBadge(s) !== 'LOOKUP') return false;
       if (sourceFilter === 'SCOUT' && getSourceBadge(s) !== 'SCOUT') return false;
       if (decisionFilter !== 'ALL' && getDecisionFilterValue(s) !== decisionFilter) return false;
@@ -106,46 +128,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
       if (reviewFilter !== 'ALL' && reviewFilter !== 'UNREVIEWED' && getReviewerVerdict(s) !== reviewFilter) return false;
       return true;
     });
-    const list = [...filtered];
-    switch (sortFilter) {
-      case 'OLDEST':
-        list.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
-        break;
-      case 'CONFIDENCE_HIGH':
-        list.sort((a, b) => (b.scout.confidence ?? 0) - (a.scout.confidence ?? 0));
-        break;
-      case 'CONFIDENCE_LOW':
-        list.sort((a, b) => (a.scout.confidence ?? 0) - (b.scout.confidence ?? 0));
-        break;
-      case 'NAME_AZ':
-        list.sort((a, b) => (a.scout.name ?? '').localeCompare(b.scout.name ?? ''));
-        break;
-      case 'NEWEST':
-      default:
-        list.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
-        break;
-    }
-    return list;
+    return filtered;
   }, [startups, sourceFilter, decisionFilter, reviewFilter, sortFilter]);
-
-  const [showCoachMark, setShowCoachMark] = useState(false);
-  useEffect(() => {
-    if (typeof window === 'undefined' || startups.length === 0) return;
-    try {
-      if (!window.localStorage.getItem(ORIENT_DISMISSED_KEY)) setShowCoachMark(true);
-    } catch { /* ignore */ }
-  }, [startups.length]);
-
-  useEffect(() => {
-    if (!showCoachMark) return;
-    const t = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(ORIENT_DISMISSED_KEY, '1');
-      } catch { /* ignore */ }
-      setShowCoachMark(false);
-    }, COACH_MARK_DURATION_MS);
-    return () => clearTimeout(t);
-  }, [showCoachMark]);
 
   if (startups.length === 0) {
     return (
@@ -265,6 +249,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
       <motion.div
         key={`${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
         className="flex flex-col relative"
+        layout
         initial={reduceMotion ? false : 'hidden'}
         animate="visible"
         variants={reduceMotion ? {} : {
@@ -272,21 +257,23 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
           visible: { transition: { staggerChildren: 0.1, delayChildren: 0.15 } },
         }}
       >
-        {ordered.map((startup, index) => {
+        {ordered.map((startup) => {
           const isSelected = selectedId === startup.id;
           const reviewBand = getReviewerVerdict(startup);
           const decisionVariant = getDecisionBadgeVariant(startup);
           const confidence = startup.scout.confidence ?? 0;
-          const displayIndex = (index + 1).toString().padStart(2, '0');
+          const displayIndex = (stableIndex.get(startup.id) ?? 0).toString().padStart(2, '0');
 
           return (
             <motion.div
               key={startup.id}
+              layout
               variants={reduceMotion ? {} : {
-                hidden: { opacity: 0, x: -12 },
-                visible: { opacity: 1, x: 0, transition: { duration: 0.55, ease: tokens.motion.ease } },
+                hidden: { opacity: 0, x: -8 },
+                visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: tokens.motion.ease } },
               }}
-              className={`group relative border-b border-oxford/[0.06] py-phi-5 px-phi-4 cursor-pointer transition-colors duration-500 ease-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+              transition={{ layout: { duration: reduceMotion ? 0 : 0.24, ease: tokens.motion.ease } }}
+              className={`group relative border-b border-oxford/[0.06] py-phi-3 px-phi-4 cursor-pointer transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
                 isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.02]'
               }`}
               onClick={() => onStartupClick(startup)}
@@ -302,117 +289,79 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
               aria-pressed={isSelected}
               aria-label={`Open memo for ${startup.scout.name}`}
             >
-              {/* Selected Spine */}
-              <AnimatePresence>
-                {isSelected && (
-                  <motion.div
-                    layoutId="selected-spine"
-                    layout="position"
-                    className="pointer-events-none absolute left-0 top-0 w-1.5 h-full bg-oxford/80"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{
-                      layout: { duration: 0.32, ease: tokens.motion.ease },
-                      opacity: { duration: 0.15, ease: 'easeOut' },
-                    }}
-                  />
-                )}
-              </AnimatePresence>
+              <div className="grid grid-cols-1 sm:grid-cols-[26px_minmax(0,1fr)_auto] gap-x-phi-3 gap-y-phi-2 items-start">
+                {/* Index */}
+                <span className="type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums pt-px sm:col-start-1">
+                  {displayIndex}
+                </span>
 
-              <div className="grid grid-cols-1 gap-phi-5 items-start lg:grid-cols-[60px_minmax(0,1fr)_max-content] 2xl:grid-cols-[72px_minmax(0,1fr)_max-content]">
-                {/* 01: Metadata Index */}
-
-                <div className="flex flex-col gap-phi-2 min-w-0">
-                  <span className="type-label-section text-oxford/20 group-hover:text-oxford/50 transition-colors duration-500 tabular-nums">
-                    Ref_{displayIndex}
-                  </span>
-                </div>
-
-                {/* 02: Core Essence */}
-                <div className="flex min-w-0 flex-col gap-phi-4">
-                  <div className="flex flex-col sm:flex-row sm:items-baseline gap-phi-4">
-                    <h2 className="font-sans font-semibold text-xl sm:text-2xl leading-tight text-oxford tracking-tight">
-                      {startup.scout.name}
-                    </h2>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-x-phi-4 gap-y-phi-2">
-                    {(startup.scout.sector || 'Unassigned').split('/').map((s) => s.trim()).filter(Boolean).map((s) => (
-                      <span key={s} className="type-label-tab text-oxford/40 border border-oxford/10 px-2 py-0.5 group-hover:border-oxford/30 transition-colors">
-                        {s}
+                {/* Body */}
+                <div className="min-w-0 sm:col-start-2">
+                  <h2 className="type-body-emphasis text-oxford">
+                    {startup.scout.name}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-x-1 mt-1">
+                    {sortKey(startup) && (
+                      <span className="type-meta text-oxford/40 tabular-nums whitespace-nowrap">
+                        {new Date(sortKey(startup)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </span>
-                    ))}
-                    <span className="type-meta text-oxford/40 uppercase tracking-widest">{startup.scout.funding_stage || 'Unknown Stage'}</span>
-                    <span className="w-1.5 h-1.5 border border-oxford/20 rotate-45" />
-                    <span className="type-meta text-oxford/40 uppercase tabular-nums">
-                      {getSourceBadge(startup)}
-                    </span>
-                    <span className="w-1.5 h-1.5 border border-oxford/20 rotate-45" />
+                    )}
+                    {(startup.scout.sector || '').split('/')[0].trim() && (
+                      <>
+                        <span className="type-meta text-oxford/20">·</span>
+                        <span className="type-meta text-oxford/40">{(startup.scout.sector || 'Unknown').split('/')[0].trim()}</span>
+                      </>
+                    )}
+                    {startup.scout.funding_stage && (
+                      <>
+                        <span className="type-meta text-oxford/20">·</span>
+                        <span className="type-meta text-oxford/40">{startup.scout.funding_stage}</span>
+                      </>
+                    )}
+                    <span className="type-meta text-oxford/20">·</span>
+                    <span className="type-meta text-oxford/40 uppercase">{getSourceBadge(startup)}</span>
+                    <span className="type-meta text-oxford/20">·</span>
                     <span
-                      className="type-meta text-oxford/35 tabular-nums"
-                      title="Scout-stage confidence used for prioritization, not final investment conviction."
+                      className="type-meta text-oxford/40 tabular-nums"
+                      title="Scout-stage confidence"
                       aria-label={`Scout signal ${Math.round(confidence * 100)} percent`}
                     >
-                      Scout signal {Math.round(confidence * 100)}%
+                      {Math.round(confidence * 100)}%
                     </span>
                   </div>
-
-                  {/* One Line Reveal */}
-                  <div className={`overflow-hidden transition-[max-height,opacity,margin] duration-200 ease-out ${
-                    isSelected ? 'max-h-32 opacity-100 mt-phi-2' : 'max-h-0 opacity-0 group-hover:max-h-32 group-hover:opacity-100 group-hover:mt-phi-2'
+                  <div className={`overflow-hidden transition-[max-height,opacity] duration-200 ease-out ${
+                    isSelected ? 'max-h-24 opacity-100 mt-2' : 'max-h-0 opacity-0'
                   }`}>
-                    <p className="type-body text-oxford/65 max-w-2xl leading-relaxed italic bg-oxford/[0.02] px-phi-3 py-phi-2">
-                      {startup.scout.one_line || 'No intelligence summary provided.'}
-                    </p>
+                    {startup.scout.one_line && (
+                      <p className="type-note italic text-oxford/55">
+                        {startup.scout.one_line}
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                {/* 03: Decision & Logistics */}
-                <div className="flex min-w-0 flex-col items-start gap-phi-5 lg:items-end">
-                  <div className="flex flex-col items-start lg:items-end gap-phi-2">
-                    <span className="type-meta text-oxford/30 uppercase tracking-widest">Verdict</span>
-                    <div className="flex items-center gap-2">
-                      {reviewBand && <VerdictBandBadge band={reviewBand} />}
-                      <DecisionBadge variant={decisionVariant} />
-                    </div>
-                  </div>
-
-                  <div className="flex w-full flex-col items-start gap-phi-1 border-t border-oxford/5 pt-phi-4 lg:w-auto lg:items-end">
-                    <span className="type-meta text-oxford/30 uppercase">Archived</span>
-                    <span className="type-meta text-oxford/50 tabular-nums">
-                      {new Date(sortKey(startup)).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                      })}
-                    </span>
-                  </div>
-
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={isSelected ? { opacity: 1 } : { opacity: 0 }}
-                    className="type-meta text-oxford/40 hidden lg:block uppercase tracking-widest mt-auto group-hover:opacity-100 transition-opacity"
-                  >
-                    Expose Memo →
-                  </motion.span>
+                {/* Right: badges only */}
+                <div className="flex items-center gap-1.5 pt-px sm:col-start-3">
+                  {reviewBand && <VerdictBandBadge band={reviewBand} />}
+                  <DecisionBadge variant={decisionVariant} />
                 </div>
               </div>
 
-              {/* Inline decision panel — visible only when selected */}
-              <AnimatePresence>
+              {/* Resolve panel */}
+              <AnimatePresence initial={false}>
                 {isSelected && (() => {
                   const rs = getRS(startup.id);
                   return (
                     <motion.div
                       key="decision-panel"
+                      layout
                       initial={{ opacity: 0, y: -6 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -6 }}
                       transition={{ duration: 0.25, ease: 'easeOut' }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="mt-phi-4 pt-phi-4 border-t border-oxford/[0.06] space-y-phi-4">
+                      <div className="mt-phi-3 pt-phi-3 border-t border-oxford/[0.06] space-y-phi-4">
                         {rs.resolved ? (
                           <div className="flex items-start gap-phi-4">
                             <DecisionBadge variant={
@@ -424,9 +373,9 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                           </div>
                         ) : (
                           <>
-                            <div className="flex items-center gap-phi-4">
+                            <div className="flex flex-wrap items-center gap-phi-4">
                               <span className="type-meta text-oxford/25 uppercase tracking-widest shrink-0">Decision</span>
-                              <div className="flex gap-phi-2">
+                              <div className="flex flex-wrap gap-phi-2">
                                 {([
                                   { d: 'YES' as const, label: 'Invest' },
                                   { d: 'NO' as const, label: 'Pass' },
@@ -443,7 +392,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                                       key={d}
                                       type="button"
                                       onClick={() => setRS(startup.id, { decision: isActive ? null : d, notes: isActive ? '' : rs.notes })}
-                                      className={`type-meta tracking-[0.1em] uppercase border px-phi-3 py-phi-2 transition-all duration-150 btn-interaction inline-flex items-center justify-center min-h-[32px] min-w-[64px] ${isActive ? activeClass : 'border-oxford/15 text-oxford/35 hover:border-oxford/35 hover:text-oxford/65 bg-transparent'}`}
+                                      aria-pressed={isActive}
+                                      className={`type-meta tracking-[0.1em] uppercase border px-phi-3 py-phi-1 transition-all duration-150 btn-interaction inline-flex items-center justify-center min-h-[36px] min-w-[56px] ${isActive ? activeClass : 'border-oxford/15 text-oxford/35 hover:border-oxford/35 hover:text-oxford/65 bg-transparent'}`}
                                     >
                                       {label}
                                     </button>
@@ -459,28 +409,30 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                                   animate={{ opacity: 1, y: 0 }}
                                   exit={{ opacity: 0, y: -4 }}
                                   transition={{ duration: 0.18, ease: 'easeOut' }}
-                                  className="flex items-end gap-phi-4"
+                                  className="flex flex-wrap items-end gap-phi-4"
                                 >
                                   <textarea
                                     value={rs.notes}
                                     onChange={(e) => setRS(startup.id, { notes: e.target.value })}
                                     placeholder="Rationale..."
+                                    aria-label={`Decision rationale for ${startup.scout.name}`}
                                     autoFocus
                                     rows={1}
-                                    className="flex-1 bg-transparent border-0 border-b border-oxford/10 py-phi-1 type-meta text-oxford/80 placeholder:text-oxford/20 outline-none focus:border-oxford/30 transition-colors resize-none tracking-[0.04em]"
+                                    className="w-full sm:flex-1 bg-transparent border-0 border-b border-oxford/10 py-phi-1 type-meta text-oxford/80 placeholder:text-oxford/20 outline-none focus:border-oxford/30 transition-colors resize-none tracking-[0.04em]"
                                   />
                                   <button
                                     type="button"
                                     onClick={() => handleConfirm(startup.id)}
                                     disabled={rs.notes.trim().length < 5}
-                                    className="type-meta text-oxford/65 hover:text-oxford transition-colors disabled:opacity-20 tracking-[0.12em] inline-flex items-center min-h-[32px] whitespace-nowrap"
+                                    className="type-meta text-oxford/65 hover:text-oxford transition-colors disabled:opacity-20 tracking-[0.12em] inline-flex items-center min-h-[36px] whitespace-nowrap"
                                   >
                                     Confirm →
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => setRS(startup.id, emptyRowState())}
-                                    className="type-meta text-oxford/30 hover:text-oxford/60 transition-colors tracking-[0.12em] inline-flex items-center min-h-[32px]"
+                                    aria-label={`Clear escalation resolution for ${startup.scout.name}`}
+                                    className="type-meta text-oxford/30 hover:text-oxford/60 transition-colors tracking-[0.12em] inline-flex items-center min-h-[36px]"
                                   >
                                     ×
                                   </button>

@@ -22,23 +22,32 @@ export function useFocusTrap(
     if (focusables.length === 0) return;
 
     const first = focusables[0];
-    const last = focusables[focusables.length - 1];
     first.focus();
 
     const handle = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
+      const liveFocusables = getFocusables(el);
+      if (liveFocusables.length === 0) return;
+      const firstFocusable = liveFocusables[0];
+      const lastFocusable = liveFocusables[liveFocusables.length - 1];
       const current = document.activeElement as HTMLElement | null;
-      if (!current || !el.contains(current)) return;
+      if (!current || !el.contains(current)) {
+        if (!e.shiftKey) {
+          e.preventDefault();
+          firstFocusable.focus();
+        }
+        return;
+      }
 
       if (e.shiftKey) {
-        if (current === first) {
+        if (current === firstFocusable) {
           e.preventDefault();
-          last.focus();
+          lastFocusable.focus();
         }
       } else {
-        if (current === last) {
+        if (current === lastFocusable) {
           e.preventDefault();
-          first.focus();
+          firstFocusable.focus();
         }
       }
     };
