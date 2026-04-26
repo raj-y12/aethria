@@ -437,75 +437,75 @@ export default function MainLayout({
                 aria-label="Menu"
               >
                 <div className="px-phi-4 pb-0">
-                <div className="flex flex-col items-start gap-phi-3 py-phi-3">
-                  {/* Mode toggles: Deals / Judgements / System — same mono scale as desktop spine */}
-                  <div className="flex flex-col items-stretch gap-phi-1 w-full">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRightPanel((panel) => (panel === 'feed' ? null : 'feed'));
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-1 tracking-[0.06em] btn-interaction ${rightPanel === 'feed' ? 'text-white' : 'text-white/62 hover:text-white'
-                        }`}
-                      style={{ transitionTimingFunction: 'var(--motion-ease)' }}
-                      aria-pressed={rightPanel === 'feed'}
-                    >
-                      <span
-                        className={`inline-block px-2 py-1 ${rightPanel === 'feed' ? 'bg-white/[0.07]' : 'hover:bg-white/[0.05]'}`}
+                  <div className="flex flex-col items-start gap-phi-3 py-phi-3">
+                    {/* Mode toggles: Deals / Judgements / System — same mono scale as desktop spine */}
+                    <div className="flex flex-col items-stretch gap-phi-1 w-full">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRightPanel((panel) => (panel === 'feed' ? null : 'feed'));
+                          setMobileMenuOpen(false);
+                        }}
+                        className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-1 tracking-[0.06em] btn-interaction ${rightPanel === 'feed' ? 'text-white' : 'text-white/62 hover:text-white'
+                          }`}
+                        style={{ transitionTimingFunction: 'var(--motion-ease)' }}
+                        aria-pressed={rightPanel === 'feed'}
                       >
-                        Judgements
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRightPanel((p) => (p === 'system' ? null : p));
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-1 tracking-[0.06em] btn-interaction ${rightPanel !== 'system' && rightPanel !== 'feed'
-                        ? 'text-white'
-                        : 'text-white/62 hover:text-white'
-                        }`}
-                      style={{ transitionTimingFunction: 'var(--motion-ease)' }}
-                      aria-pressed={rightPanel !== 'system' && rightPanel !== 'feed'}
-                    >
-                      <span
-                        className={`inline-block px-2 py-1 ${rightPanel !== 'system' && rightPanel !== 'feed' ? 'bg-white/[0.07]' : 'hover:bg-white/[0.05]'}`}
+                        <span
+                          className={`inline-block px-2 py-1 ${rightPanel === 'feed' ? 'bg-white/[0.07]' : 'hover:bg-white/[0.05]'}`}
+                        >
+                          Judgements
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRightPanel((p) => (p === 'system' ? null : p));
+                          setMobileMenuOpen(false);
+                        }}
+                        className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-1 tracking-[0.06em] btn-interaction ${rightPanel !== 'system' && rightPanel !== 'feed'
+                          ? 'text-white'
+                          : 'text-white/62 hover:text-white'
+                          }`}
+                        style={{ transitionTimingFunction: 'var(--motion-ease)' }}
+                        aria-pressed={rightPanel !== 'system' && rightPanel !== 'feed'}
                       >
-                        Deals
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRightPanel((panel) => (panel === 'system' ? null : 'system'));
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-1 tracking-[0.06em] btn-interaction ${rightPanel === 'system' ? 'text-white' : 'text-white/62 hover:text-white'
-                        }`}
-                      style={{ transitionTimingFunction: 'var(--motion-ease)' }}
-                      aria-pressed={rightPanel === 'system'}
-                    >
-                      <span
-                        className={`inline-block px-2 py-1 ${rightPanel === 'system' ? 'bg-white/[0.07]' : 'hover:bg-white/[0.05]'}`}
+                        <span
+                          className={`inline-block px-2 py-1 ${rightPanel !== 'system' && rightPanel !== 'feed' ? 'bg-white/[0.07]' : 'hover:bg-white/[0.05]'}`}
+                        >
+                          Deals
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRightPanel((panel) => (panel === 'system' ? null : 'system'));
+                          setMobileMenuOpen(false);
+                        }}
+                        className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-1 tracking-[0.06em] btn-interaction ${rightPanel === 'system' ? 'text-white' : 'text-white/62 hover:text-white'
+                          }`}
+                        style={{ transitionTimingFunction: 'var(--motion-ease)' }}
+                        aria-pressed={rightPanel === 'system'}
                       >
-                        System
-                      </span>
-                    </button>
-                  </div>
+                        <span
+                          className={`inline-block px-2 py-1 ${rightPanel === 'system' ? 'bg-white/[0.07]' : 'hover:bg-white/[0.05]'}`}
+                        >
+                          System
+                        </span>
+                      </button>
+                    </div>
 
-                  {/* Settings */}
-                  <div className="flex flex-col items-start gap-phi-1 mt-phi-3">
-                    <button
-                      type="button"
-                      onClick={() => navigate(SETTINGS_PATH)}
-                      className="type-label-section text-white/70 hover:text-white btn-interaction"
-                    >
-                      Settings
-                    </button>
+                    {/* Settings */}
+                    <div className="flex flex-col items-start gap-phi-1 mt-phi-3">
+                      <button
+                        type="button"
+                        onClick={() => navigate(SETTINGS_PATH)}
+                        className="type-label-section text-white/70 hover:text-white btn-interaction"
+                      >
+                        Settings
+                      </button>
+                    </div>
                   </div>
-                </div>
                 </div>
               </motion.section>
             )}
@@ -529,15 +529,15 @@ export default function MainLayout({
 
       {/* Paper canvas. Fixed height so only WorkGrid scrolls.
           On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-4 pt-phi-3 lg:pl-[calc(10rem+var(--space-6))] lg:pr-phi-6 lg:pt-phi-5">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 lg:pl-[calc(10rem+var(--space-6))] lg:pr-phi-6 lg:pt-phi-5">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(360px,5fr)_minmax(0,6fr)] min-h-0 overflow-hidden pb-phi-4 lg:pb-phi-6 gap-phi-5 lg:gap-x-phi-6 lg:gap-y-phi-2">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(360px,5fr)_minmax(0,6fr)] min-h-0 overflow-hidden pb-phi-5 lg:pb-phi-6 gap-phi-6 lg:gap-x-phi-6 lg:gap-y-phi-3">
             <section
               aria-label="Pipeline summary and fund thesis"
-              className="hidden lg:grid lg:col-span-2 lg:grid-cols-[minmax(360px,5fr)_minmax(0,6fr)] lg:gap-phi-6 min-h-[77px] border-b border-oxford/[0.06] px-phi-1 pb-phi-3"
+              className="hidden lg:grid lg:col-span-2 lg:grid-cols-[minmax(360px,5fr)_minmax(0,6fr)] lg:gap-phi-6 min-h-[89px] border-b border-oxford/[0.06] px-phi-2 pb-phi-4"
             >
               <div className="min-w-0 pr-phi-5">
-                <div className="flex flex-wrap items-center gap-x-phi-3 gap-y-phi-1">
+                <div className="flex flex-wrap items-center gap-x-phi-3 gap-y-phi-2">
                   <p className="type-meta text-oxford/45">Live overview</p>
                   <div className="flex min-w-0 flex-wrap items-center gap-x-phi-3 gap-y-phi-1">
                     <span className="type-meta text-oxford/45">Pipeline</span>
@@ -586,7 +586,7 @@ export default function MainLayout({
                     </span>
                   </div>
                 </div>
-                <div className="mt-phi-2 grid min-w-0 grid-cols-4 items-end gap-x-phi-4">
+                <div className="mt-phi-3 grid min-w-0 grid-cols-4 items-end gap-x-phi-5">
                   {[
                     { label: 'Total', value: startups.length, accent: false },
                     { label: 'Open', value: openCount, accent: false },
@@ -595,9 +595,8 @@ export default function MainLayout({
                   ].map((stat) => (
                     <div key={stat.label} className="min-w-0 text-left">
                       <p
-                        className={`font-mono font-bold text-[clamp(22px,2.1vw,30px)] leading-none tracking-[-0.03em] tabular-nums ${
-                          stat.accent ? 'text-escalation' : 'text-oxford'
-                        }`}
+                        className={`font-mono font-bold text-[clamp(22px,2.1vw,30px)] leading-none tracking-[-0.03em] tabular-nums ${stat.accent ? 'text-escalation' : 'text-oxford'
+                          }`}
                       >
                         {stat.value.toLocaleString()}
                       </p>
@@ -613,8 +612,8 @@ export default function MainLayout({
               >
                 <div className="flex items-center justify-between gap-phi-3">
                   <div className="min-w-0">
-                    <p className="type-meta text-oxford/40">Active mandate</p>
-                    <p className="mt-phi-1 type-body-sm font-semibold tracking-tight text-oxford truncate">
+                    <p className="type-label-section text-oxford/40">Active mandate</p>
+                    <p className="mt-phi-2 type-body font-semibold tracking-tight text-oxford truncate">
                       {fundName || 'No fund configured'}
                     </p>
                   </div>
@@ -625,14 +624,14 @@ export default function MainLayout({
                         style={{ opacity: 0.6 }}
                         aria-hidden
                       />
-                      <span className="type-meta text-oxford/48">Live</span>
+                      <span className="type-label-tab text-oxford/55">Live</span>
                     </span>
                   )}
                 </div>
                 {hasThesisTags && (
-                  <div className="mt-phi-2 flex flex-wrap gap-phi-1">
+                  <div className="mt-phi-3 flex flex-wrap gap-phi-2">
                     {thesisTagList.map((t) => (
-                      <span key={t} className="px-phi-2 py-phi-1 type-meta text-oxford/45 bg-oxford/[0.03]">{t}</span>
+                      <span key={t} className="px-phi-2 py-phi-1 type-label-tab text-oxford/55 bg-oxford/[0.03]">{t}</span>
                     ))}
                   </div>
                 )}
@@ -640,12 +639,12 @@ export default function MainLayout({
             </section>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
               {/* Pipeline summary + lookup */}
-              <header className="flex-none mb-phi-4 min-w-0 lg:px-0">
+              <header className="flex-none mb-phi-5 min-w-0 lg:px-0">
                 <section
                   aria-label="Pipeline summary and agent status"
-                  className="grid min-w-0 grid-cols-1 gap-phi-3 pb-phi-3 px-phi-1 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end xl:gap-x-phi-5 lg:hidden"
+                  className="grid min-w-0 grid-cols-1 gap-phi-4 pb-phi-4 px-phi-2 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end xl:gap-x-phi-5 lg:hidden"
                 >
-                  <div className="min-w-0 flex flex-col gap-phi-1">
+                  <div className="min-w-0 flex flex-col gap-phi-2">
                     <p className="type-meta text-oxford/45">Live overview</p>
                     <p className="type-meta text-oxford/72">
                       {startups.length} total · {openCount} open · {resolvedCount} decided
@@ -654,50 +653,50 @@ export default function MainLayout({
                   </div>
                   <div className="relative flex min-w-0 flex-col items-start gap-y-phi-1 xl:items-end">
                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-phi-3 gap-y-phi-1 xl:justify-end">
-                    <span className="type-meta text-oxford/45">Pipeline</span>
-                    <span className="relative inline-flex items-center gap-phi-2">
-                    {pipelineStateLabel === 'On' && (
-                      <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60"
-                        style={{
-                          animation: 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite',
-                        }}
-                        aria-hidden
-                      />
-                    )}
-                    <span className={
-                      pipelineStateLabel === 'Issue' ? 'type-meta text-escalation' :
-                        pipelineStateLabel === 'Off' ? 'type-meta text-oxford/45' :
-                          'type-meta text-oxford/80'
-                    }>
-                      {pipelineStateLabel}
-                    </span>
-                    {pipelineStateLabel === 'Issue' && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setShowPipelineIssueHelp((open) => !open)}
-                          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
-                          aria-label="Why pipeline has an issue"
-                          aria-expanded={showPipelineIssueHelp}
-                        >
-                          ?
-                        </button>
-                        {showPipelineIssueHelp && (
-                          <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
-                            Pipeline has a problem and may not process updates right now.
+                      <span className="type-meta text-oxford/45">Pipeline</span>
+                      <span className="relative inline-flex items-center gap-phi-2">
+                        {pipelineStateLabel === 'On' && (
+                          <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60"
+                            style={{
+                              animation: 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite',
+                            }}
+                            aria-hidden
+                          />
+                        )}
+                        <span className={
+                          pipelineStateLabel === 'Issue' ? 'type-meta text-escalation' :
+                            pipelineStateLabel === 'Off' ? 'type-meta text-oxford/45' :
+                              'type-meta text-oxford/80'
+                        }>
+                          {pipelineStateLabel}
+                        </span>
+                        {pipelineStateLabel === 'Issue' && (
+                          <>
                             <button
                               type="button"
-                              onClick={() => navigate(SETTINGS_PATH)}
-                              className="mt-phi-2 block type-meta tracking-[0.06em] text-oxford/62 hover:text-oxford btn-interaction"
+                              onClick={() => setShowPipelineIssueHelp((open) => !open)}
+                              className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
+                              aria-label="Why pipeline has an issue"
+                              aria-expanded={showPipelineIssueHelp}
                             >
-                              Open settings →
+                              ?
                             </button>
-                          </span>
+                            {showPipelineIssueHelp && (
+                              <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
+                                Pipeline has a problem and may not process updates right now.
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(SETTINGS_PATH)}
+                                  className="mt-phi-2 block type-meta tracking-[0.06em] text-oxford/62 hover:text-oxford btn-interaction"
+                                >
+                                  Open settings →
+                                </button>
+                              </span>
+                            )}
+                          </>
                         )}
-                      </>
-                    )}
-                  </span>
+                      </span>
                     </div>
                     {pendingEscalations > 0 && (
                       <span className="type-meta text-escalation/85">
@@ -707,26 +706,26 @@ export default function MainLayout({
                   </div>
                 </section>
                 <div className="pt-phi-1 lg:pt-phi-2">
-                <AgentDispatch
-                  input={lookupInput}
-                  setInput={setLookupInput}
-                  onSubmit={() => void handleLookupSubmit()}
-                  isBusy={lookupBusy}
-                  message={lookupMessage}
-                  lookupPhase={lookupPhaseLabel}
-                />
+                  <AgentDispatch
+                    input={lookupInput}
+                    setInput={setLookupInput}
+                    onSubmit={() => void handleLookupSubmit()}
+                    isBusy={lookupBusy}
+                    message={lookupMessage}
+                    lookupPhase={lookupPhaseLabel}
+                  />
                 </div>
               </header>
 
               {/* Fund thesis — mobile only (desktop shows it in the right column) */}
-              <div className="flex-none mb-phi-3 block lg:hidden">
+              <div className="flex-none mb-phi-4 block lg:hidden">
                 <article
-                  className="w-full bg-paper/70 px-phi-4 py-phi-3"
+                  className="w-full bg-paper/70 px-phi-5 py-phi-4"
                   style={{ boxSizing: 'border-box' }}
                   aria-label="Fund thesis preview"
                 >
                   <div className="flex items-center justify-between gap-phi-2">
-                    <p className="type-meta text-oxford/45">Active mandate</p>
+                    <p className="type-label-section text-oxford/40">Active mandate</p>
                     {hasThesis && (
                       <span className="inline-flex items-center gap-phi-1">
                         <span
@@ -734,17 +733,17 @@ export default function MainLayout({
                           style={{ opacity: 0.6 }}
                           aria-hidden
                         />
-                        <span className="type-meta text-oxford/48">Live</span>
+                        <span className="type-label-tab text-oxford/55">Live</span>
                       </span>
                     )}
                   </div>
-                  <p className="mt-phi-1 type-body-sm font-semibold tracking-tight text-oxford">
+                  <p className="mt-phi-2 type-body font-semibold tracking-tight text-oxford">
                     {fundName || 'No fund configured'}
                   </p>
                   {hasThesisTags && (
-                    <div className="mt-phi-2 flex flex-wrap gap-phi-1">
+                  <div className="mt-phi-3 flex flex-wrap gap-phi-2">
                       {thesisTagList.map((t) => (
-                        <span key={t} className="px-phi-2 py-phi-1 type-meta text-oxford/45 bg-oxford/[0.03]">{t}</span>
+                        <span key={t} className="px-phi-2 py-phi-1 type-label-tab text-oxford/55 bg-oxford/[0.03]">{t}</span>
                       ))}
                     </div>
                   )}

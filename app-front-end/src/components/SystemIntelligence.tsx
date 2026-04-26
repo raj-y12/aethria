@@ -37,9 +37,8 @@ const FilterButton = ({ active, label, onClick }: { active: boolean; label: stri
   <button
     type="button"
     onClick={onClick}
-    className={`type-meta min-h-[36px] px-2 transition-[color,border-color,background-color] duration-200 border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-      active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/45 hover:text-oxford/70'
-    }`}
+    className={`type-meta min-h-[36px] px-2 transition-[color,border-color,background-color] duration-200 border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/45 hover:text-oxford/70'
+      }`}
   >
     {label}
   </button>

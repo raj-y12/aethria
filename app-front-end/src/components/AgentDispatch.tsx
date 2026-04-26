@@ -65,9 +65,8 @@ export default function AgentDispatch({
           Dispatch
         </span>
         <span
-          className={`type-meta text-oxford/35 group-hover/trigger:text-oxford/55 transition-transform duration-300 ease-smooth ${
-            expanded ? 'rotate-180' : 'rotate-0'
-          }`}
+          className={`type-meta text-oxford/35 group-hover/trigger:text-oxford/55 transition-transform duration-300 ease-smooth ${expanded ? 'rotate-180' : 'rotate-0'
+            }`}
           aria-hidden="true"
         >
           v
@@ -78,9 +77,8 @@ export default function AgentDispatch({
       </button>
 
       <div
-        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-smooth ${
-          expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        }`}
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-smooth ${expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+          }`}
       >
         <div className="overflow-hidden">
           <div className="px-phi-1 pb-phi-4 pt-phi-3">

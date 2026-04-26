@@ -43,17 +43,15 @@ function SpineNavButton({
       type="button"
       onClick={onClick}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`type-meta w-full min-h-[44px] flex items-center justify-start px-2 cursor-pointer tracking-[0.06em] btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 ${
-        active ? 'text-white' : 'text-white/55 hover:text-white/88'
-      }`}
+      className={`type-meta w-full min-h-[44px] flex items-center justify-start px-2 cursor-pointer tracking-[0.06em] btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 ${active ? 'text-white' : 'text-white/55 hover:text-white/88'
+        }`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
       aria-pressed={ariaPressed}
       aria-current={active ? 'page' : undefined}
     >
       <span
-        className={`inline-block px-2 py-1 transition-[background-color,color] ${
-          active ? 'bg-white/[0.08]' : 'hover:bg-white/[0.05]'
-        }`}
+        className={`inline-block px-2 py-1 transition-[background-color,color] ${active ? 'bg-white/[0.08]' : 'hover:bg-white/[0.05]'
+          }`}
       >
         {label}
       </span>
@@ -193,13 +191,13 @@ export default function SystemBar({
         hasEnteredOnce
           ? undefined
           : transitionOrReduced(reduceMotion, {
-              duration: tokens.motion.duration.long,
-              ease: tokens.motion.ease,
-            })
+            duration: tokens.motion.duration.long,
+            ease: tokens.motion.ease,
+          })
       }
     >
-      <div className="relative flex flex-col gap-4 h-full min-h-0">
-        <div className="shrink-0 px-2">
+      <div className="relative flex flex-col gap-5 h-full min-h-0">
+        <div className="shrink-0 px-3">
           <p className="font-wordmark font-normal text-[16px] leading-none tracking-[0.01em] text-white/80">
             Aethria
           </p>
@@ -208,7 +206,7 @@ export default function SystemBar({
         <SpineRule />
 
         {/* Time + date */}
-        <div className="flex flex-col gap-1 shrink-0 px-2" aria-live="polite">
+        <div className="flex flex-col gap-2 shrink-0 px-3" aria-live="polite">
           <span className="type-meta tabular-nums leading-none text-white/55">{timeShort}</span>
           <span className="type-meta leading-tight tracking-[0.08em] text-white/30">
             {dateShort}
@@ -218,7 +216,7 @@ export default function SystemBar({
         <SpineRule />
 
         {/* Account */}
-        <div className="w-full flex flex-col gap-2 shrink-0 px-2">
+        <div className="w-full flex flex-col gap-3 shrink-0 px-3">
           <span
             className="type-meta truncate max-w-full text-white/70"
             title={displayName}
@@ -239,7 +237,7 @@ export default function SystemBar({
 
         {workspaceChrome ? (
           <>
-            <div className="flex flex-col gap-0.5 w-full shrink-0">
+            <div className="flex flex-col gap-1 w-full shrink-0">
               <SpineNavButton
                 label="Deals"
                 active={rightPanel !== 'system' && rightPanel !== 'feed'}
@@ -267,7 +265,7 @@ export default function SystemBar({
         ) : null}
 
         {/* Log out */}
-        <div className="mt-auto flex flex-col gap-2 pt-1 shrink-0 px-2">
+        <div className="mt-auto flex flex-col gap-3 pt-2 shrink-0 px-3">
           {agentActionError ? (
             <p className="type-meta text-white/75" role="status" aria-live="polite">
               {agentActionError}

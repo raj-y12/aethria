@@ -507,14 +507,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               return (
                 <section className="memoDocSection" aria-labelledby="memo-case">
                   <h2 className="memoDocSectionHead" id="memo-case">The Case</h2>
-                    <dl className="memoDocDL">
-                      {rows.map((r) => (
-                        <div key={r.key} className="memoDocDLRow">
-                          <dt className="memoDocDT">{r.key}</dt>
-                          <dd className="memoDocDD">{r.val}</dd>
-                        </div>
-                      ))}
-                    </dl>
+                  <dl className="memoDocDL">
+                    {rows.map((r) => (
+                      <div key={r.key} className="memoDocDLRow">
+                        <dt className="memoDocDT">{r.key}</dt>
+                        <dd className="memoDocDD">{r.val}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 </section>
               );
             })()}
@@ -528,26 +528,26 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               return (
                 <section className="memoDocSection" aria-labelledby="memo-thesis">
                   <h2 className="memoDocSectionHead" id="memo-thesis">Investment Thesis</h2>
-                    {thesis && <p className="memoDocProse memoDocThesis">{thesis}</p>}
-                    {assumptions && assumptions.length > 0 && (
-                      <div className="memoDocSubsection">
-                        <p className="memoDocSubhead">Key Assumptions</p>
-                        <ul className="memoList">
-                          {assumptions.map((item, i) => (
-                            <li key={i} className="memoListItem">
-                              <span className="memoBullet" aria-hidden>·</span>
-                              <span>{normalizeListItemText(item)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {biggest && (
-                      <div className="memoDocSubsection">
-                        <p className="memoDocSubhead">Biggest Unknown</p>
-                        <p className="memoDocProse">{biggest}</p>
-                      </div>
-                    )}
+                  {thesis && <p className="memoDocProse memoDocThesis">{thesis}</p>}
+                  {assumptions && assumptions.length > 0 && (
+                    <div className="memoDocSubsection">
+                      <p className="memoDocSubhead">Key Assumptions</p>
+                      <ul className="memoList">
+                        {assumptions.map((item, i) => (
+                          <li key={i} className="memoListItem">
+                            <span className="memoBullet" aria-hidden>·</span>
+                            <span>{normalizeListItemText(item)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {biggest && (
+                    <div className="memoDocSubsection">
+                      <p className="memoDocSubhead">Biggest Unknown</p>
+                      <p className="memoDocProse">{biggest}</p>
+                    </div>
+                  )}
                 </section>
               );
             })()}
@@ -564,145 +564,145 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 <section className="memoDocSection" aria-labelledby="memo-assessment">
                   <h2 className="memoDocSectionHead" id="memo-assessment">Assessment</h2>
 
-                    {hasScores && (
-                      <div className="memoDocScoreScope">
-                        <div className="memoDocOverallScoreRow">
-                          <p className="memoDocOverallScore">
-                            {overallScore != null && overallLabel
-                              ? `${overallScore.toFixed(1)} — ${overallLabel}`
-                              : '—'}
-                          </p>
-                          <button
-                            type="button"
-                            className="memoDocTooltipBtn"
-                            aria-label="How this score is derived"
-                            aria-expanded={scoreTooltipOpen}
-                            aria-controls={`${contentKey}-score-tooltip`}
-                            onClick={() => setScoreTooltipOpen((v) => !v)}
-                          >
-                            ?
-                          </button>
-                        </div>
-                        {scoreTooltipOpen && (
-                          <p id={`${contentKey}-score-tooltip`} className="memoDocTooltipPanel" role="note">
-                            {scoreSourceText}
-                          </p>
-                        )}
-                        <p className="memoDocScoreLegend">1–3 Weak · 4–5 Concerning · 6–7 Promising · 8–10 Strong</p>
-                        <div className="memoDocScoreStack">
-                          {scoreBlocks.map((b) => {
-                            const expanded = activeDimensionId === b.id;
-                            const panelId = `${contentKey}-${b.id}-details`;
-                            const reasoningItems = b.structuredReasoning.length
-                              ? b.structuredReasoning
-                              : [b.reasoning || (b.score != null ? getScoreBand(b.score).meaning : 'No rationale available.')];
-                            const weaknessItems = b.weaknesses.length ? b.weaknesses : null;
-                            return (
-                              <article key={b.id} className="memoDocScorePanel">
-                                <button
-                                  type="button"
-                                  className="memoDocScorePanelToggle"
-                                  onClick={() => setActiveDimensionId((prev) => (prev === b.id ? null : b.id))}
-                                  aria-expanded={expanded}
-                                  aria-controls={panelId}
+                  {hasScores && (
+                    <div className="memoDocScoreScope">
+                      <div className="memoDocOverallScoreRow">
+                        <p className="memoDocOverallScore">
+                          {overallScore != null && overallLabel
+                            ? `${overallScore.toFixed(1)} — ${overallLabel}`
+                            : '—'}
+                        </p>
+                        <button
+                          type="button"
+                          className="memoDocTooltipBtn"
+                          aria-label="How this score is derived"
+                          aria-expanded={scoreTooltipOpen}
+                          aria-controls={`${contentKey}-score-tooltip`}
+                          onClick={() => setScoreTooltipOpen((v) => !v)}
+                        >
+                          ?
+                        </button>
+                      </div>
+                      {scoreTooltipOpen && (
+                        <p id={`${contentKey}-score-tooltip`} className="memoDocTooltipPanel" role="note">
+                          {scoreSourceText}
+                        </p>
+                      )}
+                      <p className="memoDocScoreLegend">1–3 Weak · 4–5 Concerning · 6–7 Promising · 8–10 Strong</p>
+                      <div className="memoDocScoreStack">
+                        {scoreBlocks.map((b) => {
+                          const expanded = activeDimensionId === b.id;
+                          const panelId = `${contentKey}-${b.id}-details`;
+                          const reasoningItems = b.structuredReasoning.length
+                            ? b.structuredReasoning
+                            : [b.reasoning || (b.score != null ? getScoreBand(b.score).meaning : 'No rationale available.')];
+                          const weaknessItems = b.weaknesses.length ? b.weaknesses : null;
+                          return (
+                            <article key={b.id} className="memoDocScorePanel">
+                              <button
+                                type="button"
+                                className="memoDocScorePanelToggle"
+                                onClick={() => setActiveDimensionId((prev) => (prev === b.id ? null : b.id))}
+                                aria-expanded={expanded}
+                                aria-controls={panelId}
+                              >
+                                <span className="memoDocScorePanelTitle">{b.name}</span>
+                                <span className="memoDocScorePanelValue">
+                                  {b.score != null ? `${b.score.toFixed(1)} — ${b.label ?? getScoreBand(b.score).label}` : '—'}
+                                </span>
+                                <span className="memoDocScorePanelMeta">
+                                  {(b.confidence ?? 'medium').toUpperCase()} confidence · {expanded ? '−' : '+'}
+                                </span>
+                              </button>
+                              {expanded && (
+                                <div
+                                  id={panelId}
+                                  className="memoDocExpandedBody"
+                                  role="region"
                                 >
-                                  <span className="memoDocScorePanelTitle">{b.name}</span>
-                                  <span className="memoDocScorePanelValue">
-                                    {b.score != null ? `${b.score.toFixed(1)} — ${b.label ?? getScoreBand(b.score).label}` : '—'}
-                                  </span>
-                                  <span className="memoDocScorePanelMeta">
-                                    {(b.confidence ?? 'medium').toUpperCase()} confidence · {expanded ? '−' : '+'}
-                                  </span>
-                                </button>
-                                {expanded && (
-                                  <div
-                                    id={panelId}
-                                    className="memoDocExpandedBody"
-                                    role="region"
-                                  >
-                                    <p className="memoDocExpandedLabel">Reasoning</p>
-                                    <ul className="memoList">
-                                      {reasoningItems.map((item, i) => (
-                                        <li key={i} className="memoListItem">
-                                          <span className="memoBullet" aria-hidden>·</span>
-                                          <span>{normalizeListItemText(item)}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                    {weaknessItems && (
-                                      <>
-                                        <p className="memoDocExpandedLabel memoDocExpandedLabel--weaknesses">Weaknesses</p>
-                                        <ul className="memoList">
-                                          {weaknessItems.map((item, i) => (
-                                            <li key={i} className="memoListItem">
-                                              <span className="memoBullet" aria-hidden>·</span>
-                                              <span>{normalizeListItemText(item)}</span>
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </>
-                                    )}
-                                  </div>
-                                )}
-                              </article>
-                            );
-                          })}
+                                  <p className="memoDocExpandedLabel">Reasoning</p>
+                                  <ul className="memoList">
+                                    {reasoningItems.map((item, i) => (
+                                      <li key={i} className="memoListItem">
+                                        <span className="memoBullet" aria-hidden>·</span>
+                                        <span>{normalizeListItemText(item)}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                  {weaknessItems && (
+                                    <>
+                                      <p className="memoDocExpandedLabel memoDocExpandedLabel--weaknesses">Weaknesses</p>
+                                      <ul className="memoList">
+                                        {weaknessItems.map((item, i) => (
+                                          <li key={i} className="memoListItem">
+                                            <span className="memoBullet" aria-hidden>·</span>
+                                            <span>{normalizeListItemText(item)}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </article>
+                          );
+                        })}
+                      </div>
+                      {(displayStartup.review?.improvement_to_9?.length ?? 0) > 0 && (
+                        <div className="memoDocSubsection">
+                          <p className="memoDocSubhead">What would make this a 9?</p>
+                          <ul className="memoList">
+                            {(displayStartup.review?.improvement_to_9 ?? []).map((item, i) => (
+                              <li key={i} className="memoListItem">
+                                <span className="memoBullet" aria-hidden>·</span>
+                                <span>{normalizeListItemText(item)}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                        {(displayStartup.review?.improvement_to_9?.length ?? 0) > 0 && (
-                          <div className="memoDocSubsection">
-                            <p className="memoDocSubhead">What would make this a 9?</p>
-                            <ul className="memoList">
-                              {(displayStartup.review?.improvement_to_9 ?? []).map((item, i) => (
-                                <li key={i} className="memoListItem">
-                                  <span className="memoBullet" aria-hidden>·</span>
-                                  <span>{normalizeListItemText(item)}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                      )}
+                    </div>
+                  )}
 
-                    {teamItems.length > 0 && (
-                      <div className="memoDocSubsection">
-                        <p className="memoDocSubhead">Team</p>
-                        <ul className="memoList">
-                          {teamItems.map((item, i) => (
-                            <li key={i} className="memoListItem">
-                              <span className="memoBullet" aria-hidden>·</span>
-                              <span>{normalizeListItemText(item)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {compItems.length > 0 && (
-                      <div className="memoDocSubsection">
-                        <p className="memoDocSubhead">Competitive Landscape</p>
-                        <ul className="memoList">
-                          {compItems.map((item, i) => (
-                            <li key={i} className="memoListItem">
-                              <span className="memoBullet" aria-hidden>·</span>
-                              <span>{normalizeListItemText(item)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {bizItems.length > 0 && (
-                      <div className="memoDocSubsection">
-                        <p className="memoDocSubhead">Business Model</p>
-                        <ul className="memoList">
-                          {bizItems.map((item, i) => (
-                            <li key={i} className="memoListItem">
-                              <span className="memoBullet" aria-hidden>·</span>
-                              <span>{normalizeListItemText(item)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                  {teamItems.length > 0 && (
+                    <div className="memoDocSubsection">
+                      <p className="memoDocSubhead">Team</p>
+                      <ul className="memoList">
+                        {teamItems.map((item, i) => (
+                          <li key={i} className="memoListItem">
+                            <span className="memoBullet" aria-hidden>·</span>
+                            <span>{normalizeListItemText(item)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {compItems.length > 0 && (
+                    <div className="memoDocSubsection">
+                      <p className="memoDocSubhead">Competitive Landscape</p>
+                      <ul className="memoList">
+                        {compItems.map((item, i) => (
+                          <li key={i} className="memoListItem">
+                            <span className="memoBullet" aria-hidden>·</span>
+                            <span>{normalizeListItemText(item)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {bizItems.length > 0 && (
+                    <div className="memoDocSubsection">
+                      <p className="memoDocSubhead">Business Model</p>
+                      <ul className="memoList">
+                        {bizItems.map((item, i) => (
+                          <li key={i} className="memoListItem">
+                            <span className="memoBullet" aria-hidden>·</span>
+                            <span>{normalizeListItemText(item)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </section>
               );
             })()}
@@ -725,50 +725,50 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               return (
                 <section className="memoDocSection" aria-labelledby="memo-align">
                   <h2 className="memoDocSectionHead" id="memo-align">Thesis Alignment</h2>
-                    {tiles.length > 0 && (
-                      <div className="memoDocAlignTiles">
-                        {tiles.map((t) => (
-                          <div key={t.label} className="memoDocAlignTile">
-                            <p className="memoDocAlignTileLabel">{t.label}</p>
-                            <p className="memoDocAlignTileVal">{t.val}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {(fitPoints.length > 0 || gapPoints.length > 0) && (
-                      <dl className="memoDocDL">
-                        {fitPoints.length > 0 && (
-                          <div className="memoDocDLRow">
-                            <dt className="memoDocDT">Fits</dt>
-                            <dd className="memoDocDD">
-                              <ul className="memoList">
-                                {fitPoints.map((item, i) => (
-                                  <li key={i} className="memoListItem">
-                                    <span className="memoBullet" aria-hidden>·</span>
-                                    <span>{normalizeListItemText(item)}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </dd>
-                          </div>
-                        )}
-                        {gapPoints.length > 0 && (
-                          <div className="memoDocDLRow">
-                            <dt className="memoDocDT">Gaps</dt>
-                            <dd className="memoDocDD">
-                              <ul className="memoList">
-                                {gapPoints.map((item, i) => (
-                                  <li key={i} className="memoListItem">
-                                    <span className="memoBullet" aria-hidden>·</span>
-                                    <span>{normalizeListItemText(item)}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </dd>
-                          </div>
-                        )}
-                      </dl>
-                    )}
+                  {tiles.length > 0 && (
+                    <div className="memoDocAlignTiles">
+                      {tiles.map((t) => (
+                        <div key={t.label} className="memoDocAlignTile">
+                          <p className="memoDocAlignTileLabel">{t.label}</p>
+                          <p className="memoDocAlignTileVal">{t.val}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {(fitPoints.length > 0 || gapPoints.length > 0) && (
+                    <dl className="memoDocDL">
+                      {fitPoints.length > 0 && (
+                        <div className="memoDocDLRow">
+                          <dt className="memoDocDT">Fits</dt>
+                          <dd className="memoDocDD">
+                            <ul className="memoList">
+                              {fitPoints.map((item, i) => (
+                                <li key={i} className="memoListItem">
+                                  <span className="memoBullet" aria-hidden>·</span>
+                                  <span>{normalizeListItemText(item)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </dd>
+                        </div>
+                      )}
+                      {gapPoints.length > 0 && (
+                        <div className="memoDocDLRow">
+                          <dt className="memoDocDT">Gaps</dt>
+                          <dd className="memoDocDD">
+                            <ul className="memoList">
+                              {gapPoints.map((item, i) => (
+                                <li key={i} className="memoListItem">
+                                  <span className="memoBullet" aria-hidden>·</span>
+                                  <span>{normalizeListItemText(item)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
+                  )}
                 </section>
               );
             })()}
@@ -780,44 +780,44 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               const selected = reviews[selectedReviewerIdx] ?? reviews[0];
               return (
                 <section className="memoDocSection" aria-labelledby="memo-reviewers">
-                    <h2 className="memoDocSectionHead" id="memo-reviewers">
-                      Reviewer Panel
-                      {isContested && (
-                        <span className="memoDocContestedKicker">Contested</span>
-                      )}
-                    </h2>
-                    <div className="memoDocReviewerTable" role="group" aria-label="Per-reviewer scores and verdicts">
-                      {reviews.map((rv, idx) => {
-                        const isSelected = idx === selectedReviewerIdx;
-                        const scoreRow = `Mkt ${rv.market_score}  ·  Prd ${rv.product_score}  ·  Tch ${rv.technical_score}  ·  Exc ${rv.execution_score}  ·  Def ${rv.defensibility_score}`;
-                        return (
-                          <button
-                            key={rv.reviewer_type}
-                            type="button"
-                            className="memoDocReviewerRow"
-                            aria-pressed={isSelected}
-                            onClick={() => setSelectedReviewerIdx(idx)}
-                          >
-                            <span className="memoDocReviewerRowLabel">
-                              {REVIEWER_LABELS[rv.reviewer_type] ?? rv.reviewer_type}
-                            </span>
-                            <span className="memoDocReviewerRowVerdict">{rv.verdict}</span>
-                            <span className="memoDocReviewerRowScores">{scoreRow}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {selected?.overall_summary && (
-                      <motion.div
-                        key={`${contentKey}:reviewer:${selectedReviewerIdx}`}
-                        className="memoDocReviewerDetail"
-                        initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={transitionOrReduced(reduceMotion, { duration: 0.18, ease: [0.16, 1, 0.3, 1] })}
-                      >
-                        <p className="memoDocReviewerDetailText">{selected.overall_summary}</p>
-                      </motion.div>
+                  <h2 className="memoDocSectionHead" id="memo-reviewers">
+                    Reviewer Panel
+                    {isContested && (
+                      <span className="memoDocContestedKicker">Contested</span>
                     )}
+                  </h2>
+                  <div className="memoDocReviewerTable" role="group" aria-label="Per-reviewer scores and verdicts">
+                    {reviews.map((rv, idx) => {
+                      const isSelected = idx === selectedReviewerIdx;
+                      const scoreRow = `Mkt ${rv.market_score}  ·  Prd ${rv.product_score}  ·  Tch ${rv.technical_score}  ·  Exc ${rv.execution_score}  ·  Def ${rv.defensibility_score}`;
+                      return (
+                        <button
+                          key={rv.reviewer_type}
+                          type="button"
+                          className="memoDocReviewerRow"
+                          aria-pressed={isSelected}
+                          onClick={() => setSelectedReviewerIdx(idx)}
+                        >
+                          <span className="memoDocReviewerRowLabel">
+                            {REVIEWER_LABELS[rv.reviewer_type] ?? rv.reviewer_type}
+                          </span>
+                          <span className="memoDocReviewerRowVerdict">{rv.verdict}</span>
+                          <span className="memoDocReviewerRowScores">{scoreRow}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selected?.overall_summary && (
+                    <motion.div
+                      key={`${contentKey}:reviewer:${selectedReviewerIdx}`}
+                      className="memoDocReviewerDetail"
+                      initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={transitionOrReduced(reduceMotion, { duration: 0.18, ease: [0.16, 1, 0.3, 1] })}
+                    >
+                      <p className="memoDocReviewerDetailText">{selected.overall_summary}</p>
+                    </motion.div>
+                  )}
                 </section>
               );
             })()}
@@ -840,29 +840,29 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               return (
                 <section className="memoDocSection" aria-labelledby="memo-risks">
                   <h2 className="memoDocSectionHead" id="memo-risks">Risk Factors</h2>
-                    {uniqueRisks.length > 0 && (
+                  {uniqueRisks.length > 0 && (
+                    <ul className="memoList">
+                      {uniqueRisks.map((r, i) => (
+                        <li key={i} className="memoListItem">
+                          <span className="memoBullet">·</span>
+                          <span>{normalizeListItemText(r)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {mitigation.length > 0 && (
+                    <div className="memoDocSubsection">
+                      <p className="memoDocSubhead">Mitigation Checklist</p>
                       <ul className="memoList">
-                        {uniqueRisks.map((r, i) => (
+                        {mitigation.map((item, i) => (
                           <li key={i} className="memoListItem">
                             <span className="memoBullet">·</span>
-                            <span>{normalizeListItemText(r)}</span>
+                            <span>{normalizeListItemText(item)}</span>
                           </li>
                         ))}
                       </ul>
-                    )}
-                    {mitigation.length > 0 && (
-                      <div className="memoDocSubsection">
-                        <p className="memoDocSubhead">Mitigation Checklist</p>
-                        <ul className="memoList">
-                          {mitigation.map((item, i) => (
-                            <li key={i} className="memoListItem">
-                              <span className="memoBullet">·</span>
-                              <span>{normalizeListItemText(item)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    </div>
+                  )}
                 </section>
               );
             })()}
@@ -871,18 +871,18 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {nextStepText && (
               <section className="memoDocSection" aria-labelledby="memo-next">
                 <h2 className="memoDocSectionHead" id="memo-next">Next Steps</h2>
-                  {nextStepItems.length > 0 ? (
-                    <ul className="memoList">
-                      {nextStepItems.map((item, idx) => (
-                        <li key={idx} className="memoListItem">
-                          <span className="memoBullet">{idx + 1}.</span>
-                          <span>{normalizeListItemText(item)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="memoDocProse">{nextStepText}</p>
-                  )}
+                {nextStepItems.length > 0 ? (
+                  <ul className="memoList">
+                    {nextStepItems.map((item, idx) => (
+                      <li key={idx} className="memoListItem">
+                        <span className="memoBullet">{idx + 1}.</span>
+                        <span>{normalizeListItemText(item)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="memoDocProse">{nextStepText}</p>
+                )}
               </section>
             )}
 
@@ -920,27 +920,27 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     id={`${contentKey}-sources-panel`}
                     className={`min-h-0 overflow-hidden ${sourcesOpen ? '' : 'hidden'}`}
                   >
-                  <div className="memoSourcesBody">
-                    <ul className="memoList">
-                      {(displayStartup.scout.references ?? [])
-                        .map((r) => String(r ?? '').trim())
-                        .filter(Boolean)
-                        .map((ref, i) => {
-                          const href = memoReferenceHref(ref);
-                          const label = memoReferenceLabel(ref);
-                          return (
-                            <li key={i} className="memoListItem">
-                              <span className="memoBullet">·</span>
-                              {href ? (
-                                <a className="memoLink" href={href} target="_blank" rel="noreferrer">{label}</a>
-                              ) : (
-                                <span>{label}</span>
-                              )}
-                            </li>
-                          );
-                        })}
-                    </ul>
-                  </div>
+                    <div className="memoSourcesBody">
+                      <ul className="memoList">
+                        {(displayStartup.scout.references ?? [])
+                          .map((r) => String(r ?? '').trim())
+                          .filter(Boolean)
+                          .map((ref, i) => {
+                            const href = memoReferenceHref(ref);
+                            const label = memoReferenceLabel(ref);
+                            return (
+                              <li key={i} className="memoListItem">
+                                <span className="memoBullet">·</span>
+                                {href ? (
+                                  <a className="memoLink" href={href} target="_blank" rel="noreferrer">{label}</a>
+                                ) : (
+                                  <span>{label}</span>
+                                )}
+                              </li>
+                            );
+                          })}
+                      </ul>
+                    </div>
                   </div>
                 </motion.div>
               </section>
@@ -976,20 +976,20 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     id={`${contentKey}-pipeline-panel`}
                     className={`min-h-0 overflow-hidden ${pipelineLogOpen ? '' : 'hidden'}`}
                   >
-                  <ol className="memoReplayList">
-                    {pipelineReplaySteps.map((step) => (
-                      <li key={step.id} className="memoReplayItem">
-                        <p className="memoReplayKicker">
-                          <span>{step.label}</span>
-                          <span className={step.done ? 'memoReplayBadge' : 'memoReplayBadge memoReplayBadge--pending'}>
-                            {step.done ? 'Done' : 'Pending'}
-                          </span>
-                        </p>
-                        <p className="memoReplayWhen">{step.atDisplay}</p>
-                        <p className="memoReplayDetail">{step.detail}</p>
-                      </li>
-                    ))}
-                  </ol>
+                    <ol className="memoReplayList">
+                      {pipelineReplaySteps.map((step) => (
+                        <li key={step.id} className="memoReplayItem">
+                          <p className="memoReplayKicker">
+                            <span>{step.label}</span>
+                            <span className={step.done ? 'memoReplayBadge' : 'memoReplayBadge memoReplayBadge--pending'}>
+                              {step.done ? 'Done' : 'Pending'}
+                            </span>
+                          </p>
+                          <p className="memoReplayWhen">{step.atDisplay}</p>
+                          <p className="memoReplayDetail">{step.detail}</p>
+                        </li>
+                      ))}
+                    </ol>
                   </div>
                 </motion.div>
               </section>

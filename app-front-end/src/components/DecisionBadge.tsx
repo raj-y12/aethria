@@ -10,12 +10,12 @@ export type DecisionBadgeVariant = 'INVEST' | 'PASS' | 'MONITOR' | 'awaiting' | 
  * escalation remains accent fill.
  */
 const LABEL: Record<DecisionBadgeVariant, string> = {
-  INVEST:    DECISION_LABELS.INVEST    ?? 'Invest',
-  PASS:      DECISION_LABELS.PASS      ?? 'Pass',
-  MONITOR:   DECISION_LABELS.MONITOR   ?? 'Monitor',
-  awaiting:  'Awaiting Review',
+  INVEST: DECISION_LABELS.INVEST ?? 'Invest',
+  PASS: DECISION_LABELS.PASS ?? 'Pass',
+  MONITOR: DECISION_LABELS.MONITOR ?? 'Monitor',
+  awaiting: 'Awaiting Review',
   undecided: 'Pending Decision',
-  escalation:'Escalation',
+  escalation: 'Escalation',
 };
 
 export default function DecisionBadge({ variant }: { variant: DecisionBadgeVariant }) {

@@ -55,9 +55,8 @@ const FilterButton = ({ active, label, onClick }: { active: boolean; label: stri
   <button
     type="button"
     onClick={onClick}
-    className={`type-meta min-h-[36px] px-2 transition-[color,border-color,background-color] duration-200 border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-      active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/45 hover:text-oxford/70'
-    }`}
+    className={`type-meta min-h-[36px] px-2 transition-[color,border-color,background-color] duration-200 border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/45 hover:text-oxford/70'
+      }`}
   >
     {label}
   </button>
@@ -169,7 +168,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                   <option value="NAME_AZ">Identity A–Z</option>
                 </select>
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-oxford/20">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
                 </div>
               </div>
               <button
@@ -191,53 +190,51 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 transition={{ duration: 0.2, ease: tokens.motion.ease }}
                 className="border-t border-oxford/[0.06]"
               >
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-phi-4 pt-phi-3">
-                <div className="space-y-2">
-                  <span className="type-meta text-oxford/45">Decision</span>
-                  <div className="flex flex-wrap gap-2">
-                    {['ALL', 'YES', 'NO', 'MAYBE', 'ESCALATION'].map((d) => (
-                      <button
-                        key={d}
-                        onClick={() => setDecisionFilter(d as DecisionFilter)}
-                        className={`type-meta px-3 min-h-[36px] border border-oxford/10 transition-colors ${
-                          decisionFilter === d ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
-                        }`}
-                      >
-                        {d === 'ALL' ? 'Any' : d}
-                      </button>
-                    ))}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-phi-4 pt-phi-3">
+                  <div className="space-y-2">
+                    <span className="type-meta text-oxford/45">Decision</span>
+                    <div className="flex flex-wrap gap-2">
+                      {['ALL', 'YES', 'NO', 'MAYBE', 'ESCALATION'].map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => setDecisionFilter(d as DecisionFilter)}
+                          className={`type-meta px-3 min-h-[36px] border border-oxford/10 transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
+                            }`}
+                        >
+                          {d === 'ALL' ? 'Any' : d}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <span className="type-meta text-oxford/45">Review band</span>
+                    <div className="flex flex-wrap gap-2">
+                      {['ALL', 'STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'].map((r) => (
+                        <button
+                          key={r}
+                          onClick={() => setReviewFilter(r as ReviewFilter)}
+                          className={`type-meta px-3 min-h-[36px] border border-oxford/10 transition-colors ${reviewFilter === r ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
+                            }`}
+                        >
+                          {r === 'ALL' ? 'Any' : r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-end justify-end">
+                    <button
+                      onClick={() => {
+                        setSourceFilter('ALL');
+                        setDecisionFilter('ALL');
+                        setReviewFilter('ALL');
+                        setSortFilter('NEWEST');
+                      }}
+                      className="type-meta min-h-[36px] text-oxford/55 hover:text-accent transition-colors underline underline-offset-4"
+                    >
+                      Reset filters
+                    </button>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <span className="type-meta text-oxford/45">Review band</span>
-                  <div className="flex flex-wrap gap-2">
-                    {['ALL', 'STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'].map((r) => (
-                      <button
-                        key={r}
-                        onClick={() => setReviewFilter(r as ReviewFilter)}
-                        className={`type-meta px-3 min-h-[36px] border border-oxford/10 transition-colors ${
-                          reviewFilter === r ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
-                        }`}
-                      >
-                        {r === 'ALL' ? 'Any' : r}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-end justify-end">
-                  <button
-                    onClick={() => {
-                      setSourceFilter('ALL');
-                      setDecisionFilter('ALL');
-                      setReviewFilter('ALL');
-                      setSortFilter('NEWEST');
-                    }}
-                    className="type-meta min-h-[36px] text-oxford/55 hover:text-accent transition-colors underline underline-offset-4"
-                  >
-                    Reset filters
-                  </button>
-                </div>
-              </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -271,9 +268,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: tokens.motion.ease } },
               }}
               transition={{ layout: { duration: reduceMotion ? 0 : 0.24, ease: tokens.motion.ease } }}
-              className={`group relative border-b border-oxford/[0.06] py-phi-3 px-phi-3 cursor-pointer transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-                isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.02]'
-              }`}
+              className={`group relative border-b border-oxford/[0.06] px-phi-3 cursor-pointer transition-[padding,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${isSelected ? 'bg-registerTint py-phi-5' : 'hover:bg-oxford/[0.02] py-phi-4'
+                }`}
               onClick={() => onStartupClick(startup)}
               onKeyDown={(e) => {
                 if (e.target !== e.currentTarget) return;
@@ -287,7 +283,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
               aria-pressed={isSelected}
               aria-label={`Open memo for ${startup.scout.name}`}
             >
-              <div className="grid grid-cols-1 sm:grid-cols-[26px_minmax(0,1fr)_auto] gap-x-phi-3 gap-y-phi-2 items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-[26px_minmax(0,1fr)_auto] gap-x-phi-3 gap-y-phi-3 items-start">
                 {/* Index */}
                 <span className="type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums pt-px sm:col-start-1">
                   {displayIndex}
@@ -298,38 +294,37 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                   <h2 className="type-body-emphasis text-oxford">
                     {startup.scout.name}
                   </h2>
-                  <div className="flex flex-wrap items-center gap-x-1 mt-1">
+                  <div className="flex flex-wrap items-center gap-x-1 mt-phi-2">
                     {sortKey(startup) && (
-                      <span className="type-meta text-oxford/40 tabular-nums whitespace-nowrap">
+                      <span className="type-meta text-oxford/30 tabular-nums whitespace-nowrap">
                         {new Date(sortKey(startup)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </span>
                     )}
                     {(startup.scout.sector || '').split('/')[0].trim() && (
                       <>
                         <span className="type-meta text-oxford/20">·</span>
-                        <span className="type-meta text-oxford/40">{(startup.scout.sector || 'Unknown').split('/')[0].trim()}</span>
+                        <span className="type-meta text-oxford/30">{(startup.scout.sector || 'Unknown').split('/')[0].trim()}</span>
                       </>
                     )}
                     {startup.scout.funding_stage && (
                       <>
                         <span className="type-meta text-oxford/20">·</span>
-                        <span className="type-meta text-oxford/40">{startup.scout.funding_stage}</span>
+                        <span className="type-meta text-oxford/30">{startup.scout.funding_stage}</span>
                       </>
                     )}
                     <span className="type-meta text-oxford/20">·</span>
-                    <span className="type-meta text-oxford/40 uppercase">{getSourceBadge(startup)}</span>
+                    <span className="type-meta text-oxford/30 uppercase">{getSourceBadge(startup)}</span>
                     <span className="type-meta text-oxford/20">·</span>
                     <span
-                      className="type-meta text-oxford/40 tabular-nums"
+                      className="type-meta text-oxford/30 tabular-nums"
                       title="Scout-stage confidence"
                       aria-label={`Scout signal ${Math.round(confidence * 100)} percent`}
                     >
                       {Math.round(confidence * 100)}%
                     </span>
                   </div>
-                  <div className={`overflow-hidden transition-[max-height,opacity] duration-200 ease-out ${
-                    isSelected ? 'max-h-24 opacity-100 mt-2' : 'max-h-0 opacity-0'
-                  }`}>
+                  <div className={`overflow-hidden transition-[max-height,opacity,margin] duration-200 ease-out ${isSelected ? 'max-h-24 opacity-100 mt-phi-3' : 'max-h-0 opacity-0'
+                    }`}>
                     {startup.scout.one_line && (
                       <p className="type-note italic text-oxford/55">
                         {startup.scout.one_line}
@@ -339,7 +334,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 </div>
 
                 {/* Right: badges only */}
-                <div className="flex items-center gap-1.5 pt-px sm:col-start-3">
+                <div className="flex items-center gap-phi-2 pt-px sm:col-start-3">
                   {reviewBand && <VerdictBandBadge band={reviewBand} />}
                   <DecisionBadge variant={decisionVariant} />
                 </div>
@@ -393,8 +388,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                                   const activeClass = d === 'YES'
                                     ? 'bg-oxford border-oxford text-paper'
                                     : d === 'NO'
-                                    ? 'border-oxford/45 text-oxford/75 bg-paper'
-                                    : 'border-oxford/35 text-oxford/75 bg-paper';
+                                      ? 'border-oxford/45 text-oxford/75 bg-paper'
+                                      : 'border-oxford/35 text-oxford/75 bg-paper';
                                   return (
                                     <button
                                       key={d}
