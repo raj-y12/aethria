@@ -12,6 +12,7 @@ import { toggleAgents } from '../api/agents';
 interface SystemBarProps {
   agentConfig?: unknown;
   rightPanel?: 'memo' | 'feed' | 'system' | null;
+  variant?: 'fixed' | 'embedded';
   /** Show work grid (left column); clears System when open. */
   onShowDeals?: () => void;
   onShowFeed?: () => void;
@@ -64,6 +65,7 @@ function SpineNavButton({
  */
 export default function SystemBar({
   rightPanel = null,
+  variant = 'fixed',
   onShowDeals,
   onShowFeed,
   onShowSystem,
@@ -174,9 +176,14 @@ export default function SystemBar({
     })
     .toUpperCase();
 
-  const baseClass =
+  const fixedClass =
     'hidden md:flex fixed top-0 bottom-0 left-0 z-50 flex-col justify-between w-36 lg:w-40 bg-oxford';
-  const baseStyle = { padding: '26px 16px 20px' };
+  const embeddedClass =
+    'hidden lg:flex flex-col justify-between min-h-[280px] h-full w-full bg-oxford border border-white/[0.08]';
+  const baseClass = variant === 'embedded' ? embeddedClass : fixedClass;
+  const baseStyle = variant === 'embedded'
+    ? { padding: '22px 14px 18px' }
+    : { padding: '26px 16px 20px' };
 
   return (<>
     <motion.header

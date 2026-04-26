@@ -513,80 +513,79 @@ export default function MainLayout({
         </>
       )}
 
-      <SystemBar
-        rightPanel={rightPanel}
-        onShowDeals={() => setRightPanel((p) => (p === 'system' ? null : p))}
-        onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
-        onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
-        onClose={() => setRightPanel(null)}
-        navLink={{ href: SETTINGS_PATH, label: 'Settings' }}
-      />
       {startupsError && (
         <div className="flex-none px-6 py-2 bg-warning border-b border-oxford/25 type-label-tab text-oxford">
           {startupsError} — Check API URL (VITE_API_URL) and backend CORS (ALLOWED_ORIGINS).
         </div>
       )}
 
-      {/* Paper canvas. Fixed height so only WorkGrid scrolls.
-          On desktop content is offset to clear vertical SystemBar; on mobile it uses standard page padding. */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 lg:pl-[calc(10rem+var(--space-6))] lg:pr-phi-6 lg:pt-phi-5">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 lg:px-phi-6 lg:pt-phi-5">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(360px,5fr)_minmax(0,6fr)] min-h-0 overflow-hidden pb-phi-5 lg:pb-phi-6 gap-phi-6 lg:gap-x-phi-6 lg:gap-y-phi-3">
-            <section
-              aria-label="Pipeline summary and fund thesis"
-              className="hidden lg:grid lg:col-span-2 lg:grid-cols-[minmax(360px,5fr)_minmax(0,6fr)] lg:gap-phi-6 min-h-[89px] border-b border-oxford/[0.06] px-phi-2 pb-phi-4"
-            >
-              <div className="min-w-0 pr-phi-5">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(260px,20%)_minmax(420px,35%)_minmax(560px,45%)] min-h-0 overflow-hidden pb-phi-5 lg:pb-phi-6 gap-phi-6 lg:gap-phi-6">
+            <aside className="hidden lg:flex min-w-0 min-h-0 flex-col gap-phi-4">
+              <div className="h-[32%] min-h-[280px]">
+                <SystemBar
+                  variant="embedded"
+                  rightPanel={rightPanel}
+                  onShowDeals={() => setRightPanel((p) => (p === 'system' ? null : p))}
+                  onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
+                  onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
+                  onClose={() => setRightPanel(null)}
+                  navLink={{ href: SETTINGS_PATH, label: 'Settings' }}
+                />
+              </div>
+              <section
+                aria-label="Live overview"
+                className="min-h-0 bg-paper border border-oxford/[0.08] px-phi-4 py-phi-4"
+              >
                 <div className="flex flex-wrap items-center gap-x-phi-3 gap-y-phi-2">
                   <p className="type-meta text-oxford/45">Live overview</p>
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-phi-3 gap-y-phi-1">
+                  <div className="relative inline-flex items-center gap-phi-2">
                     <span className="type-meta text-oxford/45">Pipeline</span>
-                    <span className="relative inline-flex items-center gap-phi-2">
-                      {pipelineStateLabel === 'On' && (
-                        <span
-                          className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60"
-                          style={{
-                            animation: 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite',
-                          }}
-                          aria-hidden
-                        />
-                      )}
-                      <span className={
-                        pipelineStateLabel === 'Issue' ? 'type-meta text-escalation' :
-                          pipelineStateLabel === 'Off' ? 'type-meta text-oxford/45' :
-                            'type-meta text-oxford/80'
-                      }>
-                        {pipelineStateLabel}
-                      </span>
-                      {pipelineStateLabel === 'Issue' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setShowPipelineIssueHelp((open) => !open)}
-                            className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
-                            aria-label="Why pipeline has an issue"
-                            aria-expanded={showPipelineIssueHelp}
-                          >
-                            ?
-                          </button>
-                          {showPipelineIssueHelp && (
-                            <span className="absolute top-[calc(100%+6px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
-                              Pipeline has a problem and may not process updates right now.
-                              <button
-                                type="button"
-                                onClick={() => navigate(SETTINGS_PATH)}
-                                className="mt-phi-2 block type-meta tracking-[0.06em] text-oxford/62 hover:text-oxford btn-interaction"
-                              >
-                                Open settings →
-                              </button>
-                            </span>
-                          )}
-                        </>
-                      )}
+                    {pipelineStateLabel === 'On' && (
+                      <span
+                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60"
+                        style={{
+                          animation: 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite',
+                        }}
+                        aria-hidden
+                      />
+                    )}
+                    <span className={
+                      pipelineStateLabel === 'Issue' ? 'type-meta text-escalation' :
+                        pipelineStateLabel === 'Off' ? 'type-meta text-oxford/45' :
+                          'type-meta text-oxford/80'
+                    }>
+                      {pipelineStateLabel}
                     </span>
+                    {pipelineStateLabel === 'Issue' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setShowPipelineIssueHelp((open) => !open)}
+                          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
+                          aria-label="Why pipeline has an issue"
+                          aria-expanded={showPipelineIssueHelp}
+                        >
+                          ?
+                        </button>
+                        {showPipelineIssueHelp && (
+                          <span className="absolute left-0 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
+                            Pipeline has a problem and may not process updates right now.
+                            <button
+                              type="button"
+                              onClick={() => navigate(SETTINGS_PATH)}
+                              className="mt-phi-2 block type-meta tracking-[0.06em] text-oxford/62 hover:text-oxford btn-interaction"
+                            >
+                              Open settings →
+                            </button>
+                          </span>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
-                <div className="mt-phi-3 grid min-w-0 grid-cols-4 items-end gap-x-phi-5">
+                <div className="mt-phi-4 grid min-w-0 grid-cols-2 gap-x-phi-4 gap-y-phi-4">
                   {[
                     { label: 'Total', value: startups.length, accent: false },
                     { label: 'Open', value: openCount, accent: false },
@@ -595,7 +594,7 @@ export default function MainLayout({
                   ].map((stat) => (
                     <div key={stat.label} className="min-w-0 text-left">
                       <p
-                        className={`font-mono font-bold text-[clamp(22px,2.1vw,30px)] leading-none tracking-[-0.03em] tabular-nums ${stat.accent ? 'text-escalation' : 'text-oxford'
+                        className={`font-mono font-bold text-[clamp(20px,1.8vw,28px)] leading-none tracking-[-0.03em] tabular-nums ${stat.accent ? 'text-escalation' : 'text-oxford'
                           }`}
                       >
                         {stat.value.toLocaleString()}
@@ -604,15 +603,15 @@ export default function MainLayout({
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
               <article
-                className="min-w-0 border-l border-oxford/[0.06] pl-phi-5"
+                className="min-h-0 bg-paper border border-oxford/[0.08] px-phi-4 py-phi-4"
                 aria-label="Fund thesis preview"
                 style={{ boxSizing: 'border-box' }}
               >
                 <div className="flex items-center justify-between gap-phi-3">
                   <div className="min-w-0">
-                    <p className="type-label-section text-oxford/40">Active mandate</p>
+                    <p className="type-label-section text-oxford/40">Purpose / active mandate</p>
                     <p className="mt-phi-2 type-body font-semibold tracking-tight text-oxford truncate">
                       {fundName || 'No fund configured'}
                     </p>
@@ -636,7 +635,8 @@ export default function MainLayout({
                   </div>
                 )}
               </article>
-            </section>
+            </aside>
+
             <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
               {/* Pipeline summary + lookup */}
               <header className="flex-none mb-phi-5 min-w-0 lg:px-0">
