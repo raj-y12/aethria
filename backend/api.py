@@ -42,6 +42,9 @@ from utils.settings_loader import (
     is_cost_budget_enabled,
 )
 from auth_clerk import verify_clerk_token
+from admin_auth import admin_token_ttl_seconds, issue_admin_token, validate_admin_secret, verify_admin_token
+from admin_audit import record_admin_audit_event
+from admin_service import build_admin_overview
 from supabase_client import get_service_client
 from supabase_doc_store import list_get_all, list_get_by_id
 from supabase_storage import SupabaseStartupsStorage
@@ -84,6 +87,9 @@ _LOOKUP_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{8,128}$")
 _per_user_loops: Dict[str, asyncio.Task] = {}
 _loops_lock: Optional[asyncio.Lock] = None  # initialised inside lifespan (event loop must exist)
 AGENT_LOOP_INTERVAL_SECONDS = int(os.getenv("AGENT_LOOP_INTERVAL_SECONDS", "300"))
+_ADMIN_LOGIN_MAX_FAILURES = int(os.getenv("ADMIN_LOGIN_MAX_FAILURES", "5"))
+_ADMIN_LOGIN_WINDOW_SECONDS = int(os.getenv("ADMIN_LOGIN_WINDOW_SECONDS", "300"))
+_admin_login_attempts: Dict[str, List[float]] = {}
 
 
 def _safe_table_execute(fn, *, default_data, warn_label: str):
@@ -325,13 +331,18 @@ app.add_middleware(
 
 # Public paths that skip Clerk JWT auth
 _PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc", "/redoc/", "/openapi.json/"}
+_ADMIN_PATH_PREFIX = "/api/admin/"
 
 @app.middleware("http")
 async def clerk_auth_middleware(request: Request, call_next):
     """Extract Bearer token, verify Clerk JWT, attach user_id to request.state. Return 401 if invalid."""
     if request.method == "OPTIONS":
         return await call_next(request)
-    if request.url.path in _PUBLIC_PATHS or request.url.path.rstrip("/") in _PUBLIC_PATHS:
+    if (
+        request.url.path in _PUBLIC_PATHS
+        or request.url.path.rstrip("/") in _PUBLIC_PATHS
+        or request.url.path.startswith(_ADMIN_PATH_PREFIX)
+    ):
         return await call_next(request)
     auth = request.headers.get("Authorization")
     token = None
@@ -1014,6 +1025,104 @@ def get_startup_memo(request: Request, startup_id: str):
 def health():
     """Lightweight health check (public; no auth). Pending escalations require auth via /api/settings."""
     return {"status": "ok"}
+
+
+def _admin_bearer_token(request: Request) -> str:
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing admin authorization token")
+    token = auth[7:].strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing admin authorization token")
+    return token
+
+
+def _require_admin_claims(request: Request) -> Dict[str, Any]:
+    try:
+        return verify_admin_token(_admin_bearer_token(request))
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+def _admin_login_key(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _admin_login_failures_for_key(key: str, *, now: float) -> List[float]:
+    cutoff = now - _ADMIN_LOGIN_WINDOW_SECONDS
+    failures = [ts for ts in _admin_login_attempts.get(key, []) if ts >= cutoff]
+    _admin_login_attempts[key] = failures
+    return failures
+
+
+def _record_admin_login_failure(request: Request) -> None:
+    now = datetime.now(timezone.utc).timestamp()
+    key = _admin_login_key(request)
+    failures = _admin_login_failures_for_key(key, now=now)
+    failures.append(now)
+    _admin_login_attempts[key] = failures
+
+
+def _admin_login_is_limited(request: Request) -> bool:
+    now = datetime.now(timezone.utc).timestamp()
+    key = _admin_login_key(request)
+    return len(_admin_login_failures_for_key(key, now=now)) >= _ADMIN_LOGIN_MAX_FAILURES
+
+
+def _clear_admin_login_failures(request: Request) -> None:
+    _admin_login_attempts.pop(_admin_login_key(request), None)
+
+
+@app.post("/api/admin/login")
+def admin_login(request: Request, body: dict):
+    """Exchange the configured master admin secret for a short-lived admin token."""
+    if _admin_login_is_limited(request):
+        record_admin_audit_event(
+            event="admin_login",
+            success=False,
+            client_host=_admin_login_key(request),
+            detail={"reason": "rate_limited"},
+        )
+        raise HTTPException(status_code=429, detail="Too many failed admin login attempts")
+    secret = str(body.get("secret") or "")
+    if not validate_admin_secret(secret):
+        _record_admin_login_failure(request)
+        record_admin_audit_event(
+            event="admin_login",
+            success=False,
+            client_host=_admin_login_key(request),
+            detail={"reason": "invalid_secret"},
+        )
+        raise HTTPException(status_code=401, detail="Invalid admin secret")
+    _clear_admin_login_failures(request)
+    record_admin_audit_event(
+        event="admin_login",
+        success=True,
+        client_host=_admin_login_key(request),
+        detail={},
+    )
+    return {
+        "token": issue_admin_token(),
+        "token_type": "bearer",
+        "expires_in_seconds": admin_token_ttl_seconds(),
+    }
+
+
+@app.get("/api/admin/overview")
+def admin_overview(request: Request):
+    """Cross-tenant admin overview. Guarded by the separate admin token."""
+    _require_admin_claims(request)
+    record_admin_audit_event(
+        event="admin_overview",
+        success=True,
+        client_host=_admin_login_key(request),
+        detail={},
+    )
+    loop_status_by_user = {
+        user_id: task is not None and not task.done()
+        for user_id, task in _per_user_loops.items()
+    }
+    return build_admin_overview(loop_status_by_user=loop_status_by_user)
 
 
 @app.get("/api/me")

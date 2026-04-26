@@ -6,6 +6,7 @@ import MainLayout from './components/MainLayout';
 import GrainOverlay from './components/GrainOverlay';
 import LoadingAnimation from './components/LoadingAnimation';
 const SettingsPage = lazy(() => import('./settings/SettingsPage'));
+const AdminDashboardPage = lazy(() => import('./admin/AdminDashboardPage'));
 import WhileYouWereAway from './components/WhileYouWereAway';
 import { useSystemData } from './hooks/useSystemData';
 import { useAgentsEnabled } from './hooks/useAgentsEnabled';
@@ -14,6 +15,7 @@ import LoginPage from './components/LoginPage';
 
 const APP_ROOT = '/v1';
 const SETTINGS_ROOT = `${APP_ROOT}/settings`;
+const ADMIN_ROOT = '/admin';
 
 function AppShell() {
   const { pathname } = useLocation();
@@ -113,8 +115,17 @@ function App() {
   }, [isSignedIn, getToken]);
 
   const isSignInRoute = pathname.startsWith('/sign-in');
+  const isAdminRoute = pathname === ADMIN_ROOT || pathname.startsWith(ADMIN_ROOT + '/');
   const isAppRoute = pathname === APP_ROOT || pathname.startsWith(APP_ROOT + '/');
   const isSettingsRoute = pathname.startsWith(SETTINGS_ROOT);
+
+  if (isAdminRoute) {
+    return (
+      <Suspense fallback={<LoadingAnimation />}>
+        <AdminDashboardPage />
+      </Suspense>
+    );
+  }
 
   // Sign-in page: show login (LoginPage does full-page redirect to /v1 on success)
   if (isSignInRoute) {
