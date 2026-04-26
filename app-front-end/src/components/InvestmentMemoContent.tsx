@@ -2,7 +2,7 @@ import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useSt
 import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
 import './InvestmentMemoContent.css';
-import type { Startup, Review } from '../types/startup';
+import type { Startup, Review, SingleReview } from '../types/startup';
 import {
   buildMemoPDF,
   buildIcMarkdown,
@@ -95,6 +95,29 @@ function normalizeListItemText(value: unknown): string {
   return String(value ?? "")
     .replace(/^\s*[•·*-]\s+/, "")
     .trim();
+}
+
+function normalizeMemoStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => normalizeListItemText(item))
+    .filter((item) => item && !/^\[MISSING/i.test(item));
+}
+
+function uniqueMemoItems(items: string[]): string[] {
+  return [...new Set(items.map((item) => normalizeListItemText(item)).filter(Boolean))];
+}
+
+function deriveWeaknessesFromReasoning(items: string[]): string[] {
+  const caveatPattern = /\b(but|however|risk|risks|gap|gaps|weak|weakness|unknown|unproven|replication|constraint|depends|relies)\b/i;
+  return uniqueMemoItems(
+    items.flatMap((item) =>
+      normalizeListItemText(item)
+        .split(/;|\.\s+/)
+        .map((part) => part.replace(/^(but|however)\s+/i, '').trim())
+        .filter((part) => part.length > 12 && caveatPattern.test(part))
+    )
+  );
 }
 
 function partnerDecisionHeadline(startup: Startup): string {
@@ -327,7 +350,20 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
       const reasoning = displayStartup.review?.score_reasoning?.[id]?.trim() || '';
       const dimBase = id.replace('_score', '');
       const structuredReasoning = displayStartup.review?.[`${dimBase}_reasoning` as keyof Review];
-      const weaknesses = displayStartup.review?.[`${dimBase}_weaknesses` as keyof Review];
+      const normalizedReasoning = normalizeMemoStringList(structuredReasoning);
+      const weaknessKey = `${dimBase}_weaknesses` as keyof Review & keyof SingleReview;
+      const topLevelWeaknesses = normalizeMemoStringList(displayStartup.review?.[weaknessKey]);
+      const reviewerWeaknesses = (displayStartup.review?.reviews ?? []).flatMap((review) =>
+        normalizeMemoStringList(review[weaknessKey])
+      );
+      const caveatWeaknesses = deriveWeaknessesFromReasoning([
+        ...normalizedReasoning,
+        ...(reasoning ? [reasoning] : []),
+      ]);
+      const broadRiskWeaknesses = normalizeMemoStringList([
+        ...(displayStartup.review?.key_risks ?? []),
+        ...(displayStartup.review?.diligence_red_flags ?? []),
+      ]);
       const confidence = displayStartup.review?.[`${dimBase}_confidence` as keyof Review];
       return {
         id,
@@ -335,8 +371,15 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         score: numeric,
         label: scoreLabelFor(displayStartup.review, id, numeric),
         reasoning,
-        structuredReasoning: Array.isArray(structuredReasoning) ? structuredReasoning : [],
-        weaknesses: Array.isArray(weaknesses) ? weaknesses : [],
+        structuredReasoning: normalizedReasoning,
+        weaknesses: uniqueMemoItems([
+          ...topLevelWeaknesses,
+          ...reviewerWeaknesses,
+          ...caveatWeaknesses,
+          ...(topLevelWeaknesses.length || reviewerWeaknesses.length || caveatWeaknesses.length
+            ? []
+            : broadRiskWeaknesses.slice(0, 2)),
+        ]),
         confidence: typeof confidence === 'string' ? confidence : null,
       };
     });
@@ -567,11 +610,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   {hasScores && (
                     <div className="memoDocScoreScope">
                       <div className="memoDocOverallScoreRow">
-                        <p className="memoDocOverallScore">
-                          {overallScore != null && overallLabel
-                            ? `${overallScore.toFixed(1)} — ${overallLabel}`
-                            : '—'}
-                        </p>
+                        <div className="memoDocOverallScoreMain">
+                          <p className="memoDocOverallScoreValue">
+                            {overallScore != null ? overallScore.toFixed(1) : '—'}
+                          </p>
+                          <p className="memoDocOverallScoreLabel">
+                            {overallLabel ?? 'Unscored'}
+                          </p>
+                        </div>
                         <button
                           type="button"
                           className="memoDocTooltipBtn"
@@ -580,7 +626,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                           aria-controls={`${contentKey}-score-tooltip`}
                           onClick={() => setScoreTooltipOpen((v) => !v)}
                         >
-                          ?
+                          Method
                         </button>
                       </div>
                       {scoreTooltipOpen && (
@@ -588,7 +634,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                           {scoreSourceText}
                         </p>
                       )}
-                      <p className="memoDocScoreLegend">1–3 Weak · 4–5 Concerning · 6–7 Promising · 8–10 Strong</p>
+                      <div className="memoDocScoreLegend" aria-label="Score scale">
+                        <span><strong>1–3</strong> Weak</span>
+                        <span><strong>4–5</strong> Concerning</span>
+                        <span><strong>6–7</strong> Promising</span>
+                        <span><strong>8–10</strong> Strong</span>
+                      </div>
                       <div className="memoDocScoreStack">
                         {scoreBlocks.map((b) => {
                           const expanded = activeDimensionId === b.id;
@@ -607,11 +658,19 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                                 aria-controls={panelId}
                               >
                                 <span className="memoDocScorePanelTitle">{b.name}</span>
-                                <span className="memoDocScorePanelValue">
-                                  {b.score != null ? `${b.score.toFixed(1)} — ${b.label ?? getScoreBand(b.score).label}` : '—'}
+                                <span className="memoDocScorePanelValue" aria-label={`${b.name} score`}>
+                                  <span className="memoDocScorePanelNumber">
+                                    {b.score != null ? b.score.toFixed(1) : '—'}
+                                  </span>
+                                  <span className="memoDocScorePanelBand">
+                                    {b.score != null ? b.label ?? getScoreBand(b.score).label : 'Unscored'}
+                                  </span>
                                 </span>
                                 <span className="memoDocScorePanelMeta">
-                                  {(b.confidence ?? 'medium').toUpperCase()} confidence · {expanded ? '−' : '+'}
+                                  <span>{(b.confidence ?? 'medium').toUpperCase()} confidence</span>
+                                  <span className="memoDocScorePanelToggleGlyph" aria-hidden>
+                                    {expanded ? '−' : '+'}
+                                  </span>
                                 </span>
                               </button>
                               {expanded && (
@@ -631,7 +690,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                                   </ul>
                                   {weaknessItems && (
                                     <>
-                                      <p className="memoDocExpandedLabel memoDocExpandedLabel--weaknesses">Weaknesses</p>
+                                      <p className="memoDocExpandedLabel memoDocExpandedLabel--weaknesses">Weaknesses / risks</p>
                                       <ul className="memoList">
                                         {weaknessItems.map((item, i) => (
                                           <li key={i} className="memoListItem">

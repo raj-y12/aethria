@@ -18,6 +18,8 @@ export default {
       colors: {
         oxford: '#002147',
         paper: '#f2f0ea',
+        /** Darker paper — WorkGrid selected row, etc. See --color-paper-deep */
+        paperDeep: 'var(--color-paper-deep)',
         'paper-bright': '#f2f0ea',
         ivory: '#f2f0ea',
         canvas: '#f2f0ea',
@@ -63,21 +65,21 @@ export default {
         'type-meta':   ['10px', { lineHeight: '1.5', letterSpacing: '0.12em' }],
         'type-tab':    ['10px', { lineHeight: '1.5', letterSpacing: '0.14em' }],
         'type-label':  ['11px', { lineHeight: '1.5', letterSpacing: '0.12em' }],
-        'type-sm':     ['13px', { lineHeight: '1.618' }],
-        'type-body':   ['14px', { lineHeight: '1.618' }],
+        'type-sm':     ['13px', { lineHeight: '1.5' }],
+        'type-body':   ['14px', { lineHeight: '1.5' }],
         'type-title':  ['23px', { lineHeight: '1.382', letterSpacing: '-0.02em' }],
-        'type-hero':   ['37px', { lineHeight: '1.2',   letterSpacing: '-0.02em' }],
+        'type-hero':   ['37px', { lineHeight: '1.15',  letterSpacing: '-0.02em' }],
       },
       lineHeight: {
-        phi: '1.618034',    // body line-height = golden ratio
+        phi: '1.618034',    // retained for legacy; prefer 1.5 for dense UI
         title: '1.382',     // 2 − 1/φ
-        hero: '1.2',        // display / hero
+        hero: '1.15',       // display / hero (tighter for large Garamond)
         label: '1.5',       // mono labels
       },
       letterSpacing: {
         tight:  '-0.02em',  // titles and hero
-        label:  '0.12em',   // section labels (Space Mono)
-        tab:    '0.14em',   // tab labels (Space Mono)
+        label:  '0.12em',   // section labels (JetBrains Mono)
+        tab:    '0.14em',   // tab labels (JetBrains Mono)
         badge:  '0.08em',   // badge/chip text
       },
       borderRadius: { DEFAULT: '0', none: '0' },

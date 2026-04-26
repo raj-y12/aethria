@@ -11,7 +11,7 @@ interface MobileHeaderProps {
 export default function MobileHeader({ onMenuToggle }: MobileHeaderProps) {
   return (
     <header
-      className="flex items-center justify-between px-3 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2 border-b border-hairline bg-oxford"
+      className="flex items-center justify-between px-phi-4 pt-[max(var(--space-3),env(safe-area-inset-top))] pb-phi-3 border-b border-hairline bg-oxford"
       aria-label="Navigation"
     >
       <Link

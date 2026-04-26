@@ -3,7 +3,7 @@
  *
  * Palette: oxford #002147, paper #F2F0EA, paperBright #F2F0EA, inverse on oxford #FFFFFF, charcoal #2f333b.
  * Burgundy #7D2B3A (accent) is escalation-only — see color.accent. Heritage gold #b8976a is decorative only (dividers, chrome) — color.heritageGold.
- * Typography: Libre Baskerville (wordmark / type-hero only). Geist Sans (all UI body, titles, prominent copy). Space Mono (metadata/labels, 0.08–0.14em).
+ * Typography: Libre Baskerville (wordmark only). EB Garamond (display/editorial headings). Geist Sans (all UI body, titles). JetBrains Mono (metadata/labels, 0.08–0.14em).
  * Brand scale: section-label 11px/0.12em, tab/meta 10px/0.12–0.14em, body 14px/1.618.
  * Frames: 1px rgba(0,33,71,0.06). No rounded corners.
  * Register tint: CSS variable --color-register-tint (see index.css); Tailwind `registerTint` / `bg-registerTint`.
@@ -65,12 +65,12 @@ export const tokens = {
     25: 0.25,
   },
   font: {
-    /** Editorial headings — Cormorant Garamond (matches --font-display and web-front-end). */
-    display: '"Cormorant Garamond", Georgia, "Times New Roman", serif',
+    /** Editorial headings — EB Garamond (matches --font-display and web-front-end). */
+    display: '"EB Garamond", Georgia, "Times New Roman", serif',
     /** Wordmark / type-hero only — Libre Baskerville. */
     wordmark: '"Libre Baskerville", Georgia, serif',
-    body: '"Instrument Sans", system-ui, -apple-system, sans-serif',
-    mono: '"Space Mono", ui-monospace, monospace',
+    body: '"Geist Sans", system-ui, -apple-system, sans-serif',
+    mono: '"JetBrains Mono", ui-monospace, monospace',
   },
   /**
    * Layout — values snapped to φ-spacing scale (phiSpacing).

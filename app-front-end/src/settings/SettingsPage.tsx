@@ -34,7 +34,8 @@ const inputCls =
 const selectCls = `${inputCls} cursor-pointer pr-8 bg-no-repeat bg-[length:10px] bg-[center_right_2px] appearance-none`;
 const selectStyle: CSSProperties = { backgroundImage: SELECT_CHEVRON };
 const labelCls = 'type-meta uppercase tracking-[0.14em] text-oxford/35';
-const hintCls = 'type-meta text-oxford/45 mt-0.5';
+const sectionLabelCls = 'type-meta uppercase tracking-[0.14em] text-oxford/45';
+const hintCls = 'type-meta text-oxford/45 mt-phi-1';
 const btnCls = 'type-meta uppercase tracking-[0.12em] text-oxford/40 hover:text-oxford disabled:opacity-30 transition-colors btn-interaction cursor-pointer bg-transparent border-0 p-0';
 const outlineBtnCls = 'type-meta uppercase tracking-[0.12em] text-oxford/50 hover:text-oxford disabled:opacity-30 transition-colors btn-interaction cursor-pointer bg-transparent border-0 p-0';
 
@@ -54,7 +55,7 @@ function TextField({ id, label, value, onChange, hint, type = 'text', min, step 
   onChange: (v: string | number) => void; type?: 'text' | 'number'; min?: number; step?: number;
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-phi-2">
       <label htmlFor={id} className={labelCls}>{label}</label>
       {hint && <span className={hintCls}>{hint}</span>}
       <input id={id} type={type} min={min} step={step} value={value}
@@ -68,7 +69,7 @@ function SelectField({ id, label, value, onChange, children }: {
   id: string; label: string; value: string; onChange: (v: string) => void; children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-phi-2">
       <label htmlFor={id} className={labelCls}>{label}</label>
       <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={selectCls} style={selectStyle}>
         {children}
@@ -81,8 +82,8 @@ function ToggleRow({ id, checked, onChange, label, hint }: {
   id: string; checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-8 py-3">
-      <div className="flex flex-col gap-0.5 min-w-0">
+    <div className="flex items-center justify-between gap-phi-5 py-phi-3 border-b border-oxford/[0.05] last:border-0">
+      <div className="flex flex-col gap-phi-1 min-w-0">
         <label htmlFor={id} className="type-body-sm text-oxford cursor-pointer">{label}</label>
         {hint && <span className="type-meta text-oxford/30 leading-snug">{hint}</span>}
       </div>
@@ -93,6 +94,10 @@ function ToggleRow({ id, checked, onChange, label, hint }: {
       </button>
     </div>
   );
+}
+
+function SectionRule() {
+  return <div className="border-t border-oxford/[0.06] pt-phi-5" />;
 }
 
 /* ── Page ────────────────────────────────────────────────────────── */
@@ -194,12 +199,12 @@ export default function SettingsPage() {
           transition={transitionOrReduced(reduceMotion, { duration: tokens.motion.duration.micro, ease: tokens.motion.ease })}
           style={{ display: 'grid' }}
           className="border-b border-hairline bg-oxford" aria-label="Menu">
-          <div className="min-h-0 overflow-hidden px-4 pb-0">
-          <div className="flex flex-col items-start gap-3 py-3">
-            <Link to="/v1" className="type-label-section text-white/70 hover:text-white btn-interaction" onClick={() => setMobileMenuOpen(false)}>Overview</Link>
-            {displayName && <span className="type-label-section text-white/60">{displayName}</span>}
-            <button type="button" onClick={handleLogout} className="type-label-section text-white/50 hover:text-white btn-interaction">Log out</button>
-          </div>
+          <div className="min-h-0 overflow-hidden px-phi-4 pb-0">
+            <div className="flex flex-col items-start gap-phi-3 py-phi-3">
+              <Link to="/v1" className="type-label-section text-white/70 hover:text-white btn-interaction" onClick={() => setMobileMenuOpen(false)}>Overview</Link>
+              {displayName && <span className="type-label-section text-white/60">{displayName}</span>}
+              <button type="button" onClick={handleLogout} className="type-label-section text-white/50 hover:text-white btn-interaction">Log out</button>
+            </div>
           </div>
         </motion.section>
       )}
@@ -208,13 +213,21 @@ export default function SettingsPage() {
 
   if (!settings) {
     return (
-      <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
+      <div className="h-[100dvh] flex flex-col overflow-hidden bg-paper">
         {!isDesktop && <><MobileHeader onMenuToggle={() => setMobileMenuOpen((o) => !o)} />{mobileMenu}</>}
-        <SystemBar navLink={{ href: '/', label: 'Home' }} />
-        <main className="flex-1 flex items-center justify-center px-8 lg:pl-[calc(9rem+3rem)]">
-          <div className="flex flex-col gap-2">
-            <p className={labelCls}>Failed to load settings</p>
-            {loadError && <p className="type-body-sm text-oxford/50">{loadError}</p>}
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 pb-phi-5">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(260px,20%)_1fr] min-h-0 overflow-hidden gap-phi-6">
+            <aside className="hidden lg:flex min-w-0 min-h-0 flex-col gap-phi-4">
+              <div className="h-[32%] min-h-[280px]">
+                <SystemBar variant="embedded" navLink={{ href: '/v1', label: 'Overview' }} />
+              </div>
+            </aside>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="flex flex-col gap-phi-2">
+                <p className={labelCls}>Failed to load settings</p>
+                {loadError && <p className="type-body-sm text-oxford/50">{loadError}</p>}
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -222,17 +235,30 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="h-screen w-full flex flex-col overflow-hidden bg-paper">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-paper">
       {!isDesktop && <><MobileHeader onMenuToggle={() => setMobileMenuOpen((o) => !o)} />{mobileMenu}</>}
-      <SystemBar agentConfig={settings.agent_config} navLink={{ href: '/', label: 'Home' }} />
 
-      {/* Full-height canvas offset by SystemBar */}
-      <div className="flex-1 flex flex-col min-h-0 lg:pl-36">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 pb-phi-5">
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(260px,20%)_1fr] min-h-0 overflow-hidden gap-phi-6">
+
+          {/* Left column: embedded SystemBar — desktop only */}
+          <aside className="hidden lg:flex min-w-0 min-h-0 flex-col gap-phi-4">
+            <div className="h-[32%] min-h-[280px]">
+              <SystemBar
+                variant="embedded"
+                agentConfig={settings.agent_config}
+                navLink={{ href: '/v1', label: 'Overview' }}
+              />
+            </div>
+          </aside>
+
+          {/* Settings content */}
+          <div className="flex-1 flex flex-col min-h-0 min-w-0">
 
         {/* Top bar: page title + save */}
-        <div className="flex-none flex items-center justify-between px-8 py-4">
+        <div className="flex-none flex items-center justify-between border-b border-oxford/[0.06] py-phi-3">
           <span className={labelCls}>Settings</span>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-phi-4">
             {saveSuccess && <span className="type-meta text-oxford/30" role="status" aria-live="polite">Saved</span>}
             {validationErrors.length > 0 && <span className="type-meta text-escalation/60">{validationErrors[0]}</span>}
             <button type="button" onClick={handleSave} disabled={saving} className={btnCls}>
@@ -241,12 +267,14 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Tab bar — exact FilterButton style from WorkGrid */}
-        <div className="flex-none flex items-center gap-1 px-5 overflow-x-auto">
+        {/* Tab bar */}
+        <div className="flex-none flex items-center gap-0 overflow-x-auto border-b border-oxford/[0.06]">
           {TABS.map(({ id, label }) => (
             <button key={id} type="button" onClick={() => setActiveTab(id)}
-              className={`type-label-tab px-3 py-1.5 transition-all duration-300 border-b whitespace-nowrap ${
-                activeTab === id ? 'border-oxford text-oxford bg-oxford/5' : 'border-transparent text-oxford/30 hover:text-oxford/60'
+              className={`type-meta uppercase tracking-[0.12em] px-phi-4 py-phi-3 min-h-[40px] transition-colors duration-200 border-b-2 whitespace-nowrap ${
+                activeTab === id
+                  ? 'border-oxford text-oxford'
+                  : 'border-transparent text-oxford/35 hover:text-oxford/65'
               }`}>
               {label}
             </button>
@@ -260,15 +288,15 @@ export default function SettingsPage() {
                 initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
                 animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 transition={transitionOrReduced(reduceMotion, { duration: tokens.motion.duration.short, ease: tokens.motion.ease })}
-                className="h-full overflow-y-auto px-8 py-8">
+                className="h-full overflow-y-auto px-phi-6 py-phi-6">
 
                 {/* ── Fund ── */}
                 {activeTab === 'fund' && (
-                  <div className="flex flex-col gap-12">
+                  <div className="flex flex-col gap-phi-6">
 
-                    <div className="flex flex-col gap-6">
-                      <p className={labelCls}>Fund identity</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
+                    <div className="flex flex-col gap-phi-5">
+                      <p className={sectionLabelCls}>Fund identity</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-phi-5 max-w-2xl">
                         <TextField id="fund_name" label="Fund name" value={fundIdentity.fund_name} onChange={(v) => setFundIdentity('fund_name', String(v))} />
                         <TextField id="stage_focus" label="Stage focus" hint="e.g. Pre-seed, Seed, Series A" value={fundIdentity.stage_focus} onChange={(v) => setFundIdentity('stage_focus', String(v))} />
                         <TextField id="geographic_focus" label="Geographic focus" hint="e.g. Europe, UK, Global" value={fundIdentity.geographic_focus} onChange={(v) => setFundIdentity('geographic_focus', String(v))} />
@@ -276,25 +304,27 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-6">
-                      <p className={labelCls}>Investment mandate</p>
+                    <SectionRule />
+
+                    <div className="flex flex-col gap-phi-5">
+                      <p className={sectionLabelCls}>Investment mandate</p>
                       {!agentsStatus?.supabase_configured ? (
-                        <p className="type-body-sm text-oxford/40">Requires Supabase — set <code className="bg-oxford/[0.05] px-1">USE_SUPABASE_STORAGE=1</code> and apply migrations.</p>
+                        <p className="type-body-sm text-oxford/40">Requires Supabase — set <code className="bg-oxford/[0.05] px-phi-2">USE_SUPABASE_STORAGE=1</code> and apply migrations.</p>
                       ) : thesisLoading ? (
                         <p className="type-body-sm text-oxford/30">Loading…</p>
                       ) : thesisLoadError ? (
                         <p className="type-body-sm text-escalation/60">{thesisLoadError}</p>
                       ) : (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-phi-5 items-start">
 
                           {/* Active thesis */}
-                          <div className="flex flex-col gap-5">
+                          <div className="flex flex-col gap-phi-4">
                             {thesisSummary ? (
                               <>
                                 <p className="type-body-sm text-oxford/40">
                                   v{thesisSummary.active_version_number} · {(thesisSummary.mode ?? 'rule_based') === 'embedding' ? 'AI-enhanced' : 'Rule-based'}
                                 </p>
-                                <div className="overflow-y-auto max-h-48 p-3 type-meta text-oxford/50 whitespace-pre-wrap break-words font-mono leading-relaxed bg-oxford/[0.03]">
+                                <div className="overflow-y-auto max-h-48 px-phi-3 py-phi-3 type-meta text-oxford/50 whitespace-pre-wrap break-words font-mono leading-relaxed bg-oxford/[0.03]">
                                   {JSON.stringify(thesisSummary.parsed_json, null, 2)}
                                 </div>
 
@@ -305,9 +335,9 @@ export default function SettingsPage() {
                                 )}
 
                                 {thesisSummary.versions.length > 0 && (
-                                  <div className="flex flex-col gap-3">
+                                  <div className="flex flex-col gap-phi-3">
                                     <p className={labelCls}>Version history</p>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-phi-3">
                                       <select value={thesisActivateId} onChange={(e) => setThesisActivateId(e.target.value)} className={`${selectCls} flex-1`} style={selectStyle} aria-label="Select version">
                                         {thesisSummary.versions.map((v) => <option key={v.id} value={v.id}>v{v.version_number}{v.is_active ? ' (active)' : ''}</option>)}
                                       </select>
@@ -318,7 +348,7 @@ export default function SettingsPage() {
                                   </div>
                                 )}
 
-                                <div className="flex flex-col gap-3">
+                                <div className="flex flex-col gap-phi-3">
                                   <p className={labelCls}>Apply to existing pipeline</p>
                                   {thesisReprocessToast && <p className="type-body-sm text-oxford/40" role="status">{thesisReprocessToast}</p>}
                                   <button type="button" disabled={thesisBusy || thesisReprocessRunning} onClick={() => { setThesisReprocessOpen(true); setThesisReprocessModalError(null); setThesisReprocessEligible(null); setThesisReprocessDryLoading(true); void postFundThesisReprocessMissing({ dryRun: true }).then((r) => { if ('eligible' in r) setThesisReprocessEligible(r.eligible); }).catch((e: unknown) => setThesisReprocessModalError(e instanceof Error ? e.message : 'Failed')).finally(() => setThesisReprocessDryLoading(false)); }} className={`self-start ${outlineBtnCls}`}>
@@ -332,10 +362,10 @@ export default function SettingsPage() {
                           </div>
 
                           {/* Publish editor */}
-                          <div className="flex flex-col gap-4">
+                          <div className="flex flex-col gap-phi-4">
                             <p className={labelCls}>Publish new version</p>
                             <textarea value={thesisDraft} onChange={(e) => setThesisDraft(e.target.value)} rows={14}
-                              className="w-full resize-y bg-oxford/[0.03] p-4 type-body-sm text-oxford/80 outline-none placeholder:text-oxford/20"
+                              className="w-full resize-y bg-oxford/[0.03] px-phi-4 py-phi-3 type-body-sm text-oxford/80 outline-none placeholder:text-oxford/20 focus:bg-oxford/[0.05] transition-colors duration-200"
                               placeholder="Sectors, stage, geography, check size, exclusions, risk posture…" />
                             <button type="button" disabled={thesisBusy || !thesisDraft.trim()} onClick={() => { void (async () => { setThesisBusy(true); try { await postFundThesisVersion(thesisDraft.trim()); reloadThesis(); const s = await fetchAgentsStatus(); setAgentsStatus(s ?? null); } catch (e) { setThesisLoadError(e instanceof Error ? e.message : 'Publish failed'); } finally { setThesisBusy(false); } })(); }} className={`self-start ${outlineBtnCls}`}>
                               {thesisBusy ? 'Publishing…' : 'Publish'}
@@ -349,24 +379,33 @@ export default function SettingsPage() {
 
                 {/* ── Pipeline ── */}
                 {activeTab === 'pipeline' && (
-                  <div className="flex flex-col gap-12 max-w-xl">
+                  <div className="flex flex-col gap-phi-6 max-w-xl">
                     {agentsStatus && !agentsStatus.agents_will_run && (
-                      <p className="type-body-sm text-oxford/40">
-                        Pipeline may not run · Worker: {agentsStatus.worker_ready ? 'ready' : 'not ready'} · Supabase: {agentsStatus.supabase_configured ? 'ok' : 'missing'} · OpenAI: {agentsStatus.openai_configured ? 'ok' : 'missing'}
-                      </p>
+                      <div className="flex flex-col gap-phi-2 px-phi-4 py-phi-3 bg-oxford/[0.04]">
+                        <p className={labelCls}>Pipeline may not run</p>
+                        <div className="flex flex-col gap-phi-2">
+                          <p className="type-meta text-oxford/40">Worker: <span className={agentsStatus.worker_ready ? 'text-oxford/60' : 'text-oxford/30'}>{agentsStatus.worker_ready ? 'ready' : 'not ready'}</span></p>
+                          <p className="type-meta text-oxford/40">Supabase: <span className={agentsStatus.supabase_configured ? 'text-oxford/60' : 'text-oxford/30'}>{agentsStatus.supabase_configured ? 'configured' : 'missing'}</span></p>
+                          <p className="type-meta text-oxford/40">OpenAI: <span className={agentsStatus.openai_configured ? 'text-oxford/60' : 'text-oxford/30'}>{agentsStatus.openai_configured ? 'configured' : 'missing'}</span></p>
+                        </div>
+                      </div>
                     )}
 
-                    <div className="flex flex-col gap-4">
-                      <p className={labelCls}>Stages</p>
-                      <ToggleRow id="scouts_enabled" checked={settings.agent_config.scouts_enabled} onChange={(v) => setAgent('scouts_enabled', v)} label="Scouts" hint="Discover new companies matching your mandate" />
-                      <ToggleRow id="reviewers_enabled" checked={settings.agent_config.reviewers_enabled} onChange={(v) => setAgent('reviewers_enabled', v)} label="Reviewers" hint="Score across market, product, team, defensibility" />
-                      <ToggleRow id="partners_enabled" checked={settings.agent_config.partners_enabled} onChange={(v) => setAgent('partners_enabled', v)} label="Partners" hint="INVEST / MONITOR / PASS with written rationale" />
+                    <div className="flex flex-col gap-phi-4">
+                      <p className={sectionLabelCls}>Stages</p>
+                      <div className="flex flex-col">
+                        <ToggleRow id="scouts_enabled" checked={settings.agent_config.scouts_enabled} onChange={(v) => setAgent('scouts_enabled', v)} label="Scouts" hint="Discover new companies matching your mandate" />
+                        <ToggleRow id="reviewers_enabled" checked={settings.agent_config.reviewers_enabled} onChange={(v) => setAgent('reviewers_enabled', v)} label="Reviewers" hint="Score across market, product, team, defensibility" />
+                        <ToggleRow id="partners_enabled" checked={settings.agent_config.partners_enabled} onChange={(v) => setAgent('partners_enabled', v)} label="Partners" hint="INVEST / MONITOR / PASS with written rationale" />
+                      </div>
                     </div>
 
-                    <div className="flex flex-col gap-6">
-                      <p className={labelCls}>Run settings</p>
+                    <SectionRule />
+
+                    <div className="flex flex-col gap-phi-5">
+                      <p className={sectionLabelCls}>Run settings</p>
                       <TextField id="max_agents" label="Companies per cycle" type="number" value={settings.agent_config.max_agents_per_run} onChange={(v) => setAgent('max_agents_per_run', Number(v))} min={1} />
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-phi-2">
                         <label htmlFor="confidence_threshold" className={labelCls}>Decision threshold</label>
                         <span className={hintCls}>Minimum confidence for an automated call (0–1)</span>
                         <input id="confidence_threshold" type="text"
@@ -377,23 +416,26 @@ export default function SettingsPage() {
                     </div>
 
                     {settings.meta_agent && (
-                      <div className="flex flex-col gap-6">
-                        <p className={labelCls}>Self-optimisation</p>
-                        <ToggleRow id="meta_enabled" checked={settings.meta_agent.enabled} onChange={(v) => setSettings((s) => s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), enabled: v } } : s)} label="Enable self-optimisation" hint="Reweights scouts and adjusts thresholds over time" />
-                        <TextField id="meta_interval" label="Interval (seconds)" hint="86400 = daily" type="number" value={settings.meta_agent.interval_seconds} onChange={(v) => setSettings((s) => s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), interval_seconds: Number(v) } } : s)} min={0} />
-                        <TextField id="meta_min_reviews" label="Min reviews before tuning" type="number" value={settings.meta_agent.min_reviews} onChange={(v) => setSettings((s) => s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), min_reviews: Number(v) } } : s)} min={0} />
-                        <TextField id="meta_min_decisions" label="Min decisions before tuning" type="number" value={settings.meta_agent.min_decisions} onChange={(v) => setSettings((s) => s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), min_decisions: Number(v) } } : s)} min={0} />
-                        <TextField id="meta_cooldown" label="Cooldown (cycles)" type="number" value={settings.meta_agent.mutation_cooldown_cycles} onChange={(v) => setSettings((s) => s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), mutation_cooldown_cycles: Number(v) } } : s)} min={0} />
-                      </div>
+                      <>
+                        <SectionRule />
+                        <div className="flex flex-col gap-phi-5">
+                          <p className={sectionLabelCls}>Self-optimisation</p>
+                          <ToggleRow id="meta_enabled" checked={settings.meta_agent.enabled} onChange={(v) => setSettings((s) => s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), enabled: v } } : s)} label="Enable self-optimisation" hint="Reweights scouts and adjusts thresholds over time" />
+                          <TextField id="meta_interval" label="Interval (seconds)" hint="86400 = daily" type="number" value={settings.meta_agent.interval_seconds} onChange={(v) => setSettings((s) => s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), interval_seconds: Number(v) } } : s)} min={0} />
+                          <TextField id="meta_min_reviews" label="Min reviews before tuning" type="number" value={settings.meta_agent.min_reviews} onChange={(v) => setSettings((s) => s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), min_reviews: Number(v) } } : s)} min={0} />
+                          <TextField id="meta_min_decisions" label="Min decisions before tuning" type="number" value={settings.meta_agent.min_decisions} onChange={(v) => setSettings((s) => s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), min_decisions: Number(v) } } : s)} min={0} />
+                          <TextField id="meta_cooldown" label="Cooldown (cycles)" type="number" value={settings.meta_agent.mutation_cooldown_cycles} onChange={(v) => setSettings((s) => s ? { ...s, meta_agent: { ...(s.meta_agent ?? settings.meta_agent!), mutation_cooldown_cycles: Number(v) } } : s)} min={0} />
+                        </div>
+                      </>
                     )}
                   </div>
                 )}
 
                 {/* ── Discovery ── */}
                 {activeTab === 'discovery' && (
-                  <div className="flex flex-col gap-12 max-w-xl">
-                    <div className="flex flex-col gap-6">
-                      <p className={labelCls}>Search scope</p>
+                  <div className="flex flex-col gap-phi-6 max-w-xl">
+                    <div className="flex flex-col gap-phi-5">
+                      <p className={sectionLabelCls}>Search scope</p>
                       <SelectField id="scout_region" label="Target region" value={settings.agent_config.scout_region} onChange={(v) => setAgent('scout_region', v)}>
                         <option value="europe">Europe</option>
                         <option value="global">Global</option>
@@ -406,13 +448,16 @@ export default function SettingsPage() {
 
                 {/* ── Portfolio ── */}
                 {activeTab === 'portfolio' && (
-                  <div className="flex flex-col gap-12 max-w-xl">
-                    <div className="flex flex-col gap-4">
-                      <p className={labelCls}>Watchlist</p>
+                  <div className="flex flex-col gap-phi-6 max-w-xl">
+                    <div className="flex flex-col gap-phi-4">
+                      <p className={sectionLabelCls}>Watchlist</p>
                       <ToggleRow id="auto_watchlist" checked={settings.portfolio.auto_watchlist} onChange={(v) => setPortfolio('auto_watchlist', v)} label="Auto-add high-signal companies" hint="Added when scoring above the signal threshold" />
                     </div>
-                    <div className="flex flex-col gap-6">
-                      <p className={labelCls}>Monitoring</p>
+
+                    <SectionRule />
+
+                    <div className="flex flex-col gap-phi-5">
+                      <p className={sectionLabelCls}>Monitoring</p>
                       <SelectField id="signal_scan" label="Signal scan frequency" value={settings.portfolio.signal_scan_frequency} onChange={(v) => setPortfolio('signal_scan_frequency', v)}>
                         <option value="hourly">Hourly</option>
                         <option value="every_6h">Every 6 hours</option>
@@ -429,9 +474,9 @@ export default function SettingsPage() {
 
                 {/* ── Budget ── */}
                 {activeTab === 'budget' && (
-                  <div className="flex flex-col gap-12 max-w-xl">
-                    <div className="flex flex-col gap-6">
-                      <p className={labelCls}>Spending controls</p>
+                  <div className="flex flex-col gap-phi-6 max-w-xl">
+                    <div className="flex flex-col gap-phi-5">
+                      <p className={sectionLabelCls}>Spending controls</p>
                       <ToggleRow id="cost_budget_enabled" checked={settings.cost_budget?.enabled ?? false} onChange={(v) => setCost('enabled', v)} label="Enable spending limits" hint="Pipeline pauses when a cap is hit" />
                       <TextField id="daily_ceiling" label="Daily cap (USD)" type="number" value={settings.cost_budget.daily_cost_ceiling} onChange={(v) => setCost('daily_cost_ceiling', Number(v))} min={0} step={0.01} />
                       <TextField id="weekly_ceiling" label="Weekly cap (USD)" type="number" value={settings.cost_budget.weekly_cost_ceiling} onChange={(v) => setCost('weekly_cost_ceiling', Number(v))} min={0} step={0.01} />
@@ -439,21 +484,23 @@ export default function SettingsPage() {
                       <TextField id="cooldown" label="Cooldown (seconds)" hint="Pause after hitting a cap" type="number" value={settings.cost_budget.cooldown_seconds} onChange={(v) => setCost('cooldown_seconds', Number(v))} min={0} />
                     </div>
 
-                    <div className="flex flex-col gap-6">
-                      <p className={labelCls}>Usage today</p>
+                    <SectionRule />
+
+                    <div className="flex flex-col gap-phi-5">
+                      <p className={sectionLabelCls}>Usage today</p>
                       {(settings.system_health?.budget_status?.length ?? 0) > 0 ? (
-                        <div className="flex flex-col gap-8">
+                        <div className="flex flex-col gap-phi-6">
                           {settings.system_health!.budget_status.map((b: AgentBudgetStatus) => {
                             const callsPct  = b.daily_calls_limit  > 0 ? b.daily_calls_used  / b.daily_calls_limit  : 0;
                             const tokensPct = b.daily_tokens_limit > 0 ? b.daily_tokens_used / b.daily_tokens_limit : 0;
                             return (
-                              <div key={b.agent_id} className="flex flex-col gap-3">
+                              <div key={b.agent_id} className="flex flex-col gap-phi-3">
                                 <p className="type-meta uppercase tracking-[0.12em] text-oxford/50 truncate">{b.agent_id}</p>
-                                <div className="flex flex-col gap-1">
+                                <div className="flex flex-col gap-phi-2">
                                   <p className="type-meta text-oxford/30">Calls {b.daily_calls_used} / {b.daily_calls_limit}</p>
                                   <div className="h-px w-full bg-oxford/10"><div className="h-full bg-oxford/35" style={{ width: `${Math.min(100, callsPct * 100)}%` }} /></div>
                                 </div>
-                                <div className="flex flex-col gap-1">
+                                <div className="flex flex-col gap-phi-2">
                                   <p className="type-meta text-oxford/30">Tokens {b.daily_tokens_used} / {b.daily_tokens_limit}</p>
                                   <div className="h-px w-full bg-oxford/10"><div className="h-full bg-oxford/35" style={{ width: `${Math.min(100, tokensPct * 100)}%` }} /></div>
                                 </div>
@@ -471,24 +518,27 @@ export default function SettingsPage() {
 
                 {/* ── Account ── */}
                 {activeTab === 'account' && (
-                  <div className="flex flex-col gap-12">
-                    <div className="flex flex-col gap-4">
-                      <p className={labelCls}>Profile & security</p>
+                  <div className="flex flex-col gap-phi-6">
+                    <div className="flex flex-col gap-phi-4">
+                      <p className={sectionLabelCls}>Profile & security</p>
                       <div className="aethria-clerk-profile min-h-[320px]">
                         <UserProfile appearance={userProfileAppearance} routing="hash" />
                       </div>
                     </div>
                     {userId && (
-                      <div className="flex flex-col gap-4">
-                        <p className={labelCls}>User ID</p>
-                        <p className="type-body-sm text-oxford/40">Set <code className="bg-oxford/[0.05] px-1">AETHRIA_AGENT_USER_ID</code> to this value to run agents locally.</p>
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <code className="type-meta text-oxford/55 bg-oxford/[0.05] px-3 py-1 select-none" aria-hidden>{userId.replace(/./g, '•')}</code>
-                          <button type="button" onClick={() => navigator.clipboard?.writeText(userId).then(() => { setUserIdCopied(true); setTimeout(() => setUserIdCopied(false), 2000); })} className={btnCls}>
-                            {userIdCopied ? 'Copied' : 'Copy'}
-                          </button>
+                      <>
+                        <SectionRule />
+                        <div className="flex flex-col gap-phi-4">
+                          <p className={sectionLabelCls}>User ID</p>
+                          <p className="type-body-sm text-oxford/40">Set <code className="bg-oxford/[0.05] px-phi-2">AETHRIA_AGENT_USER_ID</code> to this value to run agents locally.</p>
+                          <div className="flex items-center gap-phi-3 flex-wrap">
+                            <code className="type-meta text-oxford/55 bg-oxford/[0.05] px-phi-3 py-phi-2 select-none" aria-hidden>{userId.replace(/./g, '•')}</code>
+                            <button type="button" onClick={() => navigator.clipboard?.writeText(userId).then(() => { setUserIdCopied(true); setTimeout(() => setUserIdCopied(false), 2000); })} className={btnCls}>
+                              {userIdCopied ? 'Copied' : 'Copy'}
+                            </button>
+                          </div>
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 )}
@@ -496,31 +546,33 @@ export default function SettingsPage() {
               </motion.div>
             </AnimatePresence>
           </div>
-        </div>
+          </div>{/* end settings content */}
+        </div>{/* end grid */}
+      </main>
 
       {/* Reprocess modal */}
       {thesisReprocessOpen && (
-        <div className="fixed inset-0 z-[220] flex items-center justify-center bg-oxford/25 px-4" role="presentation" onClick={() => { if (!thesisReprocessRunning) setThesisReprocessOpen(false); }}>
-          <div role="dialog" aria-modal="true" aria-labelledby="reprocess-title" className="max-w-sm w-full bg-paper p-8" onClick={(e) => e.stopPropagation()}>
-            <p id="reprocess-title" className={`${labelCls} mb-5`}>Reprocess startups?</p>
-            <p className="type-body-sm text-oxford/50 mb-6 leading-relaxed">Re-runs analysis on startups evaluated before your current mandate. May take a few minutes.</p>
+        <div className="fixed inset-0 z-[220] flex items-center justify-center bg-oxford/25 px-phi-4" role="presentation" onClick={() => { if (!thesisReprocessRunning) setThesisReprocessOpen(false); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="reprocess-title" className="max-w-sm w-full bg-paper px-phi-5 py-phi-5" onClick={(e) => e.stopPropagation()}>
+            <p id="reprocess-title" className={`${labelCls} mb-phi-4`}>Reprocess startups?</p>
+            <p className="type-body-sm text-oxford/50 mb-phi-5 leading-relaxed">Re-runs analysis on startups evaluated before your current mandate. May take a few minutes.</p>
             {thesisReprocessDryLoading
-              ? <p className="type-body-sm text-oxford/30 mb-5">Counting eligible startups…</p>
+              ? <p className="type-body-sm text-oxford/30 mb-phi-4">Counting eligible startups…</p>
               : thesisReprocessModalError
-                ? <p className="type-body-sm text-escalation/60 mb-5">{thesisReprocessModalError}</p>
+                ? <p className="type-body-sm text-escalation/60 mb-phi-4">{thesisReprocessModalError}</p>
                 : thesisReprocessEligible !== null
-                  ? <div className="mb-5 flex flex-col gap-1">
+                  ? <div className="mb-phi-4 flex flex-col gap-phi-2">
                       <p className="type-body-sm text-oxford/50">{thesisReprocessEligible} startup{thesisReprocessEligible === 1 ? '' : 's'} will be updated.</p>
                       {thesisReprocessEligible > 500 && <p className="type-body-sm text-oxford/30">Large batch — first 1000 per run.</p>}
-                      {!agentsStatus?.openai_configured && thesisReprocessEligible >= 1 && <p className="type-body-sm text-oxford/30">Configure <code className="bg-oxford/[0.05] px-1">OPENAI_API_KEY</code> to continue.</p>}
+                      {!agentsStatus?.openai_configured && thesisReprocessEligible >= 1 && <p className="type-body-sm text-oxford/30">Configure <code className="bg-oxford/[0.05] px-phi-2">OPENAI_API_KEY</code> to continue.</p>}
                     </div>
                   : null
             }
-            <div className="flex gap-4 justify-end">
+            <div className="flex gap-phi-4 justify-end">
               <button type="button" disabled={thesisReprocessRunning} onClick={() => setThesisReprocessOpen(false)} className={btnCls}>Cancel</button>
               <button type="button"
                 disabled={thesisReprocessRunning || thesisReprocessDryLoading || thesisReprocessEligible === null || thesisReprocessEligible < 1 || !!thesisReprocessModalError || !agentsStatus?.openai_configured}
-                className={`${outlineBtnCls} inline-flex items-center gap-2`}
+                className={`${outlineBtnCls} inline-flex items-center gap-phi-2`}
                 onClick={() => { void (async () => { setThesisReprocessRunning(true); setThesisReprocessModalError(null); try { const r = await postFundThesisReprocessMissing(); if (!('processed' in r)) return; setThesisReprocessOpen(false); setThesisReprocessToast(`Reprocessed ${r.processed} startup${r.processed === 1 ? '' : 's'}${r.failed > 0 ? ` (${r.failed} failed)` : ''}`); } catch (e: unknown) { setThesisReprocessModalError(e instanceof Error ? e.message : 'Reprocess failed'); } finally { setThesisReprocessRunning(false); } })(); }}>
                 {thesisReprocessRunning
                   ? <><svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>Reprocessing…</>

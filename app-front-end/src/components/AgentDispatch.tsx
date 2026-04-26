@@ -7,27 +7,27 @@ interface AgentDispatchProps {
   isBusy: boolean;
   message: string | null;
   lookupPhase: 'Scouting' | 'Reviewing' | 'Deciding' | null;
+  alwaysOpen?: boolean;
 }
 
 function formatLookupMessage(msg: string): string {
   if (!msg) return '';
-
   const substitutions: Record<string, string> = {
-    'Submitting lookup request...': 'Submitting lookup request...',
-    'Lookup queued for': 'Lookup queued for',
-    'Searching sources for': 'Searching sources for',
+    'Submitting lookup request...': 'Submitting lookup request…',
+    'Lookup queued for': 'Queued for',
+    'Searching sources for': 'Searching for',
     'Found': 'Found',
-    'Running analyst review': 'Running analyst review',
+    'Running analyst review': 'Running analyst review…',
     'Lookup complete': 'Lookup complete.',
-    'Could not submit': 'Could not submit lookup. Retry.',
+    'Could not submit': 'Could not submit. Retry.',
   };
-
   for (const [key, replacement] of Object.entries(substitutions)) {
     if (msg.includes(key)) return msg.replace(key, replacement);
   }
-
   return msg;
 }
+
+const PHASES = ['Scouting', 'Reviewing', 'Deciding'] as const;
 
 export default function AgentDispatch({
   input,
@@ -36,59 +36,79 @@ export default function AgentDispatch({
   isBusy,
   message,
   lookupPhase,
+  alwaysOpen = false,
 }: AgentDispatchProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(alwaysOpen);
+  const isExpanded = alwaysOpen || expanded;
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (expanded && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [expanded]);
+    if (isExpanded && inputRef.current && !alwaysOpen) inputRef.current.focus();
+  }, [alwaysOpen, isExpanded]);
 
-  // Auto-expand if busy/has message
   useEffect(() => {
-    if (isBusy || message) setExpanded(true);
-  }, [isBusy, message]);
+    if (alwaysOpen || isBusy || message) setExpanded(true);
+  }, [alwaysOpen, isBusy, message]);
 
   const lookupMessage = message ? formatLookupMessage(message) : null;
+  const isActive = isBusy || !!lookupMessage;
 
   return (
-    <div className="relative w-full group">
-      <button
-        type="button"
-        onClick={() => setExpanded((prev) => !prev)}
-        className="grid w-full min-h-[44px] grid-cols-[1fr_auto] items-center gap-phi-2 border-t border-oxford/[0.08] py-phi-2 text-left btn-interaction group/trigger"
-        aria-expanded={expanded}
+    <div className="w-full">
+      {/* ── Status header ───────────────────────────────────────── */}
+      <div
+        className={`w-full flex items-center gap-phi-3 px-phi-4 ${alwaysOpen ? 'min-h-[36px]' : 'min-h-[44px] border-t border-oxford/[0.08]'}`}
+        aria-expanded={isExpanded}
       >
-        <span className="type-meta text-oxford/58 group-hover/trigger:text-oxford/82 transition-colors">
+        <span className="type-meta uppercase tracking-[0.12em] text-oxford/40 group-hover/trigger:text-oxford/65 transition-colors shrink-0">
           Dispatch
         </span>
-        <span
-          className={`type-meta text-oxford/35 group-hover/trigger:text-oxford/55 transition-transform duration-300 ease-smooth ${expanded ? 'rotate-180' : 'rotate-0'
-            }`}
-          aria-hidden="true"
-        >
-          v
-        </span>
-        <span className="sr-only">
-          {expanded ? 'Close dispatch panel' : 'Open dispatch panel'}
-        </span>
-      </button>
 
+        {/* Rule — pulses when active */}
+        <span
+          className="flex-1 h-px bg-oxford/[0.06]"
+          style={isActive ? { animation: 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite' } : undefined}
+          aria-hidden
+        />
+
+        {/* Status */}
+        <span className="flex items-center gap-phi-2 shrink-0">
+          {isActive && (
+            <span
+              className="h-1.5 w-1.5 shrink-0 bg-oxford/40"
+              style={{ animation: 'aethria-pulse 1.5s cubic-bezier(0.16,1,0.3,1) infinite' }}
+              aria-hidden
+            />
+          )}
+          <span className={`type-meta uppercase tracking-[0.12em] transition-colors ${isActive ? 'text-oxford/55' : 'text-oxford/25'}`}>
+            {isBusy ? 'Running' : lookupMessage ? 'Active' : 'Ready'}
+          </span>
+        </span>
+
+        {!alwaysOpen && (
+          <button
+            type="button"
+            onClick={() => setExpanded((p) => !p)}
+            className="type-meta text-oxford/25 hover:text-oxford/50 transition-colors w-4 text-center shrink-0 select-none btn-interaction"
+            aria-expanded={isExpanded}
+          >
+            {isExpanded ? '−' : '+'}
+            <span className="sr-only">{isExpanded ? 'Close dispatch panel' : 'Open dispatch panel'}</span>
+          </button>
+        )}
+      </div>
+
+      {/* ── Panel ────────────────────────────────────────────────── */}
       <div
-        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-smooth ${expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          }`}
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-smooth ${
+          isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
       >
         <div className="overflow-hidden">
-          <div className="px-phi-1 pb-phi-4 pt-phi-3">
-            <div className="mb-phi-3 flex justify-end">
-              <span className="type-meta text-oxford/45">
-                {isBusy ? 'Running' : lookupMessage ? 'Active' : 'Ready'}
-              </span>
-            </div>
+          <div className={`px-phi-4 ${alwaysOpen ? 'pt-phi-1 pb-phi-3' : 'pt-phi-3 pb-phi-5'}`}>
 
-            <div className="relative pb-phi-1">
+            {/* Input */}
+            <div className="relative">
               <input
                 ref={inputRef}
                 type="text"
@@ -96,31 +116,40 @@ export default function AgentDispatch({
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') onSubmit();
-                  if (e.key === 'Escape' && !isBusy && !message) setExpanded(false);
+                  if (e.key === 'Escape' && !alwaysOpen && !isBusy && !message) setExpanded(false);
                 }}
                 placeholder="Company name or URL"
                 autoComplete="off"
                 disabled={isBusy}
-                className="w-full bg-transparent border-0 border-b border-oxford/10 px-0 py-2.5 font-sans text-[clamp(1rem,1.8vw,1.25rem)] font-medium text-oxford placeholder:text-oxford/22 outline-none focus:border-oxford/30 transition-colors duration-300"
+                className={`w-full bg-transparent border-0 border-b border-oxford/[0.10] px-0 font-sans font-medium text-oxford placeholder:text-oxford/25 outline-none focus:border-oxford/30 transition-colors duration-300 disabled:cursor-not-allowed ${alwaysOpen ? 'py-phi-2 text-[0.95rem]' : 'py-phi-3 text-[1rem]'}`}
               />
+              {/* Animated underline while running */}
               {isBusy && (
                 <span
-                  className="absolute bottom-0 left-0 h-[1px] w-full bg-oxford/40"
-                  style={{ animation: 'aethria-pulse 1.5s infinite' }}
+                  className="absolute bottom-0 left-0 h-px w-full bg-oxford/30"
+                  style={{ animation: 'aethria-pulse 1.5s cubic-bezier(0.16,1,0.3,1) infinite' }}
+                  aria-hidden
                 />
               )}
             </div>
 
-            <div className="mt-phi-3 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-phi-3">
-              <div className="flex flex-col gap-1 min-h-[40px] justify-center pr-phi-2">
+            {/* Message + action row */}
+            <div className={`flex items-center justify-between gap-phi-3 ${alwaysOpen ? 'mt-phi-2 min-h-[22px]' : 'mt-phi-3 min-h-[28px]'}`}>
+              <div className="flex-1 min-w-0">
                 {lookupMessage ? (
-                  <p className="type-meta text-oxford/62 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-oxford/40 rounded-none animate-pulse" />
-                    {lookupMessage}
+                  <p className="type-meta text-oxford/55 flex items-center gap-phi-2 min-w-0">
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 bg-oxford/35"
+                      style={{ animation: 'aethria-pulse 1.5s cubic-bezier(0.16,1,0.3,1) infinite' }}
+                      aria-hidden
+                    />
+                    <span className="truncate">{lookupMessage}</span>
                   </p>
-                ) : (
-                  <p className="type-meta text-oxford/42">Paste a company name or URL.</p>
-                )}
+                ) : !isBusy ? (
+                  <p className="type-meta text-oxford/25">
+                    Enter a name or URL to look up a company.
+                  </p>
+                ) : null}
               </div>
 
               {!isBusy && (
@@ -128,31 +157,48 @@ export default function AgentDispatch({
                   type="button"
                   onClick={onSubmit}
                   disabled={!input.trim()}
-                  className="group inline-flex items-center gap-2 px-0 min-h-[36px] type-meta text-oxford/60 hover:text-oxford transition-colors disabled:opacity-20"
+                  className="shrink-0 inline-flex items-center gap-phi-2 type-meta uppercase tracking-[0.12em] text-oxford/45 hover:text-oxford disabled:opacity-20 transition-colors btn-interaction"
                 >
-                  Run dispatch
-                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  Run
+                  <span className="transition-transform group-hover:translate-x-px">→</span>
                 </button>
               )}
             </div>
 
+            {/* Phase tracker */}
             {lookupPhase && (
-              <div className="mt-phi-3 border-t border-oxford/5 pt-phi-3 flex gap-3">
-                {['Scouting', 'Reviewing', 'Deciding'].map((phase) => {
-                  const isActive = lookupPhase === phase;
-                  const isPast = (lookupPhase === 'Reviewing' && phase === 'Scouting') ||
+              <div className={`border-t border-oxford/[0.06] flex gap-phi-3 ${alwaysOpen ? 'mt-phi-3 pt-phi-2' : 'mt-phi-4 pt-phi-3'}`}>
+                {PHASES.map((phase) => {
+                  const isCurrentPhase = lookupPhase === phase;
+                  const isPast =
+                    (lookupPhase === 'Reviewing' && phase === 'Scouting') ||
                     (lookupPhase === 'Deciding' && (phase === 'Scouting' || phase === 'Reviewing'));
 
                   return (
-                    <div key={phase} className="flex-1 flex flex-col gap-2">
-                      <div className="h-[2px] w-full bg-oxford/5 relative">
-                        {(isActive || isPast) && (
+                    <div key={phase} className="flex-1 flex flex-col gap-phi-2">
+                      <div className="h-px w-full bg-oxford/[0.06] relative overflow-hidden">
+                        {(isCurrentPhase || isPast) && (
                           <span
-                            className={`absolute inset-0 origin-left h-full transition-transform duration-300 ease-smooth ${isActive ? 'bg-oxford/40' : 'bg-oxford/20'} scale-x-100`}
+                            className={`absolute inset-0 h-full origin-left ${
+                              isPast ? 'bg-oxford/15' : 'bg-oxford/35'
+                            }`}
+                            style={
+                              isCurrentPhase
+                                ? { animation: 'aethria-pulse 1.5s cubic-bezier(0.16,1,0.3,1) infinite' }
+                                : undefined
+                            }
                           />
                         )}
                       </div>
-                      <span className={`type-meta ${isActive ? 'text-oxford/60' : 'text-oxford/45'}`}>
+                      <span
+                        className={`type-meta uppercase tracking-[0.12em] transition-colors ${
+                          isCurrentPhase
+                            ? 'text-oxford/60'
+                            : isPast
+                            ? 'text-oxford/30'
+                            : 'text-oxford/18'
+                        }`}
+                      >
                         {phase}
                       </span>
                     </div>

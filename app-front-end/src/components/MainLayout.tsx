@@ -13,6 +13,7 @@ import LiveIntelligenceFeed from './LiveIntelligenceFeed';
 import GhostTransition from './GhostTransition';
 import SystemIntelligence from './SystemIntelligence';
 import AgentDispatch from './AgentDispatch';
+import AccountRailPanel from './AccountRailPanel';
 import {
   useScrollLock,
   useEscapeKey,
@@ -519,11 +520,11 @@ export default function MainLayout({
         </div>
       )}
 
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 lg:px-phi-6 lg:pt-phi-5">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 pb-phi-5 lg:px-phi-5 lg:pt-phi-5 lg:pb-phi-5">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(260px,20%)_minmax(420px,35%)_minmax(560px,45%)] min-h-0 overflow-hidden pb-phi-5 lg:pb-phi-6 gap-phi-6 lg:gap-phi-6">
-            <aside className="hidden lg:flex min-w-0 min-h-0 flex-col gap-phi-4">
-              <div className="h-[32%] min-h-[280px]">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(260px,20%)_minmax(420px,35%)_minmax(560px,45%)] min-h-0 overflow-hidden gap-phi-6 lg:gap-phi-6">
+            <aside className="hidden lg:grid min-w-0 min-h-0 grid-rows-[minmax(150px,1fr)_auto_auto_auto_auto] gap-phi-4 overflow-hidden">
+              <div className="min-h-0 h-full">
                 <SystemBar
                   variant="embedded"
                   rightPanel={rightPanel}
@@ -531,32 +532,45 @@ export default function MainLayout({
                   onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
                   onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
                   onClose={() => setRightPanel(null)}
-                  navLink={{ href: SETTINGS_PATH, label: 'Settings' }}
                 />
               </div>
               <section
-                aria-label="Live overview"
-                className="min-h-0 bg-paper border border-oxford/[0.08] px-phi-4 py-phi-4"
+                aria-label="On-demand lookup"
+                className="shrink-0 min-h-0 bg-paper border border-oxford/[0.08] overflow-hidden"
               >
-                <div className="flex flex-wrap items-center gap-x-phi-3 gap-y-phi-2">
-                  <p className="type-meta text-oxford/45">Live overview</p>
+                <AgentDispatch
+                  input={lookupInput}
+                  setInput={setLookupInput}
+                  onSubmit={() => void handleLookupSubmit()}
+                  isBusy={lookupBusy}
+                  message={lookupMessage}
+                  lookupPhase={lookupPhaseLabel}
+                  alwaysOpen
+                />
+              </section>
+              <section
+                aria-label="Live overview"
+                className="bg-paper border border-oxford/[0.08] px-phi-4 py-phi-3"
+              >
+                {/* Header row: label + pipeline status */}
+                <div className="flex items-center justify-between gap-phi-3">
+                  <p className="type-meta text-oxford/40">Overview</p>
                   <div className="relative inline-flex items-center gap-phi-2">
-                    <span className="type-meta text-oxford/45">Pipeline</span>
                     {pipelineStateLabel === 'On' && (
                       <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60"
-                        style={{
-                          animation: 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite',
-                        }}
+                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/50"
+                        style={{ animation: 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite' }}
                         aria-hidden
                       />
                     )}
                     <span className={
-                      pipelineStateLabel === 'Issue' ? 'type-meta text-escalation' :
-                        pipelineStateLabel === 'Off' ? 'type-meta text-oxford/45' :
-                          'type-meta text-oxford/80'
+                      pipelineStateLabel === 'Issue'
+                        ? 'type-meta text-escalation'
+                        : pipelineStateLabel === 'Off'
+                          ? 'type-meta text-oxford/30'
+                          : 'type-meta text-oxford/55'
                     }>
-                      {pipelineStateLabel}
+                      {pipelineStateLabel === 'On' ? 'Pipeline active' : pipelineStateLabel === 'Issue' ? 'Pipeline issue' : 'Pipeline off'}
                     </span>
                     {pipelineStateLabel === 'Issue' && (
                       <>
@@ -564,13 +578,13 @@ export default function MainLayout({
                           type="button"
                           onClick={() => setShowPipelineIssueHelp((open) => !open)}
                           className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
-                          aria-label="Why pipeline has an issue"
+                          aria-label="Pipeline issue details"
                           aria-expanded={showPipelineIssueHelp}
                         >
                           ?
                         </button>
                         {showPipelineIssueHelp && (
-                          <span className="absolute left-0 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
+                          <span className="absolute right-0 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
                             Pipeline has a problem and may not process updates right now.
                             <button
                               type="button"
@@ -585,61 +599,59 @@ export default function MainLayout({
                     )}
                   </div>
                 </div>
-                <div className="mt-phi-4 grid min-w-0 grid-cols-2 gap-x-phi-4 gap-y-phi-4">
+                {/* Stats: 2×2 grid of financial numbers */}
+                <div className="mt-phi-3 grid min-w-0 grid-cols-2 gap-x-phi-5 gap-y-phi-3">
                   {[
                     { label: 'Total', value: startups.length, accent: false },
                     { label: 'Open', value: openCount, accent: false },
                     { label: 'Decided', value: resolvedCount, accent: false },
-                    { label: 'Escalated', value: pendingEscalations, accent: true },
+                    { label: 'Escalated', value: pendingEscalations, accent: pendingEscalations > 0 },
                   ].map((stat) => (
                     <div key={stat.label} className="min-w-0 text-left">
-                      <p
-                        className={`font-mono font-bold text-[clamp(20px,1.8vw,28px)] leading-none tracking-[-0.03em] tabular-nums ${stat.accent ? 'text-escalation' : 'text-oxford'
-                          }`}
-                      >
+                      <p className={`font-mono font-bold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.04em] tabular-nums ${stat.accent ? 'text-escalation' : 'text-oxford'}`}>
                         {stat.value.toLocaleString()}
                       </p>
-                      <p className="mt-1 type-meta text-oxford/55">{stat.label}</p>
+                      <p className="mt-phi-1 type-meta text-oxford/40 uppercase tracking-[0.1em]">{stat.label}</p>
                     </div>
                   ))}
                 </div>
               </section>
               <article
-                className="min-h-0 bg-paper border border-oxford/[0.08] px-phi-4 py-phi-4"
+                className="bg-paper border border-oxford/[0.08] px-phi-4 py-phi-3"
                 aria-label="Fund thesis preview"
-                style={{ boxSizing: 'border-box' }}
               >
-                <div className="flex items-center justify-between gap-phi-3">
-                  <div className="min-w-0">
-                    <p className="type-label-section text-oxford/40">Purpose / active mandate</p>
-                    <p className="mt-phi-2 type-body font-semibold tracking-tight text-oxford truncate">
+                <div className="flex items-start justify-between gap-phi-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="type-meta text-oxford/40 uppercase tracking-[0.1em]">Active mandate</p>
+                    <p className="mt-phi-2 type-body font-semibold leading-tight tracking-tight text-oxford truncate">
                       {fundName || 'No fund configured'}
                     </p>
                   </div>
                   {hasThesis && (
-                    <span className="inline-flex items-center gap-phi-2">
+                    <span className="shrink-0 inline-flex items-center gap-phi-2 mt-px">
                       <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
-                        style={{ opacity: 0.6 }}
+                        className="h-1.5 w-1.5 shrink-0 rounded-full bg-oxford/70 signal-dot-breathe"
+                        style={{ boxShadow: '0 0 0 2px rgba(16,26,43,0.08)' }}
                         aria-hidden
                       />
-                      <span className="type-label-tab text-oxford/55">Live</span>
+                      <span className="type-meta text-oxford/48 tracking-[0.06em]">Live</span>
                     </span>
                   )}
                 </div>
                 {hasThesisTags && (
                   <div className="mt-phi-3 flex flex-wrap gap-phi-2">
-                    {thesisTagList.map((t) => (
-                      <span key={t} className="px-phi-2 py-phi-1 type-label-tab text-oxford/55 bg-oxford/[0.03]">{t}</span>
+                    {thesisTagList.slice(0, 5).map((t) => (
+                      <span key={t} className="px-phi-2 py-phi-1 type-meta text-oxford/45 border border-oxford/[0.08]">{t}</span>
                     ))}
                   </div>
                 )}
               </article>
+              <AccountRailPanel settingsPath={SETTINGS_PATH} />
             </aside>
 
             <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
               {/* Pipeline summary + lookup */}
-              <header className="flex-none mb-phi-5 min-w-0 lg:px-0">
+              <header className="flex-none mb-phi-5 min-w-0 lg:mb-0 lg:px-0">
                 <section
                   aria-label="Pipeline summary and agent status"
                   className="grid min-w-0 grid-cols-1 gap-phi-4 pb-phi-4 px-phi-2 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end xl:gap-x-phi-5 lg:hidden"
@@ -705,7 +717,7 @@ export default function MainLayout({
                     )}
                   </div>
                 </section>
-                <div className="pt-phi-1 lg:pt-phi-2">
+                <div className="pt-phi-1 lg:hidden">
                   <AgentDispatch
                     input={lookupInput}
                     setInput={setLookupInput}
@@ -741,9 +753,9 @@ export default function MainLayout({
                     {fundName || 'No fund configured'}
                   </p>
                   {hasThesisTags && (
-                  <div className="mt-phi-3 flex flex-wrap gap-phi-2">
-                      {thesisTagList.map((t) => (
-                        <span key={t} className="px-phi-2 py-phi-1 type-label-tab text-oxford/55 bg-oxford/[0.03]">{t}</span>
+                    <div className="mt-phi-3 flex flex-wrap gap-phi-2">
+                      {thesisTagList.slice(0, 5).map((t) => (
+                        <span key={t} className="px-phi-2 py-phi-1 type-meta text-oxford/45 border border-oxford/[0.08]">{t}</span>
                       ))}
                     </div>
                   )}
@@ -810,7 +822,7 @@ export default function MainLayout({
                         title="JUDGEMENTS"
                         titleClassName={UI_PANEL_CHROME_LABEL}
                         headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
-                        headerBorderClass=""
+                        headerBorderClass="border-b border-hairline"
                         actions={
                           <button
                             type="button"
@@ -884,28 +896,30 @@ export default function MainLayout({
                             </button>
                           </div>
                         }
-                        contentClassName="flex-1 min-h-0 overflow-y-auto px-phi-5 py-phi-5 sm:px-phi-6 sm:py-phi-6"
+                        contentClassName="memoShellContent px-phi-5 py-phi-5 sm:px-phi-6 sm:py-phi-6"
                       >
-                        <AnimatePresence mode="wait" initial={false}>
-                          <motion.div
-                            key={memoStartup!.id}
-                            initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
-                            transition={transitionOrReduced(reduceMotion, {
-                              duration: tokens.motion.duration.short,
-                              ease: tokens.motion.ease,
-                            })}
-                            className="h-full"
-                          >
-                            <InvestmentMemoContent
-                              ref={memoContentRef}
-                              startup={memoStartup!}
-                              embedded
-                              onMemoPipelineReady={handleMemoPipelineReady}
-                            />
-                          </motion.div>
-                        </AnimatePresence>
+                        {/*
+                          Enter-only when swapping deals: `mode="wait"` on AnimatePresence forced a full
+                          exit (~0.4s) before the next memo could mount — felt like stutter/jump.
+                          Keyed motion.div remounts instantly; only the incoming memo fades in.
+                        */}
+                        <motion.div
+                          key={memoStartup!.id}
+                          initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={transitionOrReduced(reduceMotion, {
+                            duration: tokens.motion.duration.micro,
+                            ease: tokens.motion.ease,
+                          })}
+                          className="h-full"
+                        >
+                          <InvestmentMemoContent
+                            ref={memoContentRef}
+                            startup={memoStartup!}
+                            embedded
+                            onMemoPipelineReady={handleMemoPipelineReady}
+                          />
+                        </motion.div>
                       </PanelShell>
                     </motion.div>
                   ) : (

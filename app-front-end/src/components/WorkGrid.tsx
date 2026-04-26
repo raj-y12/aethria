@@ -1,8 +1,9 @@
 import { useMemo, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import type { Startup } from '../types/startup';
 import { getReviewerQualityBand } from '../design-system/semantics';
 import { tokens } from '../design-system/tokens';
+import { transitionOrReduced } from '../design-system/motion';
 import {
   UI_FILTER_TOOLBAR_LABEL,
 } from '../design-system/ui-text';
@@ -55,7 +56,7 @@ const FilterButton = ({ active, label, onClick }: { active: boolean; label: stri
   <button
     type="button"
     onClick={onClick}
-    className={`type-meta min-h-[36px] px-2 transition-[color,border-color,background-color] duration-200 border-b focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/45 hover:text-oxford/70'
+    className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-[color,border-color] duration-200 border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/40 hover:text-oxford/70'
       }`}
   >
     {label}
@@ -69,7 +70,7 @@ interface WorkGridProps {
   watchlistIds?: Set<string>;
 }
 
-const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.Element => {
+const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchlistIds }: WorkGridProps): JSX.Element => {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('ALL');
   const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>('ALL');
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('ALL');
@@ -77,6 +78,35 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [rowDecisions, setRowDecisions] = useState<Record<string, RowDecisionState>>({});
   const reduceMotion = usePrefersReducedMotion();
+
+  /** Shared timing so teaser collapse and decision panel exit stay in sync (avoids stutter). */
+  const rowExpandTransition = useMemo(
+    () =>
+      transitionOrReduced(reduceMotion, {
+        duration: 0.22,
+        ease: tokens.motion.ease,
+      }),
+    [reduceMotion]
+  );
+  const decisionPanelTransition = rowExpandTransition;
+  const listContainerVariants = useMemo((): Variants | undefined =>
+    reduceMotion
+      ? undefined
+      : {
+          hidden: {},
+          visible: { transition: { staggerChildren: 0.04, delayChildren: 0.05 } },
+        },
+    [reduceMotion]
+  );
+  const rowVariants = useMemo((): Variants | undefined =>
+    reduceMotion
+      ? undefined
+      : {
+          hidden: { opacity: 0, x: -8 },
+          visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: tokens.motion.ease } },
+        },
+    [reduceMotion]
+  );
 
   const getRS = (id: string): RowDecisionState => rowDecisions[id] ?? emptyRowState();
 
@@ -143,13 +173,13 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
 
   return (
     <div className="w-full font-sans bg-paper selection:bg-oxford selection:text-paper">
-      <div className="sticky top-0 z-20 bg-paper border-b border-oxford/[0.06] px-phi-3 py-phi-2">
+      <div className="sticky top-0 z-20 bg-paper border-b border-oxford/[0.06] px-phi-4 py-phi-2">
         <div className="flex flex-col gap-phi-3">
           <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2">
             <div className="flex min-w-0 flex-wrap items-center gap-phi-3">
               <span className={UI_FILTER_TOOLBAR_LABEL}>Deals</span>
-              <div className="flex items-center gap-0.5">
-                <FilterButton active={sourceFilter === 'ALL'} label="Universe" onClick={() => setSourceFilter('ALL')} />
+              <div className="flex items-center gap-0">
+                <FilterButton active={sourceFilter === 'ALL'} label="All" onClick={() => setSourceFilter('ALL')} />
                 <FilterButton active={sourceFilter === 'SCOUT'} label="Scout" onClick={() => setSourceFilter('SCOUT')} />
                 <FilterButton active={sourceFilter === 'LOOKUP'} label="Lookup" onClick={() => setSourceFilter('LOOKUP')} />
               </div>
@@ -174,7 +204,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
               <button
                 type="button"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="type-meta min-h-[36px] text-oxford/55 hover:text-oxford transition-colors pl-phi-2"
+                className="type-meta uppercase tracking-[0.12em] min-h-[36px] text-oxford/55 hover:text-oxford transition-colors pl-phi-2"
               >
                 {showAdvancedFilters ? 'Collapse' : 'Refine'}
               </button>
@@ -191,14 +221,14 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 className="border-t border-oxford/[0.06]"
               >
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-phi-4 pt-phi-3">
-                  <div className="space-y-2">
-                    <span className="type-meta text-oxford/45">Decision</span>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col gap-phi-2">
+                    <span className="type-meta uppercase tracking-[0.12em] text-oxford/45">Decision</span>
+                    <div className="flex flex-wrap gap-phi-2">
                       {['ALL', 'YES', 'NO', 'MAYBE', 'ESCALATION'].map((d) => (
                         <button
                           key={d}
                           onClick={() => setDecisionFilter(d as DecisionFilter)}
-                          className={`type-meta px-3 min-h-[36px] border border-oxford/10 transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
+                          className={`type-meta uppercase tracking-[0.12em] px-phi-3 min-h-[34px] border border-oxford/10 transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
                             }`}
                         >
                           {d === 'ALL' ? 'Any' : d}
@@ -206,14 +236,14 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                       ))}
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <span className="type-meta text-oxford/45">Review band</span>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col gap-phi-2">
+                    <span className="type-meta uppercase tracking-[0.12em] text-oxford/45">Review band</span>
+                    <div className="flex flex-wrap gap-phi-2">
                       {['ALL', 'STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'].map((r) => (
                         <button
                           key={r}
                           onClick={() => setReviewFilter(r as ReviewFilter)}
-                          className={`type-meta px-3 min-h-[36px] border border-oxford/10 transition-colors ${reviewFilter === r ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
+                          className={`type-meta uppercase tracking-[0.12em] px-phi-3 min-h-[34px] border border-oxford/10 transition-colors ${reviewFilter === r ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
                             }`}
                         >
                           {r === 'ALL' ? 'Any' : r}
@@ -243,32 +273,22 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
 
       <motion.div
         key={`${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
-        className="flex flex-col relative"
-        layout
+        className="flex flex-col relative [contain:layout_style]"
         initial={reduceMotion ? false : 'hidden'}
         animate="visible"
-        variants={reduceMotion ? {} : {
-          hidden: {},
-          visible: { transition: { staggerChildren: 0.04, delayChildren: 0.05 } },
-        }}
+        variants={listContainerVariants}
       >
         {ordered.map((startup) => {
           const isSelected = selectedId === startup.id;
           const reviewBand = getReviewerVerdict(startup);
           const decisionVariant = getDecisionBadgeVariant(startup);
-          const confidence = startup.scout.confidence ?? 0;
           const displayIndex = (stableIndex.get(startup.id) ?? 0).toString().padStart(2, '0');
 
           return (
             <motion.div
               key={startup.id}
-              layout
-              variants={reduceMotion ? {} : {
-                hidden: { opacity: 0, x: -8 },
-                visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: tokens.motion.ease } },
-              }}
-              transition={{ layout: { duration: reduceMotion ? 0 : 0.24, ease: tokens.motion.ease } }}
-              className={`group relative border-b border-oxford/[0.06] px-phi-3 cursor-pointer transition-[padding,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${isSelected ? 'bg-registerTint py-phi-5' : 'hover:bg-oxford/[0.02] py-phi-4'
+              variants={rowVariants}
+              className={`group relative border-b border-oxford/[0.06] px-phi-4 py-phi-5 cursor-pointer transition-[background-color] duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.012]'
                 }`}
               onClick={() => onStartupClick(startup)}
               onKeyDown={(e) => {
@@ -283,7 +303,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
               aria-pressed={isSelected}
               aria-label={`Open memo for ${startup.scout.name}`}
             >
-              <div className="grid grid-cols-1 sm:grid-cols-[26px_minmax(0,1fr)_auto] gap-x-phi-3 gap-y-phi-3 items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-[26px_minmax(0,1fr)_auto] gap-x-phi-4 gap-y-phi-3 items-start">
                 {/* Index */}
                 <span className="type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums pt-px sm:col-start-1">
                   {displayIndex}
@@ -294,42 +314,47 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                   <h2 className="type-body-emphasis text-oxford">
                     {startup.scout.name}
                   </h2>
-                  <div className="flex flex-wrap items-center gap-x-1 mt-phi-2">
+                  <div className="flex flex-wrap items-center gap-x-phi-2 mt-phi-2">
                     {sortKey(startup) && (
-                      <span className="type-meta text-oxford/30 tabular-nums whitespace-nowrap">
+                      <span className="type-meta text-oxford/28 tabular-nums whitespace-nowrap">
                         {new Date(sortKey(startup)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </span>
                     )}
                     {(startup.scout.sector || '').split('/')[0].trim() && (
                       <>
-                        <span className="type-meta text-oxford/20">·</span>
-                        <span className="type-meta text-oxford/30">{(startup.scout.sector || 'Unknown').split('/')[0].trim()}</span>
+                          <span className="type-meta text-oxford/18">·</span>
+                        <span className="type-meta text-oxford/40">{(startup.scout.sector || 'Unknown').split('/')[0].trim()}</span>
                       </>
                     )}
                     {startup.scout.funding_stage && (
                       <>
-                        <span className="type-meta text-oxford/20">·</span>
-                        <span className="type-meta text-oxford/30">{startup.scout.funding_stage}</span>
+                        <span className="type-meta text-oxford/18">·</span>
+                        <span className="type-meta text-oxford/28">{startup.scout.funding_stage}</span>
                       </>
                     )}
-                    <span className="type-meta text-oxford/20">·</span>
-                    <span className="type-meta text-oxford/30 uppercase">{getSourceBadge(startup)}</span>
-                    <span className="type-meta text-oxford/20">·</span>
-                    <span
-                      className="type-meta text-oxford/30 tabular-nums"
-                      title="Scout-stage confidence"
-                      aria-label={`Scout signal ${Math.round(confidence * 100)} percent`}
-                    >
-                      {Math.round(confidence * 100)}%
-                    </span>
-                  </div>
-                  <div className={`overflow-hidden transition-[max-height,opacity,margin] duration-200 ease-out ${isSelected ? 'max-h-24 opacity-100 mt-phi-3' : 'max-h-0 opacity-0'
-                    }`}>
-                    {startup.scout.one_line && (
-                      <p className="type-note italic text-oxford/55">
-                        {startup.scout.one_line}
-                      </p>
+                    {getSourceBadge(startup) === 'LOOKUP' && (
+                      <>
+                        <span className="type-meta text-oxford/18">·</span>
+                        <span className="type-meta tracking-[0.1em]" style={{ color: '#B5893E' }}>LOOKUP</span>
+                      </>
                     )}
+                  </div>
+                  {/* 0fr → 1fr avoids `height: auto` + max-height jank when switching rows */}
+                  <div
+                    className={`grid min-h-0 transition-[grid-template-rows,margin-top] ease-out ${isSelected && startup.scout.one_line ? 'grid-rows-[1fr] mt-phi-3' : 'grid-rows-[0fr] mt-0'
+                      }`}
+                    style={{
+                      transitionDuration: reduceMotion ? '0ms' : '220ms',
+                      transitionTimingFunction: tokens.motion.easeCss,
+                    }}
+                  >
+                    <div className="overflow-hidden min-h-0">
+                      {startup.scout.one_line ? (
+                        <p className="type-note italic text-oxford/55">
+                          {startup.scout.one_line}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
@@ -340,115 +365,103 @@ const WorkGrid = ({ startups, onStartupClick, selectedId }: WorkGridProps): JSX.
                 </div>
               </div>
 
-              {/* Resolve panel */}
-              <AnimatePresence initial={false}>
-                {isSelected && (() => {
-                  const rs = getRS(startup.id);
-                  return (
-                    <motion.div
-                      key="decision-panel"
-                      layout
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.25, ease: 'easeOut' }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="mt-phi-3 pt-phi-3 border-t border-oxford/[0.06] space-y-phi-4">
-                        {rs.resolved ? (
-                          <div className="flex items-start gap-phi-4">
-                            <DecisionBadge variant={
-                              rs.decision === 'YES' ? 'INVEST' : rs.decision === 'NO' ? 'PASS' : 'MONITOR'
-                            } />
-                            {rs.notes && (
-                              <span className="type-meta text-oxford/40 leading-relaxed">{rs.notes}</span>
-                            )}
-                          </div>
-                        ) : (
-                          <>
-                            <div className="bg-oxford/[0.02] px-phi-2 py-phi-2">
-                              <div className="flex flex-wrap items-center justify-between gap-phi-3">
-                                <div className="flex items-center gap-phi-2">
-                                  <span className="type-meta text-oxford/35 uppercase tracking-[0.16em] shrink-0">Decision</span>
-                                  <span className="type-meta text-oxford/25">Select outcome</span>
+              {/* Resolve panel: animate layout height, not only opacity, to avoid instant collapse. */}
+              <div
+                className={`grid min-h-0 transition-[grid-template-rows] ease-out ${isSelected ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+                style={{
+                  transitionDuration: reduceMotion ? '0ms' : '220ms',
+                  transitionTimingFunction: tokens.motion.easeCss,
+                }}
+                aria-hidden={!isSelected}
+              >
+                <div className={`min-h-0 overflow-hidden ${isSelected ? '' : 'pointer-events-none'}`}>
+                  <AnimatePresence initial={false}>
+                    {isSelected && (() => {
+                      const rs = getRS(startup.id);
+                      return (
+                        <motion.div
+                          key="decision-panel"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={decisionPanelTransition}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="mt-phi-3 pt-phi-3 border-t border-oxford/[0.06] space-y-phi-4">
+                            {rs.resolved ? (
+                              <motion.div
+                                className="flex items-start gap-phi-4"
+                                initial={reduceMotion ? false : { opacity: 0, x: -6 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={transitionOrReduced(reduceMotion, { duration: 0.3, ease: tokens.motion.ease })}
+                              >
+                                <DecisionBadge variant={
+                                  rs.decision === 'YES' ? 'INVEST' : rs.decision === 'NO' ? 'PASS' : 'MONITOR'
+                                } />
+                                {rs.notes && (
+                                  <span className="type-meta text-oxford/40 leading-relaxed">{rs.notes}</span>
+                                )}
+                              </motion.div>
+                            ) : (
+                              <div className="space-y-phi-3">
+                                <div className="flex flex-wrap items-center gap-x-phi-4 gap-y-phi-2">
+                                  <span className="type-meta text-oxford/45 uppercase tracking-[0.12em] shrink-0">Decision</span>
+                                  {([
+                                    { d: 'YES' as const, label: 'Invest' },
+                                    { d: 'NO' as const, label: 'Pass' },
+                                    { d: 'MAYBE' as const, label: 'Monitor' },
+                                  ] as const).map(({ d, label }) => {
+                                    const isActive = rs.decision === d;
+                                    return (
+                                      <button
+                                        key={d}
+                                        type="button"
+                                        onClick={() => setRS(startup.id, { decision: isActive ? null : d, notes: isActive ? '' : rs.notes })}
+                                        aria-pressed={isActive}
+                                        className={`type-meta uppercase tracking-[0.12em] min-h-[34px] border-b transition-[color,border-color] duration-150 btn-interaction ${isActive ? 'border-oxford text-oxford font-semibold' : 'border-transparent text-oxford/38 hover:border-oxford/20 hover:text-oxford/70'}`}
+                                      >
+                                        {label}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                                 {rs.decision && (
-                                  <span className="type-meta text-oxford/45 uppercase tracking-[0.12em]">
-                                    {rs.decision === 'YES' ? 'Invest selected' : rs.decision === 'NO' ? 'Pass selected' : 'Monitor selected'}
-                                  </span>
+                                  <div className="flex flex-wrap items-end gap-x-phi-4 gap-y-phi-2">
+                                    <textarea
+                                      value={rs.notes}
+                                      onChange={(e) => setRS(startup.id, { notes: e.target.value })}
+                                      placeholder="Rationale..."
+                                      aria-label={`Decision rationale for ${startup.scout.name}`}
+                                      autoFocus
+                                      rows={1}
+                                      className="w-full sm:flex-1 bg-transparent border-0 border-b border-oxford/10 py-phi-1 type-meta text-oxford/80 placeholder:text-oxford/20 outline-none focus:border-oxford/30 transition-colors resize-none tracking-[0.04em]"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirm(startup.id)}
+                                      disabled={rs.notes.trim().length < 5}
+                                      className="type-meta text-oxford/65 hover:text-oxford transition-colors disabled:opacity-20 tracking-[0.12em] inline-flex items-center min-h-[34px] whitespace-nowrap"
+                                    >
+                                      Confirm →
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setRS(startup.id, emptyRowState())}
+                                      className="type-meta text-oxford/30 hover:text-oxford/60 transition-colors tracking-[0.12em] inline-flex items-center min-h-[34px]"
+                                    >
+                                      Clear
+                                    </button>
+                                  </div>
                                 )}
                               </div>
-                              <div className="mt-phi-2 grid grid-cols-1 sm:grid-cols-3 gap-phi-1.5">
-                                {([
-                                  { d: 'YES' as const, label: 'Invest' },
-                                  { d: 'NO' as const, label: 'Pass' },
-                                  { d: 'MAYBE' as const, label: 'Monitor' },
-                                ] as const).map(({ d, label }) => {
-                                  const isActive = rs.decision === d;
-                                  const activeClass = d === 'YES'
-                                    ? 'bg-oxford border-oxford text-paper'
-                                    : d === 'NO'
-                                      ? 'border-oxford/45 text-oxford/75 bg-paper'
-                                      : 'border-oxford/35 text-oxford/75 bg-paper';
-                                  return (
-                                    <button
-                                      key={d}
-                                      type="button"
-                                      onClick={() => setRS(startup.id, { decision: isActive ? null : d, notes: isActive ? '' : rs.notes })}
-                                      aria-pressed={isActive}
-                                      className={`type-meta tracking-[0.1em] uppercase border px-phi-2.5 py-phi-1 transition-all duration-150 btn-interaction inline-flex items-center justify-center min-h-[34px] ${isActive ? activeClass : 'border-oxford/15 text-oxford/45 hover:border-oxford/35 hover:text-oxford/75 bg-transparent'}`}
-                                    >
-                                      {label}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                            <AnimatePresence>
-                              {rs.decision && (
-                                <motion.div
-                                  key="notes-row"
-                                  initial={{ opacity: 0, y: -4 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -4 }}
-                                  transition={{ duration: 0.18, ease: 'easeOut' }}
-                                  className="flex flex-wrap items-end gap-phi-4"
-                                >
-                                  <textarea
-                                    value={rs.notes}
-                                    onChange={(e) => setRS(startup.id, { notes: e.target.value })}
-                                    placeholder="Rationale..."
-                                    aria-label={`Decision rationale for ${startup.scout.name}`}
-                                    autoFocus
-                                    rows={1}
-                                    className="w-full sm:flex-1 bg-transparent border-0 border-b border-oxford/10 py-phi-1 type-meta text-oxford/80 placeholder:text-oxford/20 outline-none focus:border-oxford/30 transition-colors resize-none tracking-[0.04em]"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => handleConfirm(startup.id)}
-                                    disabled={rs.notes.trim().length < 5}
-                                    className="type-meta text-oxford/65 hover:text-oxford transition-colors disabled:opacity-20 tracking-[0.12em] inline-flex items-center min-h-[36px] whitespace-nowrap"
-                                  >
-                                    Confirm →
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setRS(startup.id, emptyRowState())}
-                                    aria-label={`Clear escalation resolution for ${startup.scout.name}`}
-                                    className="type-meta text-oxford/30 hover:text-oxford/60 transition-colors tracking-[0.12em] inline-flex items-center min-h-[36px]"
-                                  >
-                                    ×
-                                  </button>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })()}
-              </AnimatePresence>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    })()}
+                  </AnimatePresence>
+                </div>
+              </div>
             </motion.div>
           );
         })}

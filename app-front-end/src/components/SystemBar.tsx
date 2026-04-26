@@ -30,6 +30,10 @@ function SpineRule() {
   );
 }
 
+function EmbeddedRule() {
+  return <div className="mx-1 h-px bg-white/[0.07]" aria-hidden />;
+}
+
 function SpineNavButton({
   label,
   active,
@@ -50,7 +54,7 @@ function SpineNavButton({
       type="button"
       onClick={onClick}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`type-meta w-full flex items-center justify-start px-2 cursor-pointer tracking-[0.06em] btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 ${
+      className={`group type-meta w-full flex items-center justify-between gap-phi-3 px-1 cursor-pointer tracking-[0.06em] btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 ${
         active ? 'text-white' : 'text-white/55 hover:text-white/88'
       } ${compact ? 'min-h-[32px]' : 'min-h-[44px]'}`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
@@ -59,11 +63,21 @@ function SpineNavButton({
     >
       <span
         className={`inline-block px-2 py-1 transition-[background-color,color] ${
-          active ? 'bg-white/[0.08]' : 'hover:bg-white/[0.05]'
+          active ? 'bg-white/[0.08]' : 'group-hover:bg-white/[0.05]'
         }`}
       >
         {label}
       </span>
+      {shortcut ? (
+        <span
+          className={`tabular-nums transition-colors ${
+            active ? 'text-white/75' : 'text-white/30 group-hover:text-white/52'
+          }`}
+          aria-hidden
+        >
+          {shortcut.padStart(2, '0')}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -173,15 +187,14 @@ export default function SystemBar({
   // Compact card inside the left aside column. No entrance animation needed.
   if (isEmbedded) {
     return (
-      <>
-        <div
-          className="hidden lg:flex flex-col h-full w-full bg-oxford border border-white/[0.08] overflow-hidden"
-          style={{ padding: '14px 14px 12px' }}
-          aria-label="System"
-        >
+      <div
+        className="hidden lg:flex flex-col h-full w-full bg-oxford border border-white/[0.08] overflow-hidden"
+        style={{ padding: '14px 14px 12px' }}
+        aria-label="System"
+      >
           {/* Top: wordmark + time */}
           <div className="flex items-baseline justify-between gap-2 shrink-0 px-1">
-            <p className="font-wordmark font-normal text-[14px] leading-none tracking-[0.01em] text-white/75">
+            <p className="font-wordmark font-normal text-[18px] leading-none tracking-[0.01em] text-paper">
               Aethria
             </p>
             <span className="type-meta tabular-nums leading-none text-white/40">
@@ -189,19 +202,13 @@ export default function SystemBar({
             </span>
           </div>
 
-          {/* Account */}
-          <div className="mt-phi-3 shrink-0 px-1">
-            <span
-              className="type-meta truncate max-w-full text-white/50 block"
-              title={displayName}
-            >
-              {displayName}
-            </span>
+          <div className="mt-phi-4">
+            <EmbeddedRule />
           </div>
 
-          {/* Nav — workspace chrome only */}
-          {workspaceChrome ? (
-            <div className="mt-phi-3 flex flex-col gap-0.5 w-full shrink-0">
+        {/* Nav — workspace chrome only */}
+        {workspaceChrome ? (
+          <div className="mt-phi-4 flex flex-col gap-0.5 w-full shrink-0">
               <SpineNavButton
                 label="Deals"
                 active={rightPanel !== 'system' && rightPanel !== 'feed'}
@@ -226,44 +233,9 @@ export default function SystemBar({
                 shortcut="3"
                 compact
               />
-            </div>
-          ) : null}
-
-          {/* Bottom: settings + logout */}
-          <div className="mt-auto pt-phi-3 flex flex-col gap-phi-2 shrink-0 px-1">
-            {navLink ? (
-              <Link
-                to={navLink.href}
-                className="type-meta text-white/45 hover:text-white/80 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
-              >
-                {navLink.label}
-              </Link>
-            ) : null}
-            {agentActionError ? (
-              <p className="type-meta text-white/65" role="status" aria-live="polite">
-                {agentActionError}
-              </p>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setShowLogoutModal(true)}
-              disabled={agentActionPending}
-              className="type-meta text-left text-white/40 hover:text-white/75 bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
-            >
-              {agentActionPending ? 'Updating…' : 'Log out'}
-            </button>
           </div>
-        </div>
-
-        <AgentLogoutModal
-          open={showLogoutModal}
-          agentsEnabled={agentsEnabled}
-          onCancel={() => setShowLogoutModal(false)}
-          onKeepRunning={() => { setShowLogoutModal(false); doLogout(); }}
-          onTurnOffAndLogout={async () => { await toggleAgentsAndLogout(false); }}
-          onTurnOnAndStay={async () => { await toggleAgentsAndLogout(true); }}
-        />
-      </>
+        ) : null}
+      </div>
     );
   }
 
