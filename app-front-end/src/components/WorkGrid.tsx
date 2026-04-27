@@ -291,17 +291,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds: _watchli
               className={`group relative border-b border-oxford/[0.06] px-phi-4 py-phi-5 cursor-pointer transition-[background-color] duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.012]'
                 }`}
               onClick={() => onStartupClick(startup)}
-              onKeyDown={(e) => {
-                if (e.target !== e.currentTarget) return;
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onStartupClick(startup);
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              aria-pressed={isSelected}
-              aria-label={`Open memo for ${startup.scout.name}`}
+              role="group"
+              aria-label={`Startup row for ${startup.scout.name}`}
             >
               <div className="grid grid-cols-1 sm:grid-cols-[26px_minmax(0,1fr)_auto] gap-x-phi-4 gap-y-phi-3 items-start">
                 {/* Index */}

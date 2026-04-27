@@ -58,7 +58,6 @@ export default function AgentDispatch({
       {/* ── Status header ───────────────────────────────────────── */}
       <div
         className={`w-full flex items-center gap-phi-3 px-phi-4 ${alwaysOpen ? 'min-h-[36px]' : 'min-h-[44px] border-t border-oxford/[0.08]'}`}
-        aria-expanded={isExpanded}
       >
         <span className="type-meta uppercase tracking-[0.12em] text-oxford/40 group-hover/trigger:text-oxford/65 transition-colors shrink-0">
           Dispatch
@@ -66,8 +65,7 @@ export default function AgentDispatch({
 
         {/* Rule — pulses when active */}
         <span
-          className="flex-1 h-px bg-oxford/[0.06]"
-          style={isActive ? { animation: 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite' } : undefined}
+          className={`flex-1 h-px bg-oxford/[0.06] ${isActive ? 'pulse-soft' : ''}`}
           aria-hidden
         />
 
@@ -75,8 +73,7 @@ export default function AgentDispatch({
         <span className="flex items-center gap-phi-2 shrink-0">
           {isActive && (
             <span
-              className="h-1.5 w-1.5 shrink-0 bg-oxford/40"
-              style={{ animation: 'aethria-pulse 1.5s cubic-bezier(0.16,1,0.3,1) infinite' }}
+              className="h-1.5 w-1.5 shrink-0 bg-oxford/40 pulse-fast"
               aria-hidden
             />
           )}
@@ -126,8 +123,7 @@ export default function AgentDispatch({
               {/* Animated underline while running */}
               {isBusy && (
                 <span
-                  className="absolute bottom-0 left-0 h-px w-full bg-oxford/30"
-                  style={{ animation: 'aethria-pulse 1.5s cubic-bezier(0.16,1,0.3,1) infinite' }}
+                  className="absolute bottom-0 left-0 h-px w-full bg-oxford/30 pulse-fast"
                   aria-hidden
                 />
               )}
@@ -139,8 +135,7 @@ export default function AgentDispatch({
                 {lookupMessage ? (
                   <p className="type-meta text-oxford/55 flex items-center gap-phi-2 min-w-0">
                     <span
-                      className="h-1.5 w-1.5 shrink-0 bg-oxford/35"
-                      style={{ animation: 'aethria-pulse 1.5s cubic-bezier(0.16,1,0.3,1) infinite' }}
+                      className="h-1.5 w-1.5 shrink-0 bg-oxford/35 pulse-fast"
                       aria-hidden
                     />
                     <span className="truncate">{lookupMessage}</span>
@@ -157,7 +152,7 @@ export default function AgentDispatch({
                   type="button"
                   onClick={onSubmit}
                   disabled={!input.trim()}
-                  className="shrink-0 inline-flex items-center gap-phi-2 type-meta uppercase tracking-[0.12em] text-oxford/45 hover:text-oxford disabled:opacity-20 transition-colors btn-interaction"
+                  className="group shrink-0 inline-flex items-center gap-phi-2 type-meta uppercase tracking-[0.12em] text-oxford/45 hover:text-oxford disabled:opacity-20 transition-colors btn-interaction"
                 >
                   Run
                   <span className="transition-transform group-hover:translate-x-px">→</span>
@@ -179,14 +174,7 @@ export default function AgentDispatch({
                       <div className="h-px w-full bg-oxford/[0.06] relative overflow-hidden">
                         {(isCurrentPhase || isPast) && (
                           <span
-                            className={`absolute inset-0 h-full origin-left ${
-                              isPast ? 'bg-oxford/15' : 'bg-oxford/35'
-                            }`}
-                            style={
-                              isCurrentPhase
-                                ? { animation: 'aethria-pulse 1.5s cubic-bezier(0.16,1,0.3,1) infinite' }
-                                : undefined
-                            }
+                            className={`absolute inset-0 h-full origin-left ${isPast ? 'bg-oxford/15' : 'bg-oxford/35'} ${isCurrentPhase ? 'pulse-fast' : ''}`}
                           />
                         )}
                       </div>

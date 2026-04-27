@@ -470,21 +470,13 @@
     color: rgba(242, 240, 234, 0.25);
   }
 
-  /** Full-width rule with centred 4×4 diamond — Lazard-style section break */
+  /** Full-width rule (institutional plain divider) */
   .doc-rule-with-diamond {
     border-top: 1px solid var(--section-divider);
     position: relative;
   }
   .doc-rule-with-diamond::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 0;
-    width: 4px;
-    height: 4px;
-    background: var(--section-diamond);
-    transform: translate(-50%, -50%) rotate(45deg);
-    pointer-events: none;
+    content: none;
   }
 
   /** 1px Oxford-tinted horizontal rules (alternative to Tailwind border-b/t). */
@@ -648,4 +640,25 @@
 .underline-draw {
   transform-origin: left;
   animation: underline-draw 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.pulse-soft {
+  animation: aethria-pulse 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.pulse-fast {
+  animation: aethria-pulse 1.5s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .escalation-pulse,
+  .escalation-dot-active,
+  .skeleton-shimmer,
+  .page-transition-enter,
+  .signal-dot-breathe,
+  .underline-draw,
+  .pulse-soft,
+  .pulse-fast {
+    animation: none !important;
+  }
 }

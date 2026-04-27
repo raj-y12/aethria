@@ -22,7 +22,7 @@ export function WorkGridSkeleton() {
     <div className="w-full space-y-4 px-0 pt-3 pb-8 lg:pb-9">
       {[1, 2, 3, 4].map((i) => (
         <div key={i} className="flex gap-5 border border-hairline bg-paper p-5">
-          <SkeletonBlock className="w-12 h-12 shrink-0 rounded-full" />
+          <SkeletonBlock className="w-12 h-12 shrink-0 rounded-none" />
           <div className="flex-1 min-w-0 space-y-3">
             <SkeletonLine className="w-3/4 max-w-[200px]" />
             <SkeletonLine className="w-1/2 max-w-[120px]" />

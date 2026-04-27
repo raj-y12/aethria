@@ -522,7 +522,7 @@ export default function MainLayout({
 
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 pb-phi-5 lg:px-phi-5 lg:pt-phi-5 lg:pb-phi-5">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(260px,20%)_minmax(420px,35%)_minmax(560px,45%)] min-h-0 overflow-hidden gap-phi-6 lg:gap-phi-6">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.95fr)_minmax(360px,1.1fr)_minmax(0,1.45fr)] min-h-0 overflow-hidden gap-phi-6 lg:gap-phi-6">
             <aside className="hidden lg:grid min-w-0 min-h-0 grid-rows-[minmax(150px,1fr)_auto_auto_auto_auto] gap-phi-4 overflow-hidden">
               <div className="min-h-0 h-full">
                 <SystemBar
@@ -558,8 +558,7 @@ export default function MainLayout({
                   <div className="relative inline-flex items-center gap-phi-2">
                     {pipelineStateLabel === 'On' && (
                       <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/50"
-                        style={{ animation: 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite' }}
+                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/50 pulse-soft"
                         aria-hidden
                       />
                     )}
@@ -630,7 +629,7 @@ export default function MainLayout({
                   {hasThesis && (
                     <span className="shrink-0 inline-flex items-center gap-phi-2 mt-px">
                       <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-full bg-oxford/70 signal-dot-breathe"
+                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/70"
                         style={{ boxShadow: '0 0 0 2px rgba(16,26,43,0.08)' }}
                         aria-hidden
                       />
@@ -669,10 +668,7 @@ export default function MainLayout({
                       <span className="relative inline-flex items-center gap-phi-2">
                         {pipelineStateLabel === 'On' && (
                           <span
-                            className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60"
-                            style={{
-                              animation: 'aethria-pulse 2.4s cubic-bezier(0.16,1,0.3,1) infinite',
-                            }}
+                            className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60 pulse-soft"
                             aria-hidden
                           />
                         )}
@@ -741,7 +737,7 @@ export default function MainLayout({
                     {hasThesis && (
                       <span className="inline-flex items-center gap-phi-1">
                         <span
-                          className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
+                          className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford"
                           style={{ opacity: 0.6 }}
                           aria-hidden
                         />
