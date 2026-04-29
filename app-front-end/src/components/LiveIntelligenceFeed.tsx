@@ -4,6 +4,7 @@ import { tokens } from '../design-system/tokens';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import type { Startup, SignalItem, MetaCycleReport } from '../types/startup';
+import { formatReviewOverallStructuredScore } from '../lib/reviewScoring';
 import DecisionBadge from './DecisionBadge';
 import SignalEventRow from './SignalEventRow';
 import EmptyState from './EmptyState';
@@ -50,6 +51,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
       }
       if (s.timestamps?.reviewed_at) {
         const d = s.timestamps.reviewed_at;
+        const overall = formatReviewOverallStructuredScore(s.review);
         out.push({
           id: `${s.id}-review`,
           iso: d,
@@ -59,7 +61,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
             minute: '2-digit',
             second: '2-digit',
           }),
-          message: `${s.scout.name} · M${s.review?.market_score ?? '—'}/T${s.review?.technical_score ?? '—'}`,
+          message: `${s.scout.name} · Score ${overall}/10`,
           kind: 'reviewed',
         });
       }

@@ -82,6 +82,17 @@ class SingleReview(BaseModel):
     defensibility_confidence: Optional[Literal["low", "medium", "high"]] = None
     # Optional hash of the prompt used by this reviewer instance.
     prompt_version: Optional[str] = None
+    structured_scoring: Optional[Dict[str, Any]] = None
+    # Normalized extraction payload (auditable input to deterministic scoring).
+    structured_signals: Optional[Dict[str, Any]] = None
+
+
+class AethriaView(BaseModel):
+    """Single synthesized committee-facing view derived from persisted review artifacts (template v1)."""
+    headline: str = ""
+    thesis_fit_line: str = ""
+    tension_summary: str = ""
+    focal_question: str = ""
 
 
 class ReviewInfo(BaseModel):
@@ -149,6 +160,14 @@ class ReviewInfo(BaseModel):
     weighted_defensibility_score: Optional[float] = None
     # Confidence-adjusted score: S_bar × (1 − reviewer_delta/10); penalises high disagreement
     confidence_adjusted_score: Optional[float] = None
+    structured_scoring: Optional[Dict[str, Any]] = None
+    # Primary-row normalized structured_signals (DefaultReviewer when present).
+    structured_signals: Optional[Dict[str, Any]] = None
+    # Resolution layer notes when personas diverge materially.
+    resolution_notes: Optional[List[str]] = None
+    disagreement_summary: Optional[str] = None
+    # Unified narrative from template (no extra LLM in v1).
+    aethria_view: Optional[AethriaView] = None
 
 
 class PartnerSnapshot(BaseModel):
@@ -177,6 +196,7 @@ class PartnerInfo(BaseModel):
     partnered_at: datetime = Field(default_factory=datetime.now)
     llm_fallback_reason: Optional[str] = None
     prompt_version: Optional[str] = None
+    decision_drivers: Optional[List[str]] = None
 
 
 class Financials(BaseModel):

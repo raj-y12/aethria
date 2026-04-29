@@ -110,6 +110,7 @@ class MetaAgent:
             "cycle_number": cycle_number,
             "ran_at": now.isoformat(),
             "signal_summary": signal,
+            "prompt_proposals": mutations,
             "mutations_applied": mutations,
             "weight_updates": weight_updates,
             "calibration_changes": calibrations,
@@ -119,7 +120,7 @@ class MetaAgent:
         _append_to_json_list(_REPORTS_PATH, report, self.user_id)
 
         self.logger.info(
-            "[MetaAgent] Cycle %s complete. %s mutations, %s reweightings, %s calibrations.",
+            "[MetaAgent] Cycle %s complete. %s prompt_proposals, %s reweightings, %s calibrations.",
             cycle_number,
             len(mutations),
             len(weight_updates),

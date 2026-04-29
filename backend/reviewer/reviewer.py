@@ -12,9 +12,9 @@ class DefaultReviewer(Reviewer):
     Uses the base Reviewer with standard evaluation criteria.
     """
     
-    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
         self.reviewer_type = "default"
-        super().__init__(api_key, model=model)
+        super().__init__(api_key, model=model, tenant_user_id=tenant_user_id)
 
     async def review(self, scout_output: dict) -> Optional[ReviewerOutput]:
         """Review a Scout discovery using the base implementation."""

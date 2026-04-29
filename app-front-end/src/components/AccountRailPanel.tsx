@@ -1,8 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { useClerk, useUser } from '@clerk/react';
-import { useAgentsEnabled } from '../hooks/useAgentsEnabled';
-import { toggleAgents } from '../api/agents';
+import { Link } from 'react-router';
+import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import AgentLogoutModal from './AgentLogoutModal';
 
 interface AccountRailPanelProps {
@@ -10,32 +7,13 @@ interface AccountRailPanelProps {
 }
 
 export default function AccountRailPanel({ settingsPath }: AccountRailPanelProps) {
-  const navigate = useNavigate();
-  const { user } = useUser();
-  const { signOut } = useClerk();
-  const agentsEnabled = useAgentsEnabled();
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [agentActionPending, setAgentActionPending] = useState(false);
-  const [agentActionError, setAgentActionError] = useState<string | null>(null);
-  const displayName = user?.username ?? user?.primaryEmailAddress?.emailAddress ?? 'Account';
-
-  const doLogout = () => {
-    localStorage.removeItem('aethria_last_activity');
-    signOut?.().then(() => navigate('/sign-in', { replace: true }));
-  };
-
-  const toggleAgentsAndLogout = async (enabled: boolean) => {
-    setAgentActionPending(true);
-    setAgentActionError(null);
-    try {
-      await toggleAgents(enabled);
-      doLogout();
-    } catch {
-      setAgentActionError('Unable to update agent state. Please retry.');
-    } finally {
-      setAgentActionPending(false);
-    }
-  };
+  const {
+    displayName,
+    agentActionPending,
+    agentActionError,
+    requestLogout,
+    logoutModalProps,
+  } = useAgentLogoutFlow();
 
   return (
     <>
@@ -44,10 +22,13 @@ export default function AccountRailPanel({ settingsPath }: AccountRailPanelProps
         className="shrink-0 bg-paper border border-oxford/[0.08] px-phi-4 py-phi-3"
       >
         <div className="flex items-center gap-phi-3">
-          <p className="type-meta text-oxford/35 uppercase tracking-[0.1em]">Account</p>
+          <p className="type-meta text-oxford/35 tracking-[0.08em]">Account</p>
         </div>
 
-        <p className="mt-phi-2 type-body-sm font-semibold uppercase tracking-[0.08em] leading-tight text-oxford truncate" title={displayName}>
+        <p
+          className="mt-phi-2 type-body-sm font-semibold tracking-[0.04em] leading-tight text-oxford truncate"
+          title={displayName}
+        >
           {displayName}
         </p>
 
@@ -58,10 +39,12 @@ export default function AccountRailPanel({ settingsPath }: AccountRailPanelProps
           >
             Settings
           </Link>
-          <span className="type-meta text-oxford/20" aria-hidden>/</span>
+          <span className="type-meta text-oxford/20" aria-hidden>
+            /
+          </span>
           <button
             type="button"
-            onClick={() => setShowLogoutModal(true)}
+            onClick={requestLogout}
             disabled={agentActionPending}
             className="type-meta text-oxford/38 hover:text-oxford/70 bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction disabled:opacity-50"
           >
@@ -76,14 +59,7 @@ export default function AccountRailPanel({ settingsPath }: AccountRailPanelProps
         ) : null}
       </section>
 
-      <AgentLogoutModal
-        open={showLogoutModal}
-        agentsEnabled={agentsEnabled}
-        onCancel={() => setShowLogoutModal(false)}
-        onKeepRunning={() => { setShowLogoutModal(false); doLogout(); }}
-        onTurnOffAndLogout={async () => { await toggleAgentsAndLogout(false); }}
-        onTurnOnAndStay={async () => { await toggleAgentsAndLogout(true); }}
-      />
+      <AgentLogoutModal {...logoutModalProps} />
     </>
   );
 }

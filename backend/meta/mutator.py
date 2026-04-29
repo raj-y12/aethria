@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from utils.prompt_version import hash_prompt
 from supabase_doc_store import doc_get, doc_set, list_get_all, list_append_only
+from meta.prompt_gating import PROMPT_LIBRARY_DATA_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,56 @@ Return ONLY a JSON object with two fields:
   "new_prompt": "the full rewritten system prompt",
   "reasoning": "one paragraph explaining exactly what changed and why"
 }"""
+
+
+def _prompt_validation_limits() -> Dict[str, Any]:
+    def _i(name: str, default: str) -> int:
+        try:
+            return int(os.getenv(name, default))
+        except ValueError:
+            return int(default)
+
+    def _f(name: str, default: str) -> float:
+        try:
+            return float(os.getenv(name, default))
+        except ValueError:
+            return float(default)
+
+    return {
+        "max_chars": _i("META_AGENT_PROMPT_MAX_CHARS", "32000"),
+        "max_lines": _i("META_AGENT_PROMPT_MAX_LINES", "500"),
+        "min_ratio": _f("META_AGENT_PROMPT_MIN_LENGTH_RATIO", "0.85"),
+        "max_growth": _f("META_AGENT_PROMPT_MAX_GROWTH_RATIO", "2.5"),
+    }
+
+
+def validate_mutated_prompt(
+    new_prompt: str,
+    current_prompt: str,
+    *,
+    max_chars: int,
+    max_lines: int,
+    min_ratio: float,
+    max_growth: float,
+) -> Optional[str]:
+    """
+    Return an error reason string if invalid, else None.
+    """
+    if not new_prompt or not str(new_prompt).strip():
+        return "empty_prompt"
+    text = str(new_prompt)
+    if len(text) > max_chars:
+        return f"exceeds_max_chars:{len(text)}>{max_chars}"
+    lines = text.count("\n") + (1 if text else 0)
+    if lines > max_lines:
+        return f"exceeds_max_lines:{lines}>{max_lines}"
+    cur = (current_prompt or "").strip()
+    if cur:
+        if len(text) < len(cur) * min_ratio:
+            return f"shorter_than_min_ratio:{len(text)/len(cur):.2f}<{min_ratio}"
+        if len(text) > len(cur) * max_growth:
+            return f"longer_than_max_growth:{len(text)/len(cur):.2f}>{max_growth}"
+    return None
 
 
 def _read_json_list(path: Path, user_id: str) -> list:
@@ -54,7 +105,7 @@ def _read_json_list(path: Path, user_id: str) -> list:
 
 def _read_json_dict(path: Path, user_id: str) -> dict:
     if path and "prompt_library" in str(path):
-        data = doc_get(_PROMPT_LIBRARY_TABLE, user_id=user_id)
+        data = doc_get(_PROMPT_LIBRARY_TABLE, PROMPT_LIBRARY_DATA_KEY, user_id=user_id)
         return data if isinstance(data, dict) else {}
     if not path.exists():
         return {}
@@ -72,7 +123,7 @@ def _read_json_dict(path: Path, user_id: str) -> dict:
 
 def _atomic_write(path: Path, data: Any, user_id: str) -> None:
     if path and "prompt_library" in str(path):
-        doc_set(_PROMPT_LIBRARY_TABLE, data, user_id=user_id)
+        doc_set(_PROMPT_LIBRARY_TABLE, data, PROMPT_LIBRARY_DATA_KEY, user_id=user_id)
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(".tmp")
@@ -108,6 +159,9 @@ class PromptMutator:
         self.api_key = os.getenv("OPENAI_API_KEY", "")
         self._client = None
         self._executor = ThreadPoolExecutor(max_workers=2)
+        self._auto_apply_prompts = (
+            os.getenv("META_AGENT_PROMPT_AUTO_APPLY", "false").lower() == "true"
+        )
 
     def _get_client(self):
         if self._client is None and self.api_key:
@@ -182,7 +236,7 @@ class PromptMutator:
         scout_engine,
         reviewer_engine,
     ) -> List[Dict]:
-        """Rewrite prompts via LLM and apply to live agents. Returns PromptMutation records."""
+        """Rewrite prompts via LLM; persist proposals (pending promotion). Optionally live-apply if META_AGENT_PROMPT_AUTO_APPLY=true."""
         mutations = []
         for target in targets:
             try:
@@ -219,6 +273,27 @@ class PromptMutator:
                 "When mutating: add one targeted 'AVOID:' bullet per top rejection keyword to the prompt's "
                 "negative constraints section. Do not add more than 3 new Avoid bullets per mutation.\n"
             )
+        hf = self.signal.get("human_feedback") or {}
+        human_block = ""
+        if hf.get("recent_count"):
+            bo = hf.get("by_outcome") or {}
+            human_block = (
+                f"- Analyst decisions (Invest/Pass/Monitor) — {hf['recent_count']} recent: "
+                f"YES={bo.get('YES', 0)}, NO={bo.get('NO', 0)}, MAYBE={bo.get('MAYBE', 0)}; "
+                f"logged disagreements vs AI at resolve time: {hf.get('disagreed_with_ai_count', 0)}.\n"
+            )
+            samples = hf.get("sample_notes") or []
+            if samples:
+                snippets = " | ".join(
+                    str(s).replace("\n", " ")[:160] for s in samples[:3]
+                )
+                human_block += (
+                    f"- Analyst rationale snippets (mandate alignment, not verbatim copy): {snippets}\n"
+                )
+            human_block += (
+                "- Bias prompt changes toward what analysts actually approve and away from "
+                "recurring pass themes implied above.\n"
+            )
         user_prompt = (
             f"Agent: {agent_name}\n"
             f"Current prompt:\n{current_prompt}\n\n"
@@ -229,6 +304,7 @@ class PromptMutator:
             f"- Top failed assumptions: {pipeline.get('top_failed_assumptions', [])[:5]}\n"
             f"- Top successful thesis patterns: {pipeline.get('top_successful_thesis_patterns', [])[:5]}\n"
             f"- Oversaturated sectors to avoid: {pipeline.get('most_oversaturated_sector', 'none')}\n"
+            f"{human_block}"
             f"{rejection_avoid_block}\n"
             f"Mutate the prompt to address these failure patterns while "
             f"preserving this agent's core cognitive identity."
@@ -239,37 +315,78 @@ class PromptMutator:
             self.logger.warning(f"[Mutator] LLM returned no prompt for {agent_name}")
             return None
 
-        new_hash = hash_prompt(new_prompt)
+        lim = _prompt_validation_limits()
+        reject = validate_mutated_prompt(
+            new_prompt,
+            current_prompt,
+            max_chars=int(lim["max_chars"]),
+            max_lines=int(lim["max_lines"]),
+            min_ratio=float(lim["min_ratio"]),
+            max_growth=float(lim["max_growth"]),
+        )
         now = datetime.now().isoformat()
+        if reject:
+            self.logger.warning(
+                "[Mutator] Rejected prompt for %s: %s", agent_name, reject
+            )
+            _append_to_json_list(
+                _MUTATION_LOG_PATH,
+                {
+                    "type": "prompt_proposal_rejected",
+                    "agent_target": agent_name,
+                    "mutation_type": target["mutation_type"],
+                    "reason": reject,
+                    "cycle_number": self.cycle_number,
+                    "applied_at": now,
+                },
+                self.user_id,
+            )
+            return None
 
-        # Log mutation BEFORE applying (safety constraint)
+        new_hash = hash_prompt(new_prompt)
+        library_key = f"{agent_name}:{new_hash}"
+
         mutation = {
+            "type": "prompt_proposal",
             "mutation_id": str(uuid4()),
             "mutation_type": target["mutation_type"],
             "agent_target": agent_name,
+            "library_key": library_key,
             "previous_prompt_hash": prev_hash,
             "new_prompt_hash": new_hash,
             "reasoning": reasoning,
             "signal_inputs": target.get("signal", {}),
             "applied_at": now,
             "cycle_number": self.cycle_number,
+            "promoted": False,
         }
         _append_to_json_list(_MUTATION_LOG_PATH, mutation, self.user_id)
 
-        # Write to prompt library
         library = _read_json_dict(_PROMPT_LIBRARY_PATH, self.user_id)
-        library[f"{agent_name}:{new_hash}"] = {
+        library[library_key] = {
             "prompt": new_prompt,
             "created_at": now,
             "reasoning": reasoning,
             "cycle_number": self.cycle_number,
             "previous_hash": prev_hash,
+            "promotion_status": "pending",
         }
         _atomic_write(_PROMPT_LIBRARY_PATH, library, self.user_id)
 
-        # Apply to live agent
-        self._set_agent_prompt(agent_name, new_prompt, scout_engine, reviewer_engine)
-        self.logger.info(f"[Mutator] Applied mutation to {agent_name}: {prev_hash} -> {new_hash}")
+        if self._auto_apply_prompts:
+            self._set_agent_prompt(agent_name, new_prompt, scout_engine, reviewer_engine)
+            self.logger.info(
+                "[Mutator] Auto-applied (META_AGENT_PROMPT_AUTO_APPLY) %s: %s -> %s",
+                agent_name,
+                prev_hash,
+                new_hash,
+            )
+        else:
+            self.logger.info(
+                "[Mutator] Saved pending proposal for %s (%s); promote via API to use",
+                agent_name,
+                library_key,
+            )
 
         return mutation
 

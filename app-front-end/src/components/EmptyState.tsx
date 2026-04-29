@@ -21,7 +21,7 @@ interface EmptyStateProps {
 
 export default function EmptyState({ label, body, icon }: EmptyStateProps) {
   return (
-    <div className="flex w-full flex-col items-center justify-center px-4 py-10 text-center sm:px-6">
+    <div className="flex w-full flex-col items-center justify-center px-4 py-10 text-center sm:px-6 empty-state-enter">
       <div className="mb-phi-3 flex h-7 w-7 shrink-0 items-center justify-center text-oxford/25 [&_svg]:h-full [&_svg]:w-full">
         {icon ?? <DefaultMark />}
       </div>

@@ -3,10 +3,7 @@ import { motion, AnimatePresence, animate, useMotionValue, useTransform } from '
 import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { usePrefersReducedMotion } from '../hooks';
-import type { ActivitySummary } from '../api/activity';
-
-const API_BASE =
-  typeof window !== 'undefined' ? (import.meta.env.VITE_API_URL ?? '') : 'http://localhost:8000';
+import { fetchActivitySummaryWithToken, type ActivitySummary } from '../api/activity';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -148,19 +145,20 @@ export default function LoginPage() {
         setActivityLoading(true);
 
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const signInAny = signIn as any;
-          if (typeof signInAny.finalize === 'function') {
-            await signInAny.finalize();
-          } else if (clerk.setActive && signInAny.createdSessionId) {
-            await clerk.setActive({ session: signInAny.createdSessionId });
+          type ClerkSignInInternal = {
+            finalize?: () => Promise<unknown>;
+            createdSessionId?: string;
+          };
+          const signInInternal = signIn as unknown as ClerkSignInInternal;
+          if (typeof signInInternal.finalize === 'function') {
+            await signInInternal.finalize();
+          } else if (clerk.setActive && signInInternal.createdSessionId) {
+            await clerk.setActive({ session: signInInternal.createdSessionId });
           }
           const token = await clerk.session?.getToken();
           if (token) {
-            const res = await fetch(`${API_BASE}/api/activity/summary`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (res.ok) setActivity((await res.json()) as ActivitySummary);
+            const summary = await fetchActivitySummaryWithToken(token);
+            if (summary) setActivity(summary);
           }
         } catch {
           /* activity is optional */

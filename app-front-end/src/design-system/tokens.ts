@@ -111,9 +111,19 @@ export const tokens = {
   },
   frameBorder: '1px solid rgba(0, 33, 71, 0.06)',
   motion: {
+    /** Strong ease-out — UI entering, dropdowns, popovers. Starts fast, feels responsive. */
     ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
-    /** micro: tab switch, menu expand/collapse; short/medium/long: content entrance, panels */
-    duration: { micro: 0.15, short: 0.4, medium: 0.5, long: 0.6 },
+    /** Strong ease-in-out — elements moving across the screen, tab indicators. */
+    easeInOut: [0.77, 0, 0.175, 1] as [number, number, number, number],
+    /** iOS-like drawer curve — drawers, slide-overs. */
+    easeDrawer: [0.32, 0.72, 0, 1] as [number, number, number, number],
+    /**
+     * Duration scale — all UI animations under 300ms except modals/drawers.
+     * micro: button press, tooltip; short: list rows, filters; medium: panels, modals; long: drawers.
+     */
+    duration: { micro: 0.12, short: 0.22, medium: 0.35, long: 0.5 },
     easeCss: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    easeInOutCss: 'cubic-bezier(0.77, 0, 0.175, 1)',
+    easeDrawerCss: 'cubic-bezier(0.32, 0.72, 0, 1)',
   },
 } as const;

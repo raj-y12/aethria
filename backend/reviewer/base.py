@@ -6,8 +6,10 @@ Uses /resources for scoring thresholds, red flag definitions, and evaluation gui
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 import json
+import os
 import logging
 import asyncio
+import re
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI
@@ -18,6 +20,101 @@ from utils.scoring import DEFAULT_SCORE_SOURCE
 
 
 logger = logging.getLogger(__name__)
+MISSING_TOKEN_RE = re.compile(r"^\s*\[?\s*missing(?::[^\]]*)?\]?\s*$", re.IGNORECASE)
+
+
+def _is_missing_token(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return True
+        if MISSING_TOKEN_RE.match(text):
+            return True
+    return False
+
+
+def _strip_missing_tokens_from_list(items: Any) -> list[str]:
+    if not isinstance(items, list):
+        return []
+    out: list[str] = []
+    for item in items:
+        text = str(item).strip()
+        if not _is_missing_token(text):
+            out.append(text)
+    return out
+
+
+def _sanitize_structured_signals(signals: Any) -> dict:
+    if not isinstance(signals, dict):
+        return {}
+    cleaned: dict = {}
+    for dim, components in signals.items():
+        if not isinstance(components, dict):
+            continue
+        cleaned_components: dict = {}
+        for name, comp in components.items():
+            if not isinstance(comp, dict):
+                continue
+            entry = dict(comp)
+            if _is_missing_token(entry.get("label")):
+                entry.pop("label", None)
+                entry["value"] = None
+                entry["confidence"] = 0.2
+            elif _is_missing_token(entry.get("value")):
+                entry["value"] = None
+                entry["confidence"] = 0.2
+            cleaned_components[name] = entry
+        cleaned[dim] = cleaned_components
+    return cleaned
+
+
+_EXPECTED_STRUCTURED_COMPONENTS: Dict[str, tuple[str, ...]] = {
+    "market": ("tam", "growth_rate", "urgency", "timing", "competition"),
+    "execution": ("traction", "growth_velocity", "gtm_effectiveness", "team_execution", "operational_velocity"),
+    "product": ("value_prop", "pain_alignment", "differentiation", "ux", "retention"),
+    "technical": ("complexity", "engineering_quality", "scalability", "data_advantage", "architecture"),
+    "defensibility": ("network_effects", "switching_costs", "proprietary_data", "barriers", "brand"),
+}
+
+
+def _normalize_structured_signals_contract(data: Dict[str, Any]) -> Dict[str, Any]:
+    raw = _sanitize_structured_signals(data.get("structured_signals"))
+    out: Dict[str, Any] = {}
+    for dim, components in _EXPECTED_STRUCTURED_COMPONENTS.items():
+        dim_payload = raw.get(dim, {}) if isinstance(raw.get(dim), dict) else {}
+        dim_reasoning = data.get(f"{dim}_reasoning")
+        evidence = " ".join(str(x).strip() for x in dim_reasoning if str(x).strip()) if isinstance(dim_reasoning, list) else ""
+        out[dim] = {}
+        for comp in components:
+            item = dim_payload.get(comp, {}) if isinstance(dim_payload.get(comp), dict) else {}
+            label = item.get("label")
+            value = item.get("value")
+            if _is_missing_token(label):
+                label = None
+            if _is_missing_token(value):
+                value = None
+            confidence = item.get("confidence")
+            try:
+                conf = max(0.0, min(1.0, float(confidence)))
+            except (TypeError, ValueError):
+                conf = 0.2 if label is None and value is None else 0.5
+            normalized = {
+                "confidence": conf,
+                "reasoning": str(item.get("reasoning") or ""),
+            }
+            if label is not None:
+                normalized["label"] = str(label)
+            else:
+                normalized["value"] = value
+            if item.get("evidence") is not None:
+                normalized["evidence"] = str(item.get("evidence"))
+            elif evidence:
+                normalized["evidence"] = evidence
+            out[dim][comp] = normalized
+    data["structured_signals"] = out
+    return data
 
 
 def _load_reviewer_resources() -> tuple[Dict[str, Any], Dict[str, Any]]:
@@ -58,6 +155,18 @@ def _build_dimensions_block(rubric: Dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _deterministic_scoring_contract_block() -> str:
+    """When structured scoring is enabled platform-wide, clarify LLM ints vs authoritative scores."""
+    if os.getenv("USE_STRUCTURED_SCORING", "true").lower() not in ("1", "true", "yes"):
+        return ""
+    return """
+DETERMINISTIC SCORING (enabled in deployment):
+- Integers market_score … defensibility_score in your JSON are non-authoritative hints for coherence checks only.
+- Final published scores are computed deterministically from structured_signals (extraction → normalization → aggregation).
+- Prioritize accurate, complete structured_signals and qualitative diligence fields; do not tune integers to disagree with your own signals.
+"""
+
+
 def _build_system_prompt(reviewer_rules: Dict[str, Any], rubric: Dict[str, Any]) -> str:
     """Build system prompt from versioned reviewer rules and evaluation rubric (policy_resolver)."""
     red_flags_block = ""
@@ -94,8 +203,10 @@ VERDICT (derived from scores, not subjective):
 
 NARRATIVE AND SCORING:
 - overall_summary must be a concise narrative synthesis for the investment committee. Do NOT list or repeat numeric scores in overall_summary (scores are captured in the scores table and score_reasoning). Write 2-4 sentences summarizing strengths, concerns, and fit; no "X/10" or score phrases in this field.
+- Extract structured_signals as strict JSON evidence with confidences; deterministic scoring runs downstream and sets final scores.
+{_deterministic_scoring_contract_block()}
 - Use bullet points for positives and risks where appropriate. Provide 2-5 bullets per analysis list when content allows.
-- Use [MISSING] when information is absent (e.g. team_analysis: ["[MISSING: founder names, roles, experience]"]).
+- Never emit placeholder strings like [MISSING]. When information is absent, leave list fields empty and rely on confidence + structured_signals null values.
 - Do NOT invent data; only summarize what the Scout provides.
 
 HYPOTHESIS-DRIVEN EVALUATION:
@@ -115,6 +226,47 @@ Be honest and critical. Most ideas should score in the 4-7 range.
 Only truly exceptional opportunities should score 8+. Output ONLY valid JSON; no text before or after."""
 
 
+def _format_scout_context_extras(scout_output: Dict[str, Any]) -> str:
+    """Compact factual scout fields for the reviewer user message (matches ReviewerEngine payload)."""
+    from urllib.parse import urlparse
+
+    lines: list[str] = []
+    st = scout_output.get("scout_type")
+    if st:
+        lines.append(f"Scout type: {st}")
+    fs = scout_output.get("funding_stage")
+    if fs:
+        lines.append(f"Funding stage (scout): {fs}")
+    et = scout_output.get("est_tam")
+    if et:
+        lines.append(f"Est. TAM (scout): {et}")
+    refs = scout_output.get("references")
+    if isinstance(refs, list) and refs:
+        hosts: list[str] = []
+        for r in refs[:12]:
+            if not isinstance(r, str) or not r.strip():
+                continue
+            raw = r.strip()
+            url = raw if raw.startswith(("http://", "https://")) else f"https://{raw.split('/')[0]}"
+            try:
+                host = (urlparse(url).hostname or "").lower()
+                if host and host not in hosts:
+                    hosts.append(host)
+            except Exception:
+                continue
+            if len(hosts) >= 8:
+                break
+        host_part = ", ".join(hosts[:6]) if hosts else "(unparsed URLs)"
+        lines.append(f"References: {len(refs)} item(s); hostnames: {host_part}")
+    for lk in ("lookup_id", "lookup_query", "origin_type"):
+        v = scout_output.get(lk)
+        if v is not None and str(v).strip():
+            lines.append(f"{lk}: {str(v).strip()[:240]}")
+    if not lines:
+        return ""
+    return "\nScout context (factual — ground structured_signals here):\n" + "\n".join(lines) + "\n"
+
+
 class Reviewer(ABC):
     """
     Base class for Reviewer agents.
@@ -130,19 +282,21 @@ class Reviewer(ABC):
     
     SYSTEM_PROMPT: str = ""  # Set in __init__ from resources
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
         """
         Initialize a Reviewer.
         
         Args:
             api_key: OpenAI API key
             model: OpenAI model to use (default: gpt-5-nano)
+            tenant_user_id: Clerk user id for loading promoted prompts from Supabase
         """
         self.client = OpenAI(api_key=api_key)
         self.logger = logging.getLogger("reviewer")
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.model = model
         self._last_token_usage = 0
+        self._tenant_user_id = (tenant_user_id or "").strip()
         reviewer_rules, rubric = _load_reviewer_resources()
         self.SYSTEM_PROMPT = _build_system_prompt(reviewer_rules, rubric)
         self.reviewer_type = getattr(self, 'reviewer_type', 'default')
@@ -164,7 +318,26 @@ class Reviewer(ABC):
         return mapping.get(self.reviewer_type, "DefaultReviewer")
 
     def _load_prompt_from_library(self) -> None:
-        """Load latest prompt from data/meta/prompt_library.json if available."""
+        """Load promoted prompt from Supabase when enabled; else latest local library file."""
+        use_sb = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+        if use_sb and self._tenant_user_id:
+            try:
+                from meta.prompt_gating import load_prompt_active, load_prompt_library
+
+                library = load_prompt_library(self._tenant_user_id)
+                active = load_prompt_active(self._tenant_user_id)
+                key = active.get(self.agent_name)
+                if (
+                    key
+                    and library.get(key)
+                    and isinstance(library[key], dict)
+                    and library[key].get("prompt")
+                ):
+                    self.SYSTEM_PROMPT = str(library[key]["prompt"])
+                    self.logger.info("Loaded promoted reviewer prompt from Supabase: %s", key)
+                    return
+            except Exception as e:
+                self.logger.debug("Could not load reviewer prompt from Supabase: %s", e)
         try:
             lib_path = Path(__file__).resolve().parent.parent / "data" / "meta" / "prompt_library.json"
             if not lib_path.exists():
@@ -240,6 +413,7 @@ Target Users: {scout_output.get('target_users', 'N/A')}
 Why Now: {scout_output.get('why_now', 'N/A')}
 Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
 """
+            scout_text += _format_scout_context_extras(scout_output)
             # Hypothesis fields: include when present; otherwise omit or show N/A
             primary_thesis = scout_output.get("primary_thesis")
             key_assumptions = scout_output.get("key_assumptions")
@@ -284,19 +458,56 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     )
             
             json_schema = '''{
+  "structured_signals": { // required: extraction-only evidence used by deterministic scorer
+    "market": {
+      "tam": {"value": "€12B", "confidence": 0.7, "reasoning": "Market sizing source", "evidence": "quote"},
+      "growth_rate": {"value": "18%", "confidence": 0.6, "reasoning": "Growth estimate basis", "evidence": "quote"},
+      "urgency": {"label": "high", "confidence": 0.8, "reasoning": "Urgency basis", "evidence": "quote"},
+      "timing": {"label": "favorable", "confidence": 0.7, "reasoning": "Timing basis", "evidence": "quote"},
+      "competition": {"label": "moderate", "confidence": 0.7, "reasoning": "Competition basis", "evidence": "quote"}
+    },
+    "execution": {
+      "traction": {"label": "early_revenue", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "growth_velocity": {"label": "moderate", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "gtm_effectiveness": {"label": "repeatable", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "team_execution": {"label": "decent", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "operational_velocity": {"label": "moderate", "confidence": 0.6, "reasoning": "...", "evidence": "..."}
+    },
+    "product": {
+      "value_prop": {"label": "clear", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "pain_alignment": {"label": "strong", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "differentiation": {"label": "clear", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "ux": {"label": "usable", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "retention": {"label": "moderate", "confidence": 0.6, "reasoning": "...", "evidence": "..."}
+    },
+    "technical": {
+      "complexity": {"label": "moderate", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "engineering_quality": {"label": "decent", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "scalability": {"label": "medium", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "data_advantage": {"label": "limited", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "architecture": {"label": "early", "confidence": 0.6, "reasoning": "...", "evidence": "..."}
+    },
+    "defensibility": {
+      "network_effects": {"label": "moderate", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "switching_costs": {"label": "medium", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "proprietary_data": {"label": "some", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "barriers": {"label": "some", "confidence": 0.6, "reasoning": "...", "evidence": "..."},
+      "brand": {"label": "emerging", "confidence": 0.6, "reasoning": "...", "evidence": "..."}
+    }
+  },
   "market_score": int,        // 1-10
   "product_score": int,       // 1-10
   "technical_score": int,     // 1-10
-  "execution_score": int,     // 1-10 (emphasize team; use [MISSING] if team info absent)
+  "execution_score": int,     // 1-10 (emphasize team)
   "defensibility_score": int, // 1-10 (moats, network effects, etc.)
   "overall_summary": "string",  // Narrative synthesis for IC; do NOT list scores (e.g. no "Market 7/10: ..."); scores go in score_reasoning
   "key_risks": ["string", "..."],
   "verdict": "STRONG" | "MEDIUM" | "WEAK",
   "diligence_red_flags": ["string", "..."],  // Use only labels from versioned reviewer_rules policy
   "assumption_feedback": ["string", "..."],  // Comments on Scout assumptions; critical unknowns
-  "team_analysis": ["string", "..."],        // Optional: founders, roles, experience, unfair advantage; use "[MISSING: ...]" if absent
+  "team_analysis": ["string", "..."],        // Optional: founders, roles, experience, unfair advantage; [] if absent
   "competition_analysis": ["string", "..."], // Optional: competitors, market position, differentiation, SWOT bullets
-  "business_model_analysis": ["string", "..."], // Optional: monetization, pricing, growth plan, unit economics; use [MISSING] if absent
+  "business_model_analysis": ["string", "..."], // Optional: monetization, pricing, growth plan, unit economics; [] if absent
   "investment_thesis": ["string", "..."],    // Optional: bullet points why to invest + core assumptions
   "risk_mitigation": ["string", "..."],     // Optional: actionable strategies for each diligence_red_flags item
   "score_reasoning": {"market_score": "string", "product_score": "string", ...},  // Optional: concise reasoning per dimension for memo table
@@ -328,9 +539,14 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 f"Evaluate this startup idea discovered by a Scout:\n\n{scout_text}{resource_thesis_block}{thesis_block}\n\n"
                 "Review Scout hypotheses when provided: evaluate assumptions and flag critical unknowns in assumption_feedback. "
                 "Use only information provided or defined in resources; do not hallucinate missing data. "
+                "CRITICAL: treat all numeric score fields as provisional placeholders only. "
+                "Do not invent final scoring. Your primary responsibility is to extract structured_signals with confidence values. "
+                "structured_signals must be COMPLETE: include all 5 dimensions and all 25 components (no empty objects). "
+                "For each component provide either label or value, plus reasoning and evidence grounded in the provided startup text. "
+                "If evidence is unavailable, set value to null with confidence <= 0.2 and explain what is missing in reasoning. "
                 "In overall_summary, write a concise narrative synthesis only; do not list or repeat numeric scores (scores are in score_reasoning). "
-                "Emphasize team in execution_score; if team/founder data is missing, say so and use [MISSING] in team_analysis. "
-                "Populate team_analysis, competition_analysis, business_model_analysis, investment_thesis, and risk_mitigation when you can; use [MISSING] or [MISSING: description] when info is absent. "
+                "Emphasize team in execution_score; if team/founder data is missing, say so plainly and leave team_analysis as an empty list. "
+                "Populate team_analysis, competition_analysis, business_model_analysis, investment_thesis, and risk_mitigation when you can; use empty lists when info is absent. "
                 "Optionally include score_reasoning with one short sentence per dimension (e.g. market_score, product_score, technical_score, execution_score, defensibility_score) for the memo scores table.\n\n"
                 "For each dimension, include 2-4 reasoning bullets, 1-3 weaknesses bullets, and confidence as one of low/medium/high. "
                 "Include improvement_to_9 as actionable bullets and set score_source to reflect multi-reviewer aggregation.\n\n"
@@ -363,6 +579,9 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
             data = json.loads(content)
             
             # Default optional fields
+            if "structured_signals" not in data or not isinstance(data.get("structured_signals"), dict):
+                data["structured_signals"] = {}
+            data = _normalize_structured_signals_contract(data)
             if "defensibility_score" not in data:
                 data["defensibility_score"] = None
             if "diligence_red_flags" not in data:
@@ -372,6 +591,7 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
             for field in ("team_analysis", "competition_analysis", "business_model_analysis", "investment_thesis", "risk_mitigation"):
                 if field not in data or not isinstance(data.get(field), list):
                     data[field] = []
+                data[field] = _strip_missing_tokens_from_list(data.get(field))
             if "score_reasoning" not in data or not isinstance(data.get("score_reasoning"), dict):
                 data["score_reasoning"] = {}
             if "score_source" not in data or not isinstance(data.get("score_source"), str):
@@ -386,6 +606,8 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     data[rk] = []
                 if wk not in data or not isinstance(data.get(wk), list):
                     data[wk] = []
+                data[rk] = _strip_missing_tokens_from_list(data.get(rk))
+                data[wk] = _strip_missing_tokens_from_list(data.get(wk))
                 if ck not in data or str(data.get(ck)).lower() not in ("low", "medium", "high"):
                     data[ck] = "medium"
             if ctx:

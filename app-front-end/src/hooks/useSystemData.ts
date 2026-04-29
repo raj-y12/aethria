@@ -3,15 +3,28 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchStartups } from '../api/startups';
 import { fetchEscalations } from '../api/escalations';
 import { fetchSignals } from '../api/signals';
-import { fetchRejectionAnalytics, fetchWatchlistAnalytics, fetchConcentrationAnalytics } from '../api/analytics';
-import { fetchMetaReports, fetchScoutWeights, fetchCalibrationState } from '../api/meta';
+import {
+  fetchRejectionAnalytics,
+  fetchWatchlistAnalytics,
+  fetchConcentrationAnalytics,
+  fetchSystemHealth,
+} from '../api/analytics';
+import {
+  fetchMetaReports,
+  fetchMetaPromptState,
+  fetchMetaEvalSet,
+  fetchScoutWeights,
+  fetchCalibrationState,
+  fetchMetaInsights,
+} from '../api/meta';
 import { fetchSettings } from '../api/settings';
 import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { useQueryLiveGate } from './useQueryLiveGate';
 import type {
   Startup, EscalationItem, SignalItem,
   RejectionAnalytics, WatchlistAnalytics, ConcentrationAnalytics,
-  MetaCycleReport, ScoutWeights, CalibrationState,
+  MetaCycleReport, MetaPromptState, MetaEvalSet, ScoutWeights, CalibrationState,
+  SystemHealthSnapshot, MetaInsightsPayload,
 } from '../types/startup';
 import type { Settings } from '../api/settings';
 
@@ -41,6 +54,10 @@ export interface SystemData {
   concentrationAnalytics: ConcentrationAnalytics;
   scoutWeights: ScoutWeights;
   calibrationState: CalibrationState;
+  metaPromptState: MetaPromptState;
+  metaEvalSet: MetaEvalSet;
+  systemHealth: SystemHealthSnapshot | null;
+  metaInsights: MetaInsightsPayload | null;
   settings: Settings | null;
   pendingEscalationCount: number;
   startupsError: string | null;
@@ -75,6 +92,8 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     if (panelJustOpened || tabJustVisible) {
       void queryClient.invalidateQueries({ queryKey: ['meta'] });
       void queryClient.invalidateQueries({ queryKey: ['analytics'] });
+      void queryClient.invalidateQueries({ queryKey: ['analytics', 'system-health'] });
+      void queryClient.invalidateQueries({ queryKey: ['meta', 'insights'] });
     }
   }, [systemPanelOpen, isTabVisible, queryClient]);
 
@@ -82,6 +101,9 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     queryKey: ['startups', 'list'],
     queryFn: fetchStartups,
     ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 60_000 }),
+    // Keep WorkGrid current even during reading/idle periods while tab is visible,
+    // while keeping request volume conservative for backend egress.
+    refetchInterval: isTabVisible ? 60_000 : false,
     placeholderData: (prev) => prev ?? [],
   });
 
@@ -153,6 +175,33 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     placeholderData: (prev) => prev ?? defaultCalibration,
   });
 
+  const metaPromptStateQuery = useQuery({
+    queryKey: ['meta', 'prompt-state'],
+    queryFn: () => fetchMetaPromptState(),
+    ...getQueryConfig('STATIC'),
+    placeholderData: (prev) =>
+      prev ?? { active: {}, active_detail: {}, pending: [] },
+  });
+
+  const metaEvalSetQuery = useQuery({
+    queryKey: ['meta', 'eval-set'],
+    queryFn: fetchMetaEvalSet,
+    ...getQueryConfig('STATIC'),
+    placeholderData: (prev) => prev ?? { startup_ids: [], count: 0, max: 50 },
+  });
+
+  const systemHealthQuery = useQuery({
+    queryKey: ['analytics', 'system-health'],
+    queryFn: fetchSystemHealth,
+    ...getQueryConfig('STATIC'),
+  });
+
+  const metaInsightsQuery = useQuery({
+    queryKey: ['meta', 'insights'],
+    queryFn: fetchMetaInsights,
+    ...getQueryConfig('STATIC'),
+  });
+
   const settingsQuery = useQuery({
     queryKey: ['settings'],
     queryFn: () => fetchSettings().catch(() => null),
@@ -185,6 +234,10 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
       ContrarianScout: 0.25,
     },
     calibrationState: calibrationQuery.data ?? defaultCalibration,
+    metaPromptState: metaPromptStateQuery.data ?? { active: {}, active_detail: {}, pending: [] },
+    metaEvalSet: metaEvalSetQuery.data ?? { startup_ids: [], count: 0, max: 50 },
+    systemHealth: systemHealthQuery.data ?? null,
+    metaInsights: metaInsightsQuery.data ?? null,
     settings: settingsQuery.data ?? null,
     pendingEscalationCount,
     startupsError: startupsQuery.isError ? 'Could not load startups' : null,

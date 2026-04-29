@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from tenant_context import require_user_id
+from utils.deal_context import scout_text_blob_lower
 
 logger = logging.getLogger(__name__)
 _TRANSIENT_ERRNOS = (35, 11)  # EAGAIN variants across platforms
@@ -126,16 +127,7 @@ def _as_lower_str_list(v: Any) -> List[str]:
 
 
 def _scout_text_blob(scout_output: Dict[str, Any]) -> str:
-    parts = [
-        scout_output.get("name"),
-        scout_output.get("one_line"),
-        scout_output.get("sector"),
-        scout_output.get("problem"),
-        scout_output.get("solution"),
-        scout_output.get("target_users"),
-        scout_output.get("why_now"),
-    ]
-    return " ".join(str(p) for p in parts if p).lower()
+    return scout_text_blob_lower(scout_output)
 
 
 def _stage_normalized(s: Optional[str]) -> str:

@@ -121,6 +121,23 @@ class PartnerEngine:
                 "thesis_fit_points": getattr(review_info, "thesis_fit_points", None) or [],
                 "thesis_deviation_points": getattr(review_info, "thesis_deviation_points", None) or [],
                 "thesis_alignment_confidence": getattr(review_info, "thesis_alignment_confidence", None),
+                "confidence_adjusted_score": getattr(
+                    review_info, "confidence_adjusted_score", None
+                ),
+                "structured_scoring": getattr(review_info, "structured_scoring", None),
+                "structured_signals": getattr(review_info, "structured_signals", None),
+                "resolution_notes": getattr(review_info, "resolution_notes", None),
+                "disagreement_summary": getattr(review_info, "disagreement_summary", None),
+                "aethria_view": (
+                    review_info.aethria_view.model_dump(mode="json")
+                    if getattr(review_info, "aethria_view", None) is not None
+                    else None
+                ),
+                "reviews": (
+                    [sr.model_dump(mode="json") for sr in review_info.reviews]
+                    if review_info.reviews
+                    else None
+                ),
             },
         }
 

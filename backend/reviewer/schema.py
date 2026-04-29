@@ -48,6 +48,8 @@ class ReviewerOutput(TypedDict, total=False):
     thesis_deviation_points: list[str]
     thesis_alignment_confidence: float
     fund_thesis_alignment_score: float  # optional at runtime; validated when present
+    structured_signals: Dict[str, dict]
+    structured_scoring: Dict[str, dict]
 
 
 def validate_reviewer_output(data: dict) -> ReviewerOutput:
@@ -59,8 +61,10 @@ def validate_reviewer_output(data: dict) -> ReviewerOutput:
         if not isinstance(val, list):
             raise ValueError(f"{field} must be a list")
         cleaned = [str(item).strip() for item in val if str(item).strip()]
-        if cleaned and (len(cleaned) < min_items or len(cleaned) > max_items):
-            raise ValueError(f"{field} must contain {min_items}-{max_items} items when present")
+        # Be tolerant of LLM list-length drift: never fail reviewer output
+        # solely because optional explanatory lists are shorter/longer than target.
+        if len(cleaned) > max_items:
+            cleaned = cleaned[:max_items]
         data[field] = cleaned
 
     def _validate_confidence(field: str) -> None:
@@ -179,6 +183,12 @@ def validate_reviewer_output(data: dict) -> ReviewerOutput:
         if not isinstance(data["score_source"], str):
             raise ValueError("score_source must be a string")
         data["score_source"] = data["score_source"].strip()
+    if "structured_signals" in data and data["structured_signals"] is not None:
+        if not isinstance(data["structured_signals"], dict):
+            raise ValueError("structured_signals must be an object")
+    if "structured_scoring" in data and data["structured_scoring"] is not None:
+        if not isinstance(data["structured_scoring"], dict):
+            raise ValueError("structured_scoring must be an object")
 
     for dim in ("market", "product", "technical", "execution", "defensibility"):
         _validate_string_list(f"{dim}_reasoning", min_items=2, max_items=4)

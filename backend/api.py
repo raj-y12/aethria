@@ -52,6 +52,20 @@ from memo_generator import MemoGenerator
 from meta.agent import MetaAgent  # For manual trigger
 from meta.reweighter import load_weights
 from meta.calibrator import load_calibration_state
+from meta.prompt_gating import (
+    VALID_PROMOTE_AGENT_TARGETS,
+    REVIEWER_EVAL_AGENT_TARGETS,
+    eval_record_fresh,
+    get_last_eval_record,
+    load_eval_startup_ids,
+    load_prompt_active,
+    load_prompt_library,
+    save_eval_startup_ids,
+    save_prompt_active,
+    save_prompt_library,
+)
+from meta.evaluator import run_prompt_evaluation
+from reviewer.engine import ReviewerEngine
 from portfolio.store import PortfolioStore
 from portfolio.rejection import RejectionAnalyzer
 from portfolio.cost_control import CostController
@@ -73,6 +87,7 @@ from fund_thesis_ops import activate_fund_thesis_version, create_fund_thesis_ver
 from models import Startup
 from core import policy_resolver
 from utils.scoring import compute_overall_score, enrich_scores, score_to_label
+from utils.score_semantics import rubric_band_for_numeric
 
 _agent_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _agent_worker_task: Optional[asyncio.Task] = None
@@ -635,6 +650,56 @@ def _to_iso(v) -> str | None:
     return str(v) if v else None
 
 
+_PARTNER_LEGACY_RECOMMENDATION = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}
+
+
+def _partner_recommendation_from_stored(
+    partner_doc: Any,
+    legacy_decision: Optional[str] = None,
+) -> Optional[str]:
+    """Resolve INVEST/PASS/MONITOR from partner JSON and/or legacy YES/NO/MAYBE."""
+    pi = partner_doc if isinstance(partner_doc, dict) else {}
+    rec = pi.get("recommendation") if isinstance(pi, dict) else None
+    if rec:
+        return rec
+    ld = legacy_decision if legacy_decision is not None else pi.get("decision")
+    return _PARTNER_LEGACY_RECOMMENDATION.get((ld or "").strip(), None)
+
+
+def _partner_dict_for_frontend(partner: dict) -> dict:
+    """Stable partner slice for app-front-end (preserves all existing keys)."""
+    raw_rec = _partner_recommendation_from_stored(partner, partner.get("decision"))
+    raw_conf = partner.get("confidence")
+    if raw_conf is None and partner.get("conviction_level") is not None:
+        raw_conf = (partner["conviction_level"] or 0) / 10.0
+    return {
+        "recommendation": raw_rec,
+        "confidence": raw_conf,
+        "decision_rationale": partner.get("decision_rationale") or partner.get("rationale"),
+        "thesis": partner.get("thesis"),
+        "why_this_matters": partner.get("why_this_matters"),
+        "snapshot": partner.get("snapshot"),
+        "market_insight": partner.get("market_insight"),
+        "product_edge": partner.get("product_edge"),
+        "traction_signals": partner.get("traction_signals"),
+        "risks": partner.get("risks"),
+        "next_action": partner.get("next_action"),
+        "human_review_required": partner.get("human_review_required", False),
+        "llm_fallback_reason": partner.get("llm_fallback_reason"),
+        "prompt_version": partner.get("prompt_version"),
+    }
+
+
+def _mirror_structured_scoring_aliases(review: Dict[str, Any]) -> None:
+    """Ensure scoring / structured_scoring / score_breakdown reference the same object when any is set."""
+    sc = review.get("structured_scoring") or review.get("scoring") or review.get("score_breakdown")
+    if sc is None:
+        return
+    review["structured_scoring"] = sc
+    review["scoring"] = sc
+    review["score_breakdown"] = sc
+
+
 def _backend_to_frontend(raw: dict) -> dict:
     """Transform backend startup dict to app-front-end Startup shape."""
     sid = raw.get("startup_id", "")
@@ -693,9 +758,16 @@ def _backend_to_frontend(raw: dict) -> dict:
             "defensibility_score_label": review_enriched.get("defensibility_score_label"),
             "overall_score": review_enriched.get("overall_score"),
             "overall_label": review_enriched.get("overall_label"),
+            "overall_rubric_band": review_enriched.get("overall_rubric_band"),
+            "market_rubric_band": review_enriched.get("market_rubric_band"),
+            "product_rubric_band": review_enriched.get("product_rubric_band"),
+            "technical_rubric_band": review_enriched.get("technical_rubric_band"),
+            "execution_rubric_band": review_enriched.get("execution_rubric_band"),
+            "defensibility_rubric_band": review_enriched.get("defensibility_rubric_band"),
             "overall_summary": review_enriched.get("overall_summary"),
             "key_risks": review_enriched.get("key_risks") or [],
             "verdict": review_enriched.get("verdict"),
+            "derived_verdict": review_enriched.get("derived_verdict"),
             "score_reasoning": review_enriched.get("score_reasoning") or None,
             "score_source": review_enriched.get("score_source"),
             "improvement_to_9": review_enriched.get("improvement_to_9") or [],
@@ -731,34 +803,21 @@ def _backend_to_frontend(raw: dict) -> dict:
             "thesis_deviation_points": review_enriched.get("thesis_deviation_points") or None,
             "thesis_alignment_confidence": review_enriched.get("thesis_alignment_confidence"),
             "fund_thesis_alignment_score": review_enriched.get("fund_thesis_alignment_score"),
+            "weighted_defensibility_score": review_enriched.get("weighted_defensibility_score"),
+            "confidence_adjusted_score": review_enriched.get("confidence_adjusted_score"),
+            "structured_scoring": review_enriched.get("structured_scoring"),
+            "structured_signals": review_enriched.get("structured_signals"),
+            "resolution_notes": review_enriched.get("resolution_notes"),
+            "disagreement_summary": review_enriched.get("disagreement_summary"),
+            "aethria_view": review_enriched.get("aethria_view"),
             "reviews": review_enriched.get("reviews") or None,
         }
+        _mirror_structured_scoring_aliases(out["review"])
     else:
         out["review"] = None
 
     if partner:
-        # Backward compat: old schema used 'decision' (YES/NO/MAYBE), new uses 'recommendation' (INVEST/PASS/MONITOR)
-        _rec_compat = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}
-        raw_rec = partner.get("recommendation") or _rec_compat.get(partner.get("decision") or "", None)
-        raw_conf = partner.get("confidence")
-        if raw_conf is None and partner.get("conviction_level") is not None:
-            raw_conf = (partner["conviction_level"] or 0) / 10.0
-        out["partner"] = {
-            "recommendation": raw_rec,
-            "confidence": raw_conf,
-            "decision_rationale": partner.get("decision_rationale") or partner.get("rationale"),
-            "thesis": partner.get("thesis"),
-            "why_this_matters": partner.get("why_this_matters"),
-            "snapshot": partner.get("snapshot"),
-            "market_insight": partner.get("market_insight"),
-            "product_edge": partner.get("product_edge"),
-            "traction_signals": partner.get("traction_signals"),
-            "risks": partner.get("risks"),
-            "next_action": partner.get("next_action"),
-            "human_review_required": partner.get("human_review_required", False),
-            "llm_fallback_reason": partner.get("llm_fallback_reason"),
-            "prompt_version": partner.get("prompt_version"),
-        }
+        out["partner"] = _partner_dict_for_frontend(partner)
     else:
         out["partner"] = None
 
@@ -820,15 +879,15 @@ def _list_projection_to_frontend(row: Dict[str, Any]) -> Dict[str, Any]:
             "aggregate_score": agg,
             "overall_score": agg,
             "overall_label": score_to_label(agg) if isinstance(agg, (int, float)) else None,
+            "overall_rubric_band": rubric_band_for_numeric(float(agg))
+            if isinstance(agg, (int, float))
+            else None,
         }
     else:
         out["review"] = None
-    _rec_compat = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}
     # partner_info JSON has 'recommendation' (new schema); partner_decision column has YES/NO/MAYBE (legacy)
     pi = row.get("partner_info") or {}
-    raw_rec = (pi.get("recommendation") if isinstance(pi, dict) else None) or (
-        _rec_compat.get(row.get("partner_decision") or "", None)
-    )
+    raw_rec = _partner_recommendation_from_stored(pi, row.get("partner_decision"))
     if raw_rec:
         out["partner"] = {
             "recommendation": raw_rec,
@@ -872,6 +931,11 @@ def _thin_list_from_full_frontend(obj: Dict[str, Any]) -> Dict[str, Any]:
             "aggregate_score": overall,
             "overall_score": overall,
             "overall_label": score_to_label(float(overall)) if isinstance(overall, (int, float)) else None,
+            "overall_rubric_band": rev.get("overall_rubric_band")
+            if rev.get("overall_rubric_band") is not None
+            else (
+                rubric_band_for_numeric(float(overall)) if isinstance(overall, (int, float)) else None
+            ),
         }
     part = obj.get("partner") or {}
     thin_part: Optional[Dict[str, Any]] = None
@@ -1241,6 +1305,9 @@ def get_meta_insights(request: Request):
         },
         "what_changed": {
             "mutations_applied": latest.get("mutations_applied") or [],
+            "prompt_proposals": latest.get("prompt_proposals")
+            or latest.get("mutations_applied")
+            or [],
             "weight_updates": latest.get("weight_updates") or [],
             "calibration_changes": latest.get("calibration_changes") or [],
         },
@@ -1254,12 +1321,326 @@ def get_meta_prompt_library(request: Request):
     """
     Return the full prompt library used by the Meta-Agent (Supabase meta_prompt_library).
     """
-    from supabase_doc_store import doc_get
+    lib = load_prompt_library(request.state.user_id)
+    return lib if isinstance(lib, dict) else {}
 
-    library = doc_get("meta_prompt_library", user_id=request.state.user_id)
+
+def _summarize_library_entry(
+    library_key: str,
+    entry: Dict[str, Any],
+    *,
+    include_prompt_body: bool,
+) -> Dict[str, Any]:
+    if not isinstance(entry, dict):
+        return {"library_key": library_key, "error": "invalid_entry"}
+    prompt = entry.get("prompt")
+    out: Dict[str, Any] = {
+        "library_key": library_key,
+        "created_at": entry.get("created_at"),
+        "cycle_number": entry.get("cycle_number"),
+        "reasoning": (str(entry.get("reasoning") or ""))[:500],
+        "promotion_status": entry.get("promotion_status"),
+        "previous_hash": entry.get("previous_hash"),
+        "prompt_char_count": len(str(prompt)) if prompt else 0,
+    }
+    if include_prompt_body and prompt is not None:
+        out["prompt"] = str(prompt)
+    return out
+
+
+@app.get("/api/meta/prompt-state")
+def get_meta_prompt_state(
+    request: Request,
+    include_prompt: Optional[str] = Query(
+        default=None,
+        description="If set, include full prompt text only for this library_key",
+    ),
+):
+    """
+    Active and pending meta prompt proposals (metadata only; full text for one key via include_prompt).
+    """
+    uid = request.state.user_id
+    library = load_prompt_library(uid)
+    active = load_prompt_active(uid)
     if not isinstance(library, dict):
-        return {}
-    return library
+        library = {}
+
+    active_detail: Dict[str, Any] = {}
+    for agent, lib_key in sorted(active.items()):
+        ent = library.get(lib_key)
+        if isinstance(ent, dict):
+            active_detail[agent] = _summarize_library_entry(
+                lib_key,
+                ent,
+                include_prompt_body=bool(include_prompt and include_prompt == lib_key),
+            )
+        else:
+            active_detail[agent] = {
+                "library_key": lib_key,
+                "warning": "missing_from_library",
+            }
+
+    active_keys = set(active.values())
+    pending: List[Dict[str, Any]] = []
+    for key, ent in library.items():
+        if not isinstance(key, str) or ":" not in key:
+            continue
+        agent_tgt, _ = key.split(":", 1)
+        if agent_tgt not in VALID_PROMOTE_AGENT_TARGETS:
+            continue
+        if key in active_keys:
+            continue
+        if not isinstance(ent, dict):
+            continue
+        st = ent.get("promotion_status")
+        if st == "superseded":
+            continue
+        if st not in (None, "pending"):
+            continue
+        pending.append(
+            _summarize_library_entry(
+                key,
+                ent,
+                include_prompt_body=bool(include_prompt and include_prompt == key),
+            )
+        )
+    pending.sort(key=lambda x: (x.get("created_at") or "", x.get("library_key") or ""), reverse=True)
+
+    return {
+        "active": active,
+        "active_detail": active_detail,
+        "pending": pending[:80],
+        "restart_note": "Promoted prompts apply after workers restart unless META_AGENT_PROMPT_AUTO_APPLY ran in-process.",
+    }
+
+
+@app.post("/api/meta/prompts/promote")
+async def post_meta_prompt_promote(request: Request):
+    """Promote a pending library_key to the active prompt for an agent."""
+    uid = request.state.user_id
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    agent_target = str(body.get("agent_target") or "").strip()
+    library_key = str(body.get("library_key") or "").strip()
+    if not agent_target or not library_key:
+        raise HTTPException(status_code=400, detail="agent_target and library_key required")
+    if agent_target not in VALID_PROMOTE_AGENT_TARGETS:
+        raise HTTPException(status_code=400, detail="invalid agent_target")
+    if not library_key.startswith(f"{agent_target}:"):
+        raise HTTPException(status_code=400, detail="library_key does not match agent_target")
+
+    library = load_prompt_library(uid)
+    if not isinstance(library, dict) or library_key not in library:
+        raise HTTPException(status_code=404, detail="library_key not found")
+    ent = library[library_key]
+    if not isinstance(ent, dict) or not str(ent.get("prompt") or "").strip():
+        raise HTTPException(status_code=400, detail="library entry has no prompt")
+
+    if agent_target in REVIEWER_EVAL_AGENT_TARGETS and os.getenv(
+        "META_PROMPT_REQUIRE_EVAL_PASS", ""
+    ).lower() in ("1", "true", "yes"):
+        rec = get_last_eval_record(uid, library_key)
+        if not rec or not rec.get("passed"):
+            raise HTTPException(
+                status_code=400,
+                detail="Evaluation required: POST /api/meta/prompts/evaluate must pass for this library_key",
+            )
+        try:
+            ttl_h = int(os.getenv("META_PROMPT_EVAL_PASS_TTL_HOURS", "24"))
+        except ValueError:
+            ttl_h = 24
+        if not eval_record_fresh(rec, ttl_h):
+            raise HTTPException(
+                status_code=400,
+                detail="Evaluation stale; run POST /api/meta/prompts/evaluate again",
+            )
+
+    active = load_prompt_active(uid)
+    prev_key = active.get(agent_target)
+    if prev_key and prev_key in library and isinstance(library[prev_key], dict):
+        library[prev_key] = dict(library[prev_key])
+        library[prev_key]["promotion_status"] = "superseded"
+
+    library[library_key] = dict(ent)
+    library[library_key]["promotion_status"] = "promoted"
+    active = dict(active)
+    active[agent_target] = library_key
+
+    save_prompt_library(uid, library)
+    save_prompt_active(uid, active)
+
+    try:
+        from supabase_doc_store import list_append_only
+
+        list_append_only(
+            "meta_mutation_log",
+            {
+                "type": "prompt_promoted",
+                "agent_target": agent_target,
+                "library_key": library_key,
+                "previous_library_key": prev_key,
+                "applied_at": datetime.now(timezone.utc).isoformat(),
+            },
+            user_id=uid,
+        )
+    except Exception:
+        pass
+
+    return {"ok": True, "active": active, "promoted": library_key}
+
+
+@app.post("/api/meta/prompts/reset")
+async def post_meta_prompt_reset(request: Request):
+    """Remove active prompt for an agent (revert to codebase default on next load)."""
+    uid = request.state.user_id
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    agent_target = str(body.get("agent_target") or "").strip()
+    if not agent_target or agent_target not in VALID_PROMOTE_AGENT_TARGETS:
+        raise HTTPException(status_code=400, detail="invalid agent_target")
+
+    active = load_prompt_active(uid)
+    prev_key = active.get(agent_target)
+    if not prev_key:
+        return {"ok": True, "active": active, "message": "no active prompt for agent"}
+
+    library = load_prompt_library(uid)
+    if isinstance(library, dict) and prev_key in library and isinstance(library[prev_key], dict):
+        library = dict(library)
+        library[prev_key] = dict(library[prev_key])
+        library[prev_key]["promotion_status"] = "superseded"
+        save_prompt_library(uid, library)
+
+    active = dict(active)
+    del active[agent_target]
+    save_prompt_active(uid, active)
+
+    try:
+        from supabase_doc_store import list_append_only
+
+        list_append_only(
+            "meta_mutation_log",
+            {
+                "type": "prompt_reset",
+                "agent_target": agent_target,
+                "previous_library_key": prev_key,
+                "applied_at": datetime.now(timezone.utc).isoformat(),
+            },
+            user_id=uid,
+        )
+    except Exception:
+        pass
+
+    return {"ok": True, "active": active}
+
+
+@app.get("/api/meta/eval-set")
+def get_meta_eval_set(request: Request):
+    """Fixed startup ids used for reviewer prompt shadow evaluation."""
+    uid = request.state.user_id
+    ids = load_eval_startup_ids(uid)
+    try:
+        max_n = int(os.getenv("META_PROMPT_EVAL_SET_MAX", "50"))
+    except ValueError:
+        max_n = 50
+    return {"startup_ids": ids, "count": len(ids), "max": max_n}
+
+
+@app.put("/api/meta/eval-set")
+async def put_meta_eval_set(request: Request):
+    """Replace eval startup id list (validated against tenant storage)."""
+    uid = request.state.user_id
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    raw = body.get("startup_ids")
+    if not isinstance(raw, list):
+        raise HTTPException(status_code=400, detail="startup_ids array required")
+    try:
+        max_n = int(os.getenv("META_PROMPT_EVAL_SET_MAX", "50"))
+    except ValueError:
+        max_n = 50
+    storage = _get_storage(request)
+    validated: List[str] = []
+    missing: List[str] = []
+    seen: set[str] = set()
+    for x in raw:
+        sid = str(x).strip()
+        if not sid or sid in seen:
+            continue
+        seen.add(sid)
+        if len(validated) >= max_n:
+            break
+        if storage.get_startup(sid):
+            validated.append(sid)
+        else:
+            missing.append(sid)
+    payload = save_eval_startup_ids(uid, validated, max_n=max_n)
+    return {"ok": True, **payload, "missing_startup_ids": missing[:30]}
+
+
+@app.post("/api/meta/prompts/evaluate")
+async def post_meta_prompt_evaluate(request: Request):
+    """
+    Shadow-run a pending reviewer prompt against the eval set (or startup_ids override).
+    Persists pass/fail summary for optional META_PROMPT_REQUIRE_EVAL_PASS promote gate.
+    """
+    uid = request.state.user_id
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    agent_target = str(body.get("agent_target") or "").strip()
+    library_key = str(body.get("library_key") or "").strip()
+    if not agent_target or not library_key:
+        raise HTTPException(status_code=400, detail="agent_target and library_key required")
+    if agent_target not in REVIEWER_EVAL_AGENT_TARGETS:
+        raise HTTPException(
+            status_code=400,
+            detail="agent_target must be DefaultReviewer, SkepticalReviewer, or OpportunistReviewer",
+        )
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY required for evaluation")
+
+    storage = _get_storage(request)
+    client = get_service_client()
+    try:
+        active = get_active_thesis(client, uid)
+        if active is None:
+            _bootstrap_default_thesis_or_raise(client, uid)
+            active = get_active_thesis(client, uid)
+        thesis_ctx = active.as_engine_context() if active else None
+    except FundThesisIncompleteError as e:
+        raise HTTPException(status_code=400, detail=str(e) or "fund thesis incomplete")
+
+    reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-5-nano")
+    reviewer_engine = ReviewerEngine(
+        api_key=api_key,
+        storage=storage,
+        tenant_user_id=uid,
+        model=reviewer_model,
+        active_thesis=thesis_ctx,
+    )
+    override_ids = body.get("startup_ids")
+    sid_list: Optional[List[str]] = None
+    if isinstance(override_ids, list):
+        sid_list = [str(x).strip() for x in override_ids if str(x).strip()]
+
+    result = await run_prompt_evaluation(
+        user_id=uid,
+        agent_target=agent_target,
+        library_key=library_key,
+        storage=storage,
+        reviewer_engine=reviewer_engine,
+        startup_ids=sid_list,
+    )
+    return result
 
 
 @app.get("/api/meta/weights")
@@ -1982,6 +2363,36 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
 
     if not ok:
         raise HTTPException(status_code=404, detail="Startup not found")
+
+    # Feed analyst decisions into meta-agent signal (mutation log; type human_decision)
+    try:
+        from supabase_doc_store import list_append_only
+
+        ai_rec = None
+        try:
+            st = storage.get_startup(startup_id)
+            if st and st.partner_info is not None:
+                ai_rec = st.partner_info.recommendation
+        except Exception:
+            pass
+        _map = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}
+        list_append_only(
+            "meta_mutation_log",
+            {
+                "type": "human_decision",
+                "startup_id": startup_id,
+                "human_decision": decision,
+                "ai_recommendation_at_resolve": ai_rec,
+                "disagreed_with_ai": bool(
+                    ai_rec and _map.get(decision) and ai_rec != _map.get(decision)
+                ),
+                "notes": str(notes)[:4000],
+                "resolved_at": hr["resolved_at"],
+            },
+            user_id=request.state.user_id,
+        )
+    except Exception:
+        pass
 
     return {"status": "ok"}
 

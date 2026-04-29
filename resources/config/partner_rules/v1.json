@@ -4,7 +4,7 @@
   "quality_labels": {
     "STRONG": "Investment-grade",
     "MEDIUM": "Promising but incomplete",
-    "WEAK": "Insufficient quality"
+    "WEAK": "Early and unproven"
   },
   "verdict_rules": {
     "WEAK": {

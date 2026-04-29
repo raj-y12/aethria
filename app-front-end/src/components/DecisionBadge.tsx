@@ -21,7 +21,7 @@ const LABEL: Record<DecisionBadgeVariant, string> = {
 export default function DecisionBadge({ variant }: { variant: DecisionBadgeVariant }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-meta tracking-badge uppercase py-phi-1 px-phi-2 ${DECISION_BADGE_CLASS[variant]}`}
+      className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-meta tracking-badge py-phi-1 px-phi-2 ${DECISION_BADGE_CLASS[variant]}`}
       aria-label={LABEL[variant]}
     >
       {LABEL[variant]}

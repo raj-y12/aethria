@@ -15,19 +15,18 @@ export const SCORE_BANDS = [
 ] as const;
 
 export function getScoreBand(score: number): { label: string; meaning: string } {
-  for (const band of SCORE_BANDS) {
-    if (score >= band.range[0] && score <= band.range[1]) {
-      return { label: band.label, meaning: band.meaning };
-    }
-  }
-  return { label: '—', meaning: '' };
+  if (!Number.isFinite(score) || score < 1 || score > 10) return { label: '—', meaning: '' };
+  if (score < 4) return { label: SCORE_BANDS[0].label, meaning: SCORE_BANDS[0].meaning };
+  if (score < 6) return { label: SCORE_BANDS[1].label, meaning: SCORE_BANDS[1].meaning };
+  if (score < 8) return { label: SCORE_BANDS[2].label, meaning: SCORE_BANDS[2].meaning };
+  return { label: SCORE_BANDS[3].label, meaning: SCORE_BANDS[3].meaning };
 }
 
 /** Quality assessment from Reviewer (STRONG/MEDIUM/WEAK). */
 export const QUALITY_LABELS: Record<string, string> = {
   STRONG: 'Investment-grade',
   MEDIUM: 'Promising but incomplete',
-  WEAK: 'Insufficient quality',
+  WEAK: 'Early and unproven',
 };
 
 export type ReviewerQualityBand = 'STRONG' | 'MEDIUM' | 'WEAK';

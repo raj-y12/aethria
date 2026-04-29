@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 import json
 import logging
 import asyncio
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urlparse
@@ -168,8 +169,28 @@ class Scout(ABC):
 
     def _load_prompt_from_library(self) -> None:
         """
-        Load latest prompt for this Scout from data/meta/prompt_library.json if available.
+        Load promoted prompt for this Scout: Supabase meta_prompt_library + prompt_active
+        when USE_SUPABASE_STORAGE; else latest key from local data/meta/prompt_library.json.
         """
+        use_sb = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+        if use_sb and self._tenant_user_id:
+            try:
+                from meta.prompt_gating import load_prompt_active, load_prompt_library
+
+                library = load_prompt_library(self._tenant_user_id)
+                active = load_prompt_active(self._tenant_user_id)
+                key = active.get(self.agent_name)
+                if (
+                    key
+                    and library.get(key)
+                    and isinstance(library[key], dict)
+                    and library[key].get("prompt")
+                ):
+                    self.system_prompt = str(library[key]["prompt"])
+                    self.logger.info("Loaded promoted scout prompt from Supabase: %s", key)
+                    return
+            except Exception as e:
+                self.logger.debug("Could not load scout prompt from Supabase: %s", e)
         try:
             lib_path = Path(__file__).resolve().parent.parent / "data" / "meta" / "prompt_library.json"
             if not lib_path.exists():
@@ -190,7 +211,6 @@ class Scout(ABC):
                 self.system_prompt = library[latest_key]["prompt"]
                 self.logger.info(f"Loaded prompt from library: {latest_key}")
         except Exception as e:
-            # Library is optional; log at debug level to avoid noise.
             self.logger.debug(f"Could not load prompt from library: {e}")
 
     def set_prompt(self, new_prompt: str) -> None:
@@ -235,6 +255,86 @@ class Scout(ABC):
         if not data.get("id"):
             data["id"] = generate_id()
         data["scout_type"] = self.scout_type
+
+    @staticmethod
+    def _coerce_text(value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value.strip()
+        if isinstance(value, list):
+            parts = [str(v).strip() for v in value if str(v).strip()]
+            return ", ".join(parts)
+        if isinstance(value, dict):
+            parts = [str(v).strip() for v in value.values() if str(v).strip()]
+            return ", ".join(parts)
+        return str(value).strip()
+
+    def _coerce_scout_payload(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Best-effort deterministic coercion before strict schema validation."""
+        out = dict(data)
+        string_fields = (
+            "name",
+            "one_line",
+            "sector",
+            "problem",
+            "solution",
+            "target_users",
+            "why_now",
+            "primary_thesis",
+            "biggest_unknown",
+        )
+        for field in string_fields:
+            out[field] = self._coerce_text(out.get(field))
+
+        # Ensure name is never missing/empty; avoid hard-fail on partial LLM payloads.
+        if not out.get("name"):
+            one_line = out.get("one_line") or ""
+            if one_line:
+                out["name"] = " ".join(one_line.split()[:4]).strip(" -,:") or "Unknown Startup"
+            else:
+                out["name"] = "Unknown Startup"
+
+        # target_users is frequently returned as array from LLM; force scalar string.
+        if not out.get("target_users"):
+            out["target_users"] = "Unknown target users"
+
+        # Confidence coercion.
+        try:
+            out["confidence"] = float(out.get("confidence"))
+        except (TypeError, ValueError):
+            out["confidence"] = 0.5
+        out["confidence"] = max(0.0, min(1.0, out["confidence"]))
+
+        # key_assumptions must be list[str] with length 2-4.
+        assumptions = out.get("key_assumptions")
+        if isinstance(assumptions, str):
+            assumptions = [assumptions]
+        elif not isinstance(assumptions, list):
+            assumptions = []
+        assumptions = [self._coerce_text(a) for a in assumptions if self._coerce_text(a)]
+        if len(assumptions) < 2:
+            assumptions.extend(
+                [
+                    "Customer demand converts into repeat usage.",
+                    "Go-to-market channel remains cost-effective.",
+                ]
+            )
+        out["key_assumptions"] = assumptions[:4]
+
+        # references must be list[str].
+        refs = out.get("references")
+        if isinstance(refs, str):
+            refs = [refs]
+        elif not isinstance(refs, list):
+            refs = []
+        refs = [self._coerce_text(r) for r in refs if self._coerce_text(r)]
+        site = self._coerce_text(out.get("lookup_website"))
+        if site and not any(site in r for r in refs):
+            normalized_site = site if site.lower().startswith(("http://", "https://")) else f"https://{site}"
+            refs.append(f"{out.get('name') or 'Company'} official website - {normalized_site}")
+        out["references"] = refs
+        return out
 
     def _postprocess_scout_dict(
         self,
@@ -379,7 +479,8 @@ class Scout(ABC):
             "Every required Scout field must be present with correct types: "
             "name, one_line, sector, problem, solution, target_users, why_now, confidence (0-1 number), "
             "primary_thesis, key_assumptions (array of 2-4 strings), biggest_unknown, references (1-8 strings). "
-            "Optional: funding_stage, est_tam (may be null). "
+            "Optional: funding_stage, est_tam (may be null — prefer order-of-magnitude est_tam when sources allow). "
+            "When sources cite traction (customers, pilots, ARR/MRR), reflect it in problem/solution/why_now text. "
             "`name` must be a real operating company's brand or legal name—not a hypothetical venture, not a market theme. "
             "Never return a partial object. Do not use markdown."
         )
@@ -440,7 +541,7 @@ class Scout(ABC):
         Normalize → allowlist + URL finalize → validate; on failure run one repair LLM pass.
         Subclasses wrap TypedDict(**partial) which does not enforce completeness — this does.
         """
-        d = dict(raw_data)
+        d = self._coerce_scout_payload(raw_data)
         self._normalize_scout_ids_inplace(d)
         p = self._postprocess_scout_dict(
             d,
@@ -475,7 +576,7 @@ class Scout(ABC):
             )
             if not isinstance(fixed, dict):
                 return None
-            d2 = dict(fixed)
+            d2 = self._coerce_scout_payload(fixed)
             self._normalize_scout_ids_inplace(d2)
             p2 = self._postprocess_scout_dict(
                 d2,
@@ -573,7 +674,8 @@ class Scout(ABC):
                             "Do NOT use \"General domain knowledge\" or \"no specific external sources\"—those are rejected. "
                             "Avoid giant public companies and hyperscalers (Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, etc.). "
                             "If you cannot find a suitable VC-scale startup with verifiable sources, return nothing. "
-                            "Do NOT invent company names or make up sources. Use null for funding_stage/est_tam if unknown. "
+                            "Do NOT invent company names or make up sources. Use null for funding_stage/est_tam if unknown; prefer est_tam when sources give market size. "
+                            "If sources mention customers, pilots, or revenue, state it concretely in problem/solution/why_now (no fabricated metrics). "
                             "You MUST include every top-level key from the schema (name through references); never return a partial JSON object with only id/scout_type/references. "
                             "Output only the JSON object, no text before or after."
                         ),
@@ -699,6 +801,7 @@ class Scout(ABC):
                 "Do NOT switch to similarly named companies (for example, different spelling variants). "
                 "If the evidence appears to point to a different company identity than requested, return nothing. "
                 "If confidence is low or data is incomplete, still return best-effort fields and set unknowns to null. "
+                "Prefer est_tam as an order-of-magnitude when inferable from sources; put supported traction facts in problem/solution/why_now. "
                 "You MUST include every top-level key from the schema (name through references); never return a partial object. "
                 "Do not invent references. Output only JSON."
             )

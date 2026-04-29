@@ -39,10 +39,9 @@ export function useActivitySummary(): UseActivitySummaryResult {
         setShowSummary(hasActivity);
         setLoading(false);
       })
-      .catch((err) => {
+      .catch(() => {
         if (cancelled) return;
         clearTimeout(timer);
-        console.warn('[activity summary] fetch failed:', err);
         setLoading(false);
       });
 

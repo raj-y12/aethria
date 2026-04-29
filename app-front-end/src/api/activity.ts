@@ -21,3 +21,17 @@ export async function fetchActivitySummary(): Promise<ActivitySummary> {
 export async function markActivitySeen(): Promise<void> {
   await authedFetch(`${API_BASE}/api/activity/seen`, { method: 'POST' });
 }
+
+/**
+ * After password sign-in, the global Clerk token getter may not be wired yet.
+ * Call with the session token from Clerk so the welcome screen can load activity.
+ */
+export async function fetchActivitySummaryWithToken(token: string): Promise<ActivitySummary | null> {
+  const t = token.trim();
+  if (!t) return null;
+  const res = await fetch(`${API_BASE}/api/activity/summary`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${t}` },
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as ActivitySummary;
+}

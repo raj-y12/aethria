@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from uuid import uuid4
-from models import ScoutInfo, ReviewInfo, PartnerInfo, PartnerSnapshot, Financials
+from models import ScoutInfo, ReviewInfo, PartnerInfo, PartnerSnapshot, Financials, AethriaView
 from utils.scoring import enrich_scores
 
 
@@ -139,7 +139,25 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
         fund_thesis_alignment_score=enriched.get("fund_thesis_alignment_score"),
         weighted_defensibility_score=enriched.get("weighted_defensibility_score"),
         confidence_adjusted_score=enriched.get("confidence_adjusted_score"),
+        structured_scoring=enriched.get("structured_scoring"),
+        structured_signals=enriched.get("structured_signals"),
+        resolution_notes=enriched.get("resolution_notes") or None,
+        disagreement_summary=enriched.get("disagreement_summary"),
+        aethria_view=_coerce_aethria_view(enriched.get("aethria_view")),
     )
+
+
+def _coerce_aethria_view(raw: Any) -> Optional[AethriaView]:
+    if raw is None:
+        return None
+    if isinstance(raw, AethriaView):
+        return raw
+    if isinstance(raw, dict):
+        try:
+            return AethriaView.model_validate(raw)
+        except Exception:
+            return None
+    return None
 
 
 def partner_output_to_partner_info(partner_output: Dict[str, Any]) -> PartnerInfo:
@@ -193,4 +211,5 @@ def partner_output_to_partner_info(partner_output: Dict[str, Any]) -> PartnerInf
         partnered_at=partnered,
         llm_fallback_reason=partner_output.get("llm_fallback_reason"),
         prompt_version=partner_output.get("prompt_version"),
+        decision_drivers=partner_output.get("decision_drivers"),
     )

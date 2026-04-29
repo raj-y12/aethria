@@ -51,12 +51,14 @@
   --clerk-font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
   --clerk-font-family-buttons: "JetBrains Mono", ui-monospace, monospace;
   --clerk-border-radius: 0;
-  /* Motion tokens — single source for duration/easing in CSS */
-  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --motion-micro: 0.15s;
-  --motion-short: 0.4s;
-  --motion-medium: 0.5s;
-  --motion-long: 0.6s;
+  /* Motion tokens — aligned with tokens.ts */
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);        /* strong ease-out — entering UI */
+  --motion-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* strong ease-in-out — moving on screen */
+  --motion-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);  /* iOS-like — drawers, slide-overs */
+  --motion-micro: 0.12s;
+  --motion-short: 0.22s;
+  --motion-medium: 0.35s;
+  --motion-long: 0.5s;
 
   /* ── Golden ratio system (φ = 1.618034) ──────────────────────────────────
    * Spacing: Fibonacci sequence — each step × φ ≈ next value.
@@ -505,21 +507,29 @@
   .escalation-dot-active {
     animation: aethria-accent-pulse 2s var(--motion-ease) infinite;
   }
-  /* Canonical button interaction: hover + active (token duration), focus from Pass 4 */
+  /* Canonical button interaction — specify exact properties, never `transition: all` */
   .btn-interaction {
-    transition: color var(--motion-micro) var(--motion-ease),
-      background-color var(--motion-micro) var(--motion-ease),
-      border-color var(--motion-micro) var(--motion-ease),
-      opacity var(--motion-micro) var(--motion-ease),
-      transform var(--motion-micro) var(--motion-ease);
+    transition:
+      color 150ms var(--motion-ease),
+      background-color 150ms var(--motion-ease),
+      border-color 150ms var(--motion-ease),
+      opacity 150ms var(--motion-ease),
+      transform 120ms var(--motion-ease);
   }
+  /* scale(0.97) gives instant tactile press feedback — translateY(1px) barely registers */
   .btn-interaction:active:not(:disabled) {
-    transform: translateY(1px);
-    opacity: 0.9;
+    transform: scale(0.97);
+    opacity: 0.88;
   }
   .btn-interaction:disabled {
     opacity: 0.7;
     cursor: not-allowed;
+  }
+  /* Gate hover effects — touch devices fire :hover on tap, causing false positives */
+  @media (hover: none) {
+    .btn-interaction:hover:not(:active) {
+      transform: none;
+    }
   }
   .confidence-bar-track {
     width: 40px;
@@ -563,6 +573,21 @@
 @keyframes skeleton-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+@keyframes empty-state-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.empty-state-enter {
+  animation: empty-state-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes aethria-pulse {

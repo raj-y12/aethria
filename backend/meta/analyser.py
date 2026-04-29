@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from collections import Counter
 
 from supabase_doc_store import doc_get, list_get_all
 
@@ -66,6 +67,7 @@ class MetaAnalyser:
         pipeline_health = self._build_pipeline_health(memory, concentration)
         cooldowns = self._build_cooldowns(mutation_log)
         churn_signals = self._build_churn_signals()
+        human_feedback = self._build_human_feedback(mutation_log)
 
         # Count total reviews and decisions for minimum thresholds
         total_reviews = sum(
@@ -88,6 +90,7 @@ class MetaAnalyser:
             "pipeline_health": pipeline_health,
             "mutation_cooldowns": cooldowns,
             "portfolio_churn_signals": churn_signals,
+            "human_feedback": human_feedback,
             "data_sufficiency": {
                 "total_reviews": max(total_reviews, total_reviews_from_vd),
                 "total_decisions": total_decisions,
@@ -221,6 +224,47 @@ class MetaAnalyser:
         """Read portfolio churn signals written by FeedbackLoop into meta_churn_signals."""
         data = doc_get("meta_churn_signals", user_id=self.user_id)
         return data if isinstance(data, dict) else {}
+
+    def _build_human_feedback(self, mutation_log: List[Dict]) -> Dict[str, Any]:
+        """
+        Analyst confirmations (Invest / Pass / Monitor + rationale) from WorkGrid,
+        appended to meta_mutation_log as type human_decision.
+        """
+        rows = [
+            e for e in (mutation_log or [])
+            if isinstance(e, dict) and e.get("type") == "human_decision"
+        ]
+        if not rows:
+            return {
+                "recent_count": 0,
+                "by_outcome": {},
+                "disagreed_with_ai_count": 0,
+                "sample_notes": [],
+            }
+
+        def _ts(e: Dict) -> str:
+            return str(e.get("resolved_at") or e.get("applied_at") or "")
+
+        rows = sorted(rows, key=_ts, reverse=True)[:80]
+        outcomes = Counter(str(e.get("human_decision") or "").upper() for e in rows)
+        by_outcome = {
+            "YES": int(outcomes.get("YES", 0)),
+            "NO": int(outcomes.get("NO", 0)),
+            "MAYBE": int(outcomes.get("MAYBE", 0)),
+        }
+        disagree = sum(1 for e in rows if e.get("disagreed_with_ai"))
+        samples: List[str] = []
+        for e in rows:
+            n = (e.get("notes") or "").strip()
+            if n and len(samples) < 5:
+                samples.append(n[:400])
+
+        return {
+            "recent_count": len(rows),
+            "by_outcome": by_outcome,
+            "disagreed_with_ai_count": disagree,
+            "sample_notes": samples,
+        }
 
     def _build_cooldowns(self, mutation_log: List[Dict]) -> Dict[str, bool]:
         """Compute cooldown flags. An agent cannot be mutated more than once per N cycles."""

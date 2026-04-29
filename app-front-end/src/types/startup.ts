@@ -53,6 +53,48 @@ export interface SingleReview {
   defensibility_reasoning?: string[];
   defensibility_weaknesses?: string[];
   defensibility_confidence?: 'low' | 'medium' | 'high';
+  /** Normalized extraction payload fed into deterministic scoring (audit trail). */
+  structured_signals?: Record<string, unknown>;
+}
+
+/** Single synthesized view from persisted reviewer artifacts (template v1; no extra LLM). */
+export interface AethriaView {
+  headline: string;
+  thesis_fit_line: string;
+  tension_summary: string;
+  focal_question: string;
+}
+
+export type ScoringDimensionKey =
+  | 'market'
+  | 'execution'
+  | 'product'
+  | 'technical'
+  | 'defensibility';
+
+export interface ScoringComponent {
+  value?: string | null;
+  label?: string | null;
+  score: number;
+  reasoning: string;
+  evidence?: string | null;
+  rule?: string | null;
+  confidence?: number | null;
+}
+
+export interface ScoringDimension {
+  score: number;
+  confidence?: number | null;
+  components: Record<string, ScoringComponent>;
+}
+
+export interface StructuredScoring {
+  market: ScoringDimension;
+  execution: ScoringDimension;
+  product: ScoringDimension;
+  technical: ScoringDimension;
+  defensibility: ScoringDimension;
+  overall_score: number;
 }
 
 export interface Review {
@@ -91,6 +133,13 @@ export interface Review {
   aggregate_score?: number | null;
   overall_score?: number | null;
   overall_label?: string | null;
+  /** Rubric v1.1 band (Weak / Concerning / Promising / Strong); additive alongside legacy overall_label. */
+  overall_rubric_band?: string | null;
+  market_rubric_band?: string | null;
+  product_rubric_band?: string | null;
+  technical_rubric_band?: string | null;
+  execution_rubric_band?: string | null;
+  defensibility_rubric_band?: string | null;
   score_source?: string | null;
   improvement_to_9?: string[] | null;
   market_score_label?: string | null;
@@ -122,6 +171,22 @@ export interface Review {
   thesis_alignment_confidence?: number | null;
   /** Resource policy thesis lens alignment (0–1); informational; does not drive rubric scores. */
   fund_thesis_alignment_score?: number | null;
+  /** Structured explainable scoring payload returned by backend scoring engine. */
+  scoring?: StructuredScoring | null;
+  structured_scoring?: StructuredScoring | null;
+  score_breakdown?: StructuredScoring | null;
+  market?: ScoringDimension | null;
+  execution?: ScoringDimension | null;
+  product?: ScoringDimension | null;
+  technical?: ScoringDimension | null;
+  defensibility?: ScoringDimension | null;
+  /** Blended-score verdict from reviewer engine; preferred over raw verdict when present. */
+  derived_verdict?: 'STRONG' | 'MEDIUM' | 'WEAK' | null;
+  /** Primary-row normalized structured_signals (DefaultReviewer when available). */
+  structured_signals?: Record<string, unknown>;
+  resolution_notes?: string[] | null;
+  disagreement_summary?: string | null;
+  aethria_view?: AethriaView | null;
 }
 
 export interface PartnerSnapshot {
@@ -148,6 +213,8 @@ export interface Partner {
   llm_fallback_reason?: string | null;
   /** Hash of the Partner agent prompt used when issuing this decision. */
   prompt_version?: string | null;
+  /** Ordered narrative drivers for recommendation/rationale alignment (analytics/UI). */
+  decision_drivers?: string[];
 }
 
 export interface Timestamps {
@@ -226,6 +293,26 @@ export interface ConcentrationAnalytics {
   last_updated: string;
 }
 
+/** GET /api/analytics/system-health */
+export interface SystemHealthSnapshot {
+  calibration_warning: string | null;
+  pending_escalations: number;
+  queue_depths: {
+    unreviewed: number;
+    undecided: number;
+    watchlist: number;
+  };
+  budget_status: Array<{
+    agent_id: string;
+    daily_calls_used: number;
+    daily_calls_limit: number;
+    daily_tokens_used: number;
+    daily_tokens_limit: number;
+    in_cooldown: boolean;
+    cooldown_until: string | null;
+  }>;
+}
+
 export interface PromptMutationSummary {
   agent_target: string;
   reasoning: string;
@@ -247,14 +334,104 @@ export interface CalibrationChangeSummary {
   reasoning: string;
 }
 
+/** Analyst Invest/Pass/Monitor confirmations aggregated for meta-agent prompt proposals. */
+export interface HumanFeedbackSummary {
+  recent_count: number;
+  by_outcome: { YES: number; NO: number; MAYBE: number };
+  disagreed_with_ai_count: number;
+  sample_notes: string[];
+}
+
 export interface MetaCycleReport {
   cycle_number: number;
   ran_at: string;
   next_cycle_at: string;
   mutations_applied: PromptMutationSummary[];
+  /** Gated meta-agent prompt proposals (same items as mutations_applied when using new backend). */
+  prompt_proposals?: PromptMutationSummary[];
   weight_updates: WeightUpdateSummary[];
   calibration_changes: CalibrationChangeSummary[];
   no_action_reasons: string[];
+  /** Full analyser output from backend (optional on API). */
+  signal_summary?: {
+    human_feedback?: HumanFeedbackSummary;
+  };
+}
+
+/** GET /api/meta/insights — curated summary from latest meta report */
+export interface MetaInsightsPayload {
+  latest: {
+    cycle_number?: number;
+    ran_at?: string;
+    next_cycle_at?: string;
+  } | null;
+  what_changed: {
+    mutations_applied?: unknown[];
+    prompt_proposals?: unknown[];
+    weight_updates?: unknown[];
+    calibration_changes?: unknown[];
+  } | null;
+  why: string[];
+  signal_summary?: MetaCycleReport['signal_summary'];
+}
+
+export interface MetaPromptLibraryEntrySummary {
+  library_key: string;
+  created_at?: string;
+  cycle_number?: number;
+  reasoning?: string;
+  promotion_status?: string;
+  previous_hash?: string;
+  prompt_char_count?: number;
+  prompt?: string;
+  warning?: string;
+  error?: string;
+}
+
+export interface MetaPromptState {
+  active: Record<string, string>;
+  active_detail: Record<string, MetaPromptLibraryEntrySummary>;
+  pending: MetaPromptLibraryEntrySummary[];
+  restart_note?: string;
+}
+
+export interface MetaEvalSet {
+  startup_ids: string[];
+  count: number;
+  max: number;
+}
+
+export interface PromptEvaluateRow {
+  startup_id: string;
+  status: string;
+  baseline_verdict?: string;
+  candidate_verdict?: string;
+  verdict_match?: boolean;
+  regression?: boolean;
+  mean_abs_delta?: number;
+  error?: string;
+}
+
+export interface PromptEvaluateSummary {
+  n_requested: number;
+  n_compared: number;
+  regression_count: number;
+  verdict_agreements: number;
+  mean_abs_score_delta: number;
+  passed: boolean;
+  pass_reason: string;
+  evaluated_at: string;
+}
+
+export interface PromptEvaluateResult {
+  ok: boolean;
+  error?: string;
+  library_key?: string;
+  agent_target?: string;
+  truncated?: boolean;
+  max_startups?: number;
+  summary?: PromptEvaluateSummary;
+  rows?: PromptEvaluateRow[];
 }
 
 export interface ScoutWeights {

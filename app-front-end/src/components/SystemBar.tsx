@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { useUser, useClerk } from '@clerk/react';
+import { Link } from 'react-router';
 import { motion } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
-import { useAgentsEnabled } from '../hooks/useAgentsEnabled';
+import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import AgentLogoutModal from './AgentLogoutModal';
-import { toggleAgents } from '../api/agents';
 
 interface SystemBarProps {
   agentConfig?: unknown;
@@ -92,34 +90,15 @@ export default function SystemBar({
   navLink,
 }: SystemBarProps) {
   const reduceMotion = usePrefersReducedMotion();
-  const navigate = useNavigate();
-  const { user } = useUser();
-  const { signOut } = useClerk();
-  const agentsEnabled = useAgentsEnabled();
+  const {
+    displayName,
+    agentActionPending,
+    agentActionError,
+    requestLogout,
+    logoutModalProps,
+  } = useAgentLogoutFlow();
   const [time, setTime] = useState(new Date());
-  const displayName = user?.username ?? user?.primaryEmailAddress?.emailAddress ?? 'Account';
   const [hasEnteredOnce, setHasEnteredOnce] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [agentActionPending, setAgentActionPending] = useState(false);
-  const [agentActionError, setAgentActionError] = useState<string | null>(null);
-
-  const doLogout = () => {
-    localStorage.removeItem('aethria_last_activity');
-    signOut?.().then(() => navigate('/sign-in', { replace: true }));
-  };
-
-  const toggleAgentsAndLogout = async (enabled: boolean) => {
-    setAgentActionPending(true);
-    setAgentActionError(null);
-    try {
-      await toggleAgents(enabled);
-      doLogout();
-    } catch {
-      setAgentActionError('Unable to update agent state. Please retry.');
-    } finally {
-      setAgentActionPending(false);
-    }
-  };
 
   useEffect(() => {
     const tick = () => setTime(new Date());
@@ -306,7 +285,7 @@ export default function SystemBar({
             ) : null}
             <button
               type="button"
-              onClick={() => setShowLogoutModal(true)}
+              onClick={requestLogout}
               disabled={agentActionPending}
               className="type-meta inline-flex min-h-[44px] items-center tracking-[0.06em] text-white/60 hover:text-white bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
             >
@@ -316,14 +295,7 @@ export default function SystemBar({
         </div>
       </motion.header>
 
-      <AgentLogoutModal
-        open={showLogoutModal}
-        agentsEnabled={agentsEnabled}
-        onCancel={() => setShowLogoutModal(false)}
-        onKeepRunning={() => { setShowLogoutModal(false); doLogout(); }}
-        onTurnOffAndLogout={async () => { await toggleAgentsAndLogout(false); }}
-        onTurnOnAndStay={async () => { await toggleAgentsAndLogout(true); }}
-      />
+      <AgentLogoutModal {...logoutModalProps} />
     </>
   );
 }

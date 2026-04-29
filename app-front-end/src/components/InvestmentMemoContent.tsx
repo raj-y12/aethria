@@ -1,8 +1,9 @@
-import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useState, type ReactNode } from 'react';
 import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
 import './InvestmentMemoContent.css';
-import type { Startup, Review, SingleReview } from '../types/startup';
+import type { Review, ScoringDimensionKey, Startup, AethriaView } from '../types/startup';
+import { normalizeStructuredScoring } from '../lib/reviewScoring';
 import {
   buildMemoPDF,
   buildIcMarkdown,
@@ -11,41 +12,22 @@ import {
   type PipelineReplayStep,
 } from '../lib/memoIcPack';
 import { memoReferenceHref, memoReferenceLabel } from '../lib/memoReferenceHref';
-import {
-  getScoreBand,
-  DECISION_LABELS,
-  SCORE_DIMENSIONS,
-} from '../design-system/semantics';
+import { DECISION_LABELS } from '../design-system/semantics';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
-const SCORE_DERIVATION_FALLBACK =
-  'Score derived from multiple reviewer perspectives (optimistic, neutral, skeptical) and aggregated.';
+import ScoreOverview from './scoring/ScoreOverview';
+import DimensionCard from './scoring/DimensionCard';
 const MEMO_POLL_INITIAL_MS = 2000;
 const MEMO_POLL_MAX_MS = 15000;
 const MEMO_POLL_MAX_ATTEMPTS = 60;
 
-function computeOverallScore(review: Review | null | undefined): number | null {
-  if (!review) return null;
-  if (typeof review.overall_score === 'number') return review.overall_score;
-  if (typeof review.aggregate_score === 'number') return review.aggregate_score;
-  const scores = [
-    review.market_score,
-    review.product_score,
-    review.technical_score,
-    review.execution_score,
-  ];
-  if (!scores.every((s) => typeof s === 'number')) return null;
-  const vals = scores as number[];
-  return vals.reduce((a, b) => a + b, 0) / vals.length;
-}
-
-function scoreLabelFor(review: Review | null | undefined, dimension: string, score: number | null): string | null {
-  const key = `${dimension}_label` as keyof Review;
-  const fromReview = review?.[key];
-  if (typeof fromReview === 'string' && fromReview.trim()) return fromReview;
-  if (score == null) return null;
-  return getScoreBand(score).label;
-}
+const SCORING_DIMENSIONS: Array<{ key: ScoringDimensionKey; label: string; id: string }> = [
+  { key: 'market', label: 'Market', id: 'memo-score-market' },
+  { key: 'execution', label: 'Execution', id: 'memo-score-execution' },
+  { key: 'product', label: 'Product', id: 'memo-score-product' },
+  { key: 'technical', label: 'Technical', id: 'memo-score-technical' },
+  { key: 'defensibility', label: 'Defensibility', id: 'memo-score-defensibility' },
+];
 
 function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | null): Startup {
   if (!partial) return base;
@@ -97,27 +79,32 @@ function normalizeListItemText(value: unknown): string {
     .trim();
 }
 
-function normalizeMemoStringList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => normalizeListItemText(item))
-    .filter((item) => item && !/^\[MISSING/i.test(item));
-}
+const MEMO_NUMBER_TOKEN_REGEX = /(?:[$€£¥]\s*)?\d[\d,]*(?:\.\d+)?(?:%|x|X|k|K|m|M|b|B)?(?:\/\d+(?:\.\d+)?)?/g;
 
-function uniqueMemoItems(items: string[]): string[] {
-  return [...new Set(items.map((item) => normalizeListItemText(item)).filter(Boolean))];
-}
-
-function deriveWeaknessesFromReasoning(items: string[]): string[] {
-  const caveatPattern = /\b(but|however|risk|risks|gap|gaps|weak|weakness|unknown|unproven|replication|constraint|depends|relies)\b/i;
-  return uniqueMemoItems(
-    items.flatMap((item) =>
-      normalizeListItemText(item)
-        .split(/;|\.\s+/)
-        .map((part) => part.replace(/^(but|however)\s+/i, '').trim())
-        .filter((part) => part.length > 12 && caveatPattern.test(part))
-    )
-  );
+function renderWithMonoNumbers(value: unknown): ReactNode {
+  const text = String(value ?? '');
+  if (!text) return text;
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let tokenIndex = 0;
+  for (const match of text.matchAll(MEMO_NUMBER_TOKEN_REGEX)) {
+    const token = match[0];
+    const start = match.index ?? 0;
+    if (start > lastIndex) {
+      parts.push(text.slice(lastIndex, start));
+    }
+    parts.push(
+      <span key={`memo-num-${start}-${tokenIndex}`} className="memoNum">
+        {token}
+      </span>
+    );
+    lastIndex = start + token.length;
+    tokenIndex += 1;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts.length ? <>{parts}</> : text;
 }
 
 function partnerDecisionHeadline(startup: Startup): string {
@@ -207,11 +194,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 ) {
   const reduceMotion = usePrefersReducedMotion();
   const wrapperCls = embedded ? 'memoPanel memoPanel--embedded' : 'memoPanel';
-  const [activeDimensionId, setActiveDimensionId] = useState<string | null>(null);
   const [selectedReviewerIdx, setSelectedReviewerIdx] = useState(0);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pipelineLogOpen, setPipelineLogOpen] = useState(false);
-  const [scoreTooltipOpen, setScoreTooltipOpen] = useState(false);
 
   const [memoPartial, setMemoPartial] = useState<MemoPartialPayload | null>(null);
   const [memoPipeline, setMemoPipeline] = useState<'idle' | 'generating' | 'ready' | 'failed'>('idle');
@@ -335,68 +320,15 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   );
 
   useEffect(() => {
-    setActiveDimensionId(null);
     setSelectedReviewerIdx(0);
     setSourcesOpen(false);
     setPipelineLogOpen(false);
-    setScoreTooltipOpen(false);
   }, [startup?.id]);
 
-  const scoreBlocks = useMemo(() => {
-    if (!displayStartup?.review) return [];
-    return SCORE_DIMENSIONS.map(({ id, name }) => {
-      const score = displayStartup.review?.[id as keyof typeof displayStartup.review];
-      const numeric = typeof score === 'number' ? score : null;
-      const reasoning = displayStartup.review?.score_reasoning?.[id]?.trim() || '';
-      const dimBase = id.replace('_score', '');
-      const structuredReasoning = displayStartup.review?.[`${dimBase}_reasoning` as keyof Review];
-      const normalizedReasoning = normalizeMemoStringList(structuredReasoning);
-      const weaknessKey = `${dimBase}_weaknesses` as keyof Review & keyof SingleReview;
-      const topLevelWeaknesses = normalizeMemoStringList(displayStartup.review?.[weaknessKey]);
-      const reviewerWeaknesses = (displayStartup.review?.reviews ?? []).flatMap((review) =>
-        normalizeMemoStringList(review[weaknessKey])
-      );
-      const caveatWeaknesses = deriveWeaknessesFromReasoning([
-        ...normalizedReasoning,
-        ...(reasoning ? [reasoning] : []),
-      ]);
-      const broadRiskWeaknesses = normalizeMemoStringList([
-        ...(displayStartup.review?.key_risks ?? []),
-        ...(displayStartup.review?.diligence_red_flags ?? []),
-      ]);
-      const confidence = displayStartup.review?.[`${dimBase}_confidence` as keyof Review];
-      return {
-        id,
-        name,
-        score: numeric,
-        label: scoreLabelFor(displayStartup.review, id, numeric),
-        reasoning,
-        structuredReasoning: normalizedReasoning,
-        weaknesses: uniqueMemoItems([
-          ...topLevelWeaknesses,
-          ...reviewerWeaknesses,
-          ...caveatWeaknesses,
-          ...(topLevelWeaknesses.length || reviewerWeaknesses.length || caveatWeaknesses.length
-            ? []
-            : broadRiskWeaknesses.slice(0, 2)),
-        ]),
-        confidence: typeof confidence === 'string' ? confidence : null,
-      };
-    });
-  }, [displayStartup]);
-
-  const overallScore = useMemo(() => computeOverallScore(displayStartup?.review), [displayStartup?.review]);
-  const overallLabel = useMemo(() => {
-    if (!displayStartup?.review) return null;
-    if (typeof displayStartup.review.overall_label === 'string' && displayStartup.review.overall_label.trim()) {
-      return displayStartup.review.overall_label.trim();
-    }
-    return overallScore != null ? getScoreBand(overallScore).label : null;
-  }, [displayStartup?.review, overallScore]);
-  const scoreSourceText = useMemo(() => {
-    const raw = displayStartup?.review?.score_source;
-    return typeof raw === 'string' && raw.trim() ? raw.trim() : SCORE_DERIVATION_FALLBACK;
-  }, [displayStartup?.review?.score_source]);
+  const structuredScoring = useMemo(
+    () => normalizeStructuredScoring(displayStartup?.review ?? null),
+    [displayStartup?.review]
+  );
   const nextStepText = displayStartup ? getNextStepText(displayStartup) : '';
   const nextStepItems = useMemo(() => parseNextStepItems(nextStepText), [nextStepText]);
   const pipelineReplaySteps = useMemo(
@@ -446,7 +378,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               >
                 <p className="memoPipelineKicker">Pipeline</p>
                 <p className="memoGateTitle">Memo unavailable</p>
-                <p className="memoGateDetail">{memoGateError}</p>
+                <p className="memoGateDetail">{renderWithMonoNumbers(memoGateError)}</p>
               </motion.div>
             </div>
           )}
@@ -464,13 +396,44 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               <div className="memoDocHeaderMain">
                 <h1 className="memoCompany" id="memo-title">{companyName || '—'}</h1>
                 {displayStartup.scout.one_line?.trim() && (
-                  <p className="memoDocTagline">{displayStartup.scout.one_line}</p>
+                  <p className="memoDocTagline">{renderWithMonoNumbers(displayStartup.scout.one_line)}</p>
                 )}
-                <p className="memoMeta">{sectorCategory}</p>
+                <p className="memoMeta">
+                  {sectorCategory.trim() ? renderWithMonoNumbers(sectorCategory) : null}
+                  {showLookupBadge && (
+                    <>
+                      {sectorCategory.trim() ? (
+                        <span className="memoMetaSep" aria-hidden>
+                          {' · '}
+                        </span>
+                      ) : null}
+                      <span className="text-lookup">Lookup</span>
+                    </>
+                  )}
+                </p>
               </div>
             </div>
 
             <div className="memoDocDivider" aria-hidden />
+
+            {/* ── Generating state ── */}
+            {memoPipeline === 'generating' && (
+              <section className="memoGeneratingSection" aria-live="polite">
+                <div className="memoSummaryCallout memoGenCallout">
+                  <p className="memoPipelineKicker">Investment memo</p>
+                  <motion.p
+                    className="memoGateTitle"
+                    animate={reduceMotion ? { opacity: 1 } : { opacity: [0.55, 1, 0.55] }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                  >
+                    Generating full investment memo…
+                  </motion.p>
+                  <p className="memoGateDetail">
+                    {renderWithMonoNumbers('This page updates automatically when the formatted memo is persisted.')}
+                  </p>
+                </div>
+              </section>
+            )}
 
             {/* ── Investment Judgment ── */}
             {showJudgment && (() => {
@@ -481,23 +444,28 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <h2 className="memoDocSectionHead" id="memo-judgment">Investment Judgment</h2>
                   {decisionBadgeVariant && (
                     <div className="memoDocJudgmentTop">
-                      {showLookupBadge && <span className="memoDocLookupBadge">ON-DEMAND LOOKUP</span>}
                       <p className={`memoDocRecommendation memoDocRecommendation--${decisionBadgeVariant.toLowerCase()}`}>
                         {decisionHeadline}.
                       </p>
                       <div className="memoDocStatusLine">
                         {displayStartup.partner?.confidence != null && (
                           <p className="memoDocConfidence">
-                            {Math.round(displayStartup.partner.confidence * 100)}% confidence
+                            <span className="memoNum">{Math.round(displayStartup.partner.confidence * 100)}%</span> confidence
                           </p>
                         )}
                         {showEscalationBadge && (
                           <p className="memoDocEscalation">Escalation required</p>
                         )}
                       </div>
+                      {displayStartup.partner?.decision_drivers &&
+                        displayStartup.partner.decision_drivers.length > 0 && (
+                          <p className="memoDocDrivers">
+                            {displayStartup.partner.decision_drivers.join(' · ')}
+                          </p>
+                        )}
                     </div>
                   )}
-                  {paras.map((p, i) => <p key={i} className="memoDocProse">{p}</p>)}
+                  {paras.map((p, i) => <p key={i} className="memoDocProse">{renderWithMonoNumbers(p)}</p>)}
                 </section>
               );
             })()}
@@ -509,7 +477,31 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               return (
                 <section className="memoDocSection" aria-labelledby="memo-exec-summary">
                   <h2 className="memoDocSectionHead" id="memo-exec-summary">Executive Summary</h2>
-                  {summary && <p className="memoDocProse">{summary}</p>}
+                  {summary && <p className="memoDocProse">{renderWithMonoNumbers(summary)}</p>}
+                </section>
+              );
+            })()}
+
+            {/* ── Aethria view (synthesized from persisted signals & divergence) ── */}
+            {(() => {
+              const av = displayStartup.review?.aethria_view as AethriaView | undefined | null;
+              if (!av?.headline?.trim()) return null;
+              return (
+                <section className="memoDocSection" aria-labelledby="memo-aethria-view">
+                  <h2 className="memoDocSectionHead" id="memo-aethria-view">Aethria view</h2>
+                  <p className="memoDocProse font-semibold text-oxford">{renderWithMonoNumbers(av.headline)}</p>
+                  {av.thesis_fit_line?.trim() && (
+                    <p className="memoDocProse mt-2">{renderWithMonoNumbers(av.thesis_fit_line)}</p>
+                  )}
+                  {av.tension_summary?.trim() && (
+                    <p className="memoDocProse mt-2 text-oxford/90">{renderWithMonoNumbers(av.tension_summary)}</p>
+                  )}
+                  {av.focal_question?.trim() && (
+                    <p className="memoDocProse mt-3 border-l-2 border-oxford/25 pl-3">
+                      <span className="memoDocSubhead block mb-1">Focal question</span>
+                      {renderWithMonoNumbers(av.focal_question)}
+                    </p>
+                  )}
                 </section>
               );
             })()}
@@ -530,7 +522,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     {rows.map((r) => (
                       <div key={r.key} className="memoDocDLRow">
                         <dt className="memoDocDT">{r.key}</dt>
-                        <dd className="memoDocDD">{r.val}</dd>
+                        <dd className="memoDocDD">{renderWithMonoNumbers(r.val)}</dd>
                       </div>
                     ))}
                   </dl>
@@ -554,7 +546,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     {rows.map((r) => (
                       <div key={r.key} className="memoDocDLRow">
                         <dt className="memoDocDT">{r.key}</dt>
-                        <dd className="memoDocDD">{r.val}</dd>
+                        <dd className="memoDocDD">{renderWithMonoNumbers(r.val)}</dd>
                       </div>
                     ))}
                   </dl>
@@ -571,7 +563,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               return (
                 <section className="memoDocSection" aria-labelledby="memo-thesis">
                   <h2 className="memoDocSectionHead" id="memo-thesis">Investment Thesis</h2>
-                  {thesis && <p className="memoDocProse memoDocThesis">{thesis}</p>}
+                  {thesis && <p className="memoDocProse memoDocThesis">{renderWithMonoNumbers(thesis)}</p>}
                   {assumptions && assumptions.length > 0 && (
                     <div className="memoDocSubsection">
                       <p className="memoDocSubhead">Key Assumptions</p>
@@ -579,7 +571,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         {assumptions.map((item, i) => (
                           <li key={i} className="memoListItem">
                             <span className="memoBullet" aria-hidden>·</span>
-                            <span>{normalizeListItemText(item)}</span>
+                            <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
                           </li>
                         ))}
                       </ul>
@@ -588,7 +580,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   {biggest && (
                     <div className="memoDocSubsection">
                       <p className="memoDocSubhead">Biggest Unknown</p>
-                      <p className="memoDocProse">{biggest}</p>
+                      <p className="memoDocProse">{renderWithMonoNumbers(biggest)}</p>
                     </div>
                   )}
                 </section>
@@ -601,112 +593,86 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               const teamItems = (displayStartup.review?.team_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const compItems = (displayStartup.review?.competition_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const bizItems = (displayStartup.review?.business_model_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
-              const hasScores = displayStartup.review && scoreBlocks.length > 0;
-              if (!hasScores && !teamItems.length && !compItems.length && !bizItems.length) return null;
+              const hasScores = !!structuredScoring;
+              const rawSig = displayStartup.review?.structured_signals as Record<string, unknown> | undefined;
+              const hasSignalsAudit =
+                !!(rawSig && Object.keys(rawSig).length > 0) ||
+                !!displayStartup.review?.disagreement_summary?.trim() ||
+                (displayStartup.review?.resolution_notes?.filter(Boolean) ?? []).length > 0;
+              if (
+                !displayStartup.review &&
+                !teamItems.length &&
+                !compItems.length &&
+                !bizItems.length &&
+                !hasSignalsAudit &&
+                !hasScores
+              ) {
+                return null;
+              }
               return (
                 <section className="memoDocSection" aria-labelledby="memo-assessment">
                   <h2 className="memoDocSectionHead" id="memo-assessment">Assessment</h2>
 
-                  {hasScores && (
+                  {(hasScores || hasSignalsAudit) && (
                     <div className="memoDocScoreScope">
-                      <div className="memoDocOverallScoreRow">
-                        <div className="memoDocOverallScoreMain">
-                          <p className="memoDocOverallScoreValue">
-                            {overallScore != null ? overallScore.toFixed(1) : '—'}
-                          </p>
-                          <p className="memoDocOverallScoreLabel">
-                            {overallLabel ?? 'Unscored'}
+                      {(() => {
+                        const sig = rawSig;
+                        const dsum = displayStartup.review?.disagreement_summary?.trim();
+                        const rnotes = displayStartup.review?.resolution_notes?.filter(Boolean) ?? [];
+                        if (!sig && !dsum && rnotes.length === 0) return null;
+                        const sigPreview =
+                          sig && Object.keys(sig).length > 0
+                            ? JSON.stringify(sig, null, 2).slice(0, 6000)
+                            : null;
+                        return (
+                          <div className="memoDocSubsection mb-4 border border-oxford/10 bg-oxford/[0.03] px-3 py-3">
+                            <p className="memoDocSubhead">Signals &amp; reviewer alignment</p>
+                            {dsum && (
+                              <p className="memoDocProse text-sm text-oxford/90">{renderWithMonoNumbers(dsum)}</p>
+                            )}
+                            {rnotes.length > 0 && (
+                              <ul className="memoList mt-2">
+                                {rnotes.map((note, i) => (
+                                  <li key={i} className="memoListItem text-sm">
+                                    <span className="memoBullet" aria-hidden>
+                                      ·
+                                    </span>
+                                    <span>{renderWithMonoNumbers(String(note))}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {sigPreview && (
+                              <pre className="mt-2 max-h-48 overflow-auto rounded bg-oxford/[0.04] p-2 font-mono text-[11px] leading-snug text-oxford/85">
+                                {sigPreview}
+                                {sigPreview.length >= 6000 ? '\n…' : ''}
+                              </pre>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      {structuredScoring && (
+                        <>
+                          <ScoreOverview scoring={structuredScoring} />
+                          <div className="mt-3 space-y-3">
+                            {SCORING_DIMENSIONS.map((dimension) => (
+                              <DimensionCard
+                                key={dimension.key}
+                                id={dimension.id}
+                                title={dimension.label}
+                                dimension={structuredScoring[dimension.key]}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {hasScores && !structuredScoring && (
+                        <div className="mt-2 border border-oxford/10 bg-oxford/[0.02] px-3 py-3">
+                          <p className="type-meta text-oxford/75">
+                            Structured scoring is not present in this memo payload yet.
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          className="memoDocTooltipBtn"
-                          aria-label="How this score is derived"
-                          aria-expanded={scoreTooltipOpen}
-                          aria-controls={`${contentKey}-score-tooltip`}
-                          onClick={() => setScoreTooltipOpen((v) => !v)}
-                        >
-                          Method
-                        </button>
-                      </div>
-                      {scoreTooltipOpen && (
-                        <p id={`${contentKey}-score-tooltip`} className="memoDocTooltipPanel" role="note">
-                          {scoreSourceText}
-                        </p>
                       )}
-                      <div className="memoDocScoreLegend" aria-label="Score scale">
-                        <span><strong>1–3</strong> Weak</span>
-                        <span><strong>4–5</strong> Concerning</span>
-                        <span><strong>6–7</strong> Promising</span>
-                        <span><strong>8–10</strong> Strong</span>
-                      </div>
-                      <div className="memoDocScoreStack">
-                        {scoreBlocks.map((b) => {
-                          const expanded = activeDimensionId === b.id;
-                          const panelId = `${contentKey}-${b.id}-details`;
-                          const reasoningItems = b.structuredReasoning.length
-                            ? b.structuredReasoning
-                            : [b.reasoning || (b.score != null ? getScoreBand(b.score).meaning : 'No rationale available.')];
-                          const weaknessItems = b.weaknesses.length ? b.weaknesses : null;
-                          return (
-                            <article key={b.id} className="memoDocScorePanel">
-                              <button
-                                type="button"
-                                className="memoDocScorePanelToggle"
-                                onClick={() => setActiveDimensionId((prev) => (prev === b.id ? null : b.id))}
-                                aria-expanded={expanded}
-                                aria-controls={panelId}
-                              >
-                                <span className="memoDocScorePanelTitle">{b.name}</span>
-                                <span className="memoDocScorePanelValue" aria-label={`${b.name} score`}>
-                                  <span className="memoDocScorePanelNumber">
-                                    {b.score != null ? b.score.toFixed(1) : '—'}
-                                  </span>
-                                  <span className="memoDocScorePanelBand">
-                                    {b.score != null ? b.label ?? getScoreBand(b.score).label : 'Unscored'}
-                                  </span>
-                                </span>
-                                <span className="memoDocScorePanelMeta">
-                                  <span>{(b.confidence ?? 'medium').toUpperCase()} confidence</span>
-                                  <span className="memoDocScorePanelToggleGlyph" aria-hidden>
-                                    {expanded ? '−' : '+'}
-                                  </span>
-                                </span>
-                              </button>
-                              {expanded && (
-                                <div
-                                  id={panelId}
-                                  className="memoDocExpandedBody"
-                                  role="region"
-                                >
-                                  <p className="memoDocExpandedLabel">Reasoning</p>
-                                  <ul className="memoList">
-                                    {reasoningItems.map((item, i) => (
-                                      <li key={i} className="memoListItem">
-                                        <span className="memoBullet" aria-hidden>·</span>
-                                        <span>{normalizeListItemText(item)}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                  {weaknessItems && (
-                                    <>
-                                      <p className="memoDocExpandedLabel memoDocExpandedLabel--weaknesses">Weaknesses / risks</p>
-                                      <ul className="memoList">
-                                        {weaknessItems.map((item, i) => (
-                                          <li key={i} className="memoListItem">
-                                            <span className="memoBullet" aria-hidden>·</span>
-                                            <span>{normalizeListItemText(item)}</span>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </>
-                                  )}
-                                </div>
-                              )}
-                            </article>
-                          );
-                        })}
-                      </div>
                       {(displayStartup.review?.improvement_to_9?.length ?? 0) > 0 && (
                         <div className="memoDocSubsection">
                           <p className="memoDocSubhead">What would make this a 9?</p>
@@ -714,7 +680,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                             {(displayStartup.review?.improvement_to_9 ?? []).map((item, i) => (
                               <li key={i} className="memoListItem">
                                 <span className="memoBullet" aria-hidden>·</span>
-                                <span>{normalizeListItemText(item)}</span>
+                                <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
                               </li>
                             ))}
                           </ul>
@@ -730,7 +696,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         {teamItems.map((item, i) => (
                           <li key={i} className="memoListItem">
                             <span className="memoBullet" aria-hidden>·</span>
-                            <span>{normalizeListItemText(item)}</span>
+                            <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
                           </li>
                         ))}
                       </ul>
@@ -743,7 +709,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         {compItems.map((item, i) => (
                           <li key={i} className="memoListItem">
                             <span className="memoBullet" aria-hidden>·</span>
-                            <span>{normalizeListItemText(item)}</span>
+                            <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
                           </li>
                         ))}
                       </ul>
@@ -756,7 +722,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         {bizItems.map((item, i) => (
                           <li key={i} className="memoListItem">
                             <span className="memoBullet" aria-hidden>·</span>
-                            <span>{normalizeListItemText(item)}</span>
+                            <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
                           </li>
                         ))}
                       </ul>
@@ -789,7 +755,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       {tiles.map((t) => (
                         <div key={t.label} className="memoDocAlignTile">
                           <p className="memoDocAlignTileLabel">{t.label}</p>
-                          <p className="memoDocAlignTileVal">{t.val}</p>
+                          <p className="memoDocAlignTileVal">{renderWithMonoNumbers(t.val)}</p>
                         </div>
                       ))}
                     </div>
@@ -804,7 +770,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                               {fitPoints.map((item, i) => (
                                 <li key={i} className="memoListItem">
                                   <span className="memoBullet" aria-hidden>·</span>
-                                  <span>{normalizeListItemText(item)}</span>
+                                  <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
                                 </li>
                               ))}
                             </ul>
@@ -819,7 +785,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                               {gapPoints.map((item, i) => (
                                 <li key={i} className="memoListItem">
                                   <span className="memoBullet" aria-hidden>·</span>
-                                  <span>{normalizeListItemText(item)}</span>
+                                  <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
                                 </li>
                               ))}
                             </ul>
@@ -861,7 +827,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                             {REVIEWER_LABELS[rv.reviewer_type] ?? rv.reviewer_type}
                           </span>
                           <span className="memoDocReviewerRowVerdict">{rv.verdict}</span>
-                          <span className="memoDocReviewerRowScores">{scoreRow}</span>
+                          <span className="memoDocReviewerRowScores">{renderWithMonoNumbers(scoreRow)}</span>
                         </button>
                       );
                     })}
@@ -874,7 +840,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       animate={{ opacity: 1 }}
                       transition={transitionOrReduced(reduceMotion, { duration: 0.18, ease: [0.16, 1, 0.3, 1] })}
                     >
-                      <p className="memoDocReviewerDetailText">{selected.overall_summary}</p>
+                      <p className="memoDocReviewerDetailText">{renderWithMonoNumbers(selected.overall_summary)}</p>
                     </motion.div>
                   )}
                 </section>
@@ -904,7 +870,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       {uniqueRisks.map((r, i) => (
                         <li key={i} className="memoListItem">
                           <span className="memoBullet">·</span>
-                          <span>{normalizeListItemText(r)}</span>
+                          <span>{renderWithMonoNumbers(normalizeListItemText(r))}</span>
                         </li>
                       ))}
                     </ul>
@@ -916,7 +882,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         {mitigation.map((item, i) => (
                           <li key={i} className="memoListItem">
                             <span className="memoBullet">·</span>
-                            <span>{normalizeListItemText(item)}</span>
+                            <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
                           </li>
                         ))}
                       </ul>
@@ -934,13 +900,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <ul className="memoList">
                     {nextStepItems.map((item, idx) => (
                       <li key={idx} className="memoListItem">
-                        <span className="memoBullet">{idx + 1}.</span>
-                        <span>{normalizeListItemText(item)}</span>
+                        <span className="memoBullet"><span className="memoNum">{idx + 1}</span>.</span>
+                        <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="memoDocProse">{nextStepText}</p>
+                  <p className="memoDocProse">{renderWithMonoNumbers(nextStepText)}</p>
                 )}
               </section>
             )}
@@ -951,7 +917,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 <dl className="memoDocDL">
                   <div className="memoDocDLRow">
                     <dt className="memoDocDT">Decision context</dt>
-                    <dd className="memoDocDD">{displayStartup.partner.llm_fallback_reason}</dd>
+                    <dd className="memoDocDD">{renderWithMonoNumbers(displayStartup.partner.llm_fallback_reason)}</dd>
                   </div>
                 </dl>
               </div>
@@ -991,9 +957,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                               <li key={i} className="memoListItem">
                                 <span className="memoBullet">·</span>
                                 {href ? (
-                                  <a className="memoLink" href={href} target="_blank" rel="noreferrer">{label}</a>
+                                  <a className="memoLink" href={href} target="_blank" rel="noreferrer">{renderWithMonoNumbers(label)}</a>
                                 ) : (
-                                  <span>{label}</span>
+                                  <span>{renderWithMonoNumbers(label)}</span>
                                 )}
                               </li>
                             );
@@ -1021,7 +987,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <span className="memoPipelineToggleTitle">
                     <span className="memoPipelineKicker">Run log</span>
                     <span className="memoPipelineOneLiner" title={pipelineReplaySummary}>
-                      {pipelineReplaySummary}
+                      {renderWithMonoNumbers(pipelineReplaySummary)}
                     </span>
                   </span>
                   <span className="memoPipelinePlus">{pipelineLogOpen ? '−' : '+'}</span>
@@ -1044,8 +1010,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                               {step.done ? 'Done' : 'Pending'}
                             </span>
                           </p>
-                          <p className="memoReplayWhen">{step.atDisplay}</p>
-                          <p className="memoReplayDetail">{step.detail}</p>
+                          <p className="memoReplayWhen">{renderWithMonoNumbers(step.atDisplay)}</p>
+                          <p className="memoReplayDetail">{renderWithMonoNumbers(step.detail)}</p>
                         </li>
                       ))}
                     </ol>
@@ -1054,24 +1020,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </section>
             )}
 
-            {/* ── Generating state ── */}
-            {memoPipeline === 'generating' && (
-              <section className="memoGeneratingSection" aria-live="polite">
-                <div className="memoSummaryCallout memoGenCallout">
-                  <p className="memoPipelineKicker">Investment memo</p>
-                  <motion.p
-                    className="memoGateTitle"
-                    animate={reduceMotion ? { opacity: 1 } : { opacity: [0.55, 1, 0.55] }}
-                    transition={reduceMotion ? { duration: 0 } : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-                  >
-                    Generating full investment memo…
-                  </motion.p>
-                  <p className="memoGateDetail">
-                    This page updates automatically when the formatted memo is persisted.
-                  </p>
-                </div>
-              </section>
-            )}
 
           </motion.div>
         </div>

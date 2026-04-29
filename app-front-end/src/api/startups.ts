@@ -88,7 +88,11 @@ export async function fetchLookupJobStatus(lookupId: string): Promise<LookupJobS
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) {
-    return { lookup_id: id, failed: false };
+    return {
+      lookup_id: id,
+      failed: true,
+      message: 'Could not verify lookup status. Check your connection and try again.',
+    };
   }
   const data = await res.json();
   return {

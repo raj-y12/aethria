@@ -18,7 +18,7 @@ Your additional lens:
 - Identify hidden optionality (platform potential, adjacent markets)
 - Your role is to find the next breakout opportunity before consensus forms"""
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
+    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
         self.reviewer_type = "opportunist"
-        super().__init__(api_key, model=model)
+        super().__init__(api_key, model=model, tenant_user_id=tenant_user_id)
         self.SYSTEM_PROMPT = self.SYSTEM_PROMPT + self.OPPORTUNIST_ADDENDUM

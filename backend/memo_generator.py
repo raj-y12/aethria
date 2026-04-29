@@ -13,6 +13,7 @@ from datetime import datetime
 
 from models import Startup
 from utils.scoring import compute_overall_score, score_to_label
+from utils.score_semantics import rubric_band_for_numeric, rubric_score_bands_markdown_footnote
 
 _logger_memo = logging.getLogger("memo_generation")
 
@@ -24,16 +25,6 @@ SCORE_DIMENSIONS = [
     ("execution_score", "Execution"),
     ("defensibility_score", "Defensibility"),
 ]
-
-# Score bands: 1–3 Weak, 4–5 Concerning, 6–7 Promising, 8–10 Strong (align with evaluation_rubric)
-SCORE_BANDS = [(1, 3, "Weak"), (4, 5, "Concerning"), (6, 7, "Promising"), (8, 10, "Strong")]
-
-
-def _get_score_band(score: int) -> str:
-    for lo, hi, label in SCORE_BANDS:
-        if lo <= score <= hi:
-            return label
-    return "—"
 
 
 def _append_thesis_alignment_section(
@@ -102,7 +93,7 @@ def _append_thesis_alignment_section(
             for b in fits:
                 lines.append(f"- {b}")
         else:
-            lines.append("- [MISSING]")
+            lines.append("- Not provided")
         lines.append("")
         lines.append("**Where it deviates**")
         lines.append("")
@@ -111,7 +102,7 @@ def _append_thesis_alignment_section(
             for b in devs:
                 lines.append(f"- {b}")
         else:
-            lines.append("- [MISSING]")
+            lines.append("- Not provided")
         lines.append("")
     lines.append("---")
     lines.append("")
@@ -163,11 +154,11 @@ class MemoGenerator:
             if startup.scout_info.funding_stage:
                 lines.append(f"**Funding Stage:** {startup.scout_info.funding_stage}")
             else:
-                lines.append("**Funding Stage:** [MISSING]")
+                lines.append("**Funding Stage:** Not provided")
             if startup.scout_info.est_tam:
                 lines.append(f"**Est. TAM:** {startup.scout_info.est_tam}")
             else:
-                lines.append("**Est. TAM:** [MISSING]")
+                lines.append("**Est. TAM:** Not provided")
             lines.append(f"**Scout Type:** {startup.scout_info.scout_type}")
             lines.append(f"**Confidence Score:** {startup.scout_info.confidence_score:.2f}")
             lines.append("")
@@ -201,22 +192,22 @@ class MemoGenerator:
         if startup.financials.traction_metrics:
             lines.append(f"**Traction Metrics:** {startup.financials.traction_metrics}")
         else:
-            lines.append("**Traction Metrics:** **[MISSING]**")
+            lines.append("**Traction Metrics:** **Not provided**")
             missing_financials.append("Revenue/ARR data")
         if startup.financials.funding_history:
             lines.append(f"**Funding History:** {startup.financials.funding_history}")
         else:
-            lines.append("**Funding History:** **[MISSING]**")
+            lines.append("**Funding History:** **Not provided**")
             missing_financials.append("Funding history")
         if startup.financials.valuation_est:
             lines.append(f"**Valuation Estimate:** {startup.financials.valuation_est}")
         else:
-            lines.append("**Valuation Estimate:** **[MISSING]**")
+            lines.append("**Valuation Estimate:** **Not provided**")
             missing_financials.append("Valuation data")
         if startup.financials.ip_status:
             lines.append(f"**IP Status:** {startup.financials.ip_status}")
         else:
-            lines.append("**IP Status:** [MISSING]")
+            lines.append("**IP Status:** Not provided")
         if missing_financials and startup.review_info and startup.review_info.diligence_red_flags:
             lines.append("")
             lines.append("*Missing financial data above is reflected in Diligence Red Flags.*")
@@ -231,7 +222,7 @@ class MemoGenerator:
                 for item in team_analysis:
                     lines.append(f"- {item}")
             else:
-                lines.append("- [MISSING]")
+                lines.append("- Not provided")
             lines.append("")
 
         # Competition & Market Position; in display mode omit when only [MISSING]
@@ -243,7 +234,7 @@ class MemoGenerator:
                 for item in comp_analysis:
                     lines.append(f"- {item}")
             else:
-                lines.append("- [MISSING]")
+                lines.append("- Not provided")
             lines.append("")
 
         # Business Model & Monetization; in display mode omit when only [MISSING]
@@ -255,7 +246,7 @@ class MemoGenerator:
                 for item in bm_analysis:
                     lines.append(f"- {item}")
             else:
-                lines.append("- [MISSING]")
+                lines.append("- Not provided")
             lines.append("")
 
         # Reviewer Analysis (scores table + summary + key risks; full version adds red flags / assumption feedback)
@@ -266,14 +257,18 @@ class MemoGenerator:
             score_reasoning = getattr(ri, "score_reasoning", None) or {}
             lines.append("### Scores")
             lines.append("")
-            lines.append("*1–3: Weak · 4–5: Concerning · 6–7: Promising · 8–10: Strong*")
+            lines.append(rubric_score_bands_markdown_footnote())
             lines.append("")
             lines.append("| Dimension | Score | Band | Reasoning |")
             lines.append("|-----------|-------|------|-----------|")
             for dim_key, dim_label in SCORE_DIMENSIONS:
                 score_val = getattr(ri, dim_key, None)
                 score_str = f"{score_val}/10" if score_val is not None else "—"
-                band = _get_score_band(score_val) if score_val is not None else "—"
+                band = (
+                    rubric_band_for_numeric(float(score_val))
+                    if score_val is not None
+                    else None
+                ) or "—"
                 reasoning = (score_reasoning.get(dim_key) or "—").strip() if isinstance(score_reasoning, dict) else "—"
                 if not reasoning:
                     reasoning = "—"
@@ -299,7 +294,7 @@ class MemoGenerator:
             if summary_text.strip():
                 lines.append(summary_text.strip())
             else:
-                lines.append("[MISSING]")
+                lines.append("Not provided")
             lines.append("")
             key_risks = getattr(ri, "key_risks", None) or []
             lines.append("### Key Risks")
@@ -307,7 +302,7 @@ class MemoGenerator:
             for risk in key_risks:
                 lines.append(f"- {risk}")
             if not key_risks:
-                lines.append("- [MISSING]")
+                lines.append("- Not provided")
             lines.append("")
             if not for_display:
                 diligence_red_flags = getattr(ri, "diligence_red_flags", None) or []
@@ -316,7 +311,7 @@ class MemoGenerator:
                 for flag in diligence_red_flags:
                     lines.append(f"- **{flag}**")
                 if not diligence_red_flags:
-                    lines.append("- [MISSING]")
+                    lines.append("- Not provided")
                 lines.append("")
                 assumption_feedback = getattr(ri, "assumption_feedback", None) or []
                 lines.append("### Assumption Feedback")
@@ -324,7 +319,7 @@ class MemoGenerator:
                 for item in assumption_feedback:
                     lines.append(f"- {item}")
                 if not assumption_feedback:
-                    lines.append("- [MISSING]")
+                    lines.append("- Not provided")
                 lines.append("")
         else:
             lines.append("## Reviewer Analysis")
@@ -341,7 +336,7 @@ class MemoGenerator:
                 for item in inv_thesis:
                     lines.append(f"- {item}")
             else:
-                lines.append("- [MISSING]")
+                lines.append("- Not provided")
             lines.append("")
 
         # Risk Mitigation; in display mode omit when only [MISSING]
@@ -353,7 +348,7 @@ class MemoGenerator:
                 for item in risk_mit:
                     lines.append(f"- {item}")
             else:
-                lines.append("- [MISSING]")
+                lines.append("- Not provided")
             lines.append("")
 
         if not for_display:
@@ -393,15 +388,15 @@ class MemoGenerator:
                     lines.append(f"- **Funding History:** {startup.financials.funding_history}")
                 if startup.financials.valuation_est:
                     lines.append(f"- **Valuation Estimate:** {startup.financials.valuation_est}")
-                lines.append("- **Round size / ownership:** [MISSING]")
+                lines.append("- **Round size / ownership:** Not provided")
             else:
-                lines.append("- [MISSING]")
+                lines.append("- Not provided")
             lines.append("")
 
             # Exit Scenarios
             lines.append("## Exit Scenarios")
             lines.append("")
-            lines.append("- Acquisition / IPO / multiples: [MISSING]")
+            lines.append("- Acquisition / IPO / multiples: Not provided")
             lines.append("")
 
             # Next Steps

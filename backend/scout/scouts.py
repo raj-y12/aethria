@@ -5,6 +5,12 @@ Each Scout has a distinct cognitive strategy for finding real companies.
 from scout.base import Scout
 from utils.settings_loader import get_scout_region
 
+_SCOUT_QUANT_TRACTION_GUIDANCE = """
+
+DOWNSTREAM SIGNALS (only when sources support — never invent numbers):
+- est_tam: Set a rough order-of-magnitude string (e.g. "$12B", "€4-5B") when cited or clearly inferable from search/sources; otherwise null. If null, add one short phrase in why_now noting that TAM was not quantified in sources.
+- Traction: When sources mention revenue, customers, pilots, design partners, LOIs, or ARR/MRR, include concrete wording in problem, solution, and/or why_now so downstream scoring can ground on facts. Omit metrics you cannot support."""
+
 _NEGATIVE_CONSTRAINTS_BLOCK = """
 NEGATIVE CONSTRAINTS — DO NOT discover any of the following (they cannot reach venture scale):
 - Local or single-location service businesses (dry cleaners, barbers, restaurants, gyms, salons)
@@ -64,7 +70,11 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
         rl = _region_label_for(tenant_user_id)
-        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl) + _NEGATIVE_CONSTRAINTS_BLOCK
+        prompt = (
+            self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
+            + _SCOUT_QUANT_TRACTION_GUIDANCE
+            + _NEGATIVE_CONSTRAINTS_BLOCK
+        )
         super().__init__(
             scout_type="market_driven",
             system_prompt=prompt,
@@ -106,7 +116,11 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
         rl = _region_label_for(tenant_user_id)
-        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl) + _NEGATIVE_CONSTRAINTS_BLOCK
+        prompt = (
+            self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
+            + _SCOUT_QUANT_TRACTION_GUIDANCE
+            + _NEGATIVE_CONSTRAINTS_BLOCK
+        )
         super().__init__(
             scout_type="builder_technical",
             system_prompt=prompt,
@@ -148,7 +162,11 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
         rl = _region_label_for(tenant_user_id)
-        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl) + _NEGATIVE_CONSTRAINTS_BLOCK
+        prompt = (
+            self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
+            + _SCOUT_QUANT_TRACTION_GUIDANCE
+            + _NEGATIVE_CONSTRAINTS_BLOCK
+        )
         super().__init__(
             scout_type="pain_point",
             system_prompt=prompt,
@@ -190,7 +208,11 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
 
     def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
         rl = _region_label_for(tenant_user_id)
-        prompt = self.SYSTEM_PROMPT.format(_REGION_LABEL=rl) + _NEGATIVE_CONSTRAINTS_BLOCK
+        prompt = (
+            self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
+            + _SCOUT_QUANT_TRACTION_GUIDANCE
+            + _NEGATIVE_CONSTRAINTS_BLOCK
+        )
         super().__init__(
             scout_type="contrarian",
             system_prompt=prompt,

@@ -34,7 +34,7 @@ Every storage read/write and engine instantiation requires an explicit `user_id`
 |---|---|
 | `scout/` | 4 scout personas (Market-Driven, Builder/Technical, Pain-Point, Contrarian). Each uses OpenAI + SERP to discover **real** companies. |
 | `reviewer/` | 3 reviewer personas (Default, Skeptical, Opportunist). Score scouts against fund thesis (market/product/technical/execution/defensibility, 1–10). |
-| `partner/` | Rule-based decision engine (YES/NO/MAYBE) using versioned rules in `resources/config/partner_rules/v1.json`. LLM only for edge cases. |
+| `partner/` | Rule-based decision engine (INVEST / PASS / MONITOR) using versioned rules in `resources/config/partner_rules/v1.json`. LLM only for edge cases. |
 | `portfolio/` | Tracks accepted (YES) companies: execution, signals, feedback, health checks. |
 | `meta/` | Self-optimization: analyses pipeline outcomes, mutates scout prompts (`mutator.py`), reweights scouts (`reweighter.py`), calibrates reviewer thresholds (`calibrator.py`). |
 | `fund_thesis.py` | Per-user investment mandate. `get_active_thesis()` bootstraps a default on first access. Gates the entire pipeline. |

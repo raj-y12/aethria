@@ -41,9 +41,12 @@ def test_medium_6_4_borderline_routes_to_llm():
             "execution_score": 6,
             "defensibility_score": 6,
         }
-    )  # avg = 6.4 with 5 dims, in borderline bucket
+    )  # Core-dim avg = 6.5 → canonical MONITOR; borderline bucket triggers LLM then alignment.
+
+    llm_kwargs: dict = {}
 
     def fake_llm(*args, **kwargs):
+        llm_kwargs.update(kwargs)
         return engine._create_decision(
             decision="MAYBE",
             confidence=6,
@@ -55,8 +58,11 @@ def test_medium_6_4_borderline_routes_to_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
+    assert llm_kwargs.get("final_recommendation") == "MONITOR"
     assert out.get("decision") == "MAYBE"
-    assert out.get("rationale") == "LLM rationale"
+    rl = (out.get("rationale") or "").lower()
+    assert "we monitor at this stage" in rl
+    assert out.get("decision_drivers")
 
 
 def test_medium_5_8_near_threshold_routes_to_llm():
@@ -70,9 +76,12 @@ def test_medium_5_8_near_threshold_routes_to_llm():
             "execution_score": 5,
             "defensibility_score": 6,
         }
-    )  # avg = 5.8 with 5 dims, near-threshold low-score edge case
+    )  # Core-dim avg = 5.75 (< pass bar): canonical PASS; near-threshold still escalates to LLM.
+
+    llm_kwargs: dict = {}
 
     def fake_llm(*args, **kwargs):
+        llm_kwargs.update(kwargs)
         return engine._create_decision(
             decision="MAYBE",
             confidence=5,
@@ -84,8 +93,11 @@ def test_medium_5_8_near_threshold_routes_to_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert out.get("rationale") == "Near-threshold LLM rationale"
-    assert out.get("decision") == "MAYBE"
+    assert llm_kwargs.get("final_recommendation") == "PASS"
+    assert out.get("decision") == "NO"
+    rl = (out.get("rationale") or "").lower()
+    assert "we pass at this stage" in rl
+    assert "near-threshold llm rationale" not in rl
 
 
 def test_hard_low_score_stays_deterministic_no():
@@ -101,7 +113,91 @@ def test_hard_low_score_stays_deterministic_no():
     )  # avg = 5.0
     out = engine.decide(_base_scout(), review)
     assert out.get("decision") == "NO"
-    assert "below threshold" in (out.get("rationale") or "").lower()
+    assert "minimum pass threshold" in (out.get("rationale") or "").lower()
+
+
+def test_weak_verdict_uses_constructive_pass_rationale():
+    engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
+    review = _base_review()
+    review.update(
+        {
+            "verdict": "WEAK",
+            "market_score": 4,
+            "product_score": 4,
+            "technical_score": 4,
+            "execution_score": 4,
+        }
+    )
+
+    out = engine.decide(_base_scout(), review)
+    rationale = out.get("rationale") or ""
+
+    assert out.get("decision") == "NO"
+    assert "we pass at this stage given cautious reviewer quality" in rationale.lower()
+    assert "not suitable for investment consideration" not in rationale.lower()
+
+
+def test_critical_risk_pass_uses_actionable_language():
+    engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
+    review = _base_review()
+    review.update(
+        {
+            "verdict": "MEDIUM",
+            "market_score": 7,
+            "product_score": 7,
+            "technical_score": 6,
+            "execution_score": 6,
+            "key_risks": ["Regulatory ban risk in primary market"],
+        }
+    )
+
+    out = engine.decide(_base_scout(), review)
+    rationale = (out.get("rationale") or "").lower()
+
+    assert out.get("decision") == "MAYBE"
+    assert "we monitor at this stage" in rationale
+    assert "material diligence risks" in rationale
+    assert "risk too high for investment" not in rationale
+
+
+def test_monitor_and_invest_paths_use_consistent_professional_tone():
+    engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
+
+    monitor_review = _base_review()
+    monitor_review.update(
+        {
+            "verdict": "MEDIUM",
+            "market_score": 7,
+            "product_score": 7,
+            "technical_score": 7,
+            "execution_score": 7,
+            "defensibility_score": None,
+        }
+    )  # avg = 7.0, deterministic MONITOR
+    monitor_out = engine.decide(_base_scout(), monitor_review)
+    monitor_rationale = (monitor_out.get("rationale") or "").lower()
+    assert monitor_out.get("decision") == "MAYBE"
+    assert "we monitor at this stage" in monitor_rationale
+    assert (
+        "constructive averages" in monitor_rationale
+        or "grey zone" in monitor_rationale
+    )
+
+    invest_review = _base_review()
+    invest_review.update(
+        {
+            "verdict": "STRONG",
+            "market_score": 8,
+            "product_score": 8,
+            "technical_score": 8,
+            "execution_score": 8,
+            "defensibility_score": None,
+        }
+    )  # avg = 8.0, deterministic INVEST
+    invest_out = engine.decide(_base_scout(), invest_review)
+    invest_rationale = (invest_out.get("rationale") or "").lower()
+    assert invest_out.get("decision") == "YES"
+    assert "confirmatory diligence" in invest_rationale
 
 
 def test_empty_llm_content_generates_non_generic_rationale():
@@ -129,6 +225,8 @@ def test_empty_llm_content_generates_non_generic_rationale():
         review,
         assumption_risks=[],
         trigger_reason="MEDIUM verdict with borderline average score",
+        avg_score=6.25,
+        final_recommendation="MONITOR",
     )
     rationale = out.get("rationale") or ""
     assert out.get("decision") == "MAYBE"
@@ -153,7 +251,7 @@ def test_threshold_boundary_6_0_does_not_use_low_score_llm_path():
     )  # avg = 6.0
     out = engine.decide(_base_scout(), review)
     assert out.get("decision") in ("NO", "MAYBE")
-    assert "below threshold" not in (out.get("rationale") or "").lower()
+    assert "below our minimum pass threshold" not in (out.get("rationale") or "").lower()
 
 
 def test_threshold_boundary_7_0_not_in_borderline_bucket():
@@ -185,7 +283,10 @@ def test_contradictory_scores_trigger_llm():
         }
     )
 
+    llm_kwargs: dict = {}
+
     def fake_llm(*args, **kwargs):
+        llm_kwargs.update(kwargs)
         return engine._create_decision(
             decision="MAYBE",
             confidence=6,
@@ -197,7 +298,11 @@ def test_contradictory_scores_trigger_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert out.get("rationale") == "Contradiction handled"
+    assert llm_kwargs.get("final_recommendation") == "MONITOR"
+    rl = (out.get("rationale") or "").lower()
+    assert "contradiction handled" not in rl
+    assert "we monitor at this stage" in rl
+    assert "material tension" in rl or "mixed signals" in rl
 
 
 def test_use_llm_fallback_false_forces_deterministic_path():
@@ -212,7 +317,9 @@ def test_use_llm_fallback_false_forces_deterministic_path():
         }
     )
     out = engine.decide(_base_scout(), review)
-    assert out.get("rationale") != "Contradiction handled"
+    rl = (out.get("rationale") or "").lower()
+    assert "contradiction handled" not in rl
+    assert "we monitor at this stage" in rl
 
 
 def test_missing_assumptions_trigger_llm():
@@ -220,7 +327,10 @@ def test_missing_assumptions_trigger_llm():
     review = _base_review()
     review["assumption_feedback"] = ["Critical unknown: GTM channel conversion not validated"]
 
+    llm_kwargs: dict = {}
+
     def fake_llm(*args, **kwargs):
+        llm_kwargs.update(kwargs)
         return engine._create_decision(
             decision="MAYBE",
             confidence=5,
@@ -232,7 +342,10 @@ def test_missing_assumptions_trigger_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert out.get("rationale") == "Assumption-risk escalation"
+    assert llm_kwargs.get("final_recommendation") == "MONITOR"
+    rl = (out.get("rationale") or "").lower()
+    assert "assumption-risk escalation" not in rl
+    assert "we monitor at this stage" in rl
 
 
 def test_missing_critical_qualitative_triggers_llm():
@@ -241,7 +354,10 @@ def test_missing_critical_qualitative_triggers_llm():
     review["team_analysis"] = []
     review["business_model_analysis"] = []
 
+    llm_kwargs: dict = {}
+
     def fake_llm(*args, **kwargs):
+        llm_kwargs.update(kwargs)
         return engine._create_decision(
             decision="MAYBE",
             confidence=5,
@@ -253,7 +369,10 @@ def test_missing_critical_qualitative_triggers_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert out.get("rationale") == "Qualitative-gap escalation"
+    assert llm_kwargs.get("final_recommendation") == "MONITOR"
+    rl = (out.get("rationale") or "").lower()
+    assert "qualitative-gap escalation" not in rl
+    assert "we monitor at this stage" in rl
 
 
 def test_reviewer_disagreement_trigger_llm():
@@ -263,7 +382,10 @@ def test_reviewer_disagreement_trigger_llm():
     review = _base_review()
     review["reviewer_disagreement"] = True
 
+    llm_kwargs: dict = {}
+
     def fake_llm(*args, **kwargs):
+        llm_kwargs.update(kwargs)
         return engine._create_decision(
             decision="MAYBE",
             confidence=5,
@@ -275,7 +397,10 @@ def test_reviewer_disagreement_trigger_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert out.get("rationale") == "Reviewer-disagreement escalation"
+    assert llm_kwargs.get("final_recommendation") == "MONITOR"
+    rl = (out.get("rationale") or "").lower()
+    assert "reviewer-disagreement escalation" not in rl
+    assert "we monitor at this stage" in rl
 
 
 def test_high_thesis_alignment_trigger_llm():
@@ -287,7 +412,10 @@ def test_high_thesis_alignment_trigger_llm():
     review["execution_score"] = 7
     review["thesis_alignment_score"] = 0.9
 
+    llm_kwargs: dict = {}
+
     def fake_llm(*args, **kwargs):
+        llm_kwargs.update(kwargs)
         return engine._create_decision(
             decision="MAYBE",
             confidence=6,
@@ -299,7 +427,10 @@ def test_high_thesis_alignment_trigger_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert out.get("rationale") == "High-thesis escalation"
+    assert llm_kwargs.get("final_recommendation") == "MONITOR"
+    rl = (out.get("rationale") or "").lower()
+    assert "high-thesis escalation" not in rl
+    assert "we monitor at this stage" in rl
 
 
 def test_openai_exception_returns_safe_maybe_with_contextual_rationale():
@@ -321,6 +452,8 @@ def test_openai_exception_returns_safe_maybe_with_contextual_rationale():
         _base_review(),
         assumption_risks=[],
         trigger_reason="MEDIUM verdict with borderline average score",
+        avg_score=6.25,
+        final_recommendation="MONITOR",
     )
     assert out.get("decision") == "MAYBE"
     assert "average score" in (out.get("rationale") or "").lower()
@@ -349,6 +482,8 @@ def test_malformed_json_returns_safe_maybe():
         _base_review(),
         assumption_risks=[],
         trigger_reason="Malformed JSON check",
+        avg_score=6.25,
+        final_recommendation="MONITOR",
     )
     assert out.get("decision") == "MAYBE"
     assert "average score" in (out.get("rationale") or "").lower()
@@ -377,6 +512,8 @@ def test_invalid_model_decision_falls_back_to_safe_maybe():
         _base_review(),
         assumption_risks=[],
         trigger_reason="Invalid decision check",
+        avg_score=6.25,
+        final_recommendation="MONITOR",
     )
     assert out.get("decision") == "MAYBE"
 
@@ -395,7 +532,9 @@ def test_strong_verdict_below_yes_bar_is_maybe_not_no():
     )  # avg = 7.25
     out = engine.decide(_base_scout(), review)
     assert out.get("decision") == "MAYBE"
-    assert "strong-yes bar" in (out.get("rationale") or "").lower()
+    rl = (out.get("rationale") or "").lower()
+    assert "we monitor at this stage" in rl
+    assert "strong-yes bar" in rl or "grey zone" in rl
 
 
 def test_scout_biggest_unknown_alone_does_not_trigger_llm_escalation():
@@ -443,6 +582,8 @@ def test_llm_stats_counter_increments_on_failures():
         _base_review(),
         assumption_risks=[],
         trigger_reason="Stats check",
+        avg_score=6.25,
+        final_recommendation="MONITOR",
     )
     assert engine._llm_stats.get("fallback_invocations", 0) >= 1
     assert engine._llm_stats.get("request_errors", 0) >= 1

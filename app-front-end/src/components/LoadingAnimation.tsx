@@ -57,10 +57,19 @@ export default function LoadingAnimation({
                 marginLeft: -POINT_SIZE / 2,
                 marginTop: -POINT_SIZE / 2,
               }}
-              initial={{ x: 0, y: 0, opacity: 0.25, backgroundColor: 'rgba(var(--color-oxford-rgb), 0.25)' }}
+              // Use full `transform` string — Framer x/y shorthands run on main thread,
+              // not GPU-accelerated. Full transform string stays on compositor thread.
+              initial={{
+                transform: 'translateX(0px) translateY(0px)',
+                opacity: 0.25,
+                backgroundColor: 'rgba(var(--color-oxford-rgb), 0.25)',
+              }}
               animate={{
-                x: [0, v.x, 0],
-                y: [0, v.y, 0],
+                transform: [
+                  'translateX(0px) translateY(0px)',
+                  `translateX(${v.x}px) translateY(${v.y}px)`,
+                  'translateX(0px) translateY(0px)',
+                ],
                 opacity: [0.25, 1, 0.25],
                 backgroundColor: [
                   'rgba(var(--color-oxford-rgb), 0.25)',

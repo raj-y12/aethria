@@ -1,13 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import type {
   Startup, SignalItem, RejectionAnalytics, WatchlistAnalytics,
-  ConcentrationAnalytics, MetaCycleReport, ScoutWeights, CalibrationState,
+  ConcentrationAnalytics, MetaCycleReport, MetaPromptState, MetaEvalSet, PromptEvaluateResult, ScoutWeights, CalibrationState,
+  HumanFeedbackSummary, SystemHealthSnapshot, MetaInsightsPayload,
 } from '../types/startup';
-import { triggerMetaCycle } from '../api/meta';
+import { triggerMetaCycle, promoteMetaPrompt, resetMetaPrompt, saveMetaEvalSet, runPromptEvaluation } from '../api/meta';
 import { transitionOrReduced } from '../design-system/motion';
-import { UI_FILTER_TOOLBAR_LABEL } from '../design-system/ui-text';
 import { usePrefersReducedMotion } from '../hooks';
 import EmptyState from './EmptyState';
 import { fetchFundThesisRuntime, type FundThesisRuntime } from '../api/fundThesis';
@@ -16,7 +17,7 @@ type Tab = 'signals' | 'analytics' | 'decisions' | 'thesis' | 'meta';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'signals', label: 'Signals' },
   { key: 'analytics', label: 'Analytics' },
-  { key: 'decisions', label: 'Decisions' },
+  { key: 'decisions', label: 'Resolutions' },
   { key: 'thesis', label: 'Thesis' },
   { key: 'meta', label: 'Meta' },
 ];
@@ -27,17 +28,22 @@ interface SystemIntelligenceProps {
   rejectionAnalytics: RejectionAnalytics;
   watchlistAnalytics: WatchlistAnalytics;
   concentrationAnalytics: ConcentrationAnalytics;
+  systemHealth: SystemHealthSnapshot | null;
   metaReports: MetaCycleReport[];
   scoutWeights: ScoutWeights;
   calibrationState: CalibrationState;
-  onClose?: () => void;
+  metaPromptState: MetaPromptState;
+  metaEvalSet: MetaEvalSet;
+  metaInsights: MetaInsightsPayload | null;
 }
+
+const REVIEWER_EVAL_AGENTS = new Set(['DefaultReviewer', 'SkepticalReviewer', 'OpportunistReviewer']);
 
 const FilterButton = ({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-[color,border-color,background-color] duration-200 border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/40 hover:text-oxford/70'
+    className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 border-b-2 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/40 hover:text-oxford/70'
       }`}
   >
     {label}
@@ -67,8 +73,8 @@ function RowWrapper({ children, index, onClick, isSelected }: { children: React.
   const reduceMotion = usePrefersReducedMotion();
   return (
     <motion.div
-      initial={reduceMotion ? {} : { opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
+      initial={reduceMotion ? {} : { opacity: 0, transform: 'translateY(6px)' }}
+      animate={{ opacity: 1, transform: 'translateY(0px)' }}
       transition={{ delay: Math.min(index * 0.03, 0.3), duration: 0.4, ease: tokens.motion.ease }}
       className={`group relative border-b border-oxford/[0.06] py-phi-3 px-phi-4 transition-colors duration-200 ease-smooth ${onClick ? 'cursor-pointer' : ''
         } ${isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.02]'}`}
@@ -164,7 +170,10 @@ function DecisionsTab({ startups }: { startups: Startup[] }) {
   if (decisions.length === 0) {
     return (
       <div className="py-phi-8 px-phi-4 flex items-center justify-center">
-        <EmptyState label="Decisions" body="No manual decisions yet. Resolve an escalation to see invest, monitor, or pass outcomes." />
+        <EmptyState
+          label="Human resolutions"
+          body="No escalation resolutions yet. When you resolve a human review from the deal grid, the outcome and notes appear here. Partner verdicts stay on each deal row."
+        />
       </div>
     );
   }
@@ -226,15 +235,39 @@ function TabSection({ title, label, children }: { title: string; label?: string;
 }
 
 /* ─── ANALYTICS ─── */
-function AnalyticsTab({ rejection, watchlist, concentration }: {
+function AnalyticsTab({ rejection, watchlist, concentration, systemHealth }: {
   rejection: RejectionAnalytics; watchlist: WatchlistAnalytics; concentration: ConcentrationAnalytics;
+  systemHealth: SystemHealthSnapshot | null;
 }) {
   const maxRedFlag = Math.max(...rejection.most_common_red_flags.map((r) => r.count), 1);
   const sectors = Object.entries(concentration.by_sector).sort((a, b) => b[1].count - a[1].count).slice(0, 8);
   const maxSector = Math.max(...sectors.map(([, v]) => v.count), 1);
+  const q = systemHealth?.queue_depths;
 
   return (
     <div className="flex flex-col">
+      {systemHealth && (
+        <TabSection title="Pipeline health" label="Live">
+          <div className="flex flex-wrap gap-phi-6">
+            {[
+              { label: 'Unreviewed', value: q?.unreviewed ?? 0 },
+              { label: 'Undecided', value: q?.undecided ?? 0 },
+              { label: 'Watchlist', value: q?.watchlist ?? 0 },
+              { label: 'Escalations', value: systemHealth.pending_escalations },
+            ].map((s) => (
+              <div key={s.label} className="flex flex-col gap-phi-1">
+                <span className="font-mono font-bold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.04em] tabular-nums text-oxford">{s.value}</span>
+                <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">{s.label}</span>
+              </div>
+            ))}
+          </div>
+          {systemHealth.calibration_warning ? (
+            <p className="type-meta text-oxford/55 leading-relaxed mt-phi-4 max-w-2xl border-t border-oxford/[0.06] pt-phi-4">
+              Calibration note: {systemHealth.calibration_warning}
+            </p>
+          ) : null}
+        </TabSection>
+      )}
       <TabSection title="Rejection Patterns" label="Historical">
         {rejection.most_common_red_flags.length === 0 ? (
           <p className="type-meta text-oxford/45 uppercase tracking-[0.12em]">No rejection data yet</p>
@@ -266,11 +299,35 @@ function AnalyticsTab({ rejection, watchlist, concentration }: {
             </div>
           ))}
         </div>
+        {watchlist.entries && watchlist.entries.length > 0 && (
+          <div className="mt-phi-4 flex flex-col gap-phi-2 border-t border-oxford/[0.06] pt-phi-4">
+            <span className="type-meta uppercase tracking-[0.12em] text-oxford/35">Companies</span>
+            <ul className="flex flex-col gap-0 divide-y divide-oxford/[0.06]">
+              {watchlist.entries.slice(0, 10).map((e, i) => (
+                <li key={e.startup_id ?? `wl-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1 py-phi-2">
+                  <span className="type-note text-oxford/70 truncate min-w-0 max-w-[min(100%,20rem)]">
+                    {e.startup_name?.trim() || e.startup_id?.slice(0, 8) || 'Unknown'}
+                  </span>
+                  <span className="type-meta text-oxford/45 tabular-nums shrink-0">
+                    {e.days_on_watchlist != null ? `${e.days_on_watchlist}d` : '—'}
+                    {e.stale_warning ? ' · stale' : ''}
+                    {e.signal_count != null && e.signal_count > 0 ? ` · ${e.signal_count} sig` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </TabSection>
 
       <TabSection title="Sector Concentration" label="Distribution">
         {sectors.length === 0 ? (
-          <p className="type-meta text-oxford/45 uppercase tracking-[0.18em]">No concentration data yet</p>
+          <div className="flex flex-col gap-phi-2">
+            <p className="type-meta text-oxford/45 uppercase tracking-[0.18em]">No concentration data yet</p>
+            <p className="type-note text-oxford/50 leading-relaxed max-w-xl">
+              Distribution refreshes when the pipeline runs portfolio health and cluster analysis over your deal set.
+            </p>
+          </div>
         ) : (
           <div className="flex flex-col gap-phi-4">
             {sectors.map(([sector, data], i) => (
@@ -379,25 +436,100 @@ function InstitutionalMandateTab() {
 }
 
 /* ─── META AGENT ─── */
-function MetaCommandTab({ reports, weights, calibration }: {
-  reports: MetaCycleReport[]; weights: ScoutWeights; calibration: CalibrationState;
+function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSet, insights }: {
+  reports: MetaCycleReport[];
+  weights: ScoutWeights;
+  calibration: CalibrationState;
+  promptState: MetaPromptState;
+  metaEvalSet: MetaEvalSet;
+  insights: MetaInsightsPayload | null;
 }) {
+  const queryClient = useQueryClient();
   const [triggering, setTriggering] = useState(false);
+  const [promptBusy, setPromptBusy] = useState<string | null>(null);
+  const [evalBusy, setEvalBusy] = useState<string | null>(null);
+  const [evalDraft, setEvalDraft] = useState(() => metaEvalSet.startup_ids.join('\n'));
+  const [evalSaveNote, setEvalSaveNote] = useState<string | null>(null);
+  const [evalResult, setEvalResult] = useState<PromptEvaluateResult | null>(null);
+
+  const evalSetSig = metaEvalSet.startup_ids.join('|');
+  useEffect(() => {
+    setEvalDraft(metaEvalSet.startup_ids.join('\n'));
+  }, [evalSetSig]);
+  const invalidateMeta = () => {
+    void queryClient.invalidateQueries({ queryKey: ['meta'] });
+  };
   const handleTrigger = async () => {
     setTriggering(true);
-    try { await triggerMetaCycle(); } finally { setTriggering(false); }
+    try {
+      await triggerMetaCycle();
+      invalidateMeta();
+    } finally {
+      setTriggering(false);
+    }
   };
 
   const lastReport = reports.length > 0 ? reports[0] : null;
+  const proposalCount =
+    (lastReport?.prompt_proposals?.length ?? lastReport?.mutations_applied?.length ?? 0);
+
+  const agentFromLibraryKey = (libraryKey: string) => libraryKey.split(':')[0] ?? '';
+
+  const humanFb: HumanFeedbackSummary | undefined = lastReport?.signal_summary?.human_feedback;
+  const humanFbLine =
+    humanFb && humanFb.recent_count > 0
+      ? `Recorded ${humanFb.recent_count} analyst confirmations in the last correction signal (Invest ${humanFb.by_outcome?.YES ?? 0}, Pass ${humanFb.by_outcome?.NO ?? 0}, Monitor ${humanFb.by_outcome?.MAYBE ?? 0}${humanFb.disagreed_with_ai_count ? `; ${humanFb.disagreed_with_ai_count} differed from the AI recommendation at resolve time` : ''}).`
+      : null;
+
+  const whatChangedTotal =
+    (insights?.what_changed?.mutations_applied?.length ?? 0) +
+    (insights?.what_changed?.prompt_proposals?.length ?? 0) +
+    (insights?.what_changed?.weight_updates?.length ?? 0) +
+    (insights?.what_changed?.calibration_changes?.length ?? 0);
+  const showLatestInsight =
+    !!insights?.latest && ((insights?.why?.length ?? 0) > 0 || whatChangedTotal > 0);
 
   return (
     <div className="flex flex-col">
+      <div className="px-phi-4 py-phi-5 border-b border-oxford/[0.06]">
+        <p className="type-body text-oxford/65 leading-relaxed max-w-2xl">
+          This tab runs the scheduled correction cycle: it proposes updates to scouts, reviewers, and score thresholds.
+          When you confirm <span className="text-oxford/80">Invest</span>, <span className="text-oxford/80">Pass</span>, or{' '}
+          <span className="text-oxford/80">Monitor</span> in the deal grid with a short rationale, that is saved and folded into the next cycle so the system drifts toward how you actually decide—not generic defaults.
+        </p>
+        {humanFbLine && (
+          <p className="type-meta text-oxford/45 leading-relaxed max-w-2xl mt-phi-3">{humanFbLine}</p>
+        )}
+      </div>
+      {showLatestInsight && insights?.latest && (
+        <TabSection
+          title="Latest insight"
+          label={insights.latest.ran_at ? new Date(insights.latest.ran_at).toLocaleDateString('en-GB') : undefined}
+        >
+          <div className="flex flex-wrap gap-phi-6 mb-phi-3">
+            {typeof insights.latest.cycle_number === 'number' && (
+              <div className="flex flex-col gap-phi-1">
+                <span className="font-mono font-bold text-xl tabular-nums text-oxford">{insights.latest.cycle_number}</span>
+                <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">Cycle</span>
+              </div>
+            )}
+          </div>
+          {(insights?.why?.length ?? 0) > 0 && (
+            <div className="flex flex-col gap-phi-2">
+              <span className="type-meta text-oxford/35 uppercase tracking-[0.12em]">Why (no-action / guardrails)</span>
+              {(insights?.why ?? []).map((line, i) => (
+                <p key={i} className="type-meta text-oxford/55 leading-relaxed">{line}</p>
+              ))}
+            </div>
+          )}
+        </TabSection>
+      )}
       {lastReport ? (
         <TabSection title="Last Cycle" label={`Cycle ${lastReport.cycle_number}`}>
           <div className="flex flex-wrap gap-phi-6">
             {[
               { label: 'Ran', value: new Date(lastReport.ran_at).toLocaleDateString('en-GB') },
-              { label: 'Mutations', value: (lastReport.mutations_applied ?? []).length },
+              { label: 'Prompt proposals', value: proposalCount },
               { label: 'Weight updates', value: (lastReport.weight_updates ?? []).length },
             ].map((s) => (
               <div key={s.label} className="flex flex-col gap-phi-1">
@@ -419,6 +551,219 @@ function MetaCommandTab({ reports, weights, calibration }: {
           <p className="type-meta text-oxford/45 uppercase tracking-[0.18em]">No cycles run yet</p>
         </TabSection>
       )}
+
+      <details className="group border-b border-oxford/[0.06]">
+        <summary className="cursor-pointer list-none px-phi-4 py-phi-4 type-meta uppercase tracking-[0.12em] text-oxford/45 hover:text-oxford/70 marker:content-none flex items-center justify-between gap-phi-3">
+          <span>Advanced — prompt checks (optional)</span>
+          <span className="type-meta text-oxford/25 group-open:hidden">Show</span>
+          <span className="type-meta text-oxford/25 hidden group-open:inline">Hide</span>
+        </summary>
+        <div className="flex flex-col pb-phi-2">
+        <p className="type-body text-oxford/55 leading-relaxed px-phi-4 pt-phi-3 max-w-2xl">
+          You can ignore this unless the correction cycle has produced <span className="text-oxford/75">pending prompt drafts</span> and you want to test or turn them on.
+          Day-to-day deal work and your Invest / Pass / Monitor confirmations do not depend on anything here—the product runs on built-in prompts until you explicitly promote a draft.
+        </p>
+      <TabSection title="Bench list" label="For Evaluate only">
+        <p className="type-meta text-oxford/50 leading-relaxed mb-phi-3 max-w-2xl">
+          Paste internal startup IDs from your pipeline (one per line, up to {metaEvalSet.max}). When you press <span className="text-oxford/65">Evaluate</span> on a pending <em>reviewer</em> prompt, the system re-runs that reviewer on these deals with the proposed instructions and compares to saved scores—cheap guardrail before going live. Each ID is one extra model call.
+        </p>
+        <textarea
+          value={evalDraft}
+          onChange={(e) => setEvalDraft(e.target.value)}
+          rows={5}
+          className="w-full max-w-2xl font-mono type-meta text-oxford/70 bg-oxford/[0.03] border border-oxford/[0.1] px-phi-3 py-phi-2 resize-y"
+          placeholder={'startup_id_one\nstartup_id_two'}
+        />
+        <div className="flex flex-wrap items-center gap-phi-3 mt-phi-3">
+          <button
+            type="button"
+            disabled={promptBusy !== null || evalBusy !== null}
+            onClick={async () => {
+              const lines = evalDraft.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+              setEvalSaveNote(null);
+              try {
+                const res = await saveMetaEvalSet(lines);
+                invalidateMeta();
+                const miss = res.missing_startup_ids?.length
+                  ? ` Not found: ${res.missing_startup_ids.slice(0, 5).join(', ')}${(res.missing_startup_ids.length > 5) ? '…' : ''}.`
+                  : '';
+                setEvalSaveNote(`Saved ${res.startup_ids?.length ?? 0} ids.${miss}`);
+              } catch (e) {
+                console.error(e);
+                setEvalSaveNote(e instanceof Error ? e.message : 'Save failed');
+              }
+            }}
+            className="type-meta border border-oxford/15 px-phi-4 py-phi-2 text-oxford/55 hover:text-oxford hover:border-oxford/40 btn-interaction"
+          >
+            Save bench list
+          </button>
+          <span className="type-meta text-oxford/35">Saved: {metaEvalSet.count}</span>
+        </div>
+        {evalSaveNote && <p className="type-meta text-oxford/50 mt-phi-2">{evalSaveNote}</p>}
+      </TabSection>
+
+      <TabSection title="Prompt drafts" label="Active vs pending">
+        <p className="type-meta text-oxford/50 leading-relaxed mb-phi-3 max-w-2xl">
+          The meta cycle can propose new instructions for scouts/reviewers. <span className="text-oxford/65">Active</span> is what runs today (empty = product defaults).
+          <span className="text-oxford/65"> Pending</span> is queued proposals—use <span className="text-oxford/65">Promote</span> to make one live, or <span className="text-oxford/65">Reset</span> to drop back to defaults.
+          Your org may require a passing <span className="text-oxford/65">Evaluate</span> before Promote for reviewers.
+        </p>
+        {promptState.restart_note && (
+          <p className="type-meta text-oxford/50 leading-relaxed mb-phi-3 max-w-2xl">{promptState.restart_note}</p>
+        )}
+        <div className="flex flex-col gap-phi-4">
+          <div>
+            <span className="type-meta text-oxford/35 uppercase tracking-[0.12em] block mb-phi-2">Active (live)</span>
+            {Object.keys(promptState.active).length === 0 ? (
+              <p className="type-meta text-oxford/45">None—using built-in prompts.</p>
+            ) : (
+              <div className="flex flex-col border border-oxford/[0.06] bg-oxford/[0.01] divide-y divide-oxford/[0.06]">
+                {Object.entries(promptState.active).map(([agent, libKey]) => (
+                  <div key={agent} className="flex flex-wrap items-center justify-between gap-phi-3 p-phi-3">
+                    <div className="min-w-0">
+                      <span className="type-meta text-oxford/70">{agent}</span>
+                      <p className="font-mono type-meta text-oxford/45 truncate max-w-xl" title={libKey}>{libKey}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={promptBusy !== null}
+                      onClick={async () => {
+                        setPromptBusy(agent);
+                        try {
+                          await resetMetaPrompt(agent);
+                          invalidateMeta();
+                        } catch (e) {
+                          console.error(e);
+                        } finally {
+                          setPromptBusy(null);
+                        }
+                      }}
+                      className="type-meta border border-oxford/15 px-phi-3 py-phi-2 text-oxford/50 hover:text-oxford hover:border-oxford/40 btn-interaction shrink-0"
+                    >
+                      {promptBusy === agent ? '…' : 'Use built-in default'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <span className="type-meta text-oxford/35 uppercase tracking-[0.12em] block mb-phi-2">Pending (not live yet)</span>
+            {promptState.pending.length === 0 ? (
+              <p className="type-meta text-oxford/45">Nothing queued—defaults or only active prompts.</p>
+            ) : (
+              <div className="flex flex-col border border-oxford/[0.06] bg-oxford/[0.01] divide-y divide-oxford/[0.06] max-h-[280px] overflow-y-auto">
+                {promptState.pending.map((p) => {
+                  const agent = agentFromLibraryKey(p.library_key);
+                  const canEval = REVIEWER_EVAL_AGENTS.has(agent);
+                  return (
+                    <div key={p.library_key} className="flex flex-wrap items-start justify-between gap-phi-3 p-phi-3">
+                      <div className="min-w-0 flex-1">
+                        <span className="type-meta text-oxford/70">{agent}</span>
+                        <p className="font-mono type-meta text-oxford/45 break-all">{p.library_key}</p>
+                        {p.reasoning && (
+                          <p className="type-meta text-oxford/40 mt-phi-1 line-clamp-2">{p.reasoning}</p>
+                        )}
+                        <p className="type-meta text-oxford/30 mt-phi-1">
+                          {p.prompt_char_count != null ? `${p.prompt_char_count} chars` : ''}
+                          {p.created_at ? ` · ${new Date(p.created_at).toLocaleString('en-GB')}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-phi-2 shrink-0">
+                        {canEval && (
+                          <button
+                            type="button"
+                            disabled={promptBusy !== null || evalBusy !== null}
+                            onClick={async () => {
+                              setEvalBusy(p.library_key);
+                              setEvalResult(null);
+                              try {
+                                const r = await runPromptEvaluation(agent, p.library_key);
+                                setEvalResult(r);
+                                invalidateMeta();
+                              } catch (e) {
+                                console.error(e);
+                                setEvalResult({ ok: false, error: e instanceof Error ? e.message : 'Eval failed' });
+                              } finally {
+                                setEvalBusy(null);
+                              }
+                            }}
+                            className="type-meta border border-oxford/15 px-phi-3 py-phi-2 text-oxford/50 hover:text-oxford hover:border-oxford/40 btn-interaction"
+                          >
+                            {evalBusy === p.library_key ? '…' : 'Evaluate'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={promptBusy !== null || evalBusy !== null}
+                          onClick={async () => {
+                            setPromptBusy(p.library_key);
+                            try {
+                              await promoteMetaPrompt(agent, p.library_key);
+                              invalidateMeta();
+                            } catch (e) {
+                              console.error(e);
+                            } finally {
+                              setPromptBusy(null);
+                            }
+                          }}
+                          className="type-meta border border-oxford/15 px-phi-3 py-phi-2 text-oxford/50 hover:text-oxford hover:border-oxford/40 btn-interaction"
+                        >
+                          {promptBusy === p.library_key ? '…' : 'Promote'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+        {evalResult && (
+          <div className="mt-phi-4 border border-oxford/[0.08] bg-oxford/[0.02] px-phi-4 py-phi-3 max-w-3xl">
+            <span className="type-meta uppercase tracking-[0.12em] text-oxford/40 block mb-phi-2">Last evaluation</span>
+            {!evalResult.ok && evalResult.error && (
+              <p className="type-meta text-oxford/60">{evalResult.error}</p>
+            )}
+            {evalResult.summary && (
+              <div className="flex flex-col gap-phi-2 type-meta text-oxford/65">
+                <p>
+                  <span className={evalResult.summary.passed ? 'text-oxford' : 'text-escalation/80'}>
+                    {evalResult.summary.passed ? 'Passed' : 'Failed'}
+                  </span>
+                  {' · '}
+                  {evalResult.summary.pass_reason}
+                  {' · '}
+                  regressions {evalResult.summary.regression_count} / {evalResult.summary.n_compared} compared
+                  {' · '}
+                  mean |Δscore| {evalResult.summary.mean_abs_score_delta}
+                </p>
+                {evalResult.truncated && (
+                  <p className="text-oxford/45">Truncated to {evalResult.max_startups} startups.</p>
+                )}
+              </div>
+            )}
+            {evalResult.rows && evalResult.rows.length > 0 && (
+              <details className="mt-phi-3">
+                <summary className="type-meta text-oxford/50 cursor-pointer">Per startup</summary>
+                <ul className="mt-phi-2 space-y-phi-1 font-mono type-meta text-oxford/45 max-h-40 overflow-y-auto">
+                  {evalResult.rows.map((row) => (
+                    <li key={row.startup_id}>
+                      {row.startup_id.slice(0, 8)}… {row.status}
+                      {row.baseline_verdict != null && row.candidate_verdict != null
+                        ? ` ${row.baseline_verdict} → ${row.candidate_verdict}${row.regression ? ' (regression)' : ''}`
+                        : ''}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+      </TabSection>
+        </div>
+      </details>
+
       <TabSection title="Scout Allocation" label="Weights">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-phi-5 gap-y-phi-4">
           {([
@@ -481,7 +826,6 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
       <div className="sticky top-0 z-20 bg-paper border-b border-oxford/[0.06] px-phi-4 py-phi-2">
         <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2">
           <div className="flex min-w-0 flex-wrap items-center gap-phi-3">
-            <span className={UI_FILTER_TOOLBAR_LABEL}>System</span>
             <div className="flex items-center gap-0">
               {TABS.map((tab) => {
                 const isActive = activeTab === tab.key;
@@ -496,16 +840,6 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
               })}
             </div>
           </div>
-          {props.onClose && (
-            <button
-              type="button"
-              onClick={props.onClose}
-              className="type-meta min-h-[36px] text-oxford/55 hover:text-oxford transition-colors pl-phi-2"
-              aria-label="Hide system intelligence"
-            >
-              Close
-            </button>
-          )}
         </div>
       </div>
 
@@ -523,12 +857,20 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
               rejection={props.rejectionAnalytics}
               watchlist={props.watchlistAnalytics}
               concentration={props.concentrationAnalytics}
+              systemHealth={props.systemHealth}
             />
           )}
           {activeTab === 'decisions' && <DecisionsTab startups={props.startups} />}
           {activeTab === 'thesis' && <InstitutionalMandateTab />}
           {activeTab === 'meta' && (
-            <MetaCommandTab reports={props.metaReports} weights={props.scoutWeights} calibration={props.calibrationState} />
+            <MetaCommandTab
+              reports={props.metaReports}
+              weights={props.scoutWeights}
+              calibration={props.calibrationState}
+              promptState={props.metaPromptState}
+              metaEvalSet={props.metaEvalSet}
+              insights={props.metaInsights}
+            />
           )}
         </motion.div>
       </AnimatePresence>

@@ -34,6 +34,7 @@ class PartnerOutput(TypedDict, total=False):
     rationale: Optional[str]
     conviction_level: Optional[int]
     assumption_risks: Optional[List[str]]
+    decision_drivers: Optional[List[str]]
 
 
 VALID_RECOMMENDATIONS = ["INVEST", "PASS", "MONITOR"]

@@ -89,6 +89,10 @@ export default function MainLayout({
     concentrationAnalytics,
     scoutWeights,
     calibrationState,
+    metaPromptState,
+    metaEvalSet,
+    systemHealth,
+    metaInsights,
     liveGate,
   } = data;
   const persistedStateRef = useRef<PersistedMainLayoutState | null>(readPersistedMainLayoutState());
@@ -522,9 +526,10 @@ export default function MainLayout({
 
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 pb-phi-5 lg:px-phi-5 lg:pt-phi-5 lg:pb-phi-5">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.95fr)_minmax(360px,1.1fr)_minmax(0,1.45fr)] min-h-0 overflow-hidden gap-phi-6 lg:gap-phi-6">
-            <aside className="hidden lg:grid min-w-0 min-h-0 grid-rows-[minmax(150px,1fr)_auto_auto_auto_auto] gap-phi-4 overflow-hidden">
-              <div className="min-h-0 h-full">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.85fr)_minmax(420px,1.12fr)_minmax(0,1.46fr)] min-h-0 overflow-hidden gap-phi-5 lg:gap-phi-5">
+            <aside className="hidden lg:flex flex-col min-w-0 min-h-0 gap-phi-4 overflow-hidden">
+              {/* SystemBar fills all remaining vertical space */}
+              <div className="flex-1 min-h-[160px] overflow-hidden">
                 <SystemBar
                   variant="embedded"
                   rightPanel={rightPanel}
@@ -534,9 +539,11 @@ export default function MainLayout({
                   onClose={() => setRightPanel(null)}
                 />
               </div>
+              {/* Lower sections — stable height, no overflow clipping */}
+              <div className="shrink-0 flex flex-col gap-phi-4 [&::-webkit-scrollbar]:hidden" style={{scrollbarWidth:'none'}}>
               <section
                 aria-label="On-demand lookup"
-                className="shrink-0 min-h-0 bg-paper border border-oxford/[0.08] overflow-hidden"
+                className="bg-paper border border-oxford/[0.08] overflow-hidden"
               >
                 <AgentDispatch
                   input={lookupInput}
@@ -544,6 +551,7 @@ export default function MainLayout({
                   onSubmit={() => void handleLookupSubmit()}
                   isBusy={lookupBusy}
                   message={lookupMessage}
+                  onClearMessage={() => setLookupMessage(null)}
                   lookupPhase={lookupPhaseLabel}
                   alwaysOpen
                 />
@@ -610,7 +618,7 @@ export default function MainLayout({
                       <p className={`font-mono font-bold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.04em] tabular-nums ${stat.accent ? 'text-escalation' : 'text-oxford'}`}>
                         {stat.value.toLocaleString()}
                       </p>
-                      <p className="mt-phi-1 type-meta text-oxford/40 uppercase tracking-[0.1em]">{stat.label}</p>
+                      <p className="mt-phi-1 type-meta text-oxford/40 tracking-[0.08em]">{stat.label}</p>
                     </div>
                   ))}
                 </div>
@@ -621,7 +629,7 @@ export default function MainLayout({
               >
                 <div className="flex items-start justify-between gap-phi-3">
                   <div className="min-w-0 flex-1">
-                    <p className="type-meta text-oxford/40 uppercase tracking-[0.1em]">Active mandate</p>
+                    <p className="type-meta text-oxford/40 tracking-[0.08em]">Active mandate</p>
                     <p className="mt-phi-2 type-body font-semibold leading-tight tracking-tight text-oxford truncate">
                       {fundName || 'No fund configured'}
                     </p>
@@ -646,6 +654,7 @@ export default function MainLayout({
                 )}
               </article>
               <AccountRailPanel settingsPath={SETTINGS_PATH} />
+              </div>{/* end lower sections */}
             </aside>
 
             <div className="flex min-w-0 min-h-0 flex-1 flex-col lg:min-h-0">
@@ -720,6 +729,7 @@ export default function MainLayout({
                     onSubmit={() => void handleLookupSubmit()}
                     isBusy={lookupBusy}
                     message={lookupMessage}
+                    onClearMessage={() => setLookupMessage(null)}
                     lookupPhase={lookupPhaseLabel}
                   />
                 </div>
@@ -769,10 +779,13 @@ export default function MainLayout({
                     rejectionAnalytics={rejectionAnalytics}
                     watchlistAnalytics={watchlistAnalytics}
                     concentrationAnalytics={concentrationAnalytics}
+                    systemHealth={systemHealth}
                     metaReports={metaReports}
                     scoutWeights={scoutWeights}
                     calibrationState={calibrationState}
-                    onClose={() => setRightPanel(null)}
+                    metaPromptState={metaPromptState}
+                    metaEvalSet={metaEvalSet}
+                    metaInsights={metaInsights}
                   />
                 ) : (
                   <GhostTransition disableLift>
@@ -815,7 +828,7 @@ export default function MainLayout({
                     >
                       <PanelShell
                         className="min-h-0 flex-1"
-                        title="JUDGEMENTS"
+                        title="Judgements"
                         titleClassName={UI_PANEL_CHROME_LABEL}
                         headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
                         headerBorderClass="border-b border-hairline"
@@ -826,7 +839,7 @@ export default function MainLayout({
                             className={PANEL_CHROME_ACTION_BTN_CLASS}
                             aria-label="Hide judgements"
                           >
-                            CLOSE
+                            Close
                           </button>
                         }
                         contentOverflowHidden
@@ -866,7 +879,7 @@ export default function MainLayout({
                               className={PANEL_CHROME_ACTION_BTN_CLASS}
                               aria-label="Download IC pack as PDF"
                             >
-                              IC PACK (PDF)
+                              IC pack (PDF)
                             </button>
                             <span className={`${UI_PANEL_CHROME_LABEL} text-oxford/35`} aria-hidden="true">
                               /
@@ -877,7 +890,7 @@ export default function MainLayout({
                               className={PANEL_CHROME_ACTION_BTN_CLASS}
                               aria-label="Download IC pack as Markdown"
                             >
-                              IC PACK (MD)
+                              IC pack (MD)
                             </button>
                             <span className={`${UI_PANEL_CHROME_LABEL} text-oxford/35`} aria-hidden="true">
                               /
@@ -888,7 +901,7 @@ export default function MainLayout({
                               className={PANEL_CHROME_ACTION_BTN_CLASS}
                               aria-label="Close memo"
                             >
-                              CLOSE
+                              Close
                             </button>
                           </div>
                         }
@@ -980,8 +993,8 @@ export default function MainLayout({
             animate={{ x: 0 }}
             exit={reduceMotion ? { x: 0 } : { x: '100%' }}
             transition={transitionOrReduced(reduceMotion, {
-              duration: tokens.motion.duration.medium,
-              ease: tokens.motion.ease,
+              duration: tokens.motion.duration.long,
+              ease: tokens.motion.easeDrawer,
             })}
             className="fixed top-0 right-0 w-full max-w-full sm:w-[380px] lg:w-[400px] z-[10000] flex flex-col bg-paper"
             style={{
@@ -995,7 +1008,7 @@ export default function MainLayout({
             onClick={(e) => e.stopPropagation()}
           >
             <PanelShell
-              title="JUDGEMENTS"
+              title="Judgements"
               titleClassName={UI_PANEL_CHROME_LABEL}
               headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
               headerBorderClass=""
@@ -1006,7 +1019,7 @@ export default function MainLayout({
                   className={`${PANEL_CHROME_ACTION_BTN_CLASS} min-w-[44px] min-h-[44px] flex items-center justify-center`}
                   aria-label="Close judgements panel"
                 >
-                  CLOSE
+                  Close
                 </button>
               }
               contentOverflowHidden

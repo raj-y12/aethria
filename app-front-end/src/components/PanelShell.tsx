@@ -5,7 +5,7 @@ export const PANEL_HEADER_CLASS =
 export const PANEL_TITLE_CLASS = 'type-label-section text-oxford/60';
 export const PANEL_TAB_BAR_CLASS = 'flex-none flex gap-0 border-b border-hairline px-phi-4 sm:px-phi-5';
 export const PANEL_TAB_BUTTON_CLASS =
-  'py-phi-4 px-phi-4 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction transition-[border-color,color]';
+  'py-phi-4 px-phi-4 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
 export const PANEL_TAB_ACTIVE_CLASS = 'text-oxford border-oxford';
 export const PANEL_TAB_INACTIVE_CLASS =
   'text-oxford/40 border-transparent hover:text-oxford/80 hover:border-oxford/40';

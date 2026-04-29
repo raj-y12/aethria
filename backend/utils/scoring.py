@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Dict, Optional, Tuple
 
+from utils.score_semantics import rubric_band_for_numeric
+
 
 CORE_SCORE_FIELDS: Tuple[str, ...] = (
     "market_score",
@@ -61,15 +63,19 @@ def enrich_scores(payload: Dict[str, object]) -> Dict[str, object]:
     """
     Return a shallow copy containing:
     - overall_score
-    - overall_label
-    - per-dimension labels under <dim>_label
+    - overall_label (legacy ladder: Exceptional / Strong / Moderate / Weak)
+    - per-dimension labels under <dim>_label (same legacy ladder)
+    - overall_rubric_band and <dim>_rubric_band (evaluation_rubric v1.1: Weak / Concerning / Promising / Strong)
     """
     out = dict(payload)
     overall = compute_overall_score(out)
     out["overall_score"] = overall
     out["overall_label"] = score_to_label(overall) if overall is not None else None
+    out["overall_rubric_band"] = rubric_band_for_numeric(overall)
     for field in CORE_SCORE_FIELDS + ("defensibility_score",):
         score = _to_float(out.get(field))
         out[f"{field}_label"] = score_to_label(score) if score is not None else None
+        rub_key = field.replace("_score", "_rubric_band")
+        out[rub_key] = rubric_band_for_numeric(score)
     return out
 

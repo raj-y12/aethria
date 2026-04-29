@@ -2,16 +2,19 @@
 from typing import TypedDict, List, Dict, Optional
 
 
-class PromptMutation(TypedDict):
+class PromptMutation(TypedDict, total=False):
+    type: str                   # "prompt_proposal" when gated
     mutation_id: str
     mutation_type: str          # "scout_prompt" | "reviewer_prompt"
     agent_target: str           # e.g. "ContrarianScout", "SkepticalReviewer"
+    library_key: str            # e.g. "MarketDrivenScout:hash"
     previous_prompt_hash: str
     new_prompt_hash: str
     reasoning: str
     signal_inputs: dict
     applied_at: str
     cycle_number: int
+    promoted: bool
 
 
 class ScoutWeightUpdate(TypedDict):
@@ -34,10 +37,11 @@ class CalibrationMutation(TypedDict):
     cycle_number: int
 
 
-class MetaCycleReport(TypedDict):
+class MetaCycleReport(TypedDict, total=False):
     cycle_number: int
     ran_at: str
     signal_summary: dict
+    prompt_proposals: List[PromptMutation]
     mutations_applied: List[PromptMutation]
     weight_updates: List[ScoutWeightUpdate]
     calibration_changes: List[CalibrationMutation]

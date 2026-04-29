@@ -1,4 +1,9 @@
-import type { RejectionAnalytics, WatchlistAnalytics, ConcentrationAnalytics } from '../types/startup';
+import type {
+  RejectionAnalytics,
+  WatchlistAnalytics,
+  ConcentrationAnalytics,
+  SystemHealthSnapshot,
+} from '../types/startup';
 import { authedFetch } from './auth';
 
 const API_BASE =
@@ -22,4 +27,12 @@ export async function fetchConcentrationAnalytics(): Promise<ConcentrationAnalyt
   const res = await authedFetch(`${API_BASE}/api/analytics/concentration`, { headers: { Accept: 'application/json' } });
   if (!res.ok) return { by_sector: {}, most_concentrated_sector: '', most_concentrated_theme: '', last_updated: '' };
   return res.json();
+}
+
+export async function fetchSystemHealth(): Promise<SystemHealthSnapshot> {
+  const res = await authedFetch(`${API_BASE}/api/analytics/system-health`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`System health failed: ${res.status}`);
+  return res.json() as Promise<SystemHealthSnapshot>;
 }

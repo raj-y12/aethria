@@ -78,8 +78,8 @@ export default function AgentLogoutModal({
         >
           {/* Eyebrow */}
           <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, transform: 'translateY(10px)' }}
+            animate={{ opacity: 1, transform: 'translateY(0px)' }}
             transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
             className="type-meta uppercase tracking-[0.16em] text-oxford/40 mb-phi-3"
           >
@@ -88,8 +88,8 @@ export default function AgentLogoutModal({
 
           {/* Title */}
           <motion.h1
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, transform: 'translateY(12px)' }}
+            animate={{ opacity: 1, transform: 'translateY(0px)' }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
             className="type-display text-center text-[clamp(28px,4vw,52px)] font-medium text-oxford leading-[1.1] m-0 max-w-[15ch]"
           >
@@ -123,8 +123,8 @@ export default function AgentLogoutModal({
               <>
                 {/* Primary: Keep Running */}
                 <motion.button
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, transform: 'translateY(10px)' }}
+                  animate={{ opacity: 1, transform: 'translateY(0px)' }}
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
                   onClick={onKeepRunning}
                   disabled={busy}
@@ -135,8 +135,8 @@ export default function AgentLogoutModal({
 
                 {/* Secondary: Turn Off */}
                 <motion.button
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, transform: 'translateY(10px)' }}
+                  animate={{ opacity: 1, transform: 'translateY(0px)' }}
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
                   onClick={() => void handleTurnOff()}
                   disabled={busy}
@@ -149,8 +149,8 @@ export default function AgentLogoutModal({
               <>
                 {/* Primary: Log out */}
                 <motion.button
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, transform: 'translateY(10px)' }}
+                  animate={{ opacity: 1, transform: 'translateY(0px)' }}
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
                   onClick={onKeepRunning}
                   disabled={busy}
@@ -161,8 +161,8 @@ export default function AgentLogoutModal({
 
                 {/* Secondary: Turn on agents & log out */}
                 <motion.button
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, transform: 'translateY(10px)' }}
+                  animate={{ opacity: 1, transform: 'translateY(0px)' }}
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
                   onClick={() => void handleTurnOn()}
                   disabled={busy}
@@ -175,8 +175,8 @@ export default function AgentLogoutModal({
 
             {/* Cancel */}
             <motion.button
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, transform: 'translateY(10px)' }}
+              animate={{ opacity: 1, transform: 'translateY(0px)' }}
               transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.39 }}
               onClick={onCancel}
               disabled={busy}

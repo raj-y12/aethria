@@ -17,6 +17,9 @@ from pipeline_state import upsert_pipeline_state
 from utils.storage import Storage
 from utils.settings_loader import is_reviewers_enabled, load_settings
 from utils.scoring import DEFAULT_SCORE_SOURCE, compute_overall_score, enrich_scores
+from services.scoring import DeterministicScoringEngine
+from services.reviewer_resolution import apply_resolution_to_primary
+from reviewer.aethria_view import build_aethria_view
 
 
 logger = logging.getLogger(__name__)
@@ -71,11 +74,18 @@ class ReviewerEngine:
         # Ramp-up: when unreviewed backlog is high, process more per cycle
         self.ramp_threshold = int(os.getenv("REVIEWER_RAMP_THRESHOLD", "5"))
         self.ramp_batch_max = int(os.getenv("REVIEWER_RAMP_BATCH_MAX", "5"))
+        self.use_structured_scoring = os.getenv("USE_STRUCTURED_SCORING", "true").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        self.structured_scoring_engine = DeterministicScoringEngine() if self.use_structured_scoring else None
         
         # Initialize Reviewers (default + persona reviewers)
-        self.reviewer = DefaultReviewer(api_key, model=model)
-        self.skeptical_reviewer = SkepticalReviewer(api_key, model=model)
-        self.opportunist_reviewer = OpportunistReviewer(api_key, model=model)
+        tid = self.tenant_user_id
+        self.reviewer = DefaultReviewer(api_key, model=model, tenant_user_id=tid)
+        self.skeptical_reviewer = SkepticalReviewer(api_key, model=model, tenant_user_id=tid)
+        self.opportunist_reviewer = OpportunistReviewer(api_key, model=model, tenant_user_id=tid)
         
         self.logger = logging.getLogger("reviewer.engine")
         self.running = False
@@ -115,6 +125,77 @@ class ReviewerEngine:
             "reviewer_disagreement": reviewer_disagreement,
             "score_variance": score_variance,
         }
+
+    @staticmethod
+    def _build_scout_output_payload(startup) -> dict:
+        """
+        Full scout facts for reviewer + deterministic scorer (matches ScoutInfo on disk).
+        """
+        si = startup.scout_info
+        sid = startup.startup_id
+        refs = getattr(si, "references", None)
+        if not isinstance(refs, list):
+            refs = []
+        out: Dict[str, Any] = {
+            "id": sid,
+            "name": si.name,
+            "one_line": si.one_line,
+            "sector": si.sector,
+            "problem": si.problem,
+            "solution": si.solution,
+            "target_users": si.target_users,
+            "why_now": si.why_now,
+            "confidence": si.confidence_score,
+            "scout_type": si.scout_type,
+            "est_tam": getattr(si, "est_tam", None),
+            "funding_stage": getattr(si, "funding_stage", None),
+            "references": refs,
+            "primary_thesis": getattr(si, "primary_thesis", None),
+            "key_assumptions": getattr(si, "key_assumptions", None),
+            "biggest_unknown": getattr(si, "biggest_unknown", None),
+        }
+        for opt in ("lookup_id", "lookup_query", "lookup_website", "origin_type"):
+            v = getattr(si, opt, None)
+            if v is not None and v != "":
+                out[opt] = v
+        return out
+
+    def _reviewer_for_persona(self, persona: str):
+        m = {
+            "DefaultReviewer": self.reviewer,
+            "SkepticalReviewer": self.skeptical_reviewer,
+            "OpportunistReviewer": self.opportunist_reviewer,
+        }
+        r = m.get(persona)
+        if r is None:
+            raise ValueError(f"unknown reviewer persona: {persona}")
+        return r
+
+    async def preview_persona_review(
+        self,
+        persona: str,
+        scout_output: dict,
+        candidate_system_prompt: str,
+    ) -> Optional[dict]:
+        """
+        Run one reviewer persona with a candidate system prompt; does not persist.
+        Restores the reviewer's previous SYSTEM_PROMPT in a finally block.
+        """
+        rev = self._reviewer_for_persona(persona)
+        prev_prompt = rev.SYSTEM_PROMPT
+        try:
+            rev.set_prompt(candidate_system_prompt)
+            res = await rev.review(scout_output)
+            if res is None:
+                return None
+            out = dict(res)
+            out["reviewer_type"] = persona
+            if self.use_structured_scoring:
+                out = self._apply_structured_scoring(scout_output, out)
+            self._derive_verdict_from_scores(out)
+            return out
+        finally:
+            rev.set_prompt(prev_prompt)
 
     @staticmethod
     def _mean_round_score(values: list) -> int:
@@ -173,6 +254,76 @@ class ReviewerEngine:
             primary["confidence_adjusted_score"] = round(s_bar, 3)
         primary["score_source"] = DEFAULT_SCORE_SOURCE
         primary.update(enrich_scores(primary))
+
+    def _refresh_derived_after_dimension_changes(
+        self, primary: Dict[str, Any], all_results: List[Dict[str, Any]]
+    ) -> None:
+        """Re-run confidence_adjusted_score and enrich_scores after resolution tweaks."""
+        core_dims = ["market_score", "product_score", "technical_score", "execution_score"]
+        all_dims = list(core_dims)
+        if primary.get("defensibility_score") is not None:
+            all_dims.append("defensibility_score")
+        s_bar = sum(float(primary.get(d, 5)) for d in all_dims) / len(all_dims)
+        reviewer_avgs: List[float] = []
+        for r in all_results:
+            r_scores = [
+                float(r[d]) for d in core_dims if isinstance(r.get(d), (int, float))
+            ]
+            ds = r.get("defensibility_score")
+            if ds is not None:
+                try:
+                    r_scores.append(float(ds))
+                except (TypeError, ValueError):
+                    pass
+            if r_scores:
+                reviewer_avgs.append(sum(r_scores) / len(r_scores))
+        if len(reviewer_avgs) >= 2:
+            delta = max(reviewer_avgs) - min(reviewer_avgs)
+            primary["confidence_adjusted_score"] = round(s_bar * (1.0 - delta / 10.0), 3)
+        else:
+            primary["confidence_adjusted_score"] = round(s_bar, 3)
+        primary["score_source"] = DEFAULT_SCORE_SOURCE
+        primary.update(enrich_scores(primary))
+
+    @staticmethod
+    def _pick_primary_structured_signals(
+        successful_results: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        """Prefer DefaultReviewer normalized structured_signals; else first dict with signals."""
+        for r in successful_results:
+            if r.get("reviewer_type") == "DefaultReviewer":
+                sig = r.get("structured_signals")
+                if isinstance(sig, dict) and sig:
+                    return dict(sig)
+        for r in successful_results:
+            sig = r.get("structured_signals")
+            if isinstance(sig, dict) and sig:
+                return dict(sig)
+        return None
+
+    def _apply_structured_scoring(self, scout_output: dict, reviewer_output: dict) -> dict:
+        """Replace LLM-assigned numeric scores with deterministic weighted scores."""
+        if not self.structured_scoring_engine:
+            return reviewer_output
+        trace = self.structured_scoring_engine.score(scout_output, reviewer_output)
+        updated = dict(reviewer_output)
+        updated["market_score"] = int(round(float(trace["market"]["score"])))
+        updated["product_score"] = int(round(float(trace["product"]["score"])))
+        updated["technical_score"] = int(round(float(trace["technical"]["score"])))
+        updated["execution_score"] = int(round(float(trace["execution"]["score"])))
+        updated["defensibility_score"] = int(round(float(trace["defensibility"]["score"])))
+        updated["structured_scoring"] = trace
+        updated["score_source"] = (
+            "Deterministic structured scoring (extraction -> normalization -> weighted aggregation)"
+        )
+        updated["score_reasoning"] = {
+            "market_score": "Computed from TAM, growth, urgency, timing, and competition signals.",
+            "product_score": "Computed from extracted product-confidence signals.",
+            "technical_score": "Computed from extracted technical-confidence signals.",
+            "execution_score": "Computed from extracted execution-confidence signals.",
+            "defensibility_score": "Computed from extracted defensibility-confidence signals.",
+        }
+        return updated
 
     @staticmethod
     def _derive_verdict_from_scores(primary: dict) -> None:
@@ -358,28 +509,9 @@ class ReviewerEngine:
             if confidence_score < confidence_threshold:
                 skipped_low_confidence += 1
                 continue
-            entry_id = startup.startup_id
-            scout_output: dict = {
-                "id": entry_id,
-                "name": startup.scout_info.name,
-                "one_line": startup.scout_info.one_line,
-                "sector": startup.scout_info.sector,
-                "problem": startup.scout_info.problem,
-                "solution": startup.scout_info.solution,
-                "target_users": startup.scout_info.target_users,
-                "why_now": startup.scout_info.why_now,
-                "confidence": startup.scout_info.confidence_score,
-            }
-            scout_output["primary_thesis"] = getattr(
-                startup.scout_info, "primary_thesis", None
-            )
-            scout_output["key_assumptions"] = getattr(
-                startup.scout_info, "key_assumptions", None
-            )
-            scout_output["biggest_unknown"] = getattr(
-                startup.scout_info, "biggest_unknown", None
-            )
-            
+            scout_output = self._build_scout_output_payload(startup)
+            entry_id = scout_output["id"]
+
             try:
                 self.logger.info(
                     f"Reviewing entry {entry_id}: {scout_output.get('name', 'Unknown')} "
@@ -406,6 +538,8 @@ class ReviewerEngine:
                         )
                     elif res is not None:
                         res["reviewer_type"] = reviewer_types[i]
+                        if self.use_structured_scoring:
+                            res = self._apply_structured_scoring(scout_output, res)
                         successful_results.append(res)
                 
                 if not successful_results:
@@ -434,6 +568,16 @@ class ReviewerEngine:
                     review_output = dict(successful_results[0])
 
                 self._blend_numeric_scores_into_primary(review_output, successful_results)
+                resolution_notes, disagreement_summary = apply_resolution_to_primary(
+                    review_output, successful_results
+                )
+                self._refresh_derived_after_dimension_changes(review_output, successful_results)
+                review_output["resolution_notes"] = resolution_notes
+                review_output["disagreement_summary"] = disagreement_summary
+                sig_primary = self._pick_primary_structured_signals(successful_results)
+                if sig_primary is not None:
+                    review_output["structured_signals"] = sig_primary
+
                 self._derive_verdict_from_scores(review_output)
                 self.logger.info(
                     "reviewer_engine verdict=%s derived_verdict=%s",
@@ -458,7 +602,13 @@ class ReviewerEngine:
                 
                 # Compute consensus across all successful results
                 consensus = self._compute_consensus(successful_results)
-                
+                review_output["aethria_view"] = build_aethria_view(
+                    review_output=review_output,
+                    scout_output=scout_output,
+                    consensus=consensus,
+                    resolution_notes=resolution_notes,
+                ).model_dump(mode="json")
+
                 # Build SingleReview list for storage
                 from models import SingleReview
                 single_reviews = []
@@ -503,6 +653,12 @@ class ReviewerEngine:
                         defensibility_weaknesses=r.get("defensibility_weaknesses") or None,
                         defensibility_confidence=r.get("defensibility_confidence"),
                         prompt_version=r.get("prompt_version"),
+                        structured_scoring=r.get("structured_scoring"),
+                        structured_signals=(
+                            dict(r["structured_signals"])
+                            if isinstance(r.get("structured_signals"), dict)
+                            else None
+                        ),
                     ))
                 
                 # Convert to ReviewInfo and save (primary fields from default reviewer)
@@ -635,20 +791,7 @@ class ReviewerEngine:
             )
             return False
 
-        scout_output: dict = {
-            "id": startup.startup_id,
-            "name": startup.scout_info.name,
-            "one_line": startup.scout_info.one_line,
-            "sector": startup.scout_info.sector,
-            "problem": startup.scout_info.problem,
-            "solution": startup.scout_info.solution,
-            "target_users": startup.scout_info.target_users,
-            "why_now": startup.scout_info.why_now,
-            "confidence": startup.scout_info.confidence_score,
-            "primary_thesis": getattr(startup.scout_info, "primary_thesis", None),
-            "key_assumptions": getattr(startup.scout_info, "key_assumptions", None),
-            "biggest_unknown": getattr(startup.scout_info, "biggest_unknown", None),
-        }
+        scout_output = self._build_scout_output_payload(startup)
 
         try:
             default_task = self.reviewer.review(scout_output)
@@ -665,6 +808,8 @@ class ReviewerEngine:
                     self.logger.warning("%s reviewer failed for %s: %s", reviewer_types[i], startup_id, res)
                 elif res is not None:
                     res["reviewer_type"] = reviewer_types[i]
+                    if self.use_structured_scoring:
+                        res = self._apply_structured_scoring(scout_output, res)
                     successful_results.append(res)
             if not successful_results:
                 self.logger.warning("All reviewers failed for startup %s", startup_id)
@@ -678,6 +823,16 @@ class ReviewerEngine:
             else:
                 review_output = dict(successful_results[0])
             self._blend_numeric_scores_into_primary(review_output, successful_results)
+            resolution_notes, disagreement_summary = apply_resolution_to_primary(
+                review_output, successful_results
+            )
+            self._refresh_derived_after_dimension_changes(review_output, successful_results)
+            review_output["resolution_notes"] = resolution_notes
+            review_output["disagreement_summary"] = disagreement_summary
+            sig_primary = self._pick_primary_structured_signals(successful_results)
+            if sig_primary is not None:
+                review_output["structured_signals"] = sig_primary
+
             self._derive_verdict_from_scores(review_output)
             self.logger.info(
                 "reviewer_engine verdict=%s derived_verdict=%s",
@@ -691,6 +846,12 @@ class ReviewerEngine:
                 review_output, scout_output, startup_id
             )
             consensus = self._compute_consensus(successful_results)
+            review_output["aethria_view"] = build_aethria_view(
+                review_output=review_output,
+                scout_output=scout_output,
+                consensus=consensus,
+                resolution_notes=resolution_notes,
+            ).model_dump(mode="json")
 
             from models import SingleReview
             from utils.adapters import reviewer_output_to_review_info
@@ -736,6 +897,12 @@ class ReviewerEngine:
                     defensibility_weaknesses=r.get("defensibility_weaknesses") or None,
                     defensibility_confidence=r.get("defensibility_confidence"),
                     prompt_version=r.get("prompt_version"),
+                    structured_scoring=r.get("structured_scoring"),
+                    structured_signals=(
+                        dict(r["structured_signals"])
+                        if isinstance(r.get("structured_signals"), dict)
+                        else None
+                    ),
                 ))
 
             review_info = reviewer_output_to_review_info(review_output)

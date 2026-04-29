@@ -8,11 +8,17 @@ import os
 import json
 import logging
 import re
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from openai import OpenAI
 from utils.prompt_version import hash_prompt
 from utils.scoring import compute_overall_score
+
+from partner.rationale import (
+    compose_decision_rationale,
+    derive_situation_tags,
+    primary_tag,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -257,23 +263,30 @@ class PartnerDecisionEngine:
             return "MONITOR"
         return "PASS"
 
+    def _apply_final_recommendation_fields(
+        self,
+        result: Dict[str, Any],
+        final_recommendation: str,
+        assumption_risks: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Attach canonical headline + legacy decision + policy next_action (normalized)."""
+        na = self._get_rules().get("next_actions", {})
+        raw_next = self._next_action_for_llm_decision(final_recommendation, na)
+        result["recommendation"] = final_recommendation
+        result["decision"] = _recommendation_to_legacy_decision(final_recommendation)
+        result["assumption_risks"] = list(assumption_risks or [])
+        result["next_action"] = self._normalize_next_action(raw_next)
+        return result
+
     def _enforce_canonical_recommendation(
         self,
         result: Dict[str, Any],
         avg_score: float,
         assumption_risks: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
+        """Backward-compatible alias: canonical recommendation from average score."""
         forced = self._canonical_recommendation(avg_score)
-        result["recommendation"] = forced
-        result["decision"] = _recommendation_to_legacy_decision(forced)
-        result["assumption_risks"] = list(assumption_risks or [])
-        if forced == "PASS":
-            result["next_action"] = self._next_action_for_llm_decision("PASS", self._get_rules().get("next_actions", {}))
-        elif forced == "MONITOR":
-            result["next_action"] = self._next_action_for_llm_decision("MONITOR", self._get_rules().get("next_actions", {}))
-        else:
-            result["next_action"] = self._next_action_for_llm_decision("INVEST", self._get_rules().get("next_actions", {}))
-        return result
+        return self._apply_final_recommendation_fields(result, forced, assumption_risks)
 
     @staticmethod
     def _optional_thesis_alignment_score(review_output: Dict[str, Any]) -> Optional[float]:
@@ -542,33 +555,6 @@ class PartnerDecisionEngine:
         )
         has_missing_critical_qualitative = has_missing_team or has_missing_business_model
 
-        # Rule 1: WEAK verdict → PASS
-        weak_rule = verdict_rules.get("WEAK", {})
-        if effective_verdict == "WEAK":
-            label = self._verdict_label(effective_verdict)
-            result = self._create_decision(
-                recommendation="PASS",
-                conviction=weak_rule.get("conviction_level", 9),
-                decision_rationale=(
-                    f"Quality assessment: {label}. Average score: {avg_score:.1f}/10. "
-                    f"Not suitable for investment consideration."
-                ),
-                next_action=weak_rule.get("next_action", "Pass - Market too crowded / Low quality"),
-                human_review_required=weak_rule.get("human_review_required", False),
-                thesis=n_thesis,
-                why_this_matters=n_why,
-                snapshot=n_snapshot,
-                market_insight=n_market,
-                product_edge=n_product,
-                traction_signals=n_traction,
-                risks=merged_risks,
-            )
-            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
-            return self._finalize_thesis_soft_and_log(
-                result, review_output, scout_output, avg_score, avg_dims
-            )
-
-        # Portfolio awareness rules (after WEAK → NO)
         startup_sector = scout_output.get("sector", "")
         startup_funding_stage = scout_output.get("funding_stage")
         if portfolio_context:
@@ -579,17 +565,62 @@ class PartnerDecisionEngine:
             if total > 20 and startup_funding_stage == "Pre-Seed":
                 conviction_adjust -= 1
 
-        # Rule 2: Critical risks → PASS
-        if has_critical_risk:
+        final_recommendation = self._canonical_recommendation(avg_score)
+        reviewer_disagreement = bool(review_output.get("reviewer_disagreement", False))
+
+        tags = derive_situation_tags(
+            effective_verdict=effective_verdict,
+            avg_score=avg_score,
+            min_avg_pass=min_avg_pass,
+            min_avg_strong_yes=min_avg_strong_yes,
+            min_avg_medium_maybe=min_avg_medium_maybe,
+            min_avg_borderline_low=min_avg_borderline_low,
+            max_avg_borderline_high=max_avg_borderline_high,
+            has_critical_risk=has_critical_risk,
+            has_contradiction=has_contradiction,
+            grey_zone_active=grey_zone_active,
+            reviewer_disagreement=reviewer_disagreement,
+            has_missing_critical_qualitative=has_missing_critical_qualitative,
+        )
+        primary = primary_tag(tags)
+        label = self._verdict_label(effective_verdict)
+        sector_conc = bool(
+            portfolio_context and portfolio_context.get("sector_counts", {}).get(startup_sector, 0) >= 3
+        )
+
+        weak_rule = verdict_rules.get("WEAK", {})
+        strong_rule = verdict_rules.get("STRONG", {})
+        medium_rule = verdict_rules.get("MEDIUM", {})
+
+        def _aligned_rationale() -> Tuple[str, List[str]]:
+            return compose_decision_rationale(
+                final_recommendation=final_recommendation,
+                tags=tags,
+                primary=primary,
+                label=label,
+                avg_score=avg_score,
+                market_score=int(market_score),
+                product_score=int(product_score),
+                technical_score=int(technical_score),
+                execution_score=int(execution_score),
+                min_avg_pass=min_avg_pass,
+                min_avg_strong_yes=min_avg_strong_yes,
+                min_avg_medium_maybe=min_avg_medium_maybe,
+                min_avg_borderline_low=min_avg_borderline_low,
+                max_avg_borderline_high=max_avg_borderline_high,
+                has_contradiction=has_contradiction,
+                reviewer_disagreement=reviewer_disagreement,
+                sector_concentration_note=sector_conc,
+            )
+
+        def _emit_deterministic(conviction: int, human_rev: bool) -> Dict[str, Any]:
+            rationale, drivers = _aligned_rationale()
             result = self._create_decision(
-                recommendation="PASS",
-                conviction=8 + conviction_adjust,
-                decision_rationale=(
-                    f"Critical risks identified (regulatory or execution impossibility). "
-                    f"Average score: {avg_score:.1f}/10. Risk too high for investment."
-                ),
-                next_action=next_actions.get("critical_risks", "Pass - Critical risks too high"),
-                human_review_required=False,
+                recommendation=final_recommendation,
+                conviction=conviction,
+                decision_rationale=rationale,
+                next_action=next_actions.get("default_no", "Pass - Does not meet criteria"),
+                human_review_required=human_rev,
                 thesis=n_thesis,
                 why_this_matters=n_why,
                 snapshot=n_snapshot,
@@ -598,12 +629,26 @@ class PartnerDecisionEngine:
                 traction_signals=n_traction,
                 risks=merged_risks,
             )
-            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
+            result["decision_drivers"] = drivers
+            result = self._apply_final_recommendation_fields(
+                result, final_recommendation, assumption_risks
+            )
             return self._finalize_thesis_soft_and_log(
                 result, review_output, scout_output, avg_score, avg_dims
             )
 
-        # Rule 3: Low average score → PASS
+        # Rule 1: WEAK verdict (portfolio-aware conviction like other branches)
+        if effective_verdict == "WEAK":
+            return _emit_deterministic(
+                weak_rule.get("conviction_level", 9) + conviction_adjust,
+                weak_rule.get("human_review_required", False),
+            )
+
+        # Rule 2: Critical diligence risks
+        if has_critical_risk:
+            return _emit_deterministic(8 + conviction_adjust, False)
+
+        # Rule 3: Low average score → optional LLM edge case
         if avg_score < min_avg_pass:
             llm_triggers = rules.get("llm_fallback_triggers", {})
             low_score_edge_case = (
@@ -627,118 +672,51 @@ class PartnerDecisionEngine:
                     thesis_block=thesis_block,
                     avg_score=avg_score,
                     avg_dims=avg_dims,
+                    final_recommendation=final_recommendation,
                 )
-                result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
-                return self._finalize_thesis_soft_and_log(
-                    result, review_output, scout_output, avg_score, avg_dims
+                return self._align_llm_partner_payload(
+                    result,
+                    final_recommendation=final_recommendation,
+                    assumption_risks=assumption_risks,
+                    tags=tags,
+                    primary=primary,
+                    label=label,
+                    avg_score=avg_score,
+                    market_score=int(market_score),
+                    product_score=int(product_score),
+                    technical_score=int(technical_score),
+                    execution_score=int(execution_score),
+                    min_avg_pass=min_avg_pass,
+                    min_avg_strong_yes=min_avg_strong_yes,
+                    min_avg_medium_maybe=min_avg_medium_maybe,
+                    min_avg_borderline_low=min_avg_borderline_low,
+                    max_avg_borderline_high=max_avg_borderline_high,
+                    has_contradiction=has_contradiction,
+                    reviewer_disagreement=reviewer_disagreement,
+                    sector_concentration_note=sector_conc,
+                    review_output=review_output,
+                    scout_output=scout_output,
+                    avg_dims=avg_dims,
                 )
-            label = self._verdict_label(effective_verdict)
-            result = self._create_decision(
-                recommendation="PASS",
-                conviction=7 + conviction_adjust,
-                decision_rationale=(
-                    f"Average score {avg_score:.1f}/10 below threshold ({min_avg_pass}). "
-                    f"Quality: {label}. Insufficient quality for investment."
-                ),
-                next_action=next_actions.get("low_scores", "Pass - Low scores"),
-                human_review_required=False,
-                thesis=n_thesis,
-                why_this_matters=n_why,
-                snapshot=n_snapshot,
-                market_insight=n_market,
-                product_edge=n_product,
-                traction_signals=n_traction,
-                risks=merged_risks,
-            )
-            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
-            return self._finalize_thesis_soft_and_log(
-                result, review_output, scout_output, avg_score, avg_dims
+
+            return _emit_deterministic(7 + conviction_adjust, False)
+
+        # Rule 4: STRONG verdict, pass bar met but below YES bar
+        if effective_verdict == "STRONG" and min_avg_pass <= avg_score < min_avg_strong_yes:
+            return _emit_deterministic(
+                strong_rule.get("conviction_level_below_strong_yes_bar", 6) + conviction_adjust,
+                strong_rule.get("human_review_required_below_strong_yes_bar", False),
             )
 
-        # Rule 4: STRONG verdict, pass bar met but below YES bar → MONITOR
-        strong_rule = verdict_rules.get("STRONG", {})
-        if (
-            effective_verdict == "STRONG"
-            and min_avg_pass <= avg_score < min_avg_strong_yes
-        ):
-            next_act = strong_rule.get(
-                "next_action_below_strong_yes_bar",
-                next_actions.get("monitor", "Monitor market and track progress"),
-            )
-            label = self._verdict_label(effective_verdict)
-            rationale_parts = (
-                f"Quality: {label}. Average score ({avg_score:.1f}/10) meets the pass bar "
-                f"({min_avg_pass}) but is below the strong-YES bar ({min_avg_strong_yes}). "
-                f"Market: {market_score}/10, Product: {product_score}/10, "
-                f"Technical: {technical_score}/10, Execution: {execution_score}/10. "
-                f"Worth monitoring while execution and thesis signals mature."
-            )
-            if portfolio_context and portfolio_context.get("sector_counts", {}).get(
-                startup_sector, 0
-            ) >= 3:
-                rationale_parts += " sector_concentration_risk"
-            result = self._create_decision(
-                recommendation="MONITOR",
-                conviction=strong_rule.get("conviction_level_below_strong_yes_bar", 6) + conviction_adjust,
-                decision_rationale=rationale_parts,
-                next_action=next_act,
-                human_review_required=strong_rule.get("human_review_required_below_strong_yes_bar", False),
-                thesis=n_thesis,
-                why_this_matters=n_why,
-                snapshot=n_snapshot,
-                market_insight=n_market,
-                product_edge=n_product,
-                traction_signals=n_traction,
-                risks=merged_risks,
-            )
-            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
-            return self._finalize_thesis_soft_and_log(
-                result, review_output, scout_output, avg_score, avg_dims
-            )
-
-        # Rule 5: STRONG verdict + high score → INVEST
+        # Rule 5: STRONG verdict + high score
         if effective_verdict == "STRONG" and avg_score >= min_avg_strong_yes:
-            next_action = (
-                next_actions.get("request_cap_table_and_review", "Request Cap Table + Technical Code Review")
-                if has_red_flags
-                else next_actions.get("request_cap_table", "Request Cap Table")
-            )
             human_review = strong_rule.get("human_review_required_yes", True) or has_missing_critical_qualitative
-            label = self._verdict_label(effective_verdict)
-            rationale_parts = (
-                f"Quality: {label}. High average score ({avg_score:.1f}/10). "
-                f"Market: {market_score}/10, Product: {product_score}/10, "
-                f"Technical: {technical_score}/10, Execution: {execution_score}/10. "
-                f"Meets investment criteria."
-            )
-            if has_missing_critical_qualitative:
-                rationale_parts += " Team or business model detail missing; human review recommended."
-            if portfolio_context and portfolio_context.get("sector_counts", {}).get(startup_sector, 0) >= 3:
-                rationale_parts += " sector_concentration_risk"
-            result = self._create_decision(
-                recommendation="INVEST",
-                conviction=strong_rule.get("conviction_level_yes", 8) + conviction_adjust,
-                decision_rationale=rationale_parts,
-                next_action=next_action,
-                human_review_required=human_review,
-                thesis=n_thesis,
-                why_this_matters=n_why,
-                snapshot=n_snapshot,
-                market_insight=n_market,
-                product_edge=n_product,
-                traction_signals=n_traction,
-                risks=merged_risks,
-            )
-            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
-            return self._finalize_thesis_soft_and_log(
-                result, review_output, scout_output, avg_score, avg_dims
+            return _emit_deterministic(
+                strong_rule.get("conviction_level_yes", 8) + conviction_adjust,
+                human_review,
             )
 
-        # Check reviewer disagreement for LLM trigger
-        reviewer_disagreement = review_output.get("reviewer_disagreement", False)
-
-        # Rule 6: MEDIUM verdict + good score → MONITOR (or LLM if contradictory / missing assumptions / missing qualitative / disagreement)
-        medium_rule = verdict_rules.get("MEDIUM", {})
+        # Rule 6: MEDIUM verdict + strong average → optional LLM escalation
         if effective_verdict == "MEDIUM" and avg_score >= min_avg_medium_maybe:
             llm_triggers = rules.get("llm_fallback_triggers", {})
             trigger_reason = ""
@@ -771,40 +749,39 @@ class PartnerDecisionEngine:
                     thesis_block=thesis_block,
                     avg_score=avg_score,
                     avg_dims=avg_dims,
+                    final_recommendation=final_recommendation,
                 )
-                result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
-                return self._finalize_thesis_soft_and_log(
-                    result, review_output, scout_output, avg_score, avg_dims
+                return self._align_llm_partner_payload(
+                    result,
+                    final_recommendation=final_recommendation,
+                    assumption_risks=assumption_risks,
+                    tags=tags,
+                    primary=primary,
+                    label=label,
+                    avg_score=avg_score,
+                    market_score=int(market_score),
+                    product_score=int(product_score),
+                    technical_score=int(technical_score),
+                    execution_score=int(execution_score),
+                    min_avg_pass=min_avg_pass,
+                    min_avg_strong_yes=min_avg_strong_yes,
+                    min_avg_medium_maybe=min_avg_medium_maybe,
+                    min_avg_borderline_low=min_avg_borderline_low,
+                    max_avg_borderline_high=max_avg_borderline_high,
+                    has_contradiction=has_contradiction,
+                    reviewer_disagreement=reviewer_disagreement,
+                    sector_concentration_note=sector_conc,
+                    review_output=review_output,
+                    scout_output=scout_output,
+                    avg_dims=avg_dims,
                 )
-            label = self._verdict_label(effective_verdict)
-            rationale_text = (
-                f"Quality: {label}. Solid average score ({avg_score:.1f}/10). "
-                f"Market: {market_score}/10, Product: {product_score}/10, "
-                f"Technical: {technical_score}/10, Execution: {execution_score}/10. "
-                f"Worth monitoring for market signals or team development."
-            )
-            if portfolio_context and portfolio_context.get("sector_counts", {}).get(startup_sector, 0) >= 3:
-                rationale_text += " sector_concentration_risk"
-            result = self._create_decision(
-                recommendation="MONITOR",
-                conviction=medium_rule.get("conviction_level_maybe", 6) + conviction_adjust,
-                decision_rationale=rationale_text,
-                next_action=next_actions.get("monitor", "Monitor market and track progress"),
-                human_review_required=False,
-                thesis=n_thesis,
-                why_this_matters=n_why,
-                snapshot=n_snapshot,
-                market_insight=n_market,
-                product_edge=n_product,
-                traction_signals=n_traction,
-                risks=merged_risks,
-            )
-            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
-            return self._finalize_thesis_soft_and_log(
-                result, review_output, scout_output, avg_score, avg_dims
+
+            return _emit_deterministic(
+                medium_rule.get("conviction_level_maybe", 6) + conviction_adjust,
+                False,
             )
 
-        # Rule 7: MEDIUM verdict, borderline score → LLM or deterministic MONITOR
+        # Rule 7: MEDIUM borderline band
         if effective_verdict == "MEDIUM" and min_avg_borderline_low <= avg_score < max_avg_borderline_high:
             llm_triggers = rules.get("llm_fallback_triggers", {})
             is_edge_case = self._is_medium_borderline_edge_case(
@@ -833,62 +810,40 @@ class PartnerDecisionEngine:
                     thesis_block=thesis_block,
                     avg_score=avg_score,
                     avg_dims=avg_dims,
+                    final_recommendation=final_recommendation,
                 )
-                result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
-                return self._finalize_thesis_soft_and_log(
-                    result, review_output, scout_output, avg_score, avg_dims
+                return self._align_llm_partner_payload(
+                    result,
+                    final_recommendation=final_recommendation,
+                    assumption_risks=assumption_risks,
+                    tags=tags,
+                    primary=primary,
+                    label=label,
+                    avg_score=avg_score,
+                    market_score=int(market_score),
+                    product_score=int(product_score),
+                    technical_score=int(technical_score),
+                    execution_score=int(execution_score),
+                    min_avg_pass=min_avg_pass,
+                    min_avg_strong_yes=min_avg_strong_yes,
+                    min_avg_medium_maybe=min_avg_medium_maybe,
+                    min_avg_borderline_low=min_avg_borderline_low,
+                    max_avg_borderline_high=max_avg_borderline_high,
+                    has_contradiction=has_contradiction,
+                    reviewer_disagreement=reviewer_disagreement,
+                    sector_concentration_note=sector_conc,
+                    review_output=review_output,
+                    scout_output=scout_output,
+                    avg_dims=avg_dims,
                 )
-            label = self._verdict_label(effective_verdict)
-            result = self._create_decision(
-                recommendation="MONITOR",
-                conviction=medium_rule.get("conviction_level_borderline", 5) + conviction_adjust,
-                decision_rationale=(
-                    f"Quality: {label}. Average score ({avg_score:.1f}/10) is in the borderline band "
-                    f"({min_avg_borderline_low}-{max_avg_borderline_high}) — below the watchlist "
-                    f"threshold ({min_avg_medium_maybe}) but at or above the pass bar ({min_avg_pass}). "
-                    f"Defaulting to monitor rather than a hard pass."
-                ),
-                next_action=medium_rule.get(
-                    "next_action_borderline",
-                    next_actions.get("monitor", "Monitor market and track progress"),
-                ),
-                human_review_required=False,
-                thesis=n_thesis,
-                why_this_matters=n_why,
-                snapshot=n_snapshot,
-                market_insight=n_market,
-                product_edge=n_product,
-                traction_signals=n_traction,
-                risks=merged_risks,
-            )
-            result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
-            return self._finalize_thesis_soft_and_log(
-                result, review_output, scout_output, avg_score, avg_dims
+
+            return _emit_deterministic(
+                medium_rule.get("conviction_level_borderline", 5) + conviction_adjust,
+                False,
             )
 
-        # Default: PASS
-        label = self._verdict_label(effective_verdict)
-        result = self._create_decision(
-            recommendation="PASS",
-            conviction=6 + conviction_adjust,
-            decision_rationale=(
-                f"Does not meet investment criteria. Quality: {label}. "
-                f"Average score: {avg_score:.1f}/10."
-            ),
-            next_action=next_actions.get("default_no", "Pass - Does not meet criteria"),
-            human_review_required=False,
-            thesis=n_thesis,
-            why_this_matters=n_why,
-            snapshot=n_snapshot,
-            market_insight=n_market,
-            product_edge=n_product,
-            traction_signals=n_traction,
-            risks=merged_risks,
-        )
-        result = self._enforce_canonical_recommendation(result, avg_score, assumption_risks)
-        return self._finalize_thesis_soft_and_log(
-            result, review_output, scout_output, avg_score, avg_dims
-        )
+        # Default path
+        return _emit_deterministic(6 + conviction_adjust, False)
 
     def _compute_assumption_risks(
         self,
@@ -1159,16 +1114,17 @@ class PartnerDecisionEngine:
         scout_output: Dict[str, Any],
         review_output: Dict[str, Any],
         trigger_reason: str,
+        final_recommendation: str,
     ) -> str:
         """
         Final fallback call with a tiny prompt to avoid large-context/formatting failures.
         Returns raw model text content (possibly empty).
         """
         compact_prompt = (
-            "Return ONLY a JSON object with keys: recommendation, confidence, decision_rationale.\n"
-            "recommendation must be one of INVEST/PASS/MONITOR.\n"
+            "Return ONLY a JSON object with keys: confidence, decision_rationale.\n"
             "confidence must be a float in [0,1].\n"
-            "decision_rationale must be a non-empty string.\n\n"
+            "decision_rationale must be a non-empty string defending CANONICAL_DECISION.\n\n"
+            f"CANONICAL_DECISION={final_recommendation}\n"
             f"company={scout_output.get('name', 'Unknown')}\n"
             f"verdict={review_output.get('verdict', 'MEDIUM')}\n"
             f"scores={{market:{review_output.get('market_score', 0)},product:{review_output.get('product_score', 0)},"
@@ -1210,6 +1166,62 @@ class PartnerDecisionEngine:
         except (IndexError, AttributeError):
             return ""
 
+    def _align_llm_partner_payload(
+        self,
+        result: Dict[str, Any],
+        *,
+        final_recommendation: str,
+        assumption_risks: List[str],
+        tags,
+        primary: str,
+        label: str,
+        avg_score: float,
+        market_score: int,
+        product_score: int,
+        technical_score: int,
+        execution_score: int,
+        min_avg_pass: float,
+        min_avg_strong_yes: float,
+        min_avg_medium_maybe: float,
+        min_avg_borderline_low: float,
+        max_avg_borderline_high: float,
+        has_contradiction: bool,
+        reviewer_disagreement: bool,
+        sector_concentration_note: bool,
+        review_output: Dict[str, Any],
+        scout_output: Dict[str, Any],
+        avg_dims: int,
+    ) -> Dict[str, Any]:
+        """Force rationale + headline to match canonical recommendation (LLM narrative only)."""
+        rationale, drivers = compose_decision_rationale(
+            final_recommendation=final_recommendation,
+            tags=tags,
+            primary=primary,
+            label=label,
+            avg_score=avg_score,
+            market_score=market_score,
+            product_score=product_score,
+            technical_score=technical_score,
+            execution_score=execution_score,
+            min_avg_pass=min_avg_pass,
+            min_avg_strong_yes=min_avg_strong_yes,
+            min_avg_medium_maybe=min_avg_medium_maybe,
+            min_avg_borderline_low=min_avg_borderline_low,
+            max_avg_borderline_high=max_avg_borderline_high,
+            has_contradiction=has_contradiction,
+            reviewer_disagreement=reviewer_disagreement,
+            sector_concentration_note=sector_concentration_note,
+        )
+        result["decision_rationale"] = rationale
+        result["rationale"] = rationale
+        result["decision_drivers"] = drivers
+        result = self._apply_final_recommendation_fields(
+            result, final_recommendation, assumption_risks
+        )
+        return self._finalize_thesis_soft_and_log(
+            result, review_output, scout_output, avg_score, avg_dims
+        )
+
     def _decide_with_llm(
         self,
         scout_output: Dict[str, Any],
@@ -1222,14 +1234,16 @@ class PartnerDecisionEngine:
         *,
         avg_score: float = 0.0,
         avg_dims: int = 4,
+        final_recommendation: str = "MONITOR",
     ) -> Dict[str, Any]:
         """
         LLM path when rule engine defers (edge cases). Uses OpenAI chat.completions with JSON output.
-        On missing client, empty/invalid response, or errors: MAYBE, conviction 1 (confidence 0.0), safe rationale.
+        Canonical recommendation is fixed by the caller; model supplies defense narrative only.
+        On missing client, empty/invalid response, or errors: safe fallback payload for alignment layer.
         """
         del context_memo  # omitted from prompt to respect token budget; rule path unchanged
         del portfolio_context
-        del avg_score, avg_dims  # caller uses for post-LLM finalize + logging only
+        del avg_dims  # caller uses for finalize + logging only
 
         self.llm_call_count += 1
         self._record_llm_stat("fallback_invocations")
@@ -1255,7 +1269,7 @@ class PartnerDecisionEngine:
                 (review_output.get("key_risks") or []) + assumption_risks
             ))[:5]
             result = self._create_decision(
-                recommendation="MONITOR",
+                recommendation=final_recommendation,
                 conviction=1,
                 decision_rationale=rationale,
                 next_action=next_actions.get(
@@ -1366,9 +1380,11 @@ PARTNER_RULES_JSON (fund criteria; reason strictly against this policy)
 TRIGGER REASON (why the rule engine deferred)
 {trigger_reason}
 
-Return ONLY a single valid JSON object with exactly these keys:
+CANONICAL DECISION (fixed by fund score-band policy — must not be contradicted)
+recommendation: {final_recommendation}
+
+Return ONLY a single valid JSON object with exactly these keys (do NOT include "recommendation"):
 {{
-  "recommendation": "INVEST" | "PASS" | "MONITOR",
   "confidence": <float 0.0-1.0>,
   "thesis": "<investment thesis — 1 sentence>",
   "why_this_matters": "<market timing or structural shift — 1 sentence>",
@@ -1377,7 +1393,7 @@ Return ONLY a single valid JSON object with exactly these keys:
   "product_edge": "<meaningful differentiation or lack thereof — 1 sentence>",
   "traction_signals": "<traction evidence or null>",
   "risks": ["<risk 1>", "<risk 2>", "<risk 3>"],
-  "decision_rationale": "<2-3 sentences citing dimension scores and thesis fit>",
+  "decision_rationale": "<2-3 sentences defending the CANONICAL DECISION above using scores and thesis fit>",
   "next_action": "<specific next step for the team>",
   "human_review_required": <true|false>
 }}
@@ -1386,6 +1402,7 @@ No markdown. No extra fields. Strictly under 350 words total information density
 
         system_prompt = (
             "You are a Senior Investment Partner. Edge cases only: the deterministic rule path already passed. "
+            "The CANONICAL DECISION is fixed by policy; your JSON must defend it, never overturn it. "
             "Apply PARTNER_RULES_JSON strictly. Output only valid JSON per the user instructions."
         )
         prompt_for_hash = system_prompt + "\n\n" + user_prompt
@@ -1511,6 +1528,7 @@ No markdown. No extra fields. Strictly under 350 words total information density
                         scout_output=scout_output,
                         review_output=review_output,
                         trigger_reason=trigger_reason,
+                        final_recommendation=final_recommendation,
                     )
                 except Exception as e:
                     self._record_llm_stat("rescue_request_errors")
@@ -1529,18 +1547,6 @@ No markdown. No extra fields. Strictly under 350 words total information density
             self.logger.warning(
                 "[PARTNER] partner_llm_fallback user_id=%s malformed JSON company=%s",
                 uid_log,
-                scout_output.get("name", "Unknown"),
-            )
-            return _failure_outcome(prompt_for_hash, _synthesize_rationale())
-
-        raw_recommendation = llm_result.get("recommendation")
-        recommendation = str(raw_recommendation).strip().upper() if raw_recommendation is not None else ""
-        if recommendation not in ("INVEST", "PASS", "MONITOR"):
-            self._record_llm_stat("invalid_decision")
-            self.logger.warning(
-                "[PARTNER] partner_llm_fallback user_id=%s invalid recommendation=%r company=%s",
-                uid_log,
-                raw_recommendation,
                 scout_output.get("name", "Unknown"),
             )
             return _failure_outcome(prompt_for_hash, _synthesize_rationale())
@@ -1579,14 +1585,14 @@ No markdown. No extra fields. Strictly under 350 words total information density
 
         next_act = self._normalize_next_action(
             str(llm_result.get("next_action") or "")
-            or self._next_action_for_llm_decision(recommendation, next_actions)
+            or self._next_action_for_llm_decision(final_recommendation, next_actions)
         )
-        human_rev = bool(llm_result.get("human_review_required", recommendation != "PASS"))
+        human_rev = bool(llm_result.get("human_review_required", final_recommendation != "PASS"))
 
         result = {
-            "recommendation": recommendation,
+            "recommendation": final_recommendation,
             "confidence": round(conf_float, 2),
-            "decision": _recommendation_to_legacy_decision(recommendation),
+            "decision": _recommendation_to_legacy_decision(final_recommendation),
             "conviction_level": _confidence_float_to_conviction_level(conf_float),
             "thesis": str(llm_result.get("thesis") or scout_output.get("primary_thesis") or scout_output.get("one_line") or "").strip(),
             "why_this_matters": str(llm_result.get("why_this_matters") or scout_output.get("why_now") or "").strip(),
