@@ -1,4 +1,4 @@
-from utils.retrieval_grounding import retrieve_source_pack
+from utils.retrieval_grounding import retrieve_source_pack, retrieve_source_pack_merged
 
 
 def test_retrieve_source_pack_uses_tavily_first(monkeypatch):
@@ -33,6 +33,38 @@ def test_retrieve_source_pack_falls_back_to_serpapi(monkeypatch):
     pack = retrieve_source_pack(query="example startup", user_id="u1", max_results=3)
     assert pack["provider"] == "serpapi"
     assert len(pack["sources"]) == 1
+
+
+def test_retrieve_source_pack_merged_dedupes_urls(monkeypatch):
+    calls: list[str] = []
+
+    def fake_tavily(query: str, max_results: int):
+        calls.append(query)
+        if "funding" in query:
+            return [
+                {"title": "A", "url": "https://a.com", "snippet": "first"},
+                {"title": "B", "url": "https://b.com", "snippet": "second"},
+            ]
+        return [
+            {"title": "A dup", "url": "https://a.com", "snippet": "duplicate host"},
+            {"title": "C", "url": "https://c.com", "snippet": "third"},
+        ]
+
+    monkeypatch.setattr(
+        "utils.retrieval_grounding.get_scout_retrieval_provider",
+        lambda _uid: "tavily",
+    )
+    monkeypatch.setattr("utils.retrieval_grounding.tavily_search", fake_tavily)
+    pack = retrieve_source_pack_merged(
+        queries=["Acme startup funding", "Acme traction customers"],
+        user_id="u1",
+        max_per_query=5,
+        max_total_sources=10,
+    )
+    assert len(calls) == 2
+    assert [s["source_id"] for s in pack["sources"]] == ["S1", "S2", "S3"]
+    urls = [s["url"] for s in pack["sources"]]
+    assert urls == ["https://a.com", "https://b.com", "https://c.com"]
 
 
 def test_retrieve_source_pack_empty_when_no_provider_results(monkeypatch):

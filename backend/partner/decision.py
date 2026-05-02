@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from openai import OpenAI
 from utils.prompt_version import hash_prompt
 from utils.scoring import compute_overall_score
+from utils.partner_codes import legacy_from_recommendation, recommendation_from_legacy
 
 from partner.rationale import (
     compose_decision_rationale,
@@ -38,14 +39,6 @@ def _confidence_float_to_conviction_level(conf: Any) -> int:
         c = c / 10.0 if c <= 10.0 else 1.0
     c = max(0.0, min(1.0, c))
     return max(1, min(10, int(round(c * 9)) + 1))
-
-
-def _recommendation_to_legacy_decision(recommendation: str) -> str:
-    if recommendation == "INVEST":
-        return "YES"
-    if recommendation == "PASS":
-        return "NO"
-    return "MAYBE"
 
 
 def _log_safe_single_line(blob: str, max_len: int = 6000) -> str:
@@ -273,7 +266,7 @@ class PartnerDecisionEngine:
         na = self._get_rules().get("next_actions", {})
         raw_next = self._next_action_for_llm_decision(final_recommendation, na)
         result["recommendation"] = final_recommendation
-        result["decision"] = _recommendation_to_legacy_decision(final_recommendation)
+        result["decision"] = legacy_from_recommendation(final_recommendation)
         result["assumption_risks"] = list(assumption_risks or [])
         result["next_action"] = self._normalize_next_action(raw_next)
         return result
@@ -673,6 +666,7 @@ class PartnerDecisionEngine:
                     avg_score=avg_score,
                     avg_dims=avg_dims,
                     final_recommendation=final_recommendation,
+                    fund_thesis=fund_thesis,
                 )
                 return self._align_llm_partner_payload(
                     result,
@@ -750,6 +744,7 @@ class PartnerDecisionEngine:
                     avg_score=avg_score,
                     avg_dims=avg_dims,
                     final_recommendation=final_recommendation,
+                    fund_thesis=fund_thesis,
                 )
                 return self._align_llm_partner_payload(
                     result,
@@ -811,6 +806,7 @@ class PartnerDecisionEngine:
                     avg_score=avg_score,
                     avg_dims=avg_dims,
                     final_recommendation=final_recommendation,
+                    fund_thesis=fund_thesis,
                 )
                 return self._align_llm_partner_payload(
                     result,
@@ -1070,8 +1066,8 @@ class PartnerDecisionEngine:
         legacy_confidence = legacy_kwargs.get("confidence")
         legacy_rationale = legacy_kwargs.get("rationale")
         if recommendation is None and isinstance(legacy_decision, str):
-            recommendation = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}.get(
-                legacy_decision.strip().upper(), "MONITOR"
+            recommendation = recommendation_from_legacy(
+                legacy_decision, default_if_unknown="MONITOR"
             )
         recommendation = recommendation or "MONITOR"
         if conviction is None:
@@ -1085,7 +1081,7 @@ class PartnerDecisionEngine:
         return {
             "recommendation": recommendation,
             "confidence": round(conviction_clamped / 10.0, 2),
-            "decision": _recommendation_to_legacy_decision(recommendation),
+            "decision": legacy_from_recommendation(recommendation),
             "conviction_level": conviction_clamped,
             "thesis": thesis,
             "why_this_matters": why_this_matters,
@@ -1235,6 +1231,7 @@ class PartnerDecisionEngine:
         avg_score: float = 0.0,
         avg_dims: int = 4,
         final_recommendation: str = "MONITOR",
+        fund_thesis: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         LLM path when rule engine defers (edge cases). Uses OpenAI chat.completions with JSON output.
@@ -1344,6 +1341,17 @@ class PartnerDecisionEngine:
             tb = tb[: _MAX_THESIS_MANDATE_CHARS - 30] + "\n...(truncated)\n"
         thesis_section = f"FUND THESIS MANDATE (and resource lens if present):\n{tb}\n\n" if tb else ""
 
+        digest_prefix = ""
+        if os.getenv("PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            from utils.deal_context import build_deal_context_v1, format_deal_context_digest_prompt_line
+
+            dc = build_deal_context_v1(scout_output, review_output, fund_thesis)
+            digest_prefix = format_deal_context_digest_prompt_line(dc) + "\n\n"
+
         sr_json = json.dumps(score_reasoning, ensure_ascii=False)
         if len(sr_json) > 3500:
             sr_json = sr_json[:3500] + "...(truncated)"
@@ -1351,13 +1359,28 @@ class PartnerDecisionEngine:
         ds = review_output.get("defensibility_score")
         ds_disp = ds if ds is not None else "N/A"
 
-        user_prompt = f"""{thesis_section}STARTUP
+        est_raw = scout_output.get("est_tam")
+        est_disp = str(est_raw).strip() if est_raw is not None and str(est_raw).strip() else "N/A"
+        refs_raw = scout_output.get("references") or []
+        refs_list = [r for r in refs_raw if isinstance(r, str) and r.strip()][:12]
+        refs_json = json.dumps(refs_list, ensure_ascii=False)
+        if len(refs_json) > 2400:
+            refs_json = refs_json[:2400] + "...(truncated)"
+        prov_raw = scout_output.get("field_provenance")
+        prov_json = json.dumps(prov_raw, ensure_ascii=False) if isinstance(prov_raw, dict) else "{}"
+        if len(prov_json) > 800:
+            prov_json = prov_json[:800] + "...(truncated)"
+
+        user_prompt = f"""{digest_prefix}{thesis_section}STARTUP
 display_name: {scout_output.get('name', 'Unknown')}
 sector: {scout_output.get('sector', 'N/A')}
 stage (funding): {scout_output.get('funding_stage', 'N/A')}
 one_line: {scout_output.get('one_line', 'N/A')}
 primary_thesis: {scout_output.get('primary_thesis', 'N/A')}
 why_now: {scout_output.get('why_now', 'N/A')}
+estimated_tam: {est_disp}
+references (truncated JSON array): {refs_json}
+field_provenance (JSON — source tags for enriched scout fields): {prov_json}
 
 REVIEWER OUTPUT
 verdict: {verdict}
@@ -1383,6 +1406,8 @@ TRIGGER REASON (why the rule engine deferred)
 CANONICAL DECISION (fixed by fund score-band policy — must not be contradicted)
 recommendation: {final_recommendation}
 
+GROUNDING: For snapshot.key_signal, traction_signals, market_insight, and product_edge, only include non-null/non-empty text that paraphrases facts explicitly present in STARTUP or REVIEWER OUTPUT above. If nothing in those blocks supports a claim, use null or empty string for that field.
+
 Return ONLY a single valid JSON object with exactly these keys (do NOT include "recommendation"):
 {{
   "confidence": <float 0.0-1.0>,
@@ -1403,7 +1428,9 @@ No markdown. No extra fields. Strictly under 350 words total information density
         system_prompt = (
             "You are a Senior Investment Partner. Edge cases only: the deterministic rule path already passed. "
             "The CANONICAL DECISION is fixed by policy; your JSON must defend it, never overturn it. "
-            "Apply PARTNER_RULES_JSON strictly. Output only valid JSON per the user instructions."
+            "Apply PARTNER_RULES_JSON strictly. Output only valid JSON per the user instructions. "
+            "Do not invent snapshot.key_signal, traction_signals, market_insight, or product_edge: "
+            "each must restate information from the STARTUP and REVIEWER OUTPUT blocks in the user message, or be null/empty."
         )
         prompt_for_hash = system_prompt + "\n\n" + user_prompt
 
@@ -1592,7 +1619,7 @@ No markdown. No extra fields. Strictly under 350 words total information density
         result = {
             "recommendation": final_recommendation,
             "confidence": round(conf_float, 2),
-            "decision": _recommendation_to_legacy_decision(final_recommendation),
+            "decision": legacy_from_recommendation(final_recommendation),
             "conviction_level": _confidence_float_to_conviction_level(conf_float),
             "thesis": str(llm_result.get("thesis") or scout_output.get("primary_thesis") or scout_output.get("one_line") or "").strip(),
             "why_this_matters": str(llm_result.get("why_this_matters") or scout_output.get("why_now") or "").strip(),

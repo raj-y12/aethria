@@ -134,7 +134,18 @@ def normalize_confidence_label(label: Any) -> float:
 
 
 def normalize_traction(label: Any) -> float:
-    return _map_label(label, {"pre-product": 2, "mvp": 4, "early_revenue": 6, "scaling": 8, "strong_scale": 10, "missing": 5})
+    return _map_label(
+        label,
+        {
+            "pre-product": 2,
+            "mvp": 4,
+            "early_adoption": 5,
+            "early_revenue": 6,
+            "scaling": 8,
+            "strong_scale": 10,
+            "missing": 5,
+        },
+    )
 
 
 def normalize_growth_velocity(value_or_label: Any) -> float:
@@ -157,7 +168,7 @@ def normalize_gtm(label: Any) -> float:
 
 
 def normalize_team_execution(label: Any) -> float:
-    return _map_label(label, {"weak": 3, "decent": 6, "strong": 8, "elite": 10})
+    return _map_label(label, {"weak": 3, "decent": 6, "credible_team": 7, "strong": 8, "elite": 10})
 
 
 def normalize_operational_velocity(label: Any) -> float:

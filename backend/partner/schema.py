@@ -4,6 +4,8 @@ All Partner outputs must emit JSON matching this structure exactly.
 """
 from typing import TypedDict, Literal, List, Optional, Dict, Any
 
+from utils.partner_codes import LEGACY_TO_RECOMMENDATION, RECOMMENDATION_TO_LEGACY
+
 
 class PartnerSnapshot(TypedDict, total=False):
     one_liner: str
@@ -42,9 +44,9 @@ VALID_RECOMMENDATIONS = ["INVEST", "PASS", "MONITOR"]
 
 def validate_partner_output(data: dict) -> PartnerOutput:
     data = dict(data)
-    legacy_decision_map = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}
     if "recommendation" not in data and isinstance(data.get("decision"), str):
-        data["recommendation"] = legacy_decision_map.get(str(data["decision"]).strip().upper(), data["decision"])
+        dkey = str(data["decision"]).strip().upper()
+        data["recommendation"] = LEGACY_TO_RECOMMENDATION.get(dkey, data["decision"])
     if "decision_rationale" not in data and isinstance(data.get("rationale"), str):
         data["decision_rationale"] = data["rationale"]
     if "decision" in data and "recommendation" in data:
@@ -86,9 +88,7 @@ def validate_partner_output(data: dict) -> PartnerOutput:
 
     # Backfill legacy output keys for compatibility.
     if "decision" not in data:
-        data["decision"] = {"INVEST": "YES", "PASS": "NO", "MONITOR": "MAYBE"}.get(
-            data["recommendation"], "MAYBE"
-        )
+        data["decision"] = RECOMMENDATION_TO_LEGACY.get(data["recommendation"], "MAYBE")
     if "rationale" not in data:
         data["rationale"] = data["decision_rationale"]
     if "conviction_level" not in data:

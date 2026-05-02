@@ -119,6 +119,8 @@ def extract_traction(scout_output: Dict[str, Any], reviewer_output: Dict[str, An
         return _signal(label="strong_scale", confidence=0.75, reasoning="Signals indicate scaled commercial traction.", rule="keyword match: strong scale/scaled/enterprise contracts")
     if any(k in lower for k in ("scaling", "series b", "series c", "rapid expansion")):
         return _signal(label="scaling", confidence=0.7, reasoning="Language indicates scaling phase.", rule="keyword match: scaling/series b+/rapid expansion")
+    if any(k in lower for k in ("paying customer", "paying customers", "enterprise customer", "active users", "customers", "deployments", "deployment", "production workload", "live in production")):
+        return _signal(label="early_adoption", confidence=0.63, reasoning="Customer or deployment usage language found.", rule="keyword match: customers/users/deployments/production")
     if any(k in lower for k in ("revenue", "paying customers", "arr", "mrr")):
         return _signal(label="early_revenue", confidence=0.68, reasoning="Revenue language found.", rule="keyword match: revenue/paying customers/ARR/MRR")
     if any(k in lower for k in ("mvp", "pilot", "beta")):
@@ -173,6 +175,45 @@ def extract_team_execution(scout_output: Dict[str, Any], reviewer_output: Dict[s
         return _signal(label="elite", confidence=0.75, reasoning="Exceptional team markers present.")
     if any(k in lower for k in ("strong", "experienced", "domain expertise")):
         return _signal(label="strong", confidence=0.68, reasoning="Strong team evidence found.")
+    founder_exec_markers = (
+        "founder",
+        "co-founder",
+        "cofounder",
+        "ceo",
+        "cto",
+        "coo",
+        "chief executive",
+        "chief technology",
+        "chief product",
+        "vp engineering",
+        "vp of engineering",
+        "head of engineering",
+        "technical lead",
+        "engineering lead",
+        "previously at",
+        "prior role",
+        "ex-google",
+        "ex google",
+        "ex-meta",
+        "ex meta",
+        "ex-amazon",
+        "ex amazon",
+        "ex-microsoft",
+        "ex microsoft",
+        "alumni",
+        "stanford phd",
+        "mit phd",
+        "professor",
+        "built at",
+        "years at",
+    )
+    if any(k in lower for k in founder_exec_markers):
+        return _signal(
+            label="credible_team",
+            confidence=0.64,
+            reasoning="Founder or executive-team markers found in scout/reviewer text.",
+            rule="keyword match: founder/executive/previously-at",
+        )
     if any(k in lower for k in ("decent", "capable", "solid")):
         return _signal(label="decent", confidence=0.62, reasoning="Baseline team capability indicated.")
     if "[missing" in lower or not lower.strip():
@@ -441,18 +482,31 @@ def _attach_dimension_evidence(signals: Dict[str, Any], reviewer_output: Dict[st
         for comp in components.values():
             if not isinstance(comp, dict):
                 continue
+            existing = str(comp.get("evidence") or "").strip()
+            if existing:
+                continue
             comp["evidence"] = evidence
     return signals
 
 
+def _component_has_substantive_evidence(comp: Any) -> bool:
+    """True when LLM (or sanitizer) left at least one usable label or value."""
+    if not isinstance(comp, dict):
+        return False
+    if not _is_missing_token(comp.get("label")):
+        return True
+    if not _is_missing_token(comp.get("value")):
+        return True
+    return False
+
+
 def _provided_has_substantive_signal(structured: Dict[str, Any]) -> bool:
+    """Allow merge path when any slot has label-only OR value-only evidence (most slots use one)."""
     for dim in structured.values():
         if not isinstance(dim, dict):
             continue
         for comp in dim.values():
-            if not isinstance(comp, dict):
-                continue
-            if not _is_missing_token(comp.get("label")) and not _is_missing_token(comp.get("value")):
+            if _component_has_substantive_evidence(comp):
                 return True
     return False
 
@@ -471,16 +525,22 @@ def _sanitize_provided_structured_signals(provided: Dict[str, Any]) -> Dict[str,
 
 
 def _merge_with_defaults(provided: Dict[str, Any], defaults: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Per component: keep LLM signal only when it carries substantive label/value;
+    otherwise fall back to deterministic extraction so sparse LLM grids do not wipe scout-grounded defaults.
+    """
     merged: Dict[str, Any] = {}
     for dim, expected_components in EXPECTED_COMPONENTS.items():
         base = defaults.get(dim, {}) if isinstance(defaults.get(dim), dict) else {}
         incoming = provided.get(dim, {}) if isinstance(provided.get(dim), dict) else {}
         combined: Dict[str, Any] = {}
         for component in expected_components:
-            if component in incoming and isinstance(incoming[component], dict):
-                combined[component] = incoming[component]
-            elif component in base and isinstance(base[component], dict):
-                combined[component] = base[component]
+            inc = incoming.get(component)
+            base_comp = base.get(component) if isinstance(base.get(component), dict) else None
+            if isinstance(inc, dict) and _component_has_substantive_evidence(inc):
+                combined[component] = inc
+            elif base_comp is not None:
+                combined[component] = base_comp
             else:
                 combined[component] = _missing_signal(f"Missing extracted signal: {dim}.{component}.")
         merged[dim] = combined

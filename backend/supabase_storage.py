@@ -319,7 +319,13 @@ class SupabaseStartupsStorage:
         return startup.startup_id
 
     def add_review(
-        self, startup_id: str, review_info: ReviewInfo, *, pipeline_run_id: Optional[str] = None
+        self,
+        startup_id: str,
+        review_info: ReviewInfo,
+        *,
+        pipeline_run_id: Optional[str] = None,
+        enrichment_review_output: Optional[Dict[str, Any]] = None,
+        enrichment_gap_reference_urls: Optional[List[str]] = None,
     ) -> bool:
         pr = (pipeline_run_id or "").strip() or None
         if pr:
@@ -346,6 +352,14 @@ class SupabaseStartupsStorage:
                     error="startup not found for review",
                 )
             return False
+        if enrichment_review_output is not None:
+            from utils.scout_post_review_enrichment import merge_scout_info_enrichment
+
+            st.scout_info = merge_scout_info_enrichment(
+                st.scout_info,
+                review_output=enrichment_review_output,
+                gap_reference_urls=enrichment_gap_reference_urls,
+            )
         st.review_info = review_info
         st.update_timestamp()
         try:

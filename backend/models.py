@@ -27,6 +27,8 @@ class ScoutInfo(BaseModel):
     biggest_unknown: Optional[str] = None
     funding_stage: Optional[Literal["Pre-Seed", "Seed", "Series A", "Series B", "Series C", "Series C+", "Unknown"]] = None
     est_tam: Optional[str] = None  # Total Addressable Market estimate
+    # Optional provenance for enriched fields (e.g. est_tam, funding_stage, references): scout | reviewer_extraction | gap_retrieval | reviewer_text_infer
+    field_provenance: Optional[Dict[str, str]] = None
     # High-level references / source notes for how this opportunity was discovered.
     # E.g. reports, trends, example companies, or general domain knowledge notes.
     references: Optional[List[str]] = None

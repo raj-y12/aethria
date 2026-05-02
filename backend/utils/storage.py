@@ -170,7 +170,13 @@ class Storage:
         return startup.startup_id
 
     def add_review(
-        self, startup_id: str, review_info: ReviewInfo, *, pipeline_run_id: Optional[str] = None
+        self,
+        startup_id: str,
+        review_info: ReviewInfo,
+        *,
+        pipeline_run_id: Optional[str] = None,
+        enrichment_review_output: Optional[Dict[str, Any]] = None,
+        enrichment_gap_reference_urls: Optional[List[str]] = None,
     ) -> bool:
         """Add review to existing startup. Updates updated_at. Returns False if not found."""
         found_ref: List[bool] = [False]
@@ -184,6 +190,14 @@ class Storage:
                 except Exception as e:
                     self.logger.error(f"Invalid startup {startup_id} in storage: {e}")
                     return data
+                if enrichment_review_output is not None:
+                    from utils.scout_post_review_enrichment import merge_scout_info_enrichment
+
+                    startup.scout_info = merge_scout_info_enrichment(
+                        startup.scout_info,
+                        review_output=enrichment_review_output,
+                        gap_reference_urls=enrichment_gap_reference_urls,
+                    )
                 startup.review_info = review_info
                 startup.update_timestamp()
                 data[i] = startup.to_dict()

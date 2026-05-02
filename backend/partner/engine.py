@@ -3,6 +3,7 @@ Partner execution engine.
 Runs continuously, processing reviewed entries and making investment decisions.
 """
 import asyncio
+import json
 import logging
 import os
 from typing import List, Optional, Dict, Any, Tuple
@@ -96,6 +97,10 @@ class PartnerEngine:
                 "key_assumptions": getattr(scout_info, "key_assumptions", None),
                 "biggest_unknown": getattr(scout_info, "biggest_unknown", None),
                 "funding_stage": getattr(scout_info, "funding_stage", None),
+                "est_tam": getattr(scout_info, "est_tam", None),
+                "references": getattr(scout_info, "references", None) or [],
+                "lookup_website": getattr(scout_info, "lookup_website", None),
+                "field_provenance": getattr(scout_info, "field_provenance", None),
             },
             "review": {
                 "market_score": review_info.market_score,
@@ -227,6 +232,19 @@ class PartnerEngine:
             review_output,
             fund_thesis=self.fund_thesis,
         )
+
+        if os.getenv("DEAL_CONTEXT_LOG_PIPELINE", "").strip().lower() in ("1", "true", "yes"):
+            try:
+                from utils.deal_context import build_deal_context_v1
+
+                ctx = build_deal_context_v1(scout_output, review_output, self.fund_thesis)
+                self.logger.info(
+                    "deal_context_v1 startup_id=%s ctx=%s",
+                    entry_id,
+                    json.dumps(ctx, sort_keys=True),
+                )
+            except Exception as e:
+                self.logger.debug("deal_context_v1 log skipped: %s", e)
 
         # JSON validation with one retry
         try:

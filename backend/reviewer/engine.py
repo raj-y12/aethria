@@ -20,6 +20,7 @@ from utils.scoring import DEFAULT_SCORE_SOURCE, compute_overall_score, enrich_sc
 from services.scoring import DeterministicScoringEngine
 from services.reviewer_resolution import apply_resolution_to_primary
 from reviewer.aethria_view import build_aethria_view
+from utils.reviewer_gap_retrieval import enrich_scout_for_reviewer_llm
 
 
 logger = logging.getLogger(__name__)
@@ -185,7 +186,8 @@ class ReviewerEngine:
         prev_prompt = rev.SYSTEM_PROMPT
         try:
             rev.set_prompt(candidate_system_prompt)
-            res = await rev.review(scout_output)
+            scout_for_llm = enrich_scout_for_reviewer_llm(scout_output, self.tenant_user_id)
+            res = await rev.review(scout_for_llm)
             if res is None:
                 return None
             out = dict(res)
@@ -231,34 +233,12 @@ class ReviewerEngine:
             primary["defensibility_score"] = int(round(weighted_def))
             primary["weighted_defensibility_score"] = round(weighted_def, 3)
 
-        # Confidence-Adjusted Score: S_bar × (1 − delta/10)
-        all_dims = list(core_dims)
-        if primary.get("defensibility_score") is not None:
-            all_dims.append("defensibility_score")
-        s_bar = sum(float(primary.get(d, 5)) for d in all_dims) / len(all_dims)
-        reviewer_avgs = []
-        for r in all_results:
-            r_scores = [float(r[d]) for d in core_dims if isinstance(r.get(d), (int, float))]
-            ds = r.get("defensibility_score")
-            if ds is not None:
-                try:
-                    r_scores.append(float(ds))
-                except (TypeError, ValueError):
-                    pass
-            if r_scores:
-                reviewer_avgs.append(sum(r_scores) / len(r_scores))
-        if len(reviewer_avgs) >= 2:
-            delta = max(reviewer_avgs) - min(reviewer_avgs)
-            primary["confidence_adjusted_score"] = round(s_bar * (1.0 - delta / 10.0), 3)
-        else:
-            primary["confidence_adjusted_score"] = round(s_bar, 3)
-        primary["score_source"] = DEFAULT_SCORE_SOURCE
-        primary.update(enrich_scores(primary))
+        self._recompute_derived_from_primary(primary, all_results)
 
-    def _refresh_derived_after_dimension_changes(
+    def _recompute_derived_from_primary(
         self, primary: Dict[str, Any], all_results: List[Dict[str, Any]]
     ) -> None:
-        """Re-run confidence_adjusted_score and enrich_scores after resolution tweaks."""
+        """Confidence-adjusted score + enrich_scores from current primary dimension scores."""
         core_dims = ["market_score", "product_score", "technical_score", "execution_score"]
         all_dims = list(core_dims)
         if primary.get("defensibility_score") is not None:
@@ -284,6 +264,12 @@ class ReviewerEngine:
             primary["confidence_adjusted_score"] = round(s_bar, 3)
         primary["score_source"] = DEFAULT_SCORE_SOURCE
         primary.update(enrich_scores(primary))
+
+    def _refresh_derived_after_dimension_changes(
+        self, primary: Dict[str, Any], all_results: List[Dict[str, Any]]
+    ) -> None:
+        """Re-run confidence_adjusted_score and enrich_scores after resolution tweaks."""
+        self._recompute_derived_from_primary(primary, all_results)
 
     @staticmethod
     def _pick_primary_structured_signals(
@@ -511,6 +497,7 @@ class ReviewerEngine:
                 continue
             scout_output = self._build_scout_output_payload(startup)
             entry_id = scout_output["id"]
+            scout_for_llm = enrich_scout_for_reviewer_llm(scout_output, self.tenant_user_id)
 
             try:
                 self.logger.info(
@@ -519,9 +506,9 @@ class ReviewerEngine:
                 )
                 
                 # Run all 3 reviewers in parallel
-                default_task = self.reviewer.review(scout_output)
-                skeptical_task = self.skeptical_reviewer.review(scout_output)
-                opportunist_task = self.opportunist_reviewer.review(scout_output)
+                default_task = self.reviewer.review(scout_for_llm)
+                skeptical_task = self.skeptical_reviewer.review(scout_for_llm)
+                opportunist_task = self.opportunist_reviewer.review(scout_for_llm)
                 
                 results = await asyncio.gather(
                     default_task, skeptical_task, opportunist_task,
@@ -670,8 +657,17 @@ class ReviewerEngine:
                 review_info.reviewer_disagreement = consensus["reviewer_disagreement"]
                 review_info.score_variance = consensus["score_variance"]
                 
+                gap_urls = [
+                    str(u).strip()
+                    for u in (scout_for_llm.get("_reviewer_gap_reference_urls") or [])
+                    if isinstance(u, str) and str(u).strip()
+                ]
                 success = self.storage.add_review(
-                    entry_id, review_info, pipeline_run_id=pipeline_run_id
+                    entry_id,
+                    review_info,
+                    pipeline_run_id=pipeline_run_id,
+                    enrichment_review_output=review_output,
+                    enrichment_gap_reference_urls=gap_urls or None,
                 )
                 
                 if success:
@@ -792,11 +788,12 @@ class ReviewerEngine:
             return False
 
         scout_output = self._build_scout_output_payload(startup)
+        scout_for_llm = enrich_scout_for_reviewer_llm(scout_output, self.tenant_user_id)
 
         try:
-            default_task = self.reviewer.review(scout_output)
-            skeptical_task = self.skeptical_reviewer.review(scout_output)
-            opportunist_task = self.opportunist_reviewer.review(scout_output)
+            default_task = self.reviewer.review(scout_for_llm)
+            skeptical_task = self.skeptical_reviewer.review(scout_for_llm)
+            opportunist_task = self.opportunist_reviewer.review(scout_for_llm)
             results = await asyncio.gather(
                 default_task, skeptical_task, opportunist_task,
                 return_exceptions=True,
@@ -918,9 +915,18 @@ class ReviewerEngine:
                     + int(getattr(self.opportunist_reviewer, "_last_token_usage", 0) or 0)
                 )
                 self.cost_controller.record_usage("reviewer", self.agent_id, total_tok)
+            gap_urls = [
+                str(u).strip()
+                for u in (scout_for_llm.get("_reviewer_gap_reference_urls") or [])
+                if isinstance(u, str) and str(u).strip()
+            ]
             return bool(
                 self.storage.add_review(
-                    startup_id, review_info, pipeline_run_id=pipeline_run_id
+                    startup_id,
+                    review_info,
+                    pipeline_run_id=pipeline_run_id,
+                    enrichment_review_output=review_output,
+                    enrichment_gap_reference_urls=gap_urls or None,
                 )
             )
         except Exception as e:

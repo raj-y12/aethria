@@ -66,6 +66,7 @@ from meta.prompt_gating import (
 )
 from meta.evaluator import run_prompt_evaluation
 from reviewer.engine import ReviewerEngine
+from reviewer.aethria_view import polish_aethria_view_for_api
 from portfolio.store import PortfolioStore
 from portfolio.rejection import RejectionAnalyzer
 from portfolio.cost_control import CostController
@@ -88,6 +89,7 @@ from models import Startup
 from core import policy_resolver
 from utils.scoring import compute_overall_score, enrich_scores, score_to_label
 from utils.score_semantics import rubric_band_for_numeric
+from utils.partner_codes import LEGACY_TO_RECOMMENDATION, recommendation_from_legacy
 
 _agent_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _agent_worker_task: Optional[asyncio.Task] = None
@@ -650,9 +652,6 @@ def _to_iso(v) -> str | None:
     return str(v) if v else None
 
 
-_PARTNER_LEGACY_RECOMMENDATION = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}
-
-
 def _partner_recommendation_from_stored(
     partner_doc: Any,
     legacy_decision: Optional[str] = None,
@@ -663,7 +662,7 @@ def _partner_recommendation_from_stored(
     if rec:
         return rec
     ld = legacy_decision if legacy_decision is not None else pi.get("decision")
-    return _PARTNER_LEGACY_RECOMMENDATION.get((ld or "").strip(), None)
+    return recommendation_from_legacy((ld or "").strip() or None, default_if_unknown=None)
 
 
 def _partner_dict_for_frontend(partner: dict) -> dict:
@@ -688,6 +687,20 @@ def _partner_dict_for_frontend(partner: dict) -> dict:
         "llm_fallback_reason": partner.get("llm_fallback_reason"),
         "prompt_version": partner.get("prompt_version"),
     }
+
+
+def _enrich_review_for_api_payload(review: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Pipeline writes enriched review payloads via adapters and reviewer engine.
+    Set SKIP_READ_ENRICH_SCORES=1 to skip redundant enrich_scores() on GET when rows
+    already carry overall_score and at least one overall label/band field.
+    """
+    if os.getenv("SKIP_READ_ENRICH_SCORES", "").strip().lower() in ("1", "true", "yes"):
+        if review.get("overall_score") is not None and (
+            review.get("overall_label") is not None or review.get("overall_rubric_band") is not None
+        ):
+            return dict(review)
+    return enrich_scores(review)
 
 
 def _mirror_structured_scoring_aliases(review: Dict[str, Any]) -> None:
@@ -739,12 +752,26 @@ def _backend_to_frontend(raw: dict) -> dict:
             "lookup_query": scout.get("lookup_query"),
             "lookup_website": scout.get("lookup_website"),
             "lookup_id": scout.get("lookup_id"),
+            "field_provenance": scout.get("field_provenance")
+            if isinstance(scout.get("field_provenance"), dict)
+            else None,
         },
         "timestamps": timestamps,
     }
 
     if review:
-        review_enriched = enrich_scores(review)
+        review_enriched = _enrich_review_for_api_payload(review)
+        _raw_aethria = review_enriched.get("aethria_view")
+        _polished_aethria = (
+            polish_aethria_view_for_api(
+                _raw_aethria, review_enriched, str(scout.get("name") or "")
+            )
+            if _raw_aethria is not None
+            else None
+        )
+        _aethria_for_fe = (
+            _polished_aethria if _polished_aethria is not None else _raw_aethria
+        )
         out["review"] = {
             "market_score": review_enriched.get("market_score"),
             "product_score": review_enriched.get("product_score"),
@@ -809,7 +836,7 @@ def _backend_to_frontend(raw: dict) -> dict:
             "structured_signals": review_enriched.get("structured_signals"),
             "resolution_notes": review_enriched.get("resolution_notes"),
             "disagreement_summary": review_enriched.get("disagreement_summary"),
-            "aethria_view": review_enriched.get("aethria_view"),
+            "aethria_view": _aethria_for_fe,
             "reviews": review_enriched.get("reviews") or None,
         }
         _mirror_structured_scoring_aliases(out["review"])
@@ -2375,7 +2402,6 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
                 ai_rec = st.partner_info.recommendation
         except Exception:
             pass
-        _map = {"YES": "INVEST", "NO": "PASS", "MAYBE": "MONITOR"}
         list_append_only(
             "meta_mutation_log",
             {
@@ -2384,7 +2410,9 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
                 "human_decision": decision,
                 "ai_recommendation_at_resolve": ai_rec,
                 "disagreed_with_ai": bool(
-                    ai_rec and _map.get(decision) and ai_rec != _map.get(decision)
+                    ai_rec
+                    and LEGACY_TO_RECOMMENDATION.get(decision)
+                    and ai_rec != LEGACY_TO_RECOMMENDATION.get(decision)
                 ),
                 "notes": str(notes)[:4000],
                 "resolved_at": hr["resolved_at"],

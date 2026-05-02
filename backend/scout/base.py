@@ -24,7 +24,7 @@ from utils.reference_verify import (
 from utils.retrieval_grounding import (
     log_pre_filter_cited_urls,
     render_sources_for_prompt,
-    retrieve_source_pack,
+    retrieve_source_pack_merged,
 )
 from utils.settings_loader import (
     get_canonical_website_hostname,
@@ -422,7 +422,7 @@ class Scout(ABC):
             # Directory/funding DB sources are useful corroboration, but weak as sole identity proof.
             # Keep them neutral when they match the requested company/domain signals.
             if host_reg in _LOW_QUALITY_DIRECTORY_DOMAINS and not (anchor_reg and token_match):
-                s -= 6
+                s -= 2
             return s
 
         return sorted(sources, key=score, reverse=True)
@@ -604,14 +604,13 @@ class Scout(ABC):
             fail_closed = is_scout_fail_closed_on_empty_retrieval(self._tenant_user_id)
             source_pack = {"provider": "none", "sources": [], "url_allowlist": set()}
             if grounded_enabled:
-                lens_query = (
-                    f"{self.scout_type.replace('_', ' ')} early-stage startup funding "
-                    f"news company website"
-                )
-                source_pack = retrieve_source_pack(
-                    query=lens_query,
+                lens = self.scout_type.replace("_", " ")
+                source_pack = retrieve_source_pack_merged(
+                    queries=[
+                        f"{lens} early-stage startup VC funding seed series traction news",
+                        f"{lens} startup customers pilots revenue growth founders team",
+                    ],
                     user_id=self._tenant_user_id,
-                    max_results=6,
                 )
                 if fail_closed and not source_pack["sources"]:
                     self.logger.warning(
@@ -649,6 +648,8 @@ class Scout(ABC):
                             + "Find one REAL VC-BACKABLE STARTUP (Seed to Series C, typically private, technology-driven), "
                             "not a hypothetical idea, not a product category or market theme, and not a mega-cap incumbent like Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, or their cloud brands. "
                             "`name` must be that company's actual brand or legal name as used in the wild (not a generic label like \"AI compliance tooling\"). "
+                            "Use retrieved snippets aggressively: when sources mention TAM/market size/CAGR, funding round/investors/valuation, customers/pilots/ARR/MRR/users, or founders/executives, "
+                            "you MUST weave those facts into problem, solution, why_now, and primary_thesis, and set `est_tam` / `funding_stage` when supported (approximate TAM as a string is fine). "
                             "Output ONLY valid JSON matching the ScoutOutput schema "
                             "(resources/contracts/schemas/scout_output_v1.json). Exact shape:\n\n"
                             "{\n"
@@ -729,11 +730,14 @@ class Scout(ABC):
             fail_closed = is_scout_fail_closed_on_empty_retrieval(self._tenant_user_id)
             source_pack = {"provider": "none", "sources": [], "url_allowlist": set()}
             if grounded_enabled:
-                query = f"{company} startup company profile funding website"
-                source_pack = retrieve_source_pack(
-                    query=query,
+                nq = company
+                source_pack = retrieve_source_pack_merged(
+                    queries=[
+                        f"{nq} startup funding round investors valuation site",
+                        f"{nq} product customers traction revenue users pilots",
+                        f"{nq} founders CEO CTO leadership engineering team",
+                    ],
                     user_id=self._tenant_user_id,
-                    max_results=6,
                 )
                 source_pack["sources"] = self._rank_company_lookup_sources(
                     list(source_pack.get("sources") or []),
@@ -801,6 +805,7 @@ class Scout(ABC):
                 "Do NOT switch to similarly named companies (for example, different spelling variants). "
                 "If the evidence appears to point to a different company identity than requested, return nothing. "
                 "If confidence is low or data is incomplete, still return best-effort fields and set unknowns to null. "
+                "Mine retrieved snippets for TAM/market sizing language, funding rounds and investors, customer or usage claims, and founder/executive names—reflect them in the narrative fields. "
                 "Prefer est_tam as an order-of-magnitude when inferable from sources; put supported traction facts in problem/solution/why_now. "
                 "You MUST include every top-level key from the schema (name through references); never return a partial object. "
                 "Do not invent references. Output only JSON."

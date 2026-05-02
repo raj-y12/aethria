@@ -17,6 +17,7 @@ from openai import OpenAI
 from reviewer.schema import ReviewerOutput, validate_reviewer_output
 from utils.prompt_version import hash_prompt
 from utils.scoring import DEFAULT_SCORE_SOURCE
+from utils.reviewer_structured_signals_clamp import clamp_structured_signals_evidence
 
 
 logger = logging.getLogger(__name__)
@@ -207,7 +208,7 @@ NARRATIVE AND SCORING:
 {_deterministic_scoring_contract_block()}
 - Use bullet points for positives and risks where appropriate. Provide 2-5 bullets per analysis list when content allows.
 - Never emit placeholder strings like [MISSING]. When information is absent, leave list fields empty and rely on confidence + structured_signals null values.
-- Do NOT invent data; only summarize what the Scout provides.
+- Do NOT invent data; only summarize what the Scout memo states and what optional supplemental web snippets in the user message support (when present).
 
 HYPOTHESIS-DRIVEN EVALUATION:
 - Consume Scout hypothesis fields: primary_thesis, key_assumptions, biggest_unknown (when provided).
@@ -218,9 +219,10 @@ HYPOTHESIS-DRIVEN EVALUATION:
 
 You do NOT:
 - Generate new ideas
-- Search externally
-- Make assumptions beyond what's provided
+- Invent companies or facts with no basis in the provided memo (and optional supplemental snippets when supplied)
 - Hallucinate missing data
+
+When the user message includes SUPPLEMENTAL WEB SNIPPETS, those are machine-retrieved like Scout grounding; use them only when they clearly match the same company.
 
 Be honest and critical. Most ideas should score in the 4-7 range.
 Only truly exceptional opportunities should score 8+. Output ONLY valid JSON; no text before or after."""
@@ -402,6 +404,7 @@ class Reviewer(ABC):
             Parsed JSON dict if successful, None if failed.
         """
         try:
+            self.scout_output = scout_output
             # Format Scout output for the prompt (core fields)
             scout_text = f"""
 Company: {scout_output.get('name', 'Unknown')}
@@ -426,6 +429,16 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 else:
                     scout_text += "Key assumptions: N/A\n"
                 scout_text += f"Biggest unknown: {biggest_unknown if biggest_unknown else 'N/A'}\n"
+
+            supplement_raw = scout_output.get("_reviewer_web_supplement")
+            supplement_block = ""
+            if isinstance(supplement_raw, str) and supplement_raw.strip():
+                supplement_block = (
+                    "\n\n---\nSUPPLEMENTAL WEB SNIPPETS (retrieved after Scout to fill likely gaps — "
+                    "verify this is the same company before trusting).\n"
+                    + supplement_raw.strip()
+                    + "\n---\n"
+                )
 
             try:
                 from core.fund_thesis_resolver import format_fund_thesis_context_for_prompt
@@ -535,10 +548,18 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
   "thesis_alignment_confidence": number // 0.0-1.0 confidence in alignment judgment
 }'''
             
+            grounding_clause = (
+                "Use the Scout memo and supplemental web snippets above when snippets clearly refer to the same company; "
+                "if snippets are ambiguous or contradict Scout, prefer Scout facts and reflect uncertainty in structured_signals. "
+                "Do not invent facts unsupported by these sources."
+                if supplement_block
+                else "Use only information provided in the Scout memo or defined in resources; do not hallucinate missing data."
+            )
+
             user_content = (
-                f"Evaluate this startup idea discovered by a Scout:\n\n{scout_text}{resource_thesis_block}{thesis_block}\n\n"
+                f"Evaluate this startup idea discovered by a Scout:\n\n{scout_text}{supplement_block}{resource_thesis_block}{thesis_block}\n\n"
                 "Review Scout hypotheses when provided: evaluate assumptions and flag critical unknowns in assumption_feedback. "
-                "Use only information provided or defined in resources; do not hallucinate missing data. "
+                f"{grounding_clause} "
                 "CRITICAL: treat all numeric score fields as provisional placeholders only. "
                 "Do not invent final scoring. Your primary responsibility is to extract structured_signals with confidence values. "
                 "structured_signals must be COMPLETE: include all 5 dimensions and all 25 components (no empty objects). "
@@ -581,6 +602,9 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
             # Default optional fields
             if "structured_signals" not in data or not isinstance(data.get("structured_signals"), dict):
                 data["structured_signals"] = {}
+            data["structured_signals"] = clamp_structured_signals_evidence(
+                self.scout_output, data["structured_signals"]
+            )
             data = _normalize_structured_signals_contract(data)
             if "defensibility_score" not in data:
                 data["defensibility_score"] = None
