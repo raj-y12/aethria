@@ -5,6 +5,7 @@ unused_components/
 node_modules/
 .vite/
 __pycache__/
+.pytest_cache/
 *.py[cod]
 .cursorignore
 app-front-end/.superpowers/
