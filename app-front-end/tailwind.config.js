@@ -16,13 +16,13 @@ export default {
     },
     extend: {
       colors: {
-        oxford: '#002147',
-        paper: '#f2f0ea',
+        oxford: '#1d2d48',
+        paper: '#e9e0d1',
         /** Darker paper — WorkGrid selected row, etc. See --color-paper-deep */
         paperDeep: 'var(--color-paper-deep)',
-        'paper-bright': '#f2f0ea',
-        ivory: '#f2f0ea',
-        canvas: '#f2f0ea',
+        'paper-bright': '#e9e0d1',
+        ivory: '#e9e0d1',
+        canvas: '#e9e0d1',
         mist: '#f2f4f8',
         graphite: '#2f333b',
         /** Structural hairlines — prefer over raw oxford/[0.06] in new code. */
@@ -43,7 +43,7 @@ export default {
         gold: '#b8976a',
         'gold-soft': 'rgba(184, 151, 106, 0.35)',
         /** Validation strip: same as paper (palette whitelist). */
-        warning: '#F2F0EA',
+        warning: '#E9E0D1',
         /** See :root --color-register-tint */
         registerTint: 'var(--color-register-tint)',
       },

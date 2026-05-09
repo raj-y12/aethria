@@ -1,7 +1,7 @@
 /**
  * Aethria design tokens — aligned with brand_assets and web-front-end.
  *
- * Palette: oxford #002147, paper #F2F0EA, paperBright #F2F0EA, inverse on oxford #FFFFFF, charcoal #2f333b.
+ * Palette: oxford #1D2D48, paper #E9E0D1, paperBright #E9E0D1, inverse on oxford #FFFFFF, charcoal #2f333b.
  * Burgundy #7D2B3A (accent) is escalation-only — see color.accent. Heritage gold #b8976a is decorative only (dividers, chrome) — color.heritageGold.
  * Typography: Libre Baskerville (wordmark only). EB Garamond (display/editorial headings). Geist Sans (all UI body, titles). JetBrains Mono (metadata/labels, 0.08–0.14em).
  * Brand scale: section-label 11px/0.12em, tab/meta 10px/0.12–0.14em, body 14px/1.618.
@@ -39,10 +39,10 @@ export const phiSpacing = {
 
 export const tokens = {
   color: {
-    oxford: '#002147',
-    paper: '#F2F0EA',
+    oxford: '#1D2D48',
+    paper: '#E9E0D1',
     /** Softer paper lift for gradients and panels (aligned with web-front-end). */
-    paperBright: '#F2F0EA',
+    paperBright: '#E9E0D1',
     charcoal: '#2f333b',
     ivory: '#FFFFFF',
     bone: '#f2f4f8',
@@ -53,7 +53,7 @@ export const tokens = {
     heritageGold: '#b8976a',
     heritageGoldSoft: 'rgba(184, 151, 106, 0.35)',
     /** Warning/validation: subtle warm tint derived from paper; not Tailwind amber. Use for validation errors, non-critical alerts. */
-    warningBg: '#F2F0EA',
+    warningBg: '#E9E0D1',
     warningBorder: 'rgba(0, 33, 71, 0.25)',
   },
   /** Oxford opacity ladder: 100, 80, 60, 40, 25. Use these for all muted Oxford text and semantic borders. */

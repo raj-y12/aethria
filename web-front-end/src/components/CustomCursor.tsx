@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 
 const DESKTOP_CURSOR_MEDIA = '(pointer: fine) and (min-width: 769px)';
 
-const INK = '#002147';
-const PAPER = '#F2F0EA';
+const INK = '#1D2D48';
+const PAPER = '#E9E0D1';
 
 type CursorMode = 'default' | 'hover' | 'headline';
 

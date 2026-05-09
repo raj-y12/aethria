@@ -228,7 +228,7 @@ export default function HomePage() {
                 <div className="flex min-w-0 flex-1 flex-col pr-0 md:pr-10">
                   <h2
                     id="pipeline-heading"
-                    className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#002147] md:text-[36px] md:tracking-normal"
+                    className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#1d2d48] md:text-[36px] md:tracking-normal"
                   >
                     The pipeline
                   </h2>
@@ -237,7 +237,7 @@ export default function HomePage() {
                   </p>
                 </div>
                 <div
-                className="hidden w-[clamp(14rem,25vw,16.5rem)] shrink-0 flex-col items-end justify-center bg-[#002147] lg:flex"
+                className="hidden w-[clamp(14rem,25vw,16.5rem)] shrink-0 flex-col items-end justify-center bg-[#1d2d48] lg:flex"
                   style={{ paddingRight: 'max(16px, env(safe-area-inset-right))' }}
                 >
                   <div className="flex flex-col items-end gap-2 text-right">
@@ -313,7 +313,7 @@ export default function HomePage() {
           aria-labelledby="graph-section-heading"
         >
           <ScrollReveal
-            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#f2f0ea] py-12 px-[max(1.25rem,var(--safe-left))] pb-10 pr-[max(1.25rem,var(--safe-right))] pt-12 md:py-14 md:px-8 lg:w-[35%] lg:px-12 lg:py-16"
+            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#e9e0d1] py-12 px-[max(1.25rem,var(--safe-left))] pb-10 pr-[max(1.25rem,var(--safe-right))] pt-12 md:py-14 md:px-8 lg:w-[35%] lg:px-12 lg:py-16"
             style={{ color: 'var(--color-charcoal)' }}
             y={24}
             amount={0.2}
@@ -322,7 +322,7 @@ export default function HomePage() {
               <p className="section-numeral mb-6" aria-hidden="true">IV</p>
               <h2
                 id="graph-section-heading"
-                className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#002147] md:text-[36px] md:tracking-normal"
+                className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#1d2d48] md:text-[36px] md:tracking-normal"
               >
                 How intelligence routes
               </h2>
@@ -331,7 +331,7 @@ export default function HomePage() {
               </p>
             </div>
           </ScrollReveal>
-          <div className="relative flex w-full min-w-0 shrink-0 flex-col items-stretch bg-[#002147] lg:w-[65%]">
+          <div className="relative flex w-full min-w-0 shrink-0 flex-col items-stretch bg-[#1d2d48] lg:w-[65%]">
             <ScrollReveal
               className="flex min-h-[min(420px,72vw)] w-full flex-1 flex-col items-center justify-center px-3 pb-2 pt-4 sm:min-h-[460px] sm:px-4 lg:min-h-[500px] lg:px-0 lg:pb-0 lg:pt-0"
               y={16}
@@ -371,7 +371,7 @@ export default function HomePage() {
                 className="flex min-h-0 min-w-0 flex-1 flex-col justify-center py-6 md:py-10 lg:max-w-[540px] lg:py-12 lg:pr-6"
                 variants={closingChildVariants}
               >
-                <h2 className="text-[clamp(1.5rem,4.8vw,1.75rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#002147] md:text-[28px] md:tracking-normal">
+                <h2 className="text-[clamp(1.5rem,4.8vw,1.75rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#1d2d48] md:text-[28px] md:tracking-normal">
                   <span className="block">Run the pipeline.</span>
                   <span className="mt-2 block">Keep the conviction.</span>
                 </h2>
@@ -434,7 +434,7 @@ export default function HomePage() {
         >
           {/* Left panel — Fund Thesis (oxford dark) */}
           <ScrollReveal
-            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#002147] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:px-12 lg:py-20"
+            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#1d2d48] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:px-12 lg:py-20"
             y={20}
             amount={0.18}
           >
@@ -445,7 +445,7 @@ export default function HomePage() {
               </p>
               <h2
                 id="thesis-lookup-heading"
-                className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[#f2f0ea]"
+                className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[#e9e0d1]"
               >
                 Define your mandate.
                 <br />
@@ -466,7 +466,7 @@ export default function HomePage() {
                   </p>
                   <span className="inline-flex items-center gap-1.5">
                     <span
-                      className="h-1.5 w-1.5 rounded-none bg-[#f2f0ea]"
+                      className="h-1.5 w-1.5 rounded-none bg-[#e9e0d1]"
                       style={{ opacity: 0.55, animation: 'pipeline-dot-pulse 2.4s ease-in-out infinite' }}
                     />
                     <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(242,240,234,0.45)]">
@@ -474,7 +474,7 @@ export default function HomePage() {
                     </span>
                   </span>
                 </div>
-                <p className="mt-2.5 font-sans text-[15px] font-semibold text-[#f2f0ea]">
+                <p className="mt-2.5 font-sans text-[15px] font-semibold text-[#e9e0d1]">
                   Deep-Tech Infrastructure
                 </p>
                 <p className="mt-1 font-sans text-[13px] leading-[1.6] text-[rgba(242,240,234,0.5)]">
@@ -490,7 +490,7 @@ export default function HomePage() {
 
           {/* Right panel — On-Demand Lookup (paper light) */}
           <ScrollReveal
-            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#f2f0ea] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:px-12 lg:py-20"
+            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#e9e0d1] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:px-12 lg:py-20"
             y={20}
             delay={0.08}
             amount={0.18}
@@ -499,7 +499,7 @@ export default function HomePage() {
               <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.38)]">
                 Instant intelligence
               </p>
-              <h2 className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[#002147]">
+              <h2 className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[#1d2d48]">
                 Interrogate any name.
                 <br />
                 <span className="italic font-normal opacity-75 text-[0.92em]">Instantly.</span>
@@ -535,7 +535,7 @@ export default function HomePage() {
                       B2B Infrastructure · Series A
                     </p>
                   </div>
-                  <p className="font-sans text-[18px] font-semibold leading-tight text-[#002147]">
+                  <p className="font-sans text-[18px] font-semibold leading-tight text-[#1d2d48]">
                     STRONG.
                   </p>
                   <p className="mt-1.5 font-sans text-[13px] leading-[1.6] text-[rgba(0,33,71,0.58)]">

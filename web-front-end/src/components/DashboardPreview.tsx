@@ -1,7 +1,7 @@
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { SCROLL_EASE } from '../motionTokens';
 
-const PAPER = '#f2f0ea';
+const PAPER = '#e9e0d1';
 
 const DIMENSION_SCORES: { label: string; score: string }[] = [
   { label: 'MARKET', score: '9/10' },
@@ -65,7 +65,7 @@ export default function DashboardPreview() {
   return (
     <section className="section-divider-top flex w-full overflow-hidden border-b border-solid border-[var(--section-divider)]">
       <motion.div
-        className="w-2 shrink-0 self-stretch origin-top bg-[#002147] sm:w-6 md:w-12"
+        className="w-2 shrink-0 self-stretch origin-top bg-[#1d2d48] sm:w-6 md:w-12"
         aria-hidden
         initial="hidden"
         whileInView="visible"
@@ -142,7 +142,7 @@ export default function DashboardPreview() {
                   </p>
                   <span className="inline-flex items-center gap-1.5">
                     <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-none bg-[#002147]"
+                      className="h-1.5 w-1.5 shrink-0 rounded-none bg-[#1d2d48]"
                       style={{ opacity: 0.65, animation: 'pipeline-dot-pulse 2.4s ease-in-out infinite' }}
                       aria-hidden
                     />

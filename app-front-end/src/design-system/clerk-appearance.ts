@@ -1,6 +1,6 @@
 /**
  * Clerk component appearance — matches Aethria design tokens.
- * Palette: oxford #002147, paper #F2F0EA, inverse #FFFFFF.
+ * Palette: oxford #1D2D48, paper #E9E0D1, inverse #FFFFFF.
  * Typography: Geist Sans (body), Space Mono (labels/actions); no rounded corners.
  */
 import { tokens } from './tokens';
@@ -8,7 +8,7 @@ import { tokens } from './tokens';
 const OXFORD = tokens.color.oxford;
 const PAPER = tokens.color.paper;
 const IVORY = tokens.color.ivory;
-const OXFORD_RGB = '0, 33, 71';
+const OXFORD_RGB = '29, 45, 72';
 const oxfordAlpha = (alpha: number): string => `rgba(${OXFORD_RGB}, ${alpha})`;
 const BORDER = oxfordAlpha(0.06);
 

@@ -1,20 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap');
 /*
  * Aethria — High-fidelity institutional design (aligned with web-front-end).
- * Palette: oxford #002147, paper #F2F0EA, paperBright #F2F0EA, memo surfaces #FFFFFF, accent #7D2B3A (escalations only), heritageGold #b8976a (decorative only).
+ * Palette: oxford #1D2D48, paper #E9E0D1, paperBright #E9E0D1, memo surfaces #FFFFFF, accent #7D2B3A (escalations only), heritageGold #b8976a (decorative only).
  * Geist Sans is bundled via @fontsource in main.tsx (body + titles). Display: EB Garamond (editorial headings, verdicts, memos). Wordmark: Libre Baskerville (wordmark ONLY). Metadata: JetBrains Mono.
  * Frames: 1px rgba(0,33,71,0.06). No rounded corners.
  * Text hierarchy: Oxford opacity ladder 100, 80, 60, 40, 25. Line-height: 1.5 labels, 1.5 body.
  */
 :root {
   /* Primary palette — aligned with web-front-end tokens */
-  --color-oxford: #002147;
-  --color-oxford-rgb: 0, 33, 71;
-  --color-paper: #f2f0ea;
+  --color-oxford: #1d2d48;
+  --color-oxford-rgb: 29, 45, 72;
+  --color-paper: #e9e0d1;
   /** Slightly darker paper — selected rows, recessed surfaces (same hue family as paper). */
   --color-paper-deep: #e6e4de;
-  --color-paper-bright: #f2f0ea;
-  --color-ivory: #f2f0ea;
+  --color-paper-bright: #e9e0d1;
+  --color-ivory: #e9e0d1;
   --color-charcoal: #2f333b;
   --color-heritage-gold: #b8976a;
   --color-heritage-gold-soft: rgba(184, 151, 106, 0.35);
@@ -81,7 +81,7 @@
   --col-content: 61.8%;
 }
 
-/* Clerk UserProfile — match Aethria: #002147 oxford, #F2F0EA paper, Geist Sans / Space Mono, no radius */
+/* Clerk UserProfile — match Aethria: #1D2D48 oxford, #E9E0D1 paper, Geist Sans / Space Mono, no radius */
 .cl-modalBackdrop {
   background-color: rgba(var(--color-oxford-rgb), 0.4) !important;
 }

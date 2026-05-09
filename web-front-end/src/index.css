@@ -8,9 +8,9 @@
 
 /* Design tokens (match app-front-end behaviour; note single-colon :root) */
 :root {
-  --color-oxford: #002147;
-  --color-paper: #f2f0ea;
-  --color-ivory: #f2f0ea;
+  --color-oxford: #1d2d48;
+  --color-paper: #e9e0d1;
+  --color-ivory: #e9e0d1;
   --color-charcoal: #2f333b;
   --color-accent: #b8976a;
   --color-accent-soft: rgba(184, 151, 106, 0.35);
@@ -77,9 +77,9 @@
   }
 }
 
-/* Marketing — paper dot grid (#F2F0EA texture, 28px, Oxford @ 3.5%) */
+/* Marketing — paper dot grid (#E9E0D1 texture, 28px, Oxford @ 3.5%) */
 .paper-dot-grid {
-  background-color: #f2f0ea;
+  background-color: #e9e0d1;
   background-image: radial-gradient(rgba(0, 33, 71, 0.055) 1px, transparent 1px);
   background-size: 28px 28px;
   background-repeat: repeat;

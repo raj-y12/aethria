@@ -7,10 +7,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        oxford: '#002147',
-        paper: '#f2f0ea',
-        ivory: '#f2f0ea',
-        canvas: '#f2f0ea',
+        oxford: '#1d2d48',
+        paper: '#e9e0d1',
+        ivory: '#e9e0d1',
+        canvas: '#e9e0d1',
         mist: '#f2f4f8',
         graphite: '#2f333b',
       },

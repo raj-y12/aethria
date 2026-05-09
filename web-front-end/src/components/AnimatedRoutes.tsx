@@ -7,8 +7,8 @@ import RequestAccessPage from '../RequestAccessPage';
 
 const DURATION = 0.3;
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
-const PAPER = '#f2f0ea';
-const OXFORD = '#002147';
+const PAPER = '#e9e0d1';
+const OXFORD = '#1d2d48';
 
 // Private routes: any file in src/private/*.tsx is exposed at /<filename-lowercase>.
 // Delete the file to remove that route at build time.
