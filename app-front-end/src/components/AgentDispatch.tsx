@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type Ref, type KeyboardEvent } from 'react';
+import { railEditorial } from '../design-system/railEditorial';
 
 interface AgentDispatchProps {
   input: string;
@@ -123,20 +124,25 @@ function DispatchPanelBody({
   const embedded = variant === 'embedded';
 
   const inputCls = embedded
-    ? 'w-full bg-transparent border-0 border-b border-oxford/[0.10] px-0 py-phi-2 font-sans font-medium text-[0.95rem] text-oxford placeholder:text-oxford/25 outline-none focus:border-oxford/30 transition-colors duration-300 disabled:cursor-not-allowed'
+    ? `w-full bg-transparent border-0 border-b border-oxford/[0.10] px-0 py-phi-2 font-medium ${railEditorial.bodyMetrics} text-oxford placeholder:text-oxford/25 outline-none focus:border-oxford/30 transition-colors duration-300 disabled:cursor-not-allowed`
     : 'w-full bg-transparent border-0 border-b border-oxford/[0.10] px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/25 outline-none focus:border-oxford/30 transition-colors duration-300 disabled:cursor-not-allowed';
 
   const statusRowCls = embedded
-    ? 'flex items-center justify-between gap-phi-3 mt-phi-2 min-h-[22px]'
+    ? 'flex items-center justify-between gap-phi-3 mt-phi-1.5 min-[1100px]:mt-phi-2 min-h-[22px]'
     : 'flex items-center justify-between gap-phi-3 mt-phi-3 min-h-[28px]';
 
-  const phaseSpacing = embedded ? 'mt-phi-3 pt-phi-2' : 'mt-phi-4 pt-phi-3';
+  const phaseSpacing = embedded
+    ? 'mt-phi-2 pt-phi-1.5 min-[1100px]:mt-phi-3 min-[1100px]:pt-phi-2'
+    : 'mt-phi-4 pt-phi-3';
 
   const statusLeft = (() => {
     if (lookupMessage) {
+      const msgCls = embedded
+        ? `${railEditorial.body} flex items-center gap-phi-2 min-w-0 flex-1`
+        : 'type-meta text-oxford/55 flex items-center gap-phi-2 min-w-0 flex-1';
       return (
         <>
-          <p className="type-meta text-oxford/55 flex items-center gap-phi-2 min-w-0 flex-1">
+          <p className={msgCls}>
             {(embedded ? isActive : true) && (
               <span className="h-1.5 w-1.5 shrink-0 bg-oxford/35 pulse-fast" aria-hidden />
             )}
@@ -157,7 +163,11 @@ function DispatchPanelBody({
     }
     if (embedded) {
       return (
-        <p className={`type-meta transition-colors ${isActive ? 'text-oxford/45' : 'text-oxford/25'}`}>
+        <p
+          className={`${railEditorial.bodyMetrics} transition-colors ${
+            isActive ? 'text-[rgba(var(--color-oxford-rgb),0.78)]' : 'text-[rgba(var(--color-oxford-rgb),0.35)]'
+          }`}
+        >
           {isBusy ? 'Running…' : 'Company name or URL'}
         </p>
       );
@@ -267,19 +277,21 @@ export default function AgentDispatch({
       )}
 
       {alwaysOpen ? (
-        <div className="px-phi-4 pt-phi-2 pb-phi-3">
-          <p className="type-meta text-oxford/40 tracking-[0.08em] mb-phi-2">Lookup</p>
-          <DispatchPanelBody
-            inputRef={inputRef}
-            input={input}
-            setInput={setInput}
-            onSubmit={onSubmit}
-            isBusy={isBusy}
-            lookupMessage={lookupMessage}
-            onClearMessage={onClearMessage}
-            lookupPhase={lookupPhase}
-            variant="embedded"
-          />
+        <div className="px-phi-4 py-phi-2 min-[1100px]:pt-phi-2 min-[1100px]:pb-phi-3">
+          <p className={railEditorial.label}>Lookup</p>
+          <div className="mt-phi-1.5 min-[1100px]:mt-phi-2">
+            <DispatchPanelBody
+              inputRef={inputRef}
+              input={input}
+              setInput={setInput}
+              onSubmit={onSubmit}
+              isBusy={isBusy}
+              lookupMessage={lookupMessage}
+              onClearMessage={onClearMessage}
+              lookupPhase={lookupPhase}
+              variant="embedded"
+            />
+          </div>
         </div>
       ) : (
         <div

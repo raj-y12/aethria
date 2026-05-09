@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { railEditorial } from '../design-system/railEditorial';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import AgentLogoutModal from './AgentLogoutModal';
 
@@ -19,20 +20,14 @@ export default function AccountRailPanel({ settingsPath }: AccountRailPanelProps
     <>
       <section
         aria-label="Account"
-        className="shrink-0 bg-paper border border-oxford/[0.08] px-phi-4 py-phi-3"
+        className="shrink-0 bg-paper border-l border-solid border-oxford/[0.08] px-phi-4 py-phi-2 min-[1100px]:py-phi-3"
       >
-        <div className="flex items-center gap-phi-3">
-          <p className="type-meta text-oxford/35 tracking-[0.08em]">Account</p>
-        </div>
-
-        <p
-          className="mt-phi-2 type-body-sm font-semibold tracking-[0.04em] leading-tight text-oxford truncate"
-          title={displayName}
-        >
+        <p className={railEditorial.label}>Account</p>
+        <p className={`${railEditorial.body} font-medium truncate`} title={displayName}>
           {displayName}
         </p>
 
-        <div className="mt-phi-3 flex items-center gap-phi-2 border-t border-oxford/[0.06] pt-phi-3">
+        <div className="mt-phi-2 min-[1100px]:mt-phi-3 flex items-center gap-phi-2 border-t border-oxford/[0.06] pt-phi-2 min-[1100px]:pt-phi-3">
           <Link
             to={settingsPath}
             className="type-meta text-oxford/45 hover:text-oxford transition-colors btn-interaction"
