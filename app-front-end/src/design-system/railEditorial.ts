@@ -2,7 +2,7 @@
  * Left-rail editorial stack — matches web-front-end DashboardPreview
  * (border + mono label + 15px sans body).
  */
-const bodyMetrics = 'font-sans text-[15px] leading-[1.7]';
+const bodyMetrics = 'font-sans text-[13px] leading-[1.5]';
 
 export const railEditorial = {
   edge: 'border-l border-solid border-[var(--section-divider)] pl-3 md:pl-4',

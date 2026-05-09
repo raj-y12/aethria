@@ -545,113 +545,109 @@ export default function MainLayout({
         />
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden px-phi-5 pt-phi-4 pb-phi-5 lg:px-phi-5 lg:pt-phi-5 lg:pb-phi-5">
           <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.85fr)_minmax(420px,1.12fr)_minmax(0,1.46fr)] lg:grid-rows-[minmax(0,1fr)] min-h-0 overflow-hidden gap-phi-5 lg:gap-phi-5">
-            <aside className="hidden lg:flex h-full min-h-0 max-h-full flex-col min-w-0 gap-phi-2 min-[1100px]:gap-phi-3 overflow-hidden paper-dot-grid">
-              <div className="flex shrink-0 flex-col overflow-visible bg-transparent">
-                <div className="shrink-0" style={{ padding: '12px 12px 0 0' }}>
-                  <div className="flex items-baseline justify-between gap-2 shrink-0 px-1">
-                    <p className="font-wordmark font-normal text-[clamp(2.15rem,4.2vw,3rem)] leading-[1.08] text-oxford">
-                      Aethria
-                    </p>
-                    <span className="type-meta tabular-nums leading-none text-oxford/45">{railTimeShort}</span>
+            <aside className="hidden lg:flex h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden paper-dot-grid">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="flex h-full flex-1 flex-col justify-between py-phi-2 min-[1100px]:py-phi-3">
+                  <div className="shrink-0 bg-paper pr-phi-4 pt-phi-1 pb-phi-2 min-[1100px]:pb-phi-3">
+                    <div className="flex shrink-0 items-baseline justify-between gap-phi-2">
+                      <p className="font-wordmark font-normal text-[clamp(2.15rem,4.2vw,3rem)] leading-[1.08] text-oxford">
+                        Aethria
+                      </p>
+                      <span className="type-meta tabular-nums leading-none text-oxford/45">{railTimeShort}</span>
+                    </div>
+                    <SystemBar
+                      variant="embedded"
+                      rightPanel={rightPanel}
+                      onShowDeals={() => setRightPanel((p) => (p === 'system' ? null : p))}
+                      onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
+                      onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
+                      onClose={() => setRightPanel(null)}
+                      pipelineState={pipelineStateLabel}
+                      pipelineIssueHelpOpen={showPipelineIssueHelp}
+                      onPipelineIssueHelpToggle={() => setShowPipelineIssueHelp((open) => !open)}
+                      onPipelineOpenSettings={() => navigate(SETTINGS_PATH)}
+                    />
                   </div>
-                </div>
-                <div
-                  className="shrink-0 overflow-visible border-l border-oxford/[0.08]"
-                  style={{ padding: '0 12px 10px' }}
-                >
-                  <SystemBar
-                    variant="embedded"
-                    rightPanel={rightPanel}
-                    onShowDeals={() => setRightPanel((p) => (p === 'system' ? null : p))}
-                    onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
-                    onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
-                    onClose={() => setRightPanel(null)}
-                    pipelineState={pipelineStateLabel}
-                    pipelineIssueHelpOpen={showPipelineIssueHelp}
-                    onPipelineIssueHelpToggle={() => setShowPipelineIssueHelp((open) => !open)}
-                    onPipelineOpenSettings={() => navigate(SETTINGS_PATH)}
-                  />
+                  <section
+                    aria-label="On-demand lookup"
+                    className="shrink-0 bg-paper border-l border-solid border-oxford/[0.08] overflow-hidden"
+                  >
+                    <AgentDispatch
+                      input={lookupInput}
+                      setInput={setLookupInput}
+                      onSubmit={() => void handleLookupSubmit()}
+                      isBusy={lookupBusy}
+                      message={lookupMessage}
+                      onClearMessage={() => setLookupMessage(null)}
+                      lookupPhase={lookupPhaseLabel}
+                      alwaysOpen
+                    />
+                  </section>
+                  <section
+                    aria-label="Live overview"
+                    className="shrink-0 bg-paper border-l border-solid border-oxford/[0.08] px-phi-4 py-phi-2"
+                  >
+                    <p className={railEditorial.label}>Overview</p>
+                    <div className="mt-phi-1 grid min-w-0 grid-cols-2 gap-x-phi-4 gap-y-phi-2">
+                      {[
+                        { label: 'Total', value: startups.length, accent: false },
+                        { label: 'Open', value: openCount, accent: false },
+                        { label: 'Decided', value: resolvedCount, accent: false },
+                        { label: 'Escalated', value: pendingEscalations, accent: pendingEscalations > 0 },
+                      ].map((stat) => (
+                        <div key={stat.label} className="min-w-0 text-left">
+                          <p
+                            className={`font-mono font-bold text-[clamp(18px,1.6vw,24px)] leading-none tracking-[-0.04em] tabular-nums ${stat.accent ? 'text-escalation' : 'text-oxford'}`}
+                          >
+                            {stat.value.toLocaleString()}
+                          </p>
+                          <p className={`mt-phi-1 ${railEditorial.body}`}>{stat.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                  <article
+                    className="shrink-0 bg-paper border-l border-solid border-oxford/[0.08] px-phi-4 py-phi-2"
+                    aria-label="Fund thesis preview"
+                  >
+                    <div className="flex items-start justify-between gap-phi-3">
+                      <div className="min-w-0 flex-1">
+                        <p className={railEditorial.label}>Active mandate</p>
+                        <p className={`${railEditorial.body} font-medium truncate`}>
+                          {fundName || 'No fund configured'}
+                        </p>
+                      </div>
+                      {hasThesis && (
+                        <span className="shrink-0 inline-flex items-center gap-phi-2 mt-px">
+                          <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/70"
+                            style={{ boxShadow: '0 0 0 2px rgba(16,26,43,0.08)' }}
+                            aria-hidden
+                          />
+                          <span className="font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(var(--color-oxford-rgb),0.5)]">
+                            Live
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    {hasThesisTags && (
+                      <div className="mt-phi-1 flex flex-wrap gap-phi-2">
+                        {thesisTagList.slice(0, 5).map((t) => (
+                          <span
+                            key={t}
+                            className="px-phi-2 py-phi-1 type-meta text-oxford/45 border border-oxford/[0.08]"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                  <div className="shrink-0 min-h-0">
+                    <AccountRailPanel settingsPath={SETTINGS_PATH} />
+                  </div>
                 </div>
               </div>
-              {/* Lower sections — scroll inside rail so grid row stays within 100dvh */}
-              <div className="flex min-h-0 flex-1 flex-col gap-phi-2 min-[1100px]:gap-phi-3 overflow-x-hidden overflow-y-auto overscroll-contain pb-phi-1 [scrollbar-gutter:stable]">
-              <section
-                aria-label="On-demand lookup"
-                className="bg-paper border-l border-solid border-oxford/[0.08] overflow-hidden"
-              >
-                <AgentDispatch
-                  input={lookupInput}
-                  setInput={setLookupInput}
-                  onSubmit={() => void handleLookupSubmit()}
-                  isBusy={lookupBusy}
-                  message={lookupMessage}
-                  onClearMessage={() => setLookupMessage(null)}
-                  lookupPhase={lookupPhaseLabel}
-                  alwaysOpen
-                />
-              </section>
-              <section
-                aria-label="Live overview"
-                className="bg-paper border-l border-solid border-oxford/[0.08] px-phi-4 py-phi-2 min-[1100px]:py-phi-3"
-              >
-                <p className={railEditorial.label}>Overview</p>
-                <div className="mt-phi-2 min-[1100px]:mt-phi-3 grid min-w-0 grid-cols-2 gap-x-phi-4 min-[1100px]:gap-x-phi-5 gap-y-phi-2 min-[1100px]:gap-y-phi-3">
-                  {[
-                    { label: 'Total', value: startups.length, accent: false },
-                    { label: 'Open', value: openCount, accent: false },
-                    { label: 'Decided', value: resolvedCount, accent: false },
-                    { label: 'Escalated', value: pendingEscalations, accent: pendingEscalations > 0 },
-                  ].map((stat) => (
-                    <div key={stat.label} className="min-w-0 text-left">
-                      <p
-                        className={`font-mono font-bold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.04em] tabular-nums ${stat.accent ? 'text-escalation' : 'text-oxford'}`}
-                      >
-                        {stat.value.toLocaleString()}
-                      </p>
-                      <p className={`mt-phi-1 ${railEditorial.body}`}>{stat.label}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-              <article
-                className="bg-paper border-l border-solid border-oxford/[0.08] px-phi-4 py-phi-2 min-[1100px]:py-phi-3"
-                aria-label="Fund thesis preview"
-              >
-                <div className="flex items-start justify-between gap-phi-3">
-                  <div className="min-w-0 flex-1">
-                    <p className={railEditorial.label}>Active mandate</p>
-                    <p className={`${railEditorial.body} font-medium truncate`}>
-                      {fundName || 'No fund configured'}
-                    </p>
-                  </div>
-                  {hasThesis && (
-                    <span className="shrink-0 inline-flex items-center gap-phi-2 mt-px">
-                      <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/70"
-                        style={{ boxShadow: '0 0 0 2px rgba(16,26,43,0.08)' }}
-                        aria-hidden
-                      />
-                      <span className="font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(var(--color-oxford-rgb),0.5)]">
-                        Live
-                      </span>
-                    </span>
-                  )}
-                </div>
-                {hasThesisTags && (
-                  <div className="mt-phi-2 min-[1100px]:mt-phi-3 flex flex-wrap gap-phi-2">
-                    {thesisTagList.slice(0, 5).map((t) => (
-                      <span
-                        key={t}
-                        className="px-phi-2 py-phi-1 type-meta text-oxford/45 border border-oxford/[0.08]"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </article>
-              <AccountRailPanel settingsPath={SETTINGS_PATH} />
-              </div>{/* end lower sections */}
             </aside>
 
             <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:h-full lg:min-h-0">

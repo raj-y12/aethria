@@ -185,12 +185,12 @@ export default function SystemBar({
   if (isEmbedded) {
     return (
       <div
-        className="hidden lg:flex flex-col h-auto w-full min-h-0 bg-transparent overflow-visible"
+        className="hidden lg:flex flex-col h-auto w-full min-h-0 border-l border-solid border-oxford/[0.08] bg-transparent pl-phi-4 overflow-visible"
         aria-label="System"
       >
         {/* Nav — workspace chrome only (wordmark + clock live in MainLayout above) */}
         {workspaceChrome ? (
-          <div className="mt-phi-4 flex flex-col gap-0.5 w-full shrink-0">
+          <div className="mt-phi-2 min-[1100px]:mt-phi-3 flex flex-col gap-0.5 w-full shrink-0">
               <SpineNavButton
                 label="Deals"
                 active={rightPanel !== 'system' && rightPanel !== 'feed'}
@@ -221,7 +221,7 @@ export default function SystemBar({
           </div>
         ) : null}
         {workspaceChrome && pipelineState != null ? (
-          <div className="mt-phi-4 flex w-full shrink-0 items-center justify-end px-1">
+          <div className="mt-phi-3 min-[1100px]:mt-phi-4 flex w-full shrink-0 items-center justify-end px-1">
             <div className="relative inline-flex items-center gap-phi-2">
               {pipelineState === 'On' && (
                 <span
