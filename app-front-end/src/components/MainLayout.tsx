@@ -524,10 +524,14 @@ export default function MainLayout({
         </div>
       )}
 
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 pb-phi-5 lg:px-phi-5 lg:pt-phi-5 lg:pb-phi-5">
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <main className="flex-1 flex min-h-0 overflow-hidden">
+        <div
+          className="w-3 shrink-0 self-stretch origin-top bg-[#1d2d48] sm:w-8 md:w-14"
+          aria-hidden="true"
+        />
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden px-phi-5 pt-phi-4 pb-phi-5 lg:px-phi-5 lg:pt-phi-5 lg:pb-phi-5">
           <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.85fr)_minmax(420px,1.12fr)_minmax(0,1.46fr)] min-h-0 overflow-hidden gap-phi-5 lg:gap-phi-5">
-            <aside className="hidden lg:flex flex-col min-w-0 min-h-0 gap-phi-4 overflow-hidden">
+            <aside className="hidden lg:flex flex-col min-w-0 min-h-0 gap-phi-4 overflow-hidden paper-dot-grid">
               {/* SystemBar fills all remaining vertical space */}
               <div className="flex-1 min-h-[160px] overflow-hidden">
                 <SystemBar
