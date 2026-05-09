@@ -1,5 +1,5 @@
 import type { ReviewerQualityBand } from './semantics';
-import type { DecisionBadgeVariant } from '../components/DecisionBadge';
+import type { DecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 
 /**
  * Centralized badge semantics to keep decision and quality systems aligned.

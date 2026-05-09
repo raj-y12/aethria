@@ -151,8 +151,12 @@
 }
 .memoDocSection { margin-top: clamp(34px, 4vw, 48px); }
 .memoDocSection + .memoDocSection {
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.06);
-  padding-top: clamp(18px, 2.4vw, 24px);
+  border-top: none;
+  padding-top: clamp(28px, 3.6vw, 40px);
+  margin-top: clamp(21px, 2.8vw, 34px);
+}
+.memoDocVerdictSection {
+  margin-top: clamp(40px, 5vw, 56px);
 }
 
 /* === Empty state === */
@@ -199,11 +203,13 @@
 }
 .memoDocTagline {
   font-family: "Geist Sans", system-ui, sans-serif;
-  font-size: var(--memo-size-body);
-  line-height: 1.58;
-  color: rgba(var(--color-oxford-rgb), 0.60);
-  margin: 0 0 10px 0;
-  font-style: italic;
+  font-size: var(--memo-size-ui);
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: rgba(var(--color-oxford-rgb), 0.48);
+  margin: -2px 0 8px 0;
+  max-width: 42rem;
+  font-style: normal;
 }
 .memoMeta {
   font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -226,12 +232,12 @@
 }
 .memoDocRecommendation {
   font-family: "Geist Sans", system-ui, sans-serif;
-  font-size: clamp(1.55rem, 3.8vw, 2rem);
+  font-size: clamp(1.35rem, 2.15vw, 1.85rem);
   font-weight: 600;
-  letter-spacing: -0.03em;
-  text-transform: none;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   margin: 0;
-  line-height: 1.04;
+  line-height: 1.2;
   color: var(--color-oxford);
 }
 .memoDocRecommendation--invest { color: var(--color-oxford); }
@@ -274,9 +280,9 @@
   gap: 7px 21px;
   align-items: end;
   margin-bottom: 18px;
-  padding: 13px 0;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.06);
-  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.06);
+  padding: 21px 0 13px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  border-bottom: none;
 }
 
 /* === Header divider === */
@@ -284,6 +290,10 @@
   height: 1px;
   background: rgba(var(--color-oxford-rgb), 0.06);
   margin: clamp(21px, 3vw, 30px) 0 0 0;
+}
+.memoDocFocalInset {
+  padding-left: 13px;
+  box-shadow: inset 3px 0 0 rgba(var(--color-oxford-rgb), 0.12);
 }
 
 /* === Section heading === */
@@ -790,12 +800,21 @@
   outline: 2px solid rgba(var(--color-oxford-rgb), 0.22);
   outline-offset: 2px;
 }
-.memoPipelineToggleTitle { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.memoPipelineToggleTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+/* Instrument line under Run log — matches memoReplayWhen / meta scale, not memoDocProse body */
 .memoPipelineOneLiner {
-  font-family: "Geist Sans", system-ui, sans-serif;
-  font-size: var(--memo-size-body);
-  line-height: 1.45;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: var(--memo-size-ui);
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: rgba(var(--color-oxford-rgb), 0.38);
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -804,10 +823,10 @@
 .memoPipelinePlus {
   flex-shrink: 0;
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: var(--memo-size-label);
+  font-size: var(--memo-size-ui);
   color: rgba(var(--color-oxford-rgb), 0.30);
   line-height: 1.5;
-  padding-top: 2px;
+  padding-top: 1px;
 }
 .memoReplayList { list-style: none; margin: 0; padding: 4px 0 2px 0; }
 .memoReplayItem { padding: 21px 0; border-top: 1px solid rgba(var(--color-oxford-rgb), 0.06); }
@@ -856,7 +875,18 @@
   padding: 16px 20px 18px;
 }
 .memoGenCallout .memoPipelineKicker { margin-bottom: 8px; }
-.memoGenCallout .memoGateTitle { margin-top: 0; }
+/* Pipeline gate title mirrors WorkGrid DecisionBadge: mono, uppercase, badge tracking */
+.memoGenCallout .memoGateTitle {
+  margin-top: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+@media screen and (max-width: 1023px) {
+  .memoGenCallout .memoGateTitle { font-size: 12px; }
+}
 .memoGenCallout .memoGateDetail { margin-bottom: 0; }
 
 /* also clean up stray Tailwind inline usage in InvestmentMemoContent.tsx */

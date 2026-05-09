@@ -9,6 +9,7 @@ import DecisionBadge from './DecisionBadge';
 import VerdictBandBadge from './VerdictBandBadge';
 import EmptyState from './EmptyState';
 import { resolveEscalation } from '../api/escalations';
+import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 
 interface RowDecisionState { decision: string | null; notes: string; resolved: boolean; }
 const emptyRowState = (): RowDecisionState => ({ decision: null, notes: '', resolved: false });
@@ -48,20 +49,11 @@ function getDecisionFilterValue(s: Startup): Exclude<DecisionFilter, 'ALL'> {
   return 'AWAITING_REVIEW';
 }
 
-function getDecisionBadgeVariant(s: Startup): 'INVEST' | 'PASS' | 'MONITOR' | 'awaiting' | 'undecided' | 'escalation' {
-  if (s.partner != null && s.partner.human_review_required === true) return 'escalation';
-  const rec = s.partner?.recommendation;
-  if (!rec) return s.review ? 'undecided' : 'awaiting';
-  if (rec === 'INVEST') return 'INVEST';
-  if (rec === 'PASS') return 'PASS';
-  return 'MONITOR';
-}
-
 const FilterButton = ({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`type-label-tab min-h-[36px] px-phi-3 transition-[color,border-color] duration-200 border-b border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/30 hover:text-oxford/60'
+    className={`type-label-tab min-h-[36px] px-phi-3 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${active ? 'text-oxford font-semibold' : 'text-oxford/30 hover:text-oxford/60'
       }`}
   >
     {label}
@@ -78,12 +70,12 @@ interface WorkGridProps {
 const EMPTY_WATCHLIST_IDS = new Set<string>();
 
 const DECISION_FILTER_CHIPS: { key: DecisionFilter; label: string }[] = [
-  { key: 'ALL', label: 'Any' },
-  { key: 'YES', label: 'Yes' },
-  { key: 'NO', label: 'No' },
-  { key: 'MAYBE', label: 'Maybe' },
-  { key: 'ESCALATION', label: 'Escalation' },
-  { key: 'WATCHLIST', label: 'Monitor list' },
+  { key: 'ALL', label: 'ANY' },
+  { key: 'YES', label: 'YES' },
+  { key: 'NO', label: 'NO' },
+  { key: 'MAYBE', label: 'MAYBE' },
+  { key: 'ESCALATION', label: 'ESCALATION' },
+  { key: 'WATCHLIST', label: 'MONITOR LIST' },
 ];
 
 const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGridProps): JSX.Element => {
@@ -221,15 +213,15 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
   }
 
   return (
-    <div className="w-full font-sans bg-paper selection:bg-oxford selection:text-paper">
-      <div className="sticky top-0 z-20 bg-paper px-phi-4 py-phi-2">
-        <div className="flex flex-col gap-phi-3">
+    <div className="w-full font-sans bg-surface-canvas selection:bg-oxford selection:text-paper">
+      <div className="sticky top-0 z-20 bg-surface-canvas px-phi-4 py-phi-3">
+        <div className="flex flex-col gap-phi-3 uppercase tracking-[0.06em]">
           <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2">
             <div className="flex min-w-0 flex-wrap items-center gap-phi-3">
               <div className="flex items-center gap-0">
-                <FilterButton active={sourceFilter === 'ALL'} label="All" onClick={() => setSourceFilter('ALL')} />
-                <FilterButton active={sourceFilter === 'SCOUT'} label="Scout" onClick={() => setSourceFilter('SCOUT')} />
-                <FilterButton active={sourceFilter === 'LOOKUP'} label="Lookup" onClick={() => setSourceFilter('LOOKUP')} />
+                <FilterButton active={sourceFilter === 'ALL'} label="ALL" onClick={() => setSourceFilter('ALL')} />
+                <FilterButton active={sourceFilter === 'SCOUT'} label="SCOUT" onClick={() => setSourceFilter('SCOUT')} />
+                <FilterButton active={sourceFilter === 'LOOKUP'} label="LOOKUP" onClick={() => setSourceFilter('LOOKUP')} />
               </div>
             </div>
             <div className="flex items-center gap-phi-3">
@@ -240,11 +232,11 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                   aria-label="Sort deals"
                   className="appearance-none min-h-[36px] bg-transparent type-meta text-oxford/30 hover:text-oxford/60 transition-colors pr-6 outline-none cursor-pointer"
                 >
-                  <option value="NEWEST">Chronological ↓</option>
-                  <option value="OLDEST">Chronological ↑</option>
-                  <option value="CONFIDENCE_HIGH">Scout Signal ↓</option>
-                  <option value="CONFIDENCE_LOW">Scout Signal ↑</option>
-                  <option value="NAME_AZ">Identity A–Z</option>
+                  <option value="NEWEST">CHRONOLOGICAL ↓</option>
+                  <option value="OLDEST">CHRONOLOGICAL ↑</option>
+                  <option value="CONFIDENCE_HIGH">SCOUT SIGNAL ↓</option>
+                  <option value="CONFIDENCE_LOW">SCOUT SIGNAL ↑</option>
+                  <option value="NAME_AZ">IDENTITY A–Z</option>
                 </select>
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-oxford/20">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
@@ -255,7 +247,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                 className="type-meta min-h-[36px] text-oxford/30 hover:text-oxford/60 transition-colors pl-phi-2"
               >
-                {showAdvancedFilters ? 'Collapse' : 'Refine'}
+                {showAdvancedFilters ? 'COLLAPSE' : 'REFINE'}
               </button>
             </div>
           </div>
@@ -267,18 +259,18 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.2, ease: tokens.motion.ease }}
-                className="border-t border-oxford/[0.06]"
+                className="pt-phi-3 mt-phi-1"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-phi-4 pt-phi-3">
-                  <div className="flex flex-col gap-phi-2">
-                    <span className="type-label-tab text-oxford/30">Decision</span>
-                    <div className="flex flex-wrap gap-phi-2">
+                <div className="flex flex-col gap-phi-4 pt-phi-3">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-phi-2 sm:gap-phi-4">
+                    <span className="type-label-tab text-oxford/30 sm:w-[112px] sm:shrink-0 sm:pt-[10px]">DECISION</span>
+                    <div className="flex flex-wrap gap-phi-2 flex-1 min-w-0">
                       {DECISION_FILTER_CHIPS.map(({ key: d, label }) => (
                         <button
                           key={d}
                           type="button"
                           onClick={() => setDecisionFilter(d)}
-                          className={`type-meta px-phi-3 min-h-[34px] border border-oxford/[0.08] transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'hover:bg-oxford/[0.04] text-oxford/60'
+                          className={`type-meta px-phi-3 min-h-[34px] transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'bg-registerTint hover:bg-oxford/[0.06] text-oxford/60'
                             }`}
                         >
                           {label}
@@ -286,22 +278,22 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                       ))}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-phi-2">
-                    <span className="type-label-tab text-oxford/30">Review band</span>
-                    <div className="flex flex-wrap gap-phi-2">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-phi-2 sm:gap-phi-4">
+                    <span className="type-label-tab text-oxford/30 sm:w-[112px] sm:shrink-0 sm:pt-[10px]">REVIEW BAND</span>
+                    <div className="flex flex-wrap gap-phi-2 flex-1 min-w-0">
                       {['ALL', 'STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'].map((r) => (
                         <button
                           key={r}
                           onClick={() => setReviewFilter(r as ReviewFilter)}
-                          className={`type-meta px-phi-3 min-h-[34px] border border-oxford/[0.08] transition-colors ${reviewFilter === r ? 'bg-oxford text-paper' : 'hover:bg-oxford/[0.04] text-oxford/60'
+                          className={`type-meta px-phi-3 min-h-[34px] transition-colors ${reviewFilter === r ? 'bg-oxford text-paper' : 'bg-registerTint hover:bg-oxford/[0.06] text-oxford/60'
                             }`}
                         >
-                          {r === 'ALL' ? 'Any' : r.charAt(0) + r.slice(1).toLowerCase()}
+                          {r === 'ALL' ? 'ANY' : r}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div className="flex items-end justify-end">
+                  <div className="flex justify-end pt-phi-2 border-t border-oxford/[0.06]">
                     <button
                       onClick={() => {
                         setSourceFilter('ALL');
@@ -311,7 +303,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                       }}
                       className="type-meta min-h-[36px] text-oxford/30 hover:text-oxford/60 transition-colors"
                     >
-                      Reset filters
+                      RESET FILTERS
                     </button>
                   </div>
                 </div>
@@ -346,7 +338,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                 else rowRefs.current.delete(startup.id);
               }}
               variants={rowVariants}
-              className={`group relative border-b border-oxford/[0.06] px-phi-4 py-phi-5 cursor-pointer transition-[background-color] duration-[180ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${isSelected ? 'bg-oxford/[0.04]' : 'hover:bg-oxford/[0.018]'
+              className={`group relative px-phi-4 py-phi-6 cursor-pointer transition-[background-color] duration-[180ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset hover:bg-registerTint ${isSelected ? 'bg-registerTint' : ''
                 }`}
               style={{ transitionTimingFunction: 'var(--motion-ease)' }}
               onClick={() => onStartupClick(startup)}
@@ -394,11 +386,11 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                   </div>
                 </div>
 
-                {/* Right: badges only */}
+                {/* Right: monitor chip, review band, partner verdict badge */}
                 <div className="flex flex-wrap items-center justify-end gap-phi-2 pt-px sm:col-start-3">
                   {onMonitorList && (
                     <span
-                      className="type-label-tab text-oxford/45 border border-oxford/[0.12] px-phi-2 py-0.5 shrink-0"
+                      className="type-label-tab text-oxford/45 bg-registerTint px-phi-2 py-0.5 shrink-0"
                       title="Tracked on portfolio monitor list (partner monitor outcome)"
                     >
                       Monitor
@@ -406,27 +398,6 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                   )}
                   {reviewBand && <VerdictBandBadge band={reviewBand} />}
                   <DecisionBadge variant={decisionVariant} />
-                </div>
-
-                {/* One-liner spans body + badges width on desktop */}
-                <div className="min-w-0 sm:col-start-2 sm:col-end-4">
-                  {/* 0fr → 1fr avoids `height: auto` + max-height jank when switching rows */}
-                  <div
-                    className={`grid min-h-0 transition-[grid-template-rows,margin-top] ease-out ${isSelected && startup.scout.one_line ? 'grid-rows-[1fr] mt-phi-3' : 'grid-rows-[0fr] mt-0'
-                      }`}
-                    style={{
-                      transitionDuration: reduceMotion ? '0ms' : '220ms',
-                      transitionTimingFunction: tokens.motion.easeCss,
-                    }}
-                  >
-                    <div className="overflow-hidden min-h-0">
-                      {startup.scout.one_line ? (
-                        <p className="type-note italic text-oxford/55">
-                          {startup.scout.one_line}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -452,7 +423,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                           transition={decisionPanelTransition}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <div className="mt-phi-3 pt-phi-3 border-t border-oxford/[0.06] space-y-phi-4">
+                          <div className="mt-phi-4 pt-phi-4 space-y-phi-4">
                             {rs.resolved ? (
                               <motion.div
                                 className="flex items-start gap-phi-4"

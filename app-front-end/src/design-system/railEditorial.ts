@@ -1,9 +1,9 @@
 const bodyMetrics = 'font-sans text-[13px] leading-[1.5]';
 
 export const railEditorial = {
-  /** Primary wordmark — both MainLayout and SettingsPage asides (Libre Baskerville). */
+  /** Primary wordmark — both MainLayout and SettingsPage asides (Libre Baskerville). Title case in markup. */
   wordmark:
-    'font-wordmark font-normal text-[11px] leading-none tracking-[0.18em] uppercase text-oxford',
+    'font-wordmark font-bold text-[clamp(15px,1.35vw,19px)] leading-tight tracking-[0.05em] text-oxford',
 
   /**
    * Section titles — memo `.memoDocSectionHead` rhythm (tracking, color, mb);

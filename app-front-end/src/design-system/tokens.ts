@@ -39,6 +39,21 @@ export const phiSpacing = {
   9: '144px',  // 144 — major layout gap
 } as const;
 
+/**
+ * Semantic surfaces — judgment-layer UI: separate planes **without** boxing everything.
+ * Use Tailwind: `bg-surface-canvas` … `bg-surface-selected` (see tailwind.config.js).
+ */
+export const surface = {
+  /** Primary canvas — same as paper */
+  canvas: '#E9E0D1',
+  /** Raised chrome — sidebar/header lifts */
+  raised: '#ebe8e0',
+  /** Recessed rows / inset strips — matches paperDeep */
+  recessed: '#E6E4DE',
+  /** Selected/hover row tint — oxford @ 3%, aligns with --color-register-tint */
+  selectedTint: 'rgba(26, 43, 72, 0.03)',
+} as const;
+
 export const tokens = {
   color: {
     oxford: '#1A2B48',

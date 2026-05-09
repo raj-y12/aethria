@@ -3,6 +3,14 @@
  * Prefer `index.css` utilities (`type-label-tab`, `type-meta`, …) where they fit alone.
  */
 
+/** Empty detail pane — ledger awaiting judgment. */
+export const UI_DETAIL_EMPTY_HINT =
+  'Select a matter to open the investment memo — conviction stays yours.' as const;
+
+/** Judgements panel subtitle tone (optional future use). */
+export const UI_JUDGEMENTS_SUBTITLE =
+  'Traceable outcomes — partner rules, escalations, resolutions.' as const;
+
 /** Toolbar / filter row: 11px mono uppercase (tracking matches WorkGrid segments). */
 export const UI_DENSE_MONO_UPPER =
   'font-mono text-[11px] font-normal uppercase tracking-[0.1em]' as const;

@@ -13,10 +13,13 @@ import {
 } from '../lib/memoIcPack';
 import { memoReferenceHref, memoReferenceLabel } from '../lib/memoReferenceHref';
 import { DECISION_LABELS } from '../design-system/semantics';
+import { UI_DETAIL_EMPTY_HINT } from '../design-system/ui-text';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import ScoreOverview from './scoring/ScoreOverview';
 import DimensionCard from './scoring/DimensionCard';
+import { DECISION_BADGE_LABEL } from './DecisionBadge';
+import { getDecisionBadgeVariant, type DecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 const MEMO_POLL_INITIAL_MS = 2000;
 const MEMO_POLL_MAX_MS = 15000;
 const MEMO_POLL_MAX_ATTEMPTS = 60;
@@ -37,6 +40,28 @@ function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | null): St
     review: partial.review ?? base.review,
     partner: partial.partner ?? base.partner,
   };
+}
+
+const MEMO_GENERATING_DETAIL_AWAITING =
+  'Reviewers are scoring this company against your fund thesis. Memo sections appear as outputs land.';
+const MEMO_GENERATING_DETAIL_UNDECIDED =
+  'Analyst review is complete; the partner engine is determining Invest, Pass, or Monitor. This page updates as the memo fills in.';
+const MEMO_GENERATING_DETAIL_ESCALATION =
+  'Partner flagged human review. Sections still populate from the pipeline where available.';
+const MEMO_GENERATING_DETAIL_FORMATTING =
+  'Formatting and persisting the IC memo. This page updates automatically when the document is ready.';
+
+function memoGeneratingDetailForVariant(variant: DecisionBadgeVariant): string {
+  switch (variant) {
+    case 'awaiting':
+      return MEMO_GENERATING_DETAIL_AWAITING;
+    case 'undecided':
+      return MEMO_GENERATING_DETAIL_UNDECIDED;
+    case 'escalation':
+      return MEMO_GENERATING_DETAIL_ESCALATION;
+    default:
+      return MEMO_GENERATING_DETAIL_FORMATTING;
+  }
 }
 
 function reviewHasThesisAlignment(r: Review | null | undefined): boolean {
@@ -110,8 +135,7 @@ function renderWithMonoNumbers(value: unknown): ReactNode {
 function partnerDecisionHeadline(startup: Startup): string {
   const rec = startup.partner?.recommendation;
   if (rec == null) return '—';
-  const label = DECISION_LABELS[rec] ?? String(rec);
-  return label.toUpperCase();
+  return DECISION_LABELS[rec] ?? String(rec);
 }
 
 function toJudgmentReasoning(startup: Startup): string[] {
@@ -206,6 +230,15 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     () => (startup ? mergeMemoPartial(startup, memoPartial) : null),
     [startup, memoPartial]
   );
+
+  const memoGeneratingGateCopy = useMemo(() => {
+    if (!displayStartup) return { title: '', detail: '' };
+    const variant = getDecisionBadgeVariant(displayStartup);
+    return {
+      title: DECISION_BADGE_LABEL[variant],
+      detail: memoGeneratingDetailForVariant(variant),
+    };
+  }, [displayStartup]);
 
   const handleDownloadPDF = useCallback(async () => {
     if (!displayStartup) return;
@@ -354,7 +387,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         <div className="memoEmpty">
           <div className="memoEmptyInner">
             <p className="memoEmptyWordmark">Aethria</p>
-            <div className="memoEmptyHint">Select a company to view the investment memo.</div>
+            <div className="memoEmptyHint">{UI_DETAIL_EMPTY_HINT}</div>
           </div>
         </div>
       ) : (
@@ -426,22 +459,21 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     animate={reduceMotion ? { opacity: 1 } : { opacity: [0.55, 1, 0.55] }}
                     transition={reduceMotion ? { duration: 0 } : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
                   >
-                    Generating full investment memo…
+                    {memoGeneratingGateCopy.title}
                   </motion.p>
                   <p className="memoGateDetail">
-                    {renderWithMonoNumbers('This page updates automatically when the formatted memo is persisted.')}
+                    {renderWithMonoNumbers(memoGeneratingGateCopy.detail)}
                   </p>
                 </div>
               </section>
             )}
 
-            {/* ── Investment Judgment ── */}
+            {/* ── Verdict (partner recommendation — published conclusion) ── */}
             {showJudgment && (() => {
               const paras = reasoningParagraphs.filter((p) => String(p ?? '').trim());
-              if (!paras.length) return null;
               return (
-                <section className="memoDocSection" aria-labelledby="memo-judgment">
-                  <h2 className="memoDocSectionHead" id="memo-judgment">Investment Judgment</h2>
+                <section className="memoDocSection memoDocVerdictSection" aria-labelledby="memo-verdict">
+                  <h2 className="memoDocSectionHead" id="memo-verdict">Verdict</h2>
                   {decisionBadgeVariant && (
                     <div className="memoDocJudgmentTop">
                       <p className={`memoDocRecommendation memoDocRecommendation--${decisionBadgeVariant.toLowerCase()}`}>
@@ -465,12 +497,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         )}
                     </div>
                   )}
-                  {paras.map((p, i) => <p key={i} className="memoDocProse">{renderWithMonoNumbers(p)}</p>)}
+                  {paras.map((p, i) => (
+                    <p key={i} className="memoDocProse">{renderWithMonoNumbers(p)}</p>
+                  ))}
                 </section>
               );
             })()}
 
-            {/* ── Executive Summary ── */}
+            {/* ── Executive Summary (synthesis after verdict) ── */}
             {showJudgment && (() => {
               const summary = displayStartup.review?.overall_summary?.trim();
               if (!summary) return null;
@@ -482,7 +516,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               );
             })()}
 
-            {/* ── Aethria view (synthesized from persisted signals & divergence) ── */}
+            {/* ── Aethria view (thesis fit narrative) ── */}
             {(() => {
               const av = displayStartup.review?.aethria_view as AethriaView | undefined | null;
               if (!av?.headline?.trim()) return null;
@@ -497,7 +531,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     <p className="memoDocProse mt-2 text-oxford/90">{renderWithMonoNumbers(av.tension_summary)}</p>
                   )}
                   {av.focal_question?.trim() && (
-                    <p className="memoDocProse mt-3 border-l-2 border-oxford/25 pl-3">
+                    <p className="memoDocProse memoDocFocalInset mt-3">
                       <span className="memoDocSubhead block mb-1">Focal question</span>
                       {renderWithMonoNumbers(av.focal_question)}
                     </p>
@@ -505,7 +539,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </section>
               );
             })()}
-
 
             {/* ── Company Overview ── */}
             {(() => {
@@ -625,7 +658,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                             ? JSON.stringify(sig, null, 2).slice(0, 6000)
                             : null;
                         return (
-                          <div className="memoDocSubsection mb-4 border border-oxford/10 bg-oxford/[0.03] px-3 py-3">
+                          <div className="memoDocSubsection mb-4 bg-registerTint px-3 py-3">
                             <p className="memoDocSubhead">Signals &amp; reviewer alignment</p>
                             {dsum && (
                               <p className="memoDocProse text-sm text-oxford/90">{renderWithMonoNumbers(dsum)}</p>

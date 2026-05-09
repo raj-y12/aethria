@@ -18,6 +18,14 @@ interface SystemBarProps {
   navLink?: { href: string; label: string };
 }
 
+/** Spine nav shortcut badges — Roman numerals for keys 1–12 (workspace panel shortcuts). */
+function shortcutKeyToRomanNumeral(shortcut: string): string {
+  const n = parseInt(shortcut.trim(), 10);
+  if (!Number.isFinite(n) || n < 1 || n > 12) return shortcut.trim();
+  const romans = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+  return romans[n] ?? shortcut.trim();
+}
+
 /** Thin horizontal rule — only used in fixed (full-height) variant. */
 function SpineRule() {
   return (
@@ -74,7 +82,7 @@ function SpineNavButton({
           className={`tabular-nums transition-colors ${active ? shortcutActive : shortcutIdle}`}
           aria-hidden
         >
-          {shortcut.padStart(2, '0')}
+          {shortcutKeyToRomanNumeral(shortcut)}
         </span>
       ) : null}
     </button>

@@ -91,6 +91,12 @@
   /* Column ratio */
   --col-sidebar: 38.2%;
   --col-content: 61.8%;
+
+  /* Semantic surfaces — mirror tokens.surface + Tailwind bg-surface-* */
+  --surface-canvas: var(--color-paper);
+  --surface-raised: var(--color-paper-bright);
+  --surface-recessed: var(--color-paper-deep);
+  --surface-selected: var(--color-register-tint);
 }
 
 /* Clerk UserProfile — match Aethria: oxford, cream paper, Figtree / JetBrains Mono, no radius */

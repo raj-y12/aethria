@@ -46,6 +46,11 @@ export default {
         warning: '#e9e0d1',
         /** See :root --color-register-tint */
         registerTint: 'var(--color-register-tint)',
+        /** Judgment-surface layering — maps to tokens.surface + index.css */
+        'surface-canvas': 'var(--surface-canvas)',
+        'surface-raised': 'var(--surface-raised)',
+        'surface-recessed': 'var(--surface-recessed)',
+        'surface-selected': 'var(--surface-selected)',
       },
       fontFamily: {
         display: ['"EB Garamond"', 'Georgia', 'serif'],

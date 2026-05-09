@@ -8,6 +8,7 @@ import { formatReviewOverallStructuredScore } from '../lib/reviewScoring';
 import DecisionBadge from './DecisionBadge';
 import SignalEventRow from './SignalEventRow';
 import EmptyState from './EmptyState';
+import { UI_JUDGEMENTS_SUBTITLE } from '../design-system/ui-text';
 
 interface LogEntry {
   id: string;
@@ -16,6 +17,25 @@ interface LogEntry {
   message: string;
   kind: 'scanned' | 'reviewed' | 'decision' | 'meta_cycle' | 'signal_detected' | 'escalation_resolved';
   decision?: string; // INVEST | PASS | MONITOR — for kind 'decision'
+}
+
+function logProvenanceLabel(kind: LogEntry['kind']): string {
+  switch (kind) {
+    case 'scanned':
+      return 'Scout queue';
+    case 'reviewed':
+      return 'Reviewer synthesis';
+    case 'decision':
+      return 'Partner verdict';
+    case 'meta_cycle':
+      return 'Meta-Agent cycle';
+    case 'signal_detected':
+      return 'Portfolio signal';
+    case 'escalation_resolved':
+      return 'Human resolution';
+    default:
+      return 'System';
+  }
 }
 
 interface LiveIntelligenceFeedProps {
@@ -137,7 +157,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
       <div className="h-full overflow-y-auto flex flex-col">
         <EmptyState
           label="Judgements"
-          body="Partner decisions, escalations, and human resolutions will stream here as the pipeline runs."
+          body={`${UI_JUDGEMENTS_SUBTITLE} Stream fills as the pipeline runs.`}
         />
       </div>
     );
@@ -145,7 +165,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="space-y-0 p-4 sm:p-5">
+      <div className="space-y-0 px-phi-4 py-phi-5 sm:px-phi-5 bg-surface-canvas">
         <AnimatePresence mode="popLayout">
           {entries.map((e, i) => (
             <motion.div
@@ -158,11 +178,26 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
                 delay: reduceMotion ? 0 : i * 0.025,
                 ease: tokens.motion.ease,
               })}
+              className={i > 0 ? 'mt-phi-1' : ''}
             >
               <SignalEventRow
-                layout="compact"
+                layout="stacked"
                 timestamp={e.timestamp}
+                label={logProvenanceLabel(e.kind)}
                 body={e.message}
+                meta={
+                  e.iso
+                    ? new Date(e.iso).toLocaleString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false,
+                      })
+                    : undefined
+                }
                 trailing={
                   e.kind === 'decision' && e.decision ? (
                     <DecisionBadge

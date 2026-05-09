@@ -23,7 +23,10 @@ import {
   usePrefersReducedMotion,
 } from '../hooks';
 import { transitionOrReduced } from '../design-system/motion';
-import { UI_PANEL_CHROME_LABEL } from '../design-system/ui-text';
+import {
+  UI_DETAIL_EMPTY_HINT,
+  UI_PANEL_CHROME_LABEL,
+} from '../design-system/ui-text';
 import type { Startup } from '../types/startup';
 import type { SystemData } from '../hooks/useSystemData';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './InvestmentMemoContent';
@@ -423,7 +426,7 @@ export default function MainLayout({
     const sectors = pj ? toStrings(pj.sectors ?? pj.sector ?? pj.focus_areas) : toStrings(undefined);
     const stages = pj ? toStrings(pj.stage_focus ?? pj.stage) : toStrings(fundStage);
     const geos = pj ? toStrings(pj.geography ?? pj.geographies ?? pj.geographic_focus) : toStrings(undefined);
-    // Fall back to settings if parsed_json has nothing
+    // Fall back to settings if parsed_json has nothing — chips are sectors · stage · region only
     return {
       sectors,
       stages: stages.length ? stages : fundStage ? [fundStage] : [],
@@ -431,7 +434,7 @@ export default function MainLayout({
     };
   }, [fundThesisSummary, fundStage, fundGeo, scoutRegion]);
   const thesisTagList = useMemo(
-    () => [...thesisTags.sectors, ...thesisTags.stages, ...thesisTags.geos],
+    () => [...thesisTags.stages, ...thesisTags.geos, ...thesisTags.sectors],
     [thesisTags.geos, thesisTags.sectors, thesisTags.stages]
   );
   const hasThesisTags = thesisTagList.length > 0;
@@ -541,7 +544,7 @@ export default function MainLayout({
 
       <main className="flex-1 flex min-h-0 overflow-hidden bg-paper">
         <div
-          className="w-3 shrink-0 self-stretch origin-top bg-oxford sm:w-6 md:w-10"
+          className="w-4 shrink-0 self-stretch origin-top bg-oxford sm:w-8 md:w-12"
           aria-hidden="true"
         />
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-paper px-phi-5 pt-phi-4 pb-phi-5 lg:px-phi-5 lg:pt-phi-5 lg:pb-phi-5">
@@ -611,8 +614,7 @@ export default function MainLayout({
                   </div>
                 </div>
 
-                {/* Single structural hairline — nav/controls from info content */}
-                <div className="shrink-0 h-px w-full bg-oxford/[0.08]" aria-hidden />
+                <div className="shrink-0 mt-phi-5" aria-hidden />
 
                 {/* ── Lookup ─────────────────────────────────────────── */}
                 <div className="shrink-0 min-w-0">
@@ -661,16 +663,30 @@ export default function MainLayout({
                       {fundName || 'No fund configured'}
                     </p>
                     {hasThesis ? (
-                      <div className="flex shrink-0 items-center gap-phi-2">
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/35" aria-hidden />
-                        <span className={`${railEditorial.meta} text-oxford/28`}>Live</span>
+                      <div
+                        className="flex shrink-0 items-center gap-phi-2"
+                        aria-live="polite"
+                        title="Active mandate linked to pipeline"
+                      >
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
+                          aria-hidden
+                        />
+                        <span
+                          className={`${railEditorial.meta} text-oxford/45 pulse-soft [animation-delay:900ms]`}
+                        >
+                          Live
+                        </span>
                       </div>
                     ) : null}
                   </div>
                   {hasThesisTags && (
                     <div className="mt-phi-3 flex flex-wrap gap-phi-2">
-                      {thesisTagList.slice(0, 4).map((t) => (
-                        <span key={t} className={`border border-oxford/[0.09] px-phi-2 py-phi-1 ${railEditorial.meta} text-oxford/38`}>
+                      {thesisTagList.map((t, i) => (
+                        <span
+                          key={`mandate-${i}-${t}`}
+                          className={`bg-registerTint px-phi-2 py-phi-1 ${railEditorial.meta} text-oxford/45`}
+                        >
                           {t}
                         </span>
                       ))}
@@ -679,7 +695,7 @@ export default function MainLayout({
                 </article>
 
                 {/* ── Account — pushed to bottom ─────────────────────── */}
-                <div className="mt-auto shrink-0 min-w-0 border-t border-oxford/[0.06] pt-phi-4">
+                <div className="mt-auto shrink-0 min-w-0 pt-phi-7">
                   <AccountRailPanel settingsPath={SETTINGS_PATH} />
                 </div>
 
@@ -777,18 +793,29 @@ export default function MainLayout({
                       {fundName || 'No fund configured'}
                     </p>
                     {hasThesis ? (
-                      <div className="flex shrink-0 items-center gap-phi-2">
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/35" aria-hidden />
-                        <span className={`${railEditorial.meta} text-oxford/28`}>Live</span>
+                      <div
+                        className="flex shrink-0 items-center gap-phi-2"
+                        aria-live="polite"
+                        title="Active mandate linked to pipeline"
+                      >
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
+                          aria-hidden
+                        />
+                        <span
+                          className={`${railEditorial.meta} text-oxford/45 pulse-soft [animation-delay:900ms]`}
+                        >
+                          Live
+                        </span>
                       </div>
                     ) : null}
                   </div>
                   {hasThesisTags && (
                     <div className="mt-phi-3 flex flex-wrap gap-phi-2">
-                      {thesisTagList.slice(0, 5).map((t) => (
+                      {thesisTagList.map((t, i) => (
                         <span
-                          key={t}
-                          className="px-phi-2 py-phi-1 type-meta text-oxford/45 border border-oxford/[0.08]"
+                          key={`mandate-mobile-${i}-${t}`}
+                          className={`px-phi-2 py-phi-1 ${railEditorial.meta} text-oxford/45 bg-registerTint`}
                         >
                           {t}
                         </span>
@@ -857,11 +884,10 @@ export default function MainLayout({
                       className="h-full"
                     >
                       <PanelShell
-                        className="min-h-0 flex-1 bg-paper"
+                        className="min-h-0 flex-1 bg-surface-canvas"
                         title="Judgements"
                         titleClassName={UI_PANEL_CHROME_LABEL}
                         headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
-                        headerBorderClass="border-b border-hairline"
                         actions={
                           <button
                             type="button"
@@ -901,9 +927,8 @@ export default function MainLayout({
                         headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
                         headerBorderClass=""
                         headerJustifyClass="justify-end"
-                        headerClassName="bg-paper"
                         actions={
-                          <div className="flex items-center gap-phi-2" role="group" aria-label="Memo controls">
+                          <div className="flex min-h-[36px] items-center gap-phi-2" role="group" aria-label="Memo controls">
                             <button
                               type="button"
                               onClick={() => memoContentRef.current?.downloadPDF()}
@@ -975,8 +1000,8 @@ export default function MainLayout({
                       className="h-full"
                     >
                       <div className="flex-1 flex items-center justify-center p-8 h-full">
-                        <p className="type-label-tab text-oxford/45" style={{ transition: 'opacity var(--motion-micro) var(--motion-ease)' }}>
-                          Click a deal to open the memo here
+                        <p className="type-label-tab text-oxford/45 max-w-xs text-center leading-relaxed" style={{ transition: 'opacity var(--motion-micro) var(--motion-ease)' }}>
+                          {UI_DETAIL_EMPTY_HINT}
                         </p>
                       </div>
                     </motion.div>
@@ -1027,7 +1052,7 @@ export default function MainLayout({
               duration: tokens.motion.duration.long,
               ease: tokens.motion.easeDrawer,
             })}
-            className="fixed top-0 right-0 w-full max-w-full sm:w-[380px] lg:w-[400px] z-[10000] flex flex-col bg-paper"
+            className="fixed top-0 right-0 w-full max-w-full sm:w-[380px] lg:w-[400px] z-[10000] flex flex-col bg-surface-canvas"
             style={{
               borderLeft: tokens.frameBorder,
               minHeight: '100dvh',
@@ -1042,7 +1067,6 @@ export default function MainLayout({
               title="Judgements"
               titleClassName={UI_PANEL_CHROME_LABEL}
               headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
-              headerBorderClass=""
               actions={
                 <button
                   type="button"
@@ -1055,7 +1079,7 @@ export default function MainLayout({
               }
               contentOverflowHidden
               contentClassName="flex-1 min-h-0 overflow-hidden"
-              className="h-full"
+              className="h-full bg-surface-canvas"
             >
               <LiveIntelligenceFeed
                 startups={startups}

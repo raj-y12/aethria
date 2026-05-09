@@ -12,6 +12,8 @@ interface SignalEventRowProps {
   trailing?: ReactNode;
   /** Compact: timestamp + body (+ trailing) on one line. Stacked: timestamp+label line, then body, then meta. */
   layout?: 'compact' | 'stacked';
+  /** Hairline between rows — default false for judgment-surface spacing. */
+  showDivider?: boolean;
   className?: string;
 }
 
@@ -22,15 +24,16 @@ export default function SignalEventRow({
   meta,
   trailing,
   layout = 'stacked',
+  showDivider = false,
   className = '',
 }: SignalEventRowProps) {
-  const borderCls = 'border-b border-hairline';
+  const borderCls = showDivider ? 'border-b border-hairline' : '';
   const tsCls = 'shrink-0 tabular-nums type-meta text-oxford/40';
   const bodyCls = 'type-body-sm text-oxford/60 leading-phi';
 
   if (layout === 'compact') {
     return (
-      <div className={`flex items-baseline gap-phi-3 py-phi-3 ${borderCls} ${className}`}>
+      <div className={`flex items-baseline gap-phi-3 py-phi-4 ${borderCls} ${className}`.trim()}>
         <span className={tsCls}>{timestamp}</span>
         <span className={`${bodyCls} min-w-0 truncate flex-1`}>{body}</span>
         {trailing != null && <span className="shrink-0">{trailing}</span>}
@@ -39,7 +42,7 @@ export default function SignalEventRow({
   }
 
   return (
-    <div className={`flex flex-col gap-phi-2 py-phi-4 ${borderCls} ${className}`}>
+    <div className={`flex flex-col gap-phi-2 py-phi-5 ${borderCls} ${className}`.trim()}>
       <div className="flex items-baseline gap-phi-2 flex-wrap">
         <span className={tsCls}>{timestamp}</span>
         {label != null && label !== '' && (

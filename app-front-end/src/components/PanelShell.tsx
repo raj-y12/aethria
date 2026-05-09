@@ -1,14 +1,15 @@
 import type { ReactNode } from 'react';
 
 export const PANEL_HEADER_CLASS =
-  'flex-none flex items-center justify-between px-phi-5 py-phi-4 sm:px-phi-5 sm:py-phi-4 border-b border-hairline';
+  'flex-none flex items-center justify-between px-phi-5 py-phi-4 sm:px-phi-5 sm:py-phi-4 bg-surface-canvas uppercase tracking-[0.06em]';
 export const PANEL_TITLE_CLASS = 'type-label-section text-oxford/60';
-export const PANEL_TAB_BAR_CLASS = 'flex-none flex gap-0 border-b border-hairline px-phi-4 sm:px-phi-5';
+export const PANEL_TAB_BAR_CLASS =
+  'flex-none flex gap-phi-1 px-phi-4 sm:px-phi-5 py-phi-2 bg-surface-canvas';
 export const PANEL_TAB_BUTTON_CLASS =
-  'py-phi-4 px-phi-4 type-label-tab border-b border-transparent -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction';
-export const PANEL_TAB_ACTIVE_CLASS = 'text-oxford border-oxford';
+  'py-phi-3 px-phi-3 type-label-tab focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction rounded-none';
+export const PANEL_TAB_ACTIVE_CLASS = 'text-oxford font-semibold bg-surface-selected';
 export const PANEL_TAB_INACTIVE_CLASS =
-  'text-oxford/40 border-transparent hover:text-oxford/80 hover:border-oxford/40';
+  'text-oxford/40 hover:text-oxford/75 hover:bg-registerTint';
 export const PANEL_CONTENT_CLASS =
   'flex-1 min-h-0 overflow-y-auto p-phi-6';
 
@@ -31,7 +32,7 @@ interface PanelShellProps {
   className?: string;
   /** Default py-4. */
   headerPaddingClass?: string;
-  /** Default `border-b border-hairline`. Pass "" to remove bottom border. */
+  /** Optional header edge rule — default none (surface stepping replaces stacked hairlines). */
   headerBorderClass?: string;
   /** Default justify-between. */
   headerJustifyClass?: string;
@@ -50,7 +51,7 @@ interface PanelShellProps {
 
 /**
  * Shared panel shell: header strip, optional tab bar, content area.
- * Default header uses py-4 and bottom border; override per panel via header* / showTitle props.
+ * Header defaults to canvas/paper surface (matches WorkGrid toolbar); override via headerClassName / headerBorderClass.
  */
 export default function PanelShell({
   title,
@@ -63,7 +64,7 @@ export default function PanelShell({
   contentClassName,
   className = '',
   headerPaddingClass = 'py-phi-4',
-  headerBorderClass = 'border-b border-hairline',
+  headerBorderClass = '',
   headerJustifyClass = 'justify-between',
   showTitle = true,
   titleClassName,
@@ -80,7 +81,7 @@ export default function PanelShell({
   return (
     <div className={`flex h-full flex-col min-h-0 ${className}`}>
       <header
-        className={`flex-none flex items-center px-phi-4 lg:px-phi-5 ${headerPaddingClass} ${headerBorderClass} ${headerJustifyClass} ${headerClassName}`.trim()}
+        className={`flex-none flex items-center px-phi-4 ${headerPaddingClass} bg-surface-canvas uppercase tracking-[0.06em] ${headerBorderClass} ${headerJustifyClass} ${headerClassName}`.trim()}
       >
         {showTitle ? <span className={titleCls}>{title}</span> : null}
         {actions != null && <div className="flex items-center gap-phi-2">{actions}</div>}
