@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import GrainOverlay from './GrainOverlay';
 import type { ActivitySummary } from '../api/activity';
 
 interface Props {
@@ -37,7 +38,8 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
         padding: 'clamp(24px, 5vw, 56px)',
       }}
     >
-      <div style={{ width: '100%', maxWidth: '40rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <GrainOverlay opacity={0.028} />
+      <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '40rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* Eyebrow */}
         <motion.p
           initial={{ opacity: 0 }}
@@ -82,7 +84,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
           exit={{ opacity: 0, transition: { duration: 0.3, delay: 0.28, ease: EASE } }}
           transition={{ duration: 0.5, ease: EASE, delay: 0.18 }}
           style={{
-            fontFamily: "'Geist Sans', system-ui, sans-serif",
+            fontFamily: "var(--font-sans)",
             fontSize: '14px',
             color: 'rgba(var(--color-oxford-rgb), 0.6)',
             marginTop: '12px',
@@ -120,9 +122,9 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
             >
               <div
                 style={{
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  fontFamily: "var(--font-sans)",
                   fontSize: 'clamp(40px, 6vw, 72px)',
-                  fontWeight: 700,
+                  fontWeight: 600,
                   lineHeight: 1,
                   color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
                   letterSpacing: '-0.03em',
@@ -132,7 +134,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
               </div>
               <div
                 style={{
-                  fontFamily: "'Geist Sans', system-ui, sans-serif",
+                  fontFamily: "var(--font-sans)",
                   fontSize: '13px',
                   color: 'rgba(var(--color-oxford-rgb), 0.6)',
                   marginTop: '6px',

@@ -4,11 +4,11 @@ import { useClerk } from '@clerk/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { UserProfile } from '@clerk/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import SystemBar from '../components/SystemBar';
 import MobileHeader from '../components/MobileHeader';
 import LoadingAnimation from '../components/LoadingAnimation';
 import AgentLogoutModal from '../components/AgentLogoutModal';
 import { fetchSettings, patchSettings, type AgentBudgetStatus, type Settings, type FundIdentity } from '../api/settings';
+import { railEditorial } from '../design-system/railEditorial';
 import { fetchMe } from '../api/me';
 import { fetchAgentsStatus, toggleAgents, type AgentsStatus } from '../api/agents';
 import { useAgentsEnabled } from '../hooks/useAgentsEnabled';
@@ -30,14 +30,14 @@ const SELECT_CHEVRON =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23002147' fill-opacity='0.4' d='M0 3h10L5 8z'/%3E%3C/svg%3E\")";
 
 const inputCls =
-  'w-full bg-transparent border-0 border-b border-oxford/10 rounded-none shadow-none outline-none focus:border-oxford/30 transition-colors duration-300 type-body text-oxford py-phi-2 px-0 placeholder:text-oxford/20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]';
+  'w-full bg-transparent border-0 border-b border-oxford/[0.08] rounded-none shadow-none outline-none focus:border-oxford/30 transition-colors duration-300 type-body text-oxford py-phi-2 px-0 placeholder:text-oxford/20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]';
 const selectCls = `${inputCls} cursor-pointer pr-8 bg-no-repeat bg-[length:10px] bg-[center_right_2px] appearance-none`;
 const selectStyle: CSSProperties = { backgroundImage: SELECT_CHEVRON };
-const labelCls = 'type-meta uppercase tracking-[0.14em] text-oxford/35';
-const sectionLabelCls = 'type-meta uppercase tracking-[0.14em] text-oxford/45';
-const hintCls = 'type-meta text-oxford/45 mt-phi-1';
-const btnCls = 'type-meta uppercase tracking-[0.12em] text-oxford/40 hover:text-oxford disabled:opacity-30 transition-colors btn-interaction cursor-pointer bg-transparent border-0 p-0';
-const outlineBtnCls = 'type-meta uppercase tracking-[0.12em] text-oxford/50 hover:text-oxford disabled:opacity-30 transition-colors btn-interaction cursor-pointer bg-transparent border-0 p-0';
+const labelCls = 'type-label-section text-oxford/45';
+const sectionLabelCls = 'type-label-section text-oxford/70';
+const hintCls = 'type-meta text-oxford/40 mt-phi-1';
+const btnCls = 'type-label-section text-oxford/45 hover:text-oxford disabled:opacity-30 transition-colors btn-interaction cursor-pointer bg-transparent border-0 p-0';
+const outlineBtnCls = 'type-label-section text-oxford/70 hover:text-oxford disabled:opacity-30 transition-colors btn-interaction cursor-pointer bg-transparent border-0 p-0';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'fund',      label: 'Fund'      },
@@ -215,18 +215,12 @@ export default function SettingsPage() {
     return (
       <div className="h-[100dvh] flex flex-col overflow-hidden bg-paper">
         {!isDesktop && <><MobileHeader onMenuToggle={() => setMobileMenuOpen((o) => !o)} />{mobileMenu}</>}
-        <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 pb-phi-5">
-          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(260px,20%)_1fr] min-h-0 overflow-hidden gap-phi-6">
-            <aside className="hidden lg:flex min-w-0 min-h-0 flex-col gap-phi-4">
-              <div className="h-[32%] min-h-[280px]">
-                <SystemBar variant="embedded" navLink={{ href: '/v1', label: 'Overview' }} />
-              </div>
-            </aside>
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex flex-col gap-phi-2">
-                <p className={labelCls}>Failed to load settings</p>
-                {loadError && <p className="type-body-sm text-oxford/50">{loadError}</p>}
-              </div>
+        <main className="flex-1 flex min-h-0 overflow-hidden bg-paper">
+          <div className="w-3 shrink-0 self-stretch bg-oxford sm:w-6 md:w-10" aria-hidden />
+          <div className="flex-1 flex items-center justify-center px-phi-5 py-phi-5">
+            <div className="flex flex-col gap-phi-2">
+              <p className={labelCls}>Failed to load settings</p>
+              {loadError && <p className="type-body-sm text-oxford/50">{loadError}</p>}
             </div>
           </div>
         </main>
@@ -238,28 +232,52 @@ export default function SettingsPage() {
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-paper">
       {!isDesktop && <><MobileHeader onMenuToggle={() => setMobileMenuOpen((o) => !o)} />{mobileMenu}</>}
 
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden px-phi-5 pt-phi-4 pb-phi-5">
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(260px,20%)_1fr] min-h-0 overflow-hidden gap-phi-6">
+      <main className="flex-1 flex min-h-0 overflow-hidden bg-paper">
+        {/* Oxford stripe — matches MainLayout */}
+        <div className="w-3 shrink-0 self-stretch bg-oxford sm:w-6 md:w-10" aria-hidden />
 
-          {/* Left column: embedded SystemBar — desktop only */}
-          <aside className="hidden lg:flex min-w-0 min-h-0 flex-col gap-phi-4">
-            <div className="h-[32%] min-h-[280px]">
-              <SystemBar
-                variant="embedded"
-                agentConfig={settings.agent_config}
-                navLink={{ href: '/v1', label: 'Overview' }}
-              />
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-paper px-phi-5 pt-phi-5 pb-phi-5">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(200px,18%)_1fr] min-h-0 overflow-hidden gap-phi-5">
+
+          {/* Left aside: wordmark + vertical tab nav */}
+          <aside className="hidden lg:flex min-w-0 min-h-0 flex-col pr-phi-4">
+            {/* Wordmark */}
+            <p className={`${railEditorial.wordmark} pt-phi-1 pb-phi-6`}>
+              Aethria
+            </p>
+            {/* Vertical tab navigation */}
+            <nav aria-label="Settings sections">
+              <div className="flex flex-col gap-phi-1">
+                {TABS.map(({ id, label }) => (
+                  <button key={id} type="button" onClick={() => setActiveTab(id)}
+                    className={`type-label-tab text-left px-phi-3 py-phi-2 min-h-[36px] transition-colors duration-150 ${
+                      activeTab === id
+                        ? 'text-oxford bg-oxford/[0.05]'
+                        : 'text-oxford/40 hover:text-oxford/70 hover:bg-oxford/[0.03]'
+                    }`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </nav>
+            {/* Save + status pushed to bottom */}
+            <div className="mt-auto pt-phi-5">
+              {saveSuccess && <p className="type-meta text-oxford/40 mb-phi-2" role="status" aria-live="polite">Saved</p>}
+              {validationErrors.length > 0 && <p className="type-meta text-escalation/60 mb-phi-2">{validationErrors[0]}</p>}
+              <button type="button" onClick={handleSave} disabled={saving} className={btnCls}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
             </div>
           </aside>
 
           {/* Settings content */}
           <div className="flex-1 flex flex-col min-h-0 min-w-0">
 
-        {/* Top bar: page title + save */}
-        <div className="flex-none flex items-center justify-between border-b border-oxford/[0.06] py-phi-3">
+        {/* Mobile: top bar with save (desktop save is in aside) */}
+        <div className="flex lg:hidden flex-none items-center justify-between border-b border-oxford/[0.06] py-phi-3 mb-phi-4">
           <span className={labelCls}>Settings</span>
           <div className="flex items-center gap-phi-4">
-            {saveSuccess && <span className="type-meta text-oxford/30" role="status" aria-live="polite">Saved</span>}
+            {saveSuccess && <span className="type-meta text-oxford/40" role="status" aria-live="polite">Saved</span>}
             {validationErrors.length > 0 && <span className="type-meta text-escalation/60">{validationErrors[0]}</span>}
             <button type="button" onClick={handleSave} disabled={saving} className={btnCls}>
               {saving ? 'Saving…' : 'Save'}
@@ -267,14 +285,14 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Tab bar */}
-        <div className="flex-none flex items-center gap-0 overflow-x-auto border-b border-oxford/[0.06]">
+        {/* Mobile: horizontal tab bar */}
+        <div className="flex lg:hidden flex-none items-center gap-0 overflow-x-auto border-b border-oxford/[0.06] mb-phi-4">
           {TABS.map(({ id, label }) => (
             <button key={id} type="button" onClick={() => setActiveTab(id)}
-              className={`type-meta uppercase tracking-[0.12em] px-phi-4 py-phi-3 min-h-[40px] transition-colors duration-200 border-b-2 whitespace-nowrap ${
+              className={`type-label-tab px-phi-4 py-phi-3 min-h-[40px] transition-colors duration-200 border-b-2 whitespace-nowrap ${
                 activeTab === id
                   ? 'border-oxford text-oxford'
-                  : 'border-transparent text-oxford/35 hover:text-oxford/65'
+                  : 'border-transparent text-oxford/40 hover:text-oxford/60'
               }`}>
               {label}
             </button>
@@ -547,7 +565,8 @@ export default function SettingsPage() {
             </AnimatePresence>
           </div>
           </div>{/* end settings content */}
-        </div>{/* end grid */}
+          </div>{/* end grid */}
+        </div>{/* end inner wrapper */}
       </main>
 
       {/* Reprocess modal */}

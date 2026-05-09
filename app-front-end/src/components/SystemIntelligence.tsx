@@ -77,7 +77,7 @@ function RowWrapper({ children, index, onClick, isSelected }: { children: React.
       animate={{ opacity: 1, transform: 'translateY(0px)' }}
       transition={{ delay: Math.min(index * 0.03, 0.3), duration: 0.4, ease: tokens.motion.ease }}
       className={`group relative border-b border-oxford/[0.06] py-phi-3 px-phi-4 transition-colors duration-200 ease-smooth ${onClick ? 'cursor-pointer' : ''
-        } ${isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.02]'}`}
+        } ${isSelected ? 'bg-oxford/[0.04]' : 'hover:bg-oxford/[0.018]'}`}
       onClick={onClick}
     >
       <div className="grid grid-cols-1 gap-phi-3 items-start lg:grid-cols-[26px_minmax(0,1fr)_auto]">
@@ -256,7 +256,7 @@ function AnalyticsTab({ rejection, watchlist, concentration, systemHealth }: {
               { label: 'Escalations', value: systemHealth.pending_escalations },
             ].map((s) => (
               <div key={s.label} className="flex flex-col gap-phi-1">
-                <span className="font-mono font-bold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.04em] tabular-nums text-oxford">{s.value}</span>
+                <span className="font-sans font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">{s.value}</span>
                 <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">{s.label}</span>
               </div>
             ))}
@@ -294,7 +294,7 @@ function AnalyticsTab({ rejection, watchlist, concentration, systemHealth }: {
             { label: 'Avg Days', value: Math.round(watchlist.avg_days) },
           ].map((s) => (
             <div key={s.label} className="flex flex-col gap-phi-1">
-              <span className="font-mono font-bold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.04em] tabular-nums text-oxford">{s.value}</span>
+              <span className="font-sans font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">{s.value}</span>
               <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">{s.label}</span>
             </div>
           ))}
@@ -418,15 +418,15 @@ function InstitutionalMandateTab() {
       <TabSection title="Alignment">
         <div className="grid grid-cols-3 gap-phi-4">
           <div className="border border-oxford/10 bg-oxford/[0.02] px-phi-3 py-2">
-            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.pct_matching_thesis ?? '--'}%</span>
+            <span className="block font-sans font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.pct_matching_thesis ?? '--'}%</span>
             <span className="type-meta text-oxford/50">Mandate match</span>
           </div>
           <div className="border border-oxford/10 bg-oxford/[0.02] px-phi-3 py-2">
-            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.avg_alignment_score ?? '--'}</span>
+            <span className="block font-sans font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.avg_alignment_score ?? '--'}</span>
             <span className="type-meta text-oxford/50">Mean alignment</span>
           </div>
           <div className="border border-oxford/10 bg-oxford/[0.02] px-phi-3 py-2">
-            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.drift_vs_previous ?? '0.00'}</span>
+            <span className="block font-sans font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.drift_vs_previous ?? '0.00'}</span>
             <span className="type-meta text-oxford/50">Drift</span>
           </div>
         </div>
@@ -509,7 +509,7 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
           <div className="flex flex-wrap gap-phi-6 mb-phi-3">
             {typeof insights.latest.cycle_number === 'number' && (
               <div className="flex flex-col gap-phi-1">
-                <span className="font-mono font-bold text-xl tabular-nums text-oxford">{insights.latest.cycle_number}</span>
+                <span className="font-sans font-semibold text-xl tabular-nums text-oxford">{insights.latest.cycle_number}</span>
                 <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">Cycle</span>
               </div>
             )}
@@ -533,7 +533,7 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
               { label: 'Weight updates', value: (lastReport.weight_updates ?? []).length },
             ].map((s) => (
               <div key={s.label} className="flex flex-col gap-phi-1">
-                <span className="font-mono font-bold text-[clamp(18px,1.6vw,24px)] leading-none tracking-[-0.04em] tabular-nums text-oxford">{s.value}</span>
+                <span className="font-sans font-semibold text-[clamp(18px,1.6vw,24px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">{s.value}</span>
                 <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">{s.label}</span>
               </div>
             ))}
@@ -823,7 +823,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
 
   return (
     <div className="w-full font-sans bg-paper selection:bg-oxford selection:text-paper min-h-full">
-      <div className="sticky top-0 z-20 bg-paper border-b border-oxford/[0.06] px-phi-4 py-phi-2">
+      <div className="sticky top-0 z-20 bg-paper px-phi-4 py-phi-2">
         <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2">
           <div className="flex min-w-0 flex-wrap items-center gap-phi-3">
             <div className="flex items-center gap-0">

@@ -16,21 +16,21 @@ export default {
     },
     extend: {
       colors: {
-        oxford: '#1d2d48',
+        oxford: '#1a2b48',
         paper: '#e9e0d1',
         /** Darker paper — WorkGrid selected row, etc. See --color-paper-deep */
         paperDeep: 'var(--color-paper-deep)',
-        'paper-bright': '#e9e0d1',
+        'paper-bright': '#ebe8e0',
         ivory: '#e9e0d1',
         canvas: '#e9e0d1',
         mist: '#f2f4f8',
         graphite: '#2f333b',
         /** Structural hairlines — prefer over raw oxford/[0.06] in new code. */
-        hairline: 'rgba(0, 33, 71, 0.06)',
-        'hairline-strong': 'rgba(0, 33, 71, 0.12)',
+        hairline: 'rgba(26, 43, 72, 0.06)',
+        'hairline-strong': 'rgba(26, 43, 72, 0.12)',
         /** Inputs, fields, subtle dividers. */
-        'field-border': 'rgba(0, 33, 71, 0.15)',
-        'field-border-strong': 'rgba(0, 33, 71, 0.20)',
+        'field-border': 'rgba(26, 43, 72, 0.15)',
+        'field-border-strong': 'rgba(26, 43, 72, 0.20)',
         /** On-demand lookup origin chip — semantic, not raw hex in components. */
         lookup: {
           DEFAULT: '#B5893E',
@@ -43,7 +43,7 @@ export default {
         gold: '#b8976a',
         'gold-soft': 'rgba(184, 151, 106, 0.35)',
         /** Validation strip: same as paper (palette whitelist). */
-        warning: '#E9E0D1',
+        warning: '#e9e0d1',
         /** See :root --color-register-tint */
         registerTint: 'var(--color-register-tint)',
       },
@@ -51,9 +51,9 @@ export default {
         display: ['"EB Garamond"', 'Georgia', 'serif'],
         wordmark: ['"Libre Baskerville"', 'Georgia', 'serif'],
         cormorant: ['"EB Garamond"', 'Georgia', 'serif'],
-        // Geist Sans is the canonical app + web UI font (loaded via @fontsource in main.tsx).
-        sans: ['"Geist Sans"', 'system-ui', '-apple-system', 'sans-serif'],
-        body: ['"Geist Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+        // Figtree Variable is the canonical app UI font — matches web-front-end warmth.
+        sans: ['"Figtree Variable"', 'system-ui', '-apple-system', 'sans-serif'],
+        body: ['"Figtree Variable"', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       /**

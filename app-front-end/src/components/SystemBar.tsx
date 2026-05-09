@@ -16,11 +16,6 @@ interface SystemBarProps {
   onShowSystem?: () => void;
   onClose?: () => void;
   navLink?: { href: string; label: string };
-  /** Desktop embedded rail: pipeline health line (moved from Live overview). */
-  pipelineState?: 'On' | 'Off' | 'Issue';
-  pipelineIssueHelpOpen?: boolean;
-  onPipelineIssueHelpToggle?: () => void;
-  onPipelineOpenSettings?: () => void;
 }
 
 /** Thin horizontal rule — only used in fixed (full-height) variant. */
@@ -52,13 +47,13 @@ function SpineNavButton({
 }) {
   const onPaper = surface === 'paper';
   const textActive = onPaper ? 'text-oxford' : 'text-white';
-  const textIdle = onPaper ? 'text-oxford/55 hover:text-oxford' : 'text-white/55 hover:text-white/88';
+  const textIdle = onPaper ? 'text-oxford/50 hover:text-oxford/80' : 'text-white/55 hover:text-white/88';
   const ring = onPaper ? 'focus-visible:ring-oxford/35' : 'focus-visible:ring-white/35';
-  const pillActive = onPaper ? 'bg-oxford/[0.08]' : 'bg-white/[0.08]';
-  const pillHover = onPaper ? 'group-hover:bg-oxford/[0.05]' : 'group-hover:bg-white/[0.05]';
-  const shortcutActive = onPaper ? 'text-oxford/75' : 'text-white/75';
+  const bgActive = onPaper ? 'bg-oxford/[0.08]' : 'bg-white/[0.08]';
+  const bgHover = onPaper ? 'hover:bg-oxford/[0.04]' : 'hover:bg-white/[0.05]';
+  const shortcutActive = onPaper ? 'text-oxford/60' : 'text-white/75';
   const shortcutIdle = onPaper
-    ? 'text-oxford/30 group-hover:text-oxford/52'
+    ? 'text-oxford/25 group-hover:text-oxford/45'
     : 'text-white/30 group-hover:text-white/52';
 
   return (
@@ -66,25 +61,17 @@ function SpineNavButton({
       type="button"
       onClick={onClick}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`group type-meta w-full flex items-center justify-between gap-phi-3 px-1 cursor-pointer tracking-[0.06em] btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
-        active ? textActive : textIdle
-      } ${compact ? 'min-h-[32px]' : 'min-h-[44px]'}`}
+      className={`group type-label-tab w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
+        active ? `${textActive} ${bgActive}` : `${textIdle} ${bgHover}`
+      } ${compact ? 'min-h-[32px] px-phi-4 py-phi-1' : 'min-h-[44px] px-2 py-1'}`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
       aria-pressed={ariaPressed}
       aria-current={active ? 'page' : undefined}
     >
-      <span
-        className={`inline-block px-2 py-1 transition-[background-color,color] ${
-          active ? pillActive : pillHover
-        }`}
-      >
-        {label}
-      </span>
+      <span>{label}</span>
       {shortcut ? (
         <span
-          className={`tabular-nums transition-colors ${
-            active ? shortcutActive : shortcutIdle
-          }`}
+          className={`tabular-nums transition-colors ${active ? shortcutActive : shortcutIdle}`}
           aria-hidden
         >
           {shortcut.padStart(2, '0')}
@@ -102,10 +89,6 @@ export default function SystemBar({
   onShowSystem,
   onClose,
   navLink,
-  pipelineState,
-  pipelineIssueHelpOpen = false,
-  onPipelineIssueHelpToggle,
-  onPipelineOpenSettings,
 }: SystemBarProps) {
   const reduceMotion = usePrefersReducedMotion();
   const {
@@ -185,12 +168,12 @@ export default function SystemBar({
   if (isEmbedded) {
     return (
       <div
-        className="hidden lg:flex flex-col h-auto w-full min-h-0 border-l border-solid border-oxford/[0.08] bg-transparent pl-phi-4 overflow-visible"
+        className="hidden lg:flex flex-col h-auto w-full min-h-0 bg-transparent overflow-visible"
         aria-label="System"
       >
-        {/* Nav — workspace chrome only (wordmark + clock live in MainLayout above) */}
+        {/* Nav — workspace chrome only (wordmark + pipeline + clock live in MainLayout above) */}
         {workspaceChrome ? (
-          <div className="mt-phi-2 min-[1100px]:mt-phi-3 flex flex-col gap-0.5 w-full shrink-0">
+          <div className="flex flex-col gap-0.5 w-full shrink-0">
               <SpineNavButton
                 label="Deals"
                 active={rightPanel !== 'system' && rightPanel !== 'feed'}
@@ -218,58 +201,6 @@ export default function SystemBar({
                 compact
                 surface="paper"
               />
-          </div>
-        ) : null}
-        {workspaceChrome && pipelineState != null ? (
-          <div className="mt-phi-3 min-[1100px]:mt-phi-4 flex w-full shrink-0 items-center justify-end px-1">
-            <div className="relative inline-flex items-center gap-phi-2">
-              {pipelineState === 'On' && (
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/50 pulse-soft"
-                  aria-hidden
-                />
-              )}
-              <span
-                className={
-                  pipelineState === 'Issue'
-                    ? 'type-meta text-escalation'
-                    : pipelineState === 'Off'
-                      ? 'type-meta text-oxford/30'
-                      : 'type-meta text-oxford/55'
-                }
-              >
-                {pipelineState === 'On'
-                  ? 'Pipeline active'
-                  : pipelineState === 'Issue'
-                    ? 'Pipeline issue'
-                    : 'Pipeline off'}
-              </span>
-              {pipelineState === 'Issue' && onPipelineIssueHelpToggle && onPipelineOpenSettings ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={onPipelineIssueHelpToggle}
-                    className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
-                    aria-label="Pipeline issue details"
-                    aria-expanded={pipelineIssueHelpOpen}
-                  >
-                    ?
-                  </button>
-                  {pipelineIssueHelpOpen ? (
-                    <span className="absolute right-0 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
-                      Pipeline has a problem and may not process updates right now.
-                      <button
-                        type="button"
-                        onClick={onPipelineOpenSettings}
-                        className="mt-phi-2 block type-meta tracking-[0.06em] text-oxford/62 hover:text-oxford btn-interaction"
-                      >
-                        Open settings →
-                      </button>
-                    </span>
-                  ) : null}
-                </>
-              ) : null}
-            </div>
           </div>
         ) : null}
       </div>
@@ -314,7 +245,7 @@ export default function SystemBar({
           {/* Time + date */}
           <div className="shrink-0 px-3 flex flex-col gap-2" aria-live="polite">
             <span className="type-meta tabular-nums leading-none text-white/55">{timeShort}</span>
-            <span className="type-meta leading-tight tracking-[0.08em] text-white/30">{dateShort}</span>
+            <span className="type-label-section text-white/30">{dateShort}</span>
           </div>
 
           <SpineRule />
@@ -345,7 +276,7 @@ export default function SystemBar({
               type="button"
               onClick={requestLogout}
               disabled={agentActionPending}
-              className="type-meta inline-flex min-h-[44px] items-center tracking-[0.06em] text-white/60 hover:text-white bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
+              className="type-label-tab text-white/60 hover:text-white inline-flex min-h-[44px] items-center bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
             >
               {agentActionPending ? 'Updating…' : 'Log out'}
             </button>

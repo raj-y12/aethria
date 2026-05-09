@@ -1,19 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap');
 /*
  * Aethria — High-fidelity institutional design (aligned with web-front-end).
- * Palette: oxford #1D2D48, paper #E9E0D1, paperBright #E9E0D1, memo surfaces #FFFFFF, accent #7D2B3A (escalations only), heritageGold #b8976a (decorative only).
- * Geist Sans is bundled via @fontsource in main.tsx (body + titles). Display: EB Garamond (editorial headings, verdicts, memos). Wordmark: Libre Baskerville (wordmark ONLY). Metadata: JetBrains Mono.
- * Frames: 1px rgba(0,33,71,0.06). No rounded corners.
+ * Palette: oxford #1A2B48, paper #E9E0D1 (matches web-front-end), charcoal body text, shell/memo on paper, accent #7D2B3A (escalations only), heritageGold #b8976a (decorative only).
+ * Figtree Variable (body + UI, matches web-front-end warmth). Display: EB Garamond (editorial headings, verdicts, memos). Wordmark: Libre Baskerville (wordmark ONLY). Metadata: JetBrains Mono.
+ * Frames: 1px rgba(var(--color-oxford-rgb), 0.06). No rounded corners.
  * Text hierarchy: Oxford opacity ladder 100, 80, 60, 40, 25. Line-height: 1.5 labels, 1.5 body.
  */
 :root {
   /* Primary palette — aligned with web-front-end tokens */
-  --color-oxford: #1d2d48;
-  --color-oxford-rgb: 29, 45, 72;
+  --color-oxford: #1a2b48;
+  --color-oxford-rgb: 26, 43, 72;
   --color-paper: #e9e0d1;
   /** Slightly darker paper — selected rows, recessed surfaces (same hue family as paper). */
   --color-paper-deep: #e6e4de;
-  --color-paper-bright: #e9e0d1;
+  /** Subtle lift for raised chrome (aligned with web marketing paper family). */
+  --color-paper-bright: #ebe8e0;
   --color-ivory: #e9e0d1;
   --color-charcoal: #2f333b;
   --color-heritage-gold: #b8976a;
@@ -34,9 +35,21 @@
   /* Typography roles — aligned with web-front-end font stack */
   --font-display: 'EB Garamond', 'Georgia', 'Times New Roman', serif;
   --font-wordmark: 'Libre Baskerville', 'Georgia', serif;
-  --font-sans: 'Geist Sans', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Figtree Variable', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  /* Clerk — match app palette and typography (oxford, paper, Geist Sans / Space Mono) */
+  /* Semantic text hierarchy — aligned with web-front-end */
+  --text-primary:            rgba(var(--color-oxford-rgb), 0.90);
+  --text-secondary:          rgba(var(--color-oxford-rgb), 0.74);
+  --text-tertiary:           rgba(var(--color-oxford-rgb), 0.62);
+  --text-muted:              rgba(var(--color-oxford-rgb), 0.50);
+  --text-subtle:             rgba(var(--color-oxford-rgb), 0.38);
+  --text-ghost:              rgba(var(--color-oxford-rgb), 0.22);
+  --text-inverse:            rgba(242, 240, 234, 0.94);
+  --text-inverse-secondary:  rgba(242, 240, 234, 0.78);
+  --text-inverse-muted:      rgba(242, 240, 234, 0.56);
+  --label-strong:            rgba(var(--color-oxford-rgb), 0.74);
+  --label-muted:             rgba(var(--color-oxford-rgb), 0.42);
+  /* Clerk — match app palette and typography */
   --clerk-color-primary: var(--color-oxford);
   --clerk-color-background: var(--color-paper);
   --clerk-color-foreground: var(--color-oxford);
@@ -44,11 +57,10 @@
   --clerk-color-muted-foreground: rgba(var(--color-oxford-rgb), 0.6);
   --clerk-color-muted: rgba(var(--color-oxford-rgb), 0.06);
   --clerk-color-border: rgba(var(--color-oxford-rgb), 0.06);
-  /* Oxford ladder: 100, 80, 60, 40, 25 — frame stays 0.06 */
   --clerk-color-input: var(--color-paper);
   --clerk-color-input-foreground: var(--color-oxford);
   --clerk-color-ring: var(--color-oxford);
-  --clerk-font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
+  --clerk-font-family: "Figtree Variable", system-ui, -apple-system, sans-serif;
   --clerk-font-family-buttons: "JetBrains Mono", ui-monospace, monospace;
   --clerk-border-radius: 0;
   /* Motion tokens — aligned with tokens.ts */
@@ -81,7 +93,7 @@
   --col-content: 61.8%;
 }
 
-/* Clerk UserProfile — match Aethria: #1D2D48 oxford, #E9E0D1 paper, Geist Sans / Space Mono, no radius */
+/* Clerk UserProfile — match Aethria: oxford, cream paper, Figtree / JetBrains Mono, no radius */
 .cl-modalBackdrop {
   background-color: rgba(var(--color-oxford-rgb), 0.4) !important;
 }
@@ -91,14 +103,14 @@
   border: 1px solid rgba(var(--color-oxford-rgb), 0.06) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Figtree Variable", system-ui, -apple-system, sans-serif !important;
 }
 .cl-card {
   background-color: var(--color-paper) !important;
   color: var(--color-oxford) !important;
   border: 1px solid rgba(var(--color-oxford-rgb), 0.06) !important;
   border-radius: 0 !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Figtree Variable", system-ui, -apple-system, sans-serif !important;
 }
 .cl-scrollBox {
   background-color: var(--color-paper) !important;
@@ -110,12 +122,12 @@
   --clerk-color-primary: var(--color-oxford);
   --clerk-color-background: var(--color-paper);
   --clerk-color-foreground: var(--color-oxford);
-  --clerk-font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
+  --clerk-font-family: "Figtree Variable", system-ui, -apple-system, sans-serif;
   --clerk-font-family-buttons: "JetBrains Mono", ui-monospace, monospace;
   --clerk-border-radius: 0;
   background-color: var(--color-paper) !important;
   color: var(--color-oxford) !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Figtree Variable", system-ui, -apple-system, sans-serif !important;
 }
 .cl-userProfile-root .cl-formFieldInput,
 .cl-userProfile-root .cl-formFieldLabel,
@@ -129,7 +141,7 @@
 .cl-userProfile-root p,
 .cl-userProfile-root span {
   color: var(--color-oxford) !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Figtree Variable", system-ui, -apple-system, sans-serif !important;
 }
 .cl-userProfile-root .cl-formFieldLabel,
 .cl-userProfile-root .cl-profileSectionTitle,
@@ -199,7 +211,7 @@
 .cl-userProfile-root h1,
 .cl-userProfile-root h2,
 .cl-userProfile-root h3 {
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Figtree Variable", system-ui, -apple-system, sans-serif !important;
   color: var(--color-oxford) !important;
   font-weight: 500 !important;
 }
@@ -208,7 +220,7 @@
 .aethria-clerk-profile {
   background-color: var(--color-paper) !important;
   color: var(--color-oxford) !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Figtree Variable", system-ui, -apple-system, sans-serif !important;
 }
 .aethria-clerk-profile .cl-userProfile-root {
   background-color: transparent !important;
@@ -219,7 +231,7 @@
 [data-clerk-portal] > div {
   background-color: var(--color-paper) !important;
   color: var(--color-oxford) !important;
-  font-family: "Geist Sans", system-ui, -apple-system, sans-serif !important;
+  font-family: "Figtree Variable", system-ui, -apple-system, sans-serif !important;
 }
 [data-clerk-portal] [role="dialog"] {
   background-color: var(--color-paper) !important;
@@ -244,7 +256,7 @@
     @apply rounded-none border border-hairline bg-paper-bright;
   }
   .btn-aethria {
-    @apply inline-flex items-center justify-center cursor-pointer rounded-none border border-oxford bg-transparent text-oxford font-mono text-[10px] uppercase tracking-[0.12em] whitespace-nowrap transition-colors duration-150 ease-in-out btn-interaction;
+    @apply inline-flex items-center justify-center cursor-pointer rounded-none border border-oxford bg-transparent text-oxford font-mono text-[11px] uppercase tracking-[0.12em] whitespace-nowrap transition-colors duration-150 ease-in-out btn-interaction;
     height: 44px;
     padding: 0 20px;
   }
@@ -252,7 +264,7 @@
     @apply bg-oxford text-paper;
   }
   .btn-aethria-solid {
-    @apply inline-flex items-center justify-center cursor-pointer rounded-none bg-oxford text-paper font-mono text-[10px] uppercase tracking-[0.12em] whitespace-nowrap transition-opacity duration-150 ease-in-out btn-interaction;
+    @apply inline-flex items-center justify-center cursor-pointer rounded-none bg-oxford text-paper font-mono text-[11px] uppercase tracking-[0.12em] whitespace-nowrap transition-opacity duration-150 ease-in-out btn-interaction;
     height: 44px;
     padding: 0 20px;
   }
@@ -278,7 +290,7 @@
     overflow-x: hidden;
     background-color: var(--color-paper);
     color: var(--color-charcoal);
-    font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
+    font-family: "Figtree Variable", system-ui, -apple-system, sans-serif;
     font-size: 14px;
     font-weight: 400;
     line-height: var(--phi); /* golden ratio — 1.618034 */
@@ -410,13 +422,14 @@
     font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 11px;
     line-height: 1.5;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
   }
   .type-meta {
     font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 11px;
     line-height: 1.5;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
   }
   /** Data figures in lists / pipe strip — mono, tabular. */
   .type-data {
@@ -451,22 +464,12 @@
 
   /* ── Web-front-end pattern classes ─────────────────────────────────────── */
 
-  /** Subtle dot grid — paper background texture (matches marketing site). */
-  .paper-dot-grid {
-    background-color: var(--color-paper);
-    background-image: radial-gradient(rgba(var(--color-oxford-rgb), 0.055) 1px, transparent 1px);
-    background-size: 28px 28px;
-    background-repeat: repeat;
-  }
-
-  /** Roman numeral section marker — Space Mono (aligned with web-front-end) */
   .section-numeral {
     font-family: var(--font-mono);
     font-size: 9px;
     letter-spacing: 0.12em;
     color: rgba(var(--color-oxford-rgb), 0.2);
   }
-  /** Section numeral on dark backgrounds (oxford surface) */
   .section-numeral--on-dark {
     font-size: 9px;
     color: rgba(242, 240, 234, 0.25);
@@ -540,16 +543,10 @@
     height: 2px;
     background-color: rgba(var(--color-oxford-rgb), 0.4);
   }
-  /* Panel skeleton: slow subtle shimmer (token motion) */
+  /* Panel skeleton: flat oxford tint + gentle opacity pulse (no gradients). */
   .skeleton-shimmer {
-    background: linear-gradient(
-      90deg,
-      rgba(var(--color-oxford-rgb), 0.06) 0%,
-      rgba(var(--color-oxford-rgb), 0.12) 50%,
-      rgba(var(--color-oxford-rgb), 0.06) 100%
-    );
-    background-size: 200% 100%;
-    animation: skeleton-shimmer 2s var(--motion-ease) infinite;
+    background-color: rgba(var(--color-oxford-rgb), 0.08);
+    animation: skeleton-shimmer-pulse 2s var(--motion-ease) infinite;
   }
 
   /* ── Mobile typography scale (< 1024px) ─────────────────────────────────
@@ -570,9 +567,9 @@
   }
 }
 
-@keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+@keyframes skeleton-shimmer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 
 @keyframes empty-state-enter {
@@ -621,31 +618,24 @@
   animation: signal-dot-breathe 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
-/* Brass vertical accent spine — matches web-front-end inst-hero-spine */
+/* Brass vertical accent spine — flat heritage tone */
 .brass-spine {
   width: 1px;
-  background: linear-gradient(
-    180deg,
-    transparent,
-    rgba(184, 151, 106, 0.55) 22%,
-    rgba(184, 151, 106, 0.35) 78%,
-    transparent
-  );
+  background-color: rgba(184, 151, 106, 0.42);
   flex-shrink: 0;
 }
 
-/* Conviction chip — quiet bordered tag, mirrors web-front-end .conviction-chip.
- * Use for fund-thesis tags, sector/stage/geo callouts, any "labelled fact" pill. */
+/* Conviction chip — quiet bordered tag */
 .conviction-chip {
   display: inline-flex;
   align-items: center;
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.55);
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--section-divider);
+  color: rgba(var(--color-oxford-rgb), 0.50);
+  padding: 0.35rem 0.55rem;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.08);
   background-color: transparent;
   transition:
     border-color var(--motion-micro) var(--motion-ease),

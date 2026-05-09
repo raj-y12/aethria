@@ -61,7 +61,7 @@ const FilterButton = ({ active, label, onClick }: { active: boolean; label: stri
   <button
     type="button"
     onClick={onClick}
-    className={`type-meta tracking-[0.08em] min-h-[36px] px-phi-3 transition-[color,border-color] duration-200 border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/40 hover:text-oxford/70'
+    className={`type-label-tab min-h-[36px] px-phi-3 transition-[color,border-color] duration-200 border-b border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${active ? 'border-oxford text-oxford' : 'border-transparent text-oxford/30 hover:text-oxford/60'
       }`}
   >
     {label}
@@ -222,7 +222,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
 
   return (
     <div className="w-full font-sans bg-paper selection:bg-oxford selection:text-paper">
-      <div className="sticky top-0 z-20 bg-paper border-b border-oxford/[0.06] px-phi-4 py-phi-2">
+      <div className="sticky top-0 z-20 bg-paper px-phi-4 py-phi-2">
         <div className="flex flex-col gap-phi-3">
           <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2">
             <div className="flex min-w-0 flex-wrap items-center gap-phi-3">
@@ -238,7 +238,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                   value={sortFilter}
                   onChange={(e) => setSortFilter(e.target.value as SortFilter)}
                   aria-label="Sort deals"
-                  className="appearance-none min-h-[36px] bg-transparent type-meta tracking-wide text-oxford/55 hover:text-oxford transition-colors pr-6 outline-none cursor-pointer"
+                  className="appearance-none min-h-[36px] bg-transparent type-meta text-oxford/30 hover:text-oxford/60 transition-colors pr-6 outline-none cursor-pointer"
                 >
                   <option value="NEWEST">Chronological ↓</option>
                   <option value="OLDEST">Chronological ↑</option>
@@ -253,7 +253,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
               <button
                 type="button"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="type-meta tracking-[0.08em] min-h-[36px] text-oxford/55 hover:text-oxford transition-colors pl-phi-2"
+                className="type-meta min-h-[36px] text-oxford/30 hover:text-oxford/60 transition-colors pl-phi-2"
               >
                 {showAdvancedFilters ? 'Collapse' : 'Refine'}
               </button>
@@ -271,14 +271,14 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
               >
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-phi-4 pt-phi-3">
                   <div className="flex flex-col gap-phi-2">
-                    <span className="type-meta tracking-[0.08em] text-oxford/45">Decision</span>
+                    <span className="type-label-tab text-oxford/30">Decision</span>
                     <div className="flex flex-wrap gap-phi-2">
                       {DECISION_FILTER_CHIPS.map(({ key: d, label }) => (
                         <button
                           key={d}
                           type="button"
                           onClick={() => setDecisionFilter(d)}
-                          className={`type-meta tracking-[0.08em] px-phi-3 min-h-[34px] border border-oxford/10 transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
+                          className={`type-meta px-phi-3 min-h-[34px] border border-oxford/[0.08] transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'hover:bg-oxford/[0.04] text-oxford/60'
                             }`}
                         >
                           {label}
@@ -287,13 +287,13 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                     </div>
                   </div>
                   <div className="flex flex-col gap-phi-2">
-                    <span className="type-meta tracking-[0.08em] text-oxford/45">Review band</span>
+                    <span className="type-label-tab text-oxford/30">Review band</span>
                     <div className="flex flex-wrap gap-phi-2">
                       {['ALL', 'STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'].map((r) => (
                         <button
                           key={r}
                           onClick={() => setReviewFilter(r as ReviewFilter)}
-                          className={`type-meta tracking-[0.08em] px-phi-3 min-h-[34px] border border-oxford/10 transition-colors ${reviewFilter === r ? 'bg-oxford text-paper' : 'hover:bg-oxford/5 text-oxford/60'
+                          className={`type-meta px-phi-3 min-h-[34px] border border-oxford/[0.08] transition-colors ${reviewFilter === r ? 'bg-oxford text-paper' : 'hover:bg-oxford/[0.04] text-oxford/60'
                             }`}
                         >
                           {r === 'ALL' ? 'Any' : r.charAt(0) + r.slice(1).toLowerCase()}
@@ -309,7 +309,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                         setReviewFilter('ALL');
                         setSortFilter('NEWEST');
                       }}
-                      className="type-meta min-h-[36px] text-oxford/55 hover:text-accent transition-colors underline underline-offset-4"
+                      className="type-meta min-h-[36px] text-oxford/30 hover:text-oxford/60 transition-colors"
                     >
                       Reset filters
                     </button>
@@ -346,7 +346,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                 else rowRefs.current.delete(startup.id);
               }}
               variants={rowVariants}
-              className={`group relative border-b border-oxford/[0.06] px-phi-4 py-phi-5 cursor-pointer transition-[background-color] duration-[180ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${isSelected ? 'bg-registerTint' : 'hover:bg-oxford/[0.012]'
+              className={`group relative border-b border-oxford/[0.06] px-phi-4 py-phi-5 cursor-pointer transition-[background-color] duration-[180ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${isSelected ? 'bg-oxford/[0.04]' : 'hover:bg-oxford/[0.018]'
                 }`}
               style={{ transitionTimingFunction: 'var(--motion-ease)' }}
               onClick={() => onStartupClick(startup)}
@@ -358,7 +358,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
             >
               <div className="grid grid-cols-1 sm:grid-cols-[26px_minmax(0,1fr)_auto] gap-x-phi-4 gap-y-phi-3 items-start">
                 {/* Index */}
-                <span className="type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums pt-px sm:col-start-1">
+                <span className="type-meta text-oxford/25 group-hover:text-oxford/45 transition-colors tabular-nums pt-px sm:col-start-1">
                   {displayIndex}
                 </span>
 
@@ -369,25 +369,25 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                   </h2>
                   <div className="flex flex-wrap items-center gap-x-phi-2 mt-phi-2">
                     {sortKey(startup) && (
-                      <span className="type-meta text-oxford/28 tabular-nums whitespace-nowrap">
+                      <span className="type-meta text-oxford/35 tabular-nums whitespace-nowrap">
                         {new Date(sortKey(startup)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </span>
                     )}
                     {(startup.scout.sector || '').split('/')[0].trim() && (
                       <>
-                          <span className="type-meta text-oxford/18">·</span>
-                        <span className="type-meta text-oxford/40">{(startup.scout.sector || 'Unknown').split('/')[0].trim()}</span>
+                        <span className="type-meta text-oxford/25">·</span>
+                        <span className="type-meta text-oxford/50">{(startup.scout.sector || 'Unknown').split('/')[0].trim()}</span>
                       </>
                     )}
                     {startup.scout.funding_stage && (
                       <>
-                        <span className="type-meta text-oxford/18">·</span>
-                        <span className="type-meta text-oxford/28">{startup.scout.funding_stage}</span>
+                        <span className="type-meta text-oxford/25">·</span>
+                        <span className="type-meta text-oxford/35">{startup.scout.funding_stage}</span>
                       </>
                     )}
                     {getSourceBadge(startup) === 'LOOKUP' && (
                       <>
-                        <span className="type-meta text-oxford/18">·</span>
+                        <span className="type-meta text-oxford/25">·</span>
                         <span className="type-meta tracking-[0.08em] text-lookup">Lookup</span>
                       </>
                     )}
@@ -398,10 +398,10 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                 <div className="flex flex-wrap items-center justify-end gap-phi-2 pt-px sm:col-start-3">
                   {onMonitorList && (
                     <span
-                      className="type-meta tracking-[0.1em] uppercase text-oxford/45 border border-oxford/[0.12] px-phi-2 py-0.5 shrink-0"
+                      className="type-label-tab text-oxford/45 border border-oxford/[0.12] px-phi-2 py-0.5 shrink-0"
                       title="Tracked on portfolio monitor list (partner monitor outcome)"
                     >
-                      Monitor list
+                      Monitor
                     </span>
                   )}
                   {reviewBand && <VerdictBandBadge band={reviewBand} />}

@@ -3,6 +3,7 @@ import { motion, AnimatePresence, animate, useMotionValue, useTransform } from '
 import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { usePrefersReducedMotion } from '../hooks';
+import GrainOverlay from './GrainOverlay';
 import { fetchActivitySummaryWithToken, type ActivitySummary } from '../api/activity';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -214,11 +215,13 @@ export default function LoginPage() {
   const enterDelay = stats ? 0.22 + stats.length * 0.07 + 0.1 : 0.2;
 
   return (
-    <div
-      className="flex flex-col items-center justify-center min-h-[100dvh] w-full bg-paper overflow-hidden"
-      style={{ padding: 'clamp(24px, 5vw, 56px)' }}
-    >
-      <div className="relative z-10 w-full max-w-[40rem] flex flex-col items-center">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
+      <GrainOverlay opacity={0.028} />
+      <div
+        className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-hidden"
+        style={{ padding: 'clamp(24px, 5vw, 56px)' }}
+      >
+      <div className="w-full max-w-[40rem] flex flex-col items-center">
 
         {/* Eyebrow */}
         <AnimatePresence mode="wait">
@@ -300,7 +303,7 @@ export default function LoginPage() {
               transition={{ duration: 0.5, ease: EASE, delay: 0.3 }}
               className="flex flex-col items-center mb-phi-9"
             >
-              <h1 className="font-wordmark text-center text-[clamp(48px,8vw,80px)] font-normal text-oxford leading-[0.9] m-0 tracking-normal">
+              <h1 className="font-wordmark text-center text-[clamp(48px,8vw,80px)] font-normal text-oxford leading-[0.9] m-0 tracking-[0.07em]">
                 Aethria
               </h1>
               <p className="type-meta uppercase tracking-[0.14em] text-oxford/35 mt-phi-4">
@@ -538,12 +541,13 @@ export default function LoginPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 1, delay: 1 }}
-        className="fixed bottom-0 left-0 w-full p-phi-6 flex justify-center pointer-events-none"
+        className="fixed bottom-0 left-0 z-20 w-full p-phi-6 flex justify-center pointer-events-none"
       >
         <p className="type-meta text-[11px] tracking-[0.08em] text-oxford/22">
           Protocol 4.1 · Secure Perimeter
         </p>
       </motion.footer>
+      </div>
     </div>
   );
 }

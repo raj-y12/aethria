@@ -377,6 +377,7 @@ export default function MainLayout({
     }
   }, [pipelineHealthIssue, showPipelineIssueHelp]);
 
+
   const watchlistIds = useMemo(() => {
     const ids = new Set<string>();
     for (const e of watchlistAnalytics?.entries ?? []) {
@@ -465,7 +466,7 @@ export default function MainLayout({
                           setRightPanel((panel) => (panel === 'feed' ? null : 'feed'));
                           setMobileMenuOpen(false);
                         }}
-                        className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-1 tracking-[0.06em] btn-interaction ${rightPanel === 'feed' ? 'text-white' : 'text-white/62 hover:text-white'
+                        className={`type-label-tab min-h-[44px] flex items-center justify-start cursor-pointer px-1 btn-interaction ${rightPanel === 'feed' ? 'text-white' : 'text-white/60 hover:text-white'
                           }`}
                         style={{ transitionTimingFunction: 'var(--motion-ease)' }}
                         aria-pressed={rightPanel === 'feed'}
@@ -482,9 +483,9 @@ export default function MainLayout({
                           setRightPanel((p) => (p === 'system' ? null : p));
                           setMobileMenuOpen(false);
                         }}
-                        className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-1 tracking-[0.06em] btn-interaction ${rightPanel !== 'system' && rightPanel !== 'feed'
+                        className={`type-label-tab min-h-[44px] flex items-center justify-start cursor-pointer px-1 btn-interaction ${rightPanel !== 'system' && rightPanel !== 'feed'
                           ? 'text-white'
-                          : 'text-white/62 hover:text-white'
+                          : 'text-white/60 hover:text-white'
                           }`}
                         style={{ transitionTimingFunction: 'var(--motion-ease)' }}
                         aria-pressed={rightPanel !== 'system' && rightPanel !== 'feed'}
@@ -501,7 +502,7 @@ export default function MainLayout({
                           setRightPanel((panel) => (panel === 'system' ? null : 'system'));
                           setMobileMenuOpen(false);
                         }}
-                        className={`type-meta min-h-[44px] flex items-center justify-start cursor-pointer px-1 tracking-[0.06em] btn-interaction ${rightPanel === 'system' ? 'text-white' : 'text-white/62 hover:text-white'
+                        className={`type-label-tab min-h-[44px] flex items-center justify-start cursor-pointer px-1 btn-interaction ${rightPanel === 'system' ? 'text-white' : 'text-white/60 hover:text-white'
                           }`}
                         style={{ transitionTimingFunction: 'var(--motion-ease)' }}
                         aria-pressed={rightPanel === 'system'}
@@ -538,23 +539,67 @@ export default function MainLayout({
         </div>
       )}
 
-      <main className="flex-1 flex min-h-0 overflow-hidden">
+      <main className="flex-1 flex min-h-0 overflow-hidden bg-paper">
         <div
-          className="w-3 shrink-0 self-stretch origin-top bg-[#1d2d48] sm:w-8 md:w-14"
+          className="w-3 shrink-0 self-stretch origin-top bg-oxford sm:w-6 md:w-10"
           aria-hidden="true"
         />
-        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden px-phi-5 pt-phi-4 pb-phi-5 lg:px-phi-5 lg:pt-phi-5 lg:pb-phi-5">
-          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.85fr)_minmax(420px,1.12fr)_minmax(0,1.46fr)] lg:grid-rows-[minmax(0,1fr)] min-h-0 overflow-hidden gap-phi-5 lg:gap-phi-5">
-            <aside className="hidden lg:flex h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden paper-dot-grid">
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="flex h-full flex-1 flex-col justify-between py-phi-2 min-[1100px]:py-phi-3">
-                  <div className="shrink-0 bg-paper pr-phi-4 pt-phi-1 pb-phi-2 min-[1100px]:pb-phi-3">
-                    <div className="flex shrink-0 items-baseline justify-between gap-phi-2">
-                      <p className="font-wordmark font-normal text-[clamp(2.15rem,4.2vw,3rem)] leading-[1.08] text-oxford">
-                        Aethria
-                      </p>
-                      <span className="type-meta tabular-nums leading-none text-oxford/45">{railTimeShort}</span>
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-paper px-phi-5 pt-phi-4 pb-phi-5 lg:px-phi-5 lg:pt-phi-5 lg:pb-phi-5">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.85fr)_minmax(420px,1.12fr)_minmax(0,1.46fr)] lg:grid-rows-[minmax(0,1fr)] min-h-0 overflow-hidden gap-phi-5 lg:gap-phi-5 bg-paper">
+            <aside className="hidden lg:flex h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden bg-paper">
+              <div className="flex h-full flex-1 flex-col min-h-0 overflow-y-auto overflow-x-hidden px-phi-4 py-phi-4 gap-y-phi-4">
+
+                {/* ── Wordmark + pipeline status ─────────────────────── */}
+                <div className="shrink-0">
+                  <div className="flex items-center justify-between gap-phi-3">
+                    <p className={railEditorial.wordmark}>
+                      Aethria
+                    </p>
+                    <div className="relative flex items-center gap-phi-2">
+                      {pipelineStateLabel === 'On' && (
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/40 pulse-soft" aria-hidden />
+                      )}
+                      <span
+                        className={
+                          pipelineStateLabel === 'Issue'
+                            ? 'type-meta text-escalation'
+                            : pipelineStateLabel === 'Off'
+                              ? 'type-meta text-oxford/25'
+                              : 'type-meta tabular-nums text-oxford/32'
+                        }
+                      >
+                        {pipelineStateLabel === 'Issue' ? 'Issue' : railTimeShort}
+                      </span>
+                      {pipelineStateLabel === 'Issue' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setShowPipelineIssueHelp((open) => !open)}
+                            className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
+                            aria-label="Pipeline issue details"
+                            aria-expanded={showPipelineIssueHelp}
+                          >
+                            ?
+                          </button>
+                          {showPipelineIssueHelp && (
+                            <span className="absolute right-0 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
+                              Pipeline has a problem and may not process updates right now.
+                              <button
+                                type="button"
+                                onClick={() => navigate(SETTINGS_PATH)}
+                                className="mt-phi-2 block type-meta text-oxford/35 hover:text-oxford btn-interaction"
+                              >
+                                Open settings →
+                              </button>
+                            </span>
+                          )}
+                        </>
+                      )}
                     </div>
+                  </div>
+
+                  {/* Nav */}
+                  <div className="mt-phi-3 -mx-phi-4">
                     <SystemBar
                       variant="embedded"
                       rightPanel={rightPanel}
@@ -562,95 +607,86 @@ export default function MainLayout({
                       onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
                       onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
                       onClose={() => setRightPanel(null)}
-                      pipelineState={pipelineStateLabel}
-                      pipelineIssueHelpOpen={showPipelineIssueHelp}
-                      onPipelineIssueHelpToggle={() => setShowPipelineIssueHelp((open) => !open)}
-                      onPipelineOpenSettings={() => navigate(SETTINGS_PATH)}
                     />
-                  </div>
-                  <section
-                    aria-label="On-demand lookup"
-                    className="shrink-0 bg-paper border-l border-solid border-oxford/[0.08] overflow-hidden"
-                  >
-                    <AgentDispatch
-                      input={lookupInput}
-                      setInput={setLookupInput}
-                      onSubmit={() => void handleLookupSubmit()}
-                      isBusy={lookupBusy}
-                      message={lookupMessage}
-                      onClearMessage={() => setLookupMessage(null)}
-                      lookupPhase={lookupPhaseLabel}
-                      alwaysOpen
-                    />
-                  </section>
-                  <section
-                    aria-label="Live overview"
-                    className="shrink-0 bg-paper border-l border-solid border-oxford/[0.08] px-phi-4 py-phi-2"
-                  >
-                    <p className={railEditorial.label}>Overview</p>
-                    <div className="mt-phi-1 grid min-w-0 grid-cols-2 gap-x-phi-4 gap-y-phi-2">
-                      {[
-                        { label: 'Total', value: startups.length, accent: false },
-                        { label: 'Open', value: openCount, accent: false },
-                        { label: 'Decided', value: resolvedCount, accent: false },
-                        { label: 'Escalated', value: pendingEscalations, accent: pendingEscalations > 0 },
-                      ].map((stat) => (
-                        <div key={stat.label} className="min-w-0 text-left">
-                          <p
-                            className={`font-mono font-bold text-[clamp(18px,1.6vw,24px)] leading-none tracking-[-0.04em] tabular-nums ${stat.accent ? 'text-escalation' : 'text-oxford'}`}
-                          >
-                            {stat.value.toLocaleString()}
-                          </p>
-                          <p className={`mt-phi-1 ${railEditorial.body}`}>{stat.label}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                  <article
-                    className="shrink-0 bg-paper border-l border-solid border-oxford/[0.08] px-phi-4 py-phi-2"
-                    aria-label="Fund thesis preview"
-                  >
-                    <div className="flex items-start justify-between gap-phi-3">
-                      <div className="min-w-0 flex-1">
-                        <p className={railEditorial.label}>Active mandate</p>
-                        <p className={`${railEditorial.body} font-medium truncate`}>
-                          {fundName || 'No fund configured'}
-                        </p>
-                      </div>
-                      {hasThesis && (
-                        <span className="shrink-0 inline-flex items-center gap-phi-2 mt-px">
-                          <span
-                            className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/70"
-                            style={{ boxShadow: '0 0 0 2px rgba(16,26,43,0.08)' }}
-                            aria-hidden
-                          />
-                          <span className="font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(var(--color-oxford-rgb),0.5)]">
-                            Live
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                    {hasThesisTags && (
-                      <div className="mt-phi-1 flex flex-wrap gap-phi-2">
-                        {thesisTagList.slice(0, 5).map((t) => (
-                          <span
-                            key={t}
-                            className="px-phi-2 py-phi-1 type-meta text-oxford/45 border border-oxford/[0.08]"
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </article>
-                  <div className="shrink-0 min-h-0">
-                    <AccountRailPanel settingsPath={SETTINGS_PATH} />
                   </div>
                 </div>
+
+                {/* Single structural hairline — nav/controls from info content */}
+                <div className="shrink-0 h-px w-full bg-oxford/[0.08]" aria-hidden />
+
+                {/* ── Lookup ─────────────────────────────────────────── */}
+                <div className="shrink-0 min-w-0">
+                  <AgentDispatch
+                    input={lookupInput}
+                    setInput={setLookupInput}
+                    onSubmit={() => void handleLookupSubmit()}
+                    isBusy={lookupBusy}
+                    message={lookupMessage}
+                    onClearMessage={() => setLookupMessage(null)}
+                    lookupPhase={lookupPhaseLabel}
+                    alwaysOpen
+                  />
+                </div>
+
+                {/* ── Overview ───────────────────────────────────────── */}
+                <section aria-label="Live overview" className="shrink-0 min-w-0">
+                  <p className={railEditorial.label}>Overview</p>
+                  <div className="grid min-w-0 grid-cols-2 gap-phi-2">
+                    {[
+                      { label: 'Total',     value: startups.length,    accent: false },
+                      { label: 'Open',      value: openCount,          accent: false },
+                      { label: 'Decided',   value: resolvedCount,      accent: false },
+                      { label: 'Escalated', value: pendingEscalations, accent: pendingEscalations > 0 },
+                    ].map((stat) => (
+                      <div
+                        key={stat.label}
+                        className="flex min-h-0 min-w-0 flex-col justify-between gap-phi-2 py-phi-2"
+                      >
+                        <span className={railEditorial.statLabel}>{stat.label}</span>
+                        <span
+                          className={`${railEditorial.statValue} truncate ${stat.accent ? 'text-escalation' : 'text-oxford'}`}
+                        >
+                          {stat.value.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* ── Mandate ────────────────────────────────────────── */}
+                <article className="shrink-0 min-w-0" aria-label="Fund thesis preview">
+                  <p className={railEditorial.label}>Mandate</p>
+                  <div className="flex min-w-0 items-center justify-between gap-phi-3">
+                    <p className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong}`}>
+                      {fundName || 'No fund configured'}
+                    </p>
+                    {hasThesis ? (
+                      <div className="flex shrink-0 items-center gap-phi-2">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/35" aria-hidden />
+                        <span className={`${railEditorial.meta} text-oxford/28`}>Live</span>
+                      </div>
+                    ) : null}
+                  </div>
+                  {hasThesisTags && (
+                    <div className="mt-phi-3 flex flex-wrap gap-phi-2">
+                      {thesisTagList.slice(0, 4).map((t) => (
+                        <span key={t} className={`border border-oxford/[0.09] px-phi-2 py-phi-1 ${railEditorial.meta} text-oxford/38`}>
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </article>
+
+                {/* ── Account — pushed to bottom ─────────────────────── */}
+                <div className="mt-auto shrink-0 min-w-0 border-t border-oxford/[0.06] pt-phi-4">
+                  <AccountRailPanel settingsPath={SETTINGS_PATH} />
+                </div>
+
               </div>
             </aside>
 
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:h-full lg:min-h-0">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-paper lg:h-full lg:min-h-0">
               {/* Pipeline summary + lookup */}
               <header className="flex-none mb-phi-5 min-w-0 lg:mb-0 lg:px-0">
                 <section
@@ -658,15 +694,15 @@ export default function MainLayout({
                   className="grid min-w-0 grid-cols-1 gap-phi-4 pb-phi-4 px-phi-2 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end xl:gap-x-phi-5 lg:hidden"
                 >
                   <div className="min-w-0 flex flex-col gap-phi-2">
-                    <p className="type-meta text-oxford/45">Live overview</p>
-                    <p className="type-meta text-oxford/72">
+                    <p className="type-meta text-oxford/30">Live overview</p>
+                    <p className="type-meta text-oxford/60">
                       {startups.length} total · {openCount} open · {resolvedCount} decided
                       {signals.length > 0 ? ` · ${signals.length} signals` : ''}
                     </p>
                   </div>
                   <div className="relative flex min-w-0 flex-col items-start gap-y-phi-1 xl:items-end">
                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-phi-3 gap-y-phi-1 xl:justify-end">
-                      <span className="type-meta text-oxford/45">Pipeline</span>
+                      <span className="type-meta text-oxford/30">Pipeline</span>
                       <span className="relative inline-flex items-center gap-phi-2">
                         {pipelineStateLabel === 'On' && (
                           <span
@@ -676,8 +712,8 @@ export default function MainLayout({
                         )}
                         <span className={
                           pipelineStateLabel === 'Issue' ? 'type-meta text-escalation' :
-                            pipelineStateLabel === 'Off' ? 'type-meta text-oxford/45' :
-                              'type-meta text-oxford/80'
+                            pipelineStateLabel === 'Off' ? 'type-meta text-oxford/30' :
+                              'type-meta text-oxford/60'
                         }>
                           {pipelineStateLabel}
                         </span>
@@ -698,7 +734,7 @@ export default function MainLayout({
                                 <button
                                   type="button"
                                   onClick={() => navigate(SETTINGS_PATH)}
-                                  className="mt-phi-2 block type-meta tracking-[0.06em] text-oxford/62 hover:text-oxford btn-interaction"
+                                  className="mt-phi-2 block type-meta text-oxford/30 hover:text-oxford btn-interaction"
                                 >
                                   Open settings →
                                 </button>
@@ -731,28 +767,22 @@ export default function MainLayout({
               {/* Fund thesis — mobile only (desktop shows it in the right column) */}
               <div className="flex-none mb-phi-4 block lg:hidden">
                 <article
-                  className="w-full bg-paper/70 px-phi-5 py-phi-4"
+                  className="w-full bg-paper px-phi-5 py-phi-4"
                   style={{ boxSizing: 'border-box' }}
                   aria-label="Fund thesis preview"
                 >
-                  <div className="flex items-center justify-between gap-phi-2">
-                    <p className={railEditorial.label}>Active mandate</p>
-                    {hasThesis && (
-                      <span className="inline-flex items-center gap-phi-1">
-                        <span
-                          className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford"
-                          style={{ opacity: 0.6 }}
-                          aria-hidden
-                        />
-                        <span className="font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(var(--color-oxford-rgb),0.5)]">
-                          Live
-                        </span>
-                      </span>
-                    )}
+                  <p className={railEditorial.label}>Active mandate</p>
+                  <div className="flex min-w-0 items-center justify-between gap-phi-3">
+                    <p className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong}`}>
+                      {fundName || 'No fund configured'}
+                    </p>
+                    {hasThesis ? (
+                      <div className="flex shrink-0 items-center gap-phi-2">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/35" aria-hidden />
+                        <span className={`${railEditorial.meta} text-oxford/28`}>Live</span>
+                      </div>
+                    ) : null}
                   </div>
-                  <p className={`${railEditorial.body} font-medium`}>
-                    {fundName || 'No fund configured'}
-                  </p>
                   {hasThesisTags && (
                     <div className="mt-phi-3 flex flex-wrap gap-phi-2">
                       {thesisTagList.slice(0, 5).map((t) => (
@@ -801,7 +831,7 @@ export default function MainLayout({
             </div>
 
             {/* Right zone: Judgements or memo only — never System. */}
-            <div className="hidden min-h-0 min-w-0 flex-col lg:flex lg:h-full">
+            <div className="hidden min-h-0 min-w-0 flex-col bg-paper lg:flex lg:h-full">
               <aside
                 className="min-w-0 min-h-0 flex-1 bg-paper overflow-hidden"
                 aria-live="polite"
@@ -827,7 +857,7 @@ export default function MainLayout({
                       className="h-full"
                     >
                       <PanelShell
-                        className="min-h-0 flex-1"
+                        className="min-h-0 flex-1 bg-paper"
                         title="Judgements"
                         titleClassName={UI_PANEL_CHROME_LABEL}
                         headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
@@ -865,12 +895,13 @@ export default function MainLayout({
                       className="h-full"
                     >
                       <PanelShell
-                        className="min-h-0 min-w-0 flex-1 w-full"
+                        className="min-h-0 min-w-0 flex-1 w-full bg-paper"
                         title=""
                         showTitle={false}
                         headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
                         headerBorderClass=""
                         headerJustifyClass="justify-end"
+                        headerClassName="bg-paper"
                         actions={
                           <div className="flex items-center gap-phi-2" role="group" aria-label="Memo controls">
                             <button
@@ -905,7 +936,7 @@ export default function MainLayout({
                             </button>
                           </div>
                         }
-                        contentClassName="memoShellContent px-phi-5 py-phi-5 sm:px-phi-6 sm:py-phi-6"
+                        contentClassName="memoShellContent bg-paper px-phi-4 py-phi-3 sm:px-phi-5 sm:py-phi-4"
                       >
                         {/*
                           Enter-only when swapping deals: `mode="wait"` on AnimatePresence forced a full
@@ -920,7 +951,7 @@ export default function MainLayout({
                             duration: tokens.motion.duration.micro,
                             ease: tokens.motion.ease,
                           })}
-                          className="h-full"
+                          className="h-full min-h-full bg-paper"
                         >
                           <InvestmentMemoContent
                             ref={memoContentRef}

@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import { usePrefersReducedMotion } from '../hooks';
+import GrainOverlay from './GrainOverlay';
 
 interface LoadingAnimationProps {
   fullScreen?: boolean;
@@ -33,6 +34,7 @@ export default function LoadingAnimation({
 
   return (
     <div className={containerClass}>
+      {fullScreen && <GrainOverlay opacity={0.028} />}
       <div className="relative w-[56px] h-[48px]">
         {VERTICES.map((v, i) =>
           reduceMotion ? (

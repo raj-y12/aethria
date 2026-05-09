@@ -66,8 +66,8 @@ function LookupPhaseStrip({
               )}
             </div>
             <span
-              className={`type-meta tracking-[0.08em] transition-colors ${
-                isCurrentPhase ? 'text-oxford/60' : isPast ? 'text-oxford/30' : 'text-oxford/18'
+              className={`type-meta transition-colors ${
+                isCurrentPhase ? 'text-oxford/60' : isPast ? 'text-oxford/35' : 'text-oxford/22'
               }`}
             >
               {phase}
@@ -95,7 +95,7 @@ function LookupPhaseStrip({
 }
 
 const runBtnCls =
-  'group shrink-0 inline-flex items-center gap-phi-2 type-meta tracking-[0.08em] text-oxford/45 hover:text-oxford disabled:opacity-20 transition-colors btn-interaction';
+  'group shrink-0 inline-flex items-center gap-phi-2 type-meta text-oxford/45 hover:text-oxford disabled:opacity-20 transition-colors btn-interaction';
 
 function DispatchPanelBody({
   inputRef,
@@ -249,7 +249,7 @@ export default function AgentDispatch({
     <div className="w-full">
       {!alwaysOpen && (
         <div className="w-full flex items-center gap-phi-3 px-phi-4 min-h-[44px] border-t border-oxford/[0.08]">
-          <span className="type-meta tracking-[0.08em] text-oxford/40 shrink-0">Dispatch</span>
+          <span className="type-label-tab text-oxford/40 shrink-0">Dispatch</span>
           <span
             className={`flex-1 h-px bg-oxford/[0.06] ${isActive ? 'pulse-soft' : ''}`}
             aria-hidden
@@ -259,7 +259,7 @@ export default function AgentDispatch({
               <span className="h-1.5 w-1.5 shrink-0 bg-oxford/40 pulse-fast" aria-hidden />
             )}
             <span
-              className={`type-meta tracking-[0.08em] transition-colors ${isActive ? 'text-oxford/55' : 'text-oxford/25'}`}
+              className={`type-meta transition-colors ${isActive ? 'text-oxford/55' : 'text-oxford/25'}`}
             >
               {isBusy ? 'Running' : lookupMessage ? 'Active' : 'Ready'}
             </span>
@@ -277,9 +277,9 @@ export default function AgentDispatch({
       )}
 
       {alwaysOpen ? (
-        <div className="px-phi-4 py-phi-2 min-[1100px]:pt-phi-2 min-[1100px]:pb-phi-3">
-          <p className={railEditorial.label}>Lookup</p>
-          <div className="mt-phi-1.5 min-[1100px]:mt-phi-2">
+        <div className="min-w-0">
+          <p className={railEditorial.label}>Dispatch</p>
+          <div className="min-w-0">
             <DispatchPanelBody
               inputRef={inputRef}
               input={input}

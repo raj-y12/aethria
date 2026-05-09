@@ -72,7 +72,7 @@ export default function AgentLogoutModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-phi-6 bg-paper-bright"
+          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-phi-6 bg-paper"
           role="dialog"
           aria-modal="true"
         >
@@ -128,7 +128,7 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
                   onClick={onKeepRunning}
                   disabled={busy}
-                  className="w-full px-phi-7 py-[14px] bg-oxford text-paper-bright type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
+                  className="w-full px-phi-7 py-[14px] bg-oxford text-paper type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
                 >
                   Continue running & Log out
                 </motion.button>
@@ -154,7 +154,7 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
                   onClick={onKeepRunning}
                   disabled={busy}
-                  className="w-full px-phi-7 py-[14px] bg-oxford text-paper-bright type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
+                  className="w-full px-phi-7 py-[14px] bg-oxford text-paper type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
                 >
                   Log out
                 </motion.button>

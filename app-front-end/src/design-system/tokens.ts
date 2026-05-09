@@ -1,10 +1,12 @@
 /**
  * Aethria design tokens — aligned with brand_assets and web-front-end.
  *
- * Palette: oxford #1D2D48, paper #E9E0D1, paperBright #E9E0D1, inverse on oxford #FFFFFF, charcoal #2f333b.
+ * Palette: oxford #1A2B48, paper #E9E0D1 (web-front-end), paperBright/paperDeep variants,
+ * inverse on oxford #FFFFFF, charcoal #2f333b (body UI).
+ * Typography: Geist Sans matches the brand poster’s geometric sans; EB Garamond / Libre Baskerville stay for editorial + wordmark (no font swap needed).
  * Burgundy #7D2B3A (accent) is escalation-only — see color.accent. Heritage gold #b8976a is decorative only (dividers, chrome) — color.heritageGold.
- * Typography: Libre Baskerville (wordmark only). EB Garamond (display/editorial headings). Geist Sans (all UI body, titles). JetBrains Mono (metadata/labels, 0.08–0.14em).
- * Brand scale: section-label 11px/0.12em, tab/meta 10px/0.12–0.14em, body 14px/1.618.
+ * Typography: Libre Baskerville (wordmark only). EB Garamond (display/editorial headings). Geist Sans (body/UI). JetBrains Mono (labels, tabs, meta, data — ALL CAPS on labels/tabs).
+ * Brand scale: section-label 11px/0.14em, tab/meta 11px/0.10–0.06em, body 14px/1.618.
  * Frames: 1px rgba(0,33,71,0.06). No rounded corners.
  * Register tint: CSS variable --color-register-tint (see index.css); Tailwind `registerTint` / `bg-registerTint`.
  *
@@ -39,10 +41,12 @@ export const phiSpacing = {
 
 export const tokens = {
   color: {
-    oxford: '#1D2D48',
+    oxford: '#1A2B48',
     paper: '#E9E0D1',
-    /** Softer paper lift for gradients and panels (aligned with web-front-end). */
-    paperBright: '#E9E0D1',
+    /** Slightly lifted surfaces (panels, raised chrome) — web paper family. */
+    paperBright: '#EBE8E0',
+    /** Recessed / selected rows — same hue family as paper. */
+    paperDeep: '#E6E4DE',
     charcoal: '#2f333b',
     ivory: '#FFFFFF',
     bone: '#f2f4f8',
@@ -54,7 +58,7 @@ export const tokens = {
     heritageGoldSoft: 'rgba(184, 151, 106, 0.35)',
     /** Warning/validation: subtle warm tint derived from paper; not Tailwind amber. Use for validation errors, non-critical alerts. */
     warningBg: '#E9E0D1',
-    warningBorder: 'rgba(0, 33, 71, 0.25)',
+    warningBorder: 'rgba(26, 43, 72, 0.25)',
   },
   /** Oxford opacity ladder: 100, 80, 60, 40, 25. Use these for all muted Oxford text and semantic borders. */
   oxfordOpacity: {
@@ -69,7 +73,7 @@ export const tokens = {
     display: '"EB Garamond", Georgia, "Times New Roman", serif',
     /** Wordmark / type-hero only — Libre Baskerville. */
     wordmark: '"Libre Baskerville", Georgia, serif',
-    body: '"Geist Sans", system-ui, -apple-system, sans-serif',
+    body: '"Figtree Variable", system-ui, -apple-system, sans-serif',
     mono: '"JetBrains Mono", ui-monospace, monospace',
   },
   /**
@@ -106,10 +110,10 @@ export const tokens = {
     body: { size: '14px', lineHeight: 1.618, letterSpacing: '0', font: 'body' as const },
     bodySm: { size: '13px', lineHeight: 1.618, letterSpacing: '0', font: 'body' as const },
     labelSection: { size: '11px', lineHeight: 1.5, letterSpacing: '0.12em', font: 'mono' as const },
-    labelTab: { size: '10px', lineHeight: 1.5, letterSpacing: '0.14em', font: 'mono' as const },
-    meta: { size: '10px', lineHeight: 1.5, letterSpacing: '0.12em', font: 'mono' as const },
+    labelTab: { size: '11px', lineHeight: 1.5, letterSpacing: '0.10em', font: 'mono' as const },
+    meta: { size: '11px', lineHeight: 1.5, letterSpacing: '0.06em', font: 'mono' as const },
   },
-  frameBorder: '1px solid rgba(0, 33, 71, 0.06)',
+  frameBorder: '1px solid rgba(26, 43, 72, 0.06)',
   motion: {
     /** Strong ease-out — UI entering, dropdowns, popovers. Starts fast, feels responsive. */
     ease: [0.16, 1, 0.3, 1] as [number, number, number, number],

@@ -54,7 +54,7 @@ function AppShell() {
 
   return (
     <>
-      <GrainOverlay opacity={0.02} />
+      <GrainOverlay opacity={0.028} />
       {isSettingsRoute ? (
         <Suspense fallback={<LoadingAnimation />}>
           <SettingsPage />
@@ -121,9 +121,12 @@ function App() {
 
   if (isAdminRoute) {
     return (
-      <Suspense fallback={<LoadingAnimation />}>
-        <AdminDashboardPage />
-      </Suspense>
+      <>
+        <GrainOverlay opacity={0.028} />
+        <Suspense fallback={<LoadingAnimation />}>
+          <AdminDashboardPage />
+        </Suspense>
+      </>
     );
   }
 
