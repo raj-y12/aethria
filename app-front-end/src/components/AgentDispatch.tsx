@@ -122,10 +122,11 @@ function DispatchPanelBody({
 }) {
   const isActive = isBusy || !!lookupMessage;
   const embedded = variant === 'embedded';
+  const [focused, setFocused] = useState(false);
 
   const inputCls = embedded
-    ? `w-full bg-transparent border-0 border-b border-oxford/[0.10] px-0 py-phi-2 font-medium ${railEditorial.bodyMetrics} text-oxford placeholder:text-oxford/25 outline-none focus:border-oxford/30 transition-colors duration-300 disabled:cursor-not-allowed`
-    : 'w-full bg-transparent border-0 border-b border-oxford/[0.10] px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/25 outline-none focus:border-oxford/30 transition-colors duration-300 disabled:cursor-not-allowed';
+    ? `w-full bg-transparent border-0 border-b ${focused ? 'border-oxford/38' : 'border-oxford/[0.10]'} px-0 py-phi-2 font-medium ${railEditorial.bodyMetrics} text-oxford placeholder:text-oxford/25 outline-none transition-colors duration-300 disabled:cursor-not-allowed`
+    : `w-full bg-transparent border-0 border-b ${focused ? 'border-oxford/38' : 'border-oxford/[0.10]'} px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/25 outline-none transition-colors duration-300 disabled:cursor-not-allowed`;
 
   const statusRowCls = embedded
     ? 'flex items-center justify-between gap-phi-3 mt-phi-1.5 min-[1100px]:mt-phi-2 min-h-[22px]'
@@ -168,7 +169,7 @@ function DispatchPanelBody({
             isActive ? 'text-[rgba(var(--color-oxford-rgb),0.78)]' : 'text-[rgba(var(--color-oxford-rgb),0.35)]'
           }`}
         >
-          {isBusy ? 'Running…' : 'Company name or URL'}
+          {isBusy ? 'Pipeline running…' : focused ? 'Name, domain, or founder signal' : 'Company name or URL'}
         </p>
       );
     }
@@ -186,6 +187,8 @@ function DispatchPanelBody({
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') onSubmit();
             onInputKeyDown?.(e);
@@ -202,17 +205,17 @@ function DispatchPanelBody({
 
       <div className={statusRowCls}>
         <div className="flex-1 min-w-0 flex items-center gap-phi-2">{statusLeft}</div>
-        {!isBusy && (
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={!input.trim()}
-            className={runBtnCls}
-          >
-            Run
-            <span className="transition-transform group-hover:translate-x-px">→</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={!input.trim() || isBusy}
+          className={runBtnCls}
+        >
+          {isBusy ? 'Running' : 'Run lookup'}
+          <span className={`transition-transform ${isBusy ? 'pulse-fast' : 'group-hover:translate-x-px'}`}>
+            {isBusy ? '·' : '→'}
+          </span>
+        </button>
       </div>
 
       <LookupPhaseStrip lookupPhase={lookupPhase} spacingClass={phaseSpacing} reserveHeight={embedded} />

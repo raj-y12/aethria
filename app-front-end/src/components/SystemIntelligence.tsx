@@ -822,7 +822,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
 
   return (
     <div className="w-full font-sans bg-surface-canvas selection:bg-oxford selection:text-paper min-h-full">
-      <div className="sticky top-0 z-20 bg-surface-raised px-phi-4 py-phi-3">
+      <div className="sticky top-0 z-20 bg-surface-canvas px-phi-4 py-phi-3">
         <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2">
           <div className="flex min-w-0 flex-wrap items-center gap-phi-3">
             <div className="flex items-center gap-0">

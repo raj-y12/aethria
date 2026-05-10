@@ -1,0 +1,120 @@
+import type { Startup } from '../types/startup';
+import { extractAdverseRegister } from './adverseRegister';
+
+export type RulingDecision = 'YES' | 'NO' | 'MAYBE';
+export type DealQueueState = 'decided' | 'escalated' | 'pending' | 'awaiting-review' | 'stale';
+
+const STALE_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function decisionToPartnerRecommendation(decision: RulingDecision): 'INVEST' | 'PASS' | 'MONITOR' {
+  if (decision === 'YES') return 'INVEST';
+  if (decision === 'NO') return 'PASS';
+  return 'MONITOR';
+}
+
+export function partnerRecommendationToDecision(
+  recommendation: Startup['partner'] extends infer P
+    ? P extends { recommendation?: infer R }
+      ? R
+      : never
+    : never
+): RulingDecision | null {
+  if (recommendation === 'INVEST') return 'YES';
+  if (recommendation === 'PASS') return 'NO';
+  if (recommendation === 'MONITOR') return 'MAYBE';
+  return null;
+}
+
+export function isDealHumanResolved(startup: Startup): boolean {
+  return Boolean(startup.human_resolution?.resolved_at);
+}
+
+export function isDealDecided(startup: Startup): boolean {
+  return isDealHumanResolved(startup);
+}
+
+export function getDealLastActivityIso(startup: Startup): string {
+  return startup.human_resolution?.resolved_at
+    ?? startup.timestamps?.partnered_at
+    ?? startup.timestamps?.reviewed_at
+    ?? startup.timestamps?.discovered_at
+    ?? '';
+}
+
+export function getDealAgeDays(startup: Startup, now = Date.now()): number | null {
+  const raw = getDealLastActivityIso(startup);
+  if (!raw) return null;
+  const time = new Date(raw).getTime();
+  if (!Number.isFinite(time)) return null;
+  return Math.max(0, Math.floor((now - time) / DAY_MS));
+}
+
+export function isDealStale(startup: Startup, now = Date.now()): boolean {
+  if (isDealDecided(startup)) return false;
+  const age = getDealAgeDays(startup, now);
+  return age != null && age >= STALE_DAYS;
+}
+
+export function getDealQueueState(startup: Startup, now = Date.now()): DealQueueState {
+  if (isDealDecided(startup)) return 'decided';
+  if (startup.partner?.human_review_required) return 'escalated';
+  if (isDealStale(startup, now)) return 'stale';
+  if (startup.review || startup.partner?.recommendation) return 'pending';
+  return 'awaiting-review';
+}
+
+export function hasMeaningfulAdverseItems(startup: Startup): boolean {
+  return extractAdverseRegister(startup).length > 0;
+}
+
+export function queueAttentionRank(startup: Startup, now = Date.now()): number {
+  const adverse = extractAdverseRegister(startup);
+  const high = adverse.some((item) => item.severity === 'high');
+  if (isDealDecided(startup)) return 4;
+  if (high || startup.partner?.human_review_required) return 0;
+  if (isDealStale(startup, now)) return 1;
+  if (startup.review) return 2;
+  return 3;
+}
+
+export function buildOptimisticResolution(
+  startup: Startup,
+  decision: RulingDecision,
+  notes: string
+): Startup {
+  const now = new Date().toISOString();
+  return {
+    ...startup,
+    human_resolution: {
+      decision,
+      notes,
+      resolved_at: now,
+    },
+    partner: startup.partner
+      ? {
+          ...startup.partner,
+          recommendation: decisionToPartnerRecommendation(decision),
+          human_review_required: false,
+        }
+      : {
+          recommendation: decisionToPartnerRecommendation(decision),
+          human_review_required: false,
+          decision_rationale: notes,
+        },
+  };
+}
+
+export function getBacklogPressure(startups: Startup[]) {
+  const unresolved = startups.filter((s) => !isDealDecided(s));
+  const adverse = unresolved.filter(hasMeaningfulAdverseItems);
+  const oldest = unresolved
+    .map((startup) => ({ startup, ageDays: getDealAgeDays(startup) ?? -1 }))
+    .sort((a, b) => b.ageDays - a.ageDays)[0] ?? null;
+
+  return {
+    pendingCount: unresolved.length,
+    adverseCount: adverse.length,
+    oldest,
+  };
+}

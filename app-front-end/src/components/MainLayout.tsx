@@ -24,7 +24,6 @@ import {
 } from '../hooks';
 import { transitionOrReduced } from '../design-system/motion';
 import {
-  UI_DETAIL_EMPTY_HINT,
   UI_PANEL_CHROME_LABEL,
 } from '../design-system/ui-text';
 import type { Startup } from '../types/startup';
@@ -37,6 +36,7 @@ import {
 import { fetchFundThesisSummary } from '../api/fundThesis';
 import { getQueryConfig } from '../lib/queryIntent';
 import { railEditorial } from '../design-system/railEditorial';
+import { getBacklogPressure, isDealDecided } from '../lib/dealState';
 
 const SYSTEM_MEMO_HEADER_PADDING = 'py-phi-3';
 const MAIN_LAYOUT_STATE_KEY = 'aethria.mainLayout.v1';
@@ -77,6 +77,48 @@ function readPersistedMainLayoutState(): PersistedMainLayoutState | null {
   } catch {
     return null;
   }
+}
+
+function EmptyMemoPressure({ startups }: { startups: Startup[] }) {
+  const pressure = useMemo(() => getBacklogPressure(startups), [startups]);
+  const oldestName = pressure.oldest?.startup.scout.name;
+  const oldestAge = pressure.oldest?.ageDays;
+
+  return (
+    <div className="flex h-full min-h-0 items-center justify-center bg-paper px-phi-7 py-phi-7">
+      <div className="w-full max-w-[34rem]">
+        <p className="type-label-section tracking-[0.16em] text-oxford/38">Decision queue</p>
+        <p className="mt-phi-3 font-serif text-[clamp(1.65rem,2.8vw,2.3rem)] leading-[1.08] text-oxford">
+          Conviction queue requires review.
+        </p>
+        <dl className="mt-phi-6 grid grid-cols-3 gap-x-phi-5 gap-y-phi-4 border-y border-oxford/[0.08] py-phi-4">
+          <div>
+            <dt className="type-meta text-oxford/35">Pending</dt>
+            <dd className="mt-phi-1 font-mono text-[1.35rem] leading-none text-oxford tabular-nums">
+              {pressure.pendingCount}
+            </dd>
+          </div>
+          <div>
+            <dt className="type-meta text-oxford/35">Adverse</dt>
+            <dd className={`mt-phi-1 font-mono text-[1.35rem] leading-none tabular-nums ${pressure.adverseCount > 0 ? 'text-escalation/80' : 'text-oxford'}`}>
+              {pressure.adverseCount}
+            </dd>
+          </div>
+          <div>
+            <dt className="type-meta text-oxford/35">Oldest</dt>
+            <dd className="mt-phi-1 font-mono text-[1.35rem] leading-none text-oxford tabular-nums">
+              {oldestAge != null && oldestAge >= 0 ? `${oldestAge}d` : '—'}
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-phi-4 type-meta leading-relaxed text-oxford/42">
+          {oldestName && oldestAge != null && oldestAge >= 0
+            ? `${oldestName} is the oldest unresolved matter in the queue.`
+            : 'Select a matter to inspect the current ruling surface.'}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export default function MainLayout({
@@ -162,6 +204,16 @@ export default function MainLayout({
     setRightPanel('memo');
     setSelectedStartup(startup);
   }, []);
+
+  const handleDecisionResolved = useCallback((nextStartup: Startup) => {
+    queryClient.setQueryData<Startup[]>(['startups', 'list'], (prev) =>
+      prev?.map((s) => (s.id === nextStartup.id ? nextStartup : s)) ?? prev
+    );
+    queryClient.setQueryData<Startup | null>(['startup', 'detail', nextStartup.id], nextStartup);
+    setSelectedStartup((current) => (current?.id === nextStartup.id ? nextStartup : current));
+    void queryClient.invalidateQueries({ queryKey: ['escalations'] });
+    void queryClient.invalidateQueries({ queryKey: ['settings'] });
+  }, [queryClient]);
 
   const handleCloseMemo = useCallback(() => {
     setSelectedStartup(null);
@@ -318,9 +370,9 @@ export default function MainLayout({
   useRestoreFocus(judgementsAsOverlay, { current: null }, !verdictOrMemoOpen);
   useFocusTrap(judgementsAsOverlay, judgementsPanelRef);
 
-  const resolvedCount = startups.filter((s) => s.partner?.recommendation != null).length;
+  const resolvedCount = startups.filter(isDealDecided).length;
   const openCount = Math.max(0, startups.length - resolvedCount);
-  const pendingEscalations = data.settings?.system_health?.pending_escalations ?? 0;
+  const pendingEscalations = data.pendingEscalationCount ?? data.settings?.system_health?.pending_escalations ?? 0;
   const agentConfig = data.settings?.agent_config;
   const pipelineEnabled =
     !!agentConfig && !!(agentConfig.scouts_enabled || agentConfig.reviewers_enabled || agentConfig.partners_enabled);
@@ -983,6 +1035,7 @@ export default function MainLayout({
                             startup={memoStartup!}
                             embedded
                             onMemoPipelineReady={handleMemoPipelineReady}
+                            onDecisionResolved={handleDecisionResolved}
                           />
                         </motion.div>
                       </PanelShell>
@@ -999,11 +1052,7 @@ export default function MainLayout({
                       })}
                       className="h-full"
                     >
-                      <div className="flex-1 flex items-center justify-center p-8 h-full">
-                        <p className="type-label-tab text-oxford/45 max-w-xs text-center leading-relaxed" style={{ transition: 'opacity var(--motion-micro) var(--motion-ease)' }}>
-                          {UI_DETAIL_EMPTY_HINT}
-                        </p>
-                      </div>
+                      <EmptyMemoPressure startups={startups} />
                     </motion.div>
                   )}
                 </AnimatePresence>

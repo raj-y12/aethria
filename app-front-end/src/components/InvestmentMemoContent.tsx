@@ -20,6 +20,13 @@ import ScoreOverview from './scoring/ScoreOverview';
 import DimensionCard from './scoring/DimensionCard';
 import { DECISION_BADGE_LABEL } from './DecisionBadge';
 import { getDecisionBadgeVariant, type DecisionBadgeVariant } from '../lib/decisionBadgeVariant';
+import { resolveEscalation } from '../api/escalations';
+import {
+  buildOptimisticResolution,
+  isDealDecided,
+  type RulingDecision,
+} from '../lib/dealState';
+import { extractAdverseRegister, type AdverseRegisterItem } from '../lib/adverseRegister';
 const MEMO_POLL_INITIAL_MS = 2000;
 const MEMO_POLL_MAX_MS = 15000;
 const MEMO_POLL_MAX_ATTEMPTS = 60;
@@ -79,6 +86,7 @@ export interface InvestmentMemoContentProps {
   onClose?: () => void;
   embedded?: boolean;
   onMemoPipelineReady?: () => void;
+  onDecisionResolved?: (startup: Startup) => void;
 }
 
 export interface InvestmentMemoContentHandle {
@@ -212,8 +220,20 @@ function pipelineReplayOneLiner(steps: PipelineReplayStep[]): string {
   return tail ? `${flow} · ${tail}` : flow;
 }
 
+const SEVERITY_LABEL: Record<AdverseRegisterItem['severity'], string> = {
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+};
+
+function decisionLabel(decision: RulingDecision): string {
+  if (decision === 'YES') return 'Invest';
+  if (decision === 'NO') return 'Pass';
+  return 'Monitor';
+}
+
 const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, InvestmentMemoContentProps>(function InvestmentMemoContent(
-  { startup, onClose, embedded = false, onMemoPipelineReady },
+  { startup, onClose, embedded = false, onMemoPipelineReady, onDecisionResolved },
   ref
 ) {
   const reduceMotion = usePrefersReducedMotion();
@@ -221,6 +241,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const [selectedReviewerIdx, setSelectedReviewerIdx] = useState(0);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pipelineLogOpen, setPipelineLogOpen] = useState(false);
+  const [risksReviewed, setRisksReviewed] = useState(false);
+  const [rulingDecision, setRulingDecision] = useState<RulingDecision | null>(null);
+  const [rulingNotes, setRulingNotes] = useState('');
+  const [rulingSaving, setRulingSaving] = useState(false);
+  const [rulingError, setRulingError] = useState<string | null>(null);
 
   const [memoPartial, setMemoPartial] = useState<MemoPartialPayload | null>(null);
   const [memoPipeline, setMemoPipeline] = useState<'idle' | 'generating' | 'ready' | 'failed'>('idle');
@@ -351,12 +376,49 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     () => (displayStartup && showJudgment ? toJudgmentReasoning(displayStartup) : []),
     [displayStartup, showJudgment]
   );
+  const adverseRegister = useMemo(
+    () => extractAdverseRegister(displayStartup),
+    [displayStartup]
+  );
+  const hasHighAdverse = adverseRegister.some((item) => item.severity === 'high');
+  const isAlreadyDecided = displayStartup ? isDealDecided(displayStartup) : false;
+  const needsRiskAcknowledgement = Boolean(displayStartup && hasHighAdverse && !isAlreadyDecided);
+  const riskReviewOutstanding = needsRiskAcknowledgement && !risksReviewed;
 
   useEffect(() => {
     setSelectedReviewerIdx(0);
     setSourcesOpen(false);
     setPipelineLogOpen(false);
+    setRisksReviewed(false);
+    setRulingDecision(null);
+    setRulingNotes('');
+    setRulingError(null);
   }, [startup?.id]);
+
+  useEffect(() => {
+    if (!displayStartup || rulingDecision) return;
+    const rec = displayStartup.partner?.recommendation;
+    if (rec === 'INVEST') setRulingDecision('YES');
+    else if (rec === 'PASS') setRulingDecision('NO');
+    else if (rec === 'MONITOR') setRulingDecision('MAYBE');
+  }, [displayStartup, rulingDecision]);
+
+  const handleRulingSubmit = useCallback(async () => {
+    if (!displayStartup || !rulingDecision || rulingNotes.trim().length < 5) return;
+    const previous = displayStartup;
+    const optimistic = buildOptimisticResolution(displayStartup, rulingDecision, rulingNotes.trim());
+    setRulingSaving(true);
+    setRulingError(null);
+    onDecisionResolved?.(optimistic);
+    try {
+      await resolveEscalation(displayStartup.id, rulingDecision, rulingNotes.trim());
+      setRulingSaving(false);
+    } catch {
+      onDecisionResolved?.(previous);
+      setRulingSaving(false);
+      setRulingError('Ruling did not save. Retry once the API is reachable.');
+    }
+  }, [displayStartup, onDecisionResolved, rulingDecision, rulingNotes]);
 
   const structuredScoring = useMemo(
     () => normalizeStructuredScoring(displayStartup?.review ?? null),
@@ -468,49 +530,162 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </section>
             )}
 
-            {/* ── Verdict (partner recommendation — published conclusion) ── */}
-            {showJudgment && (() => {
-              const paras = reasoningParagraphs.filter((p) => String(p ?? '').trim());
-              return (
-                <section className="memoDocSection memoDocVerdictSection" aria-labelledby="memo-verdict">
-                  <h2 className="memoDocSectionHead" id="memo-verdict">Verdict</h2>
-                  {decisionBadgeVariant && (
-                    <div className="memoDocJudgmentTop">
-                      <p className={`memoDocRecommendation memoDocRecommendation--${decisionBadgeVariant.toLowerCase()}`}>
-                        {decisionHeadline}.
+            <div className="memoDecisionCluster">
+              {/* ── Decision surface ── */}
+              <section className="memoDocSection memoDecisionSurface" aria-labelledby="memo-ruling-status">
+                <h2 className="memoDocSectionHead" id="memo-ruling-status">Decision Surface</h2>
+                <div className="memoRulingStatus">
+                  <div>
+                    <p className="memoRulingLabel">
+                      {isAlreadyDecided ? 'Recorded human ruling' : showEscalationBadge ? 'Human ruling required' : showJudgment ? 'Partner recommendation awaits ruling' : 'Pipeline assembling recommendation'}
+                    </p>
+                    {displayStartup.human_resolution?.resolved_at ? (
+                      <p className="memoRulingValue">
+                        {decisionLabel(displayStartup.human_resolution.decision)}
                       </p>
-                      <div className="memoDocStatusLine">
-                        {displayStartup.partner?.confidence != null && (
-                          <p className="memoDocConfidence">
-                            <span className="memoNum">{Math.round(displayStartup.partner.confidence * 100)}%</span> confidence
+                    ) : showJudgment ? (
+                      <p className="memoRulingValue">Needs ruling</p>
+                    ) : (
+                      <p className="memoRulingValue">Awaiting recommendation</p>
+                    )}
+                  </div>
+                  {displayStartup.human_resolution?.notes ? (
+                    <p className="memoRulingNote">{renderWithMonoNumbers(displayStartup.human_resolution.notes)}</p>
+                  ) : null}
+                </div>
+                {showJudgment && (() => {
+                  const paras = reasoningParagraphs.filter((p) => String(p ?? '').trim());
+                  return (
+                    <div className="memoRecommendationBlock" aria-labelledby="memo-verdict">
+                      <h3 className="memoDocSubhead" id="memo-verdict">Partner Recommendation</h3>
+                      {decisionBadgeVariant && (
+                        <div className="memoDocJudgmentTop">
+                          <p className={`memoDocRecommendation memoDocRecommendation--${decisionBadgeVariant.toLowerCase()}`}>
+                            {decisionHeadline}.
                           </p>
-                        )}
-                        {showEscalationBadge && (
-                          <p className="memoDocEscalation">Escalation required</p>
-                        )}
-                      </div>
-                      {displayStartup.partner?.decision_drivers &&
-                        displayStartup.partner.decision_drivers.length > 0 && (
-                          <p className="memoDocDrivers">
-                            {displayStartup.partner.decision_drivers.join(' · ')}
-                          </p>
-                        )}
+                          <div className="memoDocStatusLine">
+                            {displayStartup.partner?.confidence != null && (
+                              <p className="memoDocConfidence">
+                                <span className="memoNum">{Math.round(displayStartup.partner.confidence * 100)}%</span> confidence
+                              </p>
+                            )}
+                            {showEscalationBadge && (
+                              <p className="memoDocEscalation">Escalation required</p>
+                            )}
+                          </div>
+                          {displayStartup.partner?.decision_drivers &&
+                            displayStartup.partner.decision_drivers.length > 0 && (
+                              <p className="memoDocDrivers">
+                                {displayStartup.partner.decision_drivers.join(' · ')}
+                              </p>
+                            )}
+                        </div>
+                      )}
+                      {paras.map((p, i) => (
+                        <p key={i} className="memoDocProse">{renderWithMonoNumbers(p)}</p>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </section>
+
+              {/* ── Adverse register before ruling controls ── */}
+              {adverseRegister.length > 0 && (
+                <section className="memoDocSection memoAdverseRegister" aria-labelledby="memo-adverse-register">
+                  <h2 className="memoDocSectionHead" id="memo-adverse-register">Adverse Register</h2>
+                  <div className="memoAdverseList">
+                    {adverseRegister.map((item) => (
+                      <article key={item.id} className={`memoAdverseItem memoAdverseItem--${item.severity}`}>
+                        <div className="memoAdverseSeverity">
+                          <span>{SEVERITY_LABEL[item.severity]}</span>
+                        </div>
+                        <div className="memoAdverseMain">
+                          <p className="memoAdverseTitle">{renderWithMonoNumbers(item.title)}</p>
+                          <p className="memoAdverseBody">{renderWithMonoNumbers(item.whyItMatters)}</p>
+                        </div>
+                        <div className="memoAdverseMeta">
+                          <span>{item.basis}</span>
+                          {item.missingData && <span>Missing data</span>}
+                          {item.source && <span>{item.source}</span>}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {!isAlreadyDecided && showJudgment && (
+                <section className="memoDocSection memoRulingControls" aria-labelledby="memo-final-ruling">
+                  <h2 className="memoDocSectionHead" id="memo-final-ruling">Commit Ruling</h2>
+                  {needsRiskAcknowledgement && (
+                    <div className="memoRiskAcknowledgement">
+                      <p>
+                        High-severity risks present. Mark reviewed when satisfied.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setRisksReviewed(true)}
+                        className="memoRiskAckButton"
+                        aria-pressed={risksReviewed}
+                      >
+                        {risksReviewed ? 'Risks reviewed' : 'Mark reviewed'}
+                      </button>
                     </div>
                   )}
-                  {paras.map((p, i) => (
-                    <p key={i} className="memoDocProse">{renderWithMonoNumbers(p)}</p>
-                  ))}
+                  <div className="memoRulingPanel">
+                    <div className="memoDecisionChoices" role="group" aria-label="Choose final ruling">
+                      {([
+                        ['YES', 'Invest'],
+                        ['MAYBE', 'Monitor'],
+                        ['NO', 'Pass'],
+                      ] as const).map(([decision, label]) => (
+                        <button
+                          key={decision}
+                          type="button"
+                          onClick={() => setRulingDecision(decision)}
+                          aria-pressed={rulingDecision === decision}
+                          disabled={rulingSaving}
+                          className="memoDecisionChoice"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={rulingNotes}
+                      onChange={(e) => setRulingNotes(e.target.value)}
+                      disabled={rulingSaving}
+                      rows={2}
+                      className="memoRulingTextarea"
+                      placeholder="Ruling rationale..."
+                      aria-label="Final ruling rationale"
+                    />
+                    <div className="memoRulingSubmitRow">
+                      <button
+                        type="button"
+                        onClick={handleRulingSubmit}
+                        disabled={!rulingDecision || rulingNotes.trim().length < 5 || rulingSaving}
+                        className="memoRulingSubmit"
+                      >
+                        {rulingSaving ? 'Recording...' : 'Commit ruling'}
+                      </button>
+                      {riskReviewOutstanding && (
+                        <span className="memoRulingHint">Controls remain live.</span>
+                      )}
+                      {rulingError && <span className="memoRulingError">{rulingError}</span>}
+                    </div>
+                  </div>
                 </section>
-              );
-            })()}
+              )}
+            </div>
 
-            {/* ── Executive Summary (synthesis after verdict) ── */}
+            {/* ── Evidence summary ── */}
             {showJudgment && (() => {
               const summary = displayStartup.review?.overall_summary?.trim();
               if (!summary) return null;
               return (
                 <section className="memoDocSection" aria-labelledby="memo-exec-summary">
-                  <h2 className="memoDocSectionHead" id="memo-exec-summary">Executive Summary</h2>
+                  <h2 className="memoDocSectionHead" id="memo-exec-summary">Evidence Summary</h2>
                   {summary && <p className="memoDocProse">{renderWithMonoNumbers(summary)}</p>}
                 </section>
               );
@@ -658,15 +833,15 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                             ? JSON.stringify(sig, null, 2).slice(0, 6000)
                             : null;
                         return (
-                          <div className="memoDocSubsection mb-4 bg-registerTint px-3 py-3">
+                          <div className="memoSignalsAudit">
                             <p className="memoDocSubhead">Signals &amp; reviewer alignment</p>
                             {dsum && (
-                              <p className="memoDocProse text-sm text-oxford/90">{renderWithMonoNumbers(dsum)}</p>
+                              <p className="memoDocProse">{renderWithMonoNumbers(dsum)}</p>
                             )}
                             {rnotes.length > 0 && (
-                              <ul className="memoList mt-2">
+                              <ul className="memoList">
                                 {rnotes.map((note, i) => (
-                                  <li key={i} className="memoListItem text-sm">
+                                  <li key={i} className="memoListItem">
                                     <span className="memoBullet" aria-hidden>
                                       ·
                                     </span>
@@ -676,7 +851,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                               </ul>
                             )}
                             {sigPreview && (
-                              <pre className="mt-2 max-h-48 overflow-auto rounded bg-oxford/[0.04] p-2 font-mono text-[11px] leading-snug text-oxford/85">
+                              <pre className="memoSignalsPreview">
                                 {sigPreview}
                                 {sigPreview.length >= 6000 ? '\n…' : ''}
                               </pre>

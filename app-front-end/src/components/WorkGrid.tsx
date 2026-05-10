@@ -3,29 +3,36 @@ import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import type { Startup } from '../types/startup';
 import { getReviewerQualityBand } from '../design-system/semantics';
 import { tokens } from '../design-system/tokens';
-import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import DecisionBadge from './DecisionBadge';
 import VerdictBandBadge from './VerdictBandBadge';
 import EmptyState from './EmptyState';
-import { resolveEscalation } from '../api/escalations';
 import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
-
-interface RowDecisionState { decision: string | null; notes: string; resolved: boolean; }
-const emptyRowState = (): RowDecisionState => ({ decision: null, notes: '', resolved: false });
+import {
+  getDealAgeDays,
+  getDealQueueState,
+  isDealDecided,
+  isDealStale,
+  queueAttentionRank,
+  type RulingDecision,
+} from '../lib/dealState';
+import { extractAdverseRegister } from '../lib/adverseRegister';
 
 type SourceFilter = 'ALL' | 'SCOUT' | 'LOOKUP';
 type DecisionFilter =
   | 'ALL'
+  | 'NEEDS_RULING'
+  | 'STALE'
+  | 'ADVERSE'
   | 'YES'
   | 'NO'
   | 'MAYBE'
   | 'ESCALATION'
   | 'WATCHLIST'
-  | 'UNDECIDED'
+  | 'DECIDED'
   | 'AWAITING_REVIEW';
 type ReviewFilter = 'ALL' | 'STRONG' | 'MEDIUM' | 'WEAK' | 'UNREVIEWED';
-type SortFilter = 'NEWEST' | 'OLDEST' | 'CONFIDENCE_HIGH' | 'CONFIDENCE_LOW' | 'NAME_AZ';
+type SortFilter = 'QUEUE_PRIORITY' | 'NEWEST' | 'OLDEST' | 'CONFIDENCE_HIGH' | 'CONFIDENCE_LOW' | 'NAME_AZ';
 
 function getReviewerVerdict(s: Startup) {
   return getReviewerQualityBand(s.review);
@@ -39,21 +46,20 @@ function sortKey(s: Startup): string {
   return s.timestamps?.partnered_at ?? s.timestamps?.reviewed_at ?? s.timestamps?.discovered_at ?? '';
 }
 
-function getDecisionFilterValue(s: Startup): Exclude<DecisionFilter, 'ALL'> {
-  if (s.partner?.human_review_required) return 'ESCALATION';
-  const rec = s.partner?.recommendation;
-  if (rec === 'INVEST') return 'YES';
-  if (rec === 'PASS') return 'NO';
-  if (rec === 'MONITOR') return 'MAYBE';
-  if (s.review) return 'UNDECIDED';
-  return 'AWAITING_REVIEW';
+function getHumanDecision(startup: Startup): RulingDecision | null {
+  return startup.human_resolution?.decision ?? null;
+}
+
+function startupNeedsRuling(startup: Startup): boolean {
+  return !isDealDecided(startup) && Boolean(startup.review || startup.partner?.recommendation);
 }
 
 const FilterButton = ({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`type-label-tab min-h-[36px] px-phi-3 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${active ? 'text-oxford font-semibold' : 'text-oxford/30 hover:text-oxford/60'
+    aria-pressed={active}
+    className={`type-label-tab min-h-[44px] px-phi-3 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${active ? 'text-oxford font-semibold' : 'text-oxford/30 hover:text-oxford/60'
       }`}
   >
     {label}
@@ -69,41 +75,83 @@ interface WorkGridProps {
 
 const EMPTY_WATCHLIST_IDS = new Set<string>();
 
-const DECISION_FILTER_CHIPS: { key: DecisionFilter; label: string }[] = [
-  { key: 'ALL', label: 'ANY' },
-  { key: 'YES', label: 'YES' },
-  { key: 'NO', label: 'NO' },
-  { key: 'MAYBE', label: 'MAYBE' },
+const ATTENTION_FILTER_CHIPS: { key: DecisionFilter; label: string }[] = [
+  { key: 'ALL', label: 'ANY ATTENTION' },
+  { key: 'NEEDS_RULING', label: 'NEEDS RULING' },
+  { key: 'STALE', label: 'STALE' },
+  { key: 'ADVERSE', label: 'ADVERSE' },
   { key: 'ESCALATION', label: 'ESCALATION' },
-  { key: 'WATCHLIST', label: 'MONITOR LIST' },
+  { key: 'AWAITING_REVIEW', label: 'AWAITING REVIEW' },
+  { key: 'WATCHLIST', label: 'ON MONITOR' },
 ];
+
+const RULING_FILTER_CHIPS: { key: DecisionFilter; label: string }[] = [
+  { key: 'YES', label: 'INVEST' },
+  { key: 'MAYBE', label: 'MONITOR' },
+  { key: 'NO', label: 'PASS' },
+  { key: 'DECIDED', label: 'ANY DECIDED' },
+];
+
+interface WorkGridRow {
+  startup: Startup;
+  sourceBadge: 'LOOKUP' | 'SCOUT';
+  reviewBand: ReturnType<typeof getReviewerVerdict>;
+  decisionVariant: ReturnType<typeof getDecisionBadgeVariant>;
+  queueState: ReturnType<typeof getDealQueueState>;
+  adverseItems: ReturnType<typeof extractAdverseRegister>;
+  hasAdverse: boolean;
+  hasHighAdverse: boolean;
+  ageDays: number | null;
+  displayIndex: string;
+  onMonitorList: boolean;
+  isDecided: boolean;
+  isStale: boolean;
+  isEscalated: boolean;
+  needsRuling: boolean;
+  sortKeyValue: string;
+}
+
+function rowMatchesDecisionFilter(row: WorkGridRow, filter: DecisionFilter): boolean {
+  if (filter === 'ALL') return true;
+  if (filter === 'WATCHLIST') return row.onMonitorList;
+  if (filter === 'NEEDS_RULING') return row.needsRuling;
+  if (filter === 'STALE') return row.isStale;
+  if (filter === 'ADVERSE') return !row.isDecided && row.hasAdverse;
+  if (filter === 'ESCALATION') return !row.isDecided && row.isEscalated;
+  if (filter === 'DECIDED') return row.isDecided;
+  if (filter === 'AWAITING_REVIEW') {
+    return !row.startup.review && !row.startup.partner?.recommendation && !row.isDecided;
+  }
+  return getHumanDecision(row.startup) === filter;
+}
 
 const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGridProps): JSX.Element => {
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('ALL');
   const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>('ALL');
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('ALL');
-  const [sortFilter, setSortFilter] = useState<SortFilter>('NEWEST');
+  const [sortFilter, setSortFilter] = useState<SortFilter>('QUEUE_PRIORITY');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [rowDecisions, setRowDecisions] = useState<Record<string, RowDecisionState>>({});
   const reduceMotion = usePrefersReducedMotion();
+  const hasActiveFilters =
+    sourceFilter !== 'ALL' ||
+    decisionFilter !== 'ALL' ||
+    reviewFilter !== 'ALL' ||
+    sortFilter !== 'QUEUE_PRIORITY';
 
-  /** Shared timing so teaser collapse and decision panel exit stay in sync (avoids stutter). */
-  const rowExpandTransition = useMemo(
-    () =>
-      transitionOrReduced(reduceMotion, {
-        duration: 0.22,
-        ease: tokens.motion.ease,
-      }),
-    [reduceMotion]
-  );
-  const decisionPanelTransition = rowExpandTransition;
+  const resetFilters = useCallback(() => {
+    setSourceFilter('ALL');
+    setDecisionFilter('ALL');
+    setReviewFilter('ALL');
+    setSortFilter('QUEUE_PRIORITY');
+  }, []);
+
   const listContainerVariants = useMemo((): Variants | undefined =>
     reduceMotion
       ? undefined
       : {
           hidden: {},
-          // 40ms stagger — within Emil's 30-80ms guideline. Short enough to feel snappy.
+          // 40ms stagger stays within the local motion guideline and feels snappy.
           visible: { transition: { staggerChildren: 0.04, delayChildren: 0.04 } },
         },
     [reduceMotion]
@@ -126,79 +174,93 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
   // Ref array for keyboard navigation between rows
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  const getRS = (id: string): RowDecisionState => rowDecisions[id] ?? emptyRowState();
-
-  const setRS = useCallback((id: string, patch: Partial<RowDecisionState>) => {
-    setRowDecisions(prev => ({ ...prev, [id]: { ...(prev[id] ?? emptyRowState()), ...patch } }));
-  }, []);
-
-  const handleConfirm = useCallback(async (startupId: string) => {
-    const rs = rowDecisions[startupId] ?? emptyRowState();
-    if (!rs.decision || rs.notes.trim().length < 5) return;
-    try {
-      await resolveEscalation(startupId, rs.decision as 'YES' | 'NO' | 'MAYBE', rs.notes);
-      setRS(startupId, { resolved: true });
-    } catch { /* silent */ }
-  }, [rowDecisions, setRS]);
-
   const stableIndex = useMemo(() => {
     // Reference numbers are always chronological by discovery (oldest = 01), independent of sort
     const byDiscovery = [...startups].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
     return new Map(byDiscovery.map((s, i) => [s.id, i + 1]));
   }, [startups]);
 
-  const ordered = useMemo(() => {
-    const sorted = [...startups];
+  const orderedRows = useMemo(() => {
+    const rows: WorkGridRow[] = startups.map((startup) => {
+      const adverseItems = extractAdverseRegister(startup);
+      const queueState = getDealQueueState(startup);
+      const isDecided = isDealDecided(startup);
+      const isStale = isDealStale(startup);
+      const displayIndex = (stableIndex.get(startup.id) ?? 0).toString().padStart(2, '0');
+      return {
+        startup,
+        sourceBadge: getSourceBadge(startup),
+        reviewBand: getReviewerVerdict(startup),
+        decisionVariant: getDecisionBadgeVariant(startup),
+        queueState,
+        adverseItems,
+        hasAdverse: adverseItems.length > 0,
+        hasHighAdverse: adverseItems.some((item) => item.severity === 'high'),
+        ageDays: getDealAgeDays(startup),
+        displayIndex,
+        onMonitorList: watchlistSet.has(startup.id),
+        isDecided,
+        isStale,
+        isEscalated: queueState === 'escalated',
+        needsRuling: startupNeedsRuling(startup),
+        sortKeyValue: sortKey(startup),
+      };
+    });
+    const sorted = [...rows];
     switch (sortFilter) {
+      case 'QUEUE_PRIORITY':
+        sorted.sort((a, b) => {
+          const ar = queueAttentionRank(a.startup);
+          const br = queueAttentionRank(b.startup);
+          if (ar !== br) return ar - br;
+          return b.sortKeyValue.localeCompare(a.sortKeyValue);
+        });
+        break;
       case 'OLDEST':
-        sorted.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+        sorted.sort((a, b) => a.sortKeyValue.localeCompare(b.sortKeyValue));
         break;
       case 'CONFIDENCE_HIGH':
-        sorted.sort((a, b) => (b.scout.confidence ?? 0) - (a.scout.confidence ?? 0));
+        sorted.sort((a, b) => (b.startup.scout.confidence ?? 0) - (a.startup.scout.confidence ?? 0));
         break;
       case 'CONFIDENCE_LOW':
-        sorted.sort((a, b) => (a.scout.confidence ?? 0) - (b.scout.confidence ?? 0));
+        sorted.sort((a, b) => (a.startup.scout.confidence ?? 0) - (b.startup.scout.confidence ?? 0));
         break;
       case 'NAME_AZ':
-        sorted.sort((a, b) => (a.scout.name ?? '').localeCompare(b.scout.name ?? ''));
+        sorted.sort((a, b) => (a.startup.scout.name ?? '').localeCompare(b.startup.scout.name ?? ''));
         break;
       case 'NEWEST':
       default:
-        sorted.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+        sorted.sort((a, b) => b.sortKeyValue.localeCompare(a.sortKeyValue));
         break;
     }
-    const filtered = sorted.filter((s) => {
-      if (sourceFilter === 'LOOKUP' && getSourceBadge(s) !== 'LOOKUP') return false;
-      if (sourceFilter === 'SCOUT' && getSourceBadge(s) !== 'SCOUT') return false;
-      if (decisionFilter === 'WATCHLIST') {
-        if (!watchlistSet.has(s.id)) return false;
-      } else if (decisionFilter !== 'ALL' && getDecisionFilterValue(s) !== decisionFilter) {
-        return false;
-      }
-      if (reviewFilter === 'UNREVIEWED' && s.review != null) return false;
-      if (reviewFilter !== 'ALL' && reviewFilter !== 'UNREVIEWED' && getReviewerVerdict(s) !== reviewFilter) return false;
+    const filtered = sorted.filter((row) => {
+      if (sourceFilter === 'LOOKUP' && row.sourceBadge !== 'LOOKUP') return false;
+      if (sourceFilter === 'SCOUT' && row.sourceBadge !== 'SCOUT') return false;
+      if (!rowMatchesDecisionFilter(row, decisionFilter)) return false;
+      if (reviewFilter === 'UNREVIEWED' && row.startup.review != null) return false;
+      if (reviewFilter !== 'ALL' && reviewFilter !== 'UNREVIEWED' && row.reviewBand !== reviewFilter) return false;
       return true;
     });
     return filtered;
-  }, [startups, sourceFilter, decisionFilter, reviewFilter, sortFilter, watchlistSet]);
+  }, [startups, stableIndex, sourceFilter, decisionFilter, reviewFilter, sortFilter, watchlistSet]);
 
-  // Arrow-key navigation between rows — power-user keyboard flow
+  // Arrow-key navigation between rows for power-user keyboard flow.
   const handleRowKeyDown = useCallback(
-    (e: React.KeyboardEvent, startup: (typeof ordered)[number], idx: number) => {
+    (e: React.KeyboardEvent, row: (typeof orderedRows)[number], idx: number) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        onStartupClick(startup);
+        onStartupClick(row.startup);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        const next = ordered[idx + 1];
-        if (next) rowRefs.current.get(next.id)?.focus();
+        const next = orderedRows[idx + 1];
+        if (next) rowRefs.current.get(next.startup.id)?.focus();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        const prev = ordered[idx - 1];
-        if (prev) rowRefs.current.get(prev.id)?.focus();
+        const prev = orderedRows[idx - 1];
+        if (prev) rowRefs.current.get(prev.startup.id)?.focus();
       }
     },
-    [onStartupClick, ordered]
+    [onStartupClick, orderedRows]
   );
 
   if (startups.length === 0) {
@@ -218,7 +280,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
         <div className="flex flex-col gap-phi-3 uppercase tracking-[0.06em]">
           <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2">
             <div className="flex min-w-0 flex-wrap items-center gap-phi-3">
-              <div className="flex items-center gap-0">
+              <div className="flex items-center gap-0" role="group" aria-label="Deal source filters">
                 <FilterButton active={sourceFilter === 'ALL'} label="ALL" onClick={() => setSourceFilter('ALL')} />
                 <FilterButton active={sourceFilter === 'SCOUT'} label="SCOUT" onClick={() => setSourceFilter('SCOUT')} />
                 <FilterButton active={sourceFilter === 'LOOKUP'} label="LOOKUP" onClick={() => setSourceFilter('LOOKUP')} />
@@ -230,10 +292,11 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                   value={sortFilter}
                   onChange={(e) => setSortFilter(e.target.value as SortFilter)}
                   aria-label="Sort deals"
-                  className="appearance-none min-h-[36px] bg-transparent type-meta text-oxford/30 hover:text-oxford/60 transition-colors pr-6 outline-none cursor-pointer"
+                  className="appearance-none min-h-[44px] border-b border-transparent bg-transparent type-meta text-oxford/35 hover:text-oxford/65 transition-colors pr-6 outline-none cursor-pointer focus-visible:border-oxford/45 focus-visible:text-oxford"
                 >
-                  <option value="NEWEST">CHRONOLOGICAL ↓</option>
-                  <option value="OLDEST">CHRONOLOGICAL ↑</option>
+                  <option value="QUEUE_PRIORITY">QUEUE PRIORITY</option>
+                  <option value="NEWEST">NEWEST FIRST</option>
+                  <option value="OLDEST">OLDEST FIRST</option>
                   <option value="CONFIDENCE_HIGH">SCOUT SIGNAL ↓</option>
                   <option value="CONFIDENCE_LOW">SCOUT SIGNAL ↑</option>
                   <option value="NAME_AZ">IDENTITY A–Z</option>
@@ -245,9 +308,10 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
               <button
                 type="button"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="type-meta min-h-[36px] text-oxford/30 hover:text-oxford/60 transition-colors pl-phi-2"
+                aria-expanded={showAdvancedFilters}
+                className="type-meta min-h-[44px] text-oxford/35 hover:text-oxford/65 transition-colors pl-phi-2"
               >
-                {showAdvancedFilters ? 'COLLAPSE' : 'REFINE'}
+                {showAdvancedFilters ? 'Hide filters' : 'Refine queue'}
               </button>
             </div>
           </div>
@@ -255,22 +319,23 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
           <AnimatePresence>
             {showAdvancedFilters && (
               <motion.div
-                initial={{ opacity: 0, y: -8 }}
+                initial={reduceMotion ? false : { opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2, ease: tokens.motion.ease }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
+                transition={{ duration: reduceMotion ? 0 : 0.2, ease: tokens.motion.ease }}
                 className="pt-phi-3 mt-phi-1"
               >
                 <div className="flex flex-col gap-phi-4 pt-phi-3">
                   <div className="flex flex-col sm:flex-row sm:items-start gap-phi-2 sm:gap-phi-4">
-                    <span className="type-label-tab text-oxford/30 sm:w-[112px] sm:shrink-0 sm:pt-[10px]">DECISION</span>
-                    <div className="flex flex-wrap gap-phi-2 flex-1 min-w-0">
-                      {DECISION_FILTER_CHIPS.map(({ key: d, label }) => (
+                    <span className="type-label-tab text-oxford/30 sm:w-[112px] sm:shrink-0 sm:pt-[14px]">ATTENTION</span>
+                    <div className="flex flex-wrap gap-phi-2 flex-1 min-w-0" role="group" aria-label="Attention filters">
+                      {ATTENTION_FILTER_CHIPS.map(({ key: d, label }) => (
                         <button
                           key={d}
                           type="button"
                           onClick={() => setDecisionFilter(d)}
-                          className={`type-meta px-phi-3 min-h-[34px] transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'bg-registerTint hover:bg-oxford/[0.06] text-oxford/60'
+                          aria-pressed={decisionFilter === d}
+                          className={`type-meta px-phi-3 min-h-[44px] transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'bg-registerTint hover:bg-oxford/[0.06] text-oxford/60'
                             }`}
                         >
                           {label}
@@ -279,13 +344,32 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-start gap-phi-2 sm:gap-phi-4">
-                    <span className="type-label-tab text-oxford/30 sm:w-[112px] sm:shrink-0 sm:pt-[10px]">REVIEW BAND</span>
-                    <div className="flex flex-wrap gap-phi-2 flex-1 min-w-0">
+                    <span className="type-label-tab text-oxford/30 sm:w-[112px] sm:shrink-0 sm:pt-[14px]">FINAL RULING</span>
+                    <div className="flex flex-wrap gap-phi-2 flex-1 min-w-0" role="group" aria-label="Final ruling filters">
+                      {RULING_FILTER_CHIPS.map(({ key: d, label }) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setDecisionFilter(d)}
+                          aria-pressed={decisionFilter === d}
+                          className={`type-meta px-phi-3 min-h-[44px] transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'bg-registerTint hover:bg-oxford/[0.06] text-oxford/60'
+                            }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-phi-2 sm:gap-phi-4">
+                    <span className="type-label-tab text-oxford/30 sm:w-[112px] sm:shrink-0 sm:pt-[14px]">REVIEW BAND</span>
+                    <div className="flex flex-wrap gap-phi-2 flex-1 min-w-0" role="group" aria-label="Review band filters">
                       {['ALL', 'STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'].map((r) => (
                         <button
                           key={r}
+                          type="button"
                           onClick={() => setReviewFilter(r as ReviewFilter)}
-                          className={`type-meta px-phi-3 min-h-[34px] transition-colors ${reviewFilter === r ? 'bg-oxford text-paper' : 'bg-registerTint hover:bg-oxford/[0.06] text-oxford/60'
+                          aria-pressed={reviewFilter === r}
+                          className={`type-meta px-phi-3 min-h-[44px] transition-colors ${reviewFilter === r ? 'bg-oxford text-paper' : 'bg-registerTint hover:bg-oxford/[0.06] text-oxford/60'
                             }`}
                         >
                           {r === 'ALL' ? 'ANY' : r}
@@ -295,15 +379,11 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                   </div>
                   <div className="flex justify-end pt-phi-2 border-t border-oxford/[0.06]">
                     <button
-                      onClick={() => {
-                        setSourceFilter('ALL');
-                        setDecisionFilter('ALL');
-                        setReviewFilter('ALL');
-                        setSortFilter('NEWEST');
-                      }}
-                      className="type-meta min-h-[36px] text-oxford/30 hover:text-oxford/60 transition-colors"
+                      type="button"
+                      onClick={resetFilters}
+                      className="type-meta min-h-[44px] text-oxford/35 hover:text-oxford/65 transition-colors"
                     >
-                      RESET FILTERS
+                      Reset view
                     </button>
                   </div>
                 </div>
@@ -320,14 +400,44 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
         animate="visible"
         variants={listContainerVariants}
       >
-        {ordered.map((startup, idx) => {
+        {orderedRows.length === 0 ? (
+          <div className="min-h-[18rem] px-phi-4 py-phi-7 border-t border-oxford/[0.06]">
+            <div className="max-w-[32rem]">
+              <p className="type-label-tab text-oxford/35">Queue view</p>
+              <p className="mt-phi-3 type-body-emphasis text-oxford">No deals match this view.</p>
+              <p className="mt-phi-2 type-body text-oxford/55">
+                Adjust the filters or return to queue priority to see active decisions.
+              </p>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="mt-phi-4 type-meta min-h-[44px] text-oxford/60 hover:text-oxford transition-colors"
+                >
+                  Reset view
+                </button>
+              )}
+            </div>
+          </div>
+        ) : orderedRows.map((row, idx) => {
+          const { startup } = row;
           const isSelected = selectedId === startup.id;
-          const reviewBand = getReviewerVerdict(startup);
-          const decisionVariant = getDecisionBadgeVariant(startup);
-          const displayIndex = (stableIndex.get(startup.id) ?? 0).toString().padStart(2, '0');
-          const onMonitorList = watchlistSet.has(startup.id);
-          const rowAria = `${startup.scout.name} — ${startup.scout.sector ?? 'Unknown sector'}.${
-            onMonitorList ? ' On system monitor list.' : ''
+          const isPending = row.queueState === 'pending' || row.isEscalated || row.isStale;
+          const rowStateClass = row.isDecided
+            ? 'opacity-[0.62] hover:opacity-100'
+            : row.hasHighAdverse || row.isEscalated
+              ? 'bg-accent/[0.025]'
+              : row.isStale
+                ? 'bg-heritageGold/[0.035]'
+                : isPending
+                  ? 'bg-oxford/[0.018]'
+                  : '';
+          const rowAria = `${startup.scout.name}, ${startup.scout.sector ?? 'Unknown sector'}.${
+            row.isDecided ? ' Decided.' : row.needsRuling ? ' Needs ruling.' : ''
+          }${row.isStale && row.ageDays != null ? ` ${row.ageDays} days unresolved.` : ''}${
+            row.hasAdverse ? ` ${row.adverseItems.length} adverse item${row.adverseItems.length === 1 ? '' : 's'}.` : ''
+          }${
+            row.onMonitorList ? ' On system monitor list.' : ''
           } Press Enter to open memo.`;
 
           return (
@@ -338,31 +448,43 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                 else rowRefs.current.delete(startup.id);
               }}
               variants={rowVariants}
-              className={`group relative px-phi-4 py-phi-6 cursor-pointer transition-[background-color] duration-[180ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset hover:bg-registerTint ${isSelected ? 'bg-registerTint' : ''
+              className={`group relative border-t border-oxford/[0.055] px-phi-4 py-phi-6 cursor-pointer transition-[background-color,opacity] duration-[180ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset hover:bg-registerTint ${rowStateClass} ${isSelected ? 'bg-registerTint opacity-100' : ''
                 }`}
               style={{ transitionTimingFunction: 'var(--motion-ease)' }}
               onClick={() => onStartupClick(startup)}
-              onKeyDown={(e) => handleRowKeyDown(e, startup, idx)}
+              onKeyDown={(e) => handleRowKeyDown(e, row, idx)}
               role="button"
               tabIndex={0}
               aria-pressed={isSelected}
               aria-label={rowAria}
             >
+              {(row.hasAdverse || row.isStale || row.isEscalated) && (
+                <span
+                  className={`absolute left-0 top-phi-4 bottom-phi-4 w-px ${
+                    row.hasHighAdverse || row.isEscalated
+                      ? 'bg-escalation/55'
+                      : row.hasAdverse
+                        ? 'bg-heritageGold/70'
+                        : 'bg-oxford/18'
+                  }`}
+                  aria-hidden
+                />
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-[26px_minmax(0,1fr)_auto] gap-x-phi-4 gap-y-phi-3 items-start">
                 {/* Index */}
-                <span className="type-meta text-oxford/25 group-hover:text-oxford/45 transition-colors tabular-nums pt-px sm:col-start-1">
-                  {displayIndex}
+                <span className={`type-meta transition-colors tabular-nums pt-px sm:col-start-1 ${row.needsRuling && !row.isDecided ? 'text-oxford/45 group-hover:text-oxford/65' : 'text-oxford/25 group-hover:text-oxford/45'}`}>
+                  {row.displayIndex}
                 </span>
 
                 {/* Body */}
                 <div className="min-w-0 sm:col-start-2">
-                  <h2 className="type-body-emphasis text-oxford">
+                  <h2 className={`type-body-emphasis break-words ${row.isDecided ? 'text-oxford/70' : 'text-oxford'}`}>
                     {startup.scout.name}
                   </h2>
                   <div className="flex flex-wrap items-center gap-x-phi-2 mt-phi-2">
-                    {sortKey(startup) && (
+                    {row.sortKeyValue && (
                       <span className="type-meta text-oxford/35 tabular-nums whitespace-nowrap">
-                        {new Date(sortKey(startup)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        {new Date(row.sortKeyValue).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </span>
                     )}
                     {(startup.scout.sector || '').split('/')[0].trim() && (
@@ -377,10 +499,42 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                         <span className="type-meta text-oxford/35">{startup.scout.funding_stage}</span>
                       </>
                     )}
-                    {getSourceBadge(startup) === 'LOOKUP' && (
+                    {row.sourceBadge === 'LOOKUP' && (
                       <>
                         <span className="type-meta text-oxford/25">·</span>
                         <span className="type-meta tracking-[0.08em] text-lookup">Lookup</span>
+                      </>
+                    )}
+                    {row.needsRuling && !row.isDecided && (
+                      <>
+                        <span className="type-meta text-oxford/25">·</span>
+                        <span className="type-meta tracking-[0.08em] text-oxford/55">
+                          Needs ruling
+                        </span>
+                      </>
+                    )}
+                    {row.isEscalated && (
+                      <>
+                        <span className="type-meta text-oxford/25">·</span>
+                        <span className="type-meta tracking-[0.08em] text-escalation/75">
+                          Escalated
+                        </span>
+                      </>
+                    )}
+                    {row.isStale && row.ageDays != null && (
+                      <>
+                        <span className="type-meta text-oxford/25">·</span>
+                        <span className="type-meta tracking-[0.08em] text-oxford/50">
+                          {row.ageDays}d unresolved
+                        </span>
+                      </>
+                    )}
+                    {row.hasAdverse && (
+                      <>
+                        <span className="type-meta text-oxford/25">·</span>
+                        <span className={`type-meta tracking-[0.08em] ${row.hasHighAdverse ? 'text-escalation/75' : 'text-oxford/45'}`}>
+                          {row.adverseItems.length} adverse
+                        </span>
                       </>
                     )}
                   </div>
@@ -388,7 +542,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
 
                 {/* Right: monitor chip, review band, partner verdict badge */}
                 <div className="flex flex-wrap items-center justify-end gap-phi-2 pt-px sm:col-start-3">
-                  {onMonitorList && (
+                  {row.onMonitorList && (
                     <span
                       className="type-label-tab text-oxford/45 bg-registerTint px-phi-2 py-0.5 shrink-0"
                       title="Tracked on portfolio monitor list (partner monitor outcome)"
@@ -396,108 +550,11 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                       Monitor
                     </span>
                   )}
-                  {reviewBand && <VerdictBandBadge band={reviewBand} />}
-                  <DecisionBadge variant={decisionVariant} />
+                  {row.reviewBand && <VerdictBandBadge band={row.reviewBand} />}
+                  <DecisionBadge variant={row.decisionVariant} />
                 </div>
               </div>
 
-              {/* Resolve panel: animate layout height, not only opacity, to avoid instant collapse. */}
-              <div
-                className={`grid min-h-0 transition-[grid-template-rows] ease-out ${isSelected ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-                style={{
-                  transitionDuration: reduceMotion ? '0ms' : '220ms',
-                  transitionTimingFunction: tokens.motion.easeCss,
-                }}
-                aria-hidden={!isSelected}
-              >
-                <div className={`min-h-0 overflow-hidden ${isSelected ? '' : 'pointer-events-none'}`}>
-                  <AnimatePresence initial={false}>
-                    {isSelected && (() => {
-                      const rs = getRS(startup.id);
-                      return (
-                        <motion.div
-                          key="decision-panel"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={decisionPanelTransition}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="mt-phi-4 pt-phi-4 space-y-phi-4">
-                            {rs.resolved ? (
-                              <motion.div
-                                className="flex items-start gap-phi-4"
-                                initial={reduceMotion ? false : { opacity: 0, x: -6 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={transitionOrReduced(reduceMotion, { duration: 0.3, ease: tokens.motion.ease })}
-                              >
-                                <DecisionBadge variant={
-                                  rs.decision === 'YES' ? 'INVEST' : rs.decision === 'NO' ? 'PASS' : 'MONITOR'
-                                } />
-                                {rs.notes && (
-                                  <span className="type-meta text-oxford/40 leading-relaxed">{rs.notes}</span>
-                                )}
-                              </motion.div>
-                            ) : (
-                              <div className="space-y-phi-3">
-                                <div className="flex flex-wrap items-center gap-x-phi-4 gap-y-phi-2">
-                                  <span className="type-meta text-oxford/45 tracking-[0.08em] shrink-0">Decision</span>
-                                  {([
-                                    { d: 'YES' as const, label: 'Invest' },
-                                    { d: 'NO' as const, label: 'Pass' },
-                                    { d: 'MAYBE' as const, label: 'Monitor' },
-                                  ] as const).map(({ d, label }) => {
-                                    const isActive = rs.decision === d;
-                                    return (
-                                      <button
-                                        key={d}
-                                        type="button"
-                                        onClick={() => setRS(startup.id, { decision: isActive ? null : d, notes: isActive ? '' : rs.notes })}
-                                        aria-pressed={isActive}
-                                        className={`type-meta tracking-[0.08em] min-h-[34px] border-b transition-[color,border-color] duration-150 btn-interaction ${isActive ? 'border-oxford text-oxford font-semibold' : 'border-transparent text-oxford/38 hover:border-oxford/20 hover:text-oxford/70'}`}
-                                      >
-                                        {label}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                                {rs.decision && (
-                                  <div className="flex flex-wrap items-end gap-x-phi-4 gap-y-phi-2">
-                                    <textarea
-                                      value={rs.notes}
-                                      onChange={(e) => setRS(startup.id, { notes: e.target.value })}
-                                      placeholder="Rationale..."
-                                      aria-label={`Decision rationale for ${startup.scout.name}`}
-                                      autoFocus
-                                      rows={1}
-                                      className="w-full sm:flex-1 bg-transparent border-0 border-b border-oxford/10 py-phi-1 type-meta text-oxford/80 placeholder:text-oxford/20 outline-none focus:border-oxford/30 transition-colors resize-none tracking-[0.04em]"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleConfirm(startup.id)}
-                                      disabled={rs.notes.trim().length < 5}
-                                      className="type-meta text-oxford/65 hover:text-oxford transition-colors disabled:opacity-20 tracking-[0.12em] inline-flex items-center min-h-[34px] whitespace-nowrap"
-                                    >
-                                      Confirm →
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setRS(startup.id, emptyRowState())}
-                                      className="type-meta text-oxford/30 hover:text-oxford/60 transition-colors tracking-[0.12em] inline-flex items-center min-h-[34px]"
-                                    >
-                                      Clear
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </motion.div>
-                      );
-                    })()}
-                  </AnimatePresence>
-                </div>
-              </div>
             </motion.div>
           );
         })}
