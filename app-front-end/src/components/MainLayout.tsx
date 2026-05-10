@@ -38,9 +38,9 @@ import { fetchFundThesisSummary } from '../api/fundThesis';
 import { getQueryConfig } from '../lib/queryIntent';
 import { railEditorial } from '../design-system/railEditorial';
 import { getBacklogPressure, isDealDecided } from '../lib/dealState';
+import type { FundConfiguration } from '../lib/fundConfiguration';
 
 const SYSTEM_MEMO_HEADER_PADDING = 'py-phi-3';
-const MAIN_LAYOUT_STATE_KEY = 'aethria.mainLayout.v1';
 const SETTINGS_PATH = '/v1/settings';
 
 const PANEL_CHROME_ACTION_BTN_CLASS =
@@ -52,35 +52,7 @@ interface MainLayoutProps {
   onSystemPanelOpenChange?: (open: boolean) => void;
 }
 
-type PersistedMainLayoutState = {
-  rightPanel: 'memo' | 'feed' | 'system' | null;
-  selectedStartupId: string | null;
-};
-
-function readPersistedMainLayoutState(): PersistedMainLayoutState | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(MAIN_LAYOUT_STATE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<PersistedMainLayoutState>;
-    const panel = parsed.rightPanel;
-    const rightPanel =
-      panel === 'memo' || panel === 'feed' || panel === 'system'
-        ? panel
-        : null;
-    return {
-      rightPanel,
-      selectedStartupId:
-        typeof parsed.selectedStartupId === 'string' && parsed.selectedStartupId.trim()
-          ? parsed.selectedStartupId.trim()
-          : null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function EmptyMemoPressure({ startups }: { startups: Startup[] }) {
+function EmptyMemoPressure({ startups, fundConfiguration }: { startups: Startup[]; fundConfiguration: FundConfiguration }) {
   const pressure = useMemo(() => getBacklogPressure(startups), [startups]);
   const oldestName = pressure.oldest?.startup.scout.name;
   const oldestAge = pressure.oldest?.ageDays;
@@ -88,30 +60,38 @@ function EmptyMemoPressure({ startups }: { startups: Startup[] }) {
   return (
     <div className="flex h-full min-h-0 items-center justify-center bg-paper px-phi-7 py-phi-7">
       <div className="w-full max-w-[34rem]">
-        <p className="type-label-section tracking-[0.16em] text-oxford/38">Decision queue</p>
-        <p className="mt-phi-3 font-serif text-[clamp(1.65rem,2.8vw,2.3rem)] leading-[1.08] text-oxford">
+        <p className="type-label-section tracking-[0.12em] text-oxford/45">Decision queue</p>
+        <p className="mt-phi-3 font-display text-[clamp(1.75rem,2.8vw,2.45rem)] font-medium leading-[1.02] text-oxford">
           Conviction queue requires review.
         </p>
         <dl className="mt-phi-6 grid grid-cols-3 gap-x-phi-5 gap-y-phi-4 border-y border-oxford/[0.08] py-phi-4">
           <div>
             <dt className="type-meta text-oxford/35">Pending</dt>
-            <dd className="mt-phi-1 font-mono text-[1.35rem] leading-none text-oxford tabular-nums">
+            <dd className="mt-phi-1 font-mono text-[1.35rem] font-semibold leading-none text-oxford tabular-nums">
               {pressure.pendingCount}
             </dd>
           </div>
           <div>
             <dt className="type-meta text-oxford/35">Adverse</dt>
-            <dd className={`mt-phi-1 font-mono text-[1.35rem] leading-none tabular-nums ${pressure.adverseCount > 0 ? 'text-escalation/80' : 'text-oxford'}`}>
+            <dd className={`mt-phi-1 font-mono text-[1.35rem] font-semibold leading-none tabular-nums ${pressure.adverseCount > 0 ? 'text-escalation/80' : 'text-oxford'}`}>
               {pressure.adverseCount}
             </dd>
           </div>
           <div>
             <dt className="type-meta text-oxford/35">Oldest</dt>
-            <dd className="mt-phi-1 font-mono text-[1.35rem] leading-none text-oxford tabular-nums">
+            <dd className="mt-phi-1 font-mono text-[1.35rem] font-semibold leading-none text-oxford tabular-nums">
               {oldestAge != null && oldestAge >= 0 ? `${oldestAge}d` : '—'}
             </dd>
           </div>
         </dl>
+        <div className="mt-phi-4 grid gap-phi-2 border-b border-oxford/[0.06] pb-phi-4">
+          <p className="type-meta text-oxford/38">
+            Stale threshold <span className="font-mono tabular-nums text-oxford/62">{fundConfiguration.thresholds.staleAfterHours}h</span>
+          </p>
+          <p className="type-meta text-oxford/38">
+            Risk posture <span className="text-oxford/62">{fundConfiguration.risk.sensitivity}</span>
+          </p>
+        </div>
         <p className="mt-phi-4 type-meta leading-relaxed text-oxford/42">
           {oldestName && oldestAge != null && oldestAge >= 0
             ? `${oldestName} is the oldest unresolved matter in the queue.`
@@ -143,13 +123,8 @@ export default function MainLayout({
     metaInsights,
     liveGate,
   } = data;
-  const persistedStateRef = useRef<PersistedMainLayoutState | null>(readPersistedMainLayoutState());
-  const hydratedFromStorageRef = useRef(false);
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
-  const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>(
-    persistedStateRef.current?.rightPanel ?? null
-  );
-  const initialFirstMemoOpened = useRef(false);
+  const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>(null);
   const [lookupInput, setLookupInput] = useState('');
   const [lookupBusy, setLookupBusy] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
@@ -310,29 +285,6 @@ export default function MainLayout({
   ]);
 
   useEffect(() => {
-    if (hydratedFromStorageRef.current) return;
-    const persisted = persistedStateRef.current;
-    if (!persisted?.selectedStartupId || startups.length === 0) {
-      hydratedFromStorageRef.current = true;
-      return;
-    }
-    const startup = startups.find((s) => s.id === persisted.selectedStartupId) ?? null;
-    if (startup) {
-      setSelectedStartup(startup);
-      if (!persisted.rightPanel) setRightPanel('memo');
-      initialFirstMemoOpened.current = true;
-    }
-    hydratedFromStorageRef.current = true;
-  }, [startups]);
-
-  useEffect(() => {
-    if (initialFirstMemoOpened.current || startups.length === 0) return;
-    initialFirstMemoOpened.current = true;
-    setSelectedStartup(startups[0]);
-    setRightPanel('memo');
-  }, [startups]);
-
-  useEffect(() => {
     if (!pendingLookup) return;
     const matched = pendingLookupMatch;
     if (!matched) {
@@ -414,19 +366,6 @@ export default function MainLayout({
   useEffect(() => {
     onSystemPanelOpenChange?.(rightPanel === 'system');
   }, [rightPanel, onSystemPanelOpenChange]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const snapshot: PersistedMainLayoutState = {
-      rightPanel,
-      selectedStartupId: selectedStartup?.id ?? null,
-    };
-    try {
-      window.localStorage.setItem(MAIN_LAYOUT_STATE_KEY, JSON.stringify(snapshot));
-    } catch {
-      // ignore storage write failures (private mode/quota)
-    }
-  }, [rightPanel, selectedStartup?.id]);
 
   useEffect(() => {
     if (!pipelineHealthIssue && showPipelineIssueHelp) {
@@ -598,16 +537,16 @@ export default function MainLayout({
 
       <main className="flex-1 flex min-h-0 overflow-hidden bg-paper">
         <div
-          className="w-4 shrink-0 self-stretch origin-top bg-oxford sm:w-8 md:w-12"
+          className="w-4 shrink-0 self-stretch origin-top bg-oxford sm:w-7 md:w-10"
           aria-hidden="true"
         />
-        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-paper px-phi-5 pt-phi-4 pb-phi-5 lg:px-phi-5 lg:pt-phi-5 lg:pb-phi-5">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
           <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.85fr)_minmax(420px,1.12fr)_minmax(0,1.46fr)] lg:grid-rows-[minmax(0,1fr)] min-h-0 overflow-hidden gap-phi-5 lg:gap-phi-5 bg-paper">
             <aside className="hidden lg:flex h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden bg-paper">
-              <div className="flex h-full flex-1 flex-col min-h-0 overflow-y-auto overflow-x-hidden px-phi-4 py-phi-4 gap-y-phi-4">
+              <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] overflow-hidden px-phi-4 py-phi-4">
 
                 {/* ── Wordmark + pipeline status ─────────────────────── */}
-                <div className="shrink-0">
+                <div className="min-w-0 pb-phi-4">
                   <div className="flex items-center justify-between gap-phi-3">
                     <p className={railEditorial.wordmark}>
                       Aethria
@@ -668,10 +607,8 @@ export default function MainLayout({
                   </div>
                 </div>
 
-                <div className="shrink-0 mt-phi-5" aria-hidden />
-
                 {/* ── Lookup ─────────────────────────────────────────── */}
-                <div className="shrink-0 min-w-0">
+                <div className="flex min-h-0 min-w-0 flex-col justify-center border-t border-oxford/[0.075] py-phi-4">
                   <AgentDispatch
                     input={lookupInput}
                     setInput={setLookupInput}
@@ -685,9 +622,9 @@ export default function MainLayout({
                 </div>
 
                 {/* ── Overview ───────────────────────────────────────── */}
-                <section aria-label="Live overview" className="shrink-0 min-w-0">
+                <section aria-label="Live overview" className="flex min-h-0 min-w-0 flex-col justify-center border-t border-oxford/[0.075] py-phi-4">
                   <p className={railEditorial.label}>Overview</p>
-                  <div className="grid min-w-0 grid-cols-2 gap-phi-2">
+                  <div className="grid min-w-0 grid-cols-2 gap-x-phi-4 gap-y-phi-3">
                     {[
                       { label: 'Total',     value: startups.length,    accent: false },
                       { label: 'Open',      value: openCount,          accent: false },
@@ -696,7 +633,7 @@ export default function MainLayout({
                     ].map((stat) => (
                       <div
                         key={stat.label}
-                        className="flex min-h-0 min-w-0 flex-col justify-between gap-phi-2 py-phi-2"
+                        className="flex min-h-0 min-w-0 flex-col justify-between gap-phi-2"
                       >
                         <span className={railEditorial.statLabel}>{stat.label}</span>
                         <span
@@ -710,7 +647,7 @@ export default function MainLayout({
                 </section>
 
                 {/* ── Mandate ────────────────────────────────────────── */}
-                <article className="shrink-0 min-w-0" aria-label="Fund thesis preview">
+                <article className="flex min-h-0 min-w-0 flex-col justify-center overflow-hidden border-t border-oxford/[0.075] py-phi-4" aria-label="Fund thesis preview">
                   <p className={railEditorial.label}>Mandate</p>
                   <div className="flex min-w-0 items-center justify-between gap-phi-3">
                     <p className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong}`}>
@@ -735,7 +672,7 @@ export default function MainLayout({
                     ) : null}
                   </div>
                   {hasThesisTags && (
-                    <div className="mt-phi-3 flex flex-wrap gap-phi-2">
+                    <div className="mt-phi-3 flex max-h-[4.9rem] flex-wrap gap-phi-2 overflow-hidden">
                       {thesisTagList.map((t, i) => (
                         <span
                           key={`mandate-${i}-${t}`}
@@ -749,7 +686,7 @@ export default function MainLayout({
                 </article>
 
                 {/* ── Account — pushed to bottom ─────────────────────── */}
-                <div className="mt-auto shrink-0 min-w-0 pt-phi-7">
+                <div className="min-w-0 border-t border-oxford/[0.075] pt-phi-4">
                   <AccountRailPanel settingsPath={SETTINGS_PATH} />
                 </div>
 
@@ -881,7 +818,7 @@ export default function MainLayout({
 
               <div
                 className="flex-1 min-h-0 overflow-y-auto overscroll-contain w-full min-w-0 rounded-none bg-paper"
-                style={{ scrollbarGutter: 'stable both-edges' }}
+                style={{ scrollbarGutter: 'stable' }}
               >
                 {rightPanel === 'system' ? (
                   <SystemIntelligence
@@ -897,9 +834,10 @@ export default function MainLayout({
                     metaPromptState={metaPromptState}
                     metaEvalSet={metaEvalSet}
                     metaInsights={metaInsights}
+                    fundConfiguration={fundConfiguration}
                   />
                 ) : (
-                  <GhostTransition disableLift>
+                  <GhostTransition disableLift className="w-full min-w-0">
                     <WorkGrid
                       startups={startups}
                       onStartupClick={handleStartupClick}
@@ -1040,6 +978,7 @@ export default function MainLayout({
                             onMemoPipelineReady={handleMemoPipelineReady}
                             onDecisionResolved={handleDecisionResolved}
                             fundConfiguration={fundConfiguration}
+                            peerStartups={startups}
                           />
                         </motion.div>
                       </PanelShell>
@@ -1056,7 +995,7 @@ export default function MainLayout({
                       })}
                       className="h-full"
                     >
-                      <EmptyMemoPressure startups={startups} />
+                      <EmptyMemoPressure startups={startups} fundConfiguration={fundConfiguration} />
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -1154,6 +1093,7 @@ export default function MainLayout({
             onClose={handleCloseMemo}
             onMemoPipelineReady={handleMemoPipelineReady}
             fundConfiguration={fundConfiguration}
+            peerStartups={startups}
           />
         )}
       </AnimatePresence>

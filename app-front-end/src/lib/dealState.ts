@@ -84,12 +84,46 @@ export function buildOptimisticResolution(
   notes: string
 ): Startup {
   const now = new Date().toISOString();
+  const priorHistory = startup.conviction_state?.decision_history ?? [];
+  const previousDecision = startup.human_resolution?.decision ?? null;
+  const scoreSnapshot = startup.review
+    ? {
+        market_score: startup.review.market_score,
+        product_score: startup.review.product_score,
+        technical_score: startup.review.technical_score,
+        execution_score: startup.review.execution_score,
+        defensibility_score: startup.review.defensibility_score,
+        overall_score: startup.review.overall_score ?? startup.review.aggregate_score,
+        thesis_alignment_score: startup.review.thesis_alignment_score,
+      }
+    : null;
+  const historyRecord = {
+    company_id: startup.id,
+    previous_decision: previousDecision,
+    new_decision: decision,
+    timestamp: now,
+    rationale: notes,
+    confidence: startup.partner?.confidence ?? null,
+    score_snapshot: scoreSnapshot,
+  };
   return {
     ...startup,
     human_resolution: {
       decision,
       notes,
       resolved_at: now,
+    },
+    conviction_state: {
+      ...(startup.conviction_state ?? {}),
+      current_ruling: {
+        decision,
+        rationale: notes,
+        resolved_at: now,
+        confidence: startup.partner?.confidence ?? null,
+        score_snapshot: scoreSnapshot,
+      },
+      ruling_rationale: notes,
+      decision_history: [...priorHistory, historyRecord],
     },
     partner: startup.partner
       ? {

@@ -28,10 +28,11 @@ _LIST_SELECT = (
     "startup_id, display_name, list_one_line, list_sector, list_scout_type, list_origin_type, "
     "list_lookup_id, list_lookup_query, list_lookup_website, list_confidence, list_score, list_verdict, "
     "list_consensus_verdict, list_reviewer_disagreement, list_reviewed_at, list_partnered_at, "
-    "short_summary, partner_decision, partner_human_review_required, partner_info, created_at, updated_at"
+    "short_summary, partner_decision, partner_human_review_required, partner_info, human_resolution, "
+    "conviction_state, created_at, updated_at"
 )
 _MEMO_PARTIAL_SELECT = (
-    "startup_id, scout_info, review_info, partner_info, investment_memo_markdown"
+    "startup_id, scout_info, review_info, partner_info, conviction_state, investment_memo_markdown"
 )
 
 
@@ -45,6 +46,7 @@ def _row_to_dict(row: dict) -> dict:
         "financials": row.get("financials") or {},
         "version": row.get("version", 1),
         "human_resolution": row.get("human_resolution"),
+        "conviction_state": row.get("conviction_state"),
         "investment_memo_markdown": row.get("investment_memo_markdown"),
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
@@ -61,6 +63,8 @@ def _dict_to_row(d: dict, user_id: str) -> dict:
         "partner_info": d.get("partner_info"),
         "financials": d.get("financials") or {},
         "version": d.get("version", 1),
+        "human_resolution": d.get("human_resolution"),
+        "conviction_state": d.get("conviction_state"),
         "created_at": d.get("created_at"),
         "updated_at": d.get("updated_at"),
     }

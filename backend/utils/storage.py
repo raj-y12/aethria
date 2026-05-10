@@ -29,7 +29,7 @@ _WRITE_RETRY_DELAY = 0.1
 
 def _merge_startup_dict_patch(base: dict, patch: Dict[str, Any]) -> None:
     """Shallow-merge patch into startup dict; nested merge for scout/review/partner/financials blobs."""
-    merge_keys = ("scout_info", "review_info", "partner_info", "financials")
+    merge_keys = ("scout_info", "review_info", "partner_info", "financials", "conviction_state")
     for k, v in patch.items():
         if k in merge_keys and isinstance(v, dict) and isinstance(base.get(k), dict):
             merged = dict(base[k])

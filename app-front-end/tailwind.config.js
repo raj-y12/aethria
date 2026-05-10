@@ -24,7 +24,8 @@ export default {
         ivory: '#e9e0d1',
         canvas: '#e9e0d1',
         mist: '#f2f4f8',
-        graphite: '#2f333b',
+        /** Legacy alias — same family as oxford (avoid cool neutral ink). */
+        graphite: '#1a2b48',
         /** Structural hairlines — prefer over raw oxford/[0.06] in new code. */
         hairline: 'rgba(26, 43, 72, 0.06)',
         'hairline-strong': 'rgba(26, 43, 72, 0.12)',

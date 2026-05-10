@@ -34,6 +34,7 @@ import {
   shouldGateRisk,
   type FundConfiguration,
 } from '../lib/fundConfiguration';
+import { findPrecedentCandidates } from '../lib/institutionalConviction';
 const MEMO_POLL_INITIAL_MS = 2000;
 const MEMO_POLL_MAX_MS = 15000;
 const MEMO_POLL_MAX_ATTEMPTS = 60;
@@ -95,6 +96,7 @@ export interface InvestmentMemoContentProps {
   onMemoPipelineReady?: () => void;
   onDecisionResolved?: (startup: Startup) => void;
   fundConfiguration?: FundConfiguration;
+  peerStartups?: Startup[];
 }
 
 export interface InvestmentMemoContentHandle {
@@ -241,7 +243,7 @@ function decisionLabel(decision: RulingDecision): string {
 }
 
 const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, InvestmentMemoContentProps>(function InvestmentMemoContent(
-  { startup, onClose, embedded = false, onMemoPipelineReady, onDecisionResolved, fundConfiguration },
+  { startup, onClose, embedded = false, onMemoPipelineReady, onDecisionResolved, fundConfiguration, peerStartups = [] },
   ref
 ) {
   const config = fundConfiguration ?? createDefaultFundConfiguration();
@@ -400,6 +402,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     displayStartup && shouldGateRisk(config, hasHighAdverse, adverseRegister.length > 0, isAlreadyDecided)
   );
   const riskReviewOutstanding = needsRiskAcknowledgement && !risksReviewed;
+  const convictionHistory = displayStartup?.conviction_state?.decision_history ?? [];
+  const precedentCandidates = useMemo(
+    () => (displayStartup ? findPrecedentCandidates(displayStartup, peerStartups) : []),
+    [displayStartup, peerStartups]
+  );
 
   useEffect(() => {
     setSelectedReviewerIdx(0);
@@ -428,14 +435,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     setRulingError(null);
     onDecisionResolved?.(optimistic);
     try {
-      await resolveEscalation(displayStartup.id, rulingDecision, rulingNotes.trim());
+      await resolveEscalation(displayStartup.id, rulingDecision, rulingNotes.trim(), risksReviewed);
       setRulingSaving(false);
     } catch {
       onDecisionResolved?.(previous);
       setRulingSaving(false);
       setRulingError('Ruling did not save. Retry once the API is reachable.');
     }
-  }, [displayStartup, onDecisionResolved, rulingDecision, rulingNotes]);
+  }, [displayStartup, onDecisionResolved, risksReviewed, rulingDecision, rulingNotes]);
 
   const structuredScoring = useMemo(
     () => normalizeStructuredScoring(displayStartup?.review ?? null),
@@ -664,6 +671,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   )}
                 </section>
               )}
+              {adverseRegister.length === 0 && showJudgment && (
+                <section className="memoDocSection memoAdverseRegister memoAdverseRegister--empty" aria-labelledby="memo-adverse-register-empty">
+                  <h2 className="memoDocSectionHead" id="memo-adverse-register-empty">Adverse Register</h2>
+                  <p className="memoAdverseSummary">
+                    No material adverse items extracted under the current {config.risk.sensitivity} risk posture.
+                  </p>
+                </section>
+              )}
 
               {!isAlreadyDecided && showJudgment && (
                 <section className="memoDocSection memoRulingControls" aria-labelledby="memo-final-ruling">
@@ -725,6 +740,52 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       )}
                       {rulingError && <span className="memoRulingError">{rulingError}</span>}
                     </div>
+                  </div>
+                </section>
+              )}
+
+              {showJudgment && (
+                <section className="memoDocSection memoDecisionLedger" aria-labelledby="memo-decision-ledger">
+                  <h2 className="memoDocSectionHead" id="memo-decision-ledger">Decision Ledger</h2>
+                  {convictionHistory.length > 0 && (
+                    <ol className="memoLedgerList">
+                      {[...convictionHistory].reverse().slice(0, 5).map((entry, index) => (
+                        <li key={`${entry.timestamp}-${index}`} className="memoLedgerItem">
+                          <div className="memoLedgerMeta">
+                            <span>{decisionLabel(entry.new_decision)}</span>
+                            <span>{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('en-GB') : '—'}</span>
+                          </div>
+                          {entry.rationale && (
+                            <p className="memoLedgerText">{renderWithMonoNumbers(entry.rationale)}</p>
+                          )}
+                          <p className="memoLedgerSub">
+                            {entry.previous_decision ? `From ${decisionLabel(entry.previous_decision)} · ` : ''}
+                            {entry.config_version ? renderWithMonoNumbers(entry.config_version) : 'Current configuration'}
+                          </p>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {convictionHistory.length === 0 && (
+                    <p className="memoLedgerEmpty">Conviction history starts when a ruling is committed.</p>
+                  )}
+                  <div className="memoPrecedentBlock">
+                    <p className="memoDocSubhead">Precedents</p>
+                    {precedentCandidates.length > 0 ? (
+                      <ul className="memoList">
+                        {precedentCandidates.map((candidate) => (
+                          <li key={candidate.startupId} className="memoListItem">
+                            <span className="memoBullet" aria-hidden>·</span>
+                            <span>
+                              {candidate.name}: {decisionLabel(candidate.decision)}
+                              {candidate.matchReasons.length ? ` (${candidate.matchReasons.join(', ')})` : ''}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="memoLedgerEmpty">Precedents will appear when comparable resolved decisions exist.</p>
+                    )}
                   </div>
                 </section>
               )}

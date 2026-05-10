@@ -14,12 +14,13 @@ interface InvestmentMemoProps {
   onClose: () => void;
   onMemoPipelineReady?: () => void;
   fundConfiguration?: FundConfiguration;
+  peerStartups?: Startup[];
 }
 
 /**
  * Full-screen modal wrapper for the investment memo. Used on small viewports.
  */
-export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady, fundConfiguration }: InvestmentMemoProps) {
+export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady, fundConfiguration, peerStartups }: InvestmentMemoProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion = usePrefersReducedMotion();
   useFocusTrap(true, containerRef);
@@ -78,6 +79,7 @@ export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady, 
           onClose={onClose}
           onMemoPipelineReady={onMemoPipelineReady}
           fundConfiguration={fundConfiguration}
+          peerStartups={peerStartups}
         />
       </div>
     </motion.div>

@@ -7,6 +7,7 @@ import { usePrefersReducedMotion } from '../hooks';
 import DecisionBadge from './DecisionBadge';
 import VerdictBandBadge from './VerdictBandBadge';
 import EmptyState from './EmptyState';
+import { productInteraction, productText } from '../design-system/productSystem';
 import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 import {
   getDealAgeDays,
@@ -65,12 +66,33 @@ const FilterButton = ({ active, label, onClick }: { active: boolean; label: stri
     type="button"
     onClick={onClick}
     aria-pressed={active}
-    className={`type-label-tab min-h-[44px] px-phi-3 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${active ? 'text-oxford font-semibold' : 'text-oxford/30 hover:text-oxford/60'
+    className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'text-oxford font-semibold' : 'text-oxford/40 hover:text-oxford/70'
       }`}
   >
     {label}
   </button>
 );
+
+function AdvancedChip({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`type-meta min-h-[36px] whitespace-nowrap px-phi-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.035] hover:bg-oxford/[0.065] text-oxford/58'}`}
+    >
+      {label}
+    </button>
+  );
+}
 
 interface WorkGridProps {
   startups: Startup[];
@@ -280,8 +302,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     return (
       <div className="w-full h-full min-h-[12rem] flex flex-col items-center justify-center">
         <EmptyState
-          label="Pipeline"
-          body="Scouts are filling the queue. First companies usually appear within a few minutes."
+          label="Decision queue"
+          body={`Scouts are filling the workspace against the active mandate. Stale pressure begins after ${config.thresholds.staleAfterHours} hours.`}
         />
       </div>
     );
@@ -289,126 +311,107 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
 
   return (
     <div className="w-full font-sans bg-surface-canvas selection:bg-oxford selection:text-paper">
-      <div className="sticky top-0 z-20 bg-surface-canvas px-phi-4 py-phi-3">
-        <div className="flex flex-col gap-phi-3 uppercase tracking-[0.06em]">
-          <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2">
-            <div className="flex min-w-0 flex-wrap items-center gap-phi-3">
-              <div className="flex items-center gap-0" role="group" aria-label="Deal source filters">
-                <FilterButton active={sourceFilter === 'ALL'} label="ALL" onClick={() => setSourceFilter('ALL')} />
-                <FilterButton active={sourceFilter === 'SCOUT'} label="SCOUT" onClick={() => setSourceFilter('SCOUT')} />
-                <FilterButton active={sourceFilter === 'LOOKUP'} label="LOOKUP" onClick={() => setSourceFilter('LOOKUP')} />
-              </div>
+      <header className="sticky top-0 z-20 border-b border-oxford/[0.08] bg-paper px-phi-3 py-phi-2 uppercase tracking-[0.06em]">
+        <div className="flex min-w-0 flex-col gap-phi-2">
+          <div className="min-w-0 flex flex-col gap-phi-1">
+            <p className={productText.mutedLabel}>Decision queue</p>
+            <p className="type-meta normal-case tracking-normal text-oxford/32">
+              {config.thresholds.staleAfterHours}h stale · {config.risk.sensitivity} risk
+            </p>
+          </div>
+
+          <div className="flex min-w-0 flex-wrap items-center gap-x-phi-3 gap-y-phi-1">
+            <div className="flex items-center gap-0" role="group" aria-label="Deal source filters">
+              <FilterButton active={sourceFilter === 'ALL'} label="ALL" onClick={() => setSourceFilter('ALL')} />
+              <FilterButton active={sourceFilter === 'SCOUT'} label="SCOUT" onClick={() => setSourceFilter('SCOUT')} />
+              <FilterButton active={sourceFilter === 'LOOKUP'} label="LOOKUP" onClick={() => setSourceFilter('LOOKUP')} />
             </div>
-            <div className="flex items-center gap-phi-3">
-              <div className="relative group">
+
+            <div className="ml-auto flex items-center gap-x-phi-3">
+              <div className="relative shrink-0">
                 <select
                   value={sortFilter}
                   onChange={(e) => setSortFilter(e.target.value as SortFilter)}
                   aria-label="Sort deals"
-                  className="appearance-none min-h-[44px] border-b border-transparent bg-transparent type-meta text-oxford/35 hover:text-oxford/65 transition-colors pr-6 outline-none cursor-pointer focus-visible:border-oxford/45 focus-visible:text-oxford"
+                  className="appearance-none min-h-[36px] border-b border-transparent bg-transparent type-meta text-oxford/38 hover:text-oxford/70 transition-colors pr-6 text-right outline-none cursor-pointer focus-visible:border-oxford/45 focus-visible:text-oxford"
                 >
-                  <option value="QUEUE_PRIORITY">QUEUE PRIORITY</option>
-                  <option value="NEWEST">NEWEST FIRST</option>
-                  <option value="OLDEST">OLDEST FIRST</option>
-                  <option value="CONFIDENCE_HIGH">SCOUT SIGNAL ↓</option>
-                  <option value="CONFIDENCE_LOW">SCOUT SIGNAL ↑</option>
-                  <option value="NAME_AZ">IDENTITY A–Z</option>
+                  <option value="QUEUE_PRIORITY">PRIORITY</option>
+                  <option value="NEWEST">NEWEST</option>
+                  <option value="OLDEST">OLDEST</option>
+                  <option value="CONFIDENCE_HIGH">SIGNAL ↓</option>
+                  <option value="CONFIDENCE_LOW">SIGNAL ↑</option>
+                  <option value="NAME_AZ">NAME A–Z</option>
                 </select>
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-oxford/20">
+                <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-oxford/20" aria-hidden>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
-                </div>
+                </span>
               </div>
+
               <button
                 type="button"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                 aria-expanded={showAdvancedFilters}
-                className="type-meta min-h-[44px] text-oxford/35 hover:text-oxford/65 transition-colors pl-phi-2"
+                className={`${productInteraction.action} shrink-0 !min-h-[36px]`}
               >
-                {showAdvancedFilters ? 'Hide filters' : 'Refine queue'}
+                {showAdvancedFilters ? 'Hide' : 'Refine'}
               </button>
             </div>
           </div>
+        </div>
 
-          <AnimatePresence>
-            {showAdvancedFilters && (
-              <motion.div
-                initial={reduceMotion ? false : { opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
-                transition={{ duration: reduceMotion ? 0 : 0.2, ease: tokens.motion.ease }}
-                className="pt-phi-3 mt-phi-1"
-              >
-                <div className="flex flex-col gap-phi-4 pt-phi-3">
-                  <div className="flex flex-col sm:flex-row sm:items-start gap-phi-2 sm:gap-phi-4">
-                    <span className="type-label-tab text-oxford/30 sm:w-[112px] sm:shrink-0 sm:pt-[14px]">ATTENTION</span>
-                    <div className="flex flex-wrap gap-phi-2 flex-1 min-w-0" role="group" aria-label="Attention filters">
-                      {ATTENTION_FILTER_CHIPS.map(({ key: d, label }) => (
-                        <button
-                          key={d}
-                          type="button"
-                          onClick={() => setDecisionFilter(d)}
-                          aria-pressed={decisionFilter === d}
-                          className={`type-meta px-phi-3 min-h-[44px] transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'bg-registerTint hover:bg-oxford/[0.06] text-oxford/60'
-                            }`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-start gap-phi-2 sm:gap-phi-4">
-                    <span className="type-label-tab text-oxford/30 sm:w-[112px] sm:shrink-0 sm:pt-[14px]">FINAL RULING</span>
-                    <div className="flex flex-wrap gap-phi-2 flex-1 min-w-0" role="group" aria-label="Final ruling filters">
-                      {RULING_FILTER_CHIPS.map(({ key: d, label }) => (
-                        <button
-                          key={d}
-                          type="button"
-                          onClick={() => setDecisionFilter(d)}
-                          aria-pressed={decisionFilter === d}
-                          className={`type-meta px-phi-3 min-h-[44px] transition-colors ${decisionFilter === d ? 'bg-oxford text-paper' : 'bg-registerTint hover:bg-oxford/[0.06] text-oxford/60'
-                            }`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-start gap-phi-2 sm:gap-phi-4">
-                    <span className="type-label-tab text-oxford/30 sm:w-[112px] sm:shrink-0 sm:pt-[14px]">REVIEW BAND</span>
-                    <div className="flex flex-wrap gap-phi-2 flex-1 min-w-0" role="group" aria-label="Review band filters">
-                      {['ALL', 'STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'].map((r) => (
-                        <button
-                          key={r}
-                          type="button"
-                          onClick={() => setReviewFilter(r as ReviewFilter)}
-                          aria-pressed={reviewFilter === r}
-                          className={`type-meta px-phi-3 min-h-[44px] transition-colors ${reviewFilter === r ? 'bg-oxford text-paper' : 'bg-registerTint hover:bg-oxford/[0.06] text-oxford/60'
-                            }`}
-                        >
-                          {r === 'ALL' ? 'ANY' : r}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex justify-end pt-phi-2 border-t border-oxford/[0.06]">
-                    <button
-                      type="button"
-                      onClick={resetFilters}
-                      className="type-meta min-h-[44px] text-oxford/35 hover:text-oxford/65 transition-colors"
-                    >
-                      Reset view
-                    </button>
+        <AnimatePresence>
+          {showAdvancedFilters && (
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -8 }}
+              transition={{ duration: reduceMotion ? 0 : 0.18, ease: tokens.motion.ease }}
+              role="region"
+              aria-label="Advanced queue filters"
+              className="mt-phi-2 border-t border-oxford/[0.06] pt-phi-2"
+            >
+              <div className="grid min-w-0 gap-x-phi-6 gap-y-phi-2 md:grid-cols-3">
+                <div role="group" aria-label="Attention and queue state" className="flex min-w-0 flex-col gap-phi-1">
+                  <p className={`${productText.mutedLabel}`}>Attention</p>
+                  <div className="flex flex-wrap gap-phi-2">
+                    {ATTENTION_FILTER_CHIPS.filter((item) => item.key !== 'ALL').map(({ key: d, label }) => (
+                      <AdvancedChip key={d} active={decisionFilter === d} label={label} onClick={() => setDecisionFilter(d)} />
+                    ))}
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
+
+                <div role="group" aria-label="Partner ruling and outcome" className="flex min-w-0 flex-col gap-phi-1">
+                  <p className={`${productText.mutedLabel}`}>Outcome</p>
+                  <div className="flex flex-wrap gap-phi-2">
+                    {RULING_FILTER_CHIPS.map(({ key: d, label }) => (
+                      <AdvancedChip key={d} active={decisionFilter === d} label={label} onClick={() => setDecisionFilter(d)} />
+                    ))}
+                  </div>
+                </div>
+
+                <div role="group" aria-label="Reviewer signal strength" className="flex min-w-0 flex-col gap-phi-1">
+                  <p className={`${productText.mutedLabel}`}>Review</p>
+                  <div className="flex flex-wrap gap-phi-2">
+                    {(['STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'] as const).map((r) => (
+                      <AdvancedChip key={r} active={reviewFilter === r} label={r} onClick={() => setReviewFilter(r)} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {hasActiveFilters && (
+                <button type="button" onClick={resetFilters} className={`${productInteraction.action} mt-phi-2 shrink-0 !min-h-[36px]`}>
+                  Reset
+                </button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
 
       <motion.div
         key={`${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
-        className="flex flex-col relative [contain:layout_style]"
+        className="flex w-full min-w-0 flex-col relative [contain:layout_style]"
         initial={reduceMotion ? false : 'hidden'}
         animate="visible"
         variants={listContainerVariants}
@@ -419,7 +422,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
               <p className="type-label-tab text-oxford/35">Queue view</p>
               <p className="mt-phi-3 type-body-emphasis text-oxford">No deals match this view.</p>
               <p className="mt-phi-2 type-body text-oxford/55">
-                Adjust the filters or return to queue priority to see active decisions.
+                Adjust the filters or return to queue priority. Current thresholds still classify stale work after {config.thresholds.staleAfterHours} hours.
               </p>
               {hasActiveFilters && (
                 <button
@@ -436,15 +439,20 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
           const { startup } = row;
           const isSelected = selectedId === startup.id;
           const isPending = row.queueState === 'pending' || row.isEscalated || row.isStale;
-          const rowStateClass = row.isDecided
-            ? 'opacity-[0.62] hover:opacity-100'
-            : row.hasHighAdverse || row.isEscalated
-              ? 'bg-accent/[0.025]'
-              : row.isStale
-                ? 'bg-heritageGold/[0.035]'
-                : isPending
-                  ? 'bg-oxford/[0.018]'
-                  : '';
+          const rowOpacityClass =
+            row.isDecided && !isSelected ? 'opacity-[0.62] hover:opacity-100' : '';
+          const rowBgClass = isSelected
+            ? 'bg-oxford/[0.055]'
+            : row.isDecided
+              ? ''
+              : row.hasHighAdverse || row.isEscalated
+                ? 'bg-accent/[0.025]'
+                : row.isStale
+                  ? 'bg-heritageGold/[0.035]'
+                  : isPending
+                    ? 'bg-oxford/[0.018]'
+                    : '';
+          const rowHoverClass = isSelected ? 'hover:bg-oxford/[0.062]' : 'hover:bg-oxford/[0.025]';
           const rowAria = `${startup.scout.name}, ${startup.scout.sector ?? 'Unknown sector'}.${
             row.isDecided ? ' Decided.' : row.needsRuling ? ' Needs ruling.' : ''
           }${row.isStale && row.ageDays != null ? ` ${row.ageDays} days unresolved.` : ''}${
@@ -461,8 +469,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                 else rowRefs.current.delete(startup.id);
               }}
               variants={rowVariants}
-              className={`group relative border-t border-oxford/[0.055] px-phi-4 py-phi-6 cursor-pointer transition-[background-color,opacity] duration-[180ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset hover:bg-registerTint ${rowStateClass} ${isSelected ? 'bg-registerTint opacity-100' : ''
-                }`}
+              className={`group relative w-full min-w-0 border-t border-oxford/[0.07] px-phi-4 py-phi-6 cursor-pointer transition-[background-color,opacity] duration-[160ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${rowHoverClass} ${rowBgClass} ${rowOpacityClass}`}
               style={{ transitionTimingFunction: 'var(--motion-ease)' }}
               onClick={() => onStartupClick(startup)}
               onKeyDown={(e) => handleRowKeyDown(e, row, idx)}
@@ -483,18 +490,38 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                   aria-hidden
                 />
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-[26px_minmax(0,1fr)_auto] gap-x-phi-4 gap-y-phi-3 items-start">
+              <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-phi-4 gap-y-phi-3 items-start">
                 {/* Index */}
                 <span className={`type-meta transition-colors tabular-nums pt-px sm:col-start-1 ${row.needsRuling && !row.isDecided ? 'text-oxford/45 group-hover:text-oxford/65' : 'text-oxford/25 group-hover:text-oxford/45'}`}>
                   {row.displayIndex}
                 </span>
 
                 {/* Body */}
-                <div className="min-w-0 sm:col-start-2">
-                  <h2 className={`type-body-emphasis break-words ${row.isDecided ? 'text-oxford/70' : 'text-oxford'}`}>
-                    {startup.scout.name}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-x-phi-2 mt-phi-2">
+                <div className="min-w-0 col-start-2">
+                  <div className="grid min-w-0 gap-x-phi-4 gap-y-phi-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                    <h2 className={`type-body-emphasis min-w-0 break-words ${row.isDecided ? 'text-oxford/70' : 'text-oxford'}`}>
+                      {startup.scout.name}
+                    </h2>
+                    <div className="flex min-w-0 flex-wrap items-center gap-phi-2 sm:justify-end">
+                      {row.onMonitorList && (
+                        <span
+                          className="type-label-tab text-oxford/45 bg-registerTint px-phi-2 py-0.5 shrink-0"
+                          title="Tracked on portfolio monitor list (partner monitor outcome)"
+                        >
+                          Monitor
+                        </span>
+                      )}
+                      <span className="type-meta text-oxford/35 tabular-nums" title="Configured weighted score">
+                        {row.configuredScore}
+                      </span>
+                      <span className="type-label-tab text-oxford/40 bg-registerTint px-phi-2 py-0.5 shrink-0" title="Current score-band outcome">
+                        {row.configuredBand}
+                      </span>
+                      {row.reviewBand && <VerdictBandBadge band={row.reviewBand} />}
+                      <DecisionBadge variant={row.decisionVariant} />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-phi-2 gap-y-phi-1 mt-phi-2">
                     {row.sortKeyValue && (
                       <span className="type-meta text-oxford/35 tabular-nums whitespace-nowrap">
                         {new Date(row.sortKeyValue).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -553,25 +580,6 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                   </div>
                 </div>
 
-                {/* Right: monitor chip, review band, partner verdict badge */}
-                <div className="flex flex-wrap items-center justify-end gap-phi-2 pt-px sm:col-start-3">
-                  {row.onMonitorList && (
-                    <span
-                      className="type-label-tab text-oxford/45 bg-registerTint px-phi-2 py-0.5 shrink-0"
-                      title="Tracked on portfolio monitor list (partner monitor outcome)"
-                    >
-                      Monitor
-                    </span>
-                  )}
-                  <span className="type-meta text-oxford/35 tabular-nums" title="Configured weighted score">
-                    {row.configuredScore}
-                  </span>
-                  <span className="type-label-tab text-oxford/40 bg-registerTint px-phi-2 py-0.5 shrink-0" title="Current score-band outcome">
-                    {row.configuredBand}
-                  </span>
-                  {row.reviewBand && <VerdictBandBadge band={row.reviewBand} />}
-                  <DecisionBadge variant={row.decisionVariant} />
-                </div>
               </div>
 
             </motion.div>

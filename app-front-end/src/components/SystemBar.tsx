@@ -183,7 +183,7 @@ export default function SystemBar({
         {workspaceChrome ? (
           <div className="flex flex-col gap-0.5 w-full shrink-0">
               <SpineNavButton
-                label="Deals"
+                label="Workspace"
                 active={rightPanel !== 'system' && rightPanel !== 'feed'}
                 ariaPressed={rightPanel !== 'system' && rightPanel !== 'feed'}
                 onClick={() => onShowDeals!()}
@@ -192,7 +192,7 @@ export default function SystemBar({
                 surface="paper"
               />
               <SpineNavButton
-                label="Signals"
+                label="Judgements"
                 active={rightPanel === 'feed'}
                 ariaPressed={rightPanel === 'feed'}
                 onClick={() => (rightPanel === 'feed' ? onClose!() : onShowFeed!())}

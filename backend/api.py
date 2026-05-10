@@ -85,7 +85,8 @@ from fund_thesis import (
     thesis_has_embeddings,
 )
 from fund_thesis_ops import activate_fund_thesis_version, create_fund_thesis_version_for_user
-from models import Startup
+from models import FundConfig, FundMemory, Startup, UserPreferences
+from conviction_state import build_conviction_patch
 from core import policy_resolver
 from utils.scoring import compute_overall_score, enrich_scores, score_to_label
 from utils.score_semantics import rubric_band_for_numeric
@@ -568,6 +569,33 @@ def _save_settings(data: dict, user_id: str) -> None:
 
 def _validate_settings(body: dict) -> list[str]:
     errors = []
+    fc = body.get("fund_config")
+    if fc is not None:
+        if not isinstance(fc, dict):
+            errors.append("fund_config must be an object")
+        else:
+            try:
+                FundConfig.model_validate(fc)
+            except Exception as exc:
+                errors.append(f"fund_config is invalid: {exc}")
+    up = body.get("user_preferences")
+    if up is not None:
+        if not isinstance(up, dict):
+            errors.append("user_preferences must be an object")
+        else:
+            try:
+                UserPreferences.model_validate(up)
+            except Exception as exc:
+                errors.append(f"user_preferences is invalid: {exc}")
+    fm = body.get("fund_memory")
+    if fm is not None:
+        if not isinstance(fm, dict):
+            errors.append("fund_memory must be an object")
+        else:
+            try:
+                FundMemory.model_validate(fm)
+            except Exception as exc:
+                errors.append(f"fund_memory is invalid: {exc}")
     cb = body.get("cost_budget")
     if cb is not None:
         if not isinstance(cb, dict):
@@ -757,6 +785,8 @@ def _backend_to_frontend(raw: dict) -> dict:
             else None,
         },
         "timestamps": timestamps,
+        "human_resolution": raw.get("human_resolution"),
+        "conviction_state": raw.get("conviction_state"),
     }
 
     if review:
@@ -891,6 +921,8 @@ def _list_projection_to_frontend(row: Dict[str, Any]) -> Dict[str, Any]:
             "lookup_website": row.get("list_lookup_website"),
         },
         "timestamps": timestamps,
+        "human_resolution": row.get("human_resolution"),
+        "conviction_state": row.get("conviction_state"),
     }
     if row.get("list_verdict") or row.get("list_score") is not None or row.get("short_summary"):
         score = row.get("list_score")
@@ -1247,12 +1279,22 @@ async def patch_settings(request: Request, body: dict):
         raise HTTPException(status_code=422, detail={"message": "Validation failed", "errors": errors})
     user_id = request.state.user_id
     current = load_settings(user_id)
-    for section in ("fund_identity", "cost_budget", "agent_config", "portfolio"):
+    for section in ("fund_config", "user_preferences", "fund_memory", "fund_identity", "cost_budget", "agent_config", "portfolio"):
         if section in body and isinstance(body[section], dict):
             if section not in current:
                 current[section] = {}
-            for k, v in body[section].items():
-                current[section][k] = v
+            if section == "fund_config":
+                next_config = dict(body[section])
+                prev = current.get("fund_config") if isinstance(current.get("fund_config"), dict) else {}
+                prev_version = int(prev.get("version") or 1) if isinstance(prev, dict) else 1
+                next_config["version"] = prev_version + 1
+                next_config["lastSavedAt"] = _now_iso()
+                current[section] = next_config
+            elif section in ("user_preferences", "fund_memory"):
+                current[section] = body[section]
+            else:
+                for k, v in body[section].items():
+                    current[section][k] = v
     _save_settings(current, user_id)
 
     # If any agents are enabled after the patch, ensure the persistent background loop is running.
@@ -2374,17 +2416,31 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
     """
     decision = str(body.get("decision", "")).upper()
     notes = body.get("notes") or ""
+    risk_acknowledged = bool(body.get("risk_acknowledged", False))
     if decision not in ("YES", "NO", "MAYBE"):
         raise HTTPException(status_code=422, detail="decision must be YES, NO, or MAYBE")
 
     storage = _get_storage(request)
-    hr = {
-        "decision": decision,
-        "notes": notes,
-        "resolved_at": _now_iso(),
-    }
+    existing = storage.get_by_id(startup_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Startup not found")
+    settings = load_settings(request.state.user_id)
+    fund_config = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
+    config_version = fund_config.get("versionLabel")
+    if fund_config.get("version") is not None:
+        config_version = f"{config_version or 'Fund Config'} v{fund_config.get('version')}"
+    resolved_at = _now_iso()
+    patch = build_conviction_patch(
+        startup_id,
+        existing,
+        decision=decision,
+        rationale=str(notes),
+        resolved_at=resolved_at,
+        risk_acknowledged=risk_acknowledged,
+        config_version=str(config_version) if config_version else None,
+    )
     try:
-        ok = storage.update_startup_partial(startup_id, {"human_resolution": hr})
+        ok = storage.update_startup_partial(startup_id, patch)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to resolve escalation: {e}") from e
 
@@ -2415,10 +2471,26 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
                     and ai_rec != LEGACY_TO_RECOMMENDATION.get(decision)
                 ),
                 "notes": str(notes)[:4000],
-                "resolved_at": hr["resolved_at"],
+                "resolved_at": resolved_at,
             },
             user_id=request.state.user_id,
         )
+    except Exception:
+        pass
+
+    try:
+        current = load_settings(request.state.user_id)
+        fund_memory = current.setdefault("fund_memory", {})
+        historical = fund_memory.setdefault("historical_decisions", [])
+        history = (patch.get("conviction_state") or {}).get("decision_history") or []
+        if history:
+            latest = dict(history[-1])
+            latest["company_name"] = ((existing.get("scout_info") or {}).get("name") or "").strip()
+            latest["sector"] = ((existing.get("scout_info") or {}).get("sector") or "").strip()
+            latest["funding_stage"] = (existing.get("scout_info") or {}).get("funding_stage")
+            historical.append(latest)
+            fund_memory["historical_decisions"] = historical[-200:]
+            save_settings(current, request.state.user_id)
     except Exception:
         pass
 

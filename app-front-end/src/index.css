@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap');
 /*
  * Aethria — High-fidelity institutional design (aligned with web-front-end).
- * Palette: oxford #1A2B48, paper #E9E0D1 (matches web-front-end), charcoal body text, shell/memo on paper, accent #7D2B3A (escalations only), heritageGold #b8976a (decorative only).
+ * Palette: oxford #1A2B48, paper #E9E0D1 (matches web-front-end), primary body text on oxford ladder (no neutral ink), shell/memo on paper, accent #7D2B3A (escalations only), heritageGold #b8976a (decorative only).
  * Figtree Variable (body + UI, matches web-front-end warmth). Display: EB Garamond (editorial headings, verdicts, memos). Wordmark: Libre Baskerville (wordmark ONLY). Metadata: JetBrains Mono.
  * Frames: 1px rgba(var(--color-oxford-rgb), 0.06). No rounded corners.
  * Text hierarchy: Oxford opacity ladder 100, 80, 60, 40, 25. Line-height: 1.5 labels, 1.5 body.
@@ -16,7 +16,6 @@
   /** Subtle lift for raised chrome (aligned with web marketing paper family). */
   --color-paper-bright: #ebe8e0;
   --color-ivory: #e9e0d1;
-  --color-charcoal: #2f333b;
   --color-heritage-gold: #b8976a;
   --color-heritage-gold-soft: rgba(184, 151, 106, 0.35);
   --color-accent-soft: rgba(184, 151, 106, 0.35);
@@ -49,6 +48,8 @@
   --text-inverse-muted:      rgba(242, 240, 234, 0.56);
   --label-strong:            rgba(var(--color-oxford-rgb), 0.74);
   --label-muted:             rgba(var(--color-oxford-rgb), 0.42);
+  /* Legacy alias — same as primary prose (was neutral #2f333b). */
+  --color-charcoal:          var(--text-primary);
   /* Clerk — match app palette and typography */
   --clerk-color-primary: var(--color-oxford);
   --clerk-color-background: var(--color-paper);
@@ -295,7 +296,7 @@
   body {
     overflow-x: hidden;
     background-color: var(--color-paper);
-    color: var(--color-charcoal);
+    color: var(--text-primary);
     font-family: "Figtree Variable", system-ui, -apple-system, sans-serif;
     font-size: 14px;
     font-weight: 400;

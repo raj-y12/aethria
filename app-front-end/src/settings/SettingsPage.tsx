@@ -431,7 +431,7 @@ export default function SettingsPage() {
       setErrors(result.error.errors.length ? result.error.errors : [result.error.message]);
       return;
     }
-    const saved = saveLocalConfiguration(draft);
+    const saved = saveLocalConfiguration(result.data?.fund_config ?? draft);
     setConfiguration(saved);
     setDraft(saved);
     setSavedSnapshot(serializeConfig(saved));
@@ -526,7 +526,7 @@ export default function SettingsPage() {
               to="/v1"
               className="type-meta mt-phi-2 inline-flex min-h-[44px] items-center uppercase text-oxford/35 transition-colors hover:text-oxford/60 btn-interaction"
             >
-              Overview
+              Return to conviction workspace
             </Link>
           </div>
           <p className="type-label-section text-oxford/45">Fund Configuration</p>
@@ -559,7 +559,9 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between border-b border-oxford/[0.08] px-phi-5 py-phi-4 lg:hidden">
             <div>
               <p className={sectionLabelCls}>Fund Configuration</p>
-              <p className="mt-phi-1 type-meta text-oxford/38">{unsaved ? 'Unsaved changes' : draft.versionLabel}</p>
+              <Link to="/v1" className="mt-phi-1 inline-flex type-meta text-oxford/38 transition-colors hover:text-oxford">
+                {unsaved ? 'Unsaved changes' : 'Return to workspace'}
+              </Link>
             </div>
             <button type="button" onClick={handleSave} disabled={saving} className={solidBtnCls}>
               {saving ? 'Saving...' : 'Save'}

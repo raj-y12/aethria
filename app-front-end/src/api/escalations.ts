@@ -16,12 +16,13 @@ export async function fetchEscalations(): Promise<EscalationItem[]> {
 export async function resolveEscalation(
   startupId: string,
   decision: 'YES' | 'NO' | 'MAYBE',
-  notes: string
+  notes: string,
+  riskAcknowledged = false
 ): Promise<{ status: string }> {
   const res = await authedFetch(`${API_BASE}/api/escalations/${encodeURIComponent(startupId)}/resolve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ decision, notes }),
+    body: JSON.stringify({ decision, notes, risk_acknowledged: riskAcknowledged }),
   });
   if (!res.ok) throw new Error(`Resolve failed: ${res.status}`);
   return res.json();

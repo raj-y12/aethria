@@ -90,6 +90,10 @@ export default function LoadingAnimation({
           )
         )}
       </div>
+      <div className="mt-phi-5 text-center">
+        <p className="type-label-section text-oxford/45">Calibrating workspace</p>
+        <p className="mt-phi-2 type-meta text-oxford/30">Mandate, queue, and memo surfaces</p>
+      </div>
     </div>
   );
 }

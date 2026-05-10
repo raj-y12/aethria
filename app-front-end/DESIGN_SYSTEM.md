@@ -25,7 +25,7 @@ Institutional, editorial UI. Modelled after a private equity firm's internal dea
 | `paper` | `#F2F0EA` | Page & panel background |
 | `paper-bright` | `#F2F0EA` | Raised surface, sheet overlay (unified) |
 | `ivory` | `#F2F0EA` | Document surface (unified) |
-| `charcoal` | `#2f333b` | Secondary prose text |
+| `charcoal` | Oxford (`#1A2B48` / `--text-primary`) | Primary prose — oxford ladder, not neutral black |
 | `heritage-gold` | `#b8976a` | Heritage decorative accent — section rules, diamonds |
 | `gold-soft` | `rgba(184,151,106,0.35)` | Gold tint surfaces |
 | `escalation` | `#7D2B3A` | **Human-attention alerts only** — escalation dots, counts, critical intervention states |

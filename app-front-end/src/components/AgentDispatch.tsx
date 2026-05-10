@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type Ref, type KeyboardEvent } from 'react';
 import { railEditorial } from '../design-system/railEditorial';
+import { productInteraction, productText } from '../design-system/productSystem';
 
 interface AgentDispatchProps {
   input: string;
@@ -95,7 +96,7 @@ function LookupPhaseStrip({
 }
 
 const runBtnCls =
-  'group shrink-0 inline-flex items-center gap-phi-2 type-meta text-oxford/45 hover:text-oxford disabled:opacity-20 transition-colors btn-interaction';
+  `group shrink-0 inline-flex min-h-[36px] items-center gap-phi-2 ${productInteraction.action}`;
 
 function DispatchPanelBody({
   inputRef,
@@ -125,15 +126,15 @@ function DispatchPanelBody({
   const [focused, setFocused] = useState(false);
 
   const inputCls = embedded
-    ? `w-full bg-transparent border-0 border-b ${focused ? 'border-oxford/38' : 'border-oxford/[0.10]'} px-0 py-phi-2 font-medium ${railEditorial.bodyMetrics} text-oxford placeholder:text-oxford/25 outline-none transition-colors duration-300 disabled:cursor-not-allowed`
-    : `w-full bg-transparent border-0 border-b ${focused ? 'border-oxford/38' : 'border-oxford/[0.10]'} px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/25 outline-none transition-colors duration-300 disabled:cursor-not-allowed`;
+    ? 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-medium font-sans text-[13px] leading-[1.5] text-oxford placeholder:text-oxford/28 outline-none disabled:cursor-not-allowed'
+    : 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/28 outline-none disabled:cursor-not-allowed';
 
   const statusRowCls = embedded
-    ? 'flex items-center justify-between gap-phi-3 mt-phi-1.5 min-[1100px]:mt-phi-2 min-h-[22px]'
+    ? 'mt-phi-2 flex min-h-[22px] items-center justify-between gap-phi-3'
     : 'flex items-center justify-between gap-phi-3 mt-phi-3 min-h-[28px]';
 
   const phaseSpacing = embedded
-    ? 'mt-phi-2 pt-phi-1.5 min-[1100px]:mt-phi-3 min-[1100px]:pt-phi-2'
+    ? 'mt-phi-3 pt-phi-2'
     : 'mt-phi-4 pt-phi-3';
 
   const statusLeft = (() => {
@@ -164,12 +165,8 @@ function DispatchPanelBody({
     }
     if (embedded) {
       return (
-        <p
-          className={`${railEditorial.bodyMetrics} transition-colors ${
-            isActive ? 'text-[rgba(var(--color-oxford-rgb),0.78)]' : 'text-[rgba(var(--color-oxford-rgb),0.35)]'
-          }`}
-        >
-          {isBusy ? 'Pipeline running…' : focused ? 'Name, domain, or founder signal' : 'Company name or URL'}
+        <p className="type-meta text-oxford/34">
+          {isBusy ? 'Running lookup pipeline' : focused ? 'Ready to dispatch on Enter' : 'Name, domain, or founder signal'}
         </p>
       );
     }
@@ -181,7 +178,12 @@ function DispatchPanelBody({
 
   return (
     <>
-      <div className="relative">
+      <div
+        className={`relative flex items-center gap-phi-3 border-b transition-colors duration-200 ${
+          focused ? 'border-oxford/45' : isActive ? 'border-oxford/22' : 'border-oxford/[0.12]'
+        }`}
+        aria-label="Pipeline dispatch"
+      >
         <input
           ref={inputRef}
           type="text"
@@ -198,13 +200,6 @@ function DispatchPanelBody({
           disabled={isBusy}
           className={inputCls}
         />
-        {isBusy && (
-          <span className="absolute bottom-0 left-0 h-px w-full bg-oxford/30 pulse-fast" aria-hidden />
-        )}
-      </div>
-
-      <div className={statusRowCls}>
-        <div className="flex-1 min-w-0 flex items-center gap-phi-2">{statusLeft}</div>
         <button
           type="button"
           onClick={onSubmit}
@@ -216,6 +211,14 @@ function DispatchPanelBody({
             {isBusy ? '·' : '→'}
           </span>
         </button>
+        {isBusy && (
+          <span className="absolute bottom-0 left-0 h-px w-full bg-oxford/30 pulse-fast" aria-hidden />
+        )}
+      </div>
+
+      <div className={statusRowCls}>
+        <div className="flex-1 min-w-0 flex items-center gap-phi-2">{statusLeft}</div>
+        {!lookupMessage && !isBusy && <span className="type-meta text-oxford/24">Enter</span>}
       </div>
 
       <LookupPhaseStrip lookupPhase={lookupPhase} spacingClass={phaseSpacing} reserveHeight={embedded} />
@@ -252,7 +255,7 @@ export default function AgentDispatch({
     <div className="w-full">
       {!alwaysOpen && (
         <div className="w-full flex items-center gap-phi-3 px-phi-4 min-h-[44px] border-t border-oxford/[0.08]">
-          <span className="type-label-tab text-oxford/40 shrink-0">Dispatch</span>
+          <span className={`${productText.mutedLabel} shrink-0`}>Dispatch</span>
           <span
             className={`flex-1 h-px bg-oxford/[0.06] ${isActive ? 'pulse-soft' : ''}`}
             aria-hidden
@@ -270,7 +273,7 @@ export default function AgentDispatch({
           <button
             type="button"
             onClick={() => setExpanded((p) => !p)}
-            className="type-meta text-oxford/25 hover:text-oxford/50 transition-colors w-4 text-center shrink-0 select-none btn-interaction"
+            className={`${productInteraction.action} w-4 shrink-0 select-none text-center`}
             aria-expanded={isExpanded}
           >
             {isExpanded ? '−' : '+'}
@@ -281,7 +284,10 @@ export default function AgentDispatch({
 
       {alwaysOpen ? (
         <div className="min-w-0">
-          <p className={railEditorial.label}>Dispatch</p>
+          <div className="flex items-baseline justify-between gap-phi-3">
+            <p className={railEditorial.label}>Dispatch</p>
+            <p className="type-meta text-oxford/30">Pipeline trigger</p>
+          </div>
           <div className="min-w-0">
             <DispatchPanelBody
               inputRef={inputRef}

@@ -19,11 +19,10 @@ export const railEditorial = {
   bodyStrong: `font-sans text-[14px] leading-[1.4] font-medium text-oxford/82`,
 
   /**
-   * Large stat number — WhileYouWereAway-style (sans semibold, −0.03em tracking),
-   * scaled down for the narrow rail.
+   * Large stat number — JetBrains Mono (tabular), scaled for the narrow rail.
    */
   statValue:
-    'font-sans font-semibold tabular-nums leading-none tracking-[-0.03em] text-[clamp(26px,3.5vw,44px)]',
+    'font-mono font-semibold tabular-nums leading-none tracking-[-0.02em] text-[clamp(24px,2.85vw,38px)]',
 
   /** Label beside a stat number. */
   statLabel: 'font-mono text-[10px] leading-none text-oxford/35 tracking-[0.04em]',

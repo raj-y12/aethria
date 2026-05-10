@@ -1,15 +1,16 @@
 import type { ReactNode } from 'react';
+import { productInteraction, productPanel, productText } from '../design-system/productSystem';
 
 export const PANEL_HEADER_CLASS =
-  'flex-none flex items-center justify-between px-phi-5 py-phi-4 sm:px-phi-5 sm:py-phi-4 bg-surface-canvas uppercase tracking-[0.06em]';
-export const PANEL_TITLE_CLASS = 'type-label-section text-oxford/60';
+  `flex-none flex items-center justify-between ${productPanel.header}`;
+export const PANEL_TITLE_CLASS = productText.sectionLabel;
 export const PANEL_TAB_BAR_CLASS =
   'flex-none flex gap-phi-1 px-phi-4 sm:px-phi-5 py-phi-2 bg-surface-canvas';
 export const PANEL_TAB_BUTTON_CLASS =
-  'py-phi-3 px-phi-3 type-label-tab focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset btn-interaction rounded-none';
-export const PANEL_TAB_ACTIVE_CLASS = 'text-oxford font-semibold bg-surface-selected';
+  `py-phi-3 px-phi-3 type-label-tab btn-interaction rounded-none ${productInteraction.quiet}`;
+export const PANEL_TAB_ACTIVE_CLASS = productInteraction.selected;
 export const PANEL_TAB_INACTIVE_CLASS =
-  'text-oxford/40 hover:text-oxford/75 hover:bg-registerTint';
+  'text-oxford/42 hover:text-oxford/75 hover:bg-registerTint';
 export const PANEL_CONTENT_CLASS =
   'flex-1 min-h-0 overflow-y-auto p-phi-6';
 

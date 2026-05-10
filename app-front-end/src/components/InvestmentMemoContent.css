@@ -143,7 +143,7 @@
 .memoGateStrip--error .memoPipelineKicker { color: color-mix(in srgb, var(--color-accent) 72%, transparent); }
 
 /* === Document body === */
-.memoBody { max-width: 48rem; }
+.memoBody { max-width: 49rem; }
 .memoNum {
   font-family: var(--memo-font-mono);
   font-variant-numeric: tabular-nums;
@@ -152,10 +152,12 @@
   max-width: 39rem;
   width: 100%;
 }
-.memoDocSection { margin-top: clamp(34px, 4vw, 48px); }
+.memoDocSection {
+  margin-top: clamp(34px, 4vw, 48px);
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.075);
+  padding-top: clamp(28px, 3.4vw, 38px);
+}
 .memoDocSection + .memoDocSection {
-  border-top: none;
-  padding-top: clamp(28px, 3.6vw, 40px);
   margin-top: clamp(21px, 2.8vw, 34px);
 }
 .memoDocVerdictSection {
@@ -276,12 +278,10 @@
   gap: 12px;
   flex-wrap: wrap;
   justify-content: flex-start;
+  margin-top: 8px;
 }
 .memoDocJudgmentTop {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 7px 21px;
-  align-items: end;
+  display: block;
   margin-bottom: 18px;
   padding: 21px 0 13px;
   border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
@@ -295,6 +295,7 @@
 .memoDecisionCluster .memoDocSection {
   margin-top: 0;
   padding-top: 0;
+  border-top: none;
 }
 .memoDecisionCluster .memoDocSection + .memoDocSection {
   margin-top: 34px;
@@ -349,6 +350,10 @@
 
 .memoAdverseRegister {
   padding-top: 0;
+}
+.memoAdverseRegister--empty {
+  padding-top: 26px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.07);
 }
 .memoAdverseToggle {
   width: 100%;
@@ -465,6 +470,52 @@
 }
 
 .memoRulingControls { padding-top: 0; }
+.memoDecisionLedger {
+  padding-top: 26px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.07);
+}
+.memoLedgerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.06);
+}
+.memoLedgerItem {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.06);
+}
+.memoLedgerMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 13px;
+  justify-content: space-between;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.45);
+}
+.memoLedgerText,
+.memoLedgerEmpty {
+  margin: 8px 0 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-ui);
+  line-height: 1.55;
+  color: rgba(var(--color-oxford-rgb), 0.62);
+}
+.memoLedgerSub {
+  margin: 6px 0 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.34);
+}
+.memoPrecedentBlock {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.06);
+}
 .memoRiskAcknowledgement {
   display: flex;
   flex-wrap: wrap;
@@ -473,8 +524,8 @@
   gap: 13px;
   margin-bottom: 18px;
   padding: 13px 0;
-  border-top: 1px solid color-mix(in srgb, var(--color-accent) 20%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 14%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 .memoRiskAcknowledgement p {
   margin: 0;
@@ -603,7 +654,7 @@
   font-size: var(--memo-size-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  color: rgba(var(--color-oxford-rgb), 0.66);
   margin: 0 0 18px 0;
   display: flex;
   align-items: center;
@@ -617,7 +668,11 @@
   text-transform: uppercase;
   color: color-mix(in srgb, var(--color-accent) 65%, transparent);
 }
-.memoDocSubsection { margin-top: 34px; }
+.memoDocSubsection {
+  margin-top: 34px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.055);
+}
 .memoDocSubhead {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);

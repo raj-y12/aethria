@@ -12,12 +12,15 @@ import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import EmptyState from './EmptyState';
 import { fetchFundThesisRuntime, type FundThesisRuntime } from '../api/fundThesis';
+import { buildFundIntelligenceSnapshot } from '../lib/institutionalConviction';
+import { createDefaultFundConfiguration, type FundConfiguration } from '../lib/fundConfiguration';
 
-type Tab = 'signals' | 'analytics' | 'decisions' | 'thesis' | 'meta';
+type Tab = 'signals' | 'analytics' | 'decisions' | 'calibration' | 'thesis' | 'meta';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'signals', label: 'Signals' },
   { key: 'analytics', label: 'Analytics' },
   { key: 'decisions', label: 'Resolutions' },
+  { key: 'calibration', label: 'Calibration' },
   { key: 'thesis', label: 'Thesis' },
   { key: 'meta', label: 'Meta' },
 ];
@@ -35,6 +38,7 @@ interface SystemIntelligenceProps {
   metaPromptState: MetaPromptState;
   metaEvalSet: MetaEvalSet;
   metaInsights: MetaInsightsPayload | null;
+  fundConfiguration?: FundConfiguration;
 }
 
 const REVIEWER_EVAL_AGENTS = new Set(['DefaultReviewer', 'SkepticalReviewer', 'OpportunistReviewer']);
@@ -216,6 +220,69 @@ function DecisionsTab({ startups }: { startups: Startup[] }) {
           </div>
         </RowWrapper>
       ))}
+    </div>
+  );
+}
+
+function CalibrationTab({ startups, fundConfiguration }: { startups: Startup[]; fundConfiguration?: FundConfiguration }) {
+  const config = fundConfiguration ?? createDefaultFundConfiguration();
+  const snapshot = buildFundIntelligenceSnapshot(startups, config);
+  const hasDecisions = Object.values(snapshot.decisionsByOutcome).some((count) => count > 0);
+
+  if (!startups.length || !hasDecisions) {
+    return (
+      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
+        <EmptyState
+          label="Calibration"
+          body="Calibration will emerge as decisions accumulate."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col">
+      <TabSection title="Fund Intelligence" label="Derived">
+        <div className="flex flex-wrap gap-phi-6">
+          {snapshot.observations.map((item) => (
+            <div key={item.label} className="flex flex-col gap-phi-1">
+              <span className="font-sans font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-0 tabular-nums text-oxford">{item.value}</span>
+              <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">{item.label}</span>
+              {item.detail ? <span className="type-meta text-oxford/30">{item.detail}</span> : null}
+            </div>
+          ))}
+        </div>
+      </TabSection>
+      <TabSection title="Decision Outcomes" label="Ledger">
+        <div className="grid grid-cols-3 gap-phi-4 max-w-xl">
+          {[
+            ['Invest', snapshot.decisionsByOutcome.YES],
+            ['Monitor', snapshot.decisionsByOutcome.MAYBE],
+            ['Pass', snapshot.decisionsByOutcome.NO],
+          ].map(([label, value]) => (
+            <div key={label} className="border-t border-oxford/[0.08] pt-phi-3">
+              <span className="font-mono type-meta text-oxford/65 tabular-nums">{value}</span>
+              <span className="block mt-phi-1 type-meta uppercase tracking-[0.12em] text-oxford/38">{label}</span>
+            </div>
+          ))}
+        </div>
+      </TabSection>
+      <TabSection title="Recurring Risk Themes" label="Observed">
+        {snapshot.commonRiskThemes.length ? (
+          <ul className="flex flex-col">
+            {snapshot.commonRiskThemes.map((item) => (
+              <li key={item.theme} className="flex items-baseline justify-between gap-phi-4 border-t border-oxford/[0.06] py-phi-3 first:border-t-0">
+                <span className="type-note text-oxford/68">{item.theme}</span>
+                <span className="font-mono type-meta text-oxford/45 tabular-nums">{item.count}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="type-note text-oxford/50 leading-relaxed max-w-xl">
+            No recurring risk themes are extractable from the current resolved set.
+          </p>
+        )}
+      </TabSection>
     </div>
   );
 }
@@ -860,6 +927,9 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
             />
           )}
           {activeTab === 'decisions' && <DecisionsTab startups={props.startups} />}
+          {activeTab === 'calibration' && (
+            <CalibrationTab startups={props.startups} fundConfiguration={props.fundConfiguration} />
+          )}
           {activeTab === 'thesis' && <InstitutionalMandateTab />}
           {activeTab === 'meta' && (
             <MetaCommandTab

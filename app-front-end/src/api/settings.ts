@@ -3,6 +3,7 @@
  */
 
 import { authedFetch } from './auth';
+import type { FundConfiguration } from '../lib/fundConfiguration';
 
 const API_BASE =
   typeof window !== 'undefined'
@@ -64,6 +65,21 @@ export interface SystemHealth {
   budget_status: AgentBudgetStatus[];
 }
 
+export interface UserPreferences {
+  layoutPreferences: Record<string, unknown>;
+  savedFilters: Array<Record<string, unknown>>;
+  displayPreferences: Record<string, unknown>;
+  personalOverrides: Record<string, unknown>;
+}
+
+export interface FundMemory {
+  historical_decisions: Array<Record<string, unknown>>;
+  recurring_risk_patterns: Array<Record<string, unknown>>;
+  calibration_observations: Array<Record<string, unknown>>;
+  precedent_references: Array<Record<string, unknown>>;
+  mandate_drift_notes: Array<Record<string, unknown>>;
+}
+
 export interface FundIdentity {
   fund_name: string;
   stage_focus: string;
@@ -73,6 +89,9 @@ export interface FundIdentity {
 }
 
 export interface Settings {
+  fund_config?: FundConfiguration;
+  user_preferences?: UserPreferences;
+  fund_memory?: FundMemory;
   fund_identity?: FundIdentity;
   cost_budget: CostBudget;
   agent_config: AgentConfig;

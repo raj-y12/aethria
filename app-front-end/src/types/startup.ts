@@ -223,6 +223,33 @@ export interface Timestamps {
   partnered_at?: string;
 }
 
+export type RulingDecision = 'YES' | 'NO' | 'MAYBE';
+
+export interface DecisionHistoryRecord {
+  company_id: string;
+  previous_decision?: RulingDecision | null;
+  new_decision: RulingDecision;
+  timestamp: string;
+  rationale?: string | null;
+  confidence?: number | null;
+  score_snapshot?: Record<string, unknown> | null;
+  risk_acknowledged?: boolean | null;
+  config_version?: string | null;
+  company_name?: string;
+  sector?: string;
+  funding_stage?: string | null;
+}
+
+export interface ConvictionState {
+  current_ruling?: Record<string, unknown> | null;
+  decision_history?: DecisionHistoryRecord[];
+  ruling_rationale?: string | null;
+  risk_acknowledgements?: Array<Record<string, unknown>>;
+  score_changes?: Array<Record<string, unknown>>;
+  confidence_changes?: Array<Record<string, unknown>>;
+  escalation_events?: Array<Record<string, unknown>>;
+}
+
 export interface Startup {
   id: string;
   scout: Scout;
@@ -231,10 +258,11 @@ export interface Startup {
   timestamps?: Timestamps;
   /** Optional human override applied to a Partner decision (escalation resolution). */
   human_resolution?: {
-    decision: 'YES' | 'NO' | 'MAYBE';
+    decision: RulingDecision;
     notes?: string;
     resolved_at?: string;
   } | null;
+  conviction_state?: ConvictionState | null;
 }
 
 // ─── System Intelligence / Meta-Agent Types ───────────────────────────────────
@@ -260,10 +288,11 @@ export interface EscalationItem {
   partner?: Partner | null;
   created_at?: string;
   human_resolution?: {
-    decision?: 'YES' | 'NO' | 'MAYBE';
+    decision?: RulingDecision;
     notes?: string;
     resolved_at?: string;
   } | null;
+  conviction_state?: ConvictionState | null;
 }
 
 export interface RejectionAnalytics {

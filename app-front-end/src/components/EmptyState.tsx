@@ -4,6 +4,7 @@
  */
 
 import type { ReactNode } from 'react';
+import { productText } from '../design-system/productSystem';
 
 function DefaultMark() {
   return (
@@ -21,12 +22,12 @@ interface EmptyStateProps {
 
 export default function EmptyState({ label, body, icon }: EmptyStateProps) {
   return (
-    <div className="flex w-full flex-col items-center justify-center px-4 py-10 text-center sm:px-6 empty-state-enter">
-      <div className="mb-phi-3 flex h-7 w-7 shrink-0 items-center justify-center text-oxford/25 [&_svg]:h-full [&_svg]:w-full">
+    <div className="flex w-full flex-col items-start justify-center px-phi-6 py-phi-7 text-left sm:px-phi-7 empty-state-enter">
+      <div className="mb-phi-4 flex h-6 w-6 shrink-0 items-center justify-center text-oxford/22 [&_svg]:h-full [&_svg]:w-full">
         {icon ?? <DefaultMark />}
       </div>
-      <p className="type-meta mb-phi-2 max-w-xs uppercase text-oxford/40">{label}</p>
-      <div className="type-body-sm max-w-sm leading-phi text-oxford/40">{body}</div>
+      <p className={`${productText.mutedLabel} mb-phi-3 max-w-xs`}>{label}</p>
+      <div className={`${productText.body} max-w-[28rem]`}>{body}</div>
     </div>
   );
 }

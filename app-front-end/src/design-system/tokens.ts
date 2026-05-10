@@ -2,7 +2,7 @@
  * Aethria design tokens — aligned with brand_assets and web-front-end.
  *
  * Palette: oxford #1A2B48, paper #E9E0D1 (web-front-end), paperBright/paperDeep variants,
- * inverse on oxford #FFFFFF, charcoal #2f333b (body UI).
+ * inverse on oxford #FFFFFF; body text uses oxford ladder (see --text-primary), not neutral ink.
  * Typography: Geist Sans matches the brand poster’s geometric sans; EB Garamond / Libre Baskerville stay for editorial + wordmark (no font swap needed).
  * Burgundy #7D2B3A (accent) is escalation-only — see color.accent. Heritage gold #b8976a is decorative only (dividers, chrome) — color.heritageGold.
  * Typography: Libre Baskerville (wordmark only). EB Garamond (display/editorial headings). Geist Sans (body/UI). JetBrains Mono (labels, tabs, meta, data — ALL CAPS on labels/tabs).
@@ -62,7 +62,8 @@ export const tokens = {
     paperBright: '#EBE8E0',
     /** Recessed / selected rows — same hue family as paper. */
     paperDeep: '#E6E4DE',
-    charcoal: '#2f333b',
+    /** Primary prose ink — oxford family (was neutral #2f333b). Prefer CSS --text-primary / text-oxford/* in UI. */
+    charcoal: '#1A2B48',
     ivory: '#FFFFFF',
     bone: '#f2f4f8',
     mist: '#f2f4f8',

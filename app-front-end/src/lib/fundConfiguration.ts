@@ -20,6 +20,9 @@ export interface FundMandateConfig {
   fundName: string;
   mandateName: string;
   preferredStages: string[];
+  preferredSectors?: string[];
+  excludedSectorList?: string[];
+  geographyPreferences?: string[];
   geographies: string[];
   customGeography: string;
   sectors: string[];
@@ -97,6 +100,7 @@ export interface RubricCriterion {
 
 export interface FundConfiguration {
   versionLabel: string;
+  version: number;
   lastSavedAt: string | null;
   mandate: FundMandateConfig;
   scoringWeights: ScoringWeight[];
@@ -153,8 +157,9 @@ export const DEFAULT_SCORE_BANDS: ScoreBand[] = [
 
 export function createDefaultFundConfiguration(settings?: Settings | null): FundConfiguration {
   const identity = settings?.fund_identity;
-  return {
+  const base: FundConfiguration = {
     versionLabel: 'Fund Thesis v2',
+    version: 1,
     lastSavedAt: null,
     mandate: {
       fundName: identity?.fund_name ?? '',
@@ -207,9 +212,12 @@ export function createDefaultFundConfiguration(settings?: Settings | null): Fund
     },
     rubric: createDefaultRubric(),
   };
+  return settings?.fund_config ? mergeFundConfiguration(base, settings.fund_config) : base;
 }
 
 export function loadFundConfiguration(settings?: Settings | null): FundConfiguration {
+  const backendConfig = settings?.fund_config;
+  if (backendConfig) return createDefaultFundConfiguration(settings);
   if (typeof window === 'undefined') return createDefaultFundConfiguration(settings);
   const fallback = createDefaultFundConfiguration(settings);
   try {
@@ -242,6 +250,21 @@ export function clearFundConfiguration(settings?: Settings | null): FundConfigur
 export function mapFundConfigToSettings(config: FundConfiguration, settings: Settings): Settings {
   return {
     ...settings,
+    fund_config: {
+      ...config,
+      mandate: {
+        ...config.mandate,
+        preferredSectors: [
+          ...config.mandate.sectors,
+          config.mandate.customSectors,
+        ].map((item) => item.trim()).filter(Boolean),
+        excludedSectorList: parseList(config.mandate.excludedSectors),
+        geographyPreferences: [
+          ...config.mandate.geographies,
+          config.mandate.customGeography,
+        ].map((item) => item.trim()).filter(Boolean),
+      },
+    },
     fund_identity: {
       ...(settings.fund_identity ?? { fund_name: '', stage_focus: '', geographic_focus: '' }),
       fund_name: config.mandate.fundName,

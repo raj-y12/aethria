@@ -31,6 +31,70 @@ def _settings_key(user_id: Optional[str], *, for_save: bool = False) -> Optional
 
 
 DEFAULT_SETTINGS = {
+    # Future org/fund ownership connects here. Today this document is keyed by
+    # Clerk user_id, so the current user owns the single fund configuration.
+    "fund_config": {
+        "versionLabel": "Fund Thesis v1",
+        "version": 1,
+        "lastSavedAt": None,
+        "mandate": {
+            "fundName": "",
+            "mandateName": "Core mandate",
+            "preferredSectors": [],
+            "excludedSectors": [],
+            "preferredStages": ["Pre-seed", "Seed"],
+            "geographyPreferences": ["US", "Europe"],
+            "thesisText": "",
+            "businessModels": "",
+            "checkSizeMin": 250000,
+            "checkSizeMax": 1500000,
+            "ownershipTarget": 8,
+            "minimumTraction": "",
+        },
+        "scoringWeights": [],
+        "scoreBands": [],
+        "thresholds": {
+            "autoPass": 39,
+            "monitor": 59,
+            "escalation": 75,
+            "partnerReview": 60,
+            "staleAfterHours": 48,
+            "confidenceFloor": 0.55,
+            "missingDataThreshold": 35,
+        },
+        "risk": {
+            "sensitivity": "balanced",
+            "requireAcknowledgement": True,
+            "onlyGateHighSeverity": True,
+            "missingFounderPenalty": 8,
+            "missingTractionPenalty": 7,
+            "contradictionPenalty": 12,
+            "weakSourcePenalty": 5,
+        },
+        "memo": {
+            "style": "standard",
+            "deepDiveCollapsed": True,
+            "includeEvidenceExcerpts": True,
+            "includeMissingData": True,
+            "includeScoreReasoning": True,
+            "includeSourceConfidence": True,
+            "tone": "partner",
+        },
+        "rubric": [],
+    },
+    "user_preferences": {
+        "layoutPreferences": {},
+        "savedFilters": [],
+        "displayPreferences": {},
+        "personalOverrides": {},
+    },
+    "fund_memory": {
+        "historical_decisions": [],
+        "recurring_risk_patterns": [],
+        "calibration_observations": [],
+        "precedent_references": [],
+        "mandate_drift_notes": [],
+    },
     "fund_identity": {
         "fund_name": "",
         "stage_focus": "",
@@ -93,11 +157,22 @@ def load_settings(user_id: Optional[str] = None, *, use_cache: bool = True) -> d
         _SETTINGS_CACHE[key] = (now, out)
         return json.loads(json.dumps(out))
     out = json.loads(json.dumps(DEFAULT_SETTINGS))
-    for section in ("fund_identity", "cost_budget", "agent_config", "portfolio"):
+    for section in (
+        "fund_config",
+        "user_preferences",
+        "fund_memory",
+        "fund_identity",
+        "cost_budget",
+        "agent_config",
+        "portfolio",
+    ):
         if section in data and isinstance(data[section], dict):
-            for k, v in data[section].items():
-                if k in out.get(section, {}):
-                    out[section][k] = v
+            if section in ("fund_config", "user_preferences", "fund_memory"):
+                out[section] = _deep_merge_dict(out.get(section, {}), data[section])
+            else:
+                for k, v in data[section].items():
+                    if k in out.get(section, {}):
+                        out[section][k] = v
     # Migration 1: scout_fail_closed_on_empty_retrieval default changed from True
     # to False; stored settings auto-saved with the old default must be reset.
     ac = out.get("agent_config")
@@ -114,6 +189,16 @@ def load_settings(user_id: Optional[str] = None, *, use_cache: bool = True) -> d
             ac["confidence_threshold"] = DEFAULT_SETTINGS["agent_config"]["confidence_threshold"]
     _SETTINGS_CACHE[key] = (time.monotonic(), out)
     return json.loads(json.dumps(out))
+
+
+def _deep_merge_dict(base: dict, saved: dict) -> dict:
+    out = json.loads(json.dumps(base))
+    for key, value in saved.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _deep_merge_dict(out[key], value)
+        else:
+            out[key] = value
+    return out
 
 
 def save_settings(settings: dict, user_id: Optional[str] = None) -> None:

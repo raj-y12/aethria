@@ -8,6 +8,135 @@ from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime
 from uuid import uuid4
 
+RulingDecision = Literal["YES", "NO", "MAYBE"]
+
+
+class ScoreBandConfig(BaseModel):
+    id: str
+    min: float
+    max: float
+    label: str
+    tone: Optional[str] = None
+
+
+class ScoringWeightConfig(BaseModel):
+    key: str
+    label: str
+    description: Optional[str] = None
+    weight: float
+
+
+class RubricCriterionConfig(BaseModel):
+    id: str
+    dimension: str
+    name: str
+    description: str = ""
+    weight: float = 100
+    positiveSignals: str = ""
+    negativeSignals: str = ""
+    missingDataBehavior: str = ""
+    examples: Dict[str, str] = Field(default_factory=dict)
+
+
+class FundMandateConfig(BaseModel):
+    fundName: str = ""
+    mandateName: str = ""
+    preferredSectors: List[str] = Field(default_factory=list)
+    excludedSectors: Any = Field(default_factory=list)
+    excludedSectorList: List[str] = Field(default_factory=list)
+    preferredStages: List[str] = Field(default_factory=list)
+    geographyPreferences: List[str] = Field(default_factory=list)
+    sectors: List[str] = Field(default_factory=list)
+    customSectors: str = ""
+    geographies: List[str] = Field(default_factory=list)
+    customGeography: str = ""
+    thesisText: str = ""
+    businessModels: str = ""
+    checkSizeMin: Optional[float] = None
+    checkSizeMax: Optional[float] = None
+    ownershipTarget: Optional[float] = None
+    minimumTraction: str = ""
+
+
+class FundThresholdConfig(BaseModel):
+    autoPass: float = 39
+    monitor: float = 59
+    escalation: float = 75
+    partnerReview: float = 60
+    staleAfterHours: float = 48
+    confidenceFloor: float = 0.55
+    missingDataThreshold: float = 35
+
+
+class RiskPolicyConfig(BaseModel):
+    sensitivity: Literal["conservative", "balanced", "aggressive"] = "balanced"
+    requireAcknowledgement: bool = True
+    onlyGateHighSeverity: bool = True
+    missingFounderPenalty: float = 8
+    missingTractionPenalty: float = 7
+    contradictionPenalty: float = 12
+    weakSourcePenalty: float = 5
+
+
+class MemoPreferenceConfig(BaseModel):
+    style: Literal["concise", "standard", "detailed"] = "standard"
+    deepDiveCollapsed: bool = True
+    includeEvidenceExcerpts: bool = True
+    includeMissingData: bool = True
+    includeScoreReasoning: bool = True
+    includeSourceConfidence: bool = True
+    tone: Literal["partner", "analyst"] = "partner"
+
+
+class FundConfig(BaseModel):
+    versionLabel: str = "Fund Thesis v1"
+    version: int = 1
+    lastSavedAt: Optional[str] = None
+    mandate: FundMandateConfig = Field(default_factory=FundMandateConfig)
+    scoringWeights: List[ScoringWeightConfig] = Field(default_factory=list)
+    scoreBands: List[ScoreBandConfig] = Field(default_factory=list)
+    thresholds: FundThresholdConfig = Field(default_factory=FundThresholdConfig)
+    risk: RiskPolicyConfig = Field(default_factory=RiskPolicyConfig)
+    memo: MemoPreferenceConfig = Field(default_factory=MemoPreferenceConfig)
+    rubric: List[RubricCriterionConfig] = Field(default_factory=list)
+
+
+class UserPreferences(BaseModel):
+    layoutPreferences: Dict[str, Any] = Field(default_factory=dict)
+    savedFilters: List[Dict[str, Any]] = Field(default_factory=list)
+    displayPreferences: Dict[str, Any] = Field(default_factory=dict)
+    personalOverrides: Dict[str, Any] = Field(default_factory=dict)
+
+
+class DecisionHistoryRecord(BaseModel):
+    company_id: str
+    previous_decision: Optional[RulingDecision] = None
+    new_decision: RulingDecision
+    timestamp: str
+    rationale: Optional[str] = None
+    confidence: Optional[float] = None
+    score_snapshot: Optional[Dict[str, Any]] = None
+    risk_acknowledged: Optional[bool] = None
+    config_version: Optional[str] = None
+
+
+class ConvictionState(BaseModel):
+    current_ruling: Optional[Dict[str, Any]] = None
+    decision_history: List[DecisionHistoryRecord] = Field(default_factory=list)
+    ruling_rationale: Optional[str] = None
+    risk_acknowledgements: List[Dict[str, Any]] = Field(default_factory=list)
+    score_changes: List[Dict[str, Any]] = Field(default_factory=list)
+    confidence_changes: List[Dict[str, Any]] = Field(default_factory=list)
+    escalation_events: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class FundMemory(BaseModel):
+    historical_decisions: List[DecisionHistoryRecord] = Field(default_factory=list)
+    recurring_risk_patterns: List[Dict[str, Any]] = Field(default_factory=list)
+    calibration_observations: List[Dict[str, Any]] = Field(default_factory=list)
+    precedent_references: List[Dict[str, Any]] = Field(default_factory=list)
+    mandate_drift_notes: List[Dict[str, Any]] = Field(default_factory=list)
+
 
 class ScoutInfo(BaseModel):
     """Scout discovery information."""
@@ -234,6 +363,12 @@ class Startup(BaseModel):
 
     # Persisted display memo (Supabase); set only after partner + full markdown write
     investment_memo_markdown: Optional[str] = None
+
+    # Current human override/ruling, retained for existing API compatibility.
+    human_resolution: Optional[Dict[str, Any]] = None
+
+    # Institutional conviction architecture, currently scoped to the authenticated user.
+    conviction_state: Optional[ConvictionState] = None
     
     # Financials (can be populated at any stage)
     financials: Financials = Field(default_factory=Financials)
