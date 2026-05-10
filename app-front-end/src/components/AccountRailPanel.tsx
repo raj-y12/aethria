@@ -24,26 +24,26 @@ export default function AccountRailPanel({ settingsPath }: AccountRailPanelProps
           {displayName}
         </p>
 
-        <div className="mt-phi-3 flex items-center gap-phi-3">
+        <div className="mt-phi-2 flex items-center gap-phi-2">
           <Link
             to={settingsPath}
-            className="font-mono text-[9px] uppercase tracking-[0.14em] text-oxford/30 hover:text-oxford/60 transition-colors btn-interaction"
+            className="type-meta inline-flex min-h-[44px] items-center uppercase text-oxford/35 hover:text-oxford/60 transition-colors btn-interaction"
           >
             Settings
           </Link>
-          <span className="font-mono text-[9px] text-oxford/18" aria-hidden>·</span>
+          <span className="font-mono text-[11px] text-oxford/18" aria-hidden>·</span>
           <button
             type="button"
             onClick={requestLogout}
             disabled={agentActionPending}
-            className="font-mono text-[9px] uppercase tracking-[0.14em] text-oxford/30 hover:text-oxford/55 bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction disabled:opacity-50"
+            className="type-meta inline-flex min-h-[44px] items-center uppercase text-oxford/35 hover:text-oxford/55 bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction disabled:opacity-50"
           >
-            {agentActionPending ? 'Updating…' : 'Log out'}
+            {agentActionPending ? 'Updating...' : 'Log out'}
           </button>
         </div>
 
         {agentActionError ? (
-          <p className="mt-phi-2 font-mono text-[10px] text-escalation" role="status" aria-live="polite">
+          <p className="mt-phi-2 type-meta text-escalation" role="status" aria-live="polite">
             {agentActionError}
           </p>
         ) : null}

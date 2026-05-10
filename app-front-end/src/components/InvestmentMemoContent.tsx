@@ -27,6 +27,13 @@ import {
   type RulingDecision,
 } from '../lib/dealState';
 import { extractAdverseRegister, type AdverseRegisterItem } from '../lib/adverseRegister';
+import {
+  bandForScore,
+  computeConfiguredScore,
+  createDefaultFundConfiguration,
+  shouldGateRisk,
+  type FundConfiguration,
+} from '../lib/fundConfiguration';
 const MEMO_POLL_INITIAL_MS = 2000;
 const MEMO_POLL_MAX_MS = 15000;
 const MEMO_POLL_MAX_ATTEMPTS = 60;
@@ -87,6 +94,7 @@ export interface InvestmentMemoContentProps {
   embedded?: boolean;
   onMemoPipelineReady?: () => void;
   onDecisionResolved?: (startup: Startup) => void;
+  fundConfiguration?: FundConfiguration;
 }
 
 export interface InvestmentMemoContentHandle {
@@ -233,14 +241,16 @@ function decisionLabel(decision: RulingDecision): string {
 }
 
 const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, InvestmentMemoContentProps>(function InvestmentMemoContent(
-  { startup, onClose, embedded = false, onMemoPipelineReady, onDecisionResolved },
+  { startup, onClose, embedded = false, onMemoPipelineReady, onDecisionResolved, fundConfiguration },
   ref
 ) {
+  const config = fundConfiguration ?? createDefaultFundConfiguration();
   const reduceMotion = usePrefersReducedMotion();
   const wrapperCls = embedded ? 'memoPanel memoPanel--embedded' : 'memoPanel';
   const [selectedReviewerIdx, setSelectedReviewerIdx] = useState(0);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pipelineLogOpen, setPipelineLogOpen] = useState(false);
+  const [adverseOpen, setAdverseOpen] = useState(false);
   const [risksReviewed, setRisksReviewed] = useState(false);
   const [rulingDecision, setRulingDecision] = useState<RulingDecision | null>(null);
   const [rulingNotes, setRulingNotes] = useState('');
@@ -380,15 +390,22 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     () => extractAdverseRegister(displayStartup),
     [displayStartup]
   );
+  const configuredScore = displayStartup ? computeConfiguredScore(displayStartup, config) : null;
+  const configuredBand = configuredScore != null ? bandForScore(configuredScore, config.scoreBands) : null;
+  const highAdverseCount = adverseRegister.filter((item) => item.severity === 'high').length;
+  const mediumAdverseCount = adverseRegister.filter((item) => item.severity === 'medium').length;
   const hasHighAdverse = adverseRegister.some((item) => item.severity === 'high');
   const isAlreadyDecided = displayStartup ? isDealDecided(displayStartup) : false;
-  const needsRiskAcknowledgement = Boolean(displayStartup && hasHighAdverse && !isAlreadyDecided);
+  const needsRiskAcknowledgement = Boolean(
+    displayStartup && shouldGateRisk(config, hasHighAdverse, adverseRegister.length > 0, isAlreadyDecided)
+  );
   const riskReviewOutstanding = needsRiskAcknowledgement && !risksReviewed;
 
   useEffect(() => {
     setSelectedReviewerIdx(0);
     setSourcesOpen(false);
     setPipelineLogOpen(false);
+    setAdverseOpen(false);
     setRisksReviewed(false);
     setRulingDecision(null);
     setRulingNotes('');
@@ -569,6 +586,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                                 <span className="memoNum">{Math.round(displayStartup.partner.confidence * 100)}%</span> confidence
                               </p>
                             )}
+                            {configuredScore != null && configuredBand && (
+                              <p className="memoDocConfidence">
+                                <span className="memoNum">{configuredScore}</span> configured score, {configuredBand.label}
+                              </p>
+                            )}
                             {showEscalationBadge && (
                               <p className="memoDocEscalation">Escalation required</p>
                             )}
@@ -592,25 +614,54 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               {/* ── Adverse register before ruling controls ── */}
               {adverseRegister.length > 0 && (
                 <section className="memoDocSection memoAdverseRegister" aria-labelledby="memo-adverse-register">
-                  <h2 className="memoDocSectionHead" id="memo-adverse-register">Adverse Register</h2>
-                  <div className="memoAdverseList">
-                    {adverseRegister.map((item) => (
-                      <article key={item.id} className={`memoAdverseItem memoAdverseItem--${item.severity}`}>
-                        <div className="memoAdverseSeverity">
-                          <span>{SEVERITY_LABEL[item.severity]}</span>
-                        </div>
-                        <div className="memoAdverseMain">
-                          <p className="memoAdverseTitle">{renderWithMonoNumbers(item.title)}</p>
-                          <p className="memoAdverseBody">{renderWithMonoNumbers(item.whyItMatters)}</p>
-                        </div>
-                        <div className="memoAdverseMeta">
-                          <span>{item.basis}</span>
-                          {item.missingData && <span>Missing data</span>}
-                          {item.source && <span>{item.source}</span>}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    className="memoAdverseToggle"
+                    onClick={() => setAdverseOpen((open) => !open)}
+                    aria-expanded={adverseOpen}
+                    aria-controls={`${contentKey}-adverse-register`}
+                  >
+                    <span className="memoAdverseToggleTitle" id="memo-adverse-register">
+                      Adverse Register
+                    </span>
+                    <span className="memoAdverseCount" aria-label={`${highAdverseCount} red flags, ${adverseRegister.length} total adverse items`}>
+                      <span className={highAdverseCount > 0 ? 'memoAdverseCountCritical' : undefined}>
+                        {highAdverseCount}
+                      </span>
+                      {' red flags'}
+                      <span aria-hidden> · </span>
+                      <span>{adverseRegister.length}</span>
+                      {' total'}
+                    </span>
+                    <span className="memoAdverseChevron" aria-hidden>
+                      {adverseOpen ? '−' : '+'}
+                    </span>
+                  </button>
+                  <p className="memoAdverseSummary">
+                    {highAdverseCount > 0
+                      ? `${highAdverseCount} high-severity item${highAdverseCount === 1 ? '' : 's'} require review before conviction.`
+                      : `${mediumAdverseCount || adverseRegister.length} adverse item${(mediumAdverseCount || adverseRegister.length) === 1 ? '' : 's'} noted for diligence.`}
+                  </p>
+                  {adverseOpen && (
+                    <div className="memoAdverseList" id={`${contentKey}-adverse-register`}>
+                      {adverseRegister.map((item) => (
+                        <article key={item.id} className={`memoAdverseItem memoAdverseItem--${item.severity}`}>
+                          <div className="memoAdverseSeverity">
+                            <span>{SEVERITY_LABEL[item.severity]}</span>
+                          </div>
+                          <div className="memoAdverseMain">
+                            <p className="memoAdverseTitle">{renderWithMonoNumbers(item.title)}</p>
+                            <p className="memoAdverseBody">{renderWithMonoNumbers(item.whyItMatters)}</p>
+                          </div>
+                          <div className="memoAdverseMeta">
+                            <span>{item.basis}</span>
+                            {item.missingData && <span>Missing data</span>}
+                            {item.source && <span>{item.source}</span>}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
                 </section>
               )}
 
@@ -664,13 +715,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       <button
                         type="button"
                         onClick={handleRulingSubmit}
-                        disabled={!rulingDecision || rulingNotes.trim().length < 5 || rulingSaving}
+                        disabled={!rulingDecision || rulingNotes.trim().length < 5 || rulingSaving || riskReviewOutstanding}
                         className="memoRulingSubmit"
                       >
                         {rulingSaving ? 'Recording...' : 'Commit ruling'}
                       </button>
                       {riskReviewOutstanding && (
-                        <span className="memoRulingHint">Controls remain live.</span>
+                        <span className="memoRulingHint">Mark risks reviewed to commit.</span>
                       )}
                       {rulingError && <span className="memoRulingError">{rulingError}</span>}
                     </div>
@@ -821,7 +872,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 <section className="memoDocSection" aria-labelledby="memo-assessment">
                   <h2 className="memoDocSectionHead" id="memo-assessment">Assessment</h2>
 
-                  {(hasScores || hasSignalsAudit) && (
+                  {config.memo.includeScoreReasoning && (hasScores || hasSignalsAudit) && (
                     <div className="memoDocScoreScope">
                       {(() => {
                         const sig = rawSig;
@@ -1007,7 +1058,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             })()}
 
             {/* ── Reviewer Panel ── */}
-            {(displayStartup.review?.reviews?.length ?? 0) > 0 && (() => {
+            {config.memo.style !== 'concise' && (displayStartup.review?.reviews?.length ?? 0) > 0 && (() => {
               const reviews = displayStartup.review!.reviews!;
               const isContested = displayStartup.review?.reviewer_disagreement === true;
               const selected = reviews[selectedReviewerIdx] ?? reviews[0];
@@ -1132,7 +1183,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             )}
 
             {/* ── Sources ── */}
-            {(displayStartup.scout.references?.length ?? 0) > 0 && (
+            {config.memo.includeEvidenceExcerpts && (displayStartup.scout.references?.length ?? 0) > 0 && (
               <section className="memoSourcesSection">
                 <button
                   type="button"

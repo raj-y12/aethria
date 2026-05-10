@@ -50,7 +50,7 @@ export function useAgentLogoutFlow() {
     onTurnOffAndLogout: async () => {
       await toggleAgentsAndLogout(false);
     },
-    onTurnOnAndStay: async () => {
+    onTurnOnAndLogout: async () => {
       await toggleAgentsAndLogout(true);
     },
   };

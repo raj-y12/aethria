@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import GrainOverlay from './GrainOverlay';
 import type { ActivitySummary } from '../api/activity';
+import { usePrefersReducedMotion } from '../hooks';
 
 interface Props {
   summary: ActivitySummary;
@@ -17,15 +18,16 @@ const STATS_CONFIG = (s: ActivitySummary) => [
 ];
 
 export default function WhileYouWereAway({ summary, onDismiss }: Props) {
+  const reduceMotion = usePrefersReducedMotion();
   const stats = STATS_CONFIG(summary);
 
   return (
     <motion.div
       key="while-you-were-away"
-      initial={{ opacity: 0 }}
+      initial={reduceMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.25, ease: EASE } }}
-      transition={{ duration: 0.4, ease: EASE }}
+      exit={{ opacity: 0, transition: { duration: reduceMotion ? 0 : 0.25, ease: EASE } }}
+      transition={{ duration: reduceMotion ? 0 : 0.4, ease: EASE }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -42,12 +44,12 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
       <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '40rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* Eyebrow */}
         <motion.p
-          initial={{ opacity: 0 }}
+          initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: 0.2, delay: 0.42, ease: EASE } }}
-          transition={{ duration: 0.5, ease: EASE, delay: 0.05 }}
+          exit={{ opacity: 0, transition: { duration: reduceMotion ? 0 : 0.2, delay: reduceMotion ? 0 : 0.42, ease: EASE } }}
+          transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE, delay: reduceMotion ? 0 : 0.05 }}
           style={{
-            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            fontFamily: "var(--font-mono)",
             fontSize: '11px',
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
@@ -60,12 +62,12 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
 
         {/* Title */}
         <motion.h1
-          initial={{ opacity: 0, y: 12 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 12, transition: { duration: 0.35, delay: 0.35, ease: EASE } }}
-          transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
+          exit={{ opacity: 0, y: reduceMotion ? 0 : 12, transition: { duration: reduceMotion ? 0 : 0.35, delay: reduceMotion ? 0 : 0.35, ease: EASE } }}
+          transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
           style={{
-            fontFamily: "'EB Garamond', Georgia, serif",
+            fontFamily: "var(--font-display)",
             fontSize: 'clamp(36px, 5vw, 64px)',
             fontWeight: 500,
             color: 'var(--color-oxford)',
@@ -79,10 +81,10 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
 
         {/* Subtitle */}
         <motion.p
-          initial={{ opacity: 0 }}
+          initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: 0.3, delay: 0.28, ease: EASE } }}
-          transition={{ duration: 0.5, ease: EASE, delay: 0.18 }}
+          exit={{ opacity: 0, transition: { duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : 0.28, ease: EASE } }}
+          transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE, delay: reduceMotion ? 0 : 0.18 }}
           style={{
             fontFamily: "var(--font-sans)",
             fontSize: '14px',
@@ -110,21 +112,21 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
           {stats.map((stat, i) => (
             <motion.div
               key={stat.label}
-              initial={{ opacity: 0, y: 10 }}
+              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{
                 opacity: 0,
-                y: 10,
-                transition: { duration: 0.3, delay: (stats.length - 1 - i) * 0.06, ease: EASE },
+                y: reduceMotion ? 0 : 10,
+                transition: { duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : (stats.length - 1 - i) * 0.06, ease: EASE },
               }}
-              transition={{ duration: 0.45, ease: EASE, delay: 0.22 + i * 0.07 }}
+              transition={{ duration: reduceMotion ? 0 : 0.45, ease: EASE, delay: reduceMotion ? 0 : 0.22 + i * 0.07 }}
               style={{ textAlign: 'center' }}
             >
               <div
                 style={{
-                  fontFamily: "var(--font-sans)",
-                  fontSize: 'clamp(40px, 6vw, 72px)',
-                  fontWeight: 600,
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 'clamp(34px, 5vw, 56px)',
+                  fontWeight: 700,
                   lineHeight: 1,
                   color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
                   letterSpacing: '-0.03em',
@@ -149,16 +151,16 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
 
         {/* CTA */}
         <motion.button
-          initial={{ opacity: 0 }}
+          initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: 0.2, delay: 0, ease: EASE } }}
-          transition={{ duration: 0.4, ease: EASE, delay: 0.22 + stats.length * 0.07 }}
+          exit={{ opacity: 0, transition: { duration: reduceMotion ? 0 : 0.2, delay: 0, ease: EASE } }}
+          transition={{ duration: reduceMotion ? 0 : 0.4, ease: EASE, delay: reduceMotion ? 0 : 0.22 + stats.length * 0.07 }}
           onClick={onDismiss}
           className="group btn-aethria-solid"
           style={{ padding: '0 48px' }}
         >
           <span className="flex items-center justify-center">
-            <span>Enter System</span>
+            <span>Enter Aethria</span>
             <span
               className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
               aria-hidden

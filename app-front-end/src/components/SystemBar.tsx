@@ -286,7 +286,7 @@ export default function SystemBar({
               disabled={agentActionPending}
               className="type-label-tab text-white/60 hover:text-white inline-flex min-h-[44px] items-center bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
             >
-              {agentActionPending ? 'Updating…' : 'Log out'}
+              {agentActionPending ? 'Updating...' : 'Log out'}
             </button>
           </div>
         </div>

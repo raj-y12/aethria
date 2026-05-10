@@ -350,6 +350,64 @@
 .memoAdverseRegister {
   padding-top: 0;
 }
+.memoAdverseToggle {
+  width: 100%;
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0 0 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  cursor: pointer;
+  color: var(--color-oxford);
+}
+.memoAdverseToggle:focus { outline: none; }
+.memoAdverseToggle:focus-visible {
+  outline: 2px solid rgba(var(--color-oxford-rgb), 0.22);
+  outline-offset: 2px;
+}
+.memoAdverseToggleTitle {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.60);
+}
+.memoAdverseCount {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.45);
+  white-space: nowrap;
+}
+.memoAdverseCountCritical {
+  color: color-mix(in srgb, var(--color-accent) 78%, transparent);
+}
+.memoAdverseChevron {
+  min-width: 1ch;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  line-height: 1;
+  color: rgba(var(--color-oxford-rgb), 0.42);
+}
+.memoAdverseSummary {
+  margin: -4px 0 14px;
+  max-width: 46rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-ui);
+  line-height: 1.55;
+  color: rgba(var(--color-oxford-rgb), 0.58);
+}
 .memoAdverseList {
   display: flex;
   flex-direction: column;
@@ -1178,6 +1236,9 @@
   .memoDocJudgmentTop { grid-template-columns: 1fr; align-items: start; }
   .memoRulingStatus { grid-template-columns: 1fr; }
   .memoRulingNote { grid-column: 1; }
+  .memoAdverseToggle { grid-template-columns: 1fr auto; }
+  .memoAdverseCount { grid-column: 1 / -1; width: fit-content; }
+  .memoAdverseChevron { grid-column: 2; grid-row: 1; }
   .memoAdverseItem { grid-template-columns: 1fr; gap: 8px; }
   .memoAdverseMeta { flex-direction: row; flex-wrap: wrap; }
   .memoDecisionChoices { grid-template-columns: 1fr; }

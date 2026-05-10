@@ -12,11 +12,17 @@ import {
   getDealAgeDays,
   getDealQueueState,
   isDealDecided,
-  isDealStale,
   queueAttentionRank,
   type RulingDecision,
 } from '../lib/dealState';
 import { extractAdverseRegister } from '../lib/adverseRegister';
+import {
+  bandForScore,
+  computeConfiguredScore,
+  createDefaultFundConfiguration,
+  isStartupStaleByConfig,
+  type FundConfiguration,
+} from '../lib/fundConfiguration';
 
 type SourceFilter = 'ALL' | 'SCOUT' | 'LOOKUP';
 type DecisionFilter =
@@ -71,6 +77,7 @@ interface WorkGridProps {
   onStartupClick: (startup: Startup) => void;
   selectedId?: string | null;
   watchlistIds?: Set<string>;
+  fundConfiguration?: FundConfiguration;
 }
 
 const EMPTY_WATCHLIST_IDS = new Set<string>();
@@ -99,6 +106,8 @@ interface WorkGridRow {
   decisionVariant: ReturnType<typeof getDecisionBadgeVariant>;
   queueState: ReturnType<typeof getDealQueueState>;
   adverseItems: ReturnType<typeof extractAdverseRegister>;
+  configuredScore: number;
+  configuredBand: string;
   hasAdverse: boolean;
   hasHighAdverse: boolean;
   ageDays: number | null;
@@ -125,8 +134,9 @@ function rowMatchesDecisionFilter(row: WorkGridRow, filter: DecisionFilter): boo
   return getHumanDecision(row.startup) === filter;
 }
 
-const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGridProps): JSX.Element => {
+const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConfiguration }: WorkGridProps): JSX.Element => {
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
+  const config = fundConfiguration ?? createDefaultFundConfiguration();
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('ALL');
   const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>('ALL');
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('ALL');
@@ -185,7 +195,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
       const adverseItems = extractAdverseRegister(startup);
       const queueState = getDealQueueState(startup);
       const isDecided = isDealDecided(startup);
-      const isStale = isDealStale(startup);
+      const configuredScore = computeConfiguredScore(startup, config);
+      const isStale = isStartupStaleByConfig(startup, config);
       const displayIndex = (stableIndex.get(startup.id) ?? 0).toString().padStart(2, '0');
       return {
         startup,
@@ -194,6 +205,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
         decisionVariant: getDecisionBadgeVariant(startup),
         queueState,
         adverseItems,
+        configuredScore,
+        configuredBand: bandForScore(configuredScore, config.scoreBands).label,
         hasAdverse: adverseItems.length > 0,
         hasHighAdverse: adverseItems.some((item) => item.severity === 'high'),
         ageDays: getDealAgeDays(startup),
@@ -210,8 +223,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
     switch (sortFilter) {
       case 'QUEUE_PRIORITY':
         sorted.sort((a, b) => {
-          const ar = queueAttentionRank(a.startup);
-          const br = queueAttentionRank(b.startup);
+          const ar = a.isDecided ? 4 : a.hasHighAdverse || a.isEscalated ? 0 : a.isStale ? 1 : a.startup.review ? 2 : queueAttentionRank(a.startup);
+          const br = b.isDecided ? 4 : b.hasHighAdverse || b.isEscalated ? 0 : b.isStale ? 1 : b.startup.review ? 2 : queueAttentionRank(b.startup);
           if (ar !== br) return ar - br;
           return b.sortKeyValue.localeCompare(a.sortKeyValue);
         });
@@ -242,7 +255,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
       return true;
     });
     return filtered;
-  }, [startups, stableIndex, sourceFilter, decisionFilter, reviewFilter, sortFilter, watchlistSet]);
+  }, [startups, stableIndex, sourceFilter, decisionFilter, reviewFilter, sortFilter, watchlistSet, config]);
 
   // Arrow-key navigation between rows for power-user keyboard flow.
   const handleRowKeyDown = useCallback(
@@ -550,6 +563,12 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds }: WorkGr
                       Monitor
                     </span>
                   )}
+                  <span className="type-meta text-oxford/35 tabular-nums" title="Configured weighted score">
+                    {row.configuredScore}
+                  </span>
+                  <span className="type-label-tab text-oxford/40 bg-registerTint px-phi-2 py-0.5 shrink-0" title="Current score-band outcome">
+                    {row.configuredBand}
+                  </span>
                   {row.reviewBand && <VerdictBandBadge band={row.reviewBand} />}
                   <DecisionBadge variant={row.decisionVariant} />
                 </div>

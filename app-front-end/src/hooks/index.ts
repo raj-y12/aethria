@@ -9,4 +9,4 @@ export { useSystemData } from './useSystemData';
 export { useQueryLiveGate } from './useQueryLiveGate';
 export { useAgentsEnabled } from './useAgentsEnabled';
 export { useAgentLogoutFlow } from './useAgentLogoutFlow';
-
+export { useFundConfiguration } from './useFundConfiguration';

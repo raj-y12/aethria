@@ -3,7 +3,7 @@ const bodyMetrics = 'font-sans text-[13px] leading-[1.5]';
 export const railEditorial = {
   /** Primary wordmark — both MainLayout and SettingsPage asides (Libre Baskerville). Title case in markup. */
   wordmark:
-    'font-wordmark font-bold text-[clamp(15px,1.35vw,19px)] leading-tight tracking-[0.05em] text-oxford',
+    'font-wordmark font-medium text-[clamp(15px,1.35vw,19px)] leading-tight tracking-[0.05em] text-oxford',
 
   /**
    * Section titles — memo `.memoDocSectionHead` rhythm (tracking, color, mb);

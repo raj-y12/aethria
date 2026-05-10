@@ -12,7 +12,7 @@
  *   2. Turn on agents → enable agents via API, then logout
  *   3. Cancel → close modal
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -24,8 +24,8 @@ interface AgentLogoutModalProps {
   onKeepRunning: () => void;
   /** Disable agents via API then logout */
   onTurnOffAndLogout: () => Promise<void>;
-  /** Enable agents via API, stay logged in */
-  onTurnOnAndStay: () => Promise<void>;
+  /** Enable agents via API, then logout */
+  onTurnOnAndLogout: () => Promise<void>;
 }
 
 export default function AgentLogoutModal({
@@ -34,7 +34,7 @@ export default function AgentLogoutModal({
   onCancel,
   onKeepRunning,
   onTurnOffAndLogout,
-  onTurnOnAndStay,
+  onTurnOnAndLogout,
 }: AgentLogoutModalProps) {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -55,13 +55,22 @@ export default function AgentLogoutModal({
     setBusy(true);
     setActionError(null);
     try {
-      await onTurnOnAndStay();
+      await onTurnOnAndLogout();
     } catch {
       setActionError('Unable to update agent state right now. Please try again.');
     } finally {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!open || busy) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [busy, onCancel, open]);
 
   const modal = (
     <AnimatePresence>
@@ -104,8 +113,8 @@ export default function AgentLogoutModal({
             className="type-body text-center text-oxford/50 mt-phi-3 mb-phi-8 max-w-[34ch]"
           >
             {agentsEnabled
-              ? 'The background pipeline will persist in the cloud after you log out. You can turn them off now, or leave them running.'
-              : 'The pipeline is not running. Would you like to turn on agents before you leave?'}
+              ? 'The pipeline can keep reviewing deals after you log out. Leave it running, or pause it first.'
+              : 'The pipeline is paused. You can log out now or restart it before leaving.'}
           </motion.p>
 
           {/* Actions — vertical stack, centered */}
@@ -128,9 +137,9 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
                   onClick={onKeepRunning}
                   disabled={busy}
-                  className="w-full px-phi-7 py-[14px] bg-oxford text-paper type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
+                  className="w-full min-h-[44px] px-phi-7 py-[14px] bg-oxford text-paper type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
                 >
-                  Continue running & Log out
+                  Keep pipeline running
                 </motion.button>
 
                 {/* Secondary: Turn Off */}
@@ -140,9 +149,9 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
                   onClick={() => void handleTurnOff()}
                   disabled={busy}
-                  className="w-full text-oxford/50 hover:text-oxford type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-colors disabled:opacity-50"
+                  className="w-full min-h-[44px] text-oxford/50 hover:text-oxford type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-colors disabled:opacity-50"
                 >
-                  {busy ? 'Turning off agents…' : 'Stop agents then log out'}
+                  {busy ? 'Pausing pipeline...' : 'Pause pipeline and log out'}
                 </motion.button>
               </>
             ) : (
@@ -154,21 +163,21 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
                   onClick={onKeepRunning}
                   disabled={busy}
-                  className="w-full px-phi-7 py-[14px] bg-oxford text-paper type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
+                  className="w-full min-h-[44px] px-phi-7 py-[14px] bg-oxford text-paper type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
                 >
                   Log out
                 </motion.button>
 
-                {/* Secondary: Turn on agents & log out */}
+                {/* Secondary: Turn on agents and log out */}
                 <motion.button
                   initial={{ opacity: 0, transform: 'translateY(10px)' }}
                   animate={{ opacity: 1, transform: 'translateY(0px)' }}
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
                   onClick={() => void handleTurnOn()}
                   disabled={busy}
-                  className="w-full text-oxford/50 hover:text-oxford type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-colors disabled:opacity-50"
+                  className="w-full min-h-[44px] text-oxford/50 hover:text-oxford type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-colors disabled:opacity-50"
                 >
-                  {busy ? 'Turning on agents…' : 'Turn on agents & log out'}
+                  {busy ? 'Starting pipeline...' : 'Start pipeline and log out'}
                 </motion.button>
               </>
             )}
@@ -180,7 +189,7 @@ export default function AgentLogoutModal({
               transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.39 }}
               onClick={onCancel}
               disabled={busy}
-              className="mt-phi-4 type-meta uppercase tracking-[0.12em] text-oxford/30 hover:text-oxford/50 btn-interaction cursor-pointer transition-colors disabled:opacity-50 border-b border-oxford/10 pb-0.5"
+              className="mt-phi-4 min-h-[44px] type-meta uppercase tracking-[0.12em] text-oxford/30 hover:text-oxford/50 btn-interaction cursor-pointer transition-colors disabled:opacity-50 border-b border-oxford/10 pb-0.5"
             >
               Cancel
             </motion.button>

@@ -21,6 +21,7 @@ import {
   useFocusTrap,
   useMediaQuery,
   usePrefersReducedMotion,
+  useFundConfiguration,
 } from '../hooks';
 import { transitionOrReduced } from '../design-system/motion';
 import {
@@ -126,6 +127,7 @@ export default function MainLayout({
   startupsError,
   onSystemPanelOpenChange,
 }: MainLayoutProps) {
+  const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
   const {
     startups,
     signals,
@@ -903,6 +905,7 @@ export default function MainLayout({
                       onStartupClick={handleStartupClick}
                       selectedId={selectedStartup?.id ?? null}
                       watchlistIds={watchlistIds}
+                      fundConfiguration={fundConfiguration}
                     />
                   </GhostTransition>
                 )}
@@ -1036,6 +1039,7 @@ export default function MainLayout({
                             embedded
                             onMemoPipelineReady={handleMemoPipelineReady}
                             onDecisionResolved={handleDecisionResolved}
+                            fundConfiguration={fundConfiguration}
                           />
                         </motion.div>
                       </PanelShell>
@@ -1149,6 +1153,7 @@ export default function MainLayout({
             startup={memoStartup}
             onClose={handleCloseMemo}
             onMemoPipelineReady={handleMemoPipelineReady}
+            fundConfiguration={fundConfiguration}
           />
         )}
       </AnimatePresence>

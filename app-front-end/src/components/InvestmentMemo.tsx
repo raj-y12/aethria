@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import type { Startup } from '../types/startup';
+import type { FundConfiguration } from '../lib/fundConfiguration';
 import { tokens } from '../design-system/tokens';
 import { chrome } from '../design-system/chrome';
 import { transitionOrReduced } from '../design-system/motion';
@@ -12,12 +13,13 @@ interface InvestmentMemoProps {
   startup: Startup | null;
   onClose: () => void;
   onMemoPipelineReady?: () => void;
+  fundConfiguration?: FundConfiguration;
 }
 
 /**
  * Full-screen modal wrapper for the investment memo. Used on small viewports.
  */
-export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady }: InvestmentMemoProps) {
+export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady, fundConfiguration }: InvestmentMemoProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion = usePrefersReducedMotion();
   useFocusTrap(true, containerRef);
@@ -71,7 +73,12 @@ export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady }
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <InvestmentMemoContent startup={startup} onClose={onClose} onMemoPipelineReady={onMemoPipelineReady} />
+        <InvestmentMemoContent
+          startup={startup}
+          onClose={onClose}
+          onMemoPipelineReady={onMemoPipelineReady}
+          fundConfiguration={fundConfiguration}
+        />
       </div>
     </motion.div>
   );

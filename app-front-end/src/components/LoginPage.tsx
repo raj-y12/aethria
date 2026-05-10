@@ -233,7 +233,7 @@ export default function LoginPage() {
               exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
               transition={{ duration: 0.5, ease: EASE, delay: 0.05 }}
               style={{
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontFamily: "var(--font-mono)",
                 fontSize: '11px',
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
@@ -270,7 +270,7 @@ export default function LoginPage() {
             >
               <h1
                 style={{
-                  fontFamily: "'EB Garamond', Georgia, serif",
+                  fontFamily: "var(--font-display)",
                   fontSize: 'clamp(36px, 5vw, 64px)',
                   fontWeight: 500,
                   color: 'var(--color-oxford)',
@@ -283,7 +283,7 @@ export default function LoginPage() {
               </h1>
               <p
                 style={{
-                  fontFamily: "'Geist Sans', system-ui, sans-serif",
+                  fontFamily: "var(--font-sans)",
                   fontSize: '14px',
                   color: 'rgba(var(--color-oxford-rgb), 0.6)',
                   marginTop: '12px',
@@ -329,14 +329,14 @@ export default function LoginPage() {
                   animate={reduceMotion ? { opacity: 1 } : { opacity: [0.35, 0.8, 0.35] }}
                   transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
                   style={{
-                    fontFamily: "'Geist Sans', system-ui, sans-serif",
+                    fontFamily: "var(--font-sans)",
                     fontSize: '14px',
                     color: 'rgba(var(--color-oxford-rgb), 0.4)',
                     marginBottom: '64px',
                     textAlign: 'center',
                   }}
                 >
-                  Preparing workspace…
+                  Preparing workspace...
                 </motion.p>
               )}
 
@@ -363,8 +363,8 @@ export default function LoginPage() {
                     >
                       <div
                         style={{
-                          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                          fontSize: 'clamp(40px, 6vw, 72px)',
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 'clamp(34px, 5vw, 56px)',
                           fontWeight: 700,
                           lineHeight: 1,
                           color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
@@ -375,7 +375,7 @@ export default function LoginPage() {
                       </div>
                       <div
                         style={{
-                          fontFamily: "'Geist Sans', system-ui, sans-serif",
+                          fontFamily: "var(--font-sans)",
                           fontSize: '13px',
                           color: 'rgba(var(--color-oxford-rgb), 0.6)',
                           marginTop: '6px',
@@ -393,14 +393,14 @@ export default function LoginPage() {
               {!activityLoading && !stats && (
                 <p
                   style={{
-                    fontFamily: "'Geist Sans', system-ui, sans-serif",
+                    fontFamily: "var(--font-sans)",
                     fontSize: '14px',
                     color: 'rgba(var(--color-oxford-rgb), 0.6)',
                     marginBottom: '64px',
                     textAlign: 'center',
                   }}
                 >
-                  Everything is up to date.
+                  Everything is current.
                 </p>
               )}
 
@@ -416,7 +416,7 @@ export default function LoginPage() {
                   style={{ padding: '0 48px' }}
                 >
                   <span className="flex items-center justify-center">
-                    <span>Enter System</span>
+                    <span>Enter Aethria</span>
                     <span
                       className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
                       aria-hidden
@@ -459,7 +459,7 @@ export default function LoginPage() {
                       onFocus={() => setUsernameFocused(true)}
                       onBlur={() => setUsernameFocused(false)}
                       aria-describedby={error ? 'login-error' : undefined}
-                      className="w-full bg-transparent border-0 py-phi-3 font-mono text-[11px] text-oxford outline-none placeholder:text-oxford/35 tracking-[0.1em]"
+                      className="w-full bg-transparent border-0 py-phi-3 font-sans text-sm text-oxford outline-none placeholder:text-oxford/35 tracking-0"
                     />
                   </div>
                   <div className="flex flex-col">
@@ -479,7 +479,7 @@ export default function LoginPage() {
                       onFocus={() => setPasswordFocused(true)}
                       onBlur={() => setPasswordFocused(false)}
                       aria-describedby={error ? 'login-error' : undefined}
-                      className="w-full bg-transparent border-0 py-phi-3 font-mono text-[11px] text-oxford outline-none placeholder:text-oxford/35 tracking-[0.1em]"
+                      className="w-full bg-transparent border-0 py-phi-3 font-sans text-sm text-oxford outline-none placeholder:text-oxford/35 tracking-0"
                     />
                   </div>
                 </div>
@@ -515,11 +515,11 @@ export default function LoginPage() {
                         animate={reduceMotion ? {} : { opacity: [1, 0.4, 1] }}
                         transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
                       >
-                        Authenticating…
+                        Authenticating...
                       </motion.span>
                     ) : (
                       <>
-                        <span>Establish Session</span>
+                        <span>Enter Aethria</span>
                         <span
                           className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
                           aria-hidden
