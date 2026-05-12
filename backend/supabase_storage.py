@@ -29,6 +29,13 @@ _LIST_SELECT = (
     "list_lookup_id, list_lookup_query, list_lookup_website, list_confidence, list_score, list_verdict, "
     "list_consensus_verdict, list_reviewer_disagreement, list_reviewed_at, list_partnered_at, "
     "short_summary, partner_decision, partner_human_review_required, partner_info, human_resolution, "
+    "conviction_state, unresolved_at, created_at, updated_at"
+)
+_LIST_SELECT_LEGACY_NO_UNRESOLVED = (
+    "startup_id, display_name, list_one_line, list_sector, list_scout_type, list_origin_type, "
+    "list_lookup_id, list_lookup_query, list_lookup_website, list_confidence, list_score, list_verdict, "
+    "list_consensus_verdict, list_reviewer_disagreement, list_reviewed_at, list_partnered_at, "
+    "short_summary, partner_decision, partner_human_review_required, partner_info, human_resolution, "
     "conviction_state, created_at, updated_at"
 )
 _MEMO_PARTIAL_SELECT = (
@@ -48,6 +55,7 @@ def _row_to_dict(row: dict) -> dict:
         "human_resolution": row.get("human_resolution"),
         "conviction_state": row.get("conviction_state"),
         "investment_memo_markdown": row.get("investment_memo_markdown"),
+        "unresolved_at": row.get("unresolved_at"),
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
     }
@@ -65,11 +73,19 @@ def _dict_to_row(d: dict, user_id: str) -> dict:
         "version": d.get("version", 1),
         "human_resolution": d.get("human_resolution"),
         "conviction_state": d.get("conviction_state"),
+        "unresolved_at": d.get("unresolved_at"),
         "created_at": d.get("created_at"),
         "updated_at": d.get("updated_at"),
     }
     row["investment_memo_markdown"] = d.get("investment_memo_markdown")
     return row
+
+
+def _is_missing_unresolved_at_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "unresolved_at" in text and (
+        "does not exist" in text or "schema cache" in text or "42703" in text
+    )
 
 
 class SupabaseStartupsStorage:
@@ -140,6 +156,15 @@ class SupabaseStartupsStorage:
         try:
             self._client.table(TABLE).upsert(row, on_conflict="user_id,startup_id").execute()
         except Exception as e:
+            if _is_missing_unresolved_at_error(e):
+                legacy = dict(row)
+                legacy.pop("unresolved_at", None)
+                self.logger.warning(
+                    "Supabase unresolved_at column missing; retrying upsert without unresolved state. "
+                    "Apply migration 20260512000001_unresolved_state.sql to persist unresolved dates."
+                )
+                self._client.table(TABLE).upsert(legacy, on_conflict="user_id,startup_id").execute()
+                return
             self.logger.error("Supabase upsert failed for %s: %s", row.get("startup_id"), e)
             raise
 
@@ -176,6 +201,25 @@ class SupabaseStartupsStorage:
                 )
             )
         except Exception as e:
+            if _is_missing_unresolved_at_error(e):
+                self.logger.warning(
+                    "List projection unresolved_at column missing; using legacy projection. "
+                    "Apply migration 20260512000001_unresolved_state.sql to enable unresolved dates."
+                )
+                try:
+                    r = self._execute_with_retry(
+                        lambda: (
+                            self._client.table(TABLE)
+                            .select(_LIST_SELECT_LEGACY_NO_UNRESOLVED)
+                            .eq("user_id", self._user_id)
+                            .order("updated_at", desc=True)
+                            .execute()
+                        )
+                    )
+                except Exception as legacy_e:
+                    self.logger.warning("Legacy list projection select failed: %s", legacy_e)
+                    return None
+                return list((r.data or []) if hasattr(r, "data") else [])
             self.logger.warning("List projection select failed: %s", e)
             return None
         return list((r.data or []) if hasattr(r, "data") else [])
@@ -257,6 +301,7 @@ class SupabaseStartupsStorage:
             scout_info=scout_info,
             financials=Financials(),
         )
+        startup.unresolved_at = startup.created_at
         pr = (pipeline_run_id or "").strip() or None
         try:
             r = (
@@ -416,6 +461,7 @@ class SupabaseStartupsStorage:
                 )
             return False
         st.partner_info = partner_info
+        st.unresolved_at = partner_info.partnered_at if partner_info.human_review_required else None
         if investment_memo_markdown is not None:
             st.investment_memo_markdown = investment_memo_markdown
         st.update_timestamp()

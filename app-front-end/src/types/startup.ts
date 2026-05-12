@@ -15,6 +15,11 @@ export interface Scout {
   funding_stage?: string;
   est_tam?: string;
   references?: string[];
+  source_evidence?: Array<{
+    reference: string;
+    url?: string;
+    supports?: string;
+  }>;
   origin_type?: string;
   lookup_input_type?: string;
   /** Stable id from POST /api/startups/lookup for on-demand rows (matches pending UI state). */
@@ -86,6 +91,12 @@ export interface ScoringDimension {
   score: number;
   confidence?: number | null;
   components: Record<string, ScoringComponent>;
+  /** Narrative bullets explaining the score; populated when no per-component breakdown is available. */
+  reasoning?: string[] | null;
+  /** Notable weaknesses surfaced by the reviewer for this dimension. */
+  weaknesses?: string[] | null;
+  /** Short qualitative label for the score (e.g. "Strong", "Concerning"). */
+  score_label?: string | null;
 }
 
 export interface StructuredScoring {
@@ -221,6 +232,7 @@ export interface Timestamps {
   discovered_at?: string;
   reviewed_at?: string;
   partnered_at?: string;
+  unresolved_at?: string | null;
 }
 
 export type RulingDecision = 'YES' | 'NO' | 'MAYBE';
@@ -263,6 +275,7 @@ export interface Startup {
     resolved_at?: string;
   } | null;
   conviction_state?: ConvictionState | null;
+  unresolved_at?: string | null;
 }
 
 // ─── System Intelligence / Meta-Agent Types ───────────────────────────────────

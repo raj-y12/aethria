@@ -34,6 +34,26 @@ export function isDealDecided(startup: Startup): boolean {
   return isDealHumanResolved(startup);
 }
 
+/**
+ * "Unresolved" = unreviewed OR undecided.
+ *
+ * Mirrors the server-side `unresolved_at` semantic from
+ * `supabase/migrations/20260512000001_unresolved_state.sql`, but computed
+ * client-side so the count is correct even if that column is missing or stale.
+ *
+ * A startup is unresolved when ANY of the following is true:
+ *   1. No analyst review yet                              → "unreviewed"
+ *   2. No partner recommendation yet                      → "undecided"
+ *   3. Partner flagged for human review and no human ruling → "undecided (escalated)"
+ */
+export function isDealUnresolved(startup: Startup): boolean {
+  if (isDealHumanResolved(startup)) return false;
+  if (!startup.review) return true;
+  if (!startup.partner?.recommendation) return true;
+  if (startup.partner.human_review_required) return true;
+  return false;
+}
+
 export function getDealLastActivityIso(startup: Startup): string {
   return startup.human_resolution?.resolved_at
     ?? startup.timestamps?.partnered_at

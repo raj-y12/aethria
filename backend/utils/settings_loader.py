@@ -5,6 +5,7 @@ Settings are keyed by user_id so each user has their own settings.
 user_id must always be passed explicitly when using Supabase (no run_context).
 """
 import json
+import logging
 import os
 import time
 from pathlib import Path
@@ -15,6 +16,7 @@ from supabase_doc_store import doc_get, doc_set
 _SETTINGS_TABLE = "settings"
 _SETTINGS_CACHE_TTL_SECONDS = 2.0
 _SETTINGS_CACHE: dict[str, tuple[float, dict]] = {}
+logger = logging.getLogger(__name__)
 
 
 def _using_supabase() -> bool:
@@ -155,6 +157,7 @@ def load_settings(user_id: Optional[str] = None, *, use_cache: bool = True) -> d
     if not data or not isinstance(data, dict):
         out = json.loads(json.dumps(DEFAULT_SETTINGS))
         _SETTINGS_CACHE[key] = (now, out)
+        logger.info("settings_load user_id=%s source=defaults", key[:24])
         return json.loads(json.dumps(out))
     out = json.loads(json.dumps(DEFAULT_SETTINGS))
     for section in (
@@ -188,6 +191,13 @@ def load_settings(user_id: Optional[str] = None, *, use_cache: bool = True) -> d
         if stored_threshold in (0.5, "0.5"):
             ac["confidence_threshold"] = DEFAULT_SETTINGS["agent_config"]["confidence_threshold"]
     _SETTINGS_CACHE[key] = (time.monotonic(), out)
+    logger.info(
+        "settings_load user_id=%s source=database fund_config=%s rubric=%d score_bands=%d",
+        key[:24],
+        bool(data.get("fund_config")),
+        len(((out.get("fund_config") or {}).get("rubric") or [])),
+        len(((out.get("fund_config") or {}).get("scoreBands") or [])),
+    )
     return json.loads(json.dumps(out))
 
 
@@ -208,6 +218,105 @@ def save_settings(settings: dict, user_id: Optional[str] = None) -> None:
         raise ValueError("user_id required to save settings")
     doc_set(_SETTINGS_TABLE, settings, key, user_id=key)
     _SETTINGS_CACHE.pop(key, None)
+    logger.info("settings_save user_id=%s sections=%s", key[:24], sorted(settings.keys()))
+
+
+def get_fund_config(user_id: Optional[str] = None, *, use_cache: bool = True) -> dict:
+    fc = load_settings(user_id, use_cache=use_cache).get("fund_config")
+    return dict(fc) if isinstance(fc, dict) else {}
+
+
+def fund_config_to_thesis_parsed_json(fund_config: dict) -> dict:
+    """Convert saved UI fund configuration into the backend active-thesis shape."""
+    mandate = fund_config.get("mandate") if isinstance(fund_config.get("mandate"), dict) else {}
+    sectors = mandate.get("preferredSectors") or mandate.get("sectors") or []
+    geos = mandate.get("geographyPreferences") or mandate.get("geographies") or []
+    exclusions = mandate.get("excludedSectorList") or mandate.get("excludedSectors") or []
+    if isinstance(exclusions, str):
+        exclusions = [x.strip() for x in exclusions.split(",") if x.strip()]
+    prefs = []
+    for key in ("businessModels", "minimumTraction", "thesisText"):
+        val = mandate.get(key)
+        if isinstance(val, str) and val.strip():
+            prefs.append(val.strip())
+    return {
+        "sectors": [str(x).strip() for x in sectors if str(x).strip()],
+        "stage_focus": [str(x).strip() for x in (mandate.get("preferredStages") or []) if str(x).strip()],
+        "geography": [str(x).strip() for x in geos if str(x).strip()],
+        "preferences": prefs,
+        "exclusions": [str(x).strip() for x in exclusions if str(x).strip()],
+        "risk_profile": str((fund_config.get("risk") or {}).get("sensitivity") or "balanced"),
+        "check_size_min": mandate.get("checkSizeMin"),
+        "check_size_max": mandate.get("checkSizeMax"),
+        "ownership_target": mandate.get("ownershipTarget"),
+        "score_bands": fund_config.get("scoreBands") or [],
+        "scoring_weights": fund_config.get("scoringWeights") or [],
+        "rubric": fund_config.get("rubric") or [],
+        "thresholds": fund_config.get("thresholds") or {},
+        "source": "settings.fund_config",
+    }
+
+
+def fund_config_raw_text(fund_config: dict) -> str:
+    mandate = fund_config.get("mandate") if isinstance(fund_config.get("mandate"), dict) else {}
+    lines = [
+        str(mandate.get("thesisText") or "").strip(),
+        f"Preferred sectors: {', '.join(mandate.get('preferredSectors') or mandate.get('sectors') or [])}",
+        f"Excluded sectors: {', '.join(mandate.get('excludedSectorList') or [])}",
+        f"Preferred stages: {', '.join(mandate.get('preferredStages') or [])}",
+        f"Geography: {', '.join(mandate.get('geographyPreferences') or mandate.get('geographies') or [])}",
+        f"Business models: {mandate.get('businessModels') or ''}",
+        f"Minimum traction: {mandate.get('minimumTraction') or ''}",
+    ]
+    return "\n".join(line for line in lines if line and not line.endswith(": "))
+
+
+def dimension_weights_from_fund_config(fund_config: dict) -> dict[str, float]:
+    weights: dict[str, float] = {}
+    aliases = {"fundFit": "defensibility"}
+    for row in fund_config.get("scoringWeights") or []:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get("key") or "").strip()
+        if not key:
+            continue
+        dim = aliases.get(key, key)
+        if dim not in ("market", "product", "technical", "execution", "defensibility"):
+            continue
+        try:
+            weights[dim] = weights.get(dim, 0.0) + float(row.get("weight") or 0.0)
+        except (TypeError, ValueError):
+            continue
+    return {k: v for k, v in weights.items() if v > 0}
+
+
+def recommendation_for_score_from_fund_config(score_0_to_10: float, fund_config: dict) -> str:
+    score_100 = max(0.0, min(100.0, float(score_0_to_10) * 10.0))
+    bands = fund_config.get("scoreBands") if isinstance(fund_config, dict) else None
+    if isinstance(bands, list):
+        for band in bands:
+            if not isinstance(band, dict):
+                continue
+            try:
+                lo = float(band.get("min"))
+                hi = float(band.get("max"))
+            except (TypeError, ValueError):
+                continue
+            if lo <= score_100 <= hi:
+                label = str(band.get("label") or "").lower()
+                if "pass" in label:
+                    return "PASS"
+                if "proceed" in label or "invest" in label:
+                    return "INVEST"
+                return "MONITOR"
+    thresholds = fund_config.get("thresholds") if isinstance(fund_config.get("thresholds"), dict) else {}
+    invest_bar = float(thresholds.get("escalation") or 80) / 10.0
+    pass_bar = float(thresholds.get("partnerReview") or 60) / 10.0
+    if score_0_to_10 >= invest_bar:
+        return "INVEST"
+    if score_0_to_10 >= pass_bar:
+        return "MONITOR"
+    return "PASS"
 
 
 def is_scouts_enabled(user_id: Optional[str] = None) -> bool:

@@ -323,6 +323,33 @@
   border-top: none;
   border-bottom: 1px solid var(--memo-rule);
 }
+.memoRulingLabelRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px 0;
+}
+.memoRulingLabelRow:last-child {
+  margin-bottom: 0;
+}
+.memoRulingLabelRow .memoRulingLabel {
+  margin: 0;
+}
+.memoEscalationTag {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  line-height: 1.2;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 32%, transparent);
+  color: color-mix(in srgb, var(--color-accent) 78%, var(--memo-ink-muted));
+  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
+}
 .memoRulingLabel {
   margin: 0 0 8px 0;
   font-family: var(--memo-font-mono);
@@ -1148,6 +1175,56 @@
 .memoDocDimDetail { padding: 14px 0 2px 0; margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
 .memoDocComponentBars {
   margin-top: 6px;
+}
+/* Narrative drawer for dimensions without per-component breakdown (flat-score fallback). */
+.memoDocDimensionNarrative {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+}
+.memoDocDimensionNarrativeLabel {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.55);
+}
+.memoDocDimensionNarrativeBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.memoDocDimensionNarrativeHead {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoDocDimensionNarrativeList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.memoDocDimensionNarrativeItem {
+  display: grid;
+  grid-template-columns: 12px 1fr;
+  gap: 8px;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.62;
+  color: var(--memo-ink);
+  overflow-wrap: anywhere;
+}
+.memoDocDimensionNarrativeBullet {
+  color: rgba(var(--color-oxford-rgb), 0.35);
+  line-height: 1.62;
 }
 .memoDocComponentBar {
   border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);

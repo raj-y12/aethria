@@ -29,6 +29,14 @@ const DIMENSION_KEY_BY_TITLE: Record<string, string> = {
 export default function DimensionCard({ id, title, dimension }: DimensionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const entries = Object.entries(dimension.components ?? {});
+  const hasComponents = entries.length > 0;
+  const reasoning = (dimension.reasoning ?? []).filter((s) => typeof s === 'string' && s.trim().length > 0);
+  const weaknesses = (dimension.weaknesses ?? []).filter((s) => typeof s === 'string' && s.trim().length > 0);
+  const scoreLabel = typeof dimension.score_label === 'string' && dimension.score_label.trim().length > 0
+    ? dimension.score_label.trim()
+    : null;
+  const hasNarrative = reasoning.length > 0 || weaknesses.length > 0 || !!scoreLabel;
+  const hasDetail = hasComponents || hasNarrative;
   const band = getScoreBand(dimension.score).label;
   const dimKey = DIMENSION_KEY_BY_TITLE[title] ?? title.toLowerCase();
   const weights = DIMENSION_WEIGHTS[dimKey] ?? {};
@@ -48,28 +56,70 @@ export default function DimensionCard({ id, title, dimension }: DimensionCardPro
               <p className="memoDocScorePanelMeta">Confidence {confidenceLabel}</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsExpanded((prev) => !prev)}
-            className="memoDocTooltipBtn memoDocDimensionDetailBtn"
-            aria-expanded={isExpanded}
-            aria-controls={`${id}-components`}
-          >
-            {isExpanded ? 'Hide detail' : 'Detail'}
-          </button>
+          {hasDetail && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className="memoDocTooltipBtn memoDocDimensionDetailBtn"
+              aria-expanded={isExpanded}
+              aria-controls={`${id}-components`}
+            >
+              {isExpanded ? 'Hide detail' : 'Detail'}
+            </button>
+          )}
         </div>
         <ConfidenceIndicator confidence={dimension.confidence} />
       </div>
-      <div id={`${id}-components`} className={isExpanded ? 'memoDocComponentBars' : 'hidden'} aria-hidden={!isExpanded}>
-        {entries.map(([name, component]) => (
-          <ComponentBar
-            key={`${id}-${name}`}
-            name={name}
-            component={component}
-            weight={weights[name] ?? 0}
-          />
-        ))}
-      </div>
+      {hasDetail && (
+        <div
+          id={`${id}-components`}
+          className={isExpanded ? (hasComponents ? 'memoDocComponentBars' : 'memoDocDimensionNarrative') : 'hidden'}
+          aria-hidden={!isExpanded}
+        >
+          {hasComponents
+            ? entries.map(([name, component]) => (
+                <ComponentBar
+                  key={`${id}-${name}`}
+                  name={name}
+                  component={component}
+                  weight={weights[name] ?? 0}
+                />
+              ))
+            : (
+              <>
+                {scoreLabel && (
+                  <p className="memoDocDimensionNarrativeLabel">{scoreLabel}</p>
+                )}
+                {reasoning.length > 0 && (
+                  <div className="memoDocDimensionNarrativeBlock">
+                    <p className="memoDocDimensionNarrativeHead">Reasoning</p>
+                    <ul className="memoDocDimensionNarrativeList">
+                      {reasoning.map((item, i) => (
+                        <li key={`${id}-r-${i}`} className="memoDocDimensionNarrativeItem">
+                          <span className="memoDocDimensionNarrativeBullet" aria-hidden>·</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {weaknesses.length > 0 && (
+                  <div className="memoDocDimensionNarrativeBlock">
+                    <p className="memoDocDimensionNarrativeHead">Weaknesses</p>
+                    <ul className="memoDocDimensionNarrativeList">
+                      {weaknesses.map((item, i) => (
+                        <li key={`${id}-w-${i}`} className="memoDocDimensionNarrativeItem">
+                          <span className="memoDocDimensionNarrativeBullet" aria-hidden>·</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+        </div>
+      )}
     </article>
   );
 }

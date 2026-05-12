@@ -375,6 +375,7 @@ class Scout(ABC):
         return finalize_scout_references(
             out,
             anchor_hostname=self._reference_anchor_hostname(out, explicit_website=explicit_website),
+            company_name=str(out.get("name") or ""),
         )
 
     def _scout_validates(self, data: Dict[str, Any]) -> bool:

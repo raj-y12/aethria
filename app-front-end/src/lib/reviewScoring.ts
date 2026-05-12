@@ -1,7 +1,14 @@
 /**
  * Single place to resolve structured scoring from API review payloads.
- * Backend mirrors structured_scoring / scoring / score_breakdown; this helper
- * still checks nested reviewer rows for older rows.
+ *
+ * Resolution order:
+ *   1. Full structured payload  (`review.scoring` / `structured_scoring` /
+ *      `score_breakdown`, or a reviewer row carrying `structured_scoring`).
+ *   2. Synthesised from flat per-dimension scores on the Review when the
+ *      structured payload is missing (older / leaner backend responses).
+ *
+ * Returning `null` is reserved for "no scores at all" — both branches above
+ * came up empty.
  */
 import type { Review, ScoringDimension, StructuredScoring } from '../types/startup';
 
@@ -9,6 +16,62 @@ export function isScoringDimension(value: unknown): value is ScoringDimension {
   if (!value || typeof value !== 'object') return false;
   const casted = value as { score?: unknown; components?: unknown };
   return typeof casted.score === 'number' && !!casted.components && typeof casted.components === 'object';
+}
+
+const CONFIDENCE_TO_NUMBER: Record<string, number> = {
+  low: 0.3,
+  medium: 0.6,
+  high: 0.9,
+};
+
+function flatConfidence(value: unknown): number | undefined {
+  if (typeof value !== 'string') return undefined;
+  const key = value.trim().toLowerCase();
+  return CONFIDENCE_TO_NUMBER[key];
+}
+
+function cleanStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue;
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    if (/^\[MISSING/i.test(trimmed)) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function nullableString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/** Build a `ScoringDimension`-shaped object from flat review fields. */
+function flatDimension(
+  score: unknown,
+  confidence: unknown,
+  reasoning: unknown,
+  weaknesses: unknown,
+  scoreLabel: unknown
+): ScoringDimension | null {
+  if (typeof score !== 'number' || !Number.isFinite(score)) return null;
+  const reasoningList = cleanStringList(reasoning);
+  const weaknessList = cleanStringList(weaknesses);
+  return {
+    score,
+    confidence: flatConfidence(confidence) ?? null,
+    components: {},
+    reasoning: reasoningList.length > 0 ? reasoningList : null,
+    weaknesses: weaknessList.length > 0 ? weaknessList : null,
+    score_label: nullableString(scoreLabel),
+  };
 }
 
 export function normalizeStructuredScoring(review: Review | null | undefined): StructuredScoring | null {
@@ -25,29 +88,80 @@ export function normalizeStructuredScoring(review: Review | null | undefined): S
     (reviewRecord.score_breakdown as StructuredScoring | undefined) ??
     (reviewerStructuredCandidate as StructuredScoring | undefined);
 
-  const source = candidate ?? (review as unknown as Record<string, unknown>);
-  if (typeof source.overall_score !== 'number') return null;
-  const market = source.market;
-  const execution = source.execution;
-  const product = source.product;
-  const technical = source.technical;
-  const defensibility = source.defensibility;
-  if (
-    !isScoringDimension(market) ||
-    !isScoringDimension(execution) ||
-    !isScoringDimension(product) ||
-    !isScoringDimension(technical) ||
-    !isScoringDimension(defensibility)
-  ) {
+  // ── Path 1: full structured payload ──────────────────────────────────────
+  if (candidate && typeof candidate.overall_score === 'number') {
+    const { market, execution, product, technical, defensibility } = candidate;
+    if (
+      isScoringDimension(market) &&
+      isScoringDimension(execution) &&
+      isScoringDimension(product) &&
+      isScoringDimension(technical) &&
+      isScoringDimension(defensibility)
+    ) {
+      return {
+        market,
+        execution,
+        product,
+        technical,
+        defensibility,
+        overall_score: candidate.overall_score,
+      };
+    }
+  }
+
+  // ── Path 2: synthesise from flat per-dimension scores ────────────────────
+  const market = flatDimension(
+    review.market_score,
+    review.market_confidence,
+    review.market_reasoning,
+    review.market_weaknesses,
+    review.market_score_label
+  );
+  const product = flatDimension(
+    review.product_score,
+    review.product_confidence,
+    review.product_reasoning,
+    review.product_weaknesses,
+    review.product_score_label
+  );
+  const technical = flatDimension(
+    review.technical_score,
+    review.technical_confidence,
+    review.technical_reasoning,
+    review.technical_weaknesses,
+    review.technical_score_label
+  );
+  const execution = flatDimension(
+    review.execution_score,
+    review.execution_confidence,
+    review.execution_reasoning,
+    review.execution_weaknesses,
+    review.execution_score_label
+  );
+  const defensibility = flatDimension(
+    review.defensibility_score,
+    review.defensibility_confidence,
+    review.defensibility_reasoning,
+    review.defensibility_weaknesses,
+    review.defensibility_score_label
+  );
+  if (!market || !product || !technical || !execution || !defensibility) {
     return null;
   }
+  const flatScores = [market.score, product.score, technical.score, execution.score, defensibility.score];
+  const overallCandidate =
+    typeof review.overall_score === 'number'
+      ? review.overall_score
+      : typeof review.aggregate_score === 'number'
+        ? review.aggregate_score
+        : flatScores.reduce((sum, s) => sum + s, 0) / flatScores.length;
   return {
     market,
-    execution,
     product,
     technical,
+    execution,
     defensibility,
-    overall_score: source.overall_score,
+    overall_score: overallCandidate,
   };
 }
 

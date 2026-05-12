@@ -1,0 +1,138 @@
+[warning] slide-01.layout.json:tight-text:110: Venture software remembers companies. | Aethria remembers decisions. text box is tight: height 150px for 3 line(s) at 45px.
+    - shape Venture software remembers companies. | Aethria remembers decisions. bbox=[74,124,820,150]
+[warning] slide-01.layout.json:split-inline:129:130: 8.1 and MED look like manually split inline text.
+    - shape 8.1 bbox=[970,438,48,14]
+    - shape MED bbox=[1030,438,42,14]
+[warning] slide-01.layout.json:split-inline:130:131: MED and ADVANCE look like manually split inline text.
+    - shape MED bbox=[1030,438,42,14]
+    - shape ADVANCE bbox=[1080,438,50,14]
+[warning] slide-01.layout.json:split-inline:135:136: 6.4 and HIGH look like manually split inline text.
+    - shape 6.4 bbox=[970,502,48,14]
+    - shape HIGH bbox=[1030,502,42,14]
+[warning] slide-01.layout.json:split-inline:136:137: HIGH and DECIDE look like manually split inline text.
+    - shape HIGH bbox=[1030,502,42,14]
+    - shape DECIDE bbox=[1080,502,50,14]
+[warning] slide-01.layout.json:split-inline:141:142: 7.0 and LOW look like manually split inline text.
+    - shape 7.0 bbox=[970,566,48,14]
+    - shape LOW bbox=[1030,566,42,14]
+[warning] slide-01.layout.json:split-inline:142:143: LOW and REVIEW look like manually split inline text.
+    - shape LOW bbox=[1030,566,42,14]
+    - shape REVIEW bbox=[1080,566,50,14]
+[warning] slide-02.layout.json:tight-text:111: Every company must move toward a ruling. text box is tight: height 48px for 2 line(s) at 22px.
+    - shape Every company must move toward a ruling. bbox=[80,340,350,48]
+[warning] slide-02.layout.json:tight-text:145: 8.4 text box is tight: height 12px for 1 line(s) at 11px.
+    - shape 8.4 bbox=[1062,268,38,12]
+[warning] slide-02.layout.json:split-inline:120:121: 8.4 and MED look like manually split inline text.
+    - shape 8.4 bbox=[726,214,48,14]
+    - shape MED bbox=[786,214,42,14]
+[warning] slide-02.layout.json:split-inline:121:122: MED and ADVANCE look like manually split inline text.
+    - shape MED bbox=[786,214,42,14]
+    - shape ADVANCE bbox=[836,214,50,14]
+[warning] slide-02.layout.json:split-inline:126:127: 7.1 and HIGH look like manually split inline text.
+    - shape 7.1 bbox=[726,280,48,14]
+    - shape HIGH bbox=[786,280,42,14]
+[warning] slide-02.layout.json:split-inline:127:128: HIGH and VERIFY look like manually split inline text.
+    - shape HIGH bbox=[786,280,42,14]
+    - shape VERIFY bbox=[836,280,50,14]
+[warning] slide-02.layout.json:split-inline:132:133: 6.9 and MED look like manually split inline text.
+    - shape 6.9 bbox=[726,346,48,14]
+    - shape MED bbox=[786,346,42,14]
+[warning] slide-02.layout.json:split-inline:133:134: MED and RULE look like manually split inline text.
+    - shape MED bbox=[786,346,42,14]
+    - shape RULE bbox=[836,346,50,14]
+[warning] slide-02.layout.json:split-inline:138:139: 7.6 and LOW look like manually split inline text.
+    - shape 7.6 bbox=[726,412,48,14]
+    - shape LOW bbox=[786,412,42,14]
+[warning] slide-02.layout.json:split-inline:139:140: LOW and ASK look like manually split inline text.
+    - shape LOW bbox=[786,412,42,14]
+    - shape ASK bbox=[836,412,50,14]
+[warning] slide-03.layout.json:tight-text:111: Start where process does not already exist. text box is tight: height 38px for 2 line(s) at 22px.
+    - shape Start where process does not already exist. bbox=[80,286,420,38]
+[warning] slide-04.layout.json:tight-text:110: Start with | historical decisions. text box is tight: height 150px for 3 line(s) at 56px.
+    - shape Start with | historical decisions. bbox=[76,132,490,150]
+[warning] slide-04.layout.json:tight-text:113: 5 text box is tight: height 24px for 1 line(s) at 24px.
+    - shape 5 bbox=[100,444,44,24]
+[warning] slide-04.layout.json:tight-text:116: 5 text box is tight: height 24px for 1 line(s) at 24px.
+    - shape 5 bbox=[230,444,44,24]
+[warning] slide-04.layout.json:tight-text:119: 5 text box is tight: height 24px for 1 line(s) at 24px.
+    - shape 5 bbox=[360,444,44,24]
+[warning] slide-04.layout.json:tight-text:122: 5 text box is tight: height 24px for 1 line(s) at 24px.
+    - shape 5 bbox=[490,444,44,24]
+[warning] slide-04.layout.json:tight-text:152: decision ledger / risk postmortems / scoring consistency / precedent mapping / delayed conviction examples text box is tight: height 46px for 3 line(s) at 16px.
+    - shape decision ledger / risk postmortems / scoring consistency / precedent mapping / delayed conviction ex bbox=[724,463,320,46]
+[warning] slide-04.layout.json:split-inline:130:131: Q1 2025 and Arc Ritual look like manually split inline text.
+    - shape Q1 2025 bbox=[720,211,76,14]
+    - shape Arc Ritual bbox=[802,208,130,18]
+[warning] slide-04.layout.json:split-inline:132:133: INVEST and 8.4 look like manually split inline text.
+    - shape INVEST bbox=[950,211,52,14]
+    - shape 8.4 bbox=[1014,211,48,14]
+[warning] slide-04.layout.json:split-inline:135:136: Q2 2025 and Kiteframe look like manually split inline text.
+    - shape Q2 2025 bbox=[720,249,76,14]
+    - shape Kiteframe bbox=[802,246,130,18]
+[warning] slide-04.layout.json:split-inline:137:138: PASS and 6.1 look like manually split inline text.
+    - shape PASS bbox=[950,249,52,14]
+    - shape 6.1 bbox=[1014,249,48,14]
+[warning] slide-04.layout.json:split-inline:140:141: Q3 2025 and LumenGrid look like manually split inline text.
+    - shape Q3 2025 bbox=[720,287,76,14]
+    - shape LumenGrid bbox=[802,284,130,18]
+[warning] slide-04.layout.json:split-inline:142:143: MONITOR and 7.2 look like manually split inline text.
+    - shape MONITOR bbox=[950,287,52,14]
+    - shape 7.2 bbox=[1014,287,48,14]
+[warning] slide-04.layout.json:split-inline:145:146: Q4 2025 and Mason Labs look like manually split inline text.
+    - shape Q4 2025 bbox=[720,325,76,14]
+    - shape Mason Labs bbox=[802,322,130,18]
+[warning] slide-04.layout.json:split-inline:147:148: PASS and 5.9 look like manually split inline text.
+    - shape PASS bbox=[950,325,52,14]
+    - shape 5.9 bbox=[1014,325,48,14]
+[warning] slide-05.layout.json:tight-text:111: The product is organized around decisions, not notes. text box is tight: height 44px for 2 line(s) at 22px.
+    - shape The product is organized around decisions, not notes. bbox=[80,284,520,44]
+[warning] slide-05.layout.json:tight-text:114: QUEUE text box is tight: height 24px for 1 line(s) at 22px.
+    - shape QUEUE bbox=[104,393,120,24]
+[warning] slide-05.layout.json:tight-text:120: RISK text box is tight: height 24px for 1 line(s) at 22px.
+    - shape RISK bbox=[328,393,120,24]
+[warning] slide-05.layout.json:tight-text:126: ACTION text box is tight: height 24px for 1 line(s) at 22px.
+    - shape ACTION bbox=[552,393,120,24]
+[warning] slide-05.layout.json:tight-text:132: RULING text box is tight: height 24px for 1 line(s) at 22px.
+    - shape RULING bbox=[776,393,120,24]
+[warning] slide-05.layout.json:tight-text:138: MEMORY text box is tight: height 24px for 1 line(s) at 22px.
+    - shape MEMORY bbox=[1000,393,120,24]
+[warning] slide-08.layout.json:tight-text:110: Built product. | Now prove weekly usage. text box is tight: height 150px for 3 line(s) at 55px.
+    - shape Built product. | Now prove weekly usage. bbox=[76,126,560,150]
+[warning] slide-08.layout.json:tight-text:116: 200 text box is tight: height 18px for 1 line(s) at 20px.
+    - shape 200 bbox=[732,156,52,18]
+[warning] slide-08.layout.json:tight-text:119: 50 text box is tight: height 18px for 1 line(s) at 20px.
+    - shape 50 bbox=[761,234,52,18]
+[warning] slide-08.layout.json:tight-text:122: 15 text box is tight: height 18px for 1 line(s) at 20px.
+    - shape 15 bbox=[790,312,52,18]
+[warning] slide-08.layout.json:tight-text:125: 5 text box is tight: height 18px for 1 line(s) at 20px.
+    - shape 5 bbox=[819,390,52,18]
+[warning] slide-08.layout.json:tight-text:128: 1 text box is tight: height 18px for 1 line(s) at 20px.
+    - shape 1 bbox=[848,468,52,18]
+[warning] slide-08.layout.json:tight-text:129: LIVE WEEKLY WORKFLOW text box is tight: height 12px for 2 line(s) at 8.51px.
+    - shape LIVE WEEKLY WORKFLOW bbox=[928,474,80,12]
+[warning] slide-08.layout.json:tight-text:131: Success: Aethria becomes the primary weekly review surface for at least one fund. text box is tight: height 42px for 2 line(s) at 19px.
+    - shape Success: Aethria becomes the primary weekly review surface for at least one fund. bbox=[710,564,430,42]
+[warning] slide-09.layout.json:tight-text:111: The product exists. Now the workflow must be hardened with real funds. text box is tight: height 48px for 2 line(s) at 21px.
+    - shape The product exists. Now the workflow must be hardened with real funds. bbox=[80,312,560,48]
+[warning] slide-09.layout.json:tight-text:119: Not a career VC | Not trying to replace investor judgment | Starts with postmortems because trust must be earned operationally text box is tight: height 80px for 5 line(s) at 15px.
+    - shape Not a career VC | Not trying to replace investor judgment | Starts with postmortems because trust mu bbox=[476,484,244,80]
+[warning] slide-09.layout.json:box-bottom-pad:112:115: DCU engineering | EY technology consulting | Built Aethria end-to-end as a solo founder has only 12px bottom padding inside its containing box; expected at least 16px.
+    - shape order 112 bbox=[92,398,300,178]
+    - shape DCU engineering | EY technology consulting | Built Aethria end-to-end as a solo founder bbox=[114,484,244,80]
+[warning] slide-09.layout.json:box-bottom-pad:116:119: Not a career VC | Not trying to replace investor judgment | Starts with postmortems because trust must be earned operationally has only 12px bottom padding inside its containing box; expected at least 16px.
+    - shape order 116 bbox=[454,398,300,178]
+    - shape Not a career VC | Not trying to replace investor judgment | Starts with postmortems because trust mu bbox=[476,484,244,80]
+[warning] slide-09.layout.json:box-bottom-pad:120:123: Convert product architecture into weekly behavior with solo and two-person seed funds has only 12px bottom padding inside its containing box; expected at least 16px.
+    - shape order 120 bbox=[816,398,300,178]
+    - shape Convert product architecture into weekly behavior with solo and two-person seed funds bbox=[838,484,244,80]
+[warning] slide-10.layout.json:tight-text:113: 01 text box is tight: height 18px for 1 line(s) at 18px.
+    - shape 01 bbox=[746,199,32,18]
+[warning] slide-10.layout.json:tight-text:116: 02 text box is tight: height 18px for 1 line(s) at 18px.
+    - shape 02 bbox=[746,309,32,18]
+[warning] slide-10.layout.json:tight-text:119: 03 text box is tight: height 18px for 1 line(s) at 18px.
+    - shape 03 bbox=[746,419,32,18]
+[warning] slide-10.layout.json:tight-text:122: Aethria becomes the operating memory layer for early-stage investing. text box is tight: height 44px for 2 line(s) at 20px.
+    - shape Aethria becomes the operating memory layer for early-stage investing. bbox=[720,578,390,44]
+[warning] slide-11.layout.json:tight-text:111: Venture has systems for sourcing. | Aethria is building the system for decisions. text box is tight: height 150px for 3 line(s) at 54px.
+    - shape Venture has systems for sourcing. | Aethria is building the system for decisions. bbox=[80,304,940,150]
+Checked 12 layout file(s): 0 error(s), 56 warning(s).

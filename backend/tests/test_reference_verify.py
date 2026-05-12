@@ -138,9 +138,29 @@ def test_finalize_skips_probe_when_env_set(monkeypatch):
             "OK https://aethria.co/",
         ]
     }
-    finalize_scout_references(output, anchor_hostname="aethria.co")
+    finalize_scout_references(output, anchor_hostname="aethria.co", company_name="Aethria")
     assert len(output["references"]) == 1
     assert "aethria.co" in output["references"][0]
+    assert output["source_evidence"][0]["supports"]
+
+
+def test_finalize_drops_company_irrelevant_sources(monkeypatch):
+    monkeypatch.setenv("SKIP_REFERENCE_URL_VERIFY", "1")
+    from utils.reference_verify import finalize_scout_references
+
+    output = {
+        "name": "TinyPay",
+        "references": [
+            "TinyPay official site - https://tinypay.example/",
+            "Random AI market report - https://example.com/ai-market",
+            "TinyPay raises seed round - https://techcrunch.com/2025/tinypay-seed",
+        ],
+    }
+    finalize_scout_references(output, company_name="TinyPay")
+    refs = "\n".join(output["references"])
+    assert "tinypay.example" in refs
+    assert "techcrunch.com/2025/tinypay-seed" in refs
+    assert "ai-market" not in refs
 
 
 def test_filter_references_to_allowlist_keeps_only_allowed_urls():

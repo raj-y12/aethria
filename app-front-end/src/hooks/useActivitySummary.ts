@@ -35,7 +35,11 @@ export function useActivitySummary(): UseActivitySummaryResult {
         clearTimeout(timer);
         setSummary(data);
         const hasActivity =
-          data.found > 0 || data.reviewed > 0 || data.decided > 0 || data.escalations > 0;
+          data.found > 0 ||
+          data.reviewed > 0 ||
+          (data.agent_decided ?? data.decided) > 0 ||
+          (data.human_reviewed ?? 0) > 0 ||
+          data.escalations > 0;
         setShowSummary(hasActivity);
         setLoading(false);
       })

@@ -8,7 +8,11 @@ const API_BASE =
 export interface ActivitySummary {
   found: number;
   reviewed: number;
+  /** Backwards-compatible alias for agent_decided. */
   decided: number;
+  agent_decided?: number;
+  human_reviewed?: number;
+  open_in_progress?: number;
   escalations: number;
 }
 

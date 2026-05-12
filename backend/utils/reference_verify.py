@@ -15,7 +15,7 @@ import logging
 import os
 import re
 import ssl
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -48,6 +48,17 @@ _SOFT_ACCEPT_HOST_SUFFIXES = (
     # Soft-accept keeps on-demand lookup from failing purely on probe transport noise.
     "crunchbase.com",
     "pitchbook.com",
+)
+
+_TRUSTED_SOURCE_SUFFIXES = (
+    "crunchbase.com",
+    "pitchbook.com",
+    "techcrunch.com",
+    "businesswire.com",
+    "prnewswire.com",
+    "globenewswire.com",
+    "linkedin.com",
+    "github.com",
 )
 
 
@@ -265,6 +276,121 @@ def filter_references_by_url_probe(output: Dict[str, Any], timeout: float = 4.0)
     return output
 
 
+def _company_tokens(company_name: Optional[str]) -> List[str]:
+    text = re.sub(r"[^a-z0-9 ]+", " ", (company_name or "").lower())
+    stop = {"ai", "inc", "ltd", "llc", "the", "and", "company", "technologies", "technology", "labs"}
+    return [t for t in text.split() if len(t) >= 3 and t not in stop]
+
+
+def _reference_support_note(ref: str, company_name: Optional[str]) -> str:
+    lowered = ref.lower()
+    if any(x in lowered for x in ("funding", "raised", "series", "seed", "investor")):
+        return "Funding or investor evidence"
+    if any(x in lowered for x in ("customer", "pilot", "revenue", "arr", "users", "traction")):
+        return "Traction or customer evidence"
+    if any(x in lowered for x in ("founder", "ceo", "cto", "team", "leadership")):
+        return "Founder or team evidence"
+    if company_name and any(t in lowered for t in _company_tokens(company_name)):
+        return "Company identity evidence"
+    return "Supporting source"
+
+
+def _rank_reference(ref: str, company_name: Optional[str], anchor_hostname: Optional[str]) -> Tuple[int, str]:
+    urls = extract_http_urls(ref)
+    host = ""
+    if urls:
+        try:
+            host = (urlparse(urls[0]).hostname or "").lower()
+        except Exception:
+            host = ""
+    score = 0
+    if anchor_hostname and host:
+        ah = anchor_hostname.lower().removeprefix("www.")
+        hh = host.removeprefix("www.")
+        if hh == ah or hh.endswith("." + ah):
+            score += 100
+    if host and any(host == s or host.endswith("." + s) for s in _TRUSTED_SOURCE_SUFFIXES):
+        score += 35
+    lowered = ref.lower()
+    for token in _company_tokens(company_name):
+        if token in lowered or (host and token in host):
+            score += 20
+    if any(x in lowered for x in ("2026", "2025", "2024", "2023", "raised", "launch", "announces")):
+        score += 8
+    return (-score, normalize_url_for_match(urls[0]) if urls else ref.lower())
+
+
+def filter_references_by_company_relevance(
+    refs: List[Any],
+    *,
+    company_name: Optional[str],
+    anchor_hostname: Optional[str],
+) -> List[str]:
+    tokens = _company_tokens(company_name)
+    seen: set[str] = set()
+    kept: List[str] = []
+    dropped = 0
+    for raw in refs:
+        if not isinstance(raw, str):
+            dropped += 1
+            continue
+        ref = raw.strip()
+        if not ref:
+            dropped += 1
+            continue
+        urls = extract_http_urls(ref)
+        norm = normalize_url_for_match(urls[0]) if urls else ref.lower()
+        if norm in seen:
+            dropped += 1
+            continue
+        seen.add(norm)
+        lowered = ref.lower()
+        host = ""
+        if urls:
+            try:
+                host = (urlparse(urls[0]).hostname or "").lower()
+            except Exception:
+                host = ""
+        anchor_match = False
+        if anchor_hostname and host:
+            ah = anchor_hostname.lower().removeprefix("www.")
+            hh = host.removeprefix("www.")
+            anchor_match = hh == ah or hh.endswith("." + ah)
+        token_match = any(t in lowered or (host and t in host) for t in tokens)
+        if not (anchor_match or token_match):
+            logger.warning(
+                "reference_verify: dropped company-irrelevant reference company=%s ref=%s",
+                (company_name or "")[:80],
+                ref[:160],
+            )
+            dropped += 1
+            continue
+        kept.append(ref)
+    kept.sort(key=lambda r: _rank_reference(r, company_name, anchor_hostname))
+    if dropped:
+        logger.info(
+            "reference_verify: source_filter company=%s kept=%d dropped=%d",
+            (company_name or "")[:80],
+            len(kept),
+            dropped,
+        )
+    return kept[:8]
+
+
+def build_source_evidence(refs: List[str], *, company_name: Optional[str]) -> List[Dict[str, str]]:
+    evidence: List[Dict[str, str]] = []
+    for ref in refs:
+        urls = extract_http_urls(ref)
+        evidence.append(
+            {
+                "reference": ref,
+                "url": urls[0] if urls else "",
+                "supports": _reference_support_note(ref, company_name),
+            }
+        )
+    return evidence
+
+
 def filter_references_to_allowlist(refs: List[Any], allowlist_urls: List[str]) -> Dict[str, Any]:
     """
     Keep references when at least one cited URL matches retrieval allowlist by:
@@ -306,6 +432,7 @@ def finalize_scout_references(
     output: Dict[str, Any],
     *,
     anchor_hostname: Optional[str] = None,
+    company_name: Optional[str] = None,
     probe_timeout: float = 4.0,
 ) -> Dict[str, Any]:
     """
@@ -316,5 +443,17 @@ def finalize_scout_references(
     if not isinstance(refs, list):
         return output
     cleaned = filter_references_anchor_conflicts(refs, anchor_hostname)
+    cleaned = filter_references_by_company_relevance(
+        cleaned,
+        company_name=company_name or output.get("name"),
+        anchor_hostname=anchor_hostname,
+    )
     output["references"] = cleaned
-    return filter_references_by_url_probe(output, timeout=probe_timeout)
+    output = filter_references_by_url_probe(output, timeout=probe_timeout)
+    final_refs = output.get("references")
+    if isinstance(final_refs, list):
+        output["source_evidence"] = build_source_evidence(
+            [str(r) for r in final_refs if isinstance(r, str)],
+            company_name=company_name or output.get("name"),
+        )
+    return output

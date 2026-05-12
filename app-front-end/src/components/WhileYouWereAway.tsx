@@ -13,7 +13,9 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 const STATS_CONFIG = (s: ActivitySummary) => [
   { label: 'Discovered', value: s.found, accent: false },
   { label: 'Evaluated', value: s.reviewed, accent: false },
-  { label: 'Decided', value: s.decided, accent: false },
+  { label: 'Agent-decided', value: s.agent_decided ?? s.decided, accent: false },
+  { label: 'Human-reviewed', value: s.human_reviewed ?? 0, accent: false },
+  { label: 'Open/in-progress', value: s.open_in_progress ?? 0, accent: false },
   { label: 'Escalated', value: s.escalations, accent: true },
 ];
 

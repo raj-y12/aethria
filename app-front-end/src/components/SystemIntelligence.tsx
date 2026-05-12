@@ -316,8 +316,8 @@ function AnalyticsTab({ rejection, watchlist, concentration, systemHealth }: {
         <TabSection title="Pipeline health" label="Live">
           <div className="flex flex-wrap gap-phi-6">
             {[
-              { label: 'Unreviewed', value: q?.unreviewed ?? 0 },
-              { label: 'Undecided', value: q?.undecided ?? 0 },
+              { label: 'Awaiting review', value: q?.unreviewed ?? 0 },
+              { label: 'Awaiting partner', value: q?.undecided ?? 0 },
               { label: 'Watchlist', value: q?.watchlist ?? 0 },
               { label: 'Escalations', value: systemHealth.pending_escalations },
             ].map((s) => (

@@ -161,6 +161,7 @@ class ScoutInfo(BaseModel):
     # High-level references / source notes for how this opportunity was discovered.
     # E.g. reports, trends, example companies, or general domain knowledge notes.
     references: Optional[List[str]] = None
+    source_evidence: Optional[List[Dict[str, str]]] = None
     origin_type: Optional[str] = None
     lookup_input_type: Optional[str] = None
     lookup_query: Optional[str] = None
@@ -369,6 +370,10 @@ class Startup(BaseModel):
 
     # Institutional conviction architecture, currently scoped to the authenticated user.
     conviction_state: Optional[ConvictionState] = None
+
+    # When the item entered an unresolved state: initial processing, failed/incomplete
+    # processing, pending human review, or unresolved escalation.
+    unresolved_at: Optional[datetime] = None
     
     # Financials (can be populated at any stage)
     financials: Financials = Field(default_factory=Financials)
@@ -406,10 +411,10 @@ class Startup(BaseModel):
         """Create Startup from dict. Handles ISO timestamp strings and null timestamps (uses now() for required datetimes)."""
         data = dict(data)
         # Normalize top-level timestamps
-        for key in ("created_at", "updated_at"):
+        for key in ("created_at", "updated_at", "unresolved_at"):
             if key in data:
                 v = cls._normalize_timestamp(data[key])
-                data[key] = v if v is not None else datetime.now()
+                data[key] = v if v is not None else (datetime.now() if key != "unresolved_at" else None)
         # Nested: scout_info.discovered_at
         if "scout_info" in data and isinstance(data["scout_info"], dict):
             si = dict(data["scout_info"])

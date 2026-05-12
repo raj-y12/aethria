@@ -60,6 +60,7 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
         est_tam=scout_output.get("est_tam"),
         field_provenance=scout_output.get("field_provenance") if isinstance(scout_output.get("field_provenance"), dict) else None,
         references=scout_output.get("references") or None,
+        source_evidence=scout_output.get("source_evidence") if isinstance(scout_output.get("source_evidence"), list) else None,
         origin_type=scout_output.get("origin_type"),
         lookup_input_type=scout_output.get("lookup_input_type"),
         lookup_query=scout_output.get("lookup_query"),

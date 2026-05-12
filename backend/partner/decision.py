@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from openai import OpenAI
 from utils.prompt_version import hash_prompt
 from utils.scoring import compute_overall_score
+from utils.settings_loader import load_settings, recommendation_for_score_from_fund_config
 from utils.partner_codes import legacy_from_recommendation, recommendation_from_legacy
 
 from partner.rationale import (
@@ -180,6 +181,21 @@ class PartnerDecisionEngine:
         self.tenant_user_id = (tenant_user_id or "").strip()
         self.llm_call_count = 0
         self._rules: Dict[str, Any] = _load_partner_rules()
+        self._fund_config: Dict[str, Any] = {}
+        if self.tenant_user_id:
+            try:
+                settings = load_settings(self.tenant_user_id)
+                fc = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
+                self._fund_config = dict(fc)
+                if self._fund_config:
+                    self.logger.info(
+                        "partner_settings user_id=%s score_bands=%d thresholds=%s",
+                        self.tenant_user_id[:24],
+                        len(self._fund_config.get("scoreBands") or []),
+                        self._fund_config.get("thresholds") or {},
+                    )
+            except Exception as e:
+                self.logger.warning("Partner settings unavailable, using resource rules: %s", e)
         self.api_key = (api_key or os.getenv("OPENAI_API_KEY", "")).strip()
         self.model = model or os.getenv("PARTNER_MODEL", "gpt-5-nano")
         if self.api_key:
@@ -248,8 +264,9 @@ class PartnerDecisionEngine:
             return 0.0, 4
         return float(canonical), 4
 
-    @staticmethod
-    def _canonical_recommendation(avg_score: float) -> str:
+    def _canonical_recommendation(self, avg_score: float) -> str:
+        if self._fund_config:
+            return recommendation_for_score_from_fund_config(avg_score, self._fund_config)
         if avg_score >= 8.0:
             return "INVEST"
         if avg_score >= 6.0:
@@ -458,7 +475,7 @@ class PartnerDecisionEngine:
         try:
             from core.fund_thesis_resolver import format_fund_thesis_context_for_prompt
 
-            resource_ctx = format_fund_thesis_context_for_prompt()
+            resource_ctx = "" if fund_thesis else format_fund_thesis_context_for_prompt()
             if resource_ctx:
                 thesis_block = (thesis_block or "") + resource_ctx
         except Exception:
@@ -506,6 +523,15 @@ class PartnerDecisionEngine:
         min_avg_medium_maybe = score_thresholds.get("min_avg_medium_maybe", 7.0)
         min_avg_borderline_low = score_thresholds.get("min_avg_borderline_low", 6.0)
         max_avg_borderline_high = score_thresholds.get("max_avg_borderline_high", 7.0)
+        fc_thresholds = self._fund_config.get("thresholds") if isinstance(self._fund_config.get("thresholds"), dict) else {}
+        if fc_thresholds:
+            try:
+                min_avg_pass = float(fc_thresholds.get("partnerReview", min_avg_pass * 10)) / 10.0
+                min_avg_strong_yes = float(fc_thresholds.get("escalation", min_avg_strong_yes * 10)) / 10.0
+                min_avg_medium_maybe = float(fc_thresholds.get("monitor", min_avg_medium_maybe * 10)) / 10.0
+                min_avg_borderline_low = float(fc_thresholds.get("autoPass", min_avg_borderline_low * 10)) / 10.0
+            except (TypeError, ValueError):
+                pass
 
         assumption_risks = self._compute_assumption_risks(
             scout_output, review_output, assumption_feedback

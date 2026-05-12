@@ -57,6 +57,27 @@ function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | null): St
   };
 }
 
+function memoSourceRows(startup: Startup) {
+  const structured = startup.scout.source_evidence ?? [];
+  if (structured.length > 0) {
+    return structured.map((item) => ({
+      reference: item.reference,
+      supports: item.supports || 'Company evidence',
+      href: item.url || memoReferenceHref(item.reference),
+      label: memoReferenceLabel(item.reference),
+    }));
+  }
+  return (startup.scout.references ?? [])
+    .map((r) => String(r ?? '').trim())
+    .filter(Boolean)
+    .map((ref) => ({
+      reference: ref,
+      supports: 'Company evidence',
+      href: memoReferenceHref(ref),
+      label: memoReferenceLabel(ref),
+    }));
+}
+
 const MEMO_GENERATING_DETAIL_AWAITING =
   'Reviewers are scoring this company against your fund thesis. Memo sections appear as outputs land.';
 const MEMO_GENERATING_DETAIL_UNDECIDED =
@@ -640,15 +661,26 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 <h2 className="memoDocSectionHead" id="memo-ruling-status">Judgment Brief</h2>
                 <div className="memoRulingStatus">
                   <div>
-                    <p className="memoRulingLabel">
-                      {isAlreadyDecided ? 'Recorded human ruling' : showEscalationBadge ? 'Human ruling required' : showJudgment ? 'Partner recommendation awaits ruling' : 'Pipeline assembling recommendation'}
-                    </p>
+                    <div className="memoRulingLabelRow">
+                      <p className="memoRulingLabel">
+                        {isAlreadyDecided
+                          ? 'Recorded human ruling'
+                          : showEscalationBadge
+                            ? 'Human ruling required'
+                            : showJudgment
+                              ? 'Partner recommendation awaits ruling'
+                              : 'Pipeline assembling recommendation'}
+                      </p>
+                      {showEscalationBadge && !isAlreadyDecided ? (
+                        <span className="memoEscalationTag">Escalation</span>
+                      ) : null}
+                    </div>
                     {displayStartup.human_resolution?.resolved_at ? (
                       <p className="memoRulingValue">
                         {decisionLabel(displayStartup.human_resolution.decision)}
                       </p>
-                    ) : showJudgment ? (
-                      <p className="memoRulingValue">Needs ruling</p>
+                    ) : showEscalationBadge ? null : showJudgment ? (
+                      <p className="memoRulingValue">Partner recommends {decisionHeadline}</p>
                     ) : (
                       <p className="memoRulingValue">Awaiting recommendation</p>
                     )}
@@ -679,9 +711,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                               <p className="memoDocConfidence">
                                 <span className="memoNum">{configuredScore}</span> configured score, {configuredBand.label}
                               </p>
-                            )}
-                            {showEscalationBadge && (
-                              <p className="memoDocEscalation">Escalation required</p>
                             )}
                           </div>
                           {displayStartup.partner?.decision_drivers &&
@@ -1057,13 +1086,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                           </div>
                         </>
                       )}
-                      {hasScores && !structuredScoring && (
-                        <div className="memoScoreMissing">
-                          <p className="memoScoreMissingText">
-                            Structured scoring is not present in this memo payload yet.
-                          </p>
-                        </div>
-                      )}
                       {(displayStartup.review?.improvement_to_9?.length ?? 0) > 0 && (
                         <div className="memoDocSubsection">
                           <p className="memoDocSubhead">What would make this a 9?</p>
@@ -1342,7 +1364,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             )}
 
             {/* ── Sources ── */}
-            {config.memo.includeEvidenceExcerpts && (displayStartup.scout.references?.length ?? 0) > 0 && (
+            {config.memo.includeEvidenceExcerpts && memoSourceRows(displayStartup).length > 0 && (
               <section className="memoSourcesSection">
                 <button
                   type="button"
@@ -1365,20 +1387,19 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   >
                     <div className="memoSourcesBody">
                       <ul className="memoList">
-                        {(displayStartup.scout.references ?? [])
-                          .map((r) => String(r ?? '').trim())
-                          .filter(Boolean)
-                          .map((ref, i) => {
-                            const href = memoReferenceHref(ref);
-                            const label = memoReferenceLabel(ref);
+                        {memoSourceRows(displayStartup)
+                          .map((source, i) => {
                             return (
                               <li key={i} className="memoListItem">
                                 <span className="memoBullet">·</span>
-                                {href ? (
-                                  <a className="memoLink" href={href} target="_blank" rel="noreferrer">{renderWithMonoNumbers(label)}</a>
+                                <span className="min-w-0">
+                                {source.href ? (
+                                  <a className="memoLink" href={source.href} target="_blank" rel="noreferrer">{renderWithMonoNumbers(source.label)}</a>
                                 ) : (
-                                  <span>{renderWithMonoNumbers(label)}</span>
+                                  <span>{renderWithMonoNumbers(source.label)}</span>
                                 )}
+                                  <span className="block type-meta normal-case tracking-normal text-oxford/42">{source.supports}</span>
+                                </span>
                               </li>
                             );
                           })}

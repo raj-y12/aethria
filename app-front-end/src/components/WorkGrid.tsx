@@ -39,7 +39,7 @@ type DecisionFilter =
   | 'DECIDED'
   | 'AWAITING_REVIEW';
 type ReviewFilter = 'ALL' | 'STRONG' | 'MEDIUM' | 'WEAK' | 'UNREVIEWED';
-type SortFilter = 'QUEUE_PRIORITY' | 'NEWEST' | 'OLDEST' | 'CONFIDENCE_HIGH' | 'CONFIDENCE_LOW' | 'NAME_AZ';
+type SortFilter = 'QUEUE_PRIORITY' | 'NEWEST' | 'OLDEST' | 'UNRESOLVED_OLDEST' | 'CONFIDENCE_HIGH' | 'CONFIDENCE_LOW' | 'NAME_AZ';
 
 function getReviewerVerdict(s: Startup) {
   return getReviewerQualityBand(s.review);
@@ -140,11 +140,16 @@ interface WorkGridRow {
   isEscalated: boolean;
   needsRuling: boolean;
   sortKeyValue: string;
+  unresolvedAt: string | null;
 }
 
 function formatRowDate(value: string): string {
   if (!value) return '';
   return new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
+function getUnresolvedAt(startup: Startup): string | null {
+  return startup.unresolved_at ?? startup.timestamps?.unresolved_at ?? null;
 }
 
 function getRowAttention(row: WorkGridRow): { label: string; reason: string; tone: 'critical' | 'watch' | 'active' | 'quiet' } {
@@ -278,6 +283,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
       const isDecided = isDealDecided(startup);
       const configuredScore = computeConfiguredScore(startup, config);
       const isStale = isStartupStaleByConfig(startup, config);
+      const unresolvedAt = getUnresolvedAt(startup);
       const displayIndex = (stableIndex.get(startup.id) ?? 0).toString().padStart(2, '0');
       return {
         startup,
@@ -298,6 +304,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         isEscalated: queueState === 'escalated',
         needsRuling: startupNeedsRuling(startup),
         sortKeyValue: sortKey(startup),
+        unresolvedAt,
       };
     });
     const sorted = [...rows];
@@ -312,6 +319,9 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         break;
       case 'OLDEST':
         sorted.sort((a, b) => a.sortKeyValue.localeCompare(b.sortKeyValue));
+        break;
+      case 'UNRESOLVED_OLDEST':
+        sorted.sort((a, b) => (a.unresolvedAt ?? '9999').localeCompare(b.unresolvedAt ?? '9999'));
         break;
       case 'CONFIDENCE_HIGH':
         sorted.sort((a, b) => (b.startup.scout.confidence ?? 0) - (a.startup.scout.confidence ?? 0));
@@ -397,6 +407,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                   <option value="QUEUE_PRIORITY">PRIORITY</option>
                   <option value="NEWEST">NEWEST</option>
                   <option value="OLDEST">OLDEST</option>
+                  <option value="UNRESOLVED_OLDEST">UNRESOLVED</option>
                   <option value="CONFIDENCE_HIGH">SIGNAL ↓</option>
                   <option value="CONFIDENCE_LOW">SIGNAL ↑</option>
                   <option value="NAME_AZ">NAME A–Z</option>
@@ -515,6 +526,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
           const rowHoverClass = isSelected ? 'hover:bg-oxford/[0.062]' : 'hover:bg-oxford/[0.025]';
           const metaSectorHead = (startup.scout.sector || '').split('/')[0].trim();
           const metaHasDate = Boolean(row.sortKeyValue);
+          const metaHasUnresolved = Boolean(row.unresolvedAt) && !row.isDecided;
           const metaHasSector = Boolean(metaSectorHead);
           const metaHasFunding = Boolean(startup.scout.funding_stage);
           const metaHasDiligenceFlags = row.hasAdverse && !row.hasHighAdverse;
@@ -608,9 +620,17 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                         <span className="type-meta text-oxford/35">{startup.scout.funding_stage}</span>
                       </>
                     )}
+                    {metaHasUnresolved && (
+                      <>
+                        {(metaHasDate || metaHasSector || metaHasFunding) && <span className="type-meta text-oxford/25">·</span>}
+                        <span className="type-meta text-oxford/38 tabular-nums" title="Date this item entered unresolved state">
+                          Unresolved {formatRowDate(row.unresolvedAt ?? '')}
+                        </span>
+                      </>
+                    )}
                     {metaHasDiligenceFlags && (
                       <>
-                        {(metaHasDate || metaHasSector || metaHasFunding) && (
+                        {(metaHasDate || metaHasSector || metaHasFunding || metaHasUnresolved) && (
                           <span className="type-meta text-oxford/25">·</span>
                         )}
                         <span className="type-meta text-oxford/38">
@@ -620,7 +640,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                     )}
                     {metaHasMonitor && (
                       <>
-                        {(metaHasDate || metaHasSector || metaHasFunding || metaHasDiligenceFlags) && (
+                        {(metaHasDate || metaHasSector || metaHasFunding || metaHasUnresolved || metaHasDiligenceFlags) && (
                           <span className="type-meta text-oxford/25">·</span>
                         )}
                         <span className="type-meta text-oxford/38">On monitor</span>
@@ -628,7 +648,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                     )}
                     {metaHasLookup && (
                       <>
-                        {(metaHasDate || metaHasSector || metaHasFunding || metaHasDiligenceFlags || metaHasMonitor) && (
+                        {(metaHasDate || metaHasSector || metaHasFunding || metaHasUnresolved || metaHasDiligenceFlags || metaHasMonitor) && (
                           <span className="type-meta text-oxford/25">·</span>
                         )}
                         <span className="type-meta tracking-[0.08em] text-lookup">Lookup</span>
@@ -639,6 +659,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                         {(metaHasDate ||
                           metaHasSector ||
                           metaHasFunding ||
+                          metaHasUnresolved ||
                           metaHasDiligenceFlags ||
                           metaHasMonitor ||
                           metaHasLookup) && <span className="type-meta text-oxford/25">·</span>}

@@ -35,6 +35,8 @@ from fastapi.responses import JSONResponse
 from utils.storage import Storage
 from utils.settings_loader import (
     DEFAULT_SETTINGS,
+    fund_config_raw_text,
+    fund_config_to_thesis_parsed_json,
     get_settings_path,
     load_settings,
     save_settings,
@@ -714,6 +716,7 @@ def _partner_dict_for_frontend(partner: dict) -> dict:
         "human_review_required": partner.get("human_review_required", False),
         "llm_fallback_reason": partner.get("llm_fallback_reason"),
         "prompt_version": partner.get("prompt_version"),
+        "decision_drivers": partner.get("decision_drivers") or [],
     }
 
 
@@ -755,6 +758,8 @@ def _backend_to_frontend(raw: dict) -> dict:
         timestamps["reviewed_at"] = _to_iso(review["reviewed_at"])
     if partner and partner.get("partnered_at"):
         timestamps["partnered_at"] = _to_iso(partner["partnered_at"])
+    if raw.get("unresolved_at"):
+        timestamps["unresolved_at"] = _to_iso(raw.get("unresolved_at"))
 
     out = {
         "id": sid,
@@ -775,6 +780,7 @@ def _backend_to_frontend(raw: dict) -> dict:
             "funding_stage": scout.get("funding_stage"),
             "est_tam": scout.get("est_tam"),
             "references": scout.get("references") or [],
+            "source_evidence": scout.get("source_evidence") or [],
             "origin_type": scout.get("origin_type"),
             "lookup_input_type": scout.get("lookup_input_type"),
             "lookup_query": scout.get("lookup_query"),
@@ -787,6 +793,7 @@ def _backend_to_frontend(raw: dict) -> dict:
         "timestamps": timestamps,
         "human_resolution": raw.get("human_resolution"),
         "conviction_state": raw.get("conviction_state"),
+        "unresolved_at": _to_iso(raw.get("unresolved_at")),
     }
 
     if review:
@@ -904,6 +911,7 @@ def _list_projection_to_frontend(row: Dict[str, Any]) -> Dict[str, Any]:
         "discovered_at": _to_iso(row.get("created_at")),
         "reviewed_at": _to_iso(row.get("list_reviewed_at")) if row.get("list_reviewed_at") else None,
         "partnered_at": _to_iso(row.get("list_partnered_at")) if row.get("list_partnered_at") else None,
+        "unresolved_at": _to_iso(row.get("unresolved_at")) if row.get("unresolved_at") else None,
     }
     out: Dict[str, Any] = {
         "id": sid,
@@ -919,10 +927,12 @@ def _list_projection_to_frontend(row: Dict[str, Any]) -> Dict[str, Any]:
             "lookup_id": row.get("list_lookup_id"),
             "lookup_query": row.get("list_lookup_query"),
             "lookup_website": row.get("list_lookup_website"),
+            "source_evidence": [],
         },
         "timestamps": timestamps,
         "human_resolution": row.get("human_resolution"),
         "conviction_state": row.get("conviction_state"),
+        "unresolved_at": _to_iso(row.get("unresolved_at")) if row.get("unresolved_at") else None,
     }
     if row.get("list_verdict") or row.get("list_score") is not None or row.get("short_summary"):
         score = row.get("list_score")
@@ -1004,6 +1014,30 @@ def _thin_list_from_full_frontend(obj: Dict[str, Any]) -> Dict[str, Any]:
             "human_review_required": part.get("human_review_required", False),
         }
     return {**obj, "scout": scout, "review": thin_rev, "partner": thin_part}
+
+
+def _aggregate_activity_totals(
+    activity_rows: List[Dict[str, Any]],
+    *,
+    human_reviewed: int = 0,
+    open_in_progress: int = 0,
+) -> Dict[str, int]:
+    totals = {
+        "found": 0,
+        "reviewed": 0,
+        "decided": 0,
+        "agent_decided": 0,
+        "human_reviewed": max(0, int(human_reviewed or 0)),
+        "open_in_progress": max(0, int(open_in_progress or 0)),
+        "escalations": 0,
+    }
+    for r in activity_rows:
+        totals["found"] += int(r.get("startups_found", 0) or 0)
+        totals["reviewed"] += int(r.get("reviewed_count", 0) or 0)
+        totals["agent_decided"] += int(r.get("decisions_made", 0) or 0)
+        totals["escalations"] += int(r.get("escalations_count", 0) or 0)
+    totals["decided"] = totals["agent_decided"]
+    return totals
 
 
 def _get_storage(request: Request):
@@ -1296,6 +1330,25 @@ async def patch_settings(request: Request, body: dict):
                 for k, v in body[section].items():
                     current[section][k] = v
     _save_settings(current, user_id)
+
+    if isinstance(body.get("fund_config"), dict):
+        fc = current.get("fund_config") if isinstance(current.get("fund_config"), dict) else {}
+        raw_text = fund_config_raw_text(fc).strip()
+        if raw_text:
+            try:
+                api_key = os.getenv("OPENAI_API_KEY", "").strip()
+                create_fund_thesis_version_for_user(
+                    get_service_client(),
+                    user_id=user_id,
+                    raw_text=raw_text,
+                    api_key=api_key,
+                    parsed_json_override=fund_config_to_thesis_parsed_json(fc),
+                    additional_parsed_fields={"settings_version": fc.get("version")},
+                    skip_embedding=not bool(api_key),
+                )
+                _logger_agents.info("[%s] Synced fund_config to active fund thesis", user_id[:12])
+            except Exception as e:
+                _logger_agents.warning("[%s] fund_config thesis sync failed: %s", user_id[:12], e)
 
     # If any agents are enabled after the patch, ensure the persistent background loop is running.
     # This covers the case where the user toggles agents in the UI and clicks "Save".
@@ -2439,6 +2492,7 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
         risk_acknowledged=risk_acknowledged,
         config_version=str(config_version) if config_version else None,
     )
+    patch["unresolved_at"] = None
     try:
         ok = storage.update_startup_partial(startup_id, patch)
     except Exception as e:
@@ -2712,13 +2766,49 @@ async def get_activity_summary(request: Request):
     except Exception:
         activity_rows = []
 
-    # 3. Aggregate totals
-    totals = {"found": 0, "reviewed": 0, "decided": 0, "escalations": 0}
-    for r in activity_rows:
-        totals["found"]       += int(r.get("startups_found", 0) or 0)
-        totals["reviewed"]    += int(r.get("reviewed_count", 0) or 0)
-        totals["decided"]     += int(r.get("decisions_made", 0) or 0)
-        totals["escalations"] += int(r.get("escalations_count", 0) or 0)
+    # 3. Aggregate totals. "decided" is retained as a backwards-compatible
+    # alias for agent_decided; human decisions are counted separately.
+    human_reviewed = 0
+    open_in_progress = 0
+
+    try:
+        human_rows = (
+            svc.table("startups")
+            .select("startup_id", count="exact")
+            .eq("user_id", user_id)
+            .gt("human_resolution->>resolved_at", last_seen_at)
+            .execute()
+        )
+        human_reviewed = int(getattr(human_rows, "count", None) or 0)
+    except Exception as e:
+        logging.getLogger("api").warning("activity human decision aggregation failed: %s", e)
+
+    try:
+        open_rows = (
+            svc.table("startups")
+            .select("startup_id", count="exact")
+            .eq("user_id", user_id)
+            .not_.is_("unresolved_at", "null")
+            .execute()
+        )
+        open_in_progress = int(getattr(open_rows, "count", None) or 0)
+    except Exception as e:
+        logging.getLogger("api").warning("activity open aggregation failed: %s", e)
+
+    totals = _aggregate_activity_totals(
+        activity_rows,
+        human_reviewed=human_reviewed,
+        open_in_progress=open_in_progress,
+    )
+
+    logging.getLogger("api").info(
+        "activity_summary user_id=%s since=%s agent_decided=%s human_reviewed=%s open_in_progress=%s",
+        user_id[:24],
+        last_seen_at,
+        totals["agent_decided"],
+        totals["human_reviewed"],
+        totals["open_in_progress"],
+    )
 
     # last_seen_at is NOT updated here — only updated when the user explicitly
     # dismisses the modal via POST /api/activity/seen

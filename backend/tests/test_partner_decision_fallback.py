@@ -116,6 +116,39 @@ def test_hard_low_score_stays_deterministic_no():
     assert "minimum pass threshold" in (out.get("rationale") or "").lower()
 
 
+def test_saved_score_bands_drive_partner_recommendation(monkeypatch):
+    import partner.decision as decision_mod
+
+    monkeypatch.setattr(
+        decision_mod,
+        "load_settings",
+        lambda user_id: {
+            "fund_config": {
+                "scoreBands": [
+                    {"min": 0, "max": 49, "label": "Pass"},
+                    {"min": 50, "max": 69, "label": "Monitor"},
+                    {"min": 70, "max": 100, "label": "Strong Proceed"},
+                ],
+                "thresholds": {"partnerReview": 50, "monitor": 50, "escalation": 70, "autoPass": 49},
+            }
+        },
+    )
+    engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None, tenant_user_id="user_123")
+    review = _base_review()
+    review.update(
+        {
+            "market_score": 7,
+            "product_score": 7,
+            "technical_score": 7,
+            "execution_score": 7,
+            "derived_verdict": "STRONG",
+        }
+    )
+    out = engine.decide(_base_scout(), review)
+    assert out.get("recommendation") == "INVEST"
+    assert out.get("decision") == "YES"
+
+
 def test_weak_verdict_uses_constructive_pass_rationale():
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     review = _base_review()
