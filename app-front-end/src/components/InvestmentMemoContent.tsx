@@ -657,9 +657,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
             <div className="memoDecisionCluster">
               {/* ── Decision surface ── */}
-              <section className="memoDocSection memoDecisionSurface" aria-labelledby="memo-ruling-status">
-                <h2 className="memoDocSectionHead" id="memo-ruling-status">Judgment Brief</h2>
-                <div className="memoRulingStatus">
+              <section className="memoDocSection memoDecisionSurface" aria-label="Judgment brief">
+                <div
+                  className={`memoRulingStatus${
+                    showEscalationBadge && !isAlreadyDecided ? ' memoRulingStatus--escalation' : ''
+                  }`}
+                >
                   <div>
                     <div className="memoRulingLabelRow">
                       <p className="memoRulingLabel">
@@ -671,9 +674,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                               ? 'Partner recommendation awaits ruling'
                               : 'Pipeline assembling recommendation'}
                       </p>
-                      {showEscalationBadge && !isAlreadyDecided ? (
-                        <span className="memoEscalationTag">Escalation</span>
-                      ) : null}
                     </div>
                     {displayStartup.human_resolution?.resolved_at ? (
                       <p className="memoRulingValue">
@@ -695,7 +695,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   const remainingReasons = paras.slice(1);
                   return (
                     <div className="memoRecommendationBlock" aria-labelledby="memo-verdict">
-                      <h3 className="memoDocSubhead" id="memo-verdict">Partner Recommendation</h3>
+                      <h3 className="memoDocSectionHead" id="memo-verdict">Partner Recommendation</h3>
                       {decisionBadgeVariant && (
                         <div className="memoDocJudgmentTop">
                           <p className={`memoDocRecommendation memoDocRecommendation--${decisionBadgeVariant.toLowerCase()}`}>
@@ -809,37 +809,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     No material adverse items extracted under the current {config.risk.sensitivity} risk posture.
                   </p>
                 </section>
-              )}
-
-              {(riskFactors.risks.length > 0 || riskFactors.mitigation.length > 0) && (
-                <MemoPlainSection
-                  id={`${contentKey}-risk-context`}
-                  title="Risk Context"
-                >
-                  {riskFactors.risks.length > 0 && (
-                    <ul className="memoList">
-                      {riskFactors.risks.map((r, i) => (
-                        <li key={i} className="memoListItem">
-                          <span className="memoBullet">·</span>
-                          <span>{renderWithMonoNumbers(normalizeListItemText(r))}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {riskFactors.mitigation.length > 0 && (
-                    <div className="memoDocSubsection">
-                      <p className="memoDocSubhead">Mitigation Checklist</p>
-                      <ul className="memoList">
-                        {riskFactors.mitigation.map((item, i) => (
-                          <li key={i} className="memoListItem">
-                            <span className="memoBullet">·</span>
-                            <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </MemoPlainSection>
               )}
 
               {showJudgment && (
@@ -1012,9 +981,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               const compItems = (displayStartup.review?.competition_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const bizItems = (displayStartup.review?.business_model_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const hasScores = !!structuredScoring;
-              const rawSig = displayStartup.review?.structured_signals as Record<string, unknown> | undefined;
               const hasSignalsAudit =
-                !!(rawSig && Object.keys(rawSig).length > 0) ||
                 !!displayStartup.review?.disagreement_summary?.trim() ||
                 (displayStartup.review?.resolution_notes?.filter(Boolean) ?? []).length > 0;
               if (
@@ -1036,14 +1003,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   {config.memo.includeScoreReasoning && (hasScores || hasSignalsAudit) && (
                     <div className="memoDocScoreScope">
                       {(() => {
-                        const sig = rawSig;
                         const dsum = displayStartup.review?.disagreement_summary?.trim();
                         const rnotes = displayStartup.review?.resolution_notes?.filter(Boolean) ?? [];
-                        if (!sig && !dsum && rnotes.length === 0) return null;
-                        const sigPreview =
-                          sig && Object.keys(sig).length > 0
-                            ? JSON.stringify(sig, null, 2).slice(0, 6000)
-                            : null;
+                        if (!dsum && rnotes.length === 0) return null;
                         return (
                           <div className="memoSignalsAudit">
                             <p className="memoDocSubhead">Signals &amp; reviewer alignment</p>
@@ -1061,12 +1023,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                                   </li>
                                 ))}
                               </ul>
-                            )}
-                            {sigPreview && (
-                              <pre className="memoSignalsPreview">
-                                {sigPreview}
-                                {sigPreview.length >= 6000 ? '\n…' : ''}
-                              </pre>
                             )}
                           </div>
                         );
@@ -1263,6 +1219,38 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </MemoDisclosureSection>
               );
             })()}
+
+            {/* ── Risk Context ── */}
+            {(riskFactors.risks.length > 0 || riskFactors.mitigation.length > 0) && (
+              <MemoPlainSection
+                id={`${contentKey}-risk-context`}
+                title="Risk Context"
+              >
+                {riskFactors.risks.length > 0 && (
+                  <ul className="memoList">
+                    {riskFactors.risks.map((r, i) => (
+                      <li key={i} className="memoListItem">
+                        <span className="memoBullet">·</span>
+                        <span>{renderWithMonoNumbers(normalizeListItemText(r))}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {riskFactors.mitigation.length > 0 && (
+                  <div className="memoDocSubsection">
+                    <p className="memoDocSubhead">Mitigation Checklist</p>
+                    <ul className="memoList">
+                      {riskFactors.mitigation.map((item, i) => (
+                        <li key={i} className="memoListItem">
+                          <span className="memoBullet">·</span>
+                          <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </MemoPlainSection>
+            )}
 
             {/* ── Next Steps ── */}
             {nextStepText && (

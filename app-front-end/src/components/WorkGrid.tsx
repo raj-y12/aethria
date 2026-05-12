@@ -513,7 +513,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
           const rowOpacityClass =
             row.isDecided && !isSelected ? 'opacity-[0.62] hover:opacity-100' : '';
           const rowBgClass = isSelected
-            ? 'bg-oxford/[0.055]'
+            ? 'bg-oxford/[0.08]'
             : row.isDecided
               ? ''
               : row.hasHighAdverse || row.isEscalated
@@ -523,7 +523,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                   : isPending
                     ? 'bg-oxford/[0.018]'
                     : '';
-          const rowHoverClass = isSelected ? 'hover:bg-oxford/[0.062]' : 'hover:bg-oxford/[0.025]';
+          const rowHoverClass = isSelected ? '' : 'hover:bg-oxford/[0.025]';
           const metaSectorHead = (startup.scout.sector || '').split('/')[0].trim();
           const metaHasDate = Boolean(row.sortKeyValue);
           const metaHasUnresolved = Boolean(row.unresolvedAt) && !row.isDecided;
@@ -668,7 +668,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                           title="Configured weighted score"
                         >
                           <span className="text-oxford/34">Score</span>{' '}
-                          <span className="text-oxford/55">{row.configuredScore}</span>
+                          <span className="text-oxford/55">{row.configuredScore}%</span>
                         </span>
                       </>
                     )}

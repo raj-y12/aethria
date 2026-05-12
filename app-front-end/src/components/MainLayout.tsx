@@ -37,7 +37,12 @@ import {
 import { fetchFundThesisSummary } from '../api/fundThesis';
 import { getQueryConfig } from '../lib/queryIntent';
 import { railEditorial } from '../design-system/railEditorial';
-import { getBacklogPressure, isDealDecided, isDealUnresolved } from '../lib/dealState';
+import {
+  getBacklogPressure,
+  isDealDecided,
+  isDealPendingPartnerDecision,
+  isDealUnreviewed,
+} from '../lib/dealState';
 import type { FundConfiguration } from '../lib/fundConfiguration';
 
 const SYSTEM_MEMO_HEADER_PADDING = 'py-phi-3';
@@ -326,10 +331,8 @@ export default function MainLayout({
 
   const humanReviewedCount = startups.filter(isDealDecided).length;
   const agentDecidedCount = startups.filter((startup) => Boolean(startup.partner?.recommendation)).length;
-  // "Open/in-progress" = startups that are unreviewed or undecided.
-  // Computed from the canonical review/partner/human_resolution fields so the
-  // count stays correct even if the server-side `unresolved_at` column is stale.
-  const openCount = startups.filter(isDealUnresolved).length;
+  const unreviewedCount = startups.filter(isDealUnreviewed).length;
+  const pendingDecisionCount = startups.filter(isDealPendingPartnerDecision).length;
   const pendingEscalations = data.pendingEscalationCount ?? data.settings?.system_health?.pending_escalations ?? 0;
   const agentConfig = data.settings?.agent_config;
   const pipelineEnabled =
@@ -633,9 +636,10 @@ export default function MainLayout({
                   <p className={railEditorial.label}>Overview</p>
                   <div className="grid min-w-0 grid-cols-2 gap-x-phi-4 gap-y-phi-3">
                     {[
-                      { label: 'Total',     value: startups.length,    accent: false },
-                      { label: 'Open/in-progress', value: openCount,   accent: false },
+                      { label: 'Total', value: startups.length, accent: false },
                       { label: 'Agent-decided', value: agentDecidedCount, accent: false },
+                      { label: 'Pending decision', value: pendingDecisionCount, accent: false },
+                      { label: 'Unreviewed', value: unreviewedCount, accent: false },
                       { label: 'Human-reviewed', value: humanReviewedCount, accent: false },
                       { label: 'Escalated', value: pendingEscalations, accent: pendingEscalations > 0 },
                     ].map((stat) => (
@@ -711,7 +715,7 @@ export default function MainLayout({
                   <div className="min-w-0 flex flex-col gap-phi-2">
                     <p className="type-meta text-oxford/30">Live overview</p>
                     <p className="type-meta text-oxford/60">
-                      {startups.length} total · {openCount} open/in-progress · {agentDecidedCount} agent-decided · {humanReviewedCount} human-reviewed
+                      {startups.length} total · {agentDecidedCount} agent-decided · {pendingDecisionCount} pending decision · {unreviewedCount} unreviewed · {humanReviewedCount} human-reviewed
                       {signals.length > 0 ? ` · ${signals.length} signals` : ''}
                     </p>
                   </div>

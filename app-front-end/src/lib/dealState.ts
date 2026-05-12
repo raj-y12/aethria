@@ -54,6 +54,23 @@ export function isDealUnresolved(startup: Startup): boolean {
   return false;
 }
 
+/** In queue, no analyst review yet (excludes human-resolved). */
+export function isDealUnreviewed(startup: Startup): boolean {
+  return !isDealHumanResolved(startup) && !startup.review;
+}
+
+/**
+ * Review complete but partner recommendation not produced yet.
+ * Escalations awaiting IC (human_review_required) are excluded — counted via escalations stat.
+ */
+export function isDealPendingPartnerDecision(startup: Startup): boolean {
+  return (
+    !isDealHumanResolved(startup) &&
+    Boolean(startup.review) &&
+    !startup.partner?.recommendation
+  );
+}
+
 export function getDealLastActivityIso(startup: Startup): string {
   return startup.human_resolution?.resolved_at
     ?? startup.timestamps?.partnered_at

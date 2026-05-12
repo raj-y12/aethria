@@ -316,12 +316,45 @@
 .memoDecisionSurface { margin-top: 0; }
 .memoRulingStatus {
   display: grid;
-  grid-template-columns: minmax(9rem, 0.46fr) minmax(0, 1fr);
+  grid-template-columns: minmax(max-content, 0.46fr) minmax(0, 1fr);
   gap: 16px 24px;
   align-items: baseline;
   padding: 13px 0 16px;
   border-top: none;
   border-bottom: 1px solid var(--memo-rule);
+}
+/**
+ * Full-width strip matching WorkGrid DecisionBadge escalation
+ * (type-meta + tracking-badge + uppercase + py-phi-1 px-phi-2 + bg-escalation).
+ */
+.memoRulingStatus--escalation {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: 12px 0;
+}
+.memoRulingStatus--escalation .memoRulingLabelRow {
+  margin: 0;
+  width: 100%;
+}
+.memoRulingStatus--escalation .memoRulingLabel {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 3px 5px;
+  background-color: var(--color-accent, #7d2b3a);
+  color: var(--color-paper, #f4f1ea);
+  font-family: var(--memo-font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  border-radius: 0;
+}
+.memoRulingStatus--escalation .memoRulingNote {
+  grid-column: 1;
+  max-width: none;
 }
 .memoRulingLabelRow {
   display: flex;
@@ -336,20 +369,6 @@
 .memoRulingLabelRow .memoRulingLabel {
   margin: 0;
 }
-.memoEscalationTag {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-micro);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 4px 8px;
-  line-height: 1.2;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 32%, transparent);
-  color: color-mix(in srgb, var(--color-accent) 78%, var(--memo-ink-muted));
-  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
-}
 .memoRulingLabel {
   margin: 0 0 8px 0;
   font-family: var(--memo-font-mono);
@@ -357,6 +376,7 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--memo-ink-faint);
+  white-space: nowrap;
 }
 .memoRulingValue {
   margin: 0;
@@ -380,8 +400,8 @@
 .memoRecommendationBlock {
   margin-top: 26px;
 }
-.memoRecommendationBlock .memoDocSubhead {
-  margin-bottom: 13px;
+.memoRecommendationBlock > .memoDocSectionHead {
+  margin-top: 0;
 }
 .memoDocPrimaryReason {
   color: var(--memo-ink);
@@ -445,10 +465,10 @@
   color: var(--memo-ink-strong);
 }
 .memoAdverseToggleTitle {
-  font-family: var(--memo-font-ui);
-  font-size: var(--memo-size-body);
-  letter-spacing: 0;
-  text-transform: none;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   font-weight: 600;
   color: var(--memo-ink-strong);
 }
@@ -794,10 +814,10 @@
 
 /* === Section heading === */
 .memoDocSectionHead {
-  font-family: var(--memo-font-ui);
-  font-size: var(--memo-size-body);
-  letter-spacing: 0;
-  text-transform: none;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--memo-ink-strong);
   margin: 0 0 13px 0;
   display: flex;
@@ -838,6 +858,26 @@
   max-width: 68ch;
 }
 .memoDocProse:last-child { margin-bottom: 0; }
+
+/* === Justified body text ===
+   Apply `text-align: justify` only to prose-bearing classes so that headings,
+   labels, badges, numerals, and definition-list terms keep their alignment.
+   Browsers leave the trailing line ragged by default, which is what we want. */
+.memoDocProse,
+.memoLedgerText,
+.memoLedgerEmpty,
+.memoRulingNote,
+.memoDocDimText,
+.memoDocReviewerDetailText,
+.memoAdverseSummary,
+.memoDocDD,
+.memoGateDetail,
+.memoListItem > span:not(.memoBullet),
+.memoDocDimensionNarrativeItem > span:not(.memoDocDimensionNarrativeBullet) {
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: manual;
+}
 .memoDocThesis {
   font-style: italic;
   color: var(--memo-ink-strong);
@@ -1558,19 +1598,6 @@
 .memoSignalsAudit .memoList {
   margin-top: 0.75rem;
   font-size: var(--memo-size-secondary);
-}
-.memoSignalsPreview {
-  max-height: 12rem;
-  overflow: auto;
-  margin: 0.75rem 0 0;
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--memo-rule);
-  background: transparent;
-  font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-label);
-  line-height: 1.55;
-  color: rgba(var(--color-oxford-rgb), 0.78);
-  white-space: pre-wrap;
 }
 
 @media (max-width: 1100px) {
