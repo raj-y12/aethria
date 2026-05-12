@@ -142,6 +142,65 @@ interface WorkGridRow {
   sortKeyValue: string;
 }
 
+function formatRowDate(value: string): string {
+  if (!value) return '';
+  return new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
+function getRowAttention(row: WorkGridRow): { label: string; reason: string; tone: 'critical' | 'watch' | 'active' | 'quiet' } {
+  const { startup } = row;
+  const firstAdverse = row.adverseItems[0];
+  if (row.isDecided) {
+    const decision = getHumanDecision(startup);
+    return {
+      label: decision === 'YES' ? 'Invested' : decision === 'NO' ? 'Passed' : 'Monitoring',
+      reason: startup.human_resolution?.notes?.trim() || 'Human ruling recorded.',
+      tone: 'quiet',
+    };
+  }
+  if (row.isEscalated || row.hasHighAdverse) {
+    return {
+      label: row.isEscalated ? 'Escalation' : 'Red flag',
+      reason: firstAdverse?.title || 'Human review required before conviction can form.',
+      tone: 'critical',
+    };
+  }
+  if (row.isStale) {
+    return {
+      label: 'Aging',
+      reason: row.ageDays != null ? `${row.ageDays} days unresolved; either rule or deliberately keep on monitor.` : 'Unresolved beyond the configured stale threshold.',
+      tone: 'watch',
+    };
+  }
+  if (row.needsRuling) {
+    const recommendation = startup.partner?.recommendation
+      ? `Partner recommends ${startup.partner.recommendation.toLowerCase()}.`
+      : 'Review is complete and ready for judgment.';
+    return {
+      label: 'Ready',
+      reason: startup.partner?.snapshot?.key_signal?.trim() || startup.partner?.decision_drivers?.[0] || recommendation,
+      tone: 'active',
+    };
+  }
+  if (startup.review) {
+    return {
+      label: 'Reviewed',
+      reason: startup.review.aethria_view?.focal_question?.trim() || startup.review.overall_summary?.trim() || 'Reviewer output is available.',
+      tone: 'active',
+    };
+  }
+  return {
+    label: 'Awaiting review',
+    reason: startup.scout.biggest_unknown?.trim() || startup.scout.one_line?.trim() || 'Scout discovery is queued for reviewer judgment.',
+    tone: 'quiet',
+  };
+}
+
+function truncateRowReason(value: string): string {
+  const text = value.replace(/\s+/g, ' ').trim();
+  return text.length > 150 ? `${text.slice(0, 147).trim()}...` : text;
+}
+
 function rowMatchesDecisionFilter(row: WorkGridRow, filter: DecisionFilter): boolean {
   if (filter === 'ALL') return true;
   if (filter === 'WATCHLIST') return row.onMonitorList;
@@ -438,6 +497,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         ) : orderedRows.map((row, idx) => {
           const { startup } = row;
           const isSelected = selectedId === startup.id;
+          const attention = getRowAttention(row);
           const isPending = row.queueState === 'pending' || row.isEscalated || row.isStale;
           const rowOpacityClass =
             row.isDecided && !isSelected ? 'opacity-[0.62] hover:opacity-100' : '';
@@ -453,6 +513,15 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                     ? 'bg-oxford/[0.018]'
                     : '';
           const rowHoverClass = isSelected ? 'hover:bg-oxford/[0.062]' : 'hover:bg-oxford/[0.025]';
+          const metaSectorHead = (startup.scout.sector || '').split('/')[0].trim();
+          const metaHasDate = Boolean(row.sortKeyValue);
+          const metaHasSector = Boolean(metaSectorHead);
+          const metaHasFunding = Boolean(startup.scout.funding_stage);
+          const metaHasDiligenceFlags = row.hasAdverse && !row.hasHighAdverse;
+          const metaHasMonitor = row.onMonitorList;
+          const metaHasLookup = row.sourceBadge === 'LOOKUP';
+          const metaHasScore = showJudgmentScore(row);
+
           const rowAria = `${startup.scout.name}, ${startup.scout.sector ?? 'Unknown sector'}.${
             row.isDecided ? ' Decided.' : row.needsRuling ? ' Needs ruling.' : ''
           }${row.isStale && row.ageDays != null ? ` ${row.ageDays} days unresolved.` : ''}${
@@ -498,82 +567,87 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
 
                 {/* Body */}
                 <div className="min-w-0 col-start-2">
-                  <div className="grid min-w-0 gap-x-phi-4 gap-y-phi-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
-                    <h2 className={`type-body-emphasis min-w-0 break-words ${row.isDecided ? 'text-oxford/70' : 'text-oxford'}`}>
-                      {startup.scout.name}
-                    </h2>
-                    <div className="flex min-w-0 flex-wrap items-center gap-phi-2 sm:justify-end">
-                      {row.onMonitorList && (
-                        <span
-                          className="type-label-tab text-oxford/45 bg-registerTint px-phi-2 py-0.5 shrink-0"
-                          title="Tracked on portfolio monitor list (partner monitor outcome)"
-                        >
-                          Monitor
-                        </span>
-                      )}
-                      <span className="type-meta text-oxford/35 tabular-nums" title="Configured weighted score">
-                        {row.configuredScore}
-                      </span>
-                      <span className="type-label-tab text-oxford/40 bg-registerTint px-phi-2 py-0.5 shrink-0" title="Current score-band outcome">
-                        {row.configuredBand}
-                      </span>
+                  <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-phi-4 gap-y-phi-2">
+                    <div className="min-w-0 flex-1">
+                      <h2 className={`type-body-emphasis min-w-0 break-words ${row.isDecided ? 'text-oxford/70' : 'text-oxford'}`}>
+                        {startup.scout.name}
+                      </h2>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-phi-2 gap-y-phi-1 self-start">
                       {row.reviewBand && <VerdictBandBadge band={row.reviewBand} />}
-                      <DecisionBadge variant={row.decisionVariant} />
+                      {(row.isEscalated || row.decisionVariant === 'escalation') && <DecisionBadge variant="escalation" />}
+                      {!row.isEscalated && row.decisionVariant !== 'escalation' && <DecisionBadge variant={row.decisionVariant} />}
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-phi-2 gap-y-phi-1 mt-phi-2">
-                    {row.sortKeyValue && (
-                      <span className="type-meta text-oxford/35 tabular-nums whitespace-nowrap">
-                        {new Date(row.sortKeyValue).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  <p
+                    className={`mt-phi-2 type-body-sm leading-relaxed ${
+                      attention.tone === 'critical'
+                        ? 'max-w-[min(100%,40rem)] text-escalation/80'
+                        : row.isDecided
+                          ? 'max-w-[32rem] text-oxford/42'
+                          : 'max-w-[32rem] text-oxford/58'
+                    }`}
+                  >
+                    {truncateRowReason(attention.reason)}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-x-phi-2 gap-y-phi-1 mt-phi-3">
+                    {metaHasDate && (
+                      <span className="type-meta shrink-0 text-oxford/30 tabular-nums">
+                        {formatRowDate(row.sortKeyValue)}
                       </span>
                     )}
-                    {(startup.scout.sector || '').split('/')[0].trim() && (
+                    {metaHasSector && (
                       <>
-                        <span className="type-meta text-oxford/25">·</span>
-                        <span className="type-meta text-oxford/50">{(startup.scout.sector || 'Unknown').split('/')[0].trim()}</span>
+                        {metaHasDate && <span className="type-meta text-oxford/25">·</span>}
+                        <span className="type-meta text-oxford/45">{metaSectorHead}</span>
                       </>
                     )}
-                    {startup.scout.funding_stage && (
+                    {metaHasFunding && (
                       <>
-                        <span className="type-meta text-oxford/25">·</span>
+                        {(metaHasDate || metaHasSector) && <span className="type-meta text-oxford/25">·</span>}
                         <span className="type-meta text-oxford/35">{startup.scout.funding_stage}</span>
                       </>
                     )}
-                    {row.sourceBadge === 'LOOKUP' && (
+                    {metaHasDiligenceFlags && (
                       <>
-                        <span className="type-meta text-oxford/25">·</span>
+                        {(metaHasDate || metaHasSector || metaHasFunding) && (
+                          <span className="type-meta text-oxford/25">·</span>
+                        )}
+                        <span className="type-meta text-oxford/38">
+                          {row.adverseItems.length} diligence flag{row.adverseItems.length === 1 ? '' : 's'}
+                        </span>
+                      </>
+                    )}
+                    {metaHasMonitor && (
+                      <>
+                        {(metaHasDate || metaHasSector || metaHasFunding || metaHasDiligenceFlags) && (
+                          <span className="type-meta text-oxford/25">·</span>
+                        )}
+                        <span className="type-meta text-oxford/38">On monitor</span>
+                      </>
+                    )}
+                    {metaHasLookup && (
+                      <>
+                        {(metaHasDate || metaHasSector || metaHasFunding || metaHasDiligenceFlags || metaHasMonitor) && (
+                          <span className="type-meta text-oxford/25">·</span>
+                        )}
                         <span className="type-meta tracking-[0.08em] text-lookup">Lookup</span>
                       </>
                     )}
-                    {row.needsRuling && !row.isDecided && (
+                    {metaHasScore && (
                       <>
-                        <span className="type-meta text-oxford/25">·</span>
-                        <span className="type-meta tracking-[0.08em] text-oxford/55">
-                          Needs ruling
-                        </span>
-                      </>
-                    )}
-                    {row.isEscalated && (
-                      <>
-                        <span className="type-meta text-oxford/25">·</span>
-                        <span className="type-meta tracking-[0.08em] text-escalation/75">
-                          Escalated
-                        </span>
-                      </>
-                    )}
-                    {row.isStale && row.ageDays != null && (
-                      <>
-                        <span className="type-meta text-oxford/25">·</span>
-                        <span className="type-meta tracking-[0.08em] text-oxford/50">
-                          {row.ageDays}d unresolved
-                        </span>
-                      </>
-                    )}
-                    {row.hasAdverse && (
-                      <>
-                        <span className="type-meta text-oxford/25">·</span>
-                        <span className={`type-meta tracking-[0.08em] ${row.hasHighAdverse ? 'text-escalation/75' : 'text-oxford/45'}`}>
-                          {row.adverseItems.length} adverse
+                        {(metaHasDate ||
+                          metaHasSector ||
+                          metaHasFunding ||
+                          metaHasDiligenceFlags ||
+                          metaHasMonitor ||
+                          metaHasLookup) && <span className="type-meta text-oxford/25">·</span>}
+                        <span
+                          className="type-meta tracking-[0.06em] tabular-nums text-oxford/45"
+                          title="Configured weighted score"
+                        >
+                          <span className="text-oxford/34">Score</span>{' '}
+                          <span className="text-oxford/55">{row.configuredScore}</span>
                         </span>
                       </>
                     )}
@@ -589,5 +663,9 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     </div>
   );
 };
+
+function showJudgmentScore(row: WorkGridRow): boolean {
+  return row.startup.review != null || row.startup.partner?.recommendation != null;
+}
 
 export default WorkGrid;

@@ -1,13 +1,13 @@
 /**
  * Aethria design tokens — aligned with brand_assets and web-front-end.
  *
- * Palette: oxford #1A2B48, paper #E9E0D1 (web-front-end), paperBright/paperDeep variants,
- * inverse on oxford #FFFFFF; body text uses oxford ladder (see --text-primary), not neutral ink.
+ * Palette: deep blue #001B47, paper #F4F1EA, paperBright/paperDeep variants,
+ * inverse on deep blue #F4F1EA; body text uses blue-tinted charcoal #26313f, not black.
  * Typography: Geist Sans matches the brand poster’s geometric sans; EB Garamond / Libre Baskerville stay for editorial + wordmark (no font swap needed).
- * Burgundy #7D2B3A (accent) is escalation-only — see color.accent. Heritage gold #b8976a is decorative only (dividers, chrome) — color.heritageGold.
+ * Burgundy #7D2B3A (accent) is escalation-only — see color.accent. Heritage gold #a88a5e is decorative only (dividers, chrome) — color.heritageGold.
  * Typography: Libre Baskerville (wordmark only). EB Garamond (display/editorial headings). Geist Sans (body/UI). JetBrains Mono (labels, tabs, meta, data — ALL CAPS on labels/tabs).
  * Brand scale: section-label 11px/0.14em, tab/meta 11px/0.10–0.06em, body 14px/1.618.
- * Frames: 1px rgba(0,33,71,0.06). No rounded corners.
+ * Frames: 1px rgba(0,27,71,0.06). No rounded corners.
  * Register tint: CSS variable --color-register-tint (see index.css); Tailwind `registerTint` / `bg-registerTint`.
  *
  * Oxford opacity ladder (100 / 80 / 60 / 40 / 25): preferred for **text** and soft UI chrome.
@@ -45,36 +45,36 @@ export const phiSpacing = {
  */
 export const surface = {
   /** Primary canvas — same as paper */
-  canvas: '#E9E0D1',
+  canvas: '#F4F1EA',
   /** Raised chrome — sidebar/header lifts */
-  raised: '#ebe8e0',
+  raised: '#f8f5ee',
   /** Recessed rows / inset strips — matches paperDeep */
-  recessed: '#E6E4DE',
+  recessed: '#E7E0D4',
   /** Selected/hover row tint — oxford @ 3%, aligns with --color-register-tint */
-  selectedTint: 'rgba(26, 43, 72, 0.03)',
+  selectedTint: 'rgba(0, 27, 71, 0.03)',
 } as const;
 
 export const tokens = {
   color: {
-    oxford: '#1A2B48',
-    paper: '#E9E0D1',
+    oxford: '#001B47',
+    paper: '#F4F1EA',
     /** Slightly lifted surfaces (panels, raised chrome) — web paper family. */
-    paperBright: '#EBE8E0',
+    paperBright: '#F8F5EE',
     /** Recessed / selected rows — same hue family as paper. */
-    paperDeep: '#E6E4DE',
-    /** Primary prose ink — oxford family (was neutral #2f333b). Prefer CSS --text-primary / text-oxford/* in UI. */
-    charcoal: '#1A2B48',
-    ivory: '#FFFFFF',
+    paperDeep: '#E7E0D4',
+    /** Body / long-form prose on paper, deliberately blue-tinted rather than black. */
+    charcoal: '#26313f',
+    ivory: '#F4F1EA',
     bone: '#f2f4f8',
     mist: '#f2f4f8',
     /** Escalation-only: use only for escalation dots, pulse, escalation counts, critical alerts requiring human attention. */
     accent: '#7D2B3A',
     /** Decorative warm metal — hairlines, non-semantic highlights. Never use for alerts or status. */
-    heritageGold: '#b8976a',
-    heritageGoldSoft: 'rgba(184, 151, 106, 0.35)',
+    heritageGold: '#a88a5e',
+    heritageGoldSoft: 'rgba(168, 138, 94, 0.35)',
     /** Warning/validation: subtle warm tint derived from paper; not Tailwind amber. Use for validation errors, non-critical alerts. */
-    warningBg: '#E9E0D1',
-    warningBorder: 'rgba(26, 43, 72, 0.25)',
+    warningBg: '#F4F1EA',
+    warningBorder: 'rgba(0, 27, 71, 0.25)',
   },
   /** Oxford opacity ladder: 100, 80, 60, 40, 25. Use these for all muted Oxford text and semantic borders. */
   oxfordOpacity: {
@@ -129,7 +129,7 @@ export const tokens = {
     labelTab: { size: '11px', lineHeight: 1.5, letterSpacing: '0.10em', font: 'mono' as const },
     meta: { size: '11px', lineHeight: 1.5, letterSpacing: '0.06em', font: 'mono' as const },
   },
-  frameBorder: '1px solid rgba(26, 43, 72, 0.06)',
+  frameBorder: '1px solid rgba(0, 27, 71, 0.06)',
   motion: {
     /** Strong ease-out — UI entering, dropdowns, popovers. Starts fast, feels responsive. */
     ease: [0.16, 1, 0.3, 1] as [number, number, number, number],

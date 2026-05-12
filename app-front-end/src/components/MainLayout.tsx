@@ -541,7 +541,7 @@ export default function MainLayout({
           aria-hidden="true"
         />
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
-          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.85fr)_minmax(420px,1.12fr)_minmax(0,1.46fr)] lg:grid-rows-[minmax(0,1fr)] min-h-0 overflow-hidden gap-phi-5 lg:gap-phi-5 bg-paper">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.8fr)_minmax(460px,1.2fr)_minmax(0,1.4fr)] lg:grid-rows-[minmax(0,1fr)] min-h-0 overflow-hidden gap-phi-5 lg:gap-phi-5 bg-paper">
             <aside className="hidden lg:flex h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden bg-paper">
               <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] overflow-hidden px-phi-4 py-phi-4">
 
@@ -607,8 +607,10 @@ export default function MainLayout({
                   </div>
                 </div>
 
-                {/* ── Lookup ─────────────────────────────────────────── */}
+                {/* ── Dispatch (on-demand lookup) ─────────────────────── */}
                 <div className="flex min-h-0 min-w-0 flex-col justify-center border-t border-oxford/[0.075] py-phi-4">
+                  <p className={railEditorial.label}>Dispatch</p>
+                  <div className="mt-phi-2 min-w-0">
                   <AgentDispatch
                     input={lookupInput}
                     setInput={setLookupInput}
@@ -619,6 +621,7 @@ export default function MainLayout({
                     lookupPhase={lookupPhaseLabel}
                     alwaysOpen
                   />
+                  </div>
                 </div>
 
                 {/* ── Overview ───────────────────────────────────────── */}

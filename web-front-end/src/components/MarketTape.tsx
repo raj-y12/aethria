@@ -28,7 +28,7 @@ export default function MarketTape() {
       viewport={{ once: true, amount: 0.35 }}
       transition={{ duration: reduce ? 0 : 0.5, ease: SCROLL_EASE }}
     >
-      <div className="market-tape-marquee flex w-max items-center font-mono text-[9px] tracking-[0.12em] uppercase text-[rgba(0,33,71,0.4)] py-3">
+      <div className="market-tape-marquee flex w-max items-center font-mono text-[9px] tracking-[0.12em] uppercase text-[rgba(0,27,71,0.4)] py-3">
         <span className="shrink-0 pr-20">{LINE}</span>
         <span className="shrink-0 pr-20">{LINE}</span>
       </div>

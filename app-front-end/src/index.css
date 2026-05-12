@@ -1,26 +1,26 @@
 @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap');
 /*
  * Aethria — High-fidelity institutional design (aligned with web-front-end).
- * Palette: oxford #1A2B48, paper #E9E0D1 (matches web-front-end), primary body text on oxford ladder (no neutral ink), shell/memo on paper, accent #7D2B3A (escalations only), heritageGold #b8976a (decorative only).
+ * Palette: deep blue #001B47, paper #F4F1EA, body ink #26313f, shell/memo on paper, accent #7D2B3A (escalations only), heritageGold #a88a5e (decorative only).
  * Figtree Variable (body + UI, matches web-front-end warmth). Display: EB Garamond (editorial headings, verdicts, memos). Wordmark: Libre Baskerville (wordmark ONLY). Metadata: JetBrains Mono.
  * Frames: 1px rgba(var(--color-oxford-rgb), 0.06). No rounded corners.
  * Text hierarchy: Oxford opacity ladder 100, 80, 60, 40, 25. Line-height: 1.5 labels, 1.5 body.
  */
 :root {
   /* Primary palette — aligned with web-front-end tokens */
-  --color-oxford: #1a2b48;
-  --color-oxford-rgb: 26, 43, 72;
-  --color-paper: #e9e0d1;
+  --color-oxford: #001b47;
+  --color-oxford-rgb: 0, 27, 71;
+  --color-paper: #f4f1ea;
   /** Slightly darker paper — selected rows, recessed surfaces (same hue family as paper). */
-  --color-paper-deep: #e6e4de;
+  --color-paper-deep: #e7e0d4;
   /** Subtle lift for raised chrome (aligned with web marketing paper family). */
-  --color-paper-bright: #ebe8e0;
-  --color-ivory: #e9e0d1;
-  --color-heritage-gold: #b8976a;
-  --color-heritage-gold-soft: rgba(184, 151, 106, 0.35);
-  --color-accent-soft: rgba(184, 151, 106, 0.35);
-  --color-brass: #9a7b4f;
-  --color-brass-line: rgba(184, 151, 106, 0.55);
+  --color-paper-bright: #f8f5ee;
+  --color-ivory: #f4f1ea;
+  --color-heritage-gold: #a88a5e;
+  --color-heritage-gold-soft: rgba(168, 138, 94, 0.35);
+  --color-accent-soft: rgba(125, 43, 58, 0.24);
+  --color-brass: #8a704d;
+  --color-brass-line: rgba(168, 138, 94, 0.55);
   /* Escalation-only: use only for escalation dots, pulse, counts, critical human-attention alerts. */
   --color-accent: #7d2b3a;
   /* Pipe column headers, WorkGrid row selected/hover, memo summary — oxford @ 3%. */
@@ -43,13 +43,13 @@
   --text-muted:              rgba(var(--color-oxford-rgb), 0.50);
   --text-subtle:             rgba(var(--color-oxford-rgb), 0.38);
   --text-ghost:              rgba(var(--color-oxford-rgb), 0.22);
-  --text-inverse:            rgba(242, 240, 234, 0.94);
-  --text-inverse-secondary:  rgba(242, 240, 234, 0.78);
-  --text-inverse-muted:      rgba(242, 240, 234, 0.56);
+  --text-inverse:            rgba(244, 241, 234, 0.94);
+  --text-inverse-secondary:  rgba(244, 241, 234, 0.78);
+  --text-inverse-muted:      rgba(244, 241, 234, 0.56);
   --label-strong:            rgba(var(--color-oxford-rgb), 0.74);
   --label-muted:             rgba(var(--color-oxford-rgb), 0.42);
-  /* Legacy alias — same as primary prose (was neutral #2f333b). */
-  --color-charcoal:          var(--text-primary);
+  /* Body / long-form prose on paper, deliberately blue-tinted rather than black. */
+  --color-charcoal:          #26313f;
   /* Clerk — match app palette and typography */
   --clerk-color-primary: var(--color-oxford);
   --clerk-color-background: var(--color-paper);
@@ -479,7 +479,7 @@
   }
   .section-numeral--on-dark {
     font-size: 9px;
-    color: rgba(242, 240, 234, 0.25);
+    color: rgba(244, 241, 234, 0.25);
   }
 
   /** Full-width rule (institutional plain divider) */
@@ -628,7 +628,7 @@
 /* Brass vertical accent spine — flat heritage tone */
 .brass-spine {
   width: 1px;
-  background-color: rgba(184, 151, 106, 0.42);
+  background-color: rgba(168, 138, 94, 0.42);
   flex-shrink: 0;
 }
 
@@ -649,7 +649,7 @@
     color var(--motion-micro) var(--motion-ease);
 }
 .conviction-chip:hover {
-  border-color: rgba(184, 151, 106, 0.45);
+  border-color: rgba(168, 138, 94, 0.45);
   color: rgba(var(--color-oxford-rgb), 0.78);
 }
 

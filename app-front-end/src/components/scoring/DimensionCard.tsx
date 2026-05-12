@@ -36,31 +36,31 @@ export default function DimensionCard({ id, title, dimension }: DimensionCardPro
 
   return (
     <article id={id} className="memoDocDimensionCard">
-      <div className="w-full pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
+      <div className="memoDocDimensionHeader">
+        <div className="memoDocDimensionTopline">
+          <div className="memoDocDimensionTitleGroup">
+            <div className="memoDocDimensionTitleRow">
               <p className="memoDocScorePanelTitle">{title}</p>
               <span className="memoDocScoreBandTag">{band}</span>
             </div>
-            <div className="mt-1 flex items-end gap-2">
+            <div className="memoDocDimensionScoreRow">
               <p className="memoDocScorePanelNumber">{dimension.score.toFixed(1)}</p>
-              <p className="mb-0.5 memoDocScorePanelMeta">Confidence {confidenceLabel}</p>
+              <p className="memoDocScorePanelMeta">Confidence {confidenceLabel}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => setIsExpanded((prev) => !prev)}
-            className="memoDocTooltipBtn min-h-9 min-w-[84px] rounded-none px-2 py-1 transition-colors hover:text-oxford"
+            className="memoDocTooltipBtn memoDocDimensionDetailBtn"
             aria-expanded={isExpanded}
             aria-controls={`${id}-components`}
           >
-            {isExpanded ? 'Collapse' : 'Expand'}
+            {isExpanded ? 'Hide detail' : 'Detail'}
           </button>
         </div>
         <ConfidenceIndicator confidence={dimension.confidence} />
       </div>
-      <div id={`${id}-components`} className={`mt-1.5 ${isExpanded ? 'block' : 'hidden'}`} aria-hidden={!isExpanded}>
+      <div id={`${id}-components`} className={isExpanded ? 'memoDocComponentBars' : 'hidden'} aria-hidden={!isExpanded}>
         {entries.map(([name, component]) => (
           <ComponentBar
             key={`${id}-${name}`}

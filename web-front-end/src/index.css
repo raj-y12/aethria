@@ -1,5 +1,5 @@
 /*
- * Aethria Website — Oxford & paper. Editorial display (EB Garamond) + Figtree + JetBrains Mono.
+ * Aethria Website — deep blue and paper. Editorial display (EB Garamond) + Figtree + JetBrains Mono.
  */
 
 @tailwind base;
@@ -8,14 +8,16 @@
 
 /* Design tokens (match app-front-end behaviour; note single-colon :root) */
 :root {
-  --color-oxford: #1d2d48;
-  --color-paper: #e9e0d1;
-  --color-ivory: #e9e0d1;
-  --color-charcoal: #2f333b;
-  --color-accent: #b8976a;
-  --color-accent-soft: rgba(184, 151, 106, 0.35);
-  --color-brass: #9a7b4f;
-  --color-brass-line: rgba(184, 151, 106, 0.55);
+  --color-oxford: #001b47;
+  --color-paper: #f4f1ea;
+  --color-ivory: #f4f1ea;
+  --color-charcoal: #26313f;
+  --color-accent: #8f4a32;
+  --color-accent-soft: rgba(143, 74, 50, 0.24);
+  --color-heritage-gold: #a88a5e;
+  --color-heritage-gold-soft: rgba(168, 138, 94, 0.35);
+  --color-brass: #8a704d;
+  --color-brass-line: rgba(168, 138, 94, 0.55);
 
   /* Roles: wordmark = logo only · display = editorial headings (h1–h6 base) · sans = body & UI · mono = labels, caps, data */
   --font-sans: 'Figtree', system-ui, -apple-system, sans-serif;
@@ -29,8 +31,8 @@
   --section-padding-y: 96px;
   --section-padding-y-mobile: 56px;
   /* All marketing section top/bottom borders + matching 1px hairlines use this (1px solid). */
-  --section-divider: rgba(0, 33, 71, 0.1);
-  --section-diamond: rgba(0, 33, 71, 0.2);
+  --section-divider: rgba(0, 27, 71, 0.1);
+  --section-diamond: rgba(0, 27, 71, 0.2);
 
   /* Frame borders (match app-front-end) */
   --frame-opacity: 0.06;
@@ -44,17 +46,17 @@
   /* Semantic roles for consistent contrast and token usage */
   --surface-base: var(--color-paper);
   --surface-strong: var(--color-oxford);
-  --surface-strong-hover: rgba(0, 33, 71, 0.88);
-  --text-primary: rgba(0, 33, 71, 0.9);
-  --text-secondary: rgba(0, 33, 71, 0.74);
-  --text-tertiary: rgba(0, 33, 71, 0.62);
-  --text-muted: rgba(0, 33, 71, 0.5);
-  --text-subtle: rgba(0, 33, 71, 0.42);
-  --text-inverse: rgba(242, 240, 234, 0.94);
-  --text-inverse-secondary: rgba(242, 240, 234, 0.78);
-  --text-inverse-muted: rgba(242, 240, 234, 0.66);
-  --label-strong: rgba(0, 33, 71, 0.74);
-  --label-muted: rgba(0, 33, 71, 0.56);
+  --surface-strong-hover: rgba(0, 27, 71, 0.88);
+  --text-primary: rgba(0, 27, 71, 0.9);
+  --text-secondary: rgba(0, 27, 71, 0.74);
+  --text-tertiary: rgba(0, 27, 71, 0.62);
+  --text-muted: rgba(0, 27, 71, 0.5);
+  --text-subtle: rgba(0, 27, 71, 0.42);
+  --text-inverse: rgba(244, 241, 234, 0.94);
+  --text-inverse-secondary: rgba(244, 241, 234, 0.78);
+  --text-inverse-muted: rgba(244, 241, 234, 0.66);
+  --label-strong: rgba(0, 27, 71, 0.74);
+  --label-muted: rgba(0, 27, 71, 0.56);
 }
 
 @media (max-width: 768px) {
@@ -77,10 +79,10 @@
   }
 }
 
-/* Marketing — paper dot grid (#E9E0D1 texture, 28px, Oxford @ 3.5%) */
+/* Marketing — paper dot grid (#F4F1EA texture, 28px, Oxford @ 3.5%) */
 .paper-dot-grid {
-  background-color: #e9e0d1;
-  background-image: radial-gradient(rgba(0, 33, 71, 0.055) 1px, transparent 1px);
+  background-color: #f4f1ea;
+  background-image: radial-gradient(rgba(0, 27, 71, 0.055) 1px, transparent 1px);
   background-size: 28px 28px;
   background-repeat: repeat;
 }
@@ -189,7 +191,7 @@ hr.doc-section-separator::before {
 
 @layer base {
   * {
-    border-color: rgba(0, 33, 71, var(--frame-opacity));
+    border-color: rgba(0, 27, 71, var(--frame-opacity));
   }
 
   html {
@@ -250,7 +252,7 @@ hr.doc-section-separator::before {
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 33, 71, 0.85);
+    background: rgba(0, 27, 71, 0.85);
   }
 
   /* Hide top-level window scrollbars (html/body) while keeping scroll behavior */
@@ -293,7 +295,7 @@ hr.doc-section-separator::before {
 
   ::selection {
     background-color: var(--color-oxford);
-    color: #ffffff;
+    color: #f4f1ea;
   }
 
   a:focus-visible,
@@ -357,7 +359,7 @@ hr.doc-section-separator::before {
 }
 
 .btn-aethria-solid:hover {
-  background: rgba(0, 33, 71, 0.85);
+  background: rgba(0, 27, 71, 0.85);
 }
 
 /* RequestAccessPage form inputs — design system */
@@ -368,7 +370,7 @@ hr.doc-section-separator::before {
   border-bottom: 1px solid var(--section-divider);
   font-family: var(--font-sans);
   font-size: 14px;
-  color: rgba(0, 33, 71, 0.85);
+  color: rgba(0, 27, 71, 0.85);
   padding: 0 0 10px 0;
   border-radius: 0;
   outline: none;
@@ -405,7 +407,7 @@ hr.doc-section-separator::before {
   outline: 2px solid var(--color-oxford);
   outline-offset: 2px;
   box-shadow: none;
-  border-bottom-color: rgba(0, 33, 71, 0.15);
+  border-bottom-color: rgba(0, 27, 71, 0.15);
 }
 
 @media (max-width: 768px) {
@@ -430,7 +432,7 @@ hr.doc-section-separator::before {
 }
 
 .form-input-aethria.form-input-aethria-error {
-  border-bottom-color: rgba(0, 33, 71, 0.4) !important;
+  border-bottom-color: rgba(0, 27, 71, 0.4) !important;
 }
 
 /* Homepage: monolith slides in from the left */
@@ -466,8 +468,8 @@ hr.doc-section-separator::before {
   inset: -30% -15% -20% -15%;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 85% 55% at 18% 32%, rgba(184, 151, 106, 0.14), transparent 58%),
-    radial-gradient(ellipse 65% 45% at 88% 62%, rgba(242, 240, 234, 0.09), transparent 50%),
+    radial-gradient(ellipse 85% 55% at 18% 32%, rgba(168, 138, 94, 0.14), transparent 58%),
+    radial-gradient(ellipse 65% 45% at 88% 62%, rgba(244, 241, 234, 0.09), transparent 50%),
     radial-gradient(circle at 50% 130%, rgba(0, 0, 0, 0.45), transparent 52%);
   mix-blend-mode: soft-light;
   opacity: 0.9;
@@ -504,9 +506,9 @@ hr.doc-section-separator::before {
 /* Metrics ledger strip (JPM / Lazard annual-report rhythm) */
 .inst-metrics-strip {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, transparent 38%),
+    linear-gradient(180deg, rgba(244, 241, 234, 0.55) 0%, transparent 38%),
     var(--color-paper);
-  border-color: rgba(0, 33, 71, 0.09);
+  border-color: rgba(0, 27, 71, 0.09);
 }
 
 .inst-metric-cell {
@@ -524,9 +526,9 @@ hr.doc-section-separator::before {
     background: linear-gradient(
       180deg,
       transparent,
-      rgba(0, 33, 71, 0.1) 20%,
-      rgba(184, 151, 106, 0.25) 50%,
-      rgba(0, 33, 71, 0.1) 80%,
+      rgba(0, 27, 71, 0.1) 20%,
+      rgba(168, 138, 94, 0.25) 50%,
+      rgba(0, 27, 71, 0.1) 80%,
       transparent
     );
   }
@@ -544,8 +546,8 @@ hr.doc-section-separator::before {
   background: linear-gradient(
     180deg,
     transparent,
-    rgba(184, 151, 106, 0.55) 22%,
-    rgba(184, 151, 106, 0.35) 78%,
+    rgba(168, 138, 94, 0.55) 22%,
+    rgba(168, 138, 94, 0.35) 78%,
     transparent
   );
   flex-shrink: 0;
@@ -742,10 +744,10 @@ hr.doc-section-separator::before {
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(0, 33, 71, 0.55);
+  color: rgba(0, 27, 71, 0.55);
   padding: 0.45rem 0.65rem;
   border: 1px solid var(--section-divider);
-  background-color: rgba(255, 255, 255, 0.35);
+  background-color: rgba(244, 241, 234, 0.35);
   transition:
     border-color 0.2s ease,
     color 0.2s ease,
@@ -753,9 +755,9 @@ hr.doc-section-separator::before {
 }
 
 .conviction-chip:hover {
-  border-color: rgba(184, 151, 106, 0.45);
-  color: rgba(0, 33, 71, 0.78);
-  background-color: rgba(255, 255, 255, 0.62);
+  border-color: rgba(168, 138, 94, 0.45);
+  color: rgba(0, 27, 71, 0.78);
+  background-color: rgba(244, 241, 234, 0.62);
 }
 
 .inst-footer {
@@ -777,7 +779,7 @@ hr.doc-section-separator::before {
   bottom: -2px;
   width: 100%;
   height: 1px;
-  background-color: rgba(0, 33, 71, 0.8);
+  background-color: rgba(0, 27, 71, 0.8);
   transform-origin: left;
   transform: scaleX(0);
   transition: transform 0.2s ease;
@@ -801,7 +803,7 @@ hr.doc-section-separator::before {
 }
 
 .signal-pill:hover {
-  border-color: rgba(0, 33, 71, 0.28) !important;
+  border-color: rgba(0, 27, 71, 0.28) !important;
   box-shadow: none;
   transform: translateY(-1px);
 }
@@ -1114,4 +1116,3 @@ hr.doc-section-separator::before {
 .system-init-underline-a {
   width: 100%;
 }
-

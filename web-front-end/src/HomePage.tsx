@@ -161,7 +161,7 @@ export default function HomePage() {
                 <Link
                   to="/request-access"
                   data-cursor-expand
-                  className="group font-mono inline-flex w-full min-h-[44px] cursor-pointer items-center justify-center rounded-none bg-[var(--surface-strong)] px-6 py-3 text-[11px] uppercase tracking-[0.14em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,33,71,0.9)] md:w-fit"
+                  className="group font-mono inline-flex w-full min-h-[44px] cursor-pointer items-center justify-center rounded-none bg-[var(--surface-strong)] px-6 py-3 text-[11px] uppercase tracking-[0.14em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,27,71,0.9)] md:w-fit"
                 >
                   <span className="flex items-center justify-center">
                     <span>Request access</span>
@@ -228,16 +228,16 @@ export default function HomePage() {
                 <div className="flex min-w-0 flex-1 flex-col pr-0 md:pr-10">
                   <h2
                     id="pipeline-heading"
-                    className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#1d2d48] md:text-[36px] md:tracking-normal"
+                    className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#001b47] md:text-[36px] md:tracking-normal"
                   >
                     The pipeline
                   </h2>
-                  <p className="mt-4 max-w-xl font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.65)]">
+                  <p className="mt-4 max-w-xl font-sans text-[15px] leading-[1.7] text-[rgba(0,27,71,0.65)]">
                     From signal to position. Four locked phases. No hand-offs lost in email.
                   </p>
                 </div>
                 <div
-                className="hidden w-[clamp(14rem,25vw,16.5rem)] shrink-0 flex-col items-end justify-center bg-[#1d2d48] lg:flex"
+                className="hidden w-[clamp(14rem,25vw,16.5rem)] shrink-0 flex-col items-end justify-center bg-[#001b47] lg:flex"
                   style={{ paddingRight: 'max(16px, env(safe-area-inset-right))' }}
                 >
                   <div className="flex flex-col items-end gap-2 text-right">
@@ -297,7 +297,7 @@ export default function HomePage() {
                     <span className="font-mono text-[11px] tracking-[0.12em] text-[var(--label-muted)]">{label}</span>
                   </div>
                   <div className="mt-0 h-px w-full shrink-0 bg-[var(--section-divider)]" aria-hidden />
-                  <p className="mt-4 font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.78)]">{body}</p>
+                  <p className="mt-4 font-sans text-[15px] leading-[1.7] text-[rgba(0,27,71,0.78)]">{body}</p>
                   <p className="mt-6 font-sans text-[14px] italic leading-snug text-[var(--text-muted)] lowercase">
                     {signal}
                   </p>
@@ -313,7 +313,7 @@ export default function HomePage() {
           aria-labelledby="graph-section-heading"
         >
           <ScrollReveal
-            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#e9e0d1] py-12 px-[max(1.25rem,var(--safe-left))] pb-10 pr-[max(1.25rem,var(--safe-right))] pt-12 md:py-14 md:px-8 lg:w-[35%] lg:px-12 lg:py-16"
+            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#f4f1ea] py-12 px-[max(1.25rem,var(--safe-left))] pb-10 pr-[max(1.25rem,var(--safe-right))] pt-12 md:py-14 md:px-8 lg:w-[35%] lg:px-12 lg:py-16"
             style={{ color: 'var(--color-charcoal)' }}
             y={24}
             amount={0.2}
@@ -322,16 +322,16 @@ export default function HomePage() {
               <p className="section-numeral mb-6" aria-hidden="true">IV</p>
               <h2
                 id="graph-section-heading"
-                className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#1d2d48] md:text-[36px] md:tracking-normal"
+                className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#001b47] md:text-[36px] md:tracking-normal"
               >
                 How intelligence routes
               </h2>
-              <p className="mt-4 max-w-lg font-sans text-[15px] font-normal leading-[1.7] text-[rgba(0,33,71,0.65)]">
+              <p className="mt-4 max-w-lg font-sans text-[15px] font-normal leading-[1.7] text-[rgba(0,27,71,0.65)]">
                 Scouts feed the reviewer. Partner logic and portfolio stay coupled. Meta-agent oversight on dashed paths.
               </p>
             </div>
           </ScrollReveal>
-          <div className="relative flex w-full min-w-0 shrink-0 flex-col items-stretch bg-[#1d2d48] lg:w-[65%]">
+          <div className="relative flex w-full min-w-0 shrink-0 flex-col items-stretch bg-[#001b47] lg:w-[65%]">
             <ScrollReveal
               className="flex min-h-[min(420px,72vw)] w-full flex-1 flex-col items-center justify-center px-3 pb-2 pt-4 sm:min-h-[460px] sm:px-4 lg:min-h-[500px] lg:px-0 lg:pb-0 lg:pt-0"
               y={16}
@@ -371,11 +371,11 @@ export default function HomePage() {
                 className="flex min-h-0 min-w-0 flex-1 flex-col justify-center py-6 md:py-10 lg:max-w-[540px] lg:py-12 lg:pr-6"
                 variants={closingChildVariants}
               >
-                <h2 className="text-[clamp(1.5rem,4.8vw,1.75rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#1d2d48] md:text-[28px] md:tracking-normal">
+                <h2 className="text-[clamp(1.5rem,4.8vw,1.75rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#001b47] md:text-[28px] md:tracking-normal">
                   <span className="block">Run the pipeline.</span>
                   <span className="mt-2 block">Keep the conviction.</span>
                 </h2>
-                <p className="mt-7 max-w-[420px] font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.78)]">
+                <p className="mt-7 max-w-[420px] font-sans text-[15px] leading-[1.7] text-[rgba(0,27,71,0.78)]">
                   Aethria discovers, scores, and recommends. You advance, pass, or hold.
                 </p>
 
@@ -399,7 +399,7 @@ export default function HomePage() {
                 <Link
                   to="/request-access"
                   data-cursor-expand
-                  className="group mt-11 inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-none bg-[var(--surface-strong)] px-6 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,33,71,0.9)] sm:w-fit"
+                  className="group mt-11 inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-none bg-[var(--surface-strong)] px-6 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,27,71,0.9)] sm:w-fit"
                 >
                   <span className="flex items-center justify-center">
                     <span>Request access</span>
@@ -434,54 +434,54 @@ export default function HomePage() {
         >
           {/* Left panel — Fund Thesis (oxford dark) */}
           <ScrollReveal
-            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#1d2d48] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:px-12 lg:py-20"
+            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#001b47] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:px-12 lg:py-20"
             y={20}
             amount={0.18}
           >
             <div className="w-full max-w-lg">
-              <p className="section-numeral mb-6 text-[rgba(242,240,234,0.22)]" aria-hidden="true">VII</p>
-              <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(242,240,234,0.38)]">
+              <p className="section-numeral mb-6 text-[rgba(244,241,234,0.22)]" aria-hidden="true">VII</p>
+              <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(244,241,234,0.38)]">
                 Configuration layer
               </p>
               <h2
                 id="thesis-lookup-heading"
-                className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[#e9e0d1]"
+                className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[#f4f1ea]"
               >
                 Define your mandate.
                 <br />
                 <span className="italic font-normal opacity-80 text-[0.92em]">The system obeys.</span>
               </h2>
-              <p className="mt-5 max-w-[44ch] font-sans text-[15px] leading-[1.7] text-[rgba(242,240,234,0.6)]">
+              <p className="mt-5 max-w-[44ch] font-sans text-[15px] leading-[1.7] text-[rgba(244,241,234,0.6)]">
                 Upload or write your investment thesis. Every scout, reviewer, and partner decision is gated against it — automatically, without re-configuration.
               </p>
 
               {/* Thesis card mock */}
               <div
-                className="mt-8 border border-solid border-[rgba(242,240,234,0.12)] p-4 sm:p-5"
+                className="mt-8 border border-solid border-[rgba(244,241,234,0.12)] p-4 sm:p-5"
                 aria-hidden
               >
                 <div className="flex items-center justify-between">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-[rgba(242,240,234,0.35)]">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-[rgba(244,241,234,0.35)]">
                     Active Mandate
                   </p>
                   <span className="inline-flex items-center gap-1.5">
                     <span
-                      className="h-1.5 w-1.5 rounded-none bg-[#e9e0d1]"
+                      className="h-1.5 w-1.5 rounded-none bg-[#f4f1ea]"
                       style={{ opacity: 0.55, animation: 'pipeline-dot-pulse 2.4s ease-in-out infinite' }}
                     />
-                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(242,240,234,0.45)]">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(244,241,234,0.45)]">
                       Live
                     </span>
                   </span>
                 </div>
-                <p className="mt-2.5 font-sans text-[15px] font-semibold text-[#e9e0d1]">
+                <p className="mt-2.5 font-sans text-[15px] font-semibold text-[#f4f1ea]">
                   Deep-Tech Infrastructure
                 </p>
-                <p className="mt-1 font-sans text-[13px] leading-[1.6] text-[rgba(242,240,234,0.5)]">
+                <p className="mt-1 font-sans text-[13px] leading-[1.6] text-[rgba(244,241,234,0.5)]">
                   Series A–B · European markets · B2B focus
                 </p>
-                <div className="mt-3 h-px bg-[rgba(242,240,234,0.1)]" />
-                <p className="mt-3 font-sans text-[13px] italic leading-[1.65] text-[rgba(242,240,234,0.4)]">
+                <div className="mt-3 h-px bg-[rgba(244,241,234,0.1)]" />
+                <p className="mt-3 font-sans text-[13px] italic leading-[1.65] text-[rgba(244,241,234,0.4)]">
                   "Backing infrastructure teams building the plumbing of the next compute cycle — prioritising capital efficiency and defensible wedge."
                 </p>
               </div>
@@ -490,21 +490,21 @@ export default function HomePage() {
 
           {/* Right panel — On-Demand Lookup (paper light) */}
           <ScrollReveal
-            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#e9e0d1] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:px-12 lg:py-20"
+            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#f4f1ea] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:px-12 lg:py-20"
             y={20}
             delay={0.08}
             amount={0.18}
           >
             <div className="w-full max-w-lg">
-              <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(0,33,71,0.38)]">
+              <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.12em] text-[rgba(0,27,71,0.38)]">
                 Instant intelligence
               </p>
-              <h2 className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[#1d2d48]">
+              <h2 className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[#001b47]">
                 Interrogate any name.
                 <br />
                 <span className="italic font-normal opacity-75 text-[0.92em]">Instantly.</span>
               </h2>
-              <p className="mt-5 max-w-[44ch] font-sans text-[15px] leading-[1.7] text-[rgba(0,33,71,0.65)]">
+              <p className="mt-5 max-w-[44ch] font-sans text-[15px] leading-[1.7] text-[rgba(0,27,71,0.65)]">
                 On-demand lookup delivers a full investment memo on any company in seconds. No pipeline wait. Benchmarked against your active thesis the moment results arrive.
               </p>
 
@@ -514,13 +514,13 @@ export default function HomePage() {
                 aria-hidden
               >
                 {/* Query bar */}
-                <div className="flex items-center gap-3 border-b border-solid border-[var(--section-divider)] bg-[rgba(0,33,71,0.025)] px-4 py-2.5">
-                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(0,33,71,0.35)]">
+                <div className="flex items-center gap-3 border-b border-solid border-[var(--section-divider)] bg-[rgba(0,27,71,0.025)] px-4 py-2.5">
+                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(0,27,71,0.35)]">
                     LOOKUP
                   </span>
                   <span className="h-3 w-px shrink-0 bg-[var(--section-divider)]" />
-                  <span className="font-sans text-[13px] text-[rgba(0,33,71,0.65)]">Meridian Systems</span>
-                  <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-[rgba(0,33,71,0.3)]">
+                  <span className="font-sans text-[13px] text-[rgba(0,27,71,0.65)]">Meridian Systems</span>
+                  <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-[rgba(0,27,71,0.3)]">
                     ↵ run
                   </span>
                 </div>
@@ -528,24 +528,24 @@ export default function HomePage() {
                 {/* Result preview */}
                 <div className="px-4 py-4">
                   <div className="mb-3 flex items-baseline justify-between gap-3">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-[rgba(0,33,71,0.4)]">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-[rgba(0,27,71,0.4)]">
                       Result
                     </p>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(0,33,71,0.35)]">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(0,27,71,0.35)]">
                       B2B Infrastructure · Series A
                     </p>
                   </div>
-                  <p className="font-sans text-[18px] font-semibold leading-tight text-[#1d2d48]">
+                  <p className="font-sans text-[18px] font-semibold leading-tight text-[#001b47]">
                     STRONG.
                   </p>
-                  <p className="mt-1.5 font-sans text-[13px] leading-[1.6] text-[rgba(0,33,71,0.58)]">
+                  <p className="mt-1.5 font-sans text-[13px] leading-[1.6] text-[rgba(0,27,71,0.58)]">
                     Thesis-aligned · High conviction · Pending unit economics review
                   </p>
                   <div className="mt-3 grid grid-cols-5 gap-x-2">
                     {['MKT', 'EXEC', 'PROD', 'TECH', 'DEF'].map((d, i) => (
                       <div key={d} className="flex flex-col items-center gap-0.5">
-                        <span className="font-mono text-[10px] text-[rgba(0,33,71,0.35)]">{d}</span>
-                        <span className="font-mono text-[11px] font-bold text-[rgba(0,33,71,0.7)]">
+                        <span className="font-mono text-[10px] text-[rgba(0,27,71,0.35)]">{d}</span>
+                        <span className="font-mono text-[11px] font-bold text-[rgba(0,27,71,0.7)]">
                           {[9, 8, 8, 9, 7][i]}
                         </span>
                       </div>
@@ -565,7 +565,7 @@ export default function HomePage() {
           transition={{ duration: reduce ? 0 : 0.52, ease: SCROLL_EASE }}
         >
           <div className="page-margin-x mx-auto flex w-full max-w-[1200px] flex-col pt-14 pb-10 md:pt-24 md:pb-14">
-            <p className="max-w-2xl font-sans text-[15px] font-normal leading-[1.7] text-[rgba(0,33,71,0.65)]">
+            <p className="max-w-2xl font-sans text-[15px] font-normal leading-[1.7] text-[rgba(0,27,71,0.65)]">
               Private markets intelligence. Built for the standards of banks, advisors, and funds that cannot afford
               narrative drift.
             </p>
@@ -608,16 +608,16 @@ const PIPELINE_STATUS_CONFIG: Record<
     valueOpacity: 'text-[var(--color-oxford)]',
   },
   PROCESSING: {
-    dot: 'bg-[rgba(0,33,71,0.45)]',
+    dot: 'bg-[rgba(0,27,71,0.45)]',
     dotAnimation: 'pipeline-dot-pulse 3.5s ease-in-out infinite',
     label: 'PROCESSING',
-    valueOpacity: 'text-[rgba(0,33,71,0.55)]',
+    valueOpacity: 'text-[rgba(0,27,71,0.55)]',
   },
   IDLE: {
-    dot: 'bg-[rgba(0,33,71,0.2)]',
+    dot: 'bg-[rgba(0,27,71,0.2)]',
     dotAnimation: undefined,
     label: 'IDLE',
-    valueOpacity: 'text-[rgba(0,33,71,0.3)]',
+    valueOpacity: 'text-[rgba(0,27,71,0.3)]',
   },
 };
 
@@ -719,7 +719,7 @@ function SignalPill({
     <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-[var(--section-divider)] py-3 sm:gap-4">
       <div
         className={`font-mono text-[10px] uppercase tracking-[0.12em] ${
-          prominent ? 'text-[rgba(0,33,71,0.6)]' : 'text-[rgba(0,33,71,0.45)]'
+          prominent ? 'text-[rgba(0,27,71,0.6)]' : 'text-[rgba(0,27,71,0.45)]'
         }`}
       >
         {label}

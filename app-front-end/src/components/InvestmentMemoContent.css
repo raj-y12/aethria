@@ -12,11 +12,17 @@
   --memo-font-ui: var(--font-sans, "Figtree Variable", system-ui, -apple-system, sans-serif);
   --memo-font-mono: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
   --memo-font-display: var(--font-display, "EB Garamond", Georgia, "Times New Roman", serif);
-  --memo-size-body:      1rem;
-  --memo-size-secondary: 0.9375rem;
-  --memo-size-ui:        0.875rem;
+  --memo-size-body:      0.875rem;
+  --memo-size-secondary: 0.8125rem;
+  --memo-size-ui:        0.8125rem;
   --memo-size-label:     0.6875rem;
   --memo-size-micro:     0.625rem;
+  --memo-leading-body:   1.64;
+  --memo-ink-strong:     rgba(var(--color-oxford-rgb), 0.88);
+  --memo-ink:            rgba(var(--color-oxford-rgb), 0.70);
+  --memo-ink-muted:      rgba(var(--color-oxford-rgb), 0.52);
+  --memo-ink-faint:      rgba(var(--color-oxford-rgb), 0.34);
+  --memo-rule:           rgba(var(--color-oxford-rgb), 0.055);
 
   /* score module semantic colours */
   --memo-score-text-subtle:  rgba(var(--color-oxford-rgb), 0.30);
@@ -143,7 +149,7 @@
 .memoGateStrip--error .memoPipelineKicker { color: color-mix(in srgb, var(--color-accent) 72%, transparent); }
 
 /* === Document body === */
-.memoBody { max-width: 49rem; }
+.memoBody { max-width: 47rem; }
 .memoNum {
   font-family: var(--memo-font-mono);
   font-variant-numeric: tabular-nums;
@@ -153,12 +159,12 @@
   width: 100%;
 }
 .memoDocSection {
-  margin-top: clamp(34px, 4vw, 48px);
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.075);
-  padding-top: clamp(28px, 3.4vw, 38px);
+  margin-top: clamp(38px, 4.8vw, 58px);
+  border-top: none;
+  padding-top: 0;
 }
 .memoDocSection + .memoDocSection {
-  margin-top: clamp(21px, 2.8vw, 34px);
+  margin-top: clamp(34px, 4vw, 48px);
 }
 .memoDocVerdictSection {
   margin-top: clamp(40px, 5vw, 56px);
@@ -208,11 +214,11 @@
 }
 .memoDocTagline {
   font-family: var(--memo-font-ui);
-  font-size: var(--memo-size-ui);
-  line-height: 1.5;
+  font-size: var(--memo-size-body);
+  line-height: 1.56;
   letter-spacing: 0;
-  color: rgba(var(--color-oxford-rgb), 0.48);
-  margin: -2px 0 8px 0;
+  color: var(--memo-ink-muted);
+  margin: 0 0 10px 0;
   max-width: 42rem;
   font-style: normal;
 }
@@ -220,7 +226,8 @@
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
   letter-spacing: 0.06em;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  color: var(--memo-ink-faint);
+  margin: 0;
 }
 .memoMetaSep {
   font: inherit;
@@ -235,15 +242,17 @@
   align-items: flex-start;
   gap: 4px;
 }
+/* Verdict word — UI sans (historical memo style); company title stays display serif. */
 .memoDocRecommendation {
   font-family: var(--memo-font-ui);
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: 0;
+  font-size: clamp(1.75rem, 3vw, 2.375rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
   text-transform: none;
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.04;
   color: var(--color-oxford);
+  font-feature-settings: "kern" 1, "liga" 1;
 }
 .memoDocRecommendation--invest { color: var(--color-oxford); }
 .memoDocRecommendation--monitor { color: var(--color-oxford); }
@@ -252,7 +261,7 @@
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
   letter-spacing: 0.06em;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  color: var(--memo-ink-muted);
   margin: 0;
 }
 .memoDocEscalation {
@@ -270,7 +279,7 @@
   font-size: var(--memo-size-micro);
   letter-spacing: 0.06em;
   line-height: 1.45;
-  color: rgba(var(--color-oxford-rgb), 0.30);
+  color: var(--memo-ink-faint);
 }
 .memoDocStatusLine {
   display: flex;
@@ -283,8 +292,8 @@
 .memoDocJudgmentTop {
   display: block;
   margin-bottom: 18px;
-  padding: 21px 0 13px;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  padding: 4px 0 8px;
+  border-top: none;
   border-bottom: none;
 }
 
@@ -299,8 +308,8 @@
 }
 .memoDecisionCluster .memoDocSection + .memoDocSection {
   margin-top: 34px;
-  padding-top: 26px;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.07);
+  padding-top: 0;
+  border-top: none;
 }
 
 /* === Decision surface === */
@@ -310,9 +319,9 @@
   grid-template-columns: minmax(9rem, 0.46fr) minmax(0, 1fr);
   gap: 16px 24px;
   align-items: baseline;
-  padding: 18px 0;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
-  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  padding: 13px 0 16px;
+  border-top: none;
+  border-bottom: 1px solid var(--memo-rule);
 }
 .memoRulingLabel {
   margin: 0 0 8px 0;
@@ -320,104 +329,145 @@
   font-size: var(--memo-size-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.38);
+  color: var(--memo-ink-faint);
 }
 .memoRulingValue {
   margin: 0;
   font-family: var(--memo-font-ui);
-  font-size: 1.375rem;
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: 0;
-  line-height: 1.16;
+  line-height: 1.28;
   text-transform: none;
-  color: var(--color-oxford);
+  color: var(--memo-ink-strong);
 }
 .memoRulingNote {
   margin: 0;
   grid-column: 2;
   max-width: 42rem;
   font-family: var(--memo-font-ui);
-  font-size: var(--memo-size-ui);
-  line-height: 1.62;
-  color: rgba(var(--color-oxford-rgb), 0.58);
+  font-size: var(--memo-size-body);
+  line-height: var(--memo-leading-body);
+  color: var(--memo-ink);
 }
 .memoRecommendationBlock {
-  margin-top: 24px;
+  margin-top: 26px;
 }
 .memoRecommendationBlock .memoDocSubhead {
   margin-bottom: 13px;
+}
+.memoDocPrimaryReason {
+  color: var(--memo-ink);
+}
+.memoReasoningDisclosure {
+  margin-top: 8px;
+}
+.memoInlineDisclosure {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 10px 0;
+  min-height: 44px;
+  cursor: pointer;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.38);
+  transition: color 140ms ease;
+}
+.memoInlineDisclosure:hover { color: rgba(var(--color-oxford-rgb), 0.70); }
+.memoInlineDisclosure:focus { outline: none; }
+.memoInlineDisclosure:focus-visible {
+  outline: 2px solid rgba(var(--color-oxford-rgb), 0.22);
+  outline-offset: 2px;
+}
+.memoReasoningBody {
+  padding-top: 8px;
 }
 
 .memoAdverseRegister {
   padding-top: 0;
 }
 .memoAdverseRegister--empty {
-  padding-top: 26px;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.07);
+  padding-top: 0;
+  border-top: none;
 }
-.memoAdverseToggle {
+.memoAdverseHeader {
   width: 100%;
   appearance: none;
   border: none;
   background: transparent;
-  padding: 0 0 14px;
+  padding: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: center;
+  align-items: baseline;
   text-align: left;
-  cursor: pointer;
   color: var(--color-oxford);
+  margin-bottom: 8px;
+  cursor: pointer;
 }
-.memoAdverseToggle:focus { outline: none; }
-.memoAdverseToggle:focus-visible {
+.memoAdverseHeader:focus { outline: none; }
+.memoAdverseHeader:focus-visible {
   outline: 2px solid rgba(var(--color-oxford-rgb), 0.22);
-  outline-offset: 2px;
+  outline-offset: 3px;
+}
+.memoAdverseHeader:hover .memoAdverseToggleTitle,
+.memoAdverseHeader:hover .memoAdverseChevron {
+  color: var(--memo-ink-strong);
 }
 .memoAdverseToggleTitle {
-  font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-label);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 600;
+  color: var(--memo-ink-strong);
+}
+.memoAdverseHeaderMeta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: max-content;
 }
 .memoAdverseCount {
-  min-height: 28px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 0 10px;
-  border: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  border: none;
+  padding: 0;
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-micro);
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.45);
+  color: var(--memo-ink-faint);
   white-space: nowrap;
-}
-.memoAdverseCountCritical {
-  color: color-mix(in srgb, var(--color-accent) 78%, transparent);
 }
 .memoAdverseChevron {
   min-width: 1ch;
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-ui);
   line-height: 1;
-  color: rgba(var(--color-oxford-rgb), 0.42);
+  color: var(--memo-ink-faint);
+  transition: color 140ms ease;
+}
+.memoAdverseCountCritical {
+  color: color-mix(in srgb, var(--color-accent) 78%, transparent);
 }
 .memoAdverseSummary {
-  margin: -4px 0 14px;
+  margin: 0 0 14px;
   max-width: 46rem;
   font-family: var(--memo-font-ui);
-  font-size: var(--memo-size-ui);
+  font-size: var(--memo-size-secondary);
   line-height: 1.55;
-  color: rgba(var(--color-oxford-rgb), 0.58);
+  color: var(--memo-ink-muted);
 }
 .memoAdverseList {
   display: flex;
   flex-direction: column;
   gap: 0;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.07);
+  border-top: 1px solid var(--memo-rule);
 }
 .memoAdverseItem {
   display: grid;
@@ -425,14 +475,14 @@
   gap: 14px 18px;
   align-items: start;
   padding: 16px 0;
-  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.07);
+  border-bottom: 1px solid var(--memo-rule);
 }
 .memoAdverseSeverity {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.42);
+  color: var(--memo-ink-faint);
 }
 .memoAdverseItem--high .memoAdverseSeverity {
   color: color-mix(in srgb, var(--color-accent) 72%, transparent);
@@ -451,7 +501,7 @@
   font-size: var(--memo-size-micro);
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.38);
+  color: var(--memo-ink-faint);
 }
 .memoAdverseTitle {
   margin: 0 0 6px 0;
@@ -459,30 +509,32 @@
   font-size: var(--memo-size-body);
   line-height: 1.35;
   font-weight: 600;
-  color: rgba(var(--color-oxford-rgb), 0.82);
+  color: var(--memo-ink-strong);
 }
 .memoAdverseBody {
   margin: 0;
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-secondary);
   line-height: 1.62;
-  color: rgba(var(--color-oxford-rgb), 0.62);
+  color: var(--memo-ink-muted);
 }
 
-.memoRulingControls { padding-top: 0; }
+.memoDecisionCluster .memoRulingControls {
+  padding-top: 0;
+}
 .memoDecisionLedger {
-  padding-top: 26px;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.07);
+  padding-top: 0;
+  border-top: none;
 }
 .memoLedgerList {
   list-style: none;
   margin: 0;
   padding: 0;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.06);
+  border-top: 1px solid var(--memo-rule);
 }
 .memoLedgerItem {
   padding: 14px 0;
-  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.06);
+  border-bottom: 1px solid var(--memo-rule);
 }
 .memoLedgerMeta {
   display: flex;
@@ -493,7 +545,7 @@
   font-size: var(--memo-size-label);
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.45);
+  color: var(--memo-ink-faint);
 }
 .memoLedgerText,
 .memoLedgerEmpty {
@@ -501,7 +553,7 @@
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-ui);
   line-height: 1.55;
-  color: rgba(var(--color-oxford-rgb), 0.62);
+  color: var(--memo-ink-muted);
 }
 .memoLedgerSub {
   margin: 6px 0 0;
@@ -509,12 +561,68 @@
   font-size: var(--memo-size-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.34);
+  color: var(--memo-ink-faint);
 }
 .memoPrecedentBlock {
-  margin-top: 18px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.06);
+  margin-top: 24px;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* === Progressive disclosure === */
+.memoDisclosureSection {
+  padding-top: 0;
+}
+.memoDisclosureToggle {
+  width: 100%;
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0 0 16px;
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) minmax(0, 1fr) auto;
+  gap: 12px 18px;
+  align-items: baseline;
+  text-align: left;
+  color: var(--color-oxford);
+  cursor: pointer;
+}
+.memoDisclosureToggle:focus { outline: none; }
+.memoDisclosureToggle:focus-visible {
+  outline: 2px solid rgba(var(--color-oxford-rgb), 0.22);
+  outline-offset: 2px;
+}
+.memoDisclosureToggle:hover .memoDisclosureTitle,
+.memoDisclosureToggle:hover .memoDisclosurePlus {
+  color: rgba(var(--color-oxford-rgb), 0.72);
+}
+.memoDisclosureTitle {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.60);
+  transition: color 140ms ease;
+}
+.memoDisclosureMeta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.06em;
+  color: rgba(var(--color-oxford-rgb), 0.34);
+}
+.memoDisclosurePlus {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  color: rgba(var(--color-oxford-rgb), 0.38);
+  line-height: 1;
+  transition: color 140ms ease;
+}
+.memoDisclosureBody {
+  padding-top: 4px;
 }
 .memoRiskAcknowledgement {
   display: flex;
@@ -573,6 +681,14 @@
   flex-direction: column;
   gap: 16px;
   transition: opacity 160ms ease;
+}
+.memoRulingIntro {
+  margin: -6px 0 16px;
+  max-width: 42rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-ui);
+  line-height: 1.55;
+  color: rgba(var(--color-oxford-rgb), 0.56);
 }
 .memoDecisionChoices {
   display: grid;
@@ -638,28 +754,30 @@
 
 /* === Header divider === */
 .memoDocDivider {
-  height: 1px;
-  background: rgba(var(--color-oxford-rgb), 0.06);
-  margin: clamp(21px, 3vw, 30px) 0 0 0;
+  height: 0;
+  background: transparent;
+  margin: clamp(18px, 2.6vw, 26px) 0 0 0;
 }
 .memoDocFocalInset {
-  padding: 13px 0;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
-  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  padding: 0 0 0 18px;
+  border-left: 1px solid var(--memo-rule);
+  border-top: none;
+  border-bottom: none;
 }
 
 /* === Section heading === */
 .memoDocSectionHead {
-  font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-label);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.66);
-  margin: 0 0 18px 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--memo-ink-strong);
+  margin: 0 0 13px 0;
   display: flex;
   align-items: center;
   gap: 12px;
-  font-weight: 400;
+  font-weight: 600;
+  line-height: 1.35;
 }
 .memoDocContestedKicker {
   font-family: var(--memo-font-mono);
@@ -669,17 +787,17 @@
   color: color-mix(in srgb, var(--color-accent) 65%, transparent);
 }
 .memoDocSubsection {
-  margin-top: 34px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.055);
+  margin-top: 26px;
+  padding-top: 0;
+  border-top: none;
 }
 .memoDocSubhead {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.30);
-  margin: 0 0 10px 0;
+  color: var(--memo-ink-faint);
+  margin: 0 0 8px 0;
   font-weight: 400;
 }
 
@@ -687,15 +805,23 @@
 .memoDocProse {
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-body);
-  line-height: 1.68;
-  color: rgba(var(--color-oxford-rgb), 0.58);
-  margin: 0 0 21px 0;
-  max-width: 70ch;
+  line-height: var(--memo-leading-body);
+  color: var(--memo-ink);
+  margin: 0 0 18px 0;
+  max-width: 68ch;
 }
 .memoDocProse:last-child { margin-bottom: 0; }
 .memoDocThesis {
   font-style: italic;
-  color: rgba(var(--color-oxford-rgb), 0.80);
+  color: var(--memo-ink-strong);
+}
+.memoDocLead {
+  font-weight: 600;
+  color: var(--memo-ink-strong);
+}
+.memoDocFocalInset .memoDocSubhead {
+  display: block;
+  margin-bottom: 5px;
 }
 
 /* === Definition list (key-value rows) === */
@@ -703,25 +829,25 @@
 .memoDocDLRow {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   align-items: flex-start;
-  padding: 13px 0;
+  padding: 10px 0;
 }
 .memoDocDLRow + .memoDocDLRow { margin-top: 2px; }
 .memoDocDT {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.30);
+  color: var(--memo-ink-faint);
   margin: 0;
   font-weight: 400;
 }
 .memoDocDD {
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-body);
-  line-height: 1.72;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  line-height: var(--memo-leading-body);
+  color: var(--memo-ink);
   margin: 0;
 }
 
@@ -729,6 +855,26 @@
 .memoDocScoreScope { padding: 4px 0 0 0; }
 .memoDocScoreOverview { border: none; background: transparent; padding: 0; }
 .memoDocDimensionCard { border: none; background: transparent; padding: 8px 0; }
+.memoScoreDimensionStack {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.memoScoreMissing {
+  margin-top: 8px;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.10);
+  background: rgba(var(--color-oxford-rgb), 0.02);
+  padding: 12px;
+}
+.memoScoreMissingText {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  color: var(--memo-ink-muted);
+}
 .memoDocScorePill,
 .memoDocScorePill--high,
 .memoDocScorePill--mid,
@@ -747,7 +893,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
-  margin: 0;
+  margin: 5px 0 0;
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
   letter-spacing: 0.06em;
@@ -778,16 +924,20 @@
   gap: 21px;
   margin-bottom: 0;
 }
+.memoDocOverallScoreBlock {
+  min-width: 140px;
+}
 .memoDocOverallScoreMain {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: flex-end;
+  gap: 8px;
   min-width: 0;
+  margin-top: 5px;
 }
 .memoDocOverallScoreValue {
   margin: 0;
   font-family: var(--memo-font-mono);
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   line-height: 0.95;
   letter-spacing: 0;
@@ -806,13 +956,13 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: var(--memo-score-text-muted);
+  color: var(--memo-ink-faint);
   min-width: auto;
   min-height: 44px;
   border-radius: 0;
   cursor: pointer;
   font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-micro);
+  font-size: var(--memo-size-label);
   letter-spacing: 0.06em;
   line-height: 1;
   padding: 0;
@@ -826,12 +976,43 @@
   outline-offset: 2px;
 }
 .memoDocTooltipBtn:hover { color: var(--color-oxford); }
+.memoDocDimensionHeader {
+  width: 100%;
+  padding-bottom: 8px;
+}
+.memoDocDimensionTopline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.memoDocDimensionTitleGroup {
+  min-width: 0;
+}
+.memoDocDimensionTitleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.memoDocDimensionScoreRow {
+  margin-top: 5px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.memoDocDimensionDetailBtn {
+  min-height: 36px;
+  min-width: 84px;
+  padding: 4px 8px;
+  transition: color 140ms ease;
+}
 .memoDocTooltipPanel {
   margin: 13px 0 0 0;
   padding-top: 13px;
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-label);
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  color: var(--memo-ink-muted);
   line-height: 1.5;
 }
 .memoDocScorecardRow {
@@ -873,7 +1054,7 @@
   font-size: var(--memo-size-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  color: var(--memo-ink-muted);
 }
 .memoDocScorePanelValue {
   font-family: var(--memo-font-mono);
@@ -883,16 +1064,16 @@
   min-width: 0;
   font-size: var(--memo-size-ui);
   line-height: 1.2;
-  color: var(--color-oxford);
+  color: var(--memo-ink-strong);
 }
 .memoDocScorePanelNumber {
   min-width: 2.5rem;
   font-size: var(--memo-size-body);
   font-weight: 600;
-  color: var(--color-oxford);
+  color: var(--memo-ink-strong);
   font-variant-numeric: tabular-nums;
 }
-.memoDocScorePanelBand { color: rgba(var(--color-oxford-rgb), 0.60); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memoDocScorePanelBand { color: var(--memo-ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .memoDocScorePanelMeta {
   font-family: var(--memo-font-mono);
   display: inline-flex;
@@ -901,7 +1082,7 @@
   gap: 10px;
   font-size: var(--memo-size-label);
   letter-spacing: 0.06em;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  color: var(--memo-ink-muted);
   white-space: nowrap;
 }
 .memoDocScorePanelToggleGlyph {
@@ -965,6 +1146,47 @@
 .memoDocScoreUnderline { height: 2px; width: 100%; background: var(--memo-score-line-strong); }
 .memoDocScoreColSpacer { height: 2px; }
 .memoDocDimDetail { padding: 14px 0 2px 0; margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+.memoDocComponentBars {
+  margin-top: 6px;
+}
+.memoDocComponentBar {
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  padding: 10px 0;
+}
+.memoDocComponentBar:first-child {
+  border-top: none;
+}
+.memoDocComponentBarInner {
+  width: 100%;
+  text-align: left;
+}
+.memoDocComponentBarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.memoDocComponentTrack {
+  position: relative;
+  margin-top: 6px;
+  height: 1px;
+  width: 100%;
+  overflow: hidden;
+  background: rgba(var(--color-oxford-rgb), 0.10);
+}
+.memoDocComponentFill {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  transform-origin: left;
+  background: rgba(var(--color-oxford-rgb), 0.40);
+}
+.memoDocComponentDetail {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .memoDocDimName {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
@@ -976,14 +1198,15 @@
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-secondary);
   line-height: 1.62;
-  color: rgba(var(--color-oxford-rgb), 0.70);
+  color: var(--memo-ink);
+  overflow-wrap: anywhere;
 }
 .memoDocScoreNote {
   font-family: var(--memo-font-ui);
   font-style: italic;
   font-size: var(--memo-size-ui);
   line-height: 1.6;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  color: var(--memo-ink-muted);
   margin: 14px 0 0 0;
 }
 
@@ -1080,14 +1303,14 @@
   list-style: none;
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-body);
-  line-height: 1.72;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  line-height: var(--memo-leading-body);
+  color: var(--memo-ink);
 }
 .memoListItem { display: flex; gap: 12px; }
-.memoListItem + .memoListItem { margin-top: 0.8125rem; }
+.memoListItem + .memoListItem { margin-top: 0.625rem; }
 .memoBullet {
   flex-shrink: 0;
-  color: rgba(var(--color-oxford-rgb), 0.30);
+  color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
   margin-top: 0.12em;
@@ -1109,7 +1332,7 @@
   justify-content: space-between;
   appearance: none;
   border: none;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.06);
+  border-top: 1px solid var(--memo-rule);
   background: transparent;
   padding: 21px 0 0 0;
   cursor: pointer;
@@ -1117,10 +1340,10 @@
   font-size: var(--memo-size-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.30);
+  color: var(--memo-ink-faint);
   transition: color 120ms ease;
 }
-.memoSourcesToggle:hover { color: rgba(var(--color-oxford-rgb), 0.60); }
+.memoSourcesToggle:hover { color: var(--memo-ink-muted); }
 .memoSourcesToggle:focus { outline: none; }
 .memoSourcesToggle:focus-visible {
   outline: 2px solid rgba(var(--color-oxford-rgb), 0.22);
@@ -1129,7 +1352,7 @@
 .memoSourcesPlus {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-ui);
-  color: rgba(var(--color-oxford-rgb), 0.30);
+  color: var(--memo-ink-faint);
   line-height: 1;
 }
 .memoSourcesBody { padding-top: 21px; padding-bottom: 5px; }
@@ -1148,7 +1371,7 @@
   padding: 0 0 21px 0;
   cursor: pointer;
   text-align: left;
-  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.06);
+  border-bottom: 1px solid var(--memo-rule);
   transition: opacity 120ms ease;
 }
 .memoPipelineToggle:hover { opacity: 0.72; }
@@ -1171,7 +1394,7 @@
   line-height: 1.5;
   letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
-  color: rgba(var(--color-oxford-rgb), 0.38);
+  color: var(--memo-ink-faint);
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1181,12 +1404,12 @@
   flex-shrink: 0;
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-ui);
-  color: rgba(var(--color-oxford-rgb), 0.30);
+  color: var(--memo-ink-faint);
   line-height: 1.5;
   padding-top: 1px;
 }
 .memoReplayList { list-style: none; margin: 0; padding: 4px 0 2px 0; }
-.memoReplayItem { padding: 21px 0; border-top: 1px solid rgba(var(--color-oxford-rgb), 0.06); }
+.memoReplayItem { padding: 18px 0; border-top: 1px solid var(--memo-rule); }
 .memoReplayItem:first-child { border-top: none; padding-top: 13px; }
 .memoReplayKicker {
   display: flex;
@@ -1198,7 +1421,7 @@
   font-size: var(--memo-size-body);
   font-weight: 600;
   line-height: 1.35;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  color: var(--memo-ink);
 }
 .memoReplayBadge {
   font-family: var(--memo-font-mono);
@@ -1206,21 +1429,21 @@
   font-weight: 400;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  color: var(--memo-ink-muted);
 }
-.memoReplayBadge--pending { color: rgba(var(--color-oxford-rgb), 0.30); }
+.memoReplayBadge--pending { color: var(--memo-ink-faint); }
 .memoReplayWhen {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
   letter-spacing: 0.06em;
-  color: rgba(var(--color-oxford-rgb), 0.30);
+  color: var(--memo-ink-faint);
   margin: 0 0 6px 0;
 }
 .memoReplayDetail {
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-body);
   line-height: 1.55;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  color: var(--memo-ink-muted);
   margin: 0;
 }
 
@@ -1228,8 +1451,8 @@
 .memoGeneratingSection { margin-top: 1.25rem; }
 .memoSummaryCallout { background: transparent; padding: 0; margin: 0; border: none; }
 .memoSummaryCallout.memoGenCallout {
-  background: var(--color-register-tint);
-  padding: 16px 20px 18px;
+  background: transparent;
+  padding: 0;
 }
 .memoGenCallout .memoPipelineKicker { margin-bottom: 8px; }
 /* Pipeline gate title mirrors WorkGrid DecisionBadge: mono, uppercase, badge tracking */
@@ -1244,11 +1467,11 @@
 .memoGenCallout .memoGateDetail { margin-bottom: 0; }
 
 .memoSignalsAudit {
-  margin-top: 2.125rem;
+  margin-top: 1.625rem;
   margin-bottom: 1rem;
-  padding: 1rem 0;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.07);
-  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.07);
+  padding: 0;
+  border-top: none;
+  border-bottom: none;
   background: transparent;
 }
 .memoSignalsAudit .memoDocProse {
@@ -1264,7 +1487,7 @@
   overflow: auto;
   margin: 0.75rem 0 0;
   padding: 0.75rem 0;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.06);
+  border-top: 1px solid var(--memo-rule);
   background: transparent;
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
@@ -1291,11 +1514,14 @@
   .memoDocJudgmentTop { grid-template-columns: 1fr; align-items: start; }
   .memoRulingStatus { grid-template-columns: 1fr; }
   .memoRulingNote { grid-column: 1; }
-  .memoAdverseToggle { grid-template-columns: 1fr auto; }
+  .memoAdverseHeader { grid-template-columns: 1fr auto; }
   .memoAdverseCount { grid-column: 1 / -1; width: fit-content; }
-  .memoAdverseChevron { grid-column: 2; grid-row: 1; }
+  .memoAdverseHeaderMeta { grid-column: 1 / -1; }
   .memoAdverseItem { grid-template-columns: 1fr; gap: 8px; }
   .memoAdverseMeta { flex-direction: row; flex-wrap: wrap; }
+  .memoDisclosureToggle { grid-template-columns: 1fr auto; }
+  .memoDisclosureMeta { grid-column: 1 / -1; white-space: normal; }
+  .memoDisclosurePlus { grid-column: 2; grid-row: 1; }
   .memoDecisionChoices { grid-template-columns: 1fr; }
   .memoDecisionChoice + .memoDecisionChoice {
     border-left: none;

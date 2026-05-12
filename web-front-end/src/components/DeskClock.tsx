@@ -28,18 +28,18 @@ export default function DeskClock({ className = '' }: { className?: string }) {
       aria-label={`Desk time London ${lon}, New York ${nyc}`}
     >
       <div className="hidden whitespace-nowrap sm:block">
-        <span className="text-[rgba(0,33,71,0.55)]">Lon</span> <span>{lon}</span>
-        <span className="mx-2 text-[rgba(0,33,71,0.2)]" aria-hidden>
+        <span className="text-[rgba(0,27,71,0.55)]">Lon</span> <span>{lon}</span>
+        <span className="mx-2 text-[rgba(0,27,71,0.2)]" aria-hidden>
           │
         </span>
-        <span className="text-[rgba(0,33,71,0.55)]">Nyc</span> <span>{nyc}</span>
+        <span className="text-[rgba(0,27,71,0.55)]">Nyc</span> <span>{nyc}</span>
       </div>
       <div className="flex flex-col items-end gap-0.5 leading-tight sm:hidden">
         <span>
-          <span className="text-[rgba(0,33,71,0.55)]">Lon</span> {lon}
+          <span className="text-[rgba(0,27,71,0.55)]">Lon</span> {lon}
         </span>
         <span>
-          <span className="text-[rgba(0,33,71,0.55)]">Nyc</span> {nyc}
+          <span className="text-[rgba(0,27,71,0.55)]">Nyc</span> {nyc}
         </span>
       </div>
     </div>

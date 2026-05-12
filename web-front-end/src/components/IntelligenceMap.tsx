@@ -5,33 +5,33 @@ import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 
 gsap.registerPlugin(ScrollTrigger, MotionPathPlugin);
 
-const OXFORD = '#1D2D48';
-const PAPER = '#E9E0D1';
+const OXFORD = '#001B47';
+const PAPER = '#F4F1EA';
 
 const COLORS = {
   dark: {
-    edge: 'rgba(242, 240, 234, 0.15)',
-    edgeDash: 'rgba(242, 240, 234, 0.1)',
-    scout: 'rgba(242, 240, 234, 0.4)',
-    reviewer: 'rgba(242, 240, 234, 0.7)',
-    partner: 'rgba(242, 240, 234, 0.7)',
+    edge: 'rgba(244, 241, 234, 0.15)',
+    edgeDash: 'rgba(244, 241, 234, 0.1)',
+    scout: 'rgba(244, 241, 234, 0.4)',
+    reviewer: 'rgba(244, 241, 234, 0.7)',
+    partner: 'rgba(244, 241, 234, 0.7)',
     portfolio: PAPER,
-    meta: 'rgba(242, 240, 234, 0.55)',
-    label: 'rgba(242, 240, 234, 0.5)',
+    meta: 'rgba(244, 241, 234, 0.55)',
+    label: 'rgba(244, 241, 234, 0.5)',
     pulse: PAPER,
-    pulseMeta: 'rgba(242, 240, 234, 0.3)',
+    pulseMeta: 'rgba(244, 241, 234, 0.3)',
   },
   light: {
-    edge: 'rgba(29, 45, 72, 0.15)',
-    edgeDash: 'rgba(29, 45, 72, 0.1)',
-    scout: 'rgba(29, 45, 72, 0.35)',
-    reviewer: 'rgba(29, 45, 72, 0.55)',
-    partner: 'rgba(29, 45, 72, 0.55)',
-    portfolio: 'rgba(29, 45, 72, 0.85)',
-    meta: 'rgba(29, 45, 72, 0.5)',
-    label: 'rgba(29, 45, 72, 0.5)',
+    edge: 'rgba(0, 27, 71, 0.15)',
+    edgeDash: 'rgba(0, 27, 71, 0.1)',
+    scout: 'rgba(0, 27, 71, 0.35)',
+    reviewer: 'rgba(0, 27, 71, 0.55)',
+    partner: 'rgba(0, 27, 71, 0.55)',
+    portfolio: 'rgba(0, 27, 71, 0.85)',
+    meta: 'rgba(0, 27, 71, 0.5)',
+    label: 'rgba(0, 27, 71, 0.5)',
     pulse: OXFORD,
-    pulseMeta: 'rgba(29, 45, 72, 0.3)',
+    pulseMeta: 'rgba(0, 27, 71, 0.3)',
   },
 } as const;
 

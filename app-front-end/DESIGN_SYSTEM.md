@@ -21,19 +21,19 @@ Institutional, editorial UI. Modelled after a private equity firm's internal dea
 
 | Token | Hex / Value | Role |
 |---|---|---|
-| `oxford` | `#002147` | Primary text, borders at full opacity |
-| `paper` | `#F2F0EA` | Page & panel background |
-| `paper-bright` | `#F2F0EA` | Raised surface, sheet overlay (unified) |
-| `ivory` | `#F2F0EA` | Document surface (unified) |
-| `charcoal` | Oxford (`#1A2B48` / `--text-primary`) | Primary prose — oxford ladder, not neutral black |
-| `heritage-gold` | `#b8976a` | Heritage decorative accent — section rules, diamonds |
-| `gold-soft` | `rgba(184,151,106,0.35)` | Gold tint surfaces |
-| `escalation` | `#7D2B3A` | **Human-attention alerts only** — escalation dots, counts, critical intervention states |
-| `hairline` | `rgba(0,33,71,0.06)` | Default 1px borders (structural frames) |
-| `hairline-strong` | `rgba(0,33,71,0.12)` | Emphasized dividers |
-| `field-border` | `rgba(0,33,71,0.15)` | Input / select borders |
-| `field-border-strong` | `rgba(0,33,71,0.20)` | Focused input border |
-| `registerTint` | `rgba(0,33,71,0.03)` | WorkGrid row hover / column header fill |
+| `oxford` | `#001B47` | Primary text, borders at full opacity |
+| `paper` | `#F4F1EA` | Page & panel background |
+| `paper-bright` | `#F8F5EE` | Raised surface, sheet overlay |
+| `ivory` | `#F4F1EA` | Document surface |
+| `charcoal` | `#26313f` (`--color-charcoal`) | Primary body prose on paper |
+| `heritage-gold` | `#a88a5e` | Heritage decorative accent — section rules, diamonds |
+| `gold-soft` | `rgba(168,138,94,0.35)` | Gold tint surfaces |
+| `escalation` | `#8F4A32` | **Human-attention alerts only** — escalation dots, counts, critical intervention states |
+| `hairline` | `rgba(0,27,71,0.06)` | Default 1px borders (structural frames) |
+| `hairline-strong` | `rgba(0,27,71,0.12)` | Emphasized dividers |
+| `field-border` | `rgba(0,27,71,0.15)` | Input / select borders |
+| `field-border-strong` | `rgba(0,27,71,0.20)` | Focused input border |
+| `registerTint` | `rgba(0,27,71,0.03)` | WorkGrid row hover / column header fill |
 | `lookup.DEFAULT` | `#B5893E` | On-demand lookup origin chip |
 | `lookup.surface` | `#E8D7B4` | Lookup chip background |
 | `lookup.ink` | `#3D2A12` | Lookup chip text |
@@ -53,7 +53,7 @@ Use Tailwind's opacity modifier: `text-oxford/100`, `text-oxford/80`, etc.
 
 ### Cross-app semantic contract (mandatory)
 
-- `escalation` is always `#7D2B3A` and is never used as a decorative accent.
+- `escalation` is always `#8F4A32` and is never used as a decorative accent.
 - `heritage-gold` is decorative only and never used for critical status semantics.
 - In code, avoid introducing new raw hex values in class strings when a semantic token exists.
 
@@ -152,7 +152,7 @@ Golden ratio Fibonacci sequence. Every layout value maps to a named step.
 ## Borders & Surfaces
 
 - **All borders**: `1px solid` — no `2px`, no `dashed`, no `dotted` (except dev only).
-- **Default border colour**: `hairline` = `rgba(0,33,71,0.06)`.
+- **Default border colour**: `hairline` = `rgba(0,27,71,0.06)`.
 - **Component frames**: `border border-hairline` → `.app-chrome-frame`.
 - **Raised surfaces**: `border border-hairline bg-paper-bright` → `.app-chrome-frame-raised`.
 - **No `border-radius` on product chrome.** Tailwind's `rounded-*` should resolve to `0` for all app shell/UI surfaces.
@@ -172,7 +172,7 @@ Golden ratio Fibonacci sequence. Every layout value maps to a named step.
 
 ### Section decoration (web-front-end pattern, use in editorial contexts)
 - `.doc-rule-with-diamond` — full-width 1px rule + centered 4×4 oxford diamond
-- `.paper-dot-grid` — `#F2F0EA` bg with `rgba(0,33,71,0.055)` 1px dots at 28px
+- `.paper-dot-grid` — `#F4F1EA` bg with `rgba(0,27,71,0.055)` 1px dots at 28px
 - `.section-numeral` — `JetBrains Mono 9px`, tracking `0.12em`, `oxford/20`
 
 ---

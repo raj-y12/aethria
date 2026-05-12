@@ -16,22 +16,23 @@ export default {
     },
     extend: {
       colors: {
-        oxford: '#1a2b48',
-        paper: '#e9e0d1',
+        oxford: '#001b47',
+        paper: '#f4f1ea',
         /** Darker paper — WorkGrid selected row, etc. See --color-paper-deep */
         paperDeep: 'var(--color-paper-deep)',
-        'paper-bright': '#ebe8e0',
-        ivory: '#e9e0d1',
-        canvas: '#e9e0d1',
+        'paper-bright': '#f8f5ee',
+        ivory: '#f4f1ea',
+        canvas: '#f4f1ea',
+        charcoal: '#26313f',
         mist: '#f2f4f8',
         /** Legacy alias — same family as oxford (avoid cool neutral ink). */
-        graphite: '#1a2b48',
+        graphite: '#001b47',
         /** Structural hairlines — prefer over raw oxford/[0.06] in new code. */
-        hairline: 'rgba(26, 43, 72, 0.06)',
-        'hairline-strong': 'rgba(26, 43, 72, 0.12)',
+        hairline: 'rgba(0, 27, 71, 0.06)',
+        'hairline-strong': 'rgba(0, 27, 71, 0.12)',
         /** Inputs, fields, subtle dividers. */
-        'field-border': 'rgba(26, 43, 72, 0.15)',
-        'field-border-strong': 'rgba(26, 43, 72, 0.20)',
+        'field-border': 'rgba(0, 27, 71, 0.15)',
+        'field-border-strong': 'rgba(0, 27, 71, 0.20)',
         /** On-demand lookup origin chip — semantic, not raw hex in components. */
         lookup: {
           DEFAULT: '#B5893E',
@@ -41,10 +42,10 @@ export default {
         /** Escalation / human-attention only — matches tokens.color.accent. */
         escalation: '#7D2B3A',
         /** Decorative — aligned with web-front-end. */
-        gold: '#b8976a',
-        'gold-soft': 'rgba(184, 151, 106, 0.35)',
+        gold: '#a88a5e',
+        'gold-soft': 'rgba(168, 138, 94, 0.35)',
         /** Validation strip: same as paper (palette whitelist). */
-        warning: '#e9e0d1',
+        warning: '#f4f1ea',
         /** See :root --color-register-tint */
         registerTint: 'var(--color-register-tint)',
         /** Judgment-surface layering — maps to tokens.surface + index.css */

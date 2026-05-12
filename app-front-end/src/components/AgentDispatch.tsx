@@ -44,55 +44,28 @@ function phaseState(lookupPhase: LookupPhase, phase: Phase) {
   return { isCurrentPhase, isPast };
 }
 
-function LookupPhaseStrip({
-  lookupPhase,
-  spacingClass,
-  reserveHeight,
-}: {
-  lookupPhase: LookupPhase;
-  spacingClass: string;
-  reserveHeight: boolean;
-}) {
-  const track = (
-    <>
-      {PHASES.map((phase) => {
+/** Single-line pipeline phase — no progress bars (sidebar / drawer). */
+function LookupPhaseLine({ lookupPhase, className = '' }: { lookupPhase: LookupPhase; className?: string }) {
+  if (!lookupPhase) return null;
+  return (
+    <p className={`type-meta text-oxford/28 ${className}`} aria-live="polite">
+      {PHASES.map((phase, i) => {
         const { isCurrentPhase, isPast } = phaseState(lookupPhase, phase);
         return (
-          <div key={phase} className="flex-1 flex flex-col gap-phi-2">
-            <div className="h-px w-full bg-oxford/[0.06] relative overflow-hidden">
-              {(isCurrentPhase || isPast) && (
-                <span
-                  className={`absolute inset-0 h-full origin-left ${isPast ? 'bg-oxford/15' : 'bg-oxford/35'} ${isCurrentPhase ? 'pulse-fast' : ''}`}
-                />
-              )}
-            </div>
+          <span key={phase}>
+            {i > 0 ? <span className="text-oxford/18"> · </span> : null}
             <span
-              className={`type-meta transition-colors ${
-                isCurrentPhase ? 'text-oxford/60' : isPast ? 'text-oxford/35' : 'text-oxford/22'
-              }`}
+              className={
+                isCurrentPhase ? 'text-oxford/55' : isPast ? 'text-oxford/36' : 'text-oxford/22'
+              }
             >
               {phase}
             </span>
-          </div>
+          </span>
         );
       })}
-    </>
+    </p>
   );
-
-  if (reserveHeight) {
-    return (
-      <div
-        className={`border-t border-oxford/[0.06] flex gap-phi-3 ${spacingClass} transition-opacity duration-200 ${
-          lookupPhase ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-        aria-hidden={!lookupPhase}
-      >
-        {track}
-      </div>
-    );
-  }
-  if (!lookupPhase) return null;
-  return <div className={`border-t border-oxford/[0.06] flex gap-phi-3 ${spacingClass}`}>{track}</div>;
 }
 
 const runBtnCls =
@@ -130,24 +103,20 @@ function DispatchPanelBody({
     : 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/28 outline-none disabled:cursor-not-allowed';
 
   const statusRowCls = embedded
-    ? 'mt-phi-2 flex min-h-[22px] items-center justify-between gap-phi-3'
-    : 'flex items-center justify-between gap-phi-3 mt-phi-3 min-h-[28px]';
+    ? 'mt-phi-2 flex min-h-0 items-start justify-between gap-phi-3'
+    : 'mt-phi-3 flex min-h-0 items-start justify-between gap-phi-3';
 
-  const phaseSpacing = embedded
-    ? 'mt-phi-3 pt-phi-2'
-    : 'mt-phi-4 pt-phi-3';
+  const showStatusRow = Boolean(lookupMessage) || (!embedded && !isBusy);
 
   const statusLeft = (() => {
     if (lookupMessage) {
       const msgCls = embedded
-        ? `${railEditorial.body} flex items-center gap-phi-2 min-w-0 flex-1`
+        ? `${railEditorial.body} flex items-center gap-phi-2 min-w-0 flex-1 text-oxford/70`
         : 'type-meta text-oxford/55 flex items-center gap-phi-2 min-w-0 flex-1';
       return (
         <>
           <p className={msgCls}>
-            {(embedded ? isActive : true) && (
-              <span className="h-1.5 w-1.5 shrink-0 bg-oxford/35 pulse-fast" aria-hidden />
-            )}
+            {!embedded && <span className="h-1.5 w-1.5 shrink-0 bg-oxford/35 pulse-fast" aria-hidden />}
             <span className="truncate">{lookupMessage}</span>
           </p>
           {onClearMessage && !isBusy && (
@@ -163,15 +132,8 @@ function DispatchPanelBody({
         </>
       );
     }
-    if (embedded) {
-      return (
-        <p className="type-meta text-oxford/34">
-          {isBusy ? 'Running lookup pipeline' : focused ? 'Ready to dispatch on Enter' : 'Name, domain, or founder signal'}
-        </p>
-      );
-    }
-    if (!isBusy) {
-      return <p className="type-meta text-oxford/25">Enter a name or URL to look up a company.</p>;
+    if (!embedded && !isBusy) {
+      return <p className="type-meta text-oxford/30">Name or URL, then Enter.</p>;
     }
     return null;
   })();
@@ -206,22 +168,33 @@ function DispatchPanelBody({
           disabled={!input.trim() || isBusy}
           className={runBtnCls}
         >
-          {isBusy ? 'Running' : 'Run lookup'}
-          <span className={`transition-transform ${isBusy ? 'pulse-fast' : 'group-hover:translate-x-px'}`}>
-            {isBusy ? '·' : '→'}
-          </span>
+          {isBusy ? (
+            <>
+              Running
+              <span className="text-oxford/35 tabular-nums">…</span>
+            </>
+          ) : (
+            <>
+              {embedded ? 'Run' : 'Run lookup'}
+              <span className="transition-transform group-hover:translate-x-px">→</span>
+            </>
+          )}
         </button>
-        {isBusy && (
+        {isBusy && !embedded && (
           <span className="absolute bottom-0 left-0 h-px w-full bg-oxford/30 pulse-fast" aria-hidden />
         )}
       </div>
 
-      <div className={statusRowCls}>
-        <div className="flex-1 min-w-0 flex items-center gap-phi-2">{statusLeft}</div>
-        {!lookupMessage && !isBusy && <span className="type-meta text-oxford/24">Enter</span>}
-      </div>
+      {showStatusRow && (
+        <div className={statusRowCls}>
+          <div className="flex min-w-0 flex-1 items-center gap-phi-2">{statusLeft}</div>
+        </div>
+      )}
 
-      <LookupPhaseStrip lookupPhase={lookupPhase} spacingClass={phaseSpacing} reserveHeight={embedded} />
+      <LookupPhaseLine
+        lookupPhase={isBusy ? lookupPhase : null}
+        className={embedded ? 'mt-phi-2' : 'mt-phi-3'}
+      />
     </>
   );
 }
@@ -284,23 +257,17 @@ export default function AgentDispatch({
 
       {alwaysOpen ? (
         <div className="min-w-0">
-          <div className="flex items-baseline justify-between gap-phi-3">
-            <p className={railEditorial.label}>Dispatch</p>
-            <p className="type-meta text-oxford/30">Pipeline trigger</p>
-          </div>
-          <div className="min-w-0">
-            <DispatchPanelBody
-              inputRef={inputRef}
-              input={input}
-              setInput={setInput}
-              onSubmit={onSubmit}
-              isBusy={isBusy}
-              lookupMessage={lookupMessage}
-              onClearMessage={onClearMessage}
-              lookupPhase={lookupPhase}
-              variant="embedded"
-            />
-          </div>
+          <DispatchPanelBody
+            inputRef={inputRef}
+            input={input}
+            setInput={setInput}
+            onSubmit={onSubmit}
+            isBusy={isBusy}
+            lookupMessage={lookupMessage}
+            onClearMessage={onClearMessage}
+            lookupPhase={lookupPhase}
+            variant="embedded"
+          />
         </div>
       ) : (
         <div

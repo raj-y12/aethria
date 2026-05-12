@@ -7,12 +7,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        oxford: '#1d2d48',
-        paper: '#e9e0d1',
-        ivory: '#e9e0d1',
-        canvas: '#e9e0d1',
+        oxford: '#001b47',
+        paper: '#f4f1ea',
+        paperDeep: '#e7e0d4',
+        'paper-bright': '#f8f5ee',
+        ivory: '#f4f1ea',
+        canvas: '#f4f1ea',
         mist: '#f2f4f8',
-        graphite: '#2f333b',
+        charcoal: '#26313f',
+        graphite: '#001b47',
+        escalation: '#8f4a32',
+        gold: '#a88a5e',
+        'gold-soft': 'rgba(168, 138, 94, 0.35)',
       },
       fontFamily: {
         display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
