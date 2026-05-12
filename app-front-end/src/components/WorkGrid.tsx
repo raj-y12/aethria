@@ -421,9 +421,9 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                 type="button"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                 aria-expanded={showAdvancedFilters}
-                className={`${productInteraction.action} shrink-0 !min-h-[36px]`}
+                className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 shrink-0 ${showAdvancedFilters ? 'text-oxford font-semibold' : 'text-oxford/40 hover:text-oxford/70'}`}
               >
-                {showAdvancedFilters ? 'Hide' : 'Refine'}
+                {showAdvancedFilters ? 'HIDE' : 'REFINE'}
               </button>
             </div>
           </div>

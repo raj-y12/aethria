@@ -51,6 +51,10 @@ const SETTINGS_PATH = '/v1/settings';
 const PANEL_CHROME_ACTION_BTN_CLASS =
   `${UI_PANEL_CHROME_LABEL} rounded-none border-0 bg-transparent p-0 cursor-pointer hover:text-oxford/80 transition-colors duration-150 ease-out btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset`;
 
+/** Memo sheet header actions — same inactive styling as WorkGrid source `FilterButton`. */
+const MEMO_SHEET_ACTION_BTN_CLASS =
+  'type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 text-oxford/40 hover:text-oxford/70';
+
 interface MainLayoutProps {
   data: SystemData;
   startupsError?: string | null;
@@ -933,33 +937,27 @@ export default function MainLayout({
                         headerBorderClass=""
                         headerJustifyClass="justify-end"
                         actions={
-                          <div className="flex min-h-[36px] items-center gap-phi-2" role="group" aria-label="Memo controls">
+                          <div className="flex min-h-[36px] items-center gap-0" role="group" aria-label="Memo controls">
                             <button
                               type="button"
                               onClick={() => memoContentRef.current?.downloadPDF()}
-                              className={PANEL_CHROME_ACTION_BTN_CLASS}
+                              className={MEMO_SHEET_ACTION_BTN_CLASS}
                               aria-label="Download IC pack as PDF"
                             >
                               IC pack (PDF)
                             </button>
-                            <span className={`${UI_PANEL_CHROME_LABEL} text-oxford/35`} aria-hidden="true">
-                              /
-                            </span>
                             <button
                               type="button"
                               onClick={() => memoContentRef.current?.downloadMarkdown()}
-                              className={PANEL_CHROME_ACTION_BTN_CLASS}
+                              className={MEMO_SHEET_ACTION_BTN_CLASS}
                               aria-label="Download IC pack as Markdown"
                             >
                               IC pack (MD)
                             </button>
-                            <span className={`${UI_PANEL_CHROME_LABEL} text-oxford/35`} aria-hidden="true">
-                              /
-                            </span>
                             <button
                               type="button"
                               onClick={handleCloseMemo}
-                              className={PANEL_CHROME_ACTION_BTN_CLASS}
+                              className={MEMO_SHEET_ACTION_BTN_CLASS}
                               aria-label="Close memo"
                             >
                               Close
