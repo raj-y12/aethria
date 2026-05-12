@@ -554,10 +554,10 @@ export default function MainLayout({
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
           <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.8fr)_minmax(460px,1.2fr)_minmax(0,1.4fr)] lg:grid-rows-[minmax(0,1fr)] min-h-0 overflow-hidden gap-phi-5 lg:gap-phi-5 bg-paper">
             <aside className="hidden lg:flex h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden bg-paper">
-              <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] overflow-hidden px-phi-4 py-phi-4">
+              <div className="flex h-full min-h-0 flex-col justify-between overflow-hidden px-phi-4" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)', paddingBottom: 'clamp(5px, 0.6vw, 8px)' }}>
 
                 {/* ── Wordmark + pipeline status ─────────────────────── */}
-                <div className="min-w-0 pb-phi-4">
+                <div className="min-w-0">
                   <div className="flex items-center justify-between gap-phi-3">
                     <p className={railEditorial.wordmark}>
                       Aethria
@@ -619,7 +619,7 @@ export default function MainLayout({
                 </div>
 
                 {/* ── Dispatch (on-demand lookup) ─────────────────────── */}
-                <div className="flex min-h-0 min-w-0 flex-col justify-center border-t border-oxford/[0.075] py-phi-4">
+                <div className="min-w-0 border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}>
                   <p className={railEditorial.label}>Dispatch</p>
                   <div className="mt-phi-2 min-w-0">
                   <AgentDispatch
@@ -636,9 +636,9 @@ export default function MainLayout({
                 </div>
 
                 {/* ── Overview ───────────────────────────────────────── */}
-                <section aria-label="Live overview" className="flex min-h-0 min-w-0 flex-col justify-center border-t border-oxford/[0.075] py-phi-4">
+                <section aria-label="Live overview" className="min-w-0 border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}>
                   <p className={railEditorial.label}>Overview</p>
-                  <div className="grid min-w-0 grid-cols-2 gap-x-phi-4 gap-y-phi-3">
+                  <div className="grid min-w-0 grid-cols-2" style={{ columnGap: 'clamp(8px, 1vw, 13px)', rowGap: 'clamp(5px, 0.8vw, 8px)' }}>
                     {[
                       { label: 'Total', value: startups.length, accent: false },
                       { label: 'Agent-decided', value: agentDecidedCount, accent: false },
@@ -663,7 +663,7 @@ export default function MainLayout({
                 </section>
 
                 {/* ── Mandate ────────────────────────────────────────── */}
-                <article className="flex min-h-0 min-w-0 flex-col justify-center overflow-hidden border-t border-oxford/[0.075] py-phi-4" aria-label="Fund thesis preview">
+                <article className="min-w-0 overflow-hidden border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }} aria-label="Fund thesis preview">
                   <p className={railEditorial.label}>Mandate</p>
                   <div className="flex min-w-0 items-center justify-between gap-phi-3">
                     <p className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong}`}>
@@ -701,13 +701,14 @@ export default function MainLayout({
                   )}
                 </article>
 
-                {/* ── Account — pushed to bottom ─────────────────────── */}
-                <div className="min-w-0 border-t border-oxford/[0.075] pt-phi-4">
+                {/* ── Account ─────────────────────────────────────────── */}
+                <div className="min-w-0 border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}>
                   <AccountRailPanel settingsPath={SETTINGS_PATH} />
                 </div>
 
               </div>
             </aside>
+
 
             <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-paper lg:h-full lg:min-h-0">
               {/* Pipeline summary + lookup */}
