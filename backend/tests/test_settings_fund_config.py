@@ -52,6 +52,8 @@ def test_fund_config_raw_text_and_policy_weights():
     assert weights["market"] == 20
     assert weights["product"] == 10
     assert weights["defensibility"] == 15
+    assert "traction" not in weights
+    assert "timing" not in weights
 
 
 def test_score_bands_drive_recommendation_mapping():
@@ -83,3 +85,28 @@ def test_settings_save_and_reload_preserves_fund_config(monkeypatch):
     assert reloaded["fund_config"]["mandate"]["preferredSectors"] == ["AI Infrastructure"]
     assert reloaded["fund_config"]["scoreBands"][2]["label"] == "Strong Proceed"
     assert reloaded["fund_config"]["scoringWeights"][0]["key"] == "market"
+
+
+def test_runtime_limits_load_from_saved_settings(monkeypatch):
+    import utils.settings_loader as settings_mod
+
+    monkeypatch.setattr(
+        settings_mod,
+        "load_settings",
+        lambda user_id=None, use_cache=True: {
+            "agent_config": {"max_agents_per_run": 2},
+            "cost_budget": {
+                "enabled": True,
+                "max_tokens_per_run": 321,
+                "cooldown_seconds": 7,
+                "daily_cost_ceiling": 0.25,
+            },
+        },
+    )
+
+    limits = settings_mod.get_runtime_limits("user_settings")
+
+    assert limits["max_agents_per_run"] == 2
+    assert limits["max_tokens_per_run"] == 321
+    assert limits["cooldown_seconds"] == 7
+    assert limits["daily_cost_ceiling"] == 0.25

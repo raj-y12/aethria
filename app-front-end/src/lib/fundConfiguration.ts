@@ -137,14 +137,11 @@ const dimensionDescriptions: Record<ScoringDimensionKey, string> = {
 };
 
 export const DEFAULT_SCORING_WEIGHTS: ScoringWeight[] = [
-  { key: 'market', label: 'Market', description: dimensionDescriptions.market, weight: 16 },
-  { key: 'product', label: 'Product', description: dimensionDescriptions.product, weight: 13 },
-  { key: 'technical', label: 'Technical', description: dimensionDescriptions.technical, weight: 11 },
-  { key: 'execution', label: 'Execution', description: dimensionDescriptions.execution, weight: 16 },
-  { key: 'defensibility', label: 'Defensibility', description: dimensionDescriptions.defensibility, weight: 13 },
-  { key: 'traction', label: 'Traction', description: dimensionDescriptions.traction, weight: 11 },
-  { key: 'timing', label: 'Timing', description: dimensionDescriptions.timing, weight: 8 },
-  { key: 'fundFit', label: 'Fund Fit', description: dimensionDescriptions.fundFit, weight: 12 },
+  { key: 'market', label: 'Market', description: dimensionDescriptions.market, weight: 20 },
+  { key: 'product', label: 'Product', description: dimensionDescriptions.product, weight: 20 },
+  { key: 'technical', label: 'Technical', description: dimensionDescriptions.technical, weight: 20 },
+  { key: 'execution', label: 'Execution', description: dimensionDescriptions.execution, weight: 20 },
+  { key: 'defensibility', label: 'Defensibility', description: dimensionDescriptions.defensibility, weight: 20 },
 ];
 
 export const DEFAULT_SCORE_BANDS: ScoreBand[] = [
@@ -389,7 +386,7 @@ function mergeFundConfiguration(base: FundConfiguration, saved: Partial<FundConf
     memo: { ...base.memo, ...saved.memo },
     scoringWeights: mergeByKey(base.scoringWeights, saved.scoringWeights, 'key'),
     scoreBands: mergeByKey(base.scoreBands, saved.scoreBands, 'id'),
-    rubric: saved.rubric?.length ? saved.rubric : base.rubric,
+    rubric: saved.rubric?.length ? normalizeRubricCriteria(saved.rubric) : base.rubric,
   };
 }
 
@@ -420,6 +417,22 @@ function createDefaultRubric(): RubricCriterion[] {
       score9: 'Exceptional signal, well evidenced, and hard to replicate.',
     },
   }));
+}
+
+function normalizeRubricCriteria(rubric: RubricCriterion[]): RubricCriterion[] {
+  const dimensionMap: Partial<Record<ScoringDimensionKey, ScoringDimensionKey>> = {
+    traction: 'execution',
+    timing: 'market',
+    fundFit: 'defensibility',
+  };
+  const allowed = new Set<ScoringDimensionKey>(DEFAULT_SCORING_WEIGHTS.map((item) => item.key));
+  return rubric.map((item) => {
+    const dimension = dimensionMap[item.dimension] ?? item.dimension;
+    return {
+      ...item,
+      dimension: allowed.has(dimension) ? dimension : 'market',
+    };
+  });
 }
 
 function parseList(value?: string): string[] {

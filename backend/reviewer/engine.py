@@ -15,7 +15,7 @@ from tenant_context import require_user_id
 from fund_thesis import rule_based_thesis_alignment, thesis_context_has_embeddings
 from pipeline_state import upsert_pipeline_state
 from utils.storage import Storage
-from utils.settings_loader import dimension_weights_from_fund_config, is_reviewers_enabled, load_settings
+from utils.settings_loader import dimension_weights_from_fund_config, get_runtime_limits, is_reviewers_enabled, load_settings
 from utils.scoring import DEFAULT_SCORE_SOURCE, compute_overall_score, enrich_scores
 from services.scoring import DeterministicScoringEngine
 from services.reviewer_resolution import apply_resolution_to_primary
@@ -66,6 +66,7 @@ class ReviewerEngine:
         self.model = model
         self.batch_size = batch_size
         self.agent_id = "reviewer_v1"  # Default agent ID
+        self.logger = logging.getLogger("reviewer.engine")
         self.cost_controller = cost_controller
         self.deal_memory = deal_memory
         self.active_thesis: Optional[Dict[str, Any]] = active_thesis
@@ -88,7 +89,6 @@ class ReviewerEngine:
         self.skeptical_reviewer = SkepticalReviewer(api_key, model=model, tenant_user_id=tid)
         self.opportunist_reviewer = OpportunistReviewer(api_key, model=model, tenant_user_id=tid)
         
-        self.logger = logging.getLogger("reviewer.engine")
         self.running = False
         self.last_cycle_stats: Dict[str, Any] = {}
 
@@ -446,6 +446,11 @@ class ReviewerEngine:
                 "reason": "no_unreviewed",
             }
             return 0
+        try:
+            cycle_limit = int(get_runtime_limits(self.tenant_user_id).get("max_agents_per_run", effective_batch))
+            effective_batch = min(effective_batch, max(1, cycle_limit))
+        except Exception as e:
+            self.logger.warning("Reviewer runtime limits unavailable, using batch size: %s", e)
         
         # Load confidence threshold from settings
         try:

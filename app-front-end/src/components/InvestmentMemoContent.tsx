@@ -281,6 +281,47 @@ function uniqueRiskItems(startup: Startup | null): { risks: string[]; mitigation
   return { risks, mitigation };
 }
 
+function adverseCoverageKeys(adverseItems: AdverseRegisterItem[]): Set<string> {
+  const keys = new Set<string>();
+  for (const item of adverseItems) {
+    keys.add(item.whyItMatters.toLowerCase());
+    keys.add(item.title.toLowerCase());
+  }
+  return keys;
+}
+
+function isAdverseCovered(text: string, adverseItems: AdverseRegisterItem[]): boolean {
+  const key = text.toLowerCase();
+  const keys = adverseCoverageKeys(adverseItems);
+  if (keys.has(key)) return true;
+  return adverseItems.some((item) => {
+    const why = item.whyItMatters.toLowerCase();
+    return why.includes(key) || key.includes(why);
+  });
+}
+
+function missingDataItems(startup: Startup | null, adverseItems: AdverseRegisterItem[]): string[] {
+  if (!startup) return [];
+  const items = [
+    startup.scout.biggest_unknown?.trim(),
+    ...(startup.review?.diligence_red_flags ?? []).filter((item) => /missing|unknown|unclear/i.test(String(item))),
+  ].map((item) => String(item ?? '').trim()).filter(Boolean);
+  const seen = new Set<string>();
+  const skipAdverseOverlap = adverseItems.length > 0;
+  return items.filter((item) => {
+    const key = item.toLowerCase();
+    if (seen.has(key)) return false;
+    if (skipAdverseOverlap && isAdverseCovered(item, adverseItems)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 5);
+}
+
+function sourceSupportLine(source: ReturnType<typeof memoSourceRows>[number], showConfidence: boolean): string {
+  if (!showConfidence) return source.supports;
+  return `${source.supports} · Scout confidence signal`;
+}
+
 function MemoDisclosureSection({
   id,
   title,
@@ -488,10 +529,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     () => extractAdverseRegister(displayStartup),
     [displayStartup]
   );
+  const missingEvidenceItems = useMemo(
+    () => missingDataItems(displayStartup, adverseRegister),
+    [adverseRegister, displayStartup]
+  );
+  const memoSources = useMemo(
+    () => (displayStartup ? memoSourceRows(displayStartup) : []),
+    [displayStartup]
+  );
   const configuredScore = displayStartup ? computeConfiguredScore(displayStartup, config) : null;
   const configuredBand = configuredScore != null ? bandForScore(configuredScore, config.scoreBands) : null;
   const highAdverseCount = adverseRegister.filter((item) => item.severity === 'high').length;
-  const mediumAdverseCount = adverseRegister.filter((item) => item.severity === 'medium').length;
   const riskFactors = useMemo(
     () => uniqueRiskItems(displayStartup),
     [displayStartup]
@@ -500,6 +548,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const isAlreadyDecided = displayStartup ? isDealDecided(displayStartup) : false;
   const needsRiskAcknowledgement = Boolean(
     displayStartup && shouldGateRisk(config, hasHighAdverse, adverseRegister.length > 0, isAlreadyDecided)
+  );
+  const showRulingStatus = Boolean(
+    isAlreadyDecided
+    || (showEscalationBadge && !isAlreadyDecided)
+    || !showJudgment
   );
   const riskReviewOutstanding = needsRiskAcknowledgement && !risksReviewed;
   const convictionHistory = displayStartup?.conviction_state?.decision_history ?? [];
@@ -510,15 +563,15 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
   useEffect(() => {
     setSelectedReviewerIdx(0);
-    setSourcesOpen(false);
+    setSourcesOpen(!config.memo.deepDiveCollapsed);
     setPipelineLogOpen(false);
-    setAdverseOpen(false);
+    setAdverseOpen(!config.memo.deepDiveCollapsed);
     setReasoningOpen(false);
     setRisksReviewed(false);
     setRulingDecision(null);
     setRulingNotes('');
     setRulingError(null);
-  }, [startup?.id]);
+  }, [config.memo.deepDiveCollapsed, startup?.id]);
 
   useEffect(() => {
     if (!displayStartup || rulingDecision) return;
@@ -565,6 +618,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     SkepticalReviewer: 'Skeptical',
     OpportunistReviewer: 'Opportunist',
   };
+  const recommendationTitle = config.memo.tone === 'analyst' ? 'Analyst Read' : 'Partner Recommendation';
+  const rulingIntro =
+    config.memo.tone === 'analyst'
+      ? 'Record the fund view after reviewing the analyst read, material adverse items, and next action.'
+      : 'Record the fund view after weighing the recommendation, material adverse items, and next action.';
 
   return (
     <div className={wrapperCls}>
@@ -658,6 +716,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             <div className="memoDecisionCluster">
               {/* ── Decision surface ── */}
               <section className="memoDocSection memoDecisionSurface" aria-label="Judgment brief">
+                {showRulingStatus && (
                 <div
                   className={`memoRulingStatus${
                     showEscalationBadge && !isAlreadyDecided ? ' memoRulingStatus--escalation' : ''
@@ -670,18 +729,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                           ? 'Recorded human ruling'
                           : showEscalationBadge
                             ? 'Human ruling required'
-                            : showJudgment
-                              ? 'Partner recommendation awaits ruling'
-                              : 'Pipeline assembling recommendation'}
+                            : 'Pipeline assembling recommendation'}
                       </p>
                     </div>
                     {displayStartup.human_resolution?.resolved_at ? (
                       <p className="memoRulingValue">
                         {decisionLabel(displayStartup.human_resolution.decision)}
                       </p>
-                    ) : showEscalationBadge ? null : showJudgment ? (
-                      <p className="memoRulingValue">Partner recommends {decisionHeadline}</p>
-                    ) : (
+                    ) : showEscalationBadge ? null : (
                       <p className="memoRulingValue">Awaiting recommendation</p>
                     )}
                   </div>
@@ -689,35 +744,43 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     <p className="memoRulingNote">{renderWithMonoNumbers(displayStartup.human_resolution.notes)}</p>
                   ) : null}
                 </div>
+                )}
                 {showJudgment && (() => {
                   const paras = reasoningParagraphs.filter((p) => String(p ?? '').trim());
                   const primaryReason = paras[0];
                   const remainingReasons = paras.slice(1);
+                  const hasStatusMetrics =
+                    displayStartup.partner?.confidence != null
+                    || (configuredScore != null && configuredBand != null);
                   return (
-                    <div className="memoRecommendationBlock" aria-labelledby="memo-verdict">
-                      <h3 className="memoDocSectionHead" id="memo-verdict">Partner Recommendation</h3>
+                    <div
+                      className={`memoRecommendationBlock${showRulingStatus ? '' : ' memoRecommendationBlock--lead'}`}
+                      aria-labelledby="memo-verdict"
+                    >
+                      <h2 className="sr-only" id="memo-verdict">{recommendationTitle}</h2>
                       {decisionBadgeVariant && (
                         <div className="memoDocJudgmentTop">
                           <p className={`memoDocRecommendation memoDocRecommendation--${decisionBadgeVariant.toLowerCase()}`}>
                             {decisionHeadline}.
                           </p>
-                          <div className="memoDocStatusLine">
-                            {displayStartup.partner?.confidence != null && (
-                              <p className="memoDocConfidence">
-                                <span className="memoNum">{Math.round(displayStartup.partner.confidence * 100)}%</span> confidence
-                              </p>
-                            )}
-                            {configuredScore != null && configuredBand && (
-                              <p className="memoDocConfidence">
-                                <span className="memoNum">{configuredScore}</span> configured score, {configuredBand.label}
-                              </p>
-                            )}
-                          </div>
-                          {displayStartup.partner?.decision_drivers &&
-                            displayStartup.partner.decision_drivers.length > 0 && (
-                              <p className="memoDocDrivers">
-                                {displayStartup.partner.decision_drivers.join(' · ')}
-                              </p>
+                          {hasStatusMetrics && (
+                            <p className="memoDocConfidence">
+                              {displayStartup.partner?.confidence != null && (
+                                <>
+                                  <span className="memoNum">{Math.round(displayStartup.partner.confidence * 100)}%</span>
+                                  {' partner confidence'}
+                                </>
+                              )}
+                              {displayStartup.partner?.confidence != null && configuredScore != null && configuredBand && (
+                                <span aria-hidden>{' · '}</span>
+                              )}
+                              {configuredScore != null && configuredBand && (
+                                <>
+                                  <span className="memoNum">{configuredScore}</span>
+                                  {` fund overlay, ${configuredBand.label}`}
+                                </>
+                              )}
+                            </p>
                           )}
                         </div>
                       )}
@@ -747,115 +810,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 })()}
               </section>
 
-              {/* ── Adverse register before ruling controls ── */}
-              {adverseRegister.length > 0 && (
-                <section className="memoDocSection memoAdverseRegister" aria-labelledby="memo-adverse-register">
-                  <button
-                    type="button"
-                    className="memoAdverseHeader"
-                    onClick={() => setAdverseOpen((open) => !open)}
-                    aria-expanded={adverseOpen}
-                    aria-controls={`${contentKey}-adverse-register`}
-                  >
-                    <span className="memoAdverseToggleTitle" id="memo-adverse-register">
-                      Adverse Register
-                    </span>
-                    <span className="memoAdverseHeaderMeta">
-                      <span className="memoAdverseCount" aria-label={`${highAdverseCount} red flags, ${adverseRegister.length} total adverse items`}>
-                        <span className={highAdverseCount > 0 ? 'memoAdverseCountCritical' : undefined}>
-                          {highAdverseCount}
-                        </span>
-                        {' red flags'}
-                        <span aria-hidden> · </span>
-                        <span>{adverseRegister.length}</span>
-                        {' total'}
-                      </span>
-                      <span className="memoAdverseChevron" aria-hidden>
-                        {adverseOpen ? '−' : '+'}
-                      </span>
-                    </span>
-                  </button>
-                  <p className="memoAdverseSummary">
-                    {highAdverseCount > 0
-                      ? `${highAdverseCount} high-severity item${highAdverseCount === 1 ? '' : 's'} require review before conviction.`
-                      : `${mediumAdverseCount || adverseRegister.length} adverse item${(mediumAdverseCount || adverseRegister.length) === 1 ? '' : 's'} noted for diligence.`}
-                  </p>
-                  {adverseOpen && (
-                    <div className="memoAdverseList" id={`${contentKey}-adverse-register`}>
-                      {adverseRegister.map((item) => (
-                        <article key={item.id} className={`memoAdverseItem memoAdverseItem--${item.severity}`}>
-                          <div className="memoAdverseSeverity">
-                            <span>{SEVERITY_LABEL[item.severity]}</span>
-                          </div>
-                          <div className="memoAdverseMain">
-                            <p className="memoAdverseTitle">{renderWithMonoNumbers(item.title)}</p>
-                            <p className="memoAdverseBody">{renderWithMonoNumbers(item.whyItMatters)}</p>
-                          </div>
-                          <div className="memoAdverseMeta">
-                            <span>{item.basis}</span>
-                            {item.missingData && <span>Missing data</span>}
-                            {item.source && <span>{item.source}</span>}
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              )}
-              {adverseRegister.length === 0 && showJudgment && (
-                <section className="memoDocSection memoAdverseRegister memoAdverseRegister--empty" aria-labelledby="memo-adverse-register-empty">
-                  <h2 className="memoDocSectionHead" id="memo-adverse-register-empty">Adverse Register</h2>
-                  <p className="memoAdverseSummary">
-                    No material adverse items extracted under the current {config.risk.sensitivity} risk posture.
-                  </p>
-                </section>
-              )}
-
-              {showJudgment && (
-                <section className="memoDocSection memoDecisionLedger" aria-labelledby="memo-decision-ledger">
-                  <h2 className="memoDocSectionHead" id="memo-decision-ledger">Decision Ledger</h2>
-                  {convictionHistory.length > 0 && (
-                    <ol className="memoLedgerList">
-                      {[...convictionHistory].reverse().slice(0, 5).map((entry, index) => (
-                        <li key={`${entry.timestamp}-${index}`} className="memoLedgerItem">
-                          <div className="memoLedgerMeta">
-                            <span>{decisionLabel(entry.new_decision)}</span>
-                            <span>{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('en-GB') : '—'}</span>
-                          </div>
-                          {entry.rationale && (
-                            <p className="memoLedgerText">{renderWithMonoNumbers(entry.rationale)}</p>
-                          )}
-                          <p className="memoLedgerSub">
-                            {entry.previous_decision ? `From ${decisionLabel(entry.previous_decision)} · ` : ''}
-                            {entry.config_version ? renderWithMonoNumbers(entry.config_version) : 'Current configuration'}
-                          </p>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                  {convictionHistory.length === 0 && (
-                    <p className="memoLedgerEmpty">Conviction history starts when a ruling is committed.</p>
-                  )}
-                  <div className="memoPrecedentBlock">
-                    <p className="memoDocSubhead">Precedents</p>
-                    {precedentCandidates.length > 0 ? (
-                      <ul className="memoList">
-                        {precedentCandidates.map((candidate) => (
-                          <li key={candidate.startupId} className="memoListItem">
-                            <span className="memoBullet" aria-hidden>·</span>
-                            <span>
-                              {candidate.name}: {decisionLabel(candidate.decision)}
-                              {candidate.matchReasons.length ? ` (${candidate.matchReasons.join(', ')})` : ''}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="memoLedgerEmpty">Precedents will appear when comparable resolved decisions exist.</p>
-                    )}
-                  </div>
-                </section>
-              )}
             </div>
 
             {/* ── Evidence summary ── */}
@@ -981,15 +935,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               const compItems = (displayStartup.review?.competition_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const bizItems = (displayStartup.review?.business_model_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const hasScores = !!structuredScoring;
-              const hasSignalsAudit =
-                !!displayStartup.review?.disagreement_summary?.trim() ||
-                (displayStartup.review?.resolution_notes?.filter(Boolean) ?? []).length > 0;
               if (
                 !displayStartup.review &&
                 !teamItems.length &&
                 !compItems.length &&
                 !bizItems.length &&
-                !hasSignalsAudit &&
                 !hasScores
               ) {
                 return null;
@@ -1000,33 +950,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   title="Assessment"
                 >
 
-                  {config.memo.includeScoreReasoning && (hasScores || hasSignalsAudit) && (
+                  {config.memo.includeScoreReasoning && hasScores && (
                     <div className="memoDocScoreScope">
-                      {(() => {
-                        const dsum = displayStartup.review?.disagreement_summary?.trim();
-                        const rnotes = displayStartup.review?.resolution_notes?.filter(Boolean) ?? [];
-                        if (!dsum && rnotes.length === 0) return null;
-                        return (
-                          <div className="memoSignalsAudit">
-                            <p className="memoDocSubhead">Signals &amp; reviewer alignment</p>
-                            {dsum && (
-                              <p className="memoDocProse">{renderWithMonoNumbers(dsum)}</p>
-                            )}
-                            {rnotes.length > 0 && (
-                              <ul className="memoList">
-                                {rnotes.map((note, i) => (
-                                  <li key={i} className="memoListItem">
-                                    <span className="memoBullet" aria-hidden>
-                                      ·
-                                    </span>
-                                    <span>{renderWithMonoNumbers(String(note))}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        );
-                      })()}
                       {structuredScoring && (
                         <>
                           <ScoreOverview scoring={structuredScoring} />
@@ -1179,10 +1104,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   id={`${contentKey}-reviewer-panel`}
                   title="Reviewer Panel"
                   summary={isContested ? 'Contested reviewer read' : `${reviews.length} reviewer reads`}
-                  initialOpen={isContested}
+                  initialOpen={isContested || !config.memo.deepDiveCollapsed}
                 >
                   {isContested && (
-                    <p className="memoDocContestedKicker">Contested</p>
+                    <p className="memoDocProse">
+                      Reviewer personas did not fully agree. The headline scores lean more conservative where their reads diverged.
+                    </p>
                   )}
                   <div className="memoDocReviewerTable" role="group" aria-label="Per-reviewer scores and verdicts">
                     {reviews.map((rv, idx) => {
@@ -1220,21 +1147,78 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               );
             })()}
 
-            {/* ── Risk Context ── */}
-            {(riskFactors.risks.length > 0 || riskFactors.mitigation.length > 0) && (
-              <MemoPlainSection
-                id={`${contentKey}-risk-context`}
-                title="Risk Context"
-              >
-                {riskFactors.risks.length > 0 && (
-                  <ul className="memoList">
-                    {riskFactors.risks.map((r, i) => (
-                      <li key={i} className="memoListItem">
-                        <span className="memoBullet">·</span>
-                        <span>{renderWithMonoNumbers(normalizeListItemText(r))}</span>
-                      </li>
-                    ))}
-                  </ul>
+            {/* ── Risks ── */}
+            {(adverseRegister.length > 0 || riskFactors.risks.length > 0 || riskFactors.mitigation.length > 0 || missingEvidenceItems.length > 0) && (
+              <section className="memoDocSection memoRiskCheckpoint" aria-labelledby="memo-risk-checkpoint">
+                <h2 className="memoDocSectionHead" id="memo-risk-checkpoint">Risk Checkpoint</h2>
+                {adverseRegister.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      className="memoAdverseHeader"
+                      onClick={() => setAdverseOpen((open) => !open)}
+                      aria-expanded={adverseOpen}
+                      aria-controls={`${contentKey}-adverse-register`}
+                    >
+                      <span className="memoAdverseToggleTitle">Material Adverse</span>
+                      <span className="memoAdverseHeaderMeta">
+                        <span className="memoAdverseCount" aria-label={`${highAdverseCount} high severity, ${adverseRegister.length} material adverse items`}>
+                          <span className={highAdverseCount > 0 ? 'memoAdverseCountCritical' : undefined}>{highAdverseCount}</span>
+                          {' high'}
+                          <span aria-hidden> · </span>
+                          <span>{adverseRegister.length}</span>
+                          {' material'}
+                        </span>
+                        <span className="memoAdverseChevron" aria-hidden>{adverseOpen ? '−' : '+'}</span>
+                      </span>
+                    </button>
+                    {adverseOpen && (
+                      <div className="memoAdverseList" id={`${contentKey}-adverse-register`}>
+                        {adverseRegister.map((item) => (
+                          <article key={item.id} className={`memoAdverseItem memoAdverseItem--${item.severity}`}>
+                            <div className="memoAdverseSeverity">
+                              <span>{SEVERITY_LABEL[item.severity]}</span>
+                            </div>
+                            <div className="memoAdverseMain">
+                              <p className="memoAdverseTitle">{renderWithMonoNumbers(item.title)}</p>
+                              <p className="memoAdverseBody">{renderWithMonoNumbers(item.whyItMatters)}</p>
+                            </div>
+                            <div className="memoAdverseMeta">
+                              <span>{item.basis}</span>
+                              {item.missingData && <span>Missing data</span>}
+                              {item.source && <span>{item.source}</span>}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                {config.memo.includeMissingData && missingEvidenceItems.length > 0 && (
+                  <div className="memoDocSubsection">
+                    <p className="memoDocSubhead">Missing Evidence</p>
+                    <ul className="memoList">
+                      {missingEvidenceItems.map((item, i) => (
+                        <li key={i} className="memoListItem">
+                          <span className="memoBullet">·</span>
+                          <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {adverseRegister.length === 0 && riskFactors.risks.length > 0 && (
+                  <div className="memoDocSubsection">
+                    <p className="memoDocSubhead">Other Risks</p>
+                    <ul className="memoList">
+                      {riskFactors.risks.map((r, i) => (
+                        <li key={i} className="memoListItem">
+                          <span className="memoBullet">·</span>
+                          <span>{renderWithMonoNumbers(normalizeListItemText(r))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
                 {riskFactors.mitigation.length > 0 && (
                   <div className="memoDocSubsection">
@@ -1249,12 +1233,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </ul>
                   </div>
                 )}
-              </MemoPlainSection>
+              </section>
             )}
 
-            {/* ── Next Steps ── */}
+            {/* ── Ruling ── */}
             {nextStepText && (
-              <section className="memoDocSection" aria-labelledby="memo-next">
+              <section className="memoDocSection memoNextActionSection" aria-labelledby="memo-next">
                 <h2 className="memoDocSectionHead" id="memo-next">Next Steps</h2>
                 {nextStepItems.length > 0 ? (
                   <ul className="memoList">
@@ -1271,30 +1255,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </section>
             )}
 
-            {/* ── Decision Context (LLM trigger) ── */}
-            {displayStartup.partner?.llm_fallback_reason && (
-              <div className="memoDocSection">
-                <dl className="memoDocDL">
-                  <div className="memoDocDLRow">
-                    <dt className="memoDocDT">Decision context</dt>
-                    <dd className="memoDocDD">{renderWithMonoNumbers(displayStartup.partner.llm_fallback_reason)}</dd>
-                  </div>
-                </dl>
-              </div>
-            )}
-
-            {/* ── Commit ruling — end of memo read path (after diligence narrative) ── */}
             {!isAlreadyDecided && showJudgment && (
               <section className="memoDocSection memoRulingControls" aria-labelledby="memo-final-ruling">
                 <h2 className="memoDocSectionHead" id="memo-final-ruling">Commit Ruling</h2>
-                <p className="memoRulingIntro">
-                  Record the fund view after weighing the recommendation, adverse register, and next action.
-                </p>
+                <p className="memoRulingIntro">{rulingIntro}</p>
                 {needsRiskAcknowledgement && (
                   <div className="memoRiskAcknowledgement">
-                    <p>
-                      High-severity risks present. Mark reviewed when satisfied.
-                    </p>
+                    <p>High-severity risks present. Mark reviewed when satisfied.</p>
                     <button
                       type="button"
                       onClick={() => setRisksReviewed(true)}
@@ -1351,8 +1318,61 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </section>
             )}
 
+            {showJudgment && (convictionHistory.length > 0 || precedentCandidates.length > 0) && (
+              <section className="memoDocSection memoDecisionLedger" aria-labelledby="memo-decision-ledger">
+                <h2 className="memoDocSectionHead" id="memo-decision-ledger">Decision Ledger</h2>
+                {convictionHistory.length > 0 && (
+                  <ol className="memoLedgerList">
+                    {[...convictionHistory].reverse().slice(0, 5).map((entry, index) => (
+                      <li key={`${entry.timestamp}-${index}`} className="memoLedgerItem">
+                        <div className="memoLedgerMeta">
+                          <span>{decisionLabel(entry.new_decision)}</span>
+                          <span>{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('en-GB') : '—'}</span>
+                        </div>
+                        {entry.rationale && (
+                          <p className="memoLedgerText">{renderWithMonoNumbers(entry.rationale)}</p>
+                        )}
+                        <p className="memoLedgerSub">
+                          {entry.previous_decision ? `From ${decisionLabel(entry.previous_decision)} · ` : ''}
+                          {entry.config_version ? renderWithMonoNumbers(entry.config_version) : 'Current configuration'}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {precedentCandidates.length > 0 && (
+                  <div className="memoPrecedentBlock">
+                    <p className="memoDocSubhead">Precedents</p>
+                    <ul className="memoList">
+                      {precedentCandidates.map((candidate) => (
+                        <li key={candidate.startupId} className="memoListItem">
+                          <span className="memoBullet" aria-hidden>·</span>
+                          <span>
+                            {candidate.name}: {decisionLabel(candidate.decision)}
+                            {candidate.matchReasons.length ? ` (${candidate.matchReasons.join(', ')})` : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* ── Decision Context (LLM trigger) ── */}
+            {displayStartup.partner?.llm_fallback_reason && (
+              <div className="memoDocSection">
+                <dl className="memoDocDL">
+                  <div className="memoDocDLRow">
+                    <dt className="memoDocDT">Decision context</dt>
+                    <dd className="memoDocDD">{renderWithMonoNumbers(displayStartup.partner.llm_fallback_reason)}</dd>
+                  </div>
+                </dl>
+              </div>
+            )}
+
             {/* ── Sources ── */}
-            {config.memo.includeEvidenceExcerpts && memoSourceRows(displayStartup).length > 0 && (
+            {config.memo.includeEvidenceExcerpts && memoSources.length > 0 && (
               <section className="memoSourcesSection">
                 <button
                   type="button"
@@ -1375,7 +1395,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   >
                     <div className="memoSourcesBody">
                       <ul className="memoList">
-                        {memoSourceRows(displayStartup)
+                        {memoSources
                           .map((source, i) => {
                             return (
                               <li key={i} className="memoListItem">
@@ -1386,7 +1406,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                                 ) : (
                                   <span>{renderWithMonoNumbers(source.label)}</span>
                                 )}
-                                  <span className="block type-meta normal-case tracking-normal text-oxford/42">{source.supports}</span>
+                                  <span className="block type-meta normal-case tracking-normal text-oxford/42">
+                                    {sourceSupportLine(source, config.memo.includeSourceConfidence)}
+                                  </span>
                                 </span>
                               </li>
                             );

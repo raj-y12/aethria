@@ -77,13 +77,21 @@ const labelCls = 'type-label-section text-oxford/45';
 const sectionLabelCls = 'type-label-section text-oxford/72';
 const metaCls = 'type-meta text-oxford/42';
 const actionBtnCls =
-  'type-label-section min-h-[44px] rounded-none border-0 bg-transparent p-0 text-oxford/55 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30';
+  'type-label-section inline-flex min-h-[36px] items-center rounded-none border-0 bg-transparent p-0 text-oxford/55 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
 const solidBtnCls =
-  'type-label-section min-h-[44px] rounded-none border border-oxford bg-oxford px-phi-4 text-paper transition-colors hover:bg-oxford/90 disabled:cursor-not-allowed disabled:opacity-40';
+  'type-label-section inline-flex min-h-[36px] items-center justify-center rounded-none bg-oxford px-phi-4 text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
 
 function serializeConfig(config: FundConfiguration): string {
   const { lastSavedAt, ...rest } = config;
   return JSON.stringify(rest);
+}
+
+function serializeOperations(settings: Settings | null): string {
+  if (!settings) return '';
+  return JSON.stringify({
+    agent_config: settings.agent_config,
+    cost_budget: settings.cost_budget,
+  });
 }
 
 function TextField({
@@ -360,6 +368,7 @@ export default function SettingsPage() {
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [thesisBusy, setThesisBusy] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState('');
+  const [savedOperationsSnapshot, setSavedOperationsSnapshot] = useState('');
 
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
   const [draft, setDraft] = useState<FundConfiguration>(configuration);
@@ -370,6 +379,7 @@ export default function SettingsPage() {
       .then((data) => {
         if (cancelled) return;
         setSettings(data);
+        setSavedOperationsSnapshot(serializeOperations(data));
         setLoadError(null);
       })
       .catch((error: unknown) => {
@@ -391,7 +401,7 @@ export default function SettingsPage() {
 
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
-  const unsaved = serializeConfig(draft) !== savedSnapshot;
+  const unsaved = serializeConfig(draft) !== savedSnapshot || serializeOperations(settings) !== savedOperationsSnapshot;
 
   const updateDraft = (updater: (current: FundConfiguration) => FundConfiguration) => {
     setDraft((current) => updater(current));
@@ -435,9 +445,12 @@ export default function SettingsPage() {
     setConfiguration(saved);
     setDraft(saved);
     setSavedSnapshot(serializeConfig(saved));
-    if (result.data) setSettings(result.data);
+    if (result.data) {
+      setSettings(result.data);
+      setSavedOperationsSnapshot(serializeOperations(result.data));
+    }
     await queryClient.invalidateQueries({ queryKey: ['settings'] });
-    setStatus('Saved. Queue ordering, memo behavior, and risk gating now use this configuration.');
+    setStatus('Saved. Runtime limits and backend-compatible fund fields are synced; display-only memo and rubric options remain available in the app.');
     setSaving(false);
   };
 
@@ -577,7 +590,7 @@ export default function SettingsPage() {
                     How this fund thinks
                   </h1>
                   <p className="mt-phi-4 max-w-[42rem] type-body leading-relaxed text-oxford/58">
-                    Configure mandate, score interpretation, risk interruption, memo behavior, and the rubric behind conviction. These values now feed the queue, memo surface, and ruling flow where the frontend can apply them.
+                    Configure mandate, backend core scoring weights, runtime limits, and the app-level ruling and memo experience. Controls marked as display-only are saved for the interface but do not override reviewer or partner policy files.
                   </p>
                   {(status || errors.length > 0) && (
                     <div className="mt-phi-5 border-t border-oxford/[0.08] pt-phi-3" role={errors.length ? 'alert' : 'status'}>
@@ -625,7 +638,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="weights" title="Scoring Weights" kicker="Weights recalculate configured scores in the queue and memo preview. Backend scoring integration can consume the same shape.">
+                <SettingsSection id="weights" title="Scoring Weights" kicker="Weights match the five reviewer dimensions used by deterministic backend scoring. Traction and timing remain sub-signals inside Execution and Market.">
                   <div className="flex flex-col gap-phi-4">
                     <div className="flex flex-wrap items-center justify-between gap-phi-4 border-b border-oxford/[0.06] pb-phi-4">
                       <p className={`font-mono text-[1.6rem] tabular-nums ${weightValidation.valid ? 'text-oxford' : 'text-escalation/75'}`}>{weightValidation.total}%</p>
@@ -692,7 +705,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="thresholds" title="Decision Thresholds" kicker="Thresholds connect the mandate to the work queue: auto-pass, monitor, escalation, partner review, stale detection, and insufficient-evidence behavior.">
+                <SettingsSection id="thresholds" title="Decision Thresholds" kicker="Thresholds shape app routing, stale detection, and recommendation language. Partner rules still come from versioned backend policy.">
                   <div className="grid gap-phi-5 md:grid-cols-2">
                     <TextField id="auto-pass" label="Auto-pass threshold" type="number" value={draft.thresholds.autoPass} onChange={(value) => updateThreshold('autoPass', Number(value))} min={0} max={100} />
                     <TextField id="monitor-threshold" label="Monitor threshold" type="number" value={draft.thresholds.monitor} onChange={(value) => updateThreshold('monitor', Number(value))} min={0} max={100} />
@@ -704,7 +717,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="risk" title="Adverse / Risk Sensitivity" kicker="Controls when Aethria interrupts the user before a ruling and how missing evidence affects conviction.">
+                <SettingsSection id="risk" title="Adverse / Risk Sensitivity" kicker="Controls app-level risk acknowledgement and ruling UX. Reviewer scoring and partner policy still use backend evidence and policy rules.">
                   <div className="grid gap-phi-5">
                     <div className="grid gap-phi-5 md:grid-cols-3">
                       <div className="flex flex-col gap-phi-2">
@@ -729,7 +742,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="memo" title="Memo Output" kicker="Controls memo density and what evidence appears before the user commits a decision.">
+                <SettingsSection id="memo" title="Memo Output" kicker="Controls app memo presentation and saved memo verbosity. Existing generated memo content is not rewritten retroactively.">
                   <div className="grid gap-phi-5">
                     <div className="grid gap-phi-5 md:grid-cols-2">
                       <div className="flex flex-col gap-phi-2">
@@ -758,7 +771,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="rubric" title="Rubric Criteria Editor" kicker="Define what good means under each dimension. These criteria are available to future backend scoring integration and shape local rationale previews.">
+                <SettingsSection id="rubric" title="Rubric Criteria Editor" kicker="Save display criteria for local rationale previews and future policy work. Current backend scoring uses the five core dimensions and versioned policy files.">
                   <div className="flex flex-col gap-phi-5">
                     {draft.rubric.map((criterion) => (
                       <div key={criterion.id} className="border-t border-oxford/[0.06] pt-phi-5 first:border-t-0 first:pt-0">
@@ -807,14 +820,16 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="budget" title="Operations" kicker="Existing runtime controls are kept here because they influence whether the pipeline can think at all.">
+                <SettingsSection id="budget" title="Operations" kicker="Runtime gates for background pipeline cycles. Company limits cap scout, reviewer, and partner batch size; budget settings drive CostController when enabled.">
                   <div className="grid gap-phi-5 md:grid-cols-2">
                     <ToggleRow id="scouts-enabled" checked={settings.agent_config.scouts_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, scouts_enabled: value } } : current)} label="Scouts enabled" />
                     <ToggleRow id="reviewers-enabled" checked={settings.agent_config.reviewers_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, reviewers_enabled: value } } : current)} label="Reviewers enabled" />
                     <ToggleRow id="partners-enabled" checked={settings.agent_config.partners_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, partners_enabled: value } } : current)} label="Partners enabled" />
                     <ToggleRow id="budget-enabled" checked={settings.cost_budget.enabled} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, enabled: value } } : current)} label="Cost budget enabled" />
                     <TextField id="max-agents" label="Companies per cycle" type="number" value={settings.agent_config.max_agents_per_run} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, max_agents_per_run: Number(value) } } : current)} min={1} />
+                    <TextField id="max-tokens" label="Token cap per day" type="number" value={settings.cost_budget.max_tokens_per_run} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, max_tokens_per_run: Number(value) } } : current)} min={0} />
                     <TextField id="daily-cost" label="Daily cap (USD)" type="number" value={settings.cost_budget.daily_cost_ceiling} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, daily_cost_ceiling: Number(value) } } : current)} min={0} />
+                    <TextField id="cooldown-seconds" label="Agent cooldown seconds" type="number" value={settings.cost_budget.cooldown_seconds} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, cooldown_seconds: Number(value) } } : current)} min={0} />
                   </div>
                 </SettingsSection>
 

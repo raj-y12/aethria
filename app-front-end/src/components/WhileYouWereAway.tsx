@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import GrainOverlay from './GrainOverlay';
+import CountUp from './CountUp';
 import type { ActivitySummary } from '../api/activity';
 import { usePrefersReducedMotion } from '../hooks';
 
@@ -14,8 +15,6 @@ const STATS_CONFIG = (s: ActivitySummary) => [
   { label: 'Discovered', value: s.found, accent: false },
   { label: 'Evaluated', value: s.reviewed, accent: false },
   { label: 'Agent-decided', value: s.agent_decided ?? s.decided, accent: false },
-  { label: 'Human-reviewed', value: s.human_reviewed ?? 0, accent: false },
-  { label: 'Open/in-progress', value: s.open_in_progress ?? 0, accent: false },
   { label: 'Escalated', value: s.escalations, accent: true },
 ];
 
@@ -134,7 +133,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
                   letterSpacing: '-0.03em',
                 }}
               >
-                {stat.value.toLocaleString()}
+                <CountUp to={stat.value} delay={reduceMotion ? 0 : 0.22 + i * 0.07} reduceMotion={reduceMotion} />
               </div>
               <div
                 style={{

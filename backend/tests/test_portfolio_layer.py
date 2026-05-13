@@ -168,3 +168,36 @@ async def test_portfolio_layer():
 
 if __name__ == "__main__":
     asyncio.run(test_portfolio_layer())
+
+
+def test_cost_controller_uses_saved_runtime_limits(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "portfolio.cost_control.load_settings",
+        lambda user_id=None, use_cache=True: {
+            "cost_budget": {
+                "enabled": True,
+                "max_tokens_per_run": 100,
+                "daily_cost_ceiling": 0.0001,
+                "cooldown_seconds": 9,
+            },
+            "agent_config": {"max_agents_per_run": 3},
+        },
+    )
+    monkeypatch.setenv("AETHRIA_TOKEN_COST_PER_1K_USD", "1")
+
+    cost_controller = CostController(
+        budget_file=str(tmp_path / "budgets.json"),
+        user_id="user_settings",
+    )
+
+    allowed, reason = cost_controller.can_make_call("scout", "scout_test", estimated_tokens=101)
+    assert allowed is False
+    assert "token" in (reason or "").lower()
+
+    cost_controller.record_call("scout", "scout_test", tokens_used=1)
+    allowed, reason = cost_controller.can_make_call("scout", "scout_test_2", estimated_tokens=1)
+    assert allowed is False
+    assert "cost" in (reason or "").lower()
+
+    assert cost_controller.cooldowns["scout"] == 9
+    assert cost_controller.get_budget_status("scout")["tokens_limit"] == 100

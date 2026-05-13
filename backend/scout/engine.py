@@ -18,7 +18,7 @@ from scout.base import Scout
 from scout.schema import ScoutOutput
 from utils.storage import Storage
 from tenant_context import require_user_id
-from utils.settings_loader import is_scouts_enabled
+from utils.settings_loader import get_runtime_limits, is_scouts_enabled
 from utils.prompt_version import hash_prompt
 
 
@@ -144,6 +144,11 @@ class ScoutEngine:
         if not is_scouts_enabled(self.tenant_user_id):
             self.logger.info("Discovery cycle skipped (scouts disabled in settings)")
             return []
+        try:
+            max_discoveries = int(get_runtime_limits(self.tenant_user_id).get("max_agents_per_run", 10))
+        except Exception:
+            max_discoveries = 10
+        max_discoveries = max(1, max_discoveries)
         self._sync_thesis_to_scouts()
 
         unreviewed: Optional[int] = None
@@ -177,6 +182,9 @@ class ScoutEngine:
 
         discoveries: List[ScoutOutput] = []
         for wave_idx in range(waves):
+            remaining_slots = max_discoveries - len(discoveries)
+            if remaining_slots <= 0:
+                break
             if self.cost_controller:
                 allowed, reason = self.cost_controller.check_budget("scout", "scout_engine")
                 if not allowed:
@@ -186,6 +194,7 @@ class ScoutEngine:
                     break
 
             selected_scouts = self._select_scouts_for_wave()
+            selected_scouts = selected_scouts[:remaining_slots]
 
             if self.deal_memory:
                 memory_context = self.deal_memory.get_memory_context_for_scout()

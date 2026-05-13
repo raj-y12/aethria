@@ -353,6 +353,50 @@ def is_cost_budget_enabled(user_id: Optional[str] = None) -> bool:
     return bool(load_settings(user_id).get("cost_budget", {}).get("enabled", False))
 
 
+def _non_negative_number(value, default: float) -> float:
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0.0, n)
+
+
+def runtime_limits_from_settings(settings: dict) -> dict:
+    """Normalize runtime limits from a loaded settings document."""
+    ac = settings.get("agent_config") if isinstance(settings.get("agent_config"), dict) else {}
+    cb = settings.get("cost_budget") if isinstance(settings.get("cost_budget"), dict) else {}
+    try:
+        max_agents = int(ac.get("max_agents_per_run", DEFAULT_SETTINGS["agent_config"]["max_agents_per_run"]))
+    except (TypeError, ValueError):
+        max_agents = DEFAULT_SETTINGS["agent_config"]["max_agents_per_run"]
+    try:
+        max_tokens = int(cb.get("max_tokens_per_run", DEFAULT_SETTINGS["cost_budget"]["max_tokens_per_run"]))
+    except (TypeError, ValueError):
+        max_tokens = DEFAULT_SETTINGS["cost_budget"]["max_tokens_per_run"]
+    try:
+        cooldown = int(cb.get("cooldown_seconds", DEFAULT_SETTINGS["cost_budget"]["cooldown_seconds"]))
+    except (TypeError, ValueError):
+        cooldown = DEFAULT_SETTINGS["cost_budget"]["cooldown_seconds"]
+    return {
+        "max_agents_per_run": max(1, max_agents),
+        "max_tokens_per_run": max(0, max_tokens),
+        "cooldown_seconds": max(0, cooldown),
+        "daily_cost_ceiling": _non_negative_number(
+            cb.get("daily_cost_ceiling", DEFAULT_SETTINGS["cost_budget"]["daily_cost_ceiling"]),
+            DEFAULT_SETTINGS["cost_budget"]["daily_cost_ceiling"],
+        ),
+        "weekly_cost_ceiling": _non_negative_number(
+            cb.get("weekly_cost_ceiling", DEFAULT_SETTINGS["cost_budget"]["weekly_cost_ceiling"]),
+            DEFAULT_SETTINGS["cost_budget"]["weekly_cost_ceiling"],
+        ),
+    }
+
+
+def get_runtime_limits(user_id: Optional[str] = None) -> dict:
+    """Runtime limits saved from Settings > Operations."""
+    return runtime_limits_from_settings(load_settings(user_id))
+
+
 def get_scout_region(user_id: Optional[str] = None) -> str:
     region = load_settings(user_id).get("agent_config", {}).get("scout_region", "europe")
     if region not in ("europe", "global"):

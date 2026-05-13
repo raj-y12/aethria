@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { motion, AnimatePresence, animate, useMotionValue, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, animate } from 'framer-motion';
 import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { usePrefersReducedMotion } from '../hooks';
 import GrainOverlay from './GrainOverlay';
+import CountUp from './CountUp';
 import { fetchActivitySummaryWithToken, type ActivitySummary } from '../api/activity';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -20,22 +21,8 @@ const STATS_CONFIG = (s: ActivitySummary) => [
   { label: 'Discovered', value: s.found, accent: false },
   { label: 'Evaluated', value: s.reviewed, accent: false },
   { label: 'Agent-decided', value: s.agent_decided ?? s.decided, accent: false },
-  { label: 'Human-reviewed', value: s.human_reviewed ?? 0, accent: false },
-  { label: 'Open/in-progress', value: s.open_in_progress ?? 0, accent: false },
   { label: 'Escalated', value: s.escalations, accent: true },
 ];
-
-/** Counts up from 0 to `to` on mount using a spring-eased motion value. */
-function CountUp({ to, delay, reduceMotion }: { to: number; delay: number; reduceMotion: boolean }) {
-  const val = useMotionValue(reduceMotion ? to : 0);
-  const display = useTransform(val, (v) => Math.round(v).toLocaleString());
-  useEffect(() => {
-    if (reduceMotion) return;
-    const ctrl = animate(val, to, { duration: 0.9, delay, ease: [0.25, 1, 0.5, 1] });
-    return ctrl.stop;
-  }, [to, delay, reduceMotion, val]);
-  return <motion.span>{display}</motion.span>;
-}
 
 /** Input with an animated underline that expands from center on focus. */
 const AnimatedInput = React.forwardRef<

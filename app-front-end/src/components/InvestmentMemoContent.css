@@ -298,7 +298,7 @@
 }
 
 .memoDecisionCluster {
-  margin-top: 34px;
+  margin-top: 28px;
   padding: 0;
 }
 .memoDecisionCluster .memoDocSection {
@@ -307,7 +307,7 @@
   border-top: none;
 }
 .memoDecisionCluster .memoDocSection + .memoDocSection {
-  margin-top: 34px;
+  margin-top: 26px;
   padding-top: 0;
   border-top: none;
 }
@@ -399,6 +399,9 @@
 }
 .memoRecommendationBlock {
   margin-top: 26px;
+}
+.memoRecommendationBlock--lead {
+  margin-top: 0;
 }
 .memoRecommendationBlock > .memoDocSectionHead {
   margin-top: 0;
@@ -569,6 +572,9 @@
 .memoDecisionCluster .memoRulingControls {
   padding-top: 0;
 }
+.memoNextActionSection .memoDocProse {
+  color: var(--memo-ink);
+}
 .memoDecisionLedger {
   padding-top: 0;
   border-top: none;
@@ -730,12 +736,45 @@
   transition: opacity 160ms ease;
 }
 .memoRulingIntro {
-  margin: -6px 0 16px;
+  margin: -4px 0 14px;
   max-width: 42rem;
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-ui);
   line-height: 1.55;
   color: rgba(var(--color-oxford-rgb), 0.56);
+}
+
+.memoPanel--embedded .memoRulingStatus {
+  grid-template-columns: 1fr;
+}
+.memoPanel--embedded .memoDisclosureToggle {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  align-items: center;
+}
+.memoPanel--embedded .memoDisclosureTitle {
+  grid-column: 1 / -1;
+}
+.memoPanel--embedded .memoDisclosureMeta {
+  grid-column: 1;
+}
+.memoPanel--embedded .memoDisclosurePlus {
+  grid-column: 2;
+  justify-self: end;
+}
+.memoPanel--embedded .memoRulingNote {
+  grid-column: 1;
+}
+.memoPanel--embedded .memoDocStatusLine,
+.memoPanel--embedded .memoAdverseHeaderMeta {
+  flex-wrap: wrap;
+}
+.memoPanel--embedded .memoAdverseCount {
+  white-space: normal;
+}
+.memoPanel--embedded .memoDisclosureMeta,
+.memoPanel--embedded .memoDocReviewerRowScores {
+  white-space: normal;
 }
 .memoDecisionChoices {
   display: grid;
@@ -1582,23 +1621,6 @@
   text-transform: uppercase;
 }
 .memoGenCallout .memoGateDetail { margin-bottom: 0; }
-
-.memoSignalsAudit {
-  margin-top: 1.625rem;
-  margin-bottom: 1rem;
-  padding: 0;
-  border-top: none;
-  border-bottom: none;
-  background: transparent;
-}
-.memoSignalsAudit .memoDocProse {
-  font-size: var(--memo-size-secondary);
-  color: rgba(var(--color-oxford-rgb), 0.70);
-}
-.memoSignalsAudit .memoList {
-  margin-top: 0.75rem;
-  font-size: var(--memo-size-secondary);
-}
 
 @media (max-width: 1100px) {
   .memoPanel { width: 100%; flex-basis: auto; }

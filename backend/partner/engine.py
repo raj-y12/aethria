@@ -13,7 +13,7 @@ from partner.decision import PartnerDecisionEngine
 from partner.schema import validate_partner_output
 from tenant_context import require_user_id
 from utils.storage import Storage
-from utils.settings_loader import is_partners_enabled
+from utils.settings_loader import get_runtime_limits, is_partners_enabled
 from portfolio.store import PortfolioStore
 from pipeline_state import pipeline_stage_log, upsert_pipeline_state
 
@@ -322,7 +322,13 @@ class PartnerEngine:
 
         # Ramp: process up to batch_max per cycle so we make progress without one huge cycle
         undecided_count = self.storage.count_undecided()
-        limit = min(self.batch_max, undecided_count) if undecided_count else None
+        try:
+            cycle_limit = int(get_runtime_limits(self.tenant_user_id).get("max_agents_per_run", self.batch_max))
+        except Exception as e:
+            self.logger.warning("Partner runtime limits unavailable, using batch max: %s", e)
+            cycle_limit = self.batch_max
+        effective_batch_max = min(self.batch_max, max(1, cycle_limit))
+        limit = min(effective_batch_max, undecided_count) if undecided_count else None
         undecided = self._get_undecided_entries(limit=limit)
         
         if not undecided:

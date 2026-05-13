@@ -14,6 +14,7 @@ from collections import defaultdict
 import os
 
 from supabase_doc_store import doc_get, doc_set
+from utils.settings_loader import load_settings, runtime_limits_from_settings
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,37 @@ class CostController:
             "partner": {"calls": 1000, "tokens": 0},
         }
         self.cooldowns = {"scout": 60, "reviewer": 30, "partner": 10}
+        self.daily_cost_ceiling = 0.0
+        self.weekly_cost_ceiling = 0.0
+        self.token_cost_per_1k_usd = self._configured_token_cost()
+        self._apply_saved_limits()
         self._load_budgets()
+
+    @staticmethod
+    def _configured_token_cost() -> float:
+        raw = os.getenv("AETHRIA_TOKEN_COST_PER_1K_USD", "0.001")
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
+            return 0.001
+
+    def _apply_saved_limits(self) -> None:
+        if not self.user_id:
+            return
+        try:
+            limits = runtime_limits_from_settings(load_settings(self.user_id))
+        except Exception as e:
+            self.logger.warning("Saved runtime limits unavailable; using defaults: %s", e)
+            return
+        token_limit = int(limits.get("max_tokens_per_run", 0) or 0)
+        if token_limit > 0:
+            for agent_type in self.default_budgets:
+                self.default_budgets[agent_type]["tokens"] = token_limit
+        cooldown_seconds = int(limits.get("cooldown_seconds", 0) or 0)
+        for agent_type in self.cooldowns:
+            self.cooldowns[agent_type] = cooldown_seconds
+        self.daily_cost_ceiling = float(limits.get("daily_cost_ceiling", 0.0) or 0.0)
+        self.weekly_cost_ceiling = float(limits.get("weekly_cost_ceiling", 0.0) or 0.0)
 
     def _using_supabase(self) -> bool:
         return bool(self.user_id and os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
@@ -84,6 +115,7 @@ class CostController:
                 agent_budget["last_reset_date"] = today
                 agent_budget["calls_today"] = 0
                 agent_budget["tokens_today"] = 0
+                agent_budget["cost_today"] = 0.0
                 agent_budget["last_call_time"] = {}
                 self.budgets[agent_type] = agent_budget
         
@@ -123,6 +155,16 @@ class CostController:
         tokens_today = budget.get("tokens_today", 0)
         if tokens_today + estimated_tokens > default["tokens"]:
             return False, f"Daily token budget would be exceeded"
+
+        if self.daily_cost_ceiling > 0 and self.token_cost_per_1k_usd > 0:
+            cost_today = sum(
+                float(v.get("cost_today", 0.0) or 0.0)
+                for v in self.budgets.values()
+                if isinstance(v, dict)
+            )
+            estimated_cost = (max(0, int(estimated_tokens or 0)) / 1000.0) * self.token_cost_per_1k_usd
+            if cost_today + estimated_cost > self.daily_cost_ceiling:
+                return False, f"Daily cost ceiling would be exceeded"
         
         # Check cooldown
         last_calls = budget.get("last_call_time", {})
@@ -164,6 +206,11 @@ class CostController:
         budget = self.budgets[agent_type]
         budget["calls_today"] = budget.get("calls_today", 0) + 1
         budget["tokens_today"] = budget.get("tokens_today", 0) + tokens_used
+        budget["cost_today"] = round(
+            float(budget.get("cost_today", 0.0) or 0.0)
+            + (max(0, int(tokens_used or 0)) / 1000.0) * self.token_cost_per_1k_usd,
+            8,
+        )
         budget["last_call_time"][agent_id] = datetime.now().isoformat()
         
         self._save_budgets()
@@ -213,6 +260,8 @@ class CostController:
             "calls_limit": default["calls"],
             "tokens_used": budget.get("tokens_today", 0),
             "tokens_limit": default["tokens"],
+            "cost_used": budget.get("cost_today", 0.0),
+            "daily_cost_ceiling": self.daily_cost_ceiling,
             "last_reset": budget.get("last_reset_date"),
         }
 

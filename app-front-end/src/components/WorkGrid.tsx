@@ -148,6 +148,13 @@ function formatRowDate(value: string): string {
   return new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
+function formatUnresolvedAgeDays(value: string): string {
+  const time = new Date(value).getTime();
+  if (!Number.isFinite(time)) return '';
+  const days = Math.max(0, Math.floor((Date.now() - time) / (24 * 60 * 60 * 1000)));
+  return `${days} day${days === 1 ? '' : 's'}`;
+}
+
 function getUnresolvedAt(startup: Startup): string | null {
   return startup.unresolved_at ?? startup.timestamps?.unresolved_at ?? null;
 }
@@ -623,8 +630,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                     {metaHasUnresolved && (
                       <>
                         {(metaHasDate || metaHasSector || metaHasFunding) && <span className="type-meta text-oxford/25">·</span>}
-                        <span className="type-meta text-oxford/38 tabular-nums" title="Date this item entered unresolved state">
-                          Unresolved {formatRowDate(row.unresolvedAt ?? '')}
+                        <span className="type-meta text-oxford/38 tabular-nums" title="Days this item has been unresolved">
+                          Unresolved {formatUnresolvedAgeDays(row.unresolvedAt ?? '')}
                         </span>
                       </>
                     )}
@@ -664,11 +671,10 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                           metaHasMonitor ||
                           metaHasLookup) && <span className="type-meta text-oxford/25">·</span>}
                         <span
-                          className="type-meta tracking-[0.06em] tabular-nums text-oxford/45"
+                          className="type-meta tracking-[0.06em] tabular-nums text-oxford/55"
                           title="Configured weighted score"
                         >
-                          <span className="text-oxford/34">Score</span>{' '}
-                          <span className="text-oxford/55">{row.configuredScore}%</span>
+                          {row.configuredScore}%
                         </span>
                       </>
                     )}

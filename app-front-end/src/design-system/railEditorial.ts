@@ -32,6 +32,9 @@ export const railEditorial = {
   /** Sub-captions, timestamps, link text. */
   meta: 'font-mono text-[10px] leading-[1.4] text-oxford/35 tracking-[0.06em]',
 
+  /** Small stage/status labels inside rail rows. */
+  statusLabel: 'font-mono text-[10px] leading-none uppercase tracking-[0.10em]',
+
   /** Unstyled size+leading only — apply text color separately. */
   bodyMetrics,
 } as const;

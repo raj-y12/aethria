@@ -33,13 +33,13 @@ import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './Inves
 import { queueOnDemandLookup, fetchStartupDetail, fetchLookupJobStatus } from '../api/startups';
 import {
   fetchAgentsStatus,
+  fetchLoopStatus,
 } from '../api/agents';
 import { fetchFundThesisSummary } from '../api/fundThesis';
 import { getQueryConfig } from '../lib/queryIntent';
 import { railEditorial } from '../design-system/railEditorial';
 import {
   getBacklogPressure,
-  isDealDecided,
   isDealPendingPartnerDecision,
   isDealUnreviewed,
 } from '../lib/dealState';
@@ -54,6 +54,56 @@ const PANEL_CHROME_ACTION_BTN_CLASS =
 /** Memo sheet header actions — same inactive styling as WorkGrid source `FilterButton`. */
 const MEMO_SHEET_ACTION_BTN_CLASS =
   'type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 text-oxford/40 hover:text-oxford/70';
+
+type RailStageState = {
+  key: string;
+  label: string;
+  enabled: boolean;
+};
+
+function PipelineHeaderSignal({
+  stages,
+  loopAlive,
+  pipelineEnabled,
+  issue,
+}: {
+  stages: RailStageState[];
+  loopAlive: boolean;
+  pipelineEnabled: boolean;
+  issue: boolean;
+}) {
+  const statusLabel = issue ? 'Issue' : loopAlive ? 'Live' : pipelineEnabled ? 'Idle' : 'Paused';
+  const statusTone = issue
+    ? 'text-escalation'
+    : loopAlive
+      ? 'text-oxford/68'
+      : pipelineEnabled
+        ? 'text-oxford/44'
+        : 'text-oxford/25';
+
+  return (
+    <div className="flex items-center gap-phi-2" aria-label="Pipeline and agent stage status">
+      <span className="flex items-center gap-[3px]" aria-label="Enabled agent stages">
+        {stages.map((stage) => {
+          const active = stage.enabled && loopAlive && !issue;
+          return (
+            <span
+              key={stage.key}
+              className={`h-px w-[10px] shrink-0 ${
+                active ? 'bg-oxford/58 pulse-soft' : stage.enabled ? 'bg-oxford/28' : 'bg-oxford/10'
+              }`}
+              title={`${stage.label} ${stage.enabled ? 'enabled' : 'off'}`}
+              aria-label={`${stage.label} ${stage.enabled ? 'enabled' : 'off'}`}
+            />
+          );
+        })}
+      </span>
+      <span className={`${railEditorial.statusLabel} ${statusTone}`} aria-live="polite">
+        {statusLabel}
+      </span>
+    </div>
+  );
+}
 
 interface MainLayoutProps {
   data: SystemData;
@@ -143,19 +193,6 @@ export default function MainLayout({
     queryLabel: string;
     autoOpened: boolean;
   } | null>(null);
-
-  const [railClock, setRailClock] = useState(() => new Date());
-  useEffect(() => {
-    const tick = () => setRailClock(new Date());
-    tick();
-    const id = window.setInterval(tick, 60_000);
-    return () => window.clearInterval(id);
-  }, []);
-  const railTimeShort = railClock.toLocaleTimeString('en-GB', {
-    hour12: false,
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const reduceMotion = usePrefersReducedMotion();
@@ -333,10 +370,9 @@ export default function MainLayout({
   useRestoreFocus(judgementsAsOverlay, { current: null }, !verdictOrMemoOpen);
   useFocusTrap(judgementsAsOverlay, judgementsPanelRef);
 
-  const humanReviewedCount = startups.filter(isDealDecided).length;
-  const agentDecidedCount = startups.filter((startup) => Boolean(startup.partner?.recommendation)).length;
-  const unreviewedCount = startups.filter(isDealUnreviewed).length;
-  const pendingDecisionCount = startups.filter(isDealPendingPartnerDecision).length;
+  const openInProgressCount =
+    startups.filter(isDealUnreviewed).length + startups.filter(isDealPendingPartnerDecision).length;
+  const decidedCount = startups.filter((startup) => Boolean(startup.partner?.recommendation)).length;
   const pendingEscalations = data.pendingEscalationCount ?? data.settings?.system_health?.pending_escalations ?? 0;
   const agentConfig = data.settings?.agent_config;
   const pipelineEnabled =
@@ -347,6 +383,12 @@ export default function MainLayout({
     queryKey: ['agents-status'],
     queryFn: () => fetchAgentsStatus().catch(() => null),
     ...getQueryConfig('SEMI_DYNAMIC', { liveGate }),
+  });
+
+  const { data: loopStatus } = useQuery({
+    queryKey: ['agents-loop-status'],
+    queryFn: () => fetchLoopStatus().catch(() => null),
+    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 30_000 }),
   });
 
 
@@ -374,6 +416,12 @@ export default function MainLayout({
     : pipelineHealthIssue
       ? 'Issue'
       : 'On';
+  const pipelineLoopAlive = Boolean(loopStatus?.loop_alive);
+  const pipelineStages: RailStageState[] = [
+    { key: 'scout', label: 'Scout', enabled: Boolean(agentConfig?.scouts_enabled) },
+    { key: 'review', label: 'Review', enabled: Boolean(agentConfig?.reviewers_enabled) },
+    { key: 'partner', label: 'Partner', enabled: Boolean(agentConfig?.partners_enabled) },
+  ];
   useEffect(() => {
     onSystemPanelOpenChange?.(rightPanel === 'system');
   }, [rightPanel, onSystemPanelOpenChange]);
@@ -563,20 +611,12 @@ export default function MainLayout({
                       Aethria
                     </p>
                     <div className="relative flex items-center gap-phi-2">
-                      {pipelineStateLabel === 'On' && (
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/40 pulse-soft" aria-hidden />
-                      )}
-                      <span
-                        className={
-                          pipelineStateLabel === 'Issue'
-                            ? 'type-meta text-escalation'
-                            : pipelineStateLabel === 'Off'
-                              ? 'type-meta text-oxford/25'
-                              : 'type-meta tabular-nums text-oxford/32'
-                        }
-                      >
-                        {pipelineStateLabel === 'Issue' ? 'Issue' : railTimeShort}
-                      </span>
+                      <PipelineHeaderSignal
+                        stages={pipelineStages}
+                        loopAlive={pipelineLoopAlive}
+                        pipelineEnabled={pipelineEnabled}
+                        issue={pipelineHealthIssue}
+                      />
                       {pipelineStateLabel === 'Issue' && (
                         <>
                           <button
@@ -641,10 +681,8 @@ export default function MainLayout({
                   <div className="grid min-w-0 grid-cols-2" style={{ columnGap: 'clamp(8px, 1vw, 13px)', rowGap: 'clamp(5px, 0.8vw, 8px)' }}>
                     {[
                       { label: 'Total', value: startups.length, accent: false },
-                      { label: 'Agent-decided', value: agentDecidedCount, accent: false },
-                      { label: 'Pending decision', value: pendingDecisionCount, accent: false },
-                      { label: 'Unreviewed', value: unreviewedCount, accent: false },
-                      { label: 'Human-reviewed', value: humanReviewedCount, accent: false },
+                      { label: 'Open/in-progress', value: openInProgressCount, accent: false },
+                      { label: 'Decided', value: decidedCount, accent: false },
                       { label: 'Escalated', value: pendingEscalations, accent: pendingEscalations > 0 },
                     ].map((stat) => (
                       <div
@@ -720,7 +758,7 @@ export default function MainLayout({
                   <div className="min-w-0 flex flex-col gap-phi-2">
                     <p className="type-meta text-oxford/30">Live overview</p>
                     <p className="type-meta text-oxford/60">
-                      {startups.length} total · {agentDecidedCount} agent-decided · {pendingDecisionCount} pending decision · {unreviewedCount} unreviewed · {humanReviewedCount} human-reviewed
+                      {startups.length} total · {openInProgressCount} open/in-progress · {decidedCount} decided · {pendingEscalations} escalated
                       {signals.length > 0 ? ` · ${signals.length} signals` : ''}
                     </p>
                   </div>

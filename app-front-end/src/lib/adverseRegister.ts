@@ -39,6 +39,20 @@ const MEDIUM_TERMS = [
   'execution',
 ];
 
+const MATERIAL_TERMS = [
+  ...HIGH_TERMS,
+  'customer concentration',
+  'no customers',
+  'no revenue',
+  'churn',
+  'regulatory',
+  'security',
+  'lawsuit',
+  'runway',
+  'founder',
+  'traction',
+];
+
 function cleanText(value: unknown): string {
   return String(value ?? '')
     .replace(/^\s*[•·*-]\s+/, '')
@@ -69,6 +83,13 @@ function severityFromText(text: string, fallback: AdverseSeverity = 'medium'): A
   return fallback;
 }
 
+function isMaterialAdverse(text: string, source: string, severity: AdverseSeverity): boolean {
+  const lower = text.toLowerCase();
+  if (severity === 'high') return true;
+  if (source.includes('red flag') || source.includes('Partner risk') || source.includes('Reviewer risk')) return true;
+  return MATERIAL_TERMS.some((term) => lower.includes(term));
+}
+
 function basisFromText(text: string, source?: string): AdverseBasis {
   const lower = text.toLowerCase();
   if (source || lower.includes('reference') || lower.includes('reported') || lower.includes('according')) {
@@ -87,9 +108,11 @@ function addTextItems(
     const text = cleanText(raw);
     if (!text) continue;
     const missingData = /^\[?missing/i.test(text) || text.toLowerCase().includes('missing');
+    const severity = severityFromText(text, fallbackSeverity);
+    if (!isMaterialAdverse(text, source, severity)) continue;
     uniquePush(items, {
       id: `${source}:${items.length}:${text.slice(0, 28)}`,
-      severity: severityFromText(text, fallbackSeverity),
+      severity,
       title: titleFromText(text),
       whyItMatters: text,
       basis: basisFromText(text, source),
@@ -111,11 +134,6 @@ export function extractAdverseRegister(startup: Startup | null | undefined): Adv
 
   for (const review of startup.review?.reviews ?? []) {
     addTextItems(items, review.key_risks, `${review.reviewer_type.replace('Reviewer', '')} review`, 'medium');
-    addTextItems(items, review.market_weaknesses, 'Market weakness', 'medium');
-    addTextItems(items, review.product_weaknesses, 'Product weakness', 'medium');
-    addTextItems(items, review.technical_weaknesses, 'Technical weakness', 'medium');
-    addTextItems(items, review.execution_weaknesses, 'Execution weakness', 'medium');
-    addTextItems(items, review.defensibility_weaknesses, 'Defensibility weakness', 'medium');
   }
 
   const scoring = normalizeStructuredScoring(startup.review ?? null);
@@ -124,10 +142,10 @@ export function extractAdverseRegister(startup: Startup | null | undefined): Adv
       if (dimension === 'overall_score') continue;
       if (!detail || typeof detail !== 'object' || !('score' in detail)) continue;
       const score = Number((detail as { score?: number }).score);
-      if (!Number.isFinite(score) || score >= 5) continue;
+      if (!Number.isFinite(score) || score > 3) continue;
       uniquePush(items, {
         id: `score:${dimension}`,
-        severity: score <= 3 ? 'high' : 'medium',
+        severity: 'high',
         title: `${dimension.charAt(0).toUpperCase()}${dimension.slice(1)} score below bar`,
         whyItMatters: `Reviewer scoring places ${dimension} at ${score}/10, below the threshold for conviction without further diligence.`,
         basis: 'evidence-backed',
