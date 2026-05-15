@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useClerk } from '@clerk/react-router';
 import { UserProfile } from '@clerk/react';
@@ -369,6 +369,7 @@ export default function SettingsPage() {
   const [thesisBusy, setThesisBusy] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState('');
   const [savedOperationsSnapshot, setSavedOperationsSnapshot] = useState('');
+  const contentScrollRef = useRef<HTMLDivElement | null>(null);
 
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
   const [draft, setDraft] = useState<FundConfiguration>(configuration);
@@ -398,6 +399,36 @@ export default function SettingsPage() {
     setDraft(configuration);
     setSavedSnapshot(serializeConfig(configuration));
   }, [configuration]);
+
+  useEffect(() => {
+    const root = contentScrollRef.current;
+    if (!root) return;
+
+    const targets = sections
+      .map((section) => root.querySelector<HTMLElement>(`#${section.id}`))
+      .filter((node): node is HTMLElement => node != null);
+    if (!targets.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (!visible.length) return;
+        const id = visible[0].target.getAttribute('id') as SectionId | null;
+        if (id) setActiveSection(id);
+      },
+      {
+        root,
+        // Favor the section currently near the top of the scroll viewport.
+        rootMargin: '-20% 0px -65% 0px',
+        threshold: [0, 0.15, 0.35, 0.6],
+      }
+    );
+
+    targets.forEach((target) => observer.observe(target));
+    return () => observer.disconnect();
+  }, [loading, settings]);
 
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
@@ -548,8 +579,13 @@ export default function SettingsPage() {
               <a
                 key={section.id}
                 href={`#${section.id}`}
-                onClick={() => setActiveSection(section.id)}
-                className={`type-label-tab min-h-[36px] px-phi-3 py-phi-2 transition-colors ${activeSection === section.id ? 'bg-oxford/[0.055] text-oxford' : 'text-oxford/40 hover:bg-oxford/[0.03] hover:text-oxford/70'}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setActiveSection(section.id);
+                  const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${section.id}`);
+                  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className={`type-label-tab min-h-[36px] px-phi-3 py-phi-2 transition-colors ${activeSection === section.id ? 'bg-surface-selected text-oxford' : 'text-oxford/40 hover:bg-oxford/[0.03] hover:text-oxford/70'}`}
               >
                 {section.short}
               </a>
@@ -581,7 +617,7 @@ export default function SettingsPage() {
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-phi-5 py-phi-6 lg:px-phi-7">
+          <div ref={contentScrollRef} className="min-h-0 flex-1 overflow-y-auto scroll-smooth px-phi-5 py-phi-6 lg:px-phi-7">
             <div className="grid min-h-full gap-phi-7 xl:grid-cols-[minmax(0,1fr)_18rem]">
               <div className="min-w-0">
                 <header className="mb-phi-7 max-w-[54rem]">

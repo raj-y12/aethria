@@ -36,6 +36,8 @@ export function getReviewerQualityBand(review: Review | null | undefined): Revie
   if (!review) return null;
   const c = review.consensus_verdict;
   if (c === 'STRONG' || c === 'MEDIUM' || c === 'WEAK') return c;
+  const d = review.derived_verdict;
+  if (d === 'STRONG' || d === 'MEDIUM' || d === 'WEAK') return d;
   const v = typeof review.verdict === 'string' ? review.verdict.trim().toUpperCase() : '';
   if (v === 'STRONG' || v === 'MEDIUM' || v === 'WEAK') return v as ReviewerQualityBand;
   const first = review.reviews?.[0]?.verdict;

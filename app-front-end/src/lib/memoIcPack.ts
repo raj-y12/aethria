@@ -358,7 +358,7 @@ function addPDFSection(
     y += PDF_LINE_HEIGHT + 1;
   }
   doc.setFontSize(PDF_FONT_SIZE_BODY);
-  doc.setTextColor(0, 27, 71);
+  doc.setTextColor(0, 20, 51);
   for (const line of opts.lines) {
     const split = doc.splitTextToSize(line, maxW);
     for (const s of split) {
@@ -383,7 +383,7 @@ export async function buildMemoPDF(startup: Startup): Promise<jsPDF> {
   doc.text('CONFIDENTIAL — FOR INVESTMENT COMMITTEE USE ONLY', PDF_MARGIN, y);
   y += PDF_LINE_HEIGHT + 2;
   doc.setFontSize(PDF_FONT_SIZE_TITLE);
-  doc.setTextColor(0, 27, 71);
+  doc.setTextColor(0, 20, 51);
   doc.text('Investment committee memorandum', PDF_MARGIN, y);
   y += PDF_LINE_HEIGHT + 4;
   doc.setFontSize(14);

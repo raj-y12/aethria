@@ -16,7 +16,7 @@ export default {
     },
     extend: {
       colors: {
-        oxford: '#001b47',
+        oxford: '#001433',
         paper: '#f4f1ea',
         /** Darker paper — WorkGrid selected row, etc. See --color-paper-deep */
         paperDeep: 'var(--color-paper-deep)',
@@ -26,13 +26,13 @@ export default {
         charcoal: '#26313f',
         mist: '#f2f4f8',
         /** Legacy alias — same family as oxford (avoid cool neutral ink). */
-        graphite: '#001b47',
+        graphite: '#001433',
         /** Structural hairlines — prefer over raw oxford/[0.06] in new code. */
-        hairline: 'rgba(0, 27, 71, 0.06)',
-        'hairline-strong': 'rgba(0, 27, 71, 0.12)',
+        hairline: 'rgba(0, 20, 51, 0.06)',
+        'hairline-strong': 'rgba(0, 20, 51, 0.12)',
         /** Inputs, fields, subtle dividers. */
-        'field-border': 'rgba(0, 27, 71, 0.15)',
-        'field-border-strong': 'rgba(0, 27, 71, 0.20)',
+        'field-border': 'rgba(0, 20, 51, 0.15)',
+        'field-border-strong': 'rgba(0, 20, 51, 0.20)',
         /** On-demand lookup origin chip — semantic, not raw hex in components. */
         lookup: {
           DEFAULT: '#B5893E',

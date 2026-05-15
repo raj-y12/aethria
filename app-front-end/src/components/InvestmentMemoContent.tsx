@@ -618,7 +618,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     SkepticalReviewer: 'Skeptical',
     OpportunistReviewer: 'Opportunist',
   };
-  const recommendationTitle = config.memo.tone === 'analyst' ? 'Analyst Read' : 'Partner Recommendation';
   const rulingIntro =
     config.memo.tone === 'analyst'
       ? 'Record the fund view after reviewing the analyst read, material adverse items, and next action.'
@@ -749,37 +748,22 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   const paras = reasoningParagraphs.filter((p) => String(p ?? '').trim());
                   const primaryReason = paras[0];
                   const remainingReasons = paras.slice(1);
-                  const hasStatusMetrics =
-                    displayStartup.partner?.confidence != null
-                    || (configuredScore != null && configuredBand != null);
+                  const partnerConfidence = displayStartup.partner?.confidence;
                   return (
                     <div
                       className={`memoRecommendationBlock${showRulingStatus ? '' : ' memoRecommendationBlock--lead'}`}
-                      aria-labelledby="memo-verdict"
+                      aria-labelledby="memo-investment-judgment"
                     >
-                      <h2 className="sr-only" id="memo-verdict">{recommendationTitle}</h2>
+                      <h2 className="memoDocSectionHead" id="memo-investment-judgment">Investment Judgement</h2>
                       {decisionBadgeVariant && (
                         <div className="memoDocJudgmentTop">
                           <p className={`memoDocRecommendation memoDocRecommendation--${decisionBadgeVariant.toLowerCase()}`}>
                             {decisionHeadline}.
                           </p>
-                          {hasStatusMetrics && (
+                          {partnerConfidence != null && (
                             <p className="memoDocConfidence">
-                              {displayStartup.partner?.confidence != null && (
-                                <>
-                                  <span className="memoNum">{Math.round(displayStartup.partner.confidence * 100)}%</span>
-                                  {' partner confidence'}
-                                </>
-                              )}
-                              {displayStartup.partner?.confidence != null && configuredScore != null && configuredBand && (
-                                <span aria-hidden>{' · '}</span>
-                              )}
-                              {configuredScore != null && configuredBand && (
-                                <>
-                                  <span className="memoNum">{configuredScore}</span>
-                                  {` fund overlay, ${configuredBand.label}`}
-                                </>
-                              )}
+                              <span className="memoNum">{Math.round(partnerConfidence * 100)}%</span>
+                              {' partner confidence'}
                             </p>
                           )}
                         </div>
@@ -812,13 +796,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
             </div>
 
-            {/* ── Evidence summary ── */}
+            {/* ── Executive summary ── */}
             {showJudgment && (() => {
               const summary = displayStartup.review?.overall_summary?.trim();
               if (!summary) return null;
               return (
                 <section className="memoDocSection" aria-labelledby="memo-exec-summary">
-                  <h2 className="memoDocSectionHead" id="memo-exec-summary">Evidence Summary</h2>
+                  <h2 className="memoDocSectionHead" id="memo-exec-summary">Executive Summary</h2>
                   {summary && <p className="memoDocProse">{renderWithMonoNumbers(summary)}</p>}
                 </section>
               );

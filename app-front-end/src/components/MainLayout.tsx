@@ -80,6 +80,7 @@ function PipelineHeaderSignal({
       : pipelineEnabled
         ? 'text-oxford/44'
         : 'text-oxford/25';
+  const showLiveDot = loopAlive && !issue;
 
   return (
     <div className="flex items-center gap-phi-2" aria-label="Pipeline and agent stage status">
@@ -98,8 +99,16 @@ function PipelineHeaderSignal({
           );
         })}
       </span>
-      <span className={`${railEditorial.statusLabel} ${statusTone}`} aria-live="polite">
+      <span className="flex items-center gap-phi-1.5" aria-live="polite">
+        {showLiveDot ? (
+          <span
+            className="h-1.5 w-1.5 shrink-0 rounded-none bg-emerald-500 pulse-soft"
+            aria-hidden
+          />
+        ) : null}
+        <span className={`${railEditorial.statusLabel} ${statusTone}`}>
         {statusLabel}
+        </span>
       </span>
     </div>
   );
@@ -120,7 +129,7 @@ function EmptyMemoPressure({ startups, fundConfiguration }: { startups: Startup[
     <div className="flex h-full min-h-0 items-center justify-center bg-paper px-phi-7 py-phi-7">
       <div className="w-full max-w-[34rem]">
         <p className="type-label-section tracking-[0.12em] text-oxford/45">Decision queue</p>
-        <p className="mt-phi-3 font-display text-[clamp(1.75rem,2.8vw,2.45rem)] font-medium leading-[1.02] text-oxford">
+        <p className="mt-phi-3 font-display text-[1.9rem] font-medium leading-[0.98] tracking-0 text-oxford sm:text-[2.6rem]">
           Conviction queue requires review.
         </p>
         <dl className="mt-phi-6 grid grid-cols-3 gap-x-phi-5 gap-y-phi-4 border-y border-oxford/[0.08] py-phi-4">
@@ -596,13 +605,14 @@ export default function MainLayout({
 
       <main className="flex-1 flex min-h-0 overflow-hidden bg-paper">
         <div
-          className="w-4 shrink-0 self-stretch origin-top bg-oxford sm:w-7 md:w-10"
+          className="w-4 shrink-0 self-stretch origin-top sm:w-7 md:w-10"
+          style={{ backgroundColor: 'var(--color-oxford)' }}
           aria-hidden="true"
         />
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
           <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.8fr)_minmax(460px,1.2fr)_minmax(0,1.4fr)] lg:grid-rows-[minmax(0,1fr)] min-h-0 overflow-hidden gap-phi-5 lg:gap-phi-5 bg-paper">
-            <aside className="hidden lg:flex h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden bg-paper">
-              <div className="flex h-full min-h-0 flex-col justify-between overflow-hidden px-phi-4" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)', paddingBottom: 'clamp(5px, 0.6vw, 8px)' }}>
+            <aside className="paper-dot-grid hidden lg:flex h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden">
+              <div className="paper-dot-grid flex h-full min-h-0 flex-col justify-between overflow-hidden px-phi-4" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)', paddingBottom: 'clamp(5px, 0.6vw, 8px)' }}>
 
                 {/* ── Wordmark + pipeline status ─────────────────────── */}
                 <div className="min-w-0">

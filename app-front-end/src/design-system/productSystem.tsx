@@ -14,7 +14,7 @@ export const productInteraction = {
     'type-label-section min-h-[44px] rounded-none border-0 bg-transparent p-0 text-oxford/55 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 focus-visible:ring-offset-0',
   quiet:
     'transition-colors duration-150 hover:bg-oxford/[0.035] focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 focus-visible:ring-inset',
-  selected: 'bg-oxford/[0.08] text-oxford',
+  selected: 'bg-surface-selected text-oxford',
   idle: 'text-oxford/42 hover:text-oxford/72',
 };
 

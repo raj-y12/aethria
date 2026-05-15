@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        oxford: '#001b47',
+        oxford: '#001433',
         paper: '#f4f1ea',
         paperDeep: '#e7e0d4',
         'paper-bright': '#f8f5ee',
@@ -15,7 +15,7 @@ export default {
         canvas: '#f4f1ea',
         mist: '#f2f4f8',
         charcoal: '#26313f',
-        graphite: '#001b47',
+        graphite: '#001433',
         escalation: '#8f4a32',
         gold: '#a88a5e',
         'gold-soft': 'rgba(168, 138, 94, 0.35)',

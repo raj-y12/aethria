@@ -46,7 +46,10 @@ function getReviewerVerdict(s: Startup) {
 }
 
 function getSourceBadge(startup: Startup): 'LOOKUP' | 'SCOUT' {
-  return (startup.scout.origin_type ?? '').toLowerCase() === 'on_demand_lookup' ? 'LOOKUP' : 'SCOUT';
+  const origin = (startup.scout.origin_type ?? '').toLowerCase();
+  return origin === 'on_demand_lookup' || Boolean(startup.scout.lookup_id || startup.scout.lookup_query)
+    ? 'LOOKUP'
+    : 'SCOUT';
 }
 
 function sortKey(s: Startup): string {
@@ -55,6 +58,14 @@ function sortKey(s: Startup): string {
 
 function getHumanDecision(startup: Startup): RulingDecision | null {
   return startup.human_resolution?.decision ?? null;
+}
+
+function getVisibleRecommendation(startup: Startup): 'INVEST' | 'PASS' | 'MONITOR' | null {
+  const humanDecision = getHumanDecision(startup);
+  if (humanDecision === 'YES') return 'INVEST';
+  if (humanDecision === 'NO') return 'PASS';
+  if (humanDecision === 'MAYBE') return 'MONITOR';
+  return startup.partner?.recommendation ?? null;
 }
 
 function startupNeedsRuling(startup: Startup): boolean {
@@ -208,23 +219,78 @@ function getRowAttention(row: WorkGridRow): { label: string; reason: string; ton
   };
 }
 
-function truncateRowReason(value: string): string {
-  const text = value.replace(/\s+/g, ' ').trim();
-  return text.length > 150 ? `${text.slice(0, 147).trim()}...` : text;
+const LOW_SIGNAL_ONE_LINERS = new Set([
+  'Human ruling recorded.',
+  'Reviewer output is available.',
+  'Review is complete and ready for judgment.',
+  'Unresolved beyond the configured stale threshold.',
+  'Scout discovery is queued for reviewer judgment.',
+  'Human review required before conviction can form.',
+]);
+
+const REDUNDANT_ROW_PHRASES = [
+  /\bthesis[- ]aligned\b/gi,
+  /\bhigh conviction\b/gi,
+  /\brequires review\b/gi,
+  /\bready for judgment\b/gi,
+  /\breview is complete\b/gi,
+  /\bhuman review required\b/gi,
+];
+
+function compactOneLiner(text: string): string {
+  let out = text.replace(/\s+/g, ' ').trim();
+  REDUNDANT_ROW_PHRASES.forEach((pattern) => {
+    out = out.replace(pattern, '');
+  });
+  out = out
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s*[,;]\s*/g, ', ')
+    .replace(/\s+\./g, '.')
+    .trim()
+    .replace(/^[,.;:\-]+/, '')
+    .replace(/[,;:\-]+$/, '')
+    .trim();
+  if (!out) return '';
+  return out;
+}
+
+function rowOneLiner(row: WorkGridRow, attention: ReturnType<typeof getRowAttention>): string | null {
+  const startup = row.startup;
+  const candidates = [
+    startup.partner?.snapshot?.key_signal?.trim(),
+    startup.partner?.decision_drivers?.[0]?.trim(),
+    row.adverseItems[0]?.title?.trim(),
+    startup.review?.aethria_view?.focal_question?.trim(),
+    startup.review?.overall_summary?.trim(),
+    startup.scout.biggest_unknown?.trim(),
+    startup.scout.one_line?.trim(),
+    attention.reason?.trim(),
+  ].filter((value): value is string => Boolean(value));
+
+  for (const candidate of candidates) {
+    if (LOW_SIGNAL_ONE_LINERS.has(candidate)) continue;
+    const compact = compactOneLiner(candidate);
+    if (compact.length >= 24) return compact;
+  }
+  return null;
 }
 
 function rowMatchesDecisionFilter(row: WorkGridRow, filter: DecisionFilter): boolean {
   if (filter === 'ALL') return true;
-  if (filter === 'WATCHLIST') return row.onMonitorList;
+  const visibleRecommendation = getVisibleRecommendation(row.startup);
+  if (filter === 'WATCHLIST') return row.onMonitorList || visibleRecommendation === 'MONITOR';
   if (filter === 'NEEDS_RULING') return row.needsRuling;
   if (filter === 'STALE') return row.isStale;
   if (filter === 'ADVERSE') return !row.isDecided && row.hasAdverse;
-  if (filter === 'ESCALATION') return !row.isDecided && row.isEscalated;
+  if (filter === 'ESCALATION') return !row.isDecided && (row.isEscalated || row.decisionVariant === 'escalation');
   if (filter === 'DECIDED') return row.isDecided;
   if (filter === 'AWAITING_REVIEW') {
-    return !row.startup.review && !row.startup.partner?.recommendation && !row.isDecided;
+    return !row.startup.review && !row.isDecided;
   }
-  return getHumanDecision(row.startup) === filter;
+  if (filter === 'YES') return visibleRecommendation === 'INVEST';
+  if (filter === 'NO') return visibleRecommendation === 'PASS';
+  if (filter === 'MAYBE') return visibleRecommendation === 'MONITOR';
+  return false;
 }
 
 const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConfiguration }: WorkGridProps): JSX.Element => {
@@ -452,7 +518,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                   <p className={`${productText.mutedLabel}`}>Attention</p>
                   <div className="flex flex-wrap gap-phi-2">
                     {ATTENTION_FILTER_CHIPS.filter((item) => item.key !== 'ALL').map(({ key: d, label }) => (
-                      <AdvancedChip key={d} active={decisionFilter === d} label={label} onClick={() => setDecisionFilter(d)} />
+                      <AdvancedChip key={d} active={decisionFilter === d} label={label} onClick={() => setDecisionFilter((current) => current === d ? 'ALL' : d)} />
                     ))}
                   </div>
                 </div>
@@ -461,7 +527,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                   <p className={`${productText.mutedLabel}`}>Outcome</p>
                   <div className="flex flex-wrap gap-phi-2">
                     {RULING_FILTER_CHIPS.map(({ key: d, label }) => (
-                      <AdvancedChip key={d} active={decisionFilter === d} label={label} onClick={() => setDecisionFilter(d)} />
+                      <AdvancedChip key={d} active={decisionFilter === d} label={label} onClick={() => setDecisionFilter((current) => current === d ? 'ALL' : d)} />
                     ))}
                   </div>
                 </div>
@@ -470,7 +536,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                   <p className={`${productText.mutedLabel}`}>Review</p>
                   <div className="flex flex-wrap gap-phi-2">
                     {(['STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'] as const).map((r) => (
-                      <AdvancedChip key={r} active={reviewFilter === r} label={r} onClick={() => setReviewFilter(r)} />
+                      <AdvancedChip key={r} active={reviewFilter === r} label={r} onClick={() => setReviewFilter((current) => current === r ? 'ALL' : r)} />
                     ))}
                   </div>
                 </div>
@@ -520,7 +586,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
           const rowOpacityClass =
             row.isDecided && !isSelected ? 'opacity-[0.62] hover:opacity-100' : '';
           const rowBgClass = isSelected
-            ? 'bg-oxford/[0.08]'
+            ? 'bg-surface-selected'
             : row.isDecided
               ? ''
               : row.hasHighAdverse || row.isEscalated
@@ -557,7 +623,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                 else rowRefs.current.delete(startup.id);
               }}
               variants={rowVariants}
-              className={`group relative w-full min-w-0 border-t border-oxford/[0.07] px-phi-4 py-phi-6 cursor-pointer transition-[background-color,opacity] duration-[160ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${rowHoverClass} ${rowBgClass} ${rowOpacityClass}`}
+              className={`group relative w-full min-w-0 px-phi-4 py-phi-6 cursor-pointer transition-[background-color,opacity] duration-[160ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${rowHoverClass} ${rowBgClass} ${rowOpacityClass}`}
               style={{ transitionTimingFunction: 'var(--motion-ease)' }}
               onClick={() => onStartupClick(startup)}
               onKeyDown={(e) => handleRowKeyDown(e, row, idx)}
@@ -588,7 +654,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                 <div className="min-w-0 col-start-2">
                   <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-phi-4 gap-y-phi-2">
                     <div className="min-w-0 flex-1">
-                      <h2 className={`type-body-emphasis min-w-0 break-words ${row.isDecided ? 'text-oxford/70' : 'text-oxford'}`}>
+                      <h2 className={`min-w-0 break-words font-sans text-[clamp(20px,1.9vw,26px)] leading-[1.08] ${row.isDecided ? 'text-oxford/70' : 'text-oxford'}`}>
                         {startup.scout.name}
                       </h2>
                     </div>
@@ -598,17 +664,19 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                       {!row.isEscalated && row.decisionVariant !== 'escalation' && <DecisionBadge variant={row.decisionVariant} />}
                     </div>
                   </div>
-                  <p
-                    className={`mt-phi-2 type-body-sm leading-relaxed ${
-                      attention.tone === 'critical'
-                        ? 'max-w-[min(100%,40rem)] text-escalation/80'
-                        : row.isDecided
-                          ? 'max-w-[32rem] text-oxford/42'
-                          : 'max-w-[32rem] text-oxford/58'
-                    }`}
-                  >
-                    {truncateRowReason(attention.reason)}
-                  </p>
+                  {rowOneLiner(row, attention) ? (
+                    <p
+                      className={`mt-phi-2 type-body-sm leading-relaxed ${
+                        attention.tone === 'critical'
+                          ? 'max-w-[min(100%,40rem)] text-escalation/80'
+                          : row.isDecided
+                            ? 'max-w-[32rem] text-oxford/42'
+                            : 'max-w-[32rem] text-oxford/58'
+                      }`}
+                    >
+                      {rowOneLiner(row, attention)}
+                    </p>
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-x-phi-2 gap-y-phi-1 mt-phi-3">
                     {metaHasDate && (
                       <span className="type-meta shrink-0 text-oxford/30 tabular-nums">

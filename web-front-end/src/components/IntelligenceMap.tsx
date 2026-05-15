@@ -5,7 +5,7 @@ import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 
 gsap.registerPlugin(ScrollTrigger, MotionPathPlugin);
 
-const OXFORD = '#001B47';
+const OXFORD = '#001433';
 const PAPER = '#F4F1EA';
 
 const COLORS = {
@@ -22,16 +22,16 @@ const COLORS = {
     pulseMeta: 'rgba(244, 241, 234, 0.3)',
   },
   light: {
-    edge: 'rgba(0, 27, 71, 0.15)',
-    edgeDash: 'rgba(0, 27, 71, 0.1)',
-    scout: 'rgba(0, 27, 71, 0.35)',
-    reviewer: 'rgba(0, 27, 71, 0.55)',
-    partner: 'rgba(0, 27, 71, 0.55)',
-    portfolio: 'rgba(0, 27, 71, 0.85)',
-    meta: 'rgba(0, 27, 71, 0.5)',
-    label: 'rgba(0, 27, 71, 0.5)',
+    edge: 'rgba(0, 20, 51, 0.15)',
+    edgeDash: 'rgba(0, 20, 51, 0.1)',
+    scout: 'rgba(0, 20, 51, 0.35)',
+    reviewer: 'rgba(0, 20, 51, 0.55)',
+    partner: 'rgba(0, 20, 51, 0.55)',
+    portfolio: 'rgba(0, 20, 51, 0.85)',
+    meta: 'rgba(0, 20, 51, 0.5)',
+    label: 'rgba(0, 20, 51, 0.5)',
     pulse: OXFORD,
-    pulseMeta: 'rgba(0, 27, 71, 0.3)',
+    pulseMeta: 'rgba(0, 20, 51, 0.3)',
   },
 } as const;
 

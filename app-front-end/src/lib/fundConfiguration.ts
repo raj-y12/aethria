@@ -124,6 +124,8 @@ export interface BandValidation {
 
 export const FUND_CONFIG_STORAGE_KEY = 'aethria_fund_configuration_v1';
 export const FUND_CONFIG_EVENT = 'aethria-fund-configuration-updated';
+const KNOWN_SECTOR_OPTIONS = new Set(['B2B SaaS', 'AI', 'Infrastructure', 'Fintech', 'Healthcare', 'Devtools', 'Climate']);
+const KNOWN_GEOGRAPHY_OPTIONS = new Set(['US', 'Europe', 'UK', 'India', 'Global']);
 
 const dimensionDescriptions: Record<ScoringDimensionKey, string> = {
   market: 'Market size, urgency, budget, and category expansion.',
@@ -377,16 +379,62 @@ export function getWeightImpactText(key: ScoringDimensionKey): string {
 }
 
 function mergeFundConfiguration(base: FundConfiguration, saved: Partial<FundConfiguration>): FundConfiguration {
+  const mandate = normalizeMandate(base.mandate, saved.mandate);
   return {
     ...base,
     ...saved,
-    mandate: { ...base.mandate, ...saved.mandate },
+    mandate,
     thresholds: { ...base.thresholds, ...saved.thresholds },
     risk: { ...base.risk, ...saved.risk },
     memo: { ...base.memo, ...saved.memo },
     scoringWeights: mergeByKey(base.scoringWeights, saved.scoringWeights, 'key'),
     scoreBands: mergeByKey(base.scoreBands, saved.scoreBands, 'id'),
     rubric: saved.rubric?.length ? normalizeRubricCriteria(saved.rubric) : base.rubric,
+  };
+}
+
+function normalizeMandate(base: FundMandateConfig, saved?: Partial<FundMandateConfig>): FundMandateConfig {
+  const mandate = { ...base, ...saved };
+  const preferredSectors = toList(saved?.preferredSectors ?? mandate.preferredSectors);
+  const savedSectors = toList(saved?.sectors);
+  const explicitCustomSectors = toList(saved?.customSectors ?? mandate.customSectors);
+  const sectorSource = savedSectors.length
+    ? savedSectors
+    : preferredSectors.length
+      ? preferredSectors
+      : toList(base.sectors);
+  const sectors = sectorSource.filter((item) => KNOWN_SECTOR_OPTIONS.has(item));
+  const customSectors = explicitCustomSectors.length
+    ? joinList(explicitCustomSectors)
+    : joinList(sectorSource.filter((item) => !KNOWN_SECTOR_OPTIONS.has(item)));
+
+  const geographyPreferences = toList(saved?.geographyPreferences ?? mandate.geographyPreferences);
+  const savedGeographies = toList(saved?.geographies);
+  const explicitCustomGeography = toList(saved?.customGeography ?? mandate.customGeography);
+  const geographySource = savedGeographies.length
+    ? savedGeographies
+    : geographyPreferences.length
+      ? geographyPreferences
+      : toList(base.geographies);
+  const geographies = geographySource.filter((item) => KNOWN_GEOGRAPHY_OPTIONS.has(item));
+  const customGeography = explicitCustomGeography.length
+    ? joinList(explicitCustomGeography)
+    : joinList(geographySource.filter((item) => !KNOWN_GEOGRAPHY_OPTIONS.has(item)));
+
+  const excludedSectorList = toList(saved?.excludedSectorList ?? mandate.excludedSectorList);
+  const savedExcludedSectors = toList(saved?.excludedSectors);
+  const excludedSectors = joinList(savedExcludedSectors.length ? savedExcludedSectors : excludedSectorList);
+
+  return {
+    ...mandate,
+    preferredSectors,
+    excludedSectorList,
+    geographyPreferences,
+    sectors,
+    customSectors,
+    geographies,
+    customGeography,
+    excludedSectors,
   };
 }
 
@@ -444,6 +492,14 @@ function parseList(value?: string): string[] {
 
 function joinList(values: string[]): string {
   return values.map((item) => item.trim()).filter(Boolean).join(', ');
+}
+
+function toList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => toList(item));
+  }
+  if (typeof value === 'string') return parseList(value);
+  return [];
 }
 
 function normalizeConfidence(value: unknown): number | null {

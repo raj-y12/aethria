@@ -65,7 +65,7 @@ export default function DashboardPreview() {
   return (
     <section className="section-divider-top flex w-full overflow-hidden border-b border-solid border-[var(--section-divider)]">
       <motion.div
-        className="w-2 shrink-0 self-stretch origin-top bg-[#001b47] sm:w-6 md:w-12"
+        className="w-2 shrink-0 self-stretch origin-top bg-[#001433] sm:w-6 md:w-12"
         aria-hidden
         initial="hidden"
         whileInView="visible"
@@ -142,7 +142,7 @@ export default function DashboardPreview() {
                   </p>
                   <span className="inline-flex items-center gap-1.5">
                     <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-none bg-[#001b47]"
+                      className="h-1.5 w-1.5 shrink-0 rounded-none bg-[#001433]"
                       style={{ opacity: 0.65, animation: 'pipeline-dot-pulse 2.4s ease-in-out infinite' }}
                       aria-hidden
                     />

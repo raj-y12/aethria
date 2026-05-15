@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 const DESKTOP_CURSOR_MEDIA = '(pointer: fine) and (min-width: 769px)';
 
-const INK = '#001B47';
+const INK = '#001433';
 const PAPER = '#F4F1EA';
 
 type CursorMode = 'default' | 'hover' | 'headline';

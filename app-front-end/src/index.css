@@ -1,15 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap');
 /*
  * Aethria — High-fidelity institutional design (aligned with web-front-end).
- * Palette: deep blue #001B47, paper #F4F1EA, body ink #26313f, shell/memo on paper, accent #7D2B3A (escalations only), heritageGold #a88a5e (decorative only).
+ * Palette: deep blue #001433, paper #F4F1EA, body ink #26313f, shell/memo on paper, accent #7D2B3A (escalations only), heritageGold #a88a5e (decorative only).
  * Figtree Variable (body + UI, matches web-front-end warmth). Display: EB Garamond (editorial headings, verdicts, memos). Wordmark: Libre Baskerville (wordmark ONLY). Metadata: JetBrains Mono.
  * Frames: 1px rgba(var(--color-oxford-rgb), 0.06). No rounded corners.
  * Text hierarchy: Oxford opacity ladder 100, 80, 60, 40, 25. Line-height: 1.5 labels, 1.5 body.
  */
 :root {
   /* Primary palette — aligned with web-front-end tokens */
-  --color-oxford: #001b47;
-  --color-oxford-rgb: 0, 27, 71;
+  --color-oxford: #001433;
+  --color-oxford-rgb: 0, 20, 51;
   --color-paper: #f4f1ea;
   /** Slightly darker paper — selected rows, recessed surfaces (same hue family as paper). */
   --color-paper-deep: #e7e0d4;
@@ -98,6 +98,14 @@
   --surface-raised: var(--color-paper-bright);
   --surface-recessed: var(--color-paper-deep);
   --surface-selected: var(--color-register-tint);
+}
+
+/* Editorial paper texture (ported from web-front-end) */
+.paper-dot-grid {
+  background-color: #f4f1ea;
+  background-image: radial-gradient(rgba(0, 20, 51, 0.055) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-repeat: repeat;
 }
 
 /* Clerk UserProfile — match Aethria: oxford, cream paper, Figtree / JetBrains Mono, no radius */
