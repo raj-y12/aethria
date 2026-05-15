@@ -28,8 +28,6 @@ import {
 } from '../lib/dealState';
 import { extractAdverseRegister, type AdverseRegisterItem } from '../lib/adverseRegister';
 import {
-  bandForScore,
-  computeConfiguredScore,
   createDefaultFundConfiguration,
   shouldGateRisk,
   type FundConfiguration,
@@ -537,8 +535,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     () => (displayStartup ? memoSourceRows(displayStartup) : []),
     [displayStartup]
   );
-  const configuredScore = displayStartup ? computeConfiguredScore(displayStartup, config) : null;
-  const configuredBand = configuredScore != null ? bandForScore(configuredScore, config.scoreBands) : null;
   const highAdverseCount = adverseRegister.filter((item) => item.severity === 'high').length;
   const riskFactors = useMemo(
     () => uniqueRiskItems(displayStartup),
