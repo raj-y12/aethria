@@ -1,9 +1,9 @@
 const bodyMetrics = 'font-sans text-[13px] leading-[1.5]';
 
 export const railEditorial = {
-  /** Primary wordmark — both MainLayout and SettingsPage asides (Libre Baskerville). Title case in markup. */
+  /** Primary wordmark — both MainLayout and SettingsPage asides (Playfair Display). Title case in markup. */
   wordmark:
-    'font-wordmark font-normal text-[clamp(15px,1.35vw,19px)] leading-tight tracking-normal text-oxford',
+    'font-wordmark font-medium text-[clamp(15px,1.35vw,19px)] leading-tight tracking-normal text-oxford',
 
   /**
    * Section titles — memo `.memoDocSectionHead` rhythm (tracking, color, mb);
@@ -20,7 +20,7 @@ export const railEditorial = {
   bodyStrong: `font-sans text-[14px] leading-[1.4] font-medium text-oxford/82`,
 
   /**
-   * Large stat number — JetBrains Mono (tabular), scaled for the narrow rail.
+   * Large stat number — Space Mono (tabular), scaled for the narrow rail.
    * Scales down to 20px on tight rail columns (≈1024px viewport) and up to 38px on wide ones.
    */
   statValue:

@@ -55,13 +55,13 @@ export default {
         'surface-selected': 'var(--surface-selected)',
       },
       fontFamily: {
-        display: ['"EB Garamond"', 'Georgia', 'serif'],
-        wordmark: ['"Libre Baskerville"', 'Georgia', 'serif'],
-        cormorant: ['"EB Garamond"', 'Georgia', 'serif'],
+        display: ['"Playfair Display"', 'Georgia', 'serif'],
+        wordmark: ['"Playfair Display"', 'Georgia', 'serif'],
+        cormorant: ['"Playfair Display"', 'Georgia', 'serif'],
         // Figtree Variable is the canonical app UI font — matches web-front-end warmth.
         sans: ['"Figtree Variable"', 'system-ui', '-apple-system', 'sans-serif'],
         body: ['"Figtree Variable"', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        mono: ['"Space Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       /**
        * Type scale — golden ratio (φ = 1.618034), anchored at 14px.
@@ -80,13 +80,13 @@ export default {
       lineHeight: {
         phi: '1.618034',    // retained for legacy; prefer 1.5 for dense UI
         title: '1.382',     // 2 − 1/φ
-        hero: '1.15',       // display / hero (tighter for large Garamond)
+        hero: '1.15',       // display / hero (tighter for large Playfair)
         label: '1.5',       // mono labels
       },
       letterSpacing: {
         tight:  '-0.02em',  // titles and hero
-        label:  '0.12em',   // section labels (JetBrains Mono)
-        tab:    '0.14em',   // tab labels (JetBrains Mono)
+        label:  '0.12em',   // section labels (Space Mono)
+        tab:    '0.14em',   // tab labels (Space Mono)
         badge:  '0.08em',   // badge/chip text
       },
       borderRadius: { DEFAULT: '0', none: '0' },

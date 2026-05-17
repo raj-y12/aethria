@@ -157,7 +157,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
           exit={{ opacity: 0, transition: { duration: reduceMotion ? 0 : 0.2, delay: 0, ease: EASE } }}
           transition={{ duration: reduceMotion ? 0 : 0.4, ease: EASE, delay: reduceMotion ? 0 : 0.22 + stats.length * 0.07 }}
           onClick={onDismiss}
-          className="group btn-aethria-solid"
+          className="group btn-aethria-solid btn-interaction--no-press"
           style={{ padding: '0 48px' }}
         >
           <span className="flex items-center justify-center">

@@ -66,21 +66,21 @@ Use Tailwind's opacity modifier: `text-oxford/100`, `text-oxford/80`, etc.
 | Family | Variable | Role | When to use |
 |---|---|---|---|
 | **Geist Sans** | `font-sans` / `font-body` | UI text, body, most headings | Everything by default in app product UI |
-| **EB Garamond** | `font-display` | Editorial display headings | Hero/editorial headings in both fronts |
-| **Libre Baskerville** | `font-wordmark` | Wordmark only | Logo lockups, brand mark word treatment |
-| **JetBrains Mono** | `font-mono` | Metadata, labels, tabular microtext | Section labels, timestamps, badge text, telemetry labels |
+| **Playfair Display** | `font-display` | Editorial display headings | Hero/editorial headings in both fronts |
+| **Playfair Display** | `font-wordmark` | Wordmark only | Logo lockups, brand mark word treatment |
+| **Space Mono** | `font-mono` | Metadata, labels, tabular microtext | Section labels, timestamps, badge text, telemetry labels |
 
 ### Type scale (golden ratio, φ = 1.618034)
 
 | Class | Family | Size | Line-height | Tracking | Weight |
 |---|---|---|---|---|---|
-| `.type-hero` | EB Garamond | `37px` (14×φ²) | `1.2` | `-0.02em` | `400` |
+| `.type-hero` | Playfair Display | `37px` (14×φ²) | `1.2` | `-0.02em` | `400` |
 | `.type-title` | Geist Sans | `23px` (14×φ) | `1.382` (2−1/φ) | `-0.02em` | `500` |
 | `.type-body` | Geist Sans | `14px` | `1.618` (φ) | `0` | `400` |
 | `.type-body-sm` | Geist Sans | `13px` | `1.618` | `0` | `400` |
-| `.type-label-section` | JetBrains Mono | `11px` | `1.5` | `0.12em` | `400` |
-| `.type-label-tab` | JetBrains Mono | `10px` | `1.5` | `0.14em` | `400` |
-| `.type-meta` | JetBrains Mono | `10px` | `1.5` | `0.12em` | `400` |
+| `.type-label-section` | Space Mono | `11px` | `1.5` | `0.12em` | `400` |
+| `.type-label-tab` | Space Mono | `10px` | `1.5` | `0.14em` | `400` |
+| `.type-meta` | Space Mono | `10px` | `1.5` | `0.12em` | `400` |
 
 **Rules:**
 - No font sizes outside this scale.
@@ -173,7 +173,7 @@ Golden ratio Fibonacci sequence. Every layout value maps to a named step.
 ### Section decoration (web-front-end pattern, use in editorial contexts)
 - `.doc-rule-with-diamond` — full-width 1px rule + centered 4×4 oxford diamond
 - `.paper-dot-grid` — `#F4F1EA` bg with `rgba(0,27,71,0.055)` 1px dots at 28px
-- `.section-numeral` — `JetBrains Mono 9px`, tracking `0.12em`, `oxford/20`
+- `.section-numeral` — `Space Mono 9px`, tracking `0.12em`, `oxford/20`
 
 ---
 

@@ -292,7 +292,7 @@ export default function LoginPage() {
               transition={{ duration: 0.5, ease: EASE, delay: 0.3 }}
               className="flex flex-col items-center mb-phi-9"
             >
-              <h1 className="font-wordmark text-center text-[clamp(48px,8vw,80px)] font-normal text-oxford leading-[0.9] m-0 tracking-[0.07em]">
+              <h1 className="font-wordmark text-center text-[clamp(48px,8vw,80px)] font-medium text-oxford leading-[0.9] m-0 tracking-[0.07em]">
                 Aethria
               </h1>
               <p className="type-meta uppercase tracking-[0.14em] text-oxford/35 mt-phi-4">

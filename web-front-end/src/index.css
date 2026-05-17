@@ -1,5 +1,5 @@
 /*
- * Aethria Website — deep blue and paper. Editorial display (EB Garamond) + Figtree + JetBrains Mono.
+ * Aethria Website — deep blue and paper. Editorial display (Playfair Display) + Figtree + Space Mono.
  */
 
 @tailwind base;
@@ -21,9 +21,9 @@
 
   /* Roles: wordmark = logo only · display = editorial headings (h1–h6 base) · sans = body & UI · mono = labels, caps, data */
   --font-sans: 'Figtree', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --font-display: 'EB Garamond', 'Georgia', 'Times New Roman', serif;
-  --font-wordmark: 'Libre Baskerville', 'Georgia', serif;
+  --font-mono: 'Space Mono', ui-monospace, monospace;
+  --font-display: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+  --font-wordmark: 'Playfair Display', 'Georgia', serif;
 
   --page-margin-x: 64px;
   --page-margin-x-mobile: 24px;
@@ -229,6 +229,7 @@ hr.doc-section-separator::before {
 
   .font-wordmark {
     font-family: var(--font-wordmark);
+    font-weight: 500;
   }
 
   /* Global scrollbar styling (match app-front-end): skinny, oxford thumb, paper track */

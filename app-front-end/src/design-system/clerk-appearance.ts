@@ -1,7 +1,7 @@
 /**
  * Clerk component appearance — matches Aethria design tokens.
  * Palette: deep blue #001433, paper #F4F1EA, inverse paper.
- * Typography: Geist Sans (body), JetBrains Mono (labels/actions); no rounded corners.
+ * Typography: Geist Sans (body), Space Mono (labels/actions); no rounded corners.
  */
 import { tokens } from './tokens';
 

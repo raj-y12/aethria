@@ -104,7 +104,7 @@ function SignalsTab({ signals }: { signals: SignalItem[] }) {
     <div className="flex flex-col relative">
       {signals.map((sig, i) => (
         <RowWrapper key={sig.id ?? i} index={i}>
-          <span className="type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums pt-px">
+          <span className="font-mono type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums pt-px">
             {(i + 1).toString().padStart(2, '0')}
           </span>
 
@@ -128,7 +128,7 @@ function SignalsTab({ signals }: { signals: SignalItem[] }) {
               <span className="text-oxford/20 mx-phi-2" aria-hidden>
                 ·
               </span>
-              <span className="tabular-nums">
+              <span className="font-mono tabular-nums">
                 {sig.detected_at
                   ? `${new Date(sig.detected_at).toLocaleDateString('en-GB')} ${new Date(sig.detected_at).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' })}`
                   : '—'}
@@ -186,7 +186,7 @@ function DecisionsTab({ startups }: { startups: Startup[] }) {
       {decisions.map((item, i) => (
         <RowWrapper key={item.id} index={i}>
           <div className="flex flex-col gap-phi-2 min-w-0">
-            <span className="type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums">
+            <span className="font-mono type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums">
               {(i + 1).toString().padStart(2, '0')}
             </span>
             <div className="flex flex-col gap-phi-1">
@@ -246,7 +246,7 @@ function CalibrationTab({ startups, fundConfiguration }: { startups: Startup[]; 
         <div className="flex flex-wrap gap-phi-6">
           {snapshot.observations.map((item) => (
             <div key={item.label} className="flex flex-col gap-phi-1">
-              <span className="font-sans font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-0 tabular-nums text-oxford">{item.value}</span>
+              <span className="font-mono font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-0 tabular-nums text-oxford">{item.value}</span>
               <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">{item.label}</span>
               {item.detail ? <span className="type-meta text-oxford/30">{item.detail}</span> : null}
             </div>
@@ -322,7 +322,7 @@ function AnalyticsTab({ rejection, watchlist, concentration, systemHealth }: {
               { label: 'Escalations', value: systemHealth.pending_escalations },
             ].map((s) => (
               <div key={s.label} className="flex flex-col gap-phi-1">
-                <span className="font-sans font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">{s.value}</span>
+                <span className="font-mono font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">{s.value}</span>
                 <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">{s.label}</span>
               </div>
             ))}
@@ -360,7 +360,7 @@ function AnalyticsTab({ rejection, watchlist, concentration, systemHealth }: {
             { label: 'Avg Days', value: Math.round(watchlist.avg_days) },
           ].map((s) => (
             <div key={s.label} className="flex flex-col gap-phi-1">
-              <span className="font-sans font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">{s.value}</span>
+              <span className="font-mono font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">{s.value}</span>
               <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">{s.label}</span>
             </div>
           ))}
@@ -374,7 +374,7 @@ function AnalyticsTab({ rejection, watchlist, concentration, systemHealth }: {
                   <span className="type-note text-oxford/70 truncate min-w-0 max-w-[min(100%,20rem)]">
                     {e.startup_name?.trim() || e.startup_id?.slice(0, 8) || 'Unknown'}
                   </span>
-                  <span className="type-meta text-oxford/45 tabular-nums shrink-0">
+                  <span className="font-mono type-meta text-oxford/45 tabular-nums shrink-0">
                     {e.days_on_watchlist != null ? `${e.days_on_watchlist}d` : '—'}
                     {e.stale_warning ? ' · stale' : ''}
                     {e.signal_count != null && e.signal_count > 0 ? ` · ${e.signal_count} sig` : ''}
@@ -484,15 +484,15 @@ function InstitutionalMandateTab() {
       <TabSection title="Alignment">
         <div className="grid grid-cols-3 gap-phi-4">
           <div className="bg-registerTint px-phi-3 py-phi-3">
-            <span className="block font-sans font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.pct_matching_thesis ?? '--'}%</span>
+            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.pct_matching_thesis ?? '--'}%</span>
             <span className="type-meta text-oxford/50">Mandate match</span>
           </div>
           <div className="bg-registerTint px-phi-3 py-phi-3">
-            <span className="block font-sans font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.avg_alignment_score ?? '--'}</span>
+            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.avg_alignment_score ?? '--'}</span>
             <span className="type-meta text-oxford/50">Mean alignment</span>
           </div>
           <div className="bg-registerTint px-phi-3 py-phi-3">
-            <span className="block font-sans font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.drift_vs_previous ?? '0.00'}</span>
+            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.drift_vs_previous ?? '0.00'}</span>
             <span className="type-meta text-oxford/50">Drift</span>
           </div>
         </div>
@@ -575,7 +575,7 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
           <div className="flex flex-wrap gap-phi-6 mb-phi-3">
             {typeof insights.latest.cycle_number === 'number' && (
               <div className="flex flex-col gap-phi-1">
-                <span className="font-sans font-semibold text-xl tabular-nums text-oxford">{insights.latest.cycle_number}</span>
+                <span className="font-mono font-semibold text-xl tabular-nums text-oxford">{insights.latest.cycle_number}</span>
                 <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">Cycle</span>
               </div>
             )}
@@ -599,7 +599,7 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
               { label: 'Weight updates', value: (lastReport.weight_updates ?? []).length },
             ].map((s) => (
               <div key={s.label} className="flex flex-col gap-phi-1">
-                <span className="font-sans font-semibold text-[clamp(18px,1.6vw,24px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">{s.value}</span>
+                <span className="font-mono font-semibold text-[clamp(18px,1.6vw,24px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">{s.value}</span>
                 <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">{s.label}</span>
               </div>
             ))}

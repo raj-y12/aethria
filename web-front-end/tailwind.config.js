@@ -21,9 +21,9 @@ export default {
         'gold-soft': 'rgba(168, 138, 94, 0.35)',
       },
       fontFamily: {
-        display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+        display: ['"Playfair Display"', 'Georgia', 'serif'],
         sans: ['"Instrument Sans"', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'monospace'],
+        mono: ['"Space Mono"', 'monospace'],
         wordmark: ['var(--font-wordmark)', 'Georgia', 'serif'],
       },
       borderRadius: {

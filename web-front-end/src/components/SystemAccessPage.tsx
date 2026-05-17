@@ -81,7 +81,7 @@ export default function SystemAccessPage({
       <GrainOverlay opacity={0.032} variant="dark" />
 
       <div className="relative z-10 flex flex-col items-center">
-        <h1 className={`font-wordmark text-[clamp(2rem,5vw,3rem)] font-normal normal-case leading-none tracking-normal text-[var(--text-inverse)] ${reduce ? '' : 'system-access-hero'}`}>
+        <h1 className={`font-wordmark text-[clamp(2rem,5vw,3rem)] font-medium normal-case leading-none tracking-normal text-[var(--text-inverse)] ${reduce ? '' : 'system-access-hero'}`}>
           {hero === 'Aethria' ? (
             <span className="relative inline-block">
               A

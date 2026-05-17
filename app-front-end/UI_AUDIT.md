@@ -34,7 +34,7 @@ Compared against `/app-front-end/DESIGN_SYSTEM.md`. Every issue below is a concr
 **Typography**
 - `text-[15px]` on escalation startup name — off-scale. Closest canonical is `type-body` (14px). Use `type-body font-medium`.
 - `font-body text-[13px] leading-[1.6]` — should be `type-body-sm` class (handles family, size, line-height together).
-- Inline `style={{ fontFamily: '"Space Mono", ui-monospace, monospace' }}` on badge `<p>` — should be `font-mono`.
+- Inline `style={{ fontFamily: 'var(--font-mono)' }}` on badge `<p>` — should be `font-mono`.
 - `type-meta` class used correctly in some places but inconsistently with raw `font-mono text-[10px]` elsewhere in same file.
 
 **Spacing**

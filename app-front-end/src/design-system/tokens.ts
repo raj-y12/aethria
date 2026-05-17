@@ -3,9 +3,9 @@
  *
  * Palette: deep blue #001433, paper #F4F1EA, paperBright/paperDeep variants,
  * inverse on deep blue #F4F1EA; body text uses blue-tinted charcoal #26313f, not black.
- * Typography: Geist Sans matches the brand poster’s geometric sans; EB Garamond / Libre Baskerville stay for editorial + wordmark (no font swap needed).
+ * Typography: Geist Sans matches the brand poster’s geometric sans; Playfair Display handles editorial display and the wordmark.
  * Burgundy #7D2B3A (accent) is escalation-only — see color.accent. Heritage gold #a88a5e is decorative only (dividers, chrome) — color.heritageGold.
- * Typography: Libre Baskerville (wordmark only). EB Garamond (display/editorial headings). Geist Sans (body/UI). JetBrains Mono (labels, tabs, meta, data — ALL CAPS on labels/tabs).
+ * Typography: Playfair Display (display/editorial headings and wordmark). Geist Sans (body/UI). Space Mono (labels, tabs, meta, data — ALL CAPS on labels/tabs).
  * Brand scale: section-label 11px/0.14em, tab/meta 11px/0.10–0.06em, body 14px/1.618.
  * Frames: 1px rgba(0,27,71,0.06). No rounded corners.
  * Register tint: CSS variable --color-register-tint (see index.css); Tailwind `registerTint` / `bg-registerTint`.
@@ -85,12 +85,12 @@ export const tokens = {
     25: 0.25,
   },
   font: {
-    /** Editorial headings — EB Garamond (matches --font-display and web-front-end). */
-    display: '"EB Garamond", Georgia, "Times New Roman", serif',
-    /** Wordmark / type-hero only — Libre Baskerville. */
-    wordmark: '"Libre Baskerville", Georgia, serif',
+    /** Editorial headings — Playfair Display (matches --font-display and web-front-end). */
+    display: '"Playfair Display", Georgia, "Times New Roman", serif',
+    /** Wordmark / type-hero only — Playfair Display. */
+    wordmark: '"Playfair Display", Georgia, serif',
     body: '"Figtree Variable", system-ui, -apple-system, sans-serif',
-    mono: '"JetBrains Mono", ui-monospace, monospace',
+    mono: '"Space Mono", ui-monospace, monospace',
   },
   /**
    * Layout — values snapped to φ-spacing scale (phiSpacing).

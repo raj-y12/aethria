@@ -75,7 +75,7 @@ function RomanReveal({ show, text }: { show: boolean; text: string }) {
   return (
     <span
       className="text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[var(--color-oxford)] transition-opacity duration-500 tabular-nums md:text-[44px]"
-      style={{ fontFamily: '"JetBrains Mono", monospace', opacity: visible ? 1 : 0 }}
+      style={{ fontFamily: '"Space Mono", monospace', opacity: visible ? 1 : 0 }}
     >
       {text}
     </span>
@@ -93,19 +93,19 @@ function StatColumn({ metric, index, run }: { metric: Metric; index: number; run
     numberNode = <RomanReveal show={run} text={metric.displayRoman ?? ''} />;
   } else if (metric.kind === 'int') {
     numberNode = (
-      <span className="text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[var(--color-oxford)] tabular-nums md:text-[44px]" style={{ fontFamily: '"JetBrains Mono", monospace' }}>
+      <span className="text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[var(--color-oxford)] tabular-nums md:text-[44px]" style={{ fontFamily: '"Space Mono", monospace' }}>
         {n6}
       </span>
     );
   } else if (metric.kind === 'percent') {
     numberNode = (
-      <span className="text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[var(--color-oxford)] tabular-nums md:text-[44px]" style={{ fontFamily: '"JetBrains Mono", monospace' }}>
+      <span className="text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[var(--color-oxford)] tabular-nums md:text-[44px]" style={{ fontFamily: '"Space Mono", monospace' }}>
         {n100}%
       </span>
     );
   } else {
     numberNode = (
-      <span className="text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[var(--color-oxford)] tabular-nums md:text-[44px]" style={{ fontFamily: '"JetBrains Mono", monospace' }}>
+      <span className="text-[clamp(1.75rem,7vw,2.75rem)] font-bold leading-none tracking-[-0.03em] text-[var(--color-oxford)] tabular-nums md:text-[44px]" style={{ fontFamily: '"Space Mono", monospace' }}>
         {dec.toFixed(2)}%
       </span>
     );

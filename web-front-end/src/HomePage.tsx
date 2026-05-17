@@ -100,7 +100,7 @@ export default function HomePage() {
             <Link
               data-cursor-expand
               to="/"
-              className="font-wordmark inline-flex min-h-[44px] items-center justify-self-start text-[15px] font-normal normal-case leading-none tracking-normal text-[var(--text-primary)] transition-opacity hover:opacity-80 sm:text-[16px]"
+              className="font-wordmark inline-flex min-h-[44px] items-center justify-self-start text-[15px] font-medium normal-case leading-none tracking-normal text-[var(--text-primary)] transition-opacity hover:opacity-80 sm:text-[16px]"
             >
               Aethria
             </Link>

@@ -10,8 +10,8 @@
 /* === Layout === */
 .memoPanel {
   --memo-font-ui: var(--font-sans, "Figtree Variable", system-ui, -apple-system, sans-serif);
-  --memo-font-mono: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
-  --memo-font-display: var(--font-display, "EB Garamond", Georgia, "Times New Roman", serif);
+  --memo-font-mono: var(--font-mono, "Space Mono", ui-monospace, monospace);
+  --memo-font-display: var(--font-display, "Playfair Display", Georgia, "Times New Roman", serif);
   --memo-size-body:      0.875rem;
   --memo-size-secondary: 0.8125rem;
   --memo-size-ui:        0.8125rem;
@@ -181,8 +181,8 @@
 }
 .memoEmptyInner { text-align: center; padding: 48px; }
 .memoEmptyWordmark {
-  font-family: var(--font-wordmark, "Libre Baskerville", Georgia, serif);
-  font-weight: 400;
+  font-family: var(--font-wordmark, "Playfair Display", Georgia, serif);
+  font-weight: 500;
   font-size: 1.5rem;
   line-height: 1.4;
   color: rgba(var(--color-oxford-rgb), 0.30);
