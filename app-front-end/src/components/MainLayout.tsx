@@ -728,7 +728,7 @@ export default function MainLayout({
                           aria-hidden
                         />
                         <span
-                          className={`${railEditorial.meta} text-oxford/45 pulse-soft [animation-delay:900ms]`}
+                          className={`${railEditorial.meta} uppercase text-oxford/45 pulse-soft [animation-delay:900ms]`}
                         >
                           Live
                         </span>
@@ -859,7 +859,7 @@ export default function MainLayout({
                           aria-hidden
                         />
                         <span
-                          className={`${railEditorial.meta} text-oxford/45 pulse-soft [animation-delay:900ms]`}
+                          className={`${railEditorial.meta} uppercase text-oxford/45 pulse-soft [animation-delay:900ms]`}
                         >
                           Live
                         </span>

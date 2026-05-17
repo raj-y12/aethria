@@ -101,6 +101,10 @@ _lookup_worker_task: Optional[asyncio.Task] = None
 _logger_agents = logging.getLogger("api.agents")
 _logger_visible = logging.getLogger("uvicorn.error")
 _LOOKUP_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{8,128}$")
+_LOOKUP_LEADING_PHRASE_RE = re.compile(
+    r"(?i)^\s*(?:find|lookup|look\s+up|search(?:\s+for)?|analy[sz]e|evaluate|check(?:\s+out)?|research)\s+"
+)
+_LOOKUP_TRAILING_QUALIFIERS = {"company", "startup", "website", "profile"}
 
 # Per-user persistent agent loops: user_id -> asyncio.Task
 # Protected by _loops_lock to prevent duplicate tasks per user.
@@ -1828,9 +1832,25 @@ async def agents_status(request: Request):
         pass
     return {
         "worker_ready": _agent_queue is not None,
+        "lookup_worker_ready": _lookup_queue is not None,
+        "agent_queue_size": _agent_queue.qsize() if _agent_queue is not None else None,
+        "lookup_queue_size": _lookup_queue.qsize() if _lookup_queue is not None else None,
         "supabase_configured": supabase_configured,
         "openai_configured": openai_configured,
-        "agents_will_run": supabase_configured and openai_configured and _agent_queue is not None and user_agents_enabled,
+        "user_agents_enabled": user_agents_enabled,
+        "agents_will_run": (
+            supabase_configured
+            and openai_configured
+            and _agent_queue is not None
+            and user_agents_enabled
+            and thesis_ready
+        ),
+        "lookup_will_run": (
+            supabase_configured
+            and openai_configured
+            and _lookup_queue is not None
+            and thesis_ready
+        ),
         "thesis_ready": thesis_ready,
         "active_thesis_version_id": active_thesis_version_id,
         "thesis_error": thesis_error,
@@ -2324,7 +2344,7 @@ def _parse_lookup_input(lookup_input: str) -> Dict[str, Optional[str]]:
     raw = (lookup_input or "").strip()
     lowered = raw.lower()
     website: Optional[str] = None
-    company_name = raw
+    company_name = _normalize_lookup_company_phrase(raw)
     input_type = "context_query"
     domain_like = re.match(r"^(https?://)?([a-z0-9-]+\.)+[a-z]{2,}([/:?#].*)?$", lowered)
     embedded_url_or_domain = re.search(
@@ -2367,6 +2387,25 @@ def _parse_lookup_input(lookup_input: str) -> Dict[str, Optional[str]]:
         "lookup_query": raw,
         "lookup_input_type": input_type,
     }
+
+
+def _normalize_lookup_company_phrase(raw: str) -> str:
+    """
+    Keep on-demand lookup focused on the intended company when users type
+    natural commands instead of only the brand name.
+    """
+    value = (raw or "").strip()
+    if not value:
+        return ""
+    value = _LOOKUP_LEADING_PHRASE_RE.sub("", value).strip(" ,:;-")
+    value = re.sub(r"(?i)^(?:company|startup)\s+(?:named|called)\s+", "", value).strip(" ,:;-")
+    tokens = [t for t in re.split(r"\s+", value) if t]
+    if len(tokens) > 2:
+        last = re.sub(r"[^a-z0-9]", "", tokens[-1].lower())
+        starts_with_the = tokens[0].lower() == "the"
+        if last in _LOOKUP_TRAILING_QUALIFIERS and not (last == "company" and starts_with_the):
+            value = " ".join(tokens[:-1]).strip(" ,:;-")
+    return value or raw.strip()
 
 
 @app.post("/api/startups/lookup")

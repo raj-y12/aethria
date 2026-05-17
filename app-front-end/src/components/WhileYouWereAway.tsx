@@ -69,7 +69,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
           transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
           style={{
             fontFamily: "var(--font-display)",
-            fontSize: 'clamp(36px, 5vw, 64px)',
+            fontSize: 'clamp(32px, 4.5vw, 56px)',
             fontWeight: 500,
             color: 'var(--color-oxford)',
             lineHeight: 1.1,
@@ -126,7 +126,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
               <div
                 style={{
                   fontFamily: "var(--font-mono)",
-                  fontSize: 'clamp(34px, 5vw, 56px)',
+                  fontSize: 'clamp(40px, 6vw, 64px)',
                   fontWeight: 700,
                   lineHeight: 1,
                   color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
