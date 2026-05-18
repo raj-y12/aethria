@@ -422,16 +422,16 @@
       /* Suite F — Motion Field */
       .banner-motion {
         background:
-          linear-gradient(90deg, rgba(0, 20, 51, 0.3) 0%, rgba(201, 217, 234, 0.34) 19%, transparent 48%),
-          linear-gradient(90deg, rgba(201, 217, 234, 0.2) 0%, transparent 64%),
+          linear-gradient(90deg, color(display-p3 0 0.076 0.196 / 0.3) 0%, color(display-p3 0.803 0.857 0.916 / 0.34) 19%, transparent 48%),
+          linear-gradient(90deg, color(display-p3 0.803 0.857 0.916 / 0.2) 0%, transparent 64%),
           linear-gradient(180deg, var(--paper-deep) 0%, #d6ccba 37%, var(--paper) 100%);
         color: var(--oxford);
       }
 
       .banner-motion-invert {
         background:
-          linear-gradient(90deg, rgba(201, 217, 234, 0.28) 0%, rgba(244, 241, 234, 0.13) 21%, transparent 44%),
-          linear-gradient(90deg, rgba(244, 241, 234, 0.13) 0%, rgba(0, 20, 51, 0) 52%),
+          linear-gradient(90deg, color(display-p3 0.803 0.857 0.916 / 0.28) 0%, color(display-p3 0.961 0.945 0.918 / 0.13) 21%, transparent 44%),
+          linear-gradient(90deg, color(display-p3 0.961 0.945 0.918 / 0.13) 0%, rgba(0, 20, 51, 0) 52%),
           linear-gradient(180deg, var(--charcoal) 0%, #101f32 38%, var(--oxford) 100%);
         color: var(--cream);
       }
@@ -464,7 +464,7 @@
 
       .motion-inner::after,
       .wake-inner::after {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.35 0.45' numOctaves='5' seed='19' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 .75'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='180' color-interpolation-filters='sRGB'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.8 0.72' numOctaves='5' seed='19' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0.42 0 0 0 0 0 0.42 0 0 0 0 0 0.42 0 0 0 0 0 .72 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
         background-size: 220px 120px;
         mix-blend-mode: overlay;
         opacity: 0.46;
@@ -475,7 +475,7 @@
         left: -14%;
         width: 92%;
         height: 56px;
-        background: linear-gradient(90deg, transparent, rgba(0, 20, 51, 0.56), rgba(201, 217, 234, 0.42), transparent);
+        background: linear-gradient(90deg, transparent, color(display-p3 0 0.076 0.196 / 0.56), color(display-p3 0.803 0.857 0.916 / 0.42), transparent);
         opacity: 0.44;
         filter: blur(18px);
       }
@@ -506,7 +506,7 @@
       }
 
       .banner-motion-invert .motion-band {
-        background: linear-gradient(90deg, transparent, rgba(244, 241, 234, 0.3), rgba(201, 217, 234, 0.42), rgba(38, 49, 63, 0.24), transparent);
+        background: linear-gradient(90deg, transparent, color(display-p3 0.961 0.945 0.918 / 0.3), color(display-p3 0.803 0.857 0.916 / 0.42), rgba(38, 49, 63, 0.24), transparent);
       }
 
       .motion-copy {
@@ -1251,10 +1251,13 @@
           canvas.height = height * pixelRatio;
           canvas.style.width = width + 'px';
           canvas.style.height = height + 'px';
-          var ctx = canvas.getContext('2d');
+          var ctx = canvas.getContext('2d', { colorSpace: 'display-p3' }) || canvas.getContext('2d');
           ctx.scale(pixelRatio, pixelRatio);
           ctx.imageSmoothingEnabled = true;
-          return { canvas: canvas, ctx: ctx };
+          if ('imageSmoothingQuality' in ctx) {
+            ctx.imageSmoothingQuality = 'high';
+          }
+          return { canvas: canvas, ctx: ctx, pixelRatio: pixelRatio };
         }
 
         function paintBase(ctx, width, height, inverted) {
@@ -1435,6 +1438,41 @@
           lines.forEach(function (line, index) {
             ctx.fillText(line, x, y + index * size * lineHeight);
           });
+          ctx.restore();
+        }
+
+        function paintDeviceGrain(canvas, inverted, intensity) {
+          var ctx = canvas.getContext('2d');
+          var width = canvas.width;
+          var height = canvas.height;
+          var image = ctx.getImageData(0, 0, width, height);
+          var data = image.data;
+          var seed = inverted ? 0x9e3779b9 : 0x6d2b79f5;
+          var amp = intensity || 9;
+          for (var i = 0; i < data.length; i += 4) {
+            seed ^= seed << 13;
+            seed ^= seed >>> 17;
+            seed ^= seed << 5;
+            var noise = ((seed >>> 24) & 255) - 128;
+            var dither = (noise / 128) * amp;
+            data[i] = Math.max(0, Math.min(255, data[i] + dither));
+            data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + dither));
+            data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + dither));
+          }
+          ctx.putImageData(image, 0, 0);
+
+          ctx.save();
+          ctx.globalAlpha = inverted ? 0.11 : 0.085;
+          ctx.fillStyle = inverted ? 'rgba(244, 241, 234, 0.75)' : 'rgba(0, 20, 51, 0.72)';
+          seed = inverted ? 0x45d9f3b : 0x12ab34cd;
+          var specks = Math.floor((width * height) / 92);
+          for (var p = 0; p < specks; p += 1) {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            var x = seed % width;
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            var y = seed % height;
+            ctx.fillRect(x, y, 1, 1);
+          }
           ctx.restore();
         }
 
@@ -1639,8 +1677,13 @@
         }
 
         window.renderBrandAssetToPng = function (id, width, height, pixelRatio) {
-          var pair = makeCanvas(width, height, pixelRatio || 1);
+          var requestedRatio = pixelRatio || 1;
+          var exportRatio = id.indexOf('banner-motion') === 0 || id.indexOf('banner-wake') === 0 ? Math.max(requestedRatio, 4) : requestedRatio;
+          var pair = makeCanvas(width, height, exportRatio);
           drawAsset(pair.ctx, id, width, height);
+          if (id.indexOf('banner-motion') === 0 || id.indexOf('banner-wake') === 0) {
+            paintDeviceGrain(pair.canvas, isInverted(id), 7.5);
+          }
           return pair.canvas.toDataURL('image/png');
         };
       })();
