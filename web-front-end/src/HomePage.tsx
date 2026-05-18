@@ -1,14 +1,20 @@
 import { Link } from 'react-router-dom';
-import { useEffect, useState, type ReactNode } from 'react';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import GrainOverlay from './components/GrainOverlay';
 import MarketTape from './components/MarketTape';
 import IntelligenceMap from './components/IntelligenceMap';
 import DashboardPreview from './components/DashboardPreview';
+import LiveIndicatorsPanel from './components/LiveIndicatorsPanel';
 import DeskClock from './components/DeskClock';
 import HomeStatsSection from './components/HomeStatsSection';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SCROLL_EASE } from './motionTokens';
+import {
+  DEMO_LOOKUP_RESULT,
+  DEMO_MANDATE_DARK,
+  LookupResultSnapshot,
+  MandateCard,
+} from '@aethria/product-chrome';
 
 export default function HomePage() {
   const reduce = useReducedMotion();
@@ -413,13 +419,10 @@ export default function HomePage() {
                 </Link>
               </motion.div>
               <motion.div
-                className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center py-6 md:py-10 lg:py-12"
+                className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center py-6 md:py-10 lg:items-end lg:py-12"
                 variants={closingChildVariants}
               >
-                <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)]">
-                  Live indicators
-                </p>
-                <LiveSignalPills />
+                <LiveIndicatorsPanel />
               </motion.div>
             </div>
           </div>
@@ -455,42 +458,15 @@ export default function HomePage() {
                 Upload or write your investment thesis. Every scout, reviewer, and partner decision is gated against it — automatically, without re-configuration.
               </p>
 
-              {/* Thesis card mock */}
-              <div
-                className="mt-8 border border-solid border-[rgba(244,241,234,0.12)] p-4 sm:p-5"
-                aria-hidden
-              >
-                <div className="flex items-center justify-between">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-[rgba(244,241,234,0.35)]">
-                    Active Mandate
-                  </p>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      className="h-1.5 w-1.5 rounded-none bg-[#f4f1ea]"
-                      style={{ opacity: 0.55, animation: 'pipeline-dot-pulse 2.4s ease-in-out infinite' }}
-                    />
-                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(244,241,234,0.45)]">
-                      Live
-                    </span>
-                  </span>
-                </div>
-                <p className="mt-2.5 font-sans text-[15px] font-semibold text-[#f4f1ea]">
-                  Deep-Tech Infrastructure
-                </p>
-                <p className="mt-1 font-sans text-[13px] leading-[1.6] text-[rgba(244,241,234,0.5)]">
-                  Series A–B · European markets · B2B focus
-                </p>
-                <div className="mt-3 h-px bg-[rgba(244,241,234,0.1)]" />
-                <p className="mt-3 font-sans text-[13px] italic leading-[1.65] text-[rgba(244,241,234,0.4)]">
-                  "Backing infrastructure teams building the plumbing of the next compute cycle — prioritising capital efficiency and defensible wedge."
-                </p>
+              <div className="mt-8" aria-hidden>
+                <MandateCard {...DEMO_MANDATE_DARK} />
               </div>
             </div>
           </ScrollReveal>
 
           {/* Right panel — On-Demand Lookup (paper light) */}
           <ScrollReveal
-            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#f4f1ea] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:px-12 lg:py-20"
+            className="flex w-full shrink-0 flex-col justify-center self-stretch border-t border-solid border-[var(--section-divider)] bg-[#f4f1ea] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:border-l lg:border-t-0 lg:px-12 lg:py-20"
             y={20}
             delay={0.08}
             amount={0.18}
@@ -508,57 +484,16 @@ export default function HomePage() {
                 On-demand lookup delivers a full investment memo on any company in seconds. No pipeline wait. Benchmarked against your active thesis the moment results arrive.
               </p>
 
-              {/* Lookup interface mock */}
-              <div
-                className="mt-8 border border-solid border-[var(--section-divider)]"
-                aria-hidden
-              >
-                {/* Query bar */}
-                <div className="flex items-center gap-3 border-b border-solid border-[var(--section-divider)] bg-[rgba(0,27,71,0.025)] px-4 py-2.5">
-                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(0,27,71,0.35)]">
-                    LOOKUP
-                  </span>
-                  <span className="h-3 w-px shrink-0 bg-[var(--section-divider)]" />
-                  <span className="font-sans text-[13px] text-[rgba(0,27,71,0.65)]">Meridian Systems</span>
-                  <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-[rgba(0,27,71,0.3)]">
-                    ↵ run
-                  </span>
-                </div>
-
-                {/* Result preview */}
-                <div className="px-4 py-4">
-                  <div className="mb-3 flex items-baseline justify-between gap-3">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-[rgba(0,27,71,0.4)]">
-                      Result
-                    </p>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(0,27,71,0.35)]">
-                      B2B Infrastructure · Series A
-                    </p>
-                  </div>
-                  <p className="font-sans text-[18px] font-semibold leading-tight text-[#001433]">
-                    STRONG.
-                  </p>
-                  <p className="mt-1.5 font-sans text-[13px] leading-[1.6] text-[rgba(0,27,71,0.58)]">
-                    Thesis-aligned · High conviction · Pending unit economics review
-                  </p>
-                  <div className="mt-3 grid grid-cols-5 gap-x-2">
-                    {['MKT', 'EXEC', 'PROD', 'TECH', 'DEF'].map((d, i) => (
-                      <div key={d} className="flex flex-col items-center gap-0.5">
-                        <span className="font-mono text-[10px] text-[rgba(0,27,71,0.35)]">{d}</span>
-                        <span className="font-mono text-[11px] font-bold text-[rgba(0,27,71,0.7)]">
-                          {[9, 8, 8, 9, 7][i]}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              <div className="mt-8" aria-hidden>
+                <LookupResultSnapshot {...DEMO_LOOKUP_RESULT} />
               </div>
+
             </div>
           </ScrollReveal>
         </section>
 
         <motion.footer
-          className="home-footer paper-dot-grid section-divider-top relative z-20 w-full shrink-0"
+          className="home-footer paper-dot-grid relative z-20 w-full shrink-0"
           initial={reduce ? false : { opacity: 0, y: 18 }}
           whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
@@ -593,140 +528,3 @@ export default function HomePage() {
   );
 }
 
-type PipelineStatus = 'ACTIVE' | 'PROCESSING' | 'IDLE';
-
-const PIPELINE_STATUS_CYCLE: PipelineStatus[] = ['ACTIVE', 'PROCESSING', 'IDLE'];
-
-const PIPELINE_STATUS_CONFIG: Record<
-  PipelineStatus,
-  { dot: string; dotAnimation?: string; label: string; valueOpacity: string }
-> = {
-  ACTIVE: {
-    dot: 'bg-[var(--color-oxford)]',
-    dotAnimation: 'pipeline-dot-pulse 2s ease-in-out infinite',
-    label: 'ACTIVE',
-    valueOpacity: 'text-[var(--color-oxford)]',
-  },
-  PROCESSING: {
-    dot: 'bg-[rgba(0,27,71,0.45)]',
-    dotAnimation: 'pipeline-dot-pulse 3.5s ease-in-out infinite',
-    label: 'PROCESSING',
-    valueOpacity: 'text-[rgba(0,27,71,0.55)]',
-  },
-  IDLE: {
-    dot: 'bg-[rgba(0,27,71,0.2)]',
-    dotAnimation: undefined,
-    label: 'IDLE',
-    valueOpacity: 'text-[rgba(0,27,71,0.3)]',
-  },
-};
-
-function LiveSignalPills() {
-  const reduce = useReducedMotion();
-  const [dealsCount, setDealsCount] = useState(47);
-  const [statusIndex, setStatusIndex] = useState(0);
-  const [minutesAgo, setMinutesAgo] = useState(2);
-
-  const pipelineStatus = PIPELINE_STATUS_CYCLE[statusIndex];
-  const statusConfig = PIPELINE_STATUS_CONFIG[pipelineStatus];
-
-  const pillListVariants: Variants = {
-    hidden: {},
-    visible: {
-      transition: {
-        staggerChildren: reduce ? 0 : 0.09,
-        delayChildren: reduce ? 0 : 0.05,
-      },
-    },
-  };
-
-  const pillItemVariants: Variants = {
-    hidden: reduce ? {} : { opacity: 0, y: 12 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: reduce ? 0 : 0.42, ease: SCROLL_EASE },
-    },
-  };
-
-  useEffect(() => {
-    const dealsInterval = setInterval(() => {
-      setDealsCount((prev) => prev + 1);
-    }, 3500 + Math.random() * 2500);
-    return () => clearInterval(dealsInterval);
-  }, []);
-
-  useEffect(() => {
-    const statusInterval = setInterval(() => {
-      setStatusIndex((prev) => (prev + 1) % PIPELINE_STATUS_CYCLE.length);
-    }, 4000);
-    return () => clearInterval(statusInterval);
-  }, []);
-
-  useEffect(() => {
-    const minutesInterval = setInterval(() => {
-      setMinutesAgo((prev) => prev + 1);
-    }, 60000);
-    return () => clearInterval(minutesInterval);
-  }, []);
-
-  return (
-    <motion.div
-      className="flex w-full max-w-md min-w-0 flex-1 flex-col self-stretch border-t border-[var(--section-divider)]"
-      variants={pillListVariants}
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, amount: 0.35, margin: '0px 0px -5% 0px' }}
-    >
-      <motion.div variants={pillItemVariants}>
-        <SignalPill label="Deals reviewed this cycle" value={`${dealsCount}`} />
-      </motion.div>
-
-      {/* Pipeline status row — visually weighted by state */}
-      <motion.div variants={pillItemVariants}>
-        <SignalPill
-          label="Pipeline status"
-          prominent
-          value={
-            <span className={`inline-flex items-center gap-2 transition-colors duration-500 ${statusConfig.valueOpacity}`}>
-              <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-none ${statusConfig.dot}`}
-                style={statusConfig.dotAnimation ? { animation: statusConfig.dotAnimation } : undefined}
-              />
-              <span>{statusConfig.label}</span>
-            </span>
-          }
-        />
-      </motion.div>
-
-      <motion.div variants={pillItemVariants}>
-        <SignalPill label="Last memo generated" value={`${minutesAgo} min ago`} />
-      </motion.div>
-    </motion.div>
-  );
-}
-
-function SignalPill({
-  label,
-  value,
-  prominent = false,
-}: {
-  label: string;
-  value: ReactNode;
-  prominent?: boolean;
-}) {
-  return (
-    <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-[var(--section-divider)] py-3 sm:gap-4">
-      <div
-        className={`font-mono text-[10px] uppercase tracking-[0.12em] ${
-          prominent ? 'text-[rgba(0,27,71,0.6)]' : 'text-[rgba(0,27,71,0.45)]'
-        }`}
-      >
-        {label}
-      </div>
-      <div className={prominent ? '' : 'font-sans text-[13px] font-semibold tabular-nums text-[var(--color-oxford)]'}>
-        {value}
-      </div>
-    </div>
-  );
-}

@@ -44,6 +44,8 @@ import {
   isDealUnreviewed,
 } from '../lib/dealState';
 import type { FundConfiguration } from '../lib/fundConfiguration';
+import { LookupResultSnapshot } from '@aethria/product-chrome';
+import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 
 const SYSTEM_MEMO_HEADER_PADDING = 'py-phi-3';
 const SETTINGS_PATH = '/v1/settings';
@@ -452,7 +454,6 @@ export default function MainLayout({
 
   const hasThesis = !!fundThesisSummary?.active_version_id;
   const fundName = useMemo(() => {
-    // Prefer parsed_json name fields from the thesis itself
     const pj = fundThesisSummary?.parsed_json;
     if (pj && typeof pj === 'object') {
       for (const key of ['fund_name', 'name', 'title', 'fund', 'fund_title']) {
@@ -460,10 +461,8 @@ export default function MainLayout({
         if (typeof val === 'string' && val.trim()) return val.trim();
       }
     }
-    // Fall back to settings fund identity
     const settingsName = data.settings?.fund_identity?.fund_name?.trim();
     if (settingsName) return settingsName;
-    // Last resort: version label if thesis exists
     if (fundThesisSummary?.active_version_number != null) {
       return `Fund Thesis v${fundThesisSummary.active_version_number}`;
     }
@@ -486,8 +485,9 @@ export default function MainLayout({
     };
     const sectors = pj ? toStrings(pj.sectors ?? pj.sector ?? pj.focus_areas) : toStrings(undefined);
     const stages = pj ? toStrings(pj.stage_focus ?? pj.stage) : toStrings(fundStage);
-    const geos = pj ? toStrings(pj.geography ?? pj.geographies ?? pj.geographic_focus) : toStrings(undefined);
-    // Fall back to settings if parsed_json has nothing — chips are sectors · stage · region only
+    const geos = pj
+      ? toStrings(pj.geography ?? pj.geographies ?? pj.geographic_focus)
+      : toStrings(undefined);
     return {
       sectors,
       stages: stages.length ? stages : fundStage ? [fundStage] : [],
@@ -496,9 +496,21 @@ export default function MainLayout({
   }, [fundThesisSummary, fundStage, fundGeo, scoutRegion]);
   const thesisTagList = useMemo(
     () => [...thesisTags.stages, ...thesisTags.geos, ...thesisTags.sectors],
-    [thesisTags.geos, thesisTags.sectors, thesisTags.stages]
+    [thesisTags.geos, thesisTags.sectors, thesisTags.stages],
   );
   const hasThesisTags = thesisTagList.length > 0;
+
+  const lookupSnapshotProps = useMemo(() => {
+    if (!pendingLookupMatch) return null;
+    return buildLookupSnapshotProps(pendingLookupMatch, pendingLookup?.queryLabel);
+  }, [pendingLookupMatch, pendingLookup?.queryLabel]);
+
+  const handleOpenLookupMemo = useCallback(() => {
+    if (!pendingLookupMatch) return;
+    setSelectedStartup(pendingLookupMatch);
+    setRightPanel('memo');
+    setPendingLookup((prev) => (prev ? { ...prev, autoOpened: true } : prev));
+  }, [pendingLookupMatch]);
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-paper">
@@ -682,6 +694,14 @@ export default function MainLayout({
                     lookupPhase={lookupPhaseLabel}
                     alwaysOpen
                   />
+                  {lookupSnapshotProps ? (
+                    <div className="mt-phi-3 min-w-0">
+                      <LookupResultSnapshot
+                        {...lookupSnapshotProps}
+                        onOpenMemo={handleOpenLookupMemo}
+                      />
+                    </div>
+                  ) : null}
                   </div>
                 </div>
 
@@ -833,6 +853,11 @@ export default function MainLayout({
                     onClearMessage={() => setLookupMessage(null)}
                     lookupPhase={lookupPhaseLabel}
                   />
+                  {lookupSnapshotProps ? (
+                    <div className="mt-phi-3 min-w-0">
+                      <LookupResultSnapshot {...lookupSnapshotProps} onOpenMemo={handleOpenLookupMemo} />
+                    </div>
+                  ) : null}
                 </div>
               </header>
 

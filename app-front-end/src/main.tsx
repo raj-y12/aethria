@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider } from '@clerk/react-router';
 import '@fontsource-variable/figtree';
 import './index.css';
+import '@aethria/product-chrome';
 import App from './App.tsx';
 import { clerkAppearance } from './design-system/clerk-appearance';
 

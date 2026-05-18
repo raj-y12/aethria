@@ -1,0 +1,13 @@
+@keyframes pc-dot-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.pc-live-dot {
+  animation: pc-dot-pulse 2.4s ease-in-out infinite;
+}

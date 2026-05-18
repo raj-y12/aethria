@@ -1,17 +1,13 @@
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
+import {
+  DEMO_LOOKUP_MEMO_SAMPLE,
+  DEMO_MANDATE_PAPER,
+  LookupResultSnapshot,
+  MandateCard,
+} from '@aethria/product-chrome';
 import { SCROLL_EASE } from '../motionTokens';
 
 const PAPER = '#f4f1ea';
-
-const DIMENSION_SCORES: { label: string; score: string }[] = [
-  { label: 'MARKET', score: '9/10' },
-  { label: 'EXECUTION', score: '8/10' },
-  { label: 'PRODUCT', score: '8/10' },
-  { label: 'TECHNICAL', score: '9/10' },
-  { label: 'DEFENSIBILITY', score: '7/10' },
-];
-
-const THESIS_CRITERIA = ['B2B Infrastructure', 'Series A–B', 'European Markets'];
 
 export default function DashboardPreview() {
   const reduce = useReducedMotion();
@@ -63,7 +59,7 @@ export default function DashboardPreview() {
   };
 
   return (
-    <section className="section-divider-top flex w-full overflow-hidden border-b border-solid border-[var(--section-divider)]">
+    <section className="flex w-full overflow-hidden">
       <motion.div
         className="w-2 shrink-0 self-stretch origin-top bg-[#001433] sm:w-6 md:w-12"
         aria-hidden
@@ -124,126 +120,13 @@ export default function DashboardPreview() {
           <div className="flex w-full shrink-0 justify-center md:flex-1 md:justify-end md:pr-[min(4rem,5vw)]">
             <div className="flex w-full max-w-[540px] shrink-0 flex-col gap-3 md:w-[540px] md:max-w-[540px]">
 
-              {/* Fund thesis card — compact */}
-              <motion.article
-                variants={thesisCardVariants}
-                style={{
-                  backgroundColor: PAPER,
-                  border: '1px solid var(--section-divider)',
-                  borderRadius: 0,
-                  boxSizing: 'border-box',
-                }}
-                className="w-full p-4 sm:p-5"
-                aria-label="Fund thesis preview"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.11em] text-[rgba(0,27,71,0.4)]">
-                    Active Mandate · Fund Thesis
-                  </p>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-none bg-[#001433]"
-                      style={{ opacity: 0.65, animation: 'pipeline-dot-pulse 2.4s ease-in-out infinite' }}
-                      aria-hidden
-                    />
-                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(0,27,71,0.5)]">
-                      Live
-                    </span>
-                  </span>
-                </div>
-                <p className="mt-2.5 font-sans text-[15px] font-semibold leading-tight tracking-tight text-[var(--color-oxford)]">
-                  Deep-Tech Infrastructure
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {THESIS_CRITERIA.map((c) => (
-                    <span
-                      key={c}
-                      className="border border-solid border-[var(--section-divider)] px-2 py-0.5 font-mono text-[10px] tracking-[0.06em] text-[rgba(0,27,71,0.58)]"
-                    >
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              </motion.article>
+              <motion.div variants={thesisCardVariants} className="w-full" aria-label="Fund thesis preview">
+                <MandateCard {...DEMO_MANDATE_PAPER} />
+              </motion.div>
 
-              {/* Lookup result card — main */}
-              <motion.article
-                variants={memoCardVariants}
-                className="relative w-full p-5 sm:p-7 md:p-9"
-                style={{
-                  backgroundColor: PAPER,
-                  border: '1px solid var(--section-divider)',
-                  borderRadius: 0,
-                  boxSizing: 'border-box',
-                }}
-                aria-label="On-demand lookup result preview"
-              >
-                {/* Lookup query bar */}
-                <div
-                  className="mb-5 flex items-center gap-3 border border-solid border-[rgba(0,27,71,0.1)] bg-[rgba(0,27,71,0.025)] px-3 py-2"
-                >
-                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(0,27,71,0.35)]">
-                    LOOKUP
-                  </span>
-                  <span
-                    className="h-3 w-px shrink-0 bg-[var(--section-divider)]"
-                    aria-hidden
-                  />
-                  <span className="min-w-0 font-sans text-[13px] text-[rgba(0,27,71,0.7)]">
-                    Meridian Systems
-                  </span>
-                  <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-[rgba(0,27,71,0.35)]">
-                    Result
-                  </span>
-                </div>
-
-                <p className="mb-4 font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(0,27,71,0.4)]">
-                  AETHRIA INTELLIGENCE · AUTONOMOUS OUTPUT
-                </p>
-                <h3 className="text-xl font-semibold leading-tight tracking-tight text-[var(--color-oxford)] sm:text-2xl">
-                  Meridian Systems
-                </h3>
-                <p className="mt-1.5 font-mono text-[13px] tracking-[0.08em] text-[rgba(0,27,71,0.5)]">
-                  B2B INFRASTRUCTURE · SERIES A
-                </p>
-
-                <div className="my-5 h-px bg-[var(--section-divider)]" aria-hidden />
-
-                <p className="mb-1.5 font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(0,27,71,0.58)]">
-                  INVESTMENT JUDGMENT
-                </p>
-                <p className="font-sans text-[clamp(1.375rem,5vw,2rem)] font-semibold leading-tight tracking-[-0.03em] text-[var(--color-oxford)] md:text-[32px]">
-                  STRONG.
-                </p>
-                <p className="mt-3 font-sans text-[15px] font-normal leading-[1.6] text-[rgba(0,27,71,0.7)]">
-                  Clear market timing, credible founding team, and defensible infrastructure play. Conviction is high pending
-                  final diligence on unit economics.
-                </p>
-
-                <div className="my-5 h-px bg-[var(--section-divider)]" aria-hidden />
-
-                <p className="mb-[14px] font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(0,27,71,0.58)]">
-                  DIMENSION SCORES
-                </p>
-                <div className="grid w-full grid-cols-5 gap-x-0.5 gap-y-1 sm:gap-x-2 sm:gap-y-2 md:gap-x-3">
-                  {DIMENSION_SCORES.map((row) => (
-                    <div key={`dim-label-${row.label}`} className="flex min-w-0 items-end justify-center text-center">
-                      <p className="m-0 hyphens-auto break-normal font-mono text-[12px] leading-[1.25] tracking-[0.03em] text-[rgba(0,27,71,0.55)]">
-                        {row.label}
-                      </p>
-                    </div>
-                  ))}
-                  {DIMENSION_SCORES.map((row) => (
-                    <p
-                      key={`dim-score-${row.label}`}
-                      className="min-w-0 text-center font-mono text-base font-bold leading-tight text-[var(--color-oxford)] sm:text-xl md:text-2xl"
-                      style={{ fontFamily: '"Space Mono", monospace' }}
-                    >
-                      {row.score}
-                    </p>
-                  ))}
-                </div>
-              </motion.article>
+              <motion.div variants={memoCardVariants} className="w-full" aria-label="On-demand lookup result preview">
+                <LookupResultSnapshot {...DEMO_LOOKUP_MEMO_SAMPLE} />
+              </motion.div>
 
             </div>
           </div>

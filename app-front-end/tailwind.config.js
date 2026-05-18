@@ -3,6 +3,7 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
+    "../packages/product-chrome/src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     /* Breakpoints: 480 / 768 / 1024 / 1440 — desktop source of truth */

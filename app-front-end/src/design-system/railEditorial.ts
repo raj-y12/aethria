@@ -27,7 +27,7 @@ export const railEditorial = {
     'font-mono font-semibold tabular-nums leading-none tracking-[-0.02em] text-[clamp(20px,2.4vw,38px)]',
 
   /** Label beside a stat number. */
-  statLabel: 'font-mono text-[10px] leading-none text-oxford/35 tracking-[0.04em]',
+  statLabel: 'font-mono text-[10px] leading-none uppercase tracking-[0.10em] text-oxford/35',
 
   /** Sub-captions, timestamps, link text. */
   meta: 'font-mono text-[10px] leading-[1.4] text-oxford/35 tracking-[0.06em]',

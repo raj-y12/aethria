@@ -18,7 +18,10 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@aethria/product-chrome": ["../packages/product-chrome/src/index.ts"]
+    }
   },
   "include": ["src", "api"]
 }

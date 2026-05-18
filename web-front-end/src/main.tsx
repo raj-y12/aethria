@@ -6,7 +6,9 @@ import '@fontsource/instrument-sans/400.css';
 import '@fontsource/instrument-sans/500.css';
 import '@fontsource/instrument-sans/600.css';
 import '@fontsource/instrument-sans/700.css';
+import 'lenis/dist/lenis.css';
 import './index.css';
+import '@aethria/product-chrome';
 import App from './App.tsx';
 
 // Global smooth scroll (Lenis) for marketing site only

@@ -232,40 +232,16 @@ hr.doc-section-separator::before {
     font-weight: 500;
   }
 
-  /* Global scrollbar styling (match app-front-end): skinny, oxford thumb, paper track */
+  /* Hide scrollbars globally while preserving scroll behavior. */
   * {
-    scrollbar-width: thin; /* Firefox */
-    scrollbar-color: var(--color-oxford) transparent;
-  }
-
-  *::-webkit-scrollbar {
-    width: 4px; /* really skinny */
-    height: 4px;
-  }
-
-  *::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  *::-webkit-scrollbar-thumb {
-    background: var(--color-oxford);
-    border-radius: 0;
-  }
-
-  *::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 20, 51, 0.85);
-  }
-
-  /* Hide top-level window scrollbars (html/body) while keeping scroll behavior */
-  html,
-  body {
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE/Edge legacy */
   }
 
-  html::-webkit-scrollbar,
-  body::-webkit-scrollbar {
+  *::-webkit-scrollbar {
     display: none; /* Chrome/Safari */
+    width: 0;
+    height: 0;
   }
 
   /* iPhone: root fills viewport so 100dvh works in Safari */
