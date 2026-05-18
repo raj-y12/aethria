@@ -1608,8 +1608,8 @@
 .memoGeneratingSection { margin-top: 1.25rem; }
 .memoSummaryCallout { background: transparent; padding: 0; margin: 0; border: none; }
 .memoSummaryCallout.memoGenCallout {
-  background: transparent;
-  padding: 0;
+  background: var(--surface-selected);
+  padding: 34px 13px; /* py-phi-6 px-phi-4 — matches WorkGrid selected row */
 }
 .memoGenCallout .memoPipelineKicker { margin-bottom: 8px; }
 /* Pipeline gate title mirrors WorkGrid DecisionBadge: mono, uppercase, badge tracking */

@@ -545,11 +545,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const needsRiskAcknowledgement = Boolean(
     displayStartup && shouldGateRisk(config, hasHighAdverse, adverseRegister.length > 0, isAlreadyDecided)
   );
-  const showRulingStatus = Boolean(
-    isAlreadyDecided
-    || (showEscalationBadge && !isAlreadyDecided)
-    || !showJudgment
-  );
+  const showRulingStatus =
+    memoPipeline !== 'generating'
+    && Boolean(
+      isAlreadyDecided
+      || (showEscalationBadge && !isAlreadyDecided)
+      || !showJudgment
+    );
   const riskReviewOutstanding = needsRiskAcknowledgement && !risksReviewed;
   const convictionHistory = displayStartup?.conviction_state?.decision_history ?? [];
   const precedentCandidates = useMemo(
