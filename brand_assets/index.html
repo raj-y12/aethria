@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>Aethria — LinkedIn Banner Moods</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <!-- Libre Baskerville for logo & tagline -->
+    <!-- Aethria brand fonts -->
     <link
       rel="preconnect"
       href="https://fonts.googleapis.com"
@@ -15,14 +15,28 @@
       crossorigin
     />
     <link
-      href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400&family=Space+Mono:wght@400&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500&family=Playfair+Display:wght@400;500&family=Space+Mono:wght@400&display=swap"
       rel="stylesheet"
     />
     <style>
       :root {
-        --oxford: #002147;
-        --warm-paper: #f5f2e9;
-        --cream: #f5f2e9;
+        --oxford: #001433;
+        --paper: #f4f1ea;
+        --paper-bright: #f8f5ee;
+        --paper-deep: #e7e0d4;
+        --charcoal: #26313f;
+        --heritage-gold: #a88a5e;
+        --gold-soft: rgba(168, 138, 94, 0.35);
+        --signal-lime: #9fcf48;
+        --signal-moss: #5f743d;
+        --signal-sage: #9aa38d;
+        --signal-steel: #56646b;
+        --signal-smoke: #22313a;
+        --signal-fog: #d8d9c8;
+        --hairline: rgba(0, 20, 51, 0.08);
+        --hairline-strong: rgba(0, 20, 51, 0.16);
+        --cream: #f4f1ea;
+        --warm-paper: var(--paper);
       }
 
       * {
@@ -40,7 +54,7 @@
         min-height: 100vh;
         background-color: var(--warm-paper);
         color: var(--oxford);
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+        font-family: 'Figtree', system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
         overflow-y: auto;
         position: relative;
       }
@@ -65,7 +79,7 @@
 
       .title {
         margin-top: 8px;
-        font-family: 'Libre Baskerville', serif;
+        font-family: 'Playfair Display', Georgia, serif;
         font-weight: 400;
         font-size: 28px;
         letter-spacing: -0.02em;
@@ -112,7 +126,7 @@
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        box-shadow: 0 0 0 1px rgba(0, 33, 71, 0.06);
+        box-shadow: 0 0 0 1px var(--hairline);
       }
 
       /* Banner dimensions — 1584 x 396 */
@@ -151,7 +165,7 @@
       .underlined-a {
         position: relative;
         display: inline-block;
-        font-family: 'Libre Baskerville', serif;
+        font-family: 'Playfair Display', Georgia, serif;
         font-weight: 400;
       }
 
@@ -198,8 +212,8 @@
         right: 80px;
         bottom: 56px;
         font-size: 64px;
-        letter-spacing: -0.06em;
-        font-family: 'Libre Baskerville', serif;
+        letter-spacing: 0;
+        font-family: 'Playfair Display', Georgia, serif;
       }
 
       /* Suite B — Metadata */
@@ -258,6 +272,381 @@
         letter-spacing: 0;
       }
 
+      /* Suite D — Thesis Ledger */
+      .banner-ledger {
+        background-color: var(--warm-paper);
+        color: var(--oxford);
+      }
+
+      .banner-ledger-invert {
+        background-color: var(--oxford);
+        color: var(--cream);
+      }
+
+      .ledger-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        padding: 34px 55px;
+        display: grid;
+        grid-template-columns: 38.2% 61.8%;
+      }
+
+      .ledger-left {
+        position: relative;
+        border-right: 1px solid currentColor;
+      }
+
+      .ledger-left::before,
+      .ledger-left::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 55px;
+        height: 1px;
+        background: currentColor;
+        opacity: 0.16;
+      }
+
+      .ledger-left::before {
+        top: 89px;
+      }
+
+      .ledger-left::after {
+        bottom: 89px;
+      }
+
+      .ledger-wordmark {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 55px;
+        letter-spacing: 0;
+      }
+
+      .ledger-right {
+        padding-left: 55px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 21px;
+        align-content: end;
+      }
+
+      .ledger-row {
+        border-top: 1px solid currentColor;
+        min-height: 89px;
+        padding-top: 13px;
+      }
+
+      .ledger-kicker {
+        font-family: 'Space Mono', ui-monospace, monospace;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        opacity: 0.6;
+      }
+
+      .ledger-value {
+        margin-top: 8px;
+        font-family: 'Figtree', system-ui, sans-serif;
+        font-size: 23px;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+      }
+
+      /* Suite E — Decision Field */
+      .banner-field {
+        background-color: var(--warm-paper);
+        color: var(--oxford);
+      }
+
+      .banner-field-invert {
+        background-color: var(--oxford);
+        color: var(--cream);
+      }
+
+      .field-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        padding: 34px 55px;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: 1fr auto;
+      }
+
+      .field-rule {
+        position: absolute;
+        top: 34px;
+        bottom: 34px;
+        width: 1px;
+        background: currentColor;
+        opacity: 0.18;
+      }
+
+      .field-rule-one {
+        left: 38.2%;
+      }
+
+      .field-rule-two {
+        left: 61.8%;
+      }
+
+      .field-mark {
+        grid-column: 1 / span 2;
+        align-self: start;
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 37px;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+      }
+
+      .field-meta {
+        justify-self: end;
+        align-self: start;
+        text-align: right;
+        font-family: 'Space Mono', ui-monospace, monospace;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        line-height: 1.8;
+        text-transform: uppercase;
+        opacity: 0.64;
+      }
+
+      .field-wordmark {
+        grid-column: 2 / span 2;
+        justify-self: end;
+        align-self: end;
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 89px;
+        letter-spacing: 0;
+      }
+
+      /* Suite F — Motion Field */
+      .banner-motion {
+        background:
+          linear-gradient(90deg, rgba(0, 20, 51, 0.28) 0%, rgba(95, 116, 61, 0.32) 19%, transparent 48%),
+          linear-gradient(90deg, rgba(168, 138, 94, 0.2) 0%, transparent 64%),
+          linear-gradient(180deg, #d4d7c7 0%, #bfc8b7 37%, #ebe6d8 100%);
+        color: var(--oxford);
+      }
+
+      .banner-motion-invert {
+        background:
+          linear-gradient(90deg, rgba(159, 207, 72, 0.22) 0%, rgba(154, 163, 141, 0.24) 21%, transparent 44%),
+          linear-gradient(90deg, rgba(244, 241, 234, 0.13) 0%, rgba(0, 20, 51, 0) 52%),
+          linear-gradient(180deg, #26343b 0%, #142532 38%, #0a1724 100%);
+        color: var(--cream);
+      }
+
+      .motion-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .motion-inner::before,
+      .motion-inner::after,
+      .wake-inner::before,
+      .wake-inner::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .motion-inner::before,
+      .wake-inner::before {
+        background:
+          repeating-linear-gradient(0deg, rgba(244, 241, 234, 0.08) 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(90deg, rgba(0, 20, 51, 0.035) 0 1px, transparent 1px 11px);
+        mix-blend-mode: overlay;
+        opacity: 0.62;
+      }
+
+      .motion-inner::after,
+      .wake-inner::after {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.35 0.45' numOctaves='5' seed='19' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 .75'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-size: 220px 120px;
+        mix-blend-mode: overlay;
+        opacity: 0.46;
+      }
+
+      .motion-band {
+        position: absolute;
+        left: -14%;
+        width: 92%;
+        height: 56px;
+        background: linear-gradient(90deg, transparent, rgba(0, 20, 51, 0.56), rgba(95, 116, 61, 0.42), transparent);
+        opacity: 0.44;
+        filter: blur(18px);
+      }
+
+      .motion-band-one {
+        top: 8px;
+      }
+
+      .motion-band-two {
+        top: 66px;
+        width: 104%;
+        height: 86px;
+        opacity: 0.56;
+      }
+
+      .motion-band-three {
+        top: 160px;
+        width: 88%;
+        height: 70px;
+        opacity: 0.46;
+      }
+
+      .motion-band-four {
+        bottom: 12px;
+        width: 110%;
+        height: 88px;
+        opacity: 0.48;
+      }
+
+      .banner-motion-invert .motion-band,
+      .banner-wake-invert .wake-streak {
+        background: linear-gradient(90deg, transparent, rgba(244, 241, 234, 0.3), rgba(159, 207, 72, 0.36), rgba(86, 100, 107, 0.22), transparent);
+      }
+
+      .motion-copy {
+        position: absolute;
+        top: 44px;
+        right: 76px;
+        width: 700px;
+      }
+
+      .motion-brand {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 15px;
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 34px;
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .motion-brand-rule {
+        width: 89px;
+        height: 1px;
+        background: currentColor;
+        opacity: 0.35;
+      }
+
+      .motion-headline {
+        margin: 0;
+        font-family: 'Figtree', system-ui, sans-serif;
+        font-weight: 500;
+        font-size: 58px;
+        line-height: 0.94;
+        letter-spacing: -0.02em;
+        color: var(--signal-moss);
+        text-shadow: 0 0 18px rgba(244, 241, 234, 0.24);
+      }
+
+      .banner-motion-invert .motion-headline,
+      .banner-wake-invert .wake-headline {
+        color: var(--signal-lime);
+        text-shadow: 0 0 22px rgba(159, 207, 72, 0.12);
+      }
+
+      .motion-meta {
+        position: absolute;
+        left: 55px;
+        bottom: 34px;
+        font-family: 'Space Mono', ui-monospace, monospace;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        line-height: 1.8;
+        text-transform: uppercase;
+        opacity: 0.62;
+      }
+
+      /* Suite G — Signal Wake */
+      .banner-wake {
+        background:
+          linear-gradient(90deg, rgba(0, 20, 51, 0.22) 0%, rgba(95, 116, 61, 0.28) 30%, transparent 62%),
+          linear-gradient(180deg, #d7d6c2 0%, #b7c1ad 42%, #eee8db 100%);
+        color: var(--oxford);
+      }
+
+      .banner-wake-invert {
+        background:
+          linear-gradient(90deg, rgba(159, 207, 72, 0.16) 0%, rgba(86, 100, 107, 0.36) 28%, transparent 58%),
+          linear-gradient(180deg, #314047 0%, #152835 44%, #071523 100%);
+        color: var(--cream);
+      }
+
+      .wake-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .wake-grid {
+        position: absolute;
+        inset: 34px 55px;
+        border-top: 1px solid rgba(244, 241, 234, 0.18);
+        border-bottom: 1px solid rgba(0, 20, 51, 0.18);
+        opacity: 0.34;
+      }
+
+      .wake-streak {
+        position: absolute;
+        left: 0;
+        right: 38.2%;
+        height: 34px;
+        background: linear-gradient(90deg, transparent, rgba(95, 116, 61, 0.44), rgba(0, 20, 51, 0.42), transparent);
+        opacity: 0.48;
+        filter: blur(16px);
+      }
+
+      .wake-streak-one {
+        top: 72px;
+      }
+
+      .wake-streak-two {
+        top: 130px;
+        right: 18%;
+        height: 64px;
+      }
+
+      .wake-streak-three {
+        top: 244px;
+        right: 44%;
+      }
+
+      .wake-brand {
+        position: absolute;
+        top: 46px;
+        right: 76px;
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 34px;
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .wake-headline {
+        position: absolute;
+        right: 76px;
+        bottom: 50px;
+        width: 710px;
+        margin: 0;
+        font-family: 'Figtree', system-ui, sans-serif;
+        font-weight: 500;
+        font-size: 56px;
+        line-height: 0.96;
+        letter-spacing: -0.02em;
+        color: var(--signal-moss);
+      }
+
       /* Legacy LinkedIn profile & success layouts */
       .asset-gallery {
         display: flex;
@@ -312,10 +701,18 @@
       }
 
       .profile-wordmark {
-        font-family: 'Libre Baskerville', serif;
+        font-family: 'Playfair Display', Georgia, serif;
         font-weight: 400;
         font-size: 170px;
-        letter-spacing: -0.06em;
+        letter-spacing: 0;
+      }
+
+      .profile-monogram {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-weight: 400;
+        font-size: 360px;
+        line-height: 1;
+        letter-spacing: -0.02em;
       }
 
       .success-inner {
@@ -335,7 +732,7 @@
 
       .success-heading {
         margin: 0 0 12px;
-        font-family: 'Libre Baskerville', serif;
+        font-family: 'Playfair Display', Georgia, serif;
         font-weight: 400;
         font-size: 40px;
         line-height: 1.2;
@@ -343,7 +740,7 @@
 
       .success-subcopy {
         margin: 0;
-        font-family: 'Libre Baskerville', serif;
+        font-family: 'Playfair Display', Georgia, serif;
         font-weight: 400;
         font-size: 28px;
         line-height: 1.3;
@@ -444,6 +841,40 @@
                 <div class="profile-wordmark">
                   <span class="underlined-a">A</span>ethria
                 </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="banner-card">
+            <div class="banner-meta">
+              Monogram — Paper / Oxford
+              <button class="download-button" data-download="profile-monogram-paper">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-square frame-square-warm"
+              id="profile-monogram-paper"
+              data-width="1000"
+              data-height="1000"
+            >
+              <div class="profile-inner">
+                <span class="underlined-a profile-monogram">A</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="banner-card">
+            <div class="banner-meta">
+              Monogram — Oxford / Paper
+              <button class="download-button" data-download="profile-monogram-oxford">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-square frame-square-invert"
+              id="profile-monogram-oxford"
+              data-width="1000"
+              data-height="1000"
+            >
+              <div class="profile-inner">
+                <span class="underlined-a profile-monogram">A</span>
               </div>
             </div>
           </article>
@@ -568,82 +999,651 @@
               </div>
             </div>
           </article>
+
+          <!-- Suite D — Thesis Ledger (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite D — Thesis Ledger / Paper
+              <button class="download-button" data-download="banner-ledger">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-ledger"
+              id="banner-ledger"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="ledger-inner">
+                <div class="ledger-left">
+                  <div class="ledger-wordmark">
+                    <span class="underlined-a">A</span>ethria
+                  </div>
+                </div>
+                <div class="ledger-right">
+                  <div class="ledger-row">
+                    <div class="ledger-kicker">Scout</div>
+                    <div class="ledger-value">Market truth</div>
+                  </div>
+                  <div class="ledger-row">
+                    <div class="ledger-kicker">Review</div>
+                    <div class="ledger-value">Evidence weighted</div>
+                  </div>
+                  <div class="ledger-row">
+                    <div class="ledger-kicker">Partner</div>
+                    <div class="ledger-value">Decision ready</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite D — Thesis Ledger (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite D — Thesis Ledger / Oxford
+              <button class="download-button" data-download="banner-ledger-invert">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-ledger-invert"
+              id="banner-ledger-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="ledger-inner">
+                <div class="ledger-left">
+                  <div class="ledger-wordmark">
+                    <span class="underlined-a">A</span>ethria
+                  </div>
+                </div>
+                <div class="ledger-right">
+                  <div class="ledger-row">
+                    <div class="ledger-kicker">Scout</div>
+                    <div class="ledger-value">Market truth</div>
+                  </div>
+                  <div class="ledger-row">
+                    <div class="ledger-kicker">Review</div>
+                    <div class="ledger-value">Evidence weighted</div>
+                  </div>
+                  <div class="ledger-row">
+                    <div class="ledger-kicker">Partner</div>
+                    <div class="ledger-value">Decision ready</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite E — Decision Field (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite E — Decision Field / Paper
+              <button class="download-button" data-download="banner-field">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-field"
+              id="banner-field"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="field-inner">
+                <div class="field-rule field-rule-one"></div>
+                <div class="field-rule field-rule-two"></div>
+                <div class="field-mark">Autonomous venture intelligence, scoped by thesis.</div>
+                <div class="field-meta">Deal-flow OS<br />Private beta<br />2026</div>
+                <div class="field-wordmark">
+                  <span class="underlined-a">A</span>ethria
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite E — Decision Field (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite E — Decision Field / Oxford
+              <button class="download-button" data-download="banner-field-invert">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-field-invert"
+              id="banner-field-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="field-inner">
+                <div class="field-rule field-rule-one"></div>
+                <div class="field-rule field-rule-two"></div>
+                <div class="field-mark">Autonomous venture intelligence, scoped by thesis.</div>
+                <div class="field-meta">Deal-flow OS<br />Private beta<br />2026</div>
+                <div class="field-wordmark">
+                  <span class="underlined-a">A</span>ethria
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite F — Motion Field (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite F — Motion Field / Paper
+              <button class="download-button" data-download="banner-motion">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-motion"
+              id="banner-motion"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="motion-inner">
+                <div class="motion-band motion-band-one"></div>
+                <div class="motion-band motion-band-two"></div>
+                <div class="motion-band motion-band-three"></div>
+                <div class="motion-band motion-band-four"></div>
+                <div class="motion-meta">Scout<br />Review<br />Decide</div>
+                <div class="motion-copy">
+                  <div class="motion-brand">
+                    <span><span class="underlined-a">A</span>ethria</span>
+                    <span class="motion-brand-rule"></span>
+                  </div>
+                  <h2 class="motion-headline">Discover Signals.<br />Score Conviction.<br />Move First.</h2>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite F — Motion Field (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite F — Motion Field / Oxford
+              <button class="download-button" data-download="banner-motion-invert">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-motion-invert"
+              id="banner-motion-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="motion-inner">
+                <div class="motion-band motion-band-one"></div>
+                <div class="motion-band motion-band-two"></div>
+                <div class="motion-band motion-band-three"></div>
+                <div class="motion-band motion-band-four"></div>
+                <div class="motion-meta">Scout<br />Review<br />Decide</div>
+                <div class="motion-copy">
+                  <div class="motion-brand">
+                    <span><span class="underlined-a">A</span>ethria</span>
+                    <span class="motion-brand-rule"></span>
+                  </div>
+                  <h2 class="motion-headline">Discover Signals.<br />Score Conviction.<br />Move First.</h2>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite G — Signal Wake (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite G — Signal Wake / Paper
+              <button class="download-button" data-download="banner-wake">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-wake"
+              id="banner-wake"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="wake-inner">
+                <div class="wake-grid"></div>
+                <div class="wake-streak wake-streak-one"></div>
+                <div class="wake-streak wake-streak-two"></div>
+                <div class="wake-streak wake-streak-three"></div>
+                <div class="wake-brand"><span class="underlined-a">A</span>ethria</div>
+                <h2 class="wake-headline">Find the company before the market has a name for it.</h2>
+              </div>
+            </div>
+          </article>
+
+          <!-- Suite G — Signal Wake (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite G — Signal Wake / Oxford
+              <button class="download-button" data-download="banner-wake-invert">Download PNG</button>
+            </div>
+            <div
+              class="frame frame-banner banner-wake-invert"
+              id="banner-wake-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="wake-inner">
+                <div class="wake-grid"></div>
+                <div class="wake-streak wake-streak-one"></div>
+                <div class="wake-streak wake-streak-two"></div>
+                <div class="wake-streak wake-streak-three"></div>
+                <div class="wake-brand"><span class="underlined-a">A</span>ethria</div>
+                <h2 class="wake-headline">Find the company before the market has a name for it.</h2>
+              </div>
+            </div>
+          </article>
         </div>
       </section>
     </main>
     <script>
-      // Minimal local html-to-image-style implementation (toPng only),
-      // so downloads work without any external CDN.
+      // Canvas renderer used for PNG downloads. This avoids browser security
+      // restrictions around drawing foreignObject SVGs into a canvas.
       (function () {
-        function nodeToPng(node, options) {
-          options = options || {};
-          var width = options.width || node.offsetWidth || 300;
-          var height = options.height || node.offsetHeight || 150;
-          var pixelRatio = options.pixelRatio || 1;
+        var COLORS = {
+          oxford: '#001433',
+          paper: '#f4f1ea',
+          cream: '#f4f1ea',
+          paperDeep: '#d8d9c8',
+          heritageGold: '#a88a5e',
+          lime: '#9fcf48',
+          moss: '#5f743d',
+          sage: '#9aa38d',
+          steel: '#56646b',
+          smoke: '#22313a',
+        };
 
-          // Clone node into a wrapper so we don't mutate the live DOM.
-          var clone = node.cloneNode(true);
-          var wrapper = document.createElement('div');
-          wrapper.appendChild(clone);
-
-          var serialized = new XMLSerializer().serializeToString(wrapper);
-
-          var svgWidth = width * pixelRatio;
-          var svgHeight = height * pixelRatio;
-
-          var svg =
-            '<svg xmlns="http://www.w3.org/2000/svg" width="' +
-            svgWidth +
-            '" height="' +
-            svgHeight +
-            '">' +
-            '<foreignObject x="0" y="0" width="100%" height="100%">' +
-            '<div xmlns="http://www.w3.org/1999/xhtml" style="width:' +
-            width +
-            'px;height:' +
-            height +
-            'px;transform:scale(' +
-            pixelRatio +
-            ');transform-origin: top left;">' +
-            serialized +
-            '</div>' +
-            '</foreignObject>' +
-            '</svg>';
-
-          return new Promise(function (resolve, reject) {
-            var img = new Image();
-            img.crossOrigin = 'anonymous';
-            var blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-            var url = URL.createObjectURL(blob);
-
-            img.onload = function () {
-              try {
-                var canvas = document.createElement('canvas');
-                canvas.width = svgWidth;
-                canvas.height = svgHeight;
-                var ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                URL.revokeObjectURL(url);
-                resolve(canvas.toDataURL('image/png'));
-              } catch (err) {
-                URL.revokeObjectURL(url);
-                reject(err);
-              }
-            };
-
-            img.onerror = function (e) {
-              URL.revokeObjectURL(url);
-              reject(e);
-            };
-
-            img.src = url;
-          });
+        function isInverted(id) {
+          return id.indexOf('invert') !== -1 || id.indexOf('inverted') !== -1 || id.indexOf('oxford') !== -1;
         }
 
-        window.htmlToImage = {
-          toPng: function (node, options) {
-            return nodeToPng(node, options || {});
-          },
+        function makeCanvas(width, height, pixelRatio) {
+          var canvas = document.createElement('canvas');
+          canvas.width = width * pixelRatio;
+          canvas.height = height * pixelRatio;
+          canvas.style.width = width + 'px';
+          canvas.style.height = height + 'px';
+          var ctx = canvas.getContext('2d');
+          ctx.scale(pixelRatio, pixelRatio);
+          ctx.imageSmoothingEnabled = true;
+          return { canvas: canvas, ctx: ctx };
+        }
+
+        function paintBase(ctx, width, height, inverted) {
+          ctx.fillStyle = inverted ? COLORS.oxford : COLORS.paper;
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        function paintGrain(ctx, width, height, color, opacity) {
+          ctx.save();
+          ctx.globalAlpha = opacity;
+          ctx.fillStyle = color;
+          var seed = 271828;
+          for (var y = 0; y < height; y += 6) {
+            for (var x = 0; x < width; x += 6) {
+              seed = (seed * 9301 + 49297) % 233280;
+              if (seed / 233280 > 0.55) {
+                ctx.fillRect(x, y, 1, 1);
+              }
+            }
+          }
+          ctx.restore();
+        }
+
+        function font(size, family) {
+          return '400 ' + size + 'px ' + family;
+        }
+
+        function mono(size) {
+          return font(size, '"Space Mono", ui-monospace, monospace');
+        }
+
+        function sans(size, weight) {
+          return (weight || 400) + ' ' + size + 'px "Figtree", system-ui, sans-serif';
+        }
+
+        function display(size) {
+          return font(size, '"Playfair Display", Georgia, serif');
+        }
+
+        function underlineA(ctx, x, baseline, size) {
+          var aWidth = ctx.measureText('A').width;
+          ctx.fillRect(x, baseline + size * 0.14, aWidth * 0.95, Math.max(3, size * 0.035));
+        }
+
+        function drawWordmark(ctx, text, x, baseline, size, color) {
+          ctx.save();
+          ctx.fillStyle = color;
+          ctx.font = display(size);
+          ctx.textBaseline = 'alphabetic';
+          ctx.fillText(text, x, baseline);
+          underlineA(ctx, x, baseline, size);
+          ctx.restore();
+        }
+
+        function drawCenteredWordmark(ctx, width, height, text, size, color) {
+          ctx.save();
+          ctx.font = display(size);
+          var metrics = ctx.measureText(text);
+          var x = (width - metrics.width) / 2;
+          var baseline = height / 2 + size * 0.28;
+          ctx.restore();
+          drawWordmark(ctx, text, x, baseline, size, color);
+        }
+
+        function drawLabel(ctx, text, x, y, align, color, alpha) {
+          ctx.save();
+          ctx.globalAlpha = alpha == null ? 1 : alpha;
+          ctx.fillStyle = color;
+          ctx.font = mono(10);
+          ctx.textAlign = align || 'left';
+          ctx.textBaseline = 'top';
+          ctx.letterSpacing = '0.14em';
+          ctx.fillText(text, x, y);
+          ctx.restore();
+        }
+
+        function drawMultiLineLabel(ctx, lines, x, y, align, color) {
+          for (var i = 0; i < lines.length; i += 1) {
+            drawLabel(ctx, lines[i], x, y + i * 18, align, color, 0.64);
+          }
+        }
+
+        function drawBlurBand(ctx, x, y, width, height, color, alpha) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = color;
+          ctx.filter = 'blur(10px)';
+          ctx.fillRect(x, y, width, height);
+          ctx.filter = 'none';
+          ctx.restore();
+        }
+
+        function drawGradientBand(ctx, x, y, width, height, stops, blur, alpha) {
+          ctx.save();
+          ctx.globalAlpha = alpha == null ? 1 : alpha;
+          ctx.filter = blur ? 'blur(' + blur + 'px)' : 'none';
+          var gradient = ctx.createLinearGradient(x, y, x + width, y);
+          stops.forEach(function (stop) {
+            gradient.addColorStop(stop[0], stop[1]);
+          });
+          ctx.fillStyle = gradient;
+          ctx.fillRect(x, y, width, height);
+          ctx.filter = 'none';
+          ctx.restore();
+        }
+
+        function paintMotionBase(ctx, width, height, inverted, variant) {
+          var vertical = ctx.createLinearGradient(0, 0, 0, height);
+          if (inverted) {
+            vertical.addColorStop(0, variant === 'wake' ? '#314047' : '#26343b');
+            vertical.addColorStop(0.42, '#142532');
+            vertical.addColorStop(1, '#071523');
+          } else {
+            vertical.addColorStop(0, variant === 'wake' ? '#d7d6c2' : '#d4d7c7');
+            vertical.addColorStop(0.42, variant === 'wake' ? '#b7c1ad' : '#bfc8b7');
+            vertical.addColorStop(1, '#eee8db');
+          }
+          ctx.fillStyle = vertical;
+          ctx.fillRect(0, 0, width, height);
+
+          drawGradientBand(
+            ctx,
+            -120,
+            0,
+            width * 0.78,
+            height,
+            inverted
+              ? [
+                  [0, 'rgba(159, 207, 72, 0.18)'],
+                  [0.32, 'rgba(86, 100, 107, 0.34)'],
+                  [1, 'rgba(0, 20, 51, 0)'],
+                ]
+              : [
+                  [0, 'rgba(0, 20, 51, 0.22)'],
+                  [0.28, 'rgba(95, 116, 61, 0.34)'],
+                  [0.52, 'rgba(168, 138, 94, 0.18)'],
+                  [1, 'rgba(244, 241, 234, 0)'],
+                ],
+            18,
+            1,
+          );
+        }
+
+        function paintScanGrain(ctx, width, height, inverted) {
+          ctx.save();
+          ctx.globalAlpha = inverted ? 0.18 : 0.12;
+          ctx.strokeStyle = inverted ? 'rgba(244, 241, 234, 0.36)' : 'rgba(0, 20, 51, 0.34)';
+          ctx.lineWidth = 1;
+          for (var y = 0; y < height; y += 4) {
+            ctx.beginPath();
+            ctx.moveTo(0, y + 0.5);
+            ctx.lineTo(width, y + 0.5);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          ctx.save();
+          var seed = inverted ? 918273 : 314159;
+          ctx.fillStyle = inverted ? 'rgba(244, 241, 234, 0.13)' : 'rgba(0, 20, 51, 0.11)';
+          for (var i = 0; i < 22000; i += 1) {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            var x = (seed % width) | 0;
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            var yPoint = (seed % height) | 0;
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            if ((seed & 255) > 108) {
+              ctx.fillRect(x, yPoint, 1, 1);
+            }
+          }
+          ctx.restore();
+        }
+
+        function drawStackedHeadline(ctx, lines, x, y, size, lineHeight, color) {
+          ctx.save();
+          ctx.fillStyle = color;
+          ctx.font = sans(size, 500);
+          ctx.textBaseline = 'top';
+          lines.forEach(function (line, index) {
+            ctx.fillText(line, x, y + index * size * lineHeight);
+          });
+          ctx.restore();
+        }
+
+        function drawAsset(ctx, id, width, height) {
+          var inverted = isInverted(id);
+          var bg = inverted ? COLORS.oxford : COLORS.paper;
+          var ink = inverted ? COLORS.cream : COLORS.oxford;
+          paintBase(ctx, width, height, inverted);
+
+          if (id.indexOf('profile-standard') === 0 || id.indexOf('profile-inverted') === 0) {
+            drawCenteredWordmark(ctx, width, height, 'Aethria', 170, ink);
+          } else if (id.indexOf('profile-monogram') === 0) {
+            ctx.save();
+            ctx.fillStyle = ink;
+            ctx.font = display(360);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('A', width / 2, height / 2 + 12);
+            var aWidth = ctx.measureText('A').width;
+            ctx.fillRect(width / 2 - aWidth / 2, height / 2 + 210, aWidth * 0.95, 12);
+            ctx.restore();
+          } else if (id.indexOf('banner-blueprint') === 0) {
+            ctx.save();
+            ctx.strokeStyle = ink;
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(width * 0.33, 0);
+            ctx.lineTo(width * 0.33, height);
+            ctx.stroke();
+            ctx.restore();
+            ctx.save();
+            ctx.font = display(64);
+            var w = ctx.measureText('Aethria').width;
+            ctx.restore();
+            drawWordmark(ctx, 'Aethria', width - 80 - w, height - 56, 64, ink);
+          } else if (id.indexOf('banner-metadata') === 0) {
+            drawLabel(ctx, 'REGISTRY // 2026', width - 40, 40, 'right', ink, 1);
+            drawLabel(ctx, 'AETHRIA // SYSTEM', width - 40, height - 58, 'right', ink, 1);
+          } else if (id.indexOf('banner-seal') === 0) {
+            ctx.save();
+            ctx.fillStyle = ink;
+            ctx.font = display(120);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('A', width / 2, height / 2 - 4);
+            var sealWidth = ctx.measureText('A').width;
+            ctx.fillRect(width / 2 - sealWidth / 2, height / 2 + 72, sealWidth * 0.95, 4);
+            ctx.restore();
+          } else if (id.indexOf('banner-ledger') === 0) {
+            ctx.save();
+            ctx.strokeStyle = ink;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(55 + width * 0.382, 34);
+            ctx.lineTo(55 + width * 0.382, height - 34);
+            ctx.stroke();
+            ctx.globalAlpha = 0.16;
+            ctx.beginPath();
+            ctx.moveTo(55, 34 + 89);
+            ctx.lineTo(width * 0.382, 34 + 89);
+            ctx.moveTo(55, height - 34 - 89);
+            ctx.lineTo(width * 0.382, height - 34 - 89);
+            ctx.stroke();
+            ctx.restore();
+            drawWordmark(ctx, 'Aethria', 55, height - 34, 55, ink);
+            var labels = [
+              ['Scout', 'Market truth'],
+              ['Review', 'Evidence weighted'],
+              ['Partner', 'Decision ready'],
+            ];
+            var startX = 55 + width * 0.382 + 55;
+            var colW = (width - startX - 55 - 42) / 3;
+            labels.forEach(function (item, index) {
+              var x = startX + index * (colW + 21);
+              ctx.save();
+              ctx.strokeStyle = ink;
+              ctx.beginPath();
+              ctx.moveTo(x, height - 34 - 89);
+              ctx.lineTo(x + colW, height - 34 - 89);
+              ctx.stroke();
+              ctx.restore();
+              drawLabel(ctx, item[0], x, height - 34 - 76, 'left', ink, 0.6);
+              ctx.save();
+              ctx.fillStyle = ink;
+              ctx.font = sans(23, 400);
+              ctx.textBaseline = 'top';
+              ctx.fillText(item[1], x, height - 34 - 45);
+              ctx.restore();
+            });
+          } else if (id.indexOf('banner-field') === 0) {
+            ctx.save();
+            ctx.strokeStyle = ink;
+            ctx.globalAlpha = 0.18;
+            ctx.beginPath();
+            ctx.moveTo(width * 0.382, 34);
+            ctx.lineTo(width * 0.382, height - 34);
+            ctx.moveTo(width * 0.618, 34);
+            ctx.lineTo(width * 0.618, height - 34);
+            ctx.stroke();
+            ctx.restore();
+            ctx.save();
+            ctx.fillStyle = ink;
+            ctx.font = display(37);
+            ctx.textBaseline = 'top';
+            ctx.fillText('Autonomous venture intelligence, scoped by thesis.', 55, 34);
+            ctx.restore();
+            drawMultiLineLabel(ctx, ['Deal-flow OS', 'Private beta', '2026'], width - 55, 34, 'right', ink);
+            ctx.save();
+            ctx.font = display(89);
+            var wordmarkWidth = ctx.measureText('Aethria').width;
+            ctx.restore();
+            drawWordmark(ctx, 'Aethria', width - 55 - wordmarkWidth, height - 55, 89, ink);
+          } else if (id.indexOf('banner-motion') === 0) {
+            paintMotionBase(ctx, width, height, inverted, 'motion');
+            var smearStops = inverted
+              ? [
+                  [0, 'rgba(244, 241, 234, 0)'],
+                  [0.34, 'rgba(244, 241, 234, 0.2)'],
+                  [0.62, 'rgba(159, 207, 72, 0.24)'],
+                  [1, 'rgba(0, 20, 51, 0)'],
+                ]
+              : [
+                  [0, 'rgba(244, 241, 234, 0)'],
+                  [0.34, 'rgba(0, 20, 51, 0.26)'],
+                  [0.62, 'rgba(95, 116, 61, 0.3)'],
+                  [1, 'rgba(244, 241, 234, 0)'],
+                ];
+            drawGradientBand(ctx, -220, 8, width * 1.02, 56, smearStops, 18, 0.98);
+            drawGradientBand(ctx, -220, 66, width * 1.12, 86, smearStops, 22, 1);
+            drawGradientBand(ctx, -220, 160, width * 0.96, 70, smearStops, 19, 0.96);
+            drawGradientBand(ctx, -220, height - 100, width * 1.18, 88, smearStops, 22, 1);
+            paintScanGrain(ctx, width, height, inverted);
+            drawMultiLineLabel(ctx, ['Scout', 'Review', 'Decide'], 55, height - 88, 'left', ink);
+            var copyX = width - 76 - 700;
+            drawWordmark(ctx, 'Aethria', copyX, 78, 34, ink);
+            ctx.save();
+            ctx.strokeStyle = ink;
+            ctx.globalAlpha = 0.35;
+            ctx.beginPath();
+            ctx.moveTo(copyX + 138, 66);
+            ctx.lineTo(copyX + 227, 66);
+            ctx.stroke();
+            ctx.restore();
+            drawStackedHeadline(
+              ctx,
+              ['Discover Signals.', 'Score Conviction.', 'Move First.'],
+              copyX,
+              97,
+              58,
+              0.94,
+              inverted ? COLORS.lime : COLORS.moss,
+            );
+          } else if (id.indexOf('banner-wake') === 0) {
+            paintMotionBase(ctx, width, height, inverted, 'wake');
+            ctx.save();
+            ctx.strokeStyle = inverted ? 'rgba(244, 241, 234, 0.22)' : 'rgba(0, 20, 51, 0.2)';
+            ctx.globalAlpha = 0.34;
+            ctx.beginPath();
+            ctx.moveTo(55, 34);
+            ctx.lineTo(width - 55, 34);
+            ctx.moveTo(55, height - 34);
+            ctx.lineTo(width - 55, height - 34);
+            ctx.stroke();
+            ctx.restore();
+            var wakeStops = inverted
+              ? [
+                  [0, 'rgba(244, 241, 234, 0)'],
+                  [0.45, 'rgba(159, 207, 72, 0.28)'],
+                  [0.7, 'rgba(244, 241, 234, 0.18)'],
+                  [1, 'rgba(0, 20, 51, 0)'],
+                ]
+              : [
+                  [0, 'rgba(244, 241, 234, 0)'],
+                  [0.45, 'rgba(95, 116, 61, 0.32)'],
+                  [0.7, 'rgba(0, 20, 51, 0.24)'],
+                  [1, 'rgba(244, 241, 234, 0)'],
+                ];
+            drawGradientBand(ctx, -120, 72, width * 0.82, 40, wakeStops, 17, 0.95);
+            drawGradientBand(ctx, -120, 130, width, 72, wakeStops, 21, 1);
+            drawGradientBand(ctx, -120, 244, width * 0.72, 40, wakeStops, 16, 0.94);
+            paintScanGrain(ctx, width, height, inverted);
+            ctx.save();
+            ctx.font = display(37);
+            var wakeWordmarkWidth = ctx.measureText('Aethria').width;
+            ctx.restore();
+            drawWordmark(ctx, 'Aethria', width - 76 - wakeWordmarkWidth, 84, 34, ink);
+            drawStackedHeadline(
+              ctx,
+              ['Find the company before the', 'market has a name for it.'],
+              width - 76 - 710,
+              height - 50 - 108,
+              56,
+              0.96,
+              inverted ? COLORS.lime : COLORS.moss,
+            );
+          }
+
+          if (id.indexOf('banner-motion') !== 0 && id.indexOf('banner-wake') !== 0) {
+            paintGrain(ctx, width, height, inverted ? COLORS.cream : COLORS.oxford, 0.045);
+          }
+          ctx.fillStyle = bg;
+        }
+
+        window.renderBrandAssetToPng = function (id, width, height, pixelRatio) {
+          var pair = makeCanvas(width, height, pixelRatio || 1);
+          drawAsset(pair.ctx, id, width, height);
+          return pair.canvas.toDataURL('image/png');
         };
       })();
 
@@ -664,9 +1664,9 @@
             return;
           }
 
-          var lib = window.htmlToImage;
-          if (!lib || !lib.toPng) {
-            console.error('html-to-image implementation not available on window.htmlToImage');
+          var renderer = window.renderBrandAssetToPng;
+          if (!renderer) {
+            console.error('Brand asset renderer not available on window.renderBrandAssetToPng');
             return;
           }
 
@@ -677,19 +1677,9 @@
             .then(function () {
               if (grain) grain.style.visibility = 'hidden';
               try {
-                return lib.toPng(node, {
-                  pixelRatio: 3, // high-res / "scale: 3"
-                  width: width,
-                  height: height,
-                  cacheBust: true,
-                  style: {
-                    width: width + 'px',
-                    height: height + 'px',
-                    transform: 'none',
-                  },
-                });
+                return renderer(id, width, height, 3);
               } catch (error) {
-                console.error('Synchronous html-to-image error (possible tainted canvas/CORS):', error);
+                console.error('Synchronous brand asset render error:', error);
                 throw error;
               }
             })
