@@ -207,11 +207,11 @@ export default function IntelligenceMap({ variant = 'light' }: IntelligenceMapPr
   const pathDomId = (from: NodeKey, to: NodeKey) => `path-${from}-${to}-${uid}`;
 
   return (
-    <div ref={rootRef} className="flex w-full flex-col border-0">
-      <div className="relative h-[380px] min-h-[380px] max-h-[380px] w-full shrink-0 overflow-visible border-0">
+    <div ref={rootRef} className="flex h-full min-h-0 w-full flex-1 flex-col border-0">
+      <div className="relative h-full min-h-0 w-full flex-1 overflow-visible border-0">
         <svg
           ref={svgRef}
-          className="relative z-[1] h-full min-h-0 w-full max-w-full"
+          className="relative z-[1] block h-full w-full"
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           preserveAspectRatio="xMidYMid meet"
           role="img"

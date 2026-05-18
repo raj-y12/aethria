@@ -304,6 +304,7 @@ export default function MainLayout({
   const restoreRefVerdictMemo = useRef<HTMLElement | null>(null);
   const judgementsPanelRef = useRef<HTMLDivElement | null>(null);
   const memoContentRef = useRef<InvestmentMemoContentHandle | null>(null);
+  const lookupRequestSeqRef = useRef(0);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const handleMemoPipelineReady = useCallback(() => {
@@ -354,11 +355,14 @@ export default function MainLayout({
   const handleLookupSubmit = useCallback(async () => {
     const value = lookupInput.trim();
     if (!value || lookupBusy || (pendingLookup != null && !pendingLookup.autoOpened)) return;
+    const requestSeq = lookupRequestSeqRef.current + 1;
+    lookupRequestSeqRef.current = requestSeq;
     setLookupBusy(true);
     setLookupMessage('Submitting lookup request...');
     try {
       const lookupId = crypto.randomUUID();
       const queued = await queueOnDemandLookup(value, lookupId);
+      if (lookupRequestSeqRef.current !== requestSeq) return;
       setPendingLookup({
         lookupId: queued.lookupId,
         queryLabel: value,
@@ -371,9 +375,16 @@ export default function MainLayout({
     } catch {
       setLookupMessage('Could not submit lookup request. Please retry in a few seconds.');
     } finally {
-      setLookupBusy(false);
+      if (lookupRequestSeqRef.current === requestSeq) setLookupBusy(false);
     }
   }, [lookupInput, lookupBusy, pendingLookup]);
+
+  const handleLookupCancel = useCallback(() => {
+    lookupRequestSeqRef.current += 1;
+    setLookupBusy(false);
+    setPendingLookup(null);
+    setLookupMessage(null);
+  }, []);
 
   const pendingLookupMatch = useMemo(() => {
     if (!pendingLookup) return null;
@@ -765,6 +776,7 @@ export default function MainLayout({
                       input={lookupInput}
                       setInput={setLookupInput}
                       onSubmit={() => void handleLookupSubmit()}
+                      onCancel={handleLookupCancel}
                       isBusy={lookupWorking}
                       message={lookupMessage}
                       onClearMessage={() => setLookupMessage(null)}
@@ -900,6 +912,7 @@ export default function MainLayout({
                     input={lookupInput}
                     setInput={setLookupInput}
                     onSubmit={() => void handleLookupSubmit()}
+                    onCancel={handleLookupCancel}
                     isBusy={lookupWorking}
                     message={lookupMessage}
                     onClearMessage={() => setLookupMessage(null)}

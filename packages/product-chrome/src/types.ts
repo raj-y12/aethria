@@ -12,8 +12,9 @@ export type MandateCardProps = {
 };
 
 export type LookupCommandBarProps = {
-  query: string;
-  trailing?: 'run' | 'result';
+  label?: string;
+  query?: string;
+  trailing?: 'run' | 'result' | 'close';
   className?: string;
 };
 

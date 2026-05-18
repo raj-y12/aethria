@@ -1,10 +1,5 @@
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
-import {
-  DEMO_LOOKUP_MEMO_SAMPLE,
-  DEMO_MANDATE_PAPER,
-  LookupResultSnapshot,
-  MandateCard,
-} from '@aethria/product-chrome';
+import { DEMO_LOOKUP_MEMO_SAMPLE, LookupResultSnapshot } from '@aethria/product-chrome';
 import { SCROLL_EASE } from '../motionTokens';
 
 const PAPER = '#f4f1ea';
@@ -27,15 +22,6 @@ export default function DashboardPreview() {
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: reduce ? 0 : 0.52, ease: SCROLL_EASE },
-    },
-  };
-
-  const thesisCardVariants: Variants = {
-    hidden: reduce ? {} : { opacity: 0, x: 28 },
-    visible: {
-      opacity: 1,
-      x: 0,
       transition: { duration: reduce ? 0 : 0.52, ease: SCROLL_EASE },
     },
   };
@@ -76,7 +62,6 @@ export default function DashboardPreview() {
           whileInView="visible"
           viewport={{ once: true, amount: 0.12, margin: '0px 0px -10% 0px' }}
         >
-          {/* Left column */}
           <motion.div className="relative w-full max-w-xl shrink-0 md:w-[40%] md:pt-9" variants={leftColVariants}>
             <p className="section-numeral mb-6 md:absolute md:left-0 md:top-4 md:mb-0">VI</p>
             <p className="mb-3 font-mono text-[12px] uppercase tracking-[0.11em] text-[rgba(0,27,71,0.5)]">
@@ -116,19 +101,14 @@ export default function DashboardPreview() {
             </div>
           </motion.div>
 
-          {/* Right column — thesis card + lookup/memo card */}
           <div className="flex w-full shrink-0 justify-center md:flex-1 md:justify-end md:pr-[min(4rem,5vw)]">
-            <div className="flex w-full max-w-[540px] shrink-0 flex-col gap-3 md:w-[540px] md:max-w-[540px]">
-
-              <motion.div variants={thesisCardVariants} className="w-full" aria-label="Fund thesis preview">
-                <MandateCard {...DEMO_MANDATE_PAPER} />
-              </motion.div>
-
-              <motion.div variants={memoCardVariants} className="w-full" aria-label="On-demand lookup result preview">
-                <LookupResultSnapshot {...DEMO_LOOKUP_MEMO_SAMPLE} />
-              </motion.div>
-
-            </div>
+            <motion.div
+              variants={memoCardVariants}
+              className="flex w-full max-w-[540px] shrink-0 flex-col md:w-[540px] md:max-w-[540px]"
+              aria-label="On-demand lookup result preview"
+            >
+              <LookupResultSnapshot {...DEMO_LOOKUP_MEMO_SAMPLE} />
+            </motion.div>
           </div>
         </motion.div>
       </div>

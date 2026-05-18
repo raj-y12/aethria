@@ -48,10 +48,11 @@ export default function LookupResultSnapshot({
             : `Intelligence snapshot for ${companyName}`
       }
     >
-      {queryLabel ? (
+      {isMemo || queryLabel ? (
         <LookupCommandBar
-          query={queryLabel}
-          trailing="result"
+          label={isMemo ? 'MEMO' : 'LOOKUP'}
+          query={isMemo ? undefined : queryLabel}
+          trailing={isMemo ? 'close' : 'result'}
           className="border-0 border-b border-solid border-oxford/10 bg-oxford/[0.025]"
         />
       ) : null}

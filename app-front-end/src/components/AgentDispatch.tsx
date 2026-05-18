@@ -6,6 +6,7 @@ interface AgentDispatchProps {
   input: string;
   setInput: (val: string) => void;
   onSubmit: () => void;
+  onCancel?: () => void;
   isBusy: boolean;
   message: string | null;
   /** Allow parent to clear the message (e.g. after a failed lookup) */
@@ -76,6 +77,7 @@ function DispatchPanelBody({
   input,
   setInput,
   onSubmit,
+  onCancel,
   isBusy,
   lookupMessage,
   onClearMessage,
@@ -87,6 +89,7 @@ function DispatchPanelBody({
   input: string;
   setInput: (v: string) => void;
   onSubmit: () => void;
+  onCancel?: () => void;
   isBusy: boolean;
   lookupMessage: string | null;
   onClearMessage?: () => void;
@@ -102,11 +105,9 @@ function DispatchPanelBody({
     ? 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-medium font-sans text-[13px] leading-[1.5] text-oxford placeholder:text-oxford/28 outline-none disabled:cursor-not-allowed'
     : 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/28 outline-none disabled:cursor-not-allowed';
 
-  const statusRowCls = embedded
-    ? 'mt-phi-2 flex min-h-0 items-start justify-between gap-phi-3'
-    : 'mt-phi-3 flex min-h-0 items-start justify-between gap-phi-3';
-
-  const showStatusRow = Boolean(lookupMessage) || (!embedded && !isBusy);
+  const statusSlotCls = embedded
+    ? 'mt-phi-2 grid min-h-[44px] content-start gap-phi-1'
+    : 'mt-phi-3 grid min-h-[48px] content-start gap-phi-1';
 
   const statusLeft = (() => {
     if (lookupMessage) {
@@ -132,10 +133,14 @@ function DispatchPanelBody({
         </>
       );
     }
-    if (!embedded && !isBusy) {
-      return <p className="type-meta text-oxford/30">Name or URL, then Enter.</p>;
+    if (!isBusy) {
+      return (
+        <p className={embedded ? `${railEditorial.meta} text-oxford/28` : 'type-meta text-oxford/30'}>
+          Name or URL, then Enter.
+        </p>
+      );
     }
-    return null;
+    return <p className={embedded ? `${railEditorial.meta} text-oxford/32` : 'type-meta text-oxford/35'}>Dispatch active.</p>;
   })();
 
   return (
@@ -164,15 +169,12 @@ function DispatchPanelBody({
         />
         <button
           type="button"
-          onClick={onSubmit}
-          disabled={!input.trim() || isBusy}
-          className={runBtnCls}
+          onClick={isBusy ? onCancel : onSubmit}
+          disabled={isBusy ? !onCancel : !input.trim()}
+          className={isBusy ? `${runBtnCls} text-oxford/40 hover:text-oxford/70 disabled:opacity-100` : runBtnCls}
         >
           {isBusy ? (
-            <>
-              Running
-              <span className="text-oxford/35 tabular-nums">…</span>
-            </>
+            'Cancel'
           ) : (
             <>
               {embedded ? 'Run' : 'Run lookup'}
@@ -185,16 +187,10 @@ function DispatchPanelBody({
         )}
       </div>
 
-      {showStatusRow && (
-        <div className={statusRowCls}>
-          <div className="flex min-w-0 flex-1 items-center gap-phi-2">{statusLeft}</div>
-        </div>
-      )}
-
-      <LookupPhaseLine
-        lookupPhase={isBusy ? lookupPhase : null}
-        className={embedded ? 'mt-phi-2' : 'mt-phi-3'}
-      />
+      <div className={statusSlotCls}>
+        <div className="flex min-w-0 flex-1 items-center gap-phi-2">{statusLeft}</div>
+        <LookupPhaseLine lookupPhase={isBusy ? lookupPhase : null} />
+      </div>
     </>
   );
 }
@@ -203,6 +199,7 @@ export default function AgentDispatch({
   input,
   setInput,
   onSubmit,
+  onCancel,
   isBusy,
   message,
   onClearMessage,
@@ -262,6 +259,7 @@ export default function AgentDispatch({
             input={input}
             setInput={setInput}
             onSubmit={onSubmit}
+            onCancel={onCancel}
             isBusy={isBusy}
             lookupMessage={lookupMessage}
             onClearMessage={onClearMessage}
@@ -283,6 +281,7 @@ export default function AgentDispatch({
                 input={input}
                 setInput={setInput}
                 onSubmit={onSubmit}
+                onCancel={onCancel}
                 isBusy={isBusy}
                 lookupMessage={lookupMessage}
                 onClearMessage={onClearMessage}

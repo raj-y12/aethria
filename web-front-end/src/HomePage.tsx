@@ -205,70 +205,61 @@ export default function HomePage() {
 
         <PipelineSection />
 
-        {/* Section IV — intelligence map (paper left, monolith right — mirrors hero rhythm) */}
+        {/* Section IV — intelligence map (paper) */}
         <section
-          className="flex min-h-0 w-full flex-col items-stretch lg:flex-row"
+          className="paper-dot-grid w-full border-b border-solid border-[var(--section-divider)]"
+          style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-charcoal)' }}
           aria-labelledby="graph-section-heading"
         >
-          <ScrollReveal
-            className="flex w-full shrink-0 flex-col justify-center self-stretch border-0 bg-[#f4f1ea] py-12 px-[max(1.25rem,var(--safe-left))] pb-10 pr-[max(1.25rem,var(--safe-right))] pt-12 md:py-14 md:px-8 lg:w-[35%] lg:border-r-0 lg:px-12 lg:py-16"
-            style={{ color: 'var(--color-charcoal)' }}
-            y={24}
-            amount={0.2}
-          >
-            <div className="w-full max-w-lg">
-              <p className="section-numeral mb-6" aria-hidden="true">IV</p>
+          <motion.div className="page-margin-x py-14 md:py-20">
+            <ScrollReveal y={20} amount={0.2}>
+              <p className="section-numeral mb-6" aria-hidden="true">
+                IV
+              </p>
               <h2
                 id="graph-section-heading"
-                className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#001433] md:text-[36px] md:tracking-normal"
+                className="max-w-xl text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#001433] md:text-[36px] md:tracking-normal"
               >
                 How intelligence routes
               </h2>
-              <p className="mt-4 max-w-lg font-sans text-[15px] font-normal leading-[1.7] text-[rgba(0,27,71,0.65)]">
+              <p className="mt-4 max-w-xl font-sans text-[15px] leading-[1.7] text-[rgba(0,27,71,0.65)]">
                 Scouts feed the reviewer. Partner logic and portfolio stay coupled. Meta-agent oversight on dashed paths.
               </p>
-            </div>
-          </ScrollReveal>
-          <motion.div className="relative flex w-full min-w-0 shrink-0 flex-col items-stretch border-0 bg-[#001433] max-lg:border-t-0 lg:w-[65%] lg:border-l-0">
-            <ScrollReveal
-              className="flex min-h-[min(420px,72vw)] w-full flex-1 flex-col items-center justify-center border-0 px-3 pb-2 pt-4 sm:min-h-[460px] sm:px-4 lg:min-h-[500px] lg:px-0 lg:pb-0 lg:pt-0"
-              y={16}
-              delay={0.08}
-              amount={0.15}
-            >
-              <IntelligenceMap variant="dark" />
             </ScrollReveal>
-            <motion.p
-              className="shrink-0 border-0 py-3 text-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-inverse-muted)]"
-              initial={reduce ? false : { opacity: 0 }}
-              whileInView={reduce ? undefined : { opacity: 1 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: reduce ? 0 : 0.45, delay: reduce ? 0 : 0.12, ease: SCROLL_EASE }}
+
+            <ScrollReveal
+              className="mt-10 flex h-[min(380px,68vw)] w-full flex-col sm:h-[420px] md:mt-12 lg:h-[460px]"
+              y={16}
+              delay={0.06}
+              amount={0.12}
             >
+              <IntelligenceMap variant="light" />
+            </ScrollReveal>
+
+            <p className="mt-6 text-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)]">
               Scout · Review · Decide · Portfolio
-            </motion.p>
+            </p>
           </motion.div>
         </section>
 
         {/* Section V — live indicators */}
         <motion.section
-          className="home-closing home-closing-ledger paper-dot-grid section-divider-top relative w-full overflow-hidden border-b border-solid border-[var(--section-divider)]"
+          className="home-closing home-closing-ledger paper-dot-grid relative w-full overflow-hidden border-b border-solid border-[var(--section-divider)]"
           style={{ backgroundColor: 'var(--color-paper)' }}
           variants={closingSectionVariants}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, amount: 0.16, margin: '0px 0px -8% 0px' }}
         >
-          <div className="page-margin-x relative z-[1] mx-auto w-full max-w-[1200px] py-16 md:py-24">
-            <motion.p className="section-numeral mb-8 md:mb-12" aria-hidden variants={closingChildVariants}>
-              V
-            </motion.p>
-
+          <motion.div className="page-margin-x relative z-[1] mx-auto w-full max-w-[1200px] py-14 md:py-20">
             <div className="flex flex-col gap-10 md:gap-14 lg:flex-row lg:items-stretch lg:gap-16 xl:gap-24">
               <motion.div
-                className="flex min-h-0 min-w-0 flex-1 flex-col justify-center py-6 md:py-10 lg:max-w-[540px] lg:py-12 lg:pr-6"
+                className="flex min-h-0 min-w-0 flex-1 flex-col justify-center lg:max-w-[540px] lg:pr-6"
                 variants={closingChildVariants}
               >
+                <p className="section-numeral mb-6" aria-hidden>
+                  V
+                </p>
                 <h2 className="text-[clamp(1.5rem,4.8vw,1.75rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#001433] md:text-[28px] md:tracking-normal">
                   <span className="block">Run the pipeline.</span>
                   <span className="mt-2 block">Keep the conviction.</span>
@@ -311,13 +302,13 @@ export default function HomePage() {
                 </Link>
               </motion.div>
               <motion.div
-                className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center py-6 md:py-10 lg:items-end lg:py-12"
+                className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center lg:items-end"
                 variants={closingChildVariants}
               >
                 <LiveIndicatorsPanel />
               </motion.div>
             </div>
-          </div>
+          </motion.div>
         </motion.section>
 
         <DashboardPreview />

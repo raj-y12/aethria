@@ -39,7 +39,6 @@ export const DEMO_LOOKUP_RESULT: LookupResultSnapshotProps = {
 export const DEMO_LOOKUP_MEMO_SAMPLE: LookupResultSnapshotProps = {
   variant: 'memo',
   companyName: 'Meridian Systems',
-  queryLabel: DEMO_LOOKUP_QUERY,
   metaLine: 'B2B Infrastructure · Series A',
   verdict: 'MONITOR.',
   summary:

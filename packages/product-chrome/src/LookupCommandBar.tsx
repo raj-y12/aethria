@@ -4,8 +4,19 @@ function cx(...parts: Array<string | false | undefined>) {
   return parts.filter(Boolean).join(' ');
 }
 
-export default function LookupCommandBar({ query, trailing = 'run', className }: LookupCommandBarProps) {
-  const trailingLabel = trailing === 'result' ? 'Result' : '↵ run';
+function trailingLabel(trailing: NonNullable<LookupCommandBarProps['trailing']>): string {
+  if (trailing === 'result') return 'Result';
+  if (trailing === 'close') return 'Close';
+  return '↵ run';
+}
+
+export default function LookupCommandBar({
+  label = 'LOOKUP',
+  query,
+  trailing = 'run',
+  className,
+}: LookupCommandBarProps) {
+  const showQuery = Boolean(query?.trim());
 
   return (
     <div
@@ -14,12 +25,16 @@ export default function LookupCommandBar({ query, trailing = 'run', className }:
         className,
       )}
     >
-      <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/35">LOOKUP</span>
-      <span className="h-3 w-px shrink-0 bg-oxford/10" aria-hidden />
-      <span className="min-w-0 truncate font-sans text-[13px] text-oxford/65">{query}</span>
+      <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/35">{label}</span>
+      {showQuery ? (
+        <>
+          <span className="h-3 w-px shrink-0 bg-oxford/10" aria-hidden />
+          <span className="min-w-0 truncate font-sans text-[13px] text-oxford/65">{query}</span>
+        </>
+      ) : null}
       {trailing ? (
         <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-oxford/30">
-          {trailingLabel}
+          {trailingLabel(trailing)}
         </span>
       ) : null}
     </div>
