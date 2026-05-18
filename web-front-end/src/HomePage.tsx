@@ -7,6 +7,7 @@ import DashboardPreview from './components/DashboardPreview';
 import LiveIndicatorsPanel from './components/LiveIndicatorsPanel';
 import DeskClock from './components/DeskClock';
 import HomeStatsSection from './components/HomeStatsSection';
+import PipelineSection from './components/PipelineSection';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SCROLL_EASE } from './motionTokens';
 import {
@@ -47,25 +48,6 @@ export default function HomePage() {
       };
 
   const heroViewport = { once: true as const, amount: 0.35 };
-
-  const pipelineGridVariants: Variants = {
-    hidden: {},
-    visible: {
-      transition: {
-        staggerChildren: reduce ? 0 : 0.09,
-        delayChildren: reduce ? 0 : 0.06,
-      },
-    },
-  };
-
-  const pipelineCardVariants: Variants = {
-    hidden: reduce ? {} : { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: reduce ? 0 : 0.48, ease: SCROLL_EASE },
-    },
-  };
 
   const closingSectionVariants: Variants = {
     hidden: reduce ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 },
@@ -221,105 +203,15 @@ export default function HomePage() {
 
         <HomeStatsSection />
 
-        {/* Section III — pipeline */}
-        <section
-          className="paper-dot-grid w-full border-b border-solid border-[var(--section-divider)] pb-8"
-          aria-labelledby="pipeline-heading"
-          style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-charcoal)' }}
-        >
-          <div className="w-full border-b border-solid border-[var(--section-divider)] pt-16 md:pt-24">
-            <ScrollReveal className="page-margin-x" y={16} amount={0.2}>
-              <p className="section-numeral mb-6" aria-hidden="true">III</p>
-              <div className="flex min-w-0 flex-row items-stretch">
-                <div className="flex min-w-0 flex-1 flex-col pr-0 md:pr-10">
-                  <h2
-                    id="pipeline-heading"
-                    className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#001433] md:text-[36px] md:tracking-normal"
-                  >
-                    The pipeline
-                  </h2>
-                  <p className="mt-4 max-w-xl font-sans text-[15px] leading-[1.7] text-[rgba(0,27,71,0.65)]">
-                    From signal to position. Four locked phases. No hand-offs lost in email.
-                  </p>
-                </div>
-                <div
-                className="hidden w-[clamp(14rem,25vw,16.5rem)] shrink-0 flex-col items-end justify-center bg-[#001433] lg:flex"
-                  style={{ paddingRight: 'max(16px, env(safe-area-inset-right))' }}
-                >
-                  <div className="flex flex-col items-end gap-2 text-right">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-inverse-secondary)]">
-                      Phases I — IV
-                    </p>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-inverse-muted)]">
-                      Single audit trail
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </ScrollReveal>
-          </div>
-
-          <div className="page-margin-x flex flex-col pb-0 pt-6 md:pt-8">
-            <motion.div
-              className="grid w-full grid-cols-1 gap-0 divide-y divide-solid divide-[var(--section-divider)] lg:grid-cols-4 lg:divide-x lg:divide-y-0 lg:items-start"
-              variants={pipelineGridVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, amount: 0.12, margin: '0px 0px -5% 0px' }}
-            >
-              {[
-                {
-                  phase: 'I',
-                  label: 'SCOUT',
-                  body: 'Agents monitor market signals continuously against your fund thesis. When a name surfaces, context and sourcing are already assembled.',
-                  signal: 'thesis-gated discovery',
-                },
-                {
-                  phase: 'II',
-                  label: 'REVIEW',
-                  body: 'Structured evaluation across dimensions you define. Conviction emerges; uncertainty is explicit. On-demand lookup runs at any time.',
-                  signal: 'conviction',
-                },
-                {
-                  phase: 'III',
-                  label: 'DECIDE',
-                  body: 'Clear positions with reasoning attached. Advance, pass, or hold — no ambiguous queue.',
-                  signal: 'precision',
-                },
-                {
-                  phase: 'IV',
-                  label: 'PORTFOLIO',
-                  body: 'Decisions compound. Exposure, concentration, and follow-on judgment stay in view.',
-                  signal: 'continuity',
-                },
-              ].map(({ phase, label, body, signal }) => (
-                <motion.div
-                  key={label}
-                  variants={pipelineCardVariants}
-                  className="flex min-w-0 flex-col border-l-0 border-solid border-[var(--section-divider)] px-0 py-8 first:pt-6 last:pb-6 sm:px-1 lg:border-l lg:px-8 lg:py-8 lg:first:pt-8 lg:last:pb-8"
-                >
-                  <div className="flex flex-row items-baseline justify-between gap-3">
-                    <span className="font-mono text-[11px] tracking-[0.12em] text-[var(--text-muted)]">{phase}</span>
-                    <span className="font-mono text-[11px] tracking-[0.12em] text-[var(--label-muted)]">{label}</span>
-                  </div>
-                  <div className="mt-0 h-px w-full shrink-0 bg-[var(--section-divider)]" aria-hidden />
-                  <p className="mt-4 font-sans text-[15px] leading-[1.7] text-[rgba(0,27,71,0.78)]">{body}</p>
-                  <p className="mt-6 font-sans text-[14px] italic leading-snug text-[var(--text-muted)] lowercase">
-                    {signal}
-                  </p>
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-        </section>
+        <PipelineSection />
 
         {/* Section IV — intelligence map (paper left, monolith right — mirrors hero rhythm) */}
         <section
-          className="flex min-h-0 w-full flex-col items-stretch border-b border-solid border-[var(--section-divider)] lg:flex-row"
+          className="flex min-h-0 w-full flex-col items-stretch lg:flex-row"
           aria-labelledby="graph-section-heading"
         >
           <ScrollReveal
-            className="flex w-full shrink-0 flex-col justify-center self-stretch bg-[#f4f1ea] py-12 px-[max(1.25rem,var(--safe-left))] pb-10 pr-[max(1.25rem,var(--safe-right))] pt-12 md:py-14 md:px-8 lg:w-[35%] lg:px-12 lg:py-16"
+            className="flex w-full shrink-0 flex-col justify-center self-stretch border-0 bg-[#f4f1ea] py-12 px-[max(1.25rem,var(--safe-left))] pb-10 pr-[max(1.25rem,var(--safe-right))] pt-12 md:py-14 md:px-8 lg:w-[35%] lg:border-r-0 lg:px-12 lg:py-16"
             style={{ color: 'var(--color-charcoal)' }}
             y={24}
             amount={0.2}
@@ -337,9 +229,9 @@ export default function HomePage() {
               </p>
             </div>
           </ScrollReveal>
-          <div className="relative flex w-full min-w-0 shrink-0 flex-col items-stretch bg-[#001433] lg:w-[65%]">
+          <motion.div className="relative flex w-full min-w-0 shrink-0 flex-col items-stretch border-0 bg-[#001433] max-lg:border-t-0 lg:w-[65%] lg:border-l-0">
             <ScrollReveal
-              className="flex min-h-[min(420px,72vw)] w-full flex-1 flex-col items-center justify-center px-3 pb-2 pt-4 sm:min-h-[460px] sm:px-4 lg:min-h-[500px] lg:px-0 lg:pb-0 lg:pt-0"
+              className="flex min-h-[min(420px,72vw)] w-full flex-1 flex-col items-center justify-center border-0 px-3 pb-2 pt-4 sm:min-h-[460px] sm:px-4 lg:min-h-[500px] lg:px-0 lg:pb-0 lg:pt-0"
               y={16}
               delay={0.08}
               amount={0.15}
@@ -347,7 +239,7 @@ export default function HomePage() {
               <IntelligenceMap variant="dark" />
             </ScrollReveal>
             <motion.p
-              className="shrink-0 py-3 text-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-inverse-muted)]"
+              className="shrink-0 border-0 py-3 text-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-inverse-muted)]"
               initial={reduce ? false : { opacity: 0 }}
               whileInView={reduce ? undefined : { opacity: 1 }}
               viewport={{ once: true, amount: 0.3 }}
@@ -355,7 +247,7 @@ export default function HomePage() {
             >
               Scout · Review · Decide · Portfolio
             </motion.p>
-          </div>
+          </motion.div>
         </section>
 
         {/* Section V — live indicators */}

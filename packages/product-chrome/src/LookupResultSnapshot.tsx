@@ -63,7 +63,7 @@ export default function LookupResultSnapshot({
               {intelligenceKicker}
             </p>
             {showCompanyName ? (
-              <h3 className="text-xl font-semibold leading-tight tracking-tight text-oxford sm:text-2xl">
+              <h3 className="pc-font-sans text-xl font-semibold leading-tight tracking-tight text-oxford sm:text-2xl">
                 {companyName}
               </h3>
             ) : null}
@@ -87,7 +87,7 @@ export default function LookupResultSnapshot({
         {!isMemo && showCompanyName && companyName ? (
           <h3
             className={cx(
-              'font-semibold leading-tight tracking-tight text-oxford',
+              'pc-font-sans font-semibold leading-tight tracking-tight text-oxford',
               compact ? 'text-base' : 'text-xl sm:text-2xl',
             )}
           >

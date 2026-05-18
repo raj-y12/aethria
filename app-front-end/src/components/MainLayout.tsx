@@ -63,56 +63,149 @@ type RailStageState = {
   enabled: boolean;
 };
 
-function PipelineHeaderSignal({
-  stages,
-  loopAlive,
+function SystemTelemetryRail({
+  totalCount,
+  openInProgressCount,
+  decidedCount,
+  pendingEscalations,
   pipelineEnabled,
-  issue,
+  pipelineLoopAlive,
+  pipelineHealthIssue,
+  stages,
+  showIssueHelp,
+  onToggleIssueHelp,
+  onOpenSettings,
 }: {
-  stages: RailStageState[];
-  loopAlive: boolean;
+  totalCount: number;
+  openInProgressCount: number;
+  decidedCount: number;
+  pendingEscalations: number;
   pipelineEnabled: boolean;
-  issue: boolean;
+  pipelineLoopAlive: boolean;
+  pipelineHealthIssue: boolean;
+  stages: RailStageState[];
+  showIssueHelp: boolean;
+  onToggleIssueHelp: () => void;
+  onOpenSettings: () => void;
 }) {
-  const statusLabel = issue ? 'Issue' : loopAlive ? 'Live' : pipelineEnabled ? 'Idle' : 'Paused';
-  const statusTone = issue
+  const hasEscalations = pendingEscalations > 0;
+  const primaryLabel = hasEscalations ? 'Escalations' : 'Open / in-progress';
+  const primaryValue = hasEscalations ? pendingEscalations : openInProgressCount;
+  const statusLabel = !pipelineEnabled
+    ? 'OFF'
+    : pipelineHealthIssue
+      ? 'ISSUE'
+      : pipelineLoopAlive
+        ? 'ACTIVE'
+        : 'IDLE';
+  const statusTone = pipelineHealthIssue
     ? 'text-escalation'
-    : loopAlive
-      ? 'text-oxford/68'
-      : pipelineEnabled
-        ? 'text-oxford/44'
-        : 'text-oxford/25';
-  const showLiveDot = loopAlive && !issue;
+    : !pipelineEnabled
+      ? 'text-oxford/28'
+      : pipelineLoopAlive
+        ? 'text-oxford'
+        : 'text-oxford/45';
+  const statusDot = pipelineHealthIssue
+    ? 'bg-escalation'
+    : !pipelineEnabled
+      ? 'bg-oxford/18'
+      : pipelineLoopAlive
+        ? 'bg-oxford signal-dot-breathe'
+        : 'bg-oxford/35';
+  const stageSummary = stages
+    .filter((stage) => stage.enabled)
+    .map((stage) => stage.label)
+    .join(' · ') || 'No agents enabled';
 
   return (
-    <div className="flex items-center gap-phi-2" aria-label="Pipeline and agent stage status">
-      <span className="flex items-center gap-[3px]" aria-label="Enabled agent stages">
-        {stages.map((stage) => {
-          const active = stage.enabled && loopAlive && !issue;
-          return (
-            <span
-              key={stage.key}
-              className={`h-px w-[10px] shrink-0 ${
-                active ? 'bg-oxford/58 pulse-soft' : stage.enabled ? 'bg-oxford/28' : 'bg-oxford/10'
-              }`}
-              title={`${stage.label} ${stage.enabled ? 'enabled' : 'off'}`}
-              aria-label={`${stage.label} ${stage.enabled ? 'enabled' : 'off'}`}
-            />
-          );
-        })}
-      </span>
-      <span className="flex items-center gap-phi-1.5" aria-live="polite">
-        {showLiveDot ? (
+    <article
+      className="flex min-w-0 flex-col border border-oxford/[0.08]"
+      aria-label="Pipeline overview"
+    >
+      <header className="flex items-center justify-between gap-phi-3 border-b border-oxford/[0.075] px-phi-4 py-phi-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">
+          Pipeline overview
+        </p>
+        <span className="inline-flex items-center gap-phi-2" aria-live="polite">
           <span
-            className="h-1.5 w-1.5 shrink-0 rounded-none bg-emerald-500 pulse-soft"
+            className={`h-1.5 w-1.5 shrink-0 rounded-none ${pipelineLoopAlive && !pipelineHealthIssue ? 'bg-oxford signal-dot-breathe' : 'bg-oxford/24'}`}
             aria-hidden
           />
-        ) : null}
-        <span className={`${railEditorial.statusLabel} ${statusTone}`}>
-        {statusLabel}
+          <span className="font-mono text-[10px] uppercase tracking-[0.10em] text-oxford/48">
+            {pipelineLoopAlive && !pipelineHealthIssue ? 'Live' : statusLabel}
+          </span>
         </span>
-      </span>
-    </div>
+      </header>
+
+      <div className="border-b border-oxford/[0.075] px-phi-4 py-phi-4">
+        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+          {primaryLabel}
+        </p>
+        <p
+          className={`mt-phi-2 font-mono text-[clamp(2.25rem,4.4vw,3.25rem)] font-bold leading-none tracking-[-0.04em] tabular-nums ${hasEscalations ? 'text-escalation' : 'text-oxford'}`}
+          aria-live="polite"
+        >
+          {primaryValue.toLocaleString()}
+        </p>
+      </div>
+
+      <div className="relative flex min-h-[52px] items-center justify-between gap-phi-3 border-b border-oxford/[0.075] px-phi-4 py-phi-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45">
+            Pipeline status
+          </p>
+          <p className="mt-phi-1 truncate font-mono text-[9px] uppercase tracking-[0.08em] text-oxford/32">
+            {stageSummary}
+          </p>
+        </div>
+        <span className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[11px] uppercase tracking-[0.10em] ${statusTone}`}>
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-none ${statusDot}`} aria-hidden />
+          {statusLabel}
+          {pipelineHealthIssue ? (
+            <button
+              type="button"
+              onClick={onToggleIssueHelp}
+              className="ml-phi-1 inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-none border border-escalation/40 font-mono text-[10px] leading-none text-escalation hover:text-escalation/75 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
+              aria-label="Pipeline issue details"
+              aria-expanded={showIssueHelp}
+            >
+              ?
+            </button>
+          ) : null}
+        </span>
+        {showIssueHelp && pipelineHealthIssue ? (
+          <span className="absolute right-phi-4 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford shadow-sm">
+            Pipeline has a problem and may not process updates right now.
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="mt-phi-2 block type-meta text-oxford/35 hover:text-oxford btn-interaction"
+            >
+              Open settings →
+            </button>
+          </span>
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-2 divide-x divide-oxford/[0.075]">
+        <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+            Total
+          </p>
+          <p className="font-mono text-[15px] font-semibold tabular-nums text-oxford">
+            {totalCount.toLocaleString()}
+          </p>
+        </div>
+        <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+            Decided
+          </p>
+          <p className="font-mono text-[15px] font-semibold tabular-nums text-oxford">
+            {decidedCount.toLocaleString()}
+          </p>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -260,7 +353,7 @@ export default function MainLayout({
 
   const handleLookupSubmit = useCallback(async () => {
     const value = lookupInput.trim();
-    if (!value || lookupBusy) return;
+    if (!value || lookupBusy || (pendingLookup != null && !pendingLookup.autoOpened)) return;
     setLookupBusy(true);
     setLookupMessage('Submitting lookup request...');
     try {
@@ -280,7 +373,7 @@ export default function MainLayout({
     } finally {
       setLookupBusy(false);
     }
-  }, [lookupInput, lookupBusy]);
+  }, [lookupInput, lookupBusy, pendingLookup]);
 
   const pendingLookupMatch = useMemo(() => {
     if (!pendingLookup) return null;
@@ -632,39 +725,6 @@ export default function MainLayout({
                     <p className={railEditorial.wordmark}>
                       Aethria
                     </p>
-                    <div className="relative flex items-center gap-phi-2">
-                      <PipelineHeaderSignal
-                        stages={pipelineStages}
-                        loopAlive={pipelineLoopAlive}
-                        pipelineEnabled={pipelineEnabled}
-                        issue={pipelineHealthIssue}
-                      />
-                      {pipelineStateLabel === 'Issue' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setShowPipelineIssueHelp((open) => !open)}
-                            className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-none border border-escalation/40 type-meta leading-none text-escalation hover:bg-escalation/10 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
-                            aria-label="Pipeline issue details"
-                            aria-expanded={showPipelineIssueHelp}
-                          >
-                            ?
-                          </button>
-                          {showPipelineIssueHelp && (
-                            <span className="absolute right-0 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford">
-                              Pipeline has a problem and may not process updates right now.
-                              <button
-                                type="button"
-                                onClick={() => navigate(SETTINGS_PATH)}
-                                className="mt-phi-2 block type-meta text-oxford/35 hover:text-oxford btn-interaction"
-                              >
-                                Open settings →
-                              </button>
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
                   </div>
 
                   {/* Nav */}
@@ -680,55 +740,47 @@ export default function MainLayout({
                   </div>
                 </div>
 
+                {/* ── Pipeline overview ──────────────────────────────── */}
+                <section aria-label="Pipeline overview" className="min-w-0 border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}>
+                  <SystemTelemetryRail
+                    totalCount={startups.length}
+                    openInProgressCount={openInProgressCount}
+                    decidedCount={decidedCount}
+                    pendingEscalations={pendingEscalations}
+                    pipelineEnabled={pipelineEnabled}
+                    pipelineLoopAlive={pipelineLoopAlive}
+                    pipelineHealthIssue={pipelineHealthIssue}
+                    stages={pipelineStages}
+                    showIssueHelp={showPipelineIssueHelp}
+                    onToggleIssueHelp={() => setShowPipelineIssueHelp((open) => !open)}
+                    onOpenSettings={() => navigate(SETTINGS_PATH)}
+                  />
+                </section>
+
                 {/* ── Dispatch (on-demand lookup) ─────────────────────── */}
                 <div className="min-w-0 border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}>
                   <p className={railEditorial.label}>Dispatch</p>
                   <div className="mt-phi-2 min-w-0">
-                  <AgentDispatch
-                    input={lookupInput}
-                    setInput={setLookupInput}
-                    onSubmit={() => void handleLookupSubmit()}
-                    isBusy={lookupBusy}
-                    message={lookupMessage}
-                    onClearMessage={() => setLookupMessage(null)}
-                    lookupPhase={lookupPhaseLabel}
-                    alwaysOpen
-                  />
-                  {lookupSnapshotProps ? (
-                    <div className="mt-phi-3 min-w-0">
-                      <LookupResultSnapshot
-                        {...lookupSnapshotProps}
-                        onOpenMemo={handleOpenLookupMemo}
-                      />
-                    </div>
-                  ) : null}
+                    <AgentDispatch
+                      input={lookupInput}
+                      setInput={setLookupInput}
+                      onSubmit={() => void handleLookupSubmit()}
+                      isBusy={lookupWorking}
+                      message={lookupMessage}
+                      onClearMessage={() => setLookupMessage(null)}
+                      lookupPhase={lookupPhaseLabel}
+                      alwaysOpen
+                    />
+                    {lookupSnapshotProps ? (
+                      <div className="mt-phi-3 min-w-0">
+                        <LookupResultSnapshot
+                          {...lookupSnapshotProps}
+                          onOpenMemo={handleOpenLookupMemo}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 </div>
-
-                {/* ── Overview ───────────────────────────────────────── */}
-                <section aria-label="Live overview" className="min-w-0 border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}>
-                  <p className={railEditorial.label}>Overview</p>
-                  <div className="grid min-w-0 grid-cols-2" style={{ columnGap: 'clamp(8px, 1vw, 13px)', rowGap: 'clamp(5px, 0.8vw, 8px)' }}>
-                    {[
-                      { label: 'Total', value: startups.length, accent: false },
-                      { label: 'Open/in-progress', value: openInProgressCount, accent: false },
-                      { label: 'Decided', value: decidedCount, accent: false },
-                      { label: 'Escalated', value: pendingEscalations, accent: pendingEscalations > 0 },
-                    ].map((stat) => (
-                      <div
-                        key={stat.label}
-                        className="flex min-h-0 min-w-0 flex-col justify-between gap-phi-2"
-                      >
-                        <span className={railEditorial.statLabel}>{stat.label}</span>
-                        <span
-                          className={`${railEditorial.statValue} truncate ${stat.accent ? 'text-escalation' : 'text-oxford'}`}
-                        >
-                          {stat.value.toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
 
                 {/* ── Mandate ────────────────────────────────────────── */}
                 <article className="min-w-0 overflow-hidden border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }} aria-label="Fund thesis preview">
@@ -848,7 +900,7 @@ export default function MainLayout({
                     input={lookupInput}
                     setInput={setLookupInput}
                     onSubmit={() => void handleLookupSubmit()}
-                    isBusy={lookupBusy}
+                    isBusy={lookupWorking}
                     message={lookupMessage}
                     onClearMessage={() => setLookupMessage(null)}
                     lookupPhase={lookupPhaseLabel}
