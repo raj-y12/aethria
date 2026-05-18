@@ -27,6 +27,8 @@
         --charcoal: #26313f;
         --heritage-gold: #a88a5e;
         --gold-soft: rgba(168, 138, 94, 0.35);
+        --badge-blue: #c9d9ea;
+        --badge-blue-ink: #253f5a;
         --hairline: rgba(0, 20, 51, 0.08);
         --hairline-strong: rgba(0, 20, 51, 0.16);
         --cream: #f4f1ea;
@@ -420,15 +422,15 @@
       /* Suite F — Motion Field */
       .banner-motion {
         background:
-          linear-gradient(90deg, rgba(0, 20, 51, 0.3) 0%, rgba(168, 138, 94, 0.26) 19%, transparent 48%),
-          linear-gradient(90deg, rgba(168, 138, 94, 0.2) 0%, transparent 64%),
+          linear-gradient(90deg, rgba(0, 20, 51, 0.3) 0%, rgba(201, 217, 234, 0.34) 19%, transparent 48%),
+          linear-gradient(90deg, rgba(201, 217, 234, 0.2) 0%, transparent 64%),
           linear-gradient(180deg, var(--paper-deep) 0%, #d6ccba 37%, var(--paper) 100%);
         color: var(--oxford);
       }
 
       .banner-motion-invert {
         background:
-          linear-gradient(90deg, rgba(168, 138, 94, 0.24) 0%, rgba(244, 241, 234, 0.13) 21%, transparent 44%),
+          linear-gradient(90deg, rgba(201, 217, 234, 0.28) 0%, rgba(244, 241, 234, 0.13) 21%, transparent 44%),
           linear-gradient(90deg, rgba(244, 241, 234, 0.13) 0%, rgba(0, 20, 51, 0) 52%),
           linear-gradient(180deg, var(--charcoal) 0%, #101f32 38%, var(--oxford) 100%);
         color: var(--cream);
@@ -473,7 +475,7 @@
         left: -14%;
         width: 92%;
         height: 56px;
-        background: linear-gradient(90deg, transparent, rgba(0, 20, 51, 0.56), rgba(168, 138, 94, 0.38), transparent);
+        background: linear-gradient(90deg, transparent, rgba(0, 20, 51, 0.56), rgba(201, 217, 234, 0.42), transparent);
         opacity: 0.44;
         filter: blur(18px);
       }
@@ -503,15 +505,14 @@
         opacity: 0.48;
       }
 
-      .banner-motion-invert .motion-band,
-      .banner-wake-invert .wake-streak {
-        background: linear-gradient(90deg, transparent, rgba(244, 241, 234, 0.3), rgba(168, 138, 94, 0.36), rgba(38, 49, 63, 0.24), transparent);
+      .banner-motion-invert .motion-band {
+        background: linear-gradient(90deg, transparent, rgba(244, 241, 234, 0.3), rgba(201, 217, 234, 0.42), rgba(38, 49, 63, 0.24), transparent);
       }
 
       .motion-copy {
         position: absolute;
         top: 44px;
-        right: 76px;
+        right: 42px;
         width: 700px;
       }
 
@@ -533,6 +534,11 @@
         opacity: 0.35;
       }
 
+      .motion-brand .underlined-a::after {
+        height: 1px;
+        bottom: -3px;
+      }
+
       .motion-headline {
         margin: 0;
         font-family: 'Figtree', system-ui, sans-serif;
@@ -546,8 +552,8 @@
 
       .banner-motion-invert .motion-headline,
       .banner-wake-invert .wake-headline {
-        color: var(--heritage-gold);
-        text-shadow: 0 0 22px rgba(168, 138, 94, 0.12);
+        color: var(--badge-blue);
+        text-shadow: 0 0 22px rgba(201, 217, 234, 0.14);
       }
 
       .motion-meta {
@@ -565,14 +571,14 @@
       /* Suite G — Signal Wake */
       .banner-wake {
         background:
-          linear-gradient(90deg, rgba(0, 20, 51, 0.24) 0%, rgba(168, 138, 94, 0.24) 30%, transparent 62%),
+          linear-gradient(90deg, rgba(0, 20, 51, 0.24) 0%, rgba(201, 217, 234, 0.26) 30%, transparent 62%),
           linear-gradient(180deg, var(--paper-deep) 0%, #d6ccba 42%, var(--paper) 100%);
         color: var(--oxford);
       }
 
       .banner-wake-invert {
         background:
-          linear-gradient(90deg, rgba(168, 138, 94, 0.2) 0%, rgba(244, 241, 234, 0.16) 28%, transparent 58%),
+          linear-gradient(90deg, rgba(201, 217, 234, 0.22) 0%, rgba(244, 241, 234, 0.16) 28%, transparent 58%),
           linear-gradient(180deg, var(--charcoal) 0%, #101f32 44%, var(--oxford) 100%);
         color: var(--cream);
       }
@@ -597,7 +603,7 @@
         left: 0;
         right: 38.2%;
         height: 34px;
-        background: linear-gradient(90deg, transparent, rgba(168, 138, 94, 0.42), rgba(0, 20, 51, 0.42), transparent);
+        background: linear-gradient(90deg, transparent, rgba(201, 217, 234, 0.4), rgba(0, 20, 51, 0.42), transparent);
         opacity: 0.48;
         filter: blur(16px);
       }
@@ -1232,6 +1238,7 @@
           paperDeep: '#e7e0d4',
           charcoal: '#26313f',
           heritageGold: '#a88a5e',
+          badgeBlue: '#c9d9ea',
         };
 
         function isInverted(id) {
@@ -1287,18 +1294,18 @@
           return font(size, '"Playfair Display", Georgia, serif');
         }
 
-        function underlineA(ctx, x, baseline, size) {
+        function underlineA(ctx, x, baseline, size, height) {
           var aWidth = ctx.measureText('A').width;
-          ctx.fillRect(x, baseline + size * 0.14, aWidth * 0.95, Math.max(3, size * 0.035));
+          ctx.fillRect(x, baseline + size * 0.14, aWidth * 0.95, height || Math.max(3, size * 0.035));
         }
 
-        function drawWordmark(ctx, text, x, baseline, size, color) {
+        function drawWordmark(ctx, text, x, baseline, size, color, underlineHeight) {
           ctx.save();
           ctx.fillStyle = color;
           ctx.font = display(size);
           ctx.textBaseline = 'alphabetic';
           ctx.fillText(text, x, baseline);
-          underlineA(ctx, x, baseline, size);
+          underlineA(ctx, x, baseline, size, underlineHeight);
           ctx.restore();
         }
 
@@ -1376,14 +1383,14 @@
             height,
             inverted
               ? [
-                  [0, 'rgba(168, 138, 94, 0.2)'],
+                  [0, 'rgba(201, 217, 234, 0.22)'],
                   [0.32, 'rgba(244, 241, 234, 0.16)'],
                   [1, 'rgba(0, 20, 51, 0)'],
                 ]
               : [
                   [0, 'rgba(0, 20, 51, 0.22)'],
-                  [0.28, 'rgba(168, 138, 94, 0.28)'],
-                  [0.52, 'rgba(168, 138, 94, 0.18)'],
+                  [0.28, 'rgba(201, 217, 234, 0.32)'],
+                  [0.52, 'rgba(201, 217, 234, 0.18)'],
                   [1, 'rgba(244, 241, 234, 0)'],
                 ],
             18,
@@ -1546,13 +1553,13 @@
               ? [
                   [0, 'rgba(244, 241, 234, 0)'],
                   [0.34, 'rgba(244, 241, 234, 0.2)'],
-                  [0.62, 'rgba(168, 138, 94, 0.3)'],
+                  [0.62, 'rgba(201, 217, 234, 0.34)'],
                   [1, 'rgba(0, 20, 51, 0)'],
                 ]
               : [
                   [0, 'rgba(244, 241, 234, 0)'],
                   [0.34, 'rgba(0, 20, 51, 0.26)'],
-                  [0.62, 'rgba(168, 138, 94, 0.3)'],
+                  [0.62, 'rgba(201, 217, 234, 0.32)'],
                   [1, 'rgba(244, 241, 234, 0)'],
                 ];
             drawGradientBand(ctx, -220, 8, width * 1.02, 56, smearStops, 18, 0.98);
@@ -1561,8 +1568,8 @@
             drawGradientBand(ctx, -220, height - 100, width * 1.18, 88, smearStops, 22, 1);
             paintScanGrain(ctx, width, height, inverted);
             drawMultiLineLabel(ctx, ['Scout', 'Review', 'Decide'], 55, height - 88, 'left', ink);
-            var copyX = width - 76 - 700;
-            drawWordmark(ctx, 'Aethria', copyX, 78, 34, ink);
+            var copyX = width - 42 - 700;
+            drawWordmark(ctx, 'Aethria', copyX, 78, 34, ink, 1.5);
             ctx.save();
             ctx.strokeStyle = ink;
             ctx.globalAlpha = 0.35;
@@ -1578,7 +1585,7 @@
               97,
               58,
               0.94,
-              inverted ? COLORS.heritageGold : COLORS.oxford,
+              inverted ? COLORS.badgeBlue : COLORS.oxford,
             );
           } else if (id.indexOf('banner-wake') === 0) {
             paintMotionBase(ctx, width, height, inverted, 'wake');
@@ -1595,13 +1602,13 @@
             var wakeStops = inverted
               ? [
                   [0, 'rgba(244, 241, 234, 0)'],
-                  [0.45, 'rgba(168, 138, 94, 0.3)'],
+                  [0.45, 'rgba(201, 217, 234, 0.32)'],
                   [0.7, 'rgba(244, 241, 234, 0.18)'],
                   [1, 'rgba(0, 20, 51, 0)'],
                 ]
               : [
                   [0, 'rgba(244, 241, 234, 0)'],
-                  [0.45, 'rgba(168, 138, 94, 0.3)'],
+                  [0.45, 'rgba(201, 217, 234, 0.3)'],
                   [0.7, 'rgba(0, 20, 51, 0.24)'],
                   [1, 'rgba(244, 241, 234, 0)'],
                 ];
@@ -1621,7 +1628,7 @@
               height - 50 - 108,
               56,
               0.96,
-              inverted ? COLORS.heritageGold : COLORS.oxford,
+              inverted ? COLORS.badgeBlue : COLORS.oxford,
             );
           }
 
