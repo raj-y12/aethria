@@ -27,12 +27,6 @@
         --charcoal: #26313f;
         --heritage-gold: #a88a5e;
         --gold-soft: rgba(168, 138, 94, 0.35);
-        --signal-lime: #9fcf48;
-        --signal-moss: #5f743d;
-        --signal-sage: #9aa38d;
-        --signal-steel: #56646b;
-        --signal-smoke: #22313a;
-        --signal-fog: #d8d9c8;
         --hairline: rgba(0, 20, 51, 0.08);
         --hairline-strong: rgba(0, 20, 51, 0.16);
         --cream: #f4f1ea;
@@ -426,17 +420,17 @@
       /* Suite F — Motion Field */
       .banner-motion {
         background:
-          linear-gradient(90deg, rgba(0, 20, 51, 0.28) 0%, rgba(95, 116, 61, 0.32) 19%, transparent 48%),
+          linear-gradient(90deg, rgba(0, 20, 51, 0.3) 0%, rgba(168, 138, 94, 0.26) 19%, transparent 48%),
           linear-gradient(90deg, rgba(168, 138, 94, 0.2) 0%, transparent 64%),
-          linear-gradient(180deg, #d4d7c7 0%, #bfc8b7 37%, #ebe6d8 100%);
+          linear-gradient(180deg, var(--paper-deep) 0%, #d6ccba 37%, var(--paper) 100%);
         color: var(--oxford);
       }
 
       .banner-motion-invert {
         background:
-          linear-gradient(90deg, rgba(159, 207, 72, 0.22) 0%, rgba(154, 163, 141, 0.24) 21%, transparent 44%),
+          linear-gradient(90deg, rgba(168, 138, 94, 0.24) 0%, rgba(244, 241, 234, 0.13) 21%, transparent 44%),
           linear-gradient(90deg, rgba(244, 241, 234, 0.13) 0%, rgba(0, 20, 51, 0) 52%),
-          linear-gradient(180deg, #26343b 0%, #142532 38%, #0a1724 100%);
+          linear-gradient(180deg, var(--charcoal) 0%, #101f32 38%, var(--oxford) 100%);
         color: var(--cream);
       }
 
@@ -479,7 +473,7 @@
         left: -14%;
         width: 92%;
         height: 56px;
-        background: linear-gradient(90deg, transparent, rgba(0, 20, 51, 0.56), rgba(95, 116, 61, 0.42), transparent);
+        background: linear-gradient(90deg, transparent, rgba(0, 20, 51, 0.56), rgba(168, 138, 94, 0.38), transparent);
         opacity: 0.44;
         filter: blur(18px);
       }
@@ -511,7 +505,7 @@
 
       .banner-motion-invert .motion-band,
       .banner-wake-invert .wake-streak {
-        background: linear-gradient(90deg, transparent, rgba(244, 241, 234, 0.3), rgba(159, 207, 72, 0.36), rgba(86, 100, 107, 0.22), transparent);
+        background: linear-gradient(90deg, transparent, rgba(244, 241, 234, 0.3), rgba(168, 138, 94, 0.36), rgba(38, 49, 63, 0.24), transparent);
       }
 
       .motion-copy {
@@ -546,14 +540,14 @@
         font-size: 58px;
         line-height: 0.94;
         letter-spacing: -0.02em;
-        color: var(--signal-moss);
+        color: var(--oxford);
         text-shadow: 0 0 18px rgba(244, 241, 234, 0.24);
       }
 
       .banner-motion-invert .motion-headline,
       .banner-wake-invert .wake-headline {
-        color: var(--signal-lime);
-        text-shadow: 0 0 22px rgba(159, 207, 72, 0.12);
+        color: var(--heritage-gold);
+        text-shadow: 0 0 22px rgba(168, 138, 94, 0.12);
       }
 
       .motion-meta {
@@ -571,15 +565,15 @@
       /* Suite G — Signal Wake */
       .banner-wake {
         background:
-          linear-gradient(90deg, rgba(0, 20, 51, 0.22) 0%, rgba(95, 116, 61, 0.28) 30%, transparent 62%),
-          linear-gradient(180deg, #d7d6c2 0%, #b7c1ad 42%, #eee8db 100%);
+          linear-gradient(90deg, rgba(0, 20, 51, 0.24) 0%, rgba(168, 138, 94, 0.24) 30%, transparent 62%),
+          linear-gradient(180deg, var(--paper-deep) 0%, #d6ccba 42%, var(--paper) 100%);
         color: var(--oxford);
       }
 
       .banner-wake-invert {
         background:
-          linear-gradient(90deg, rgba(159, 207, 72, 0.16) 0%, rgba(86, 100, 107, 0.36) 28%, transparent 58%),
-          linear-gradient(180deg, #314047 0%, #152835 44%, #071523 100%);
+          linear-gradient(90deg, rgba(168, 138, 94, 0.2) 0%, rgba(244, 241, 234, 0.16) 28%, transparent 58%),
+          linear-gradient(180deg, var(--charcoal) 0%, #101f32 44%, var(--oxford) 100%);
         color: var(--cream);
       }
 
@@ -603,7 +597,7 @@
         left: 0;
         right: 38.2%;
         height: 34px;
-        background: linear-gradient(90deg, transparent, rgba(95, 116, 61, 0.44), rgba(0, 20, 51, 0.42), transparent);
+        background: linear-gradient(90deg, transparent, rgba(168, 138, 94, 0.42), rgba(0, 20, 51, 0.42), transparent);
         opacity: 0.48;
         filter: blur(16px);
       }
@@ -644,7 +638,7 @@
         font-size: 56px;
         line-height: 0.96;
         letter-spacing: -0.02em;
-        color: var(--signal-moss);
+        color: var(--oxford);
       }
 
       /* Legacy LinkedIn profile & success layouts */
@@ -1234,13 +1228,10 @@
           oxford: '#001433',
           paper: '#f4f1ea',
           cream: '#f4f1ea',
-          paperDeep: '#d8d9c8',
+          paperBright: '#f8f5ee',
+          paperDeep: '#e7e0d4',
+          charcoal: '#26313f',
           heritageGold: '#a88a5e',
-          lime: '#9fcf48',
-          moss: '#5f743d',
-          sage: '#9aa38d',
-          steel: '#56646b',
-          smoke: '#22313a',
         };
 
         function isInverted(id) {
@@ -1366,13 +1357,13 @@
         function paintMotionBase(ctx, width, height, inverted, variant) {
           var vertical = ctx.createLinearGradient(0, 0, 0, height);
           if (inverted) {
-            vertical.addColorStop(0, variant === 'wake' ? '#314047' : '#26343b');
-            vertical.addColorStop(0.42, '#142532');
-            vertical.addColorStop(1, '#071523');
+            vertical.addColorStop(0, COLORS.charcoal);
+            vertical.addColorStop(0.42, '#101f32');
+            vertical.addColorStop(1, COLORS.oxford);
           } else {
-            vertical.addColorStop(0, variant === 'wake' ? '#d7d6c2' : '#d4d7c7');
-            vertical.addColorStop(0.42, variant === 'wake' ? '#b7c1ad' : '#bfc8b7');
-            vertical.addColorStop(1, '#eee8db');
+            vertical.addColorStop(0, COLORS.paperDeep);
+            vertical.addColorStop(0.42, '#d6ccba');
+            vertical.addColorStop(1, COLORS.paper);
           }
           ctx.fillStyle = vertical;
           ctx.fillRect(0, 0, width, height);
@@ -1385,13 +1376,13 @@
             height,
             inverted
               ? [
-                  [0, 'rgba(159, 207, 72, 0.18)'],
-                  [0.32, 'rgba(86, 100, 107, 0.34)'],
+                  [0, 'rgba(168, 138, 94, 0.2)'],
+                  [0.32, 'rgba(244, 241, 234, 0.16)'],
                   [1, 'rgba(0, 20, 51, 0)'],
                 ]
               : [
                   [0, 'rgba(0, 20, 51, 0.22)'],
-                  [0.28, 'rgba(95, 116, 61, 0.34)'],
+                  [0.28, 'rgba(168, 138, 94, 0.28)'],
                   [0.52, 'rgba(168, 138, 94, 0.18)'],
                   [1, 'rgba(244, 241, 234, 0)'],
                 ],
@@ -1555,13 +1546,13 @@
               ? [
                   [0, 'rgba(244, 241, 234, 0)'],
                   [0.34, 'rgba(244, 241, 234, 0.2)'],
-                  [0.62, 'rgba(159, 207, 72, 0.24)'],
+                  [0.62, 'rgba(168, 138, 94, 0.3)'],
                   [1, 'rgba(0, 20, 51, 0)'],
                 ]
               : [
                   [0, 'rgba(244, 241, 234, 0)'],
                   [0.34, 'rgba(0, 20, 51, 0.26)'],
-                  [0.62, 'rgba(95, 116, 61, 0.3)'],
+                  [0.62, 'rgba(168, 138, 94, 0.3)'],
                   [1, 'rgba(244, 241, 234, 0)'],
                 ];
             drawGradientBand(ctx, -220, 8, width * 1.02, 56, smearStops, 18, 0.98);
@@ -1587,7 +1578,7 @@
               97,
               58,
               0.94,
-              inverted ? COLORS.lime : COLORS.moss,
+              inverted ? COLORS.heritageGold : COLORS.oxford,
             );
           } else if (id.indexOf('banner-wake') === 0) {
             paintMotionBase(ctx, width, height, inverted, 'wake');
@@ -1604,13 +1595,13 @@
             var wakeStops = inverted
               ? [
                   [0, 'rgba(244, 241, 234, 0)'],
-                  [0.45, 'rgba(159, 207, 72, 0.28)'],
+                  [0.45, 'rgba(168, 138, 94, 0.3)'],
                   [0.7, 'rgba(244, 241, 234, 0.18)'],
                   [1, 'rgba(0, 20, 51, 0)'],
                 ]
               : [
                   [0, 'rgba(244, 241, 234, 0)'],
-                  [0.45, 'rgba(95, 116, 61, 0.32)'],
+                  [0.45, 'rgba(168, 138, 94, 0.3)'],
                   [0.7, 'rgba(0, 20, 51, 0.24)'],
                   [1, 'rgba(244, 241, 234, 0)'],
                 ];
@@ -1630,7 +1621,7 @@
               height - 50 - 108,
               56,
               0.96,
-              inverted ? COLORS.lime : COLORS.moss,
+              inverted ? COLORS.heritageGold : COLORS.oxford,
             );
           }
 
