@@ -1,7 +1,7 @@
 import type { ScoringDimension } from '../../types/startup';
 import { useState } from 'react';
 import { getScoreBand } from '../../design-system/semantics';
-import ConfidenceIndicator from './ConfidenceIndicator';
+import ConfidenceIndicator, { formatConfidencePercent } from './ConfidenceIndicator';
 import ComponentBar from './ComponentBar';
 
 interface DimensionCardProps {
@@ -40,7 +40,7 @@ export default function DimensionCard({ id, title, dimension }: DimensionCardPro
   const band = getScoreBand(dimension.score).label;
   const dimKey = DIMENSION_KEY_BY_TITLE[title] ?? title.toLowerCase();
   const weights = DIMENSION_WEIGHTS[dimKey] ?? {};
-  const confidenceLabel = typeof dimension.confidence === 'number' ? `${Math.round(dimension.confidence * 100)}%` : '—';
+  const confidenceLabel = formatConfidencePercent(dimension.confidence);
 
   return (
     <article id={id} className="memoDocDimensionCard">

@@ -232,7 +232,31 @@ function getPartnerEconomicBadgeVariant(startup: Startup): 'INVEST' | 'PASS' | '
 function formatSectorAndCategory(startup: Startup): string {
   const sector = startup.scout.sector?.trim() || '—';
   const category = startup.scout.funding_stage?.trim() || startup.scout.scout_type?.trim() || '';
-  return category ? `${sector} · ${category}` : sector;
+  return (category ? `${sector} · ${category}` : sector).toUpperCase();
+}
+
+function memoHeaderThesisLine(startup: Startup): string {
+  const scoutOneLine = startup.scout.one_line?.trim().toLowerCase();
+  const candidates = [
+    startup.partner?.snapshot?.key_signal,
+    startup.partner?.decision_drivers?.[0],
+    startup.review?.aethria_view?.thesis_fit_line,
+    startup.review?.investment_thesis?.[0],
+    startup.partner?.thesis,
+    startup.partner?.why_this_matters,
+    startup.partner?.snapshot?.one_liner,
+    startup.review?.overall_summary,
+    startup.scout.primary_thesis,
+  ];
+
+  for (const candidate of candidates) {
+    const value = String(candidate ?? '').trim();
+    if (!value) continue;
+    if (scoutOneLine && value.toLowerCase() === scoutOneLine) continue;
+    return value;
+  }
+
+  return '';
 }
 
 function isLookupStartup(startup: Startup): boolean {
@@ -519,6 +543,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   );
   const showEscalationBadge = !!(displayStartup?.partner?.human_review_required && decisionBadgeVariant);
   const showLookupBadge = !!(displayStartup && isLookupStartup(displayStartup));
+  const headerMeta = [sectorCategory.trim(), showLookupBadge ? 'LOOKUP' : ''].filter(Boolean).join(' · ');
+  const headerThesisLine = displayStartup ? memoHeaderThesisLine(displayStartup) : '';
   const reasoningParagraphs = useMemo(
     () => (displayStartup && showJudgment ? toJudgmentReasoning(displayStartup) : []),
     [displayStartup, showJudgment]
@@ -669,23 +695,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Document header ── */}
             <div className="memoDocHeader">
               <div className="memoDocHeaderMain">
-                <h1 className="memoCompany" id="memo-title">{companyName || '—'}</h1>
-                {displayStartup.scout.one_line?.trim() && (
-                  <p className="memoDocTagline">{renderWithMonoNumbers(displayStartup.scout.one_line)}</p>
-                )}
-                <p className="memoMeta">
-                  {sectorCategory.trim() ? renderWithMonoNumbers(sectorCategory) : null}
-                  {showLookupBadge && (
-                    <>
-                      {sectorCategory.trim() ? (
-                        <span className="memoMetaSep" aria-hidden>
-                          {' · '}
-                        </span>
-                      ) : null}
-                      <span className="text-lookup">Lookup</span>
-                    </>
-                  )}
-                </p>
+                <p className="memoKicker">INVESTMENT MEMO</p>
+                <div className="memoTitleRow">
+                  <h1 className="memoCompany" id="memo-title">{companyName || '—'}</h1>
+                  {headerMeta ? <p className="memoMeta">{renderWithMonoNumbers(headerMeta)}</p> : null}
+                </div>
+                {headerThesisLine ? (
+                  <p className="memoThesisLine">{renderWithMonoNumbers(headerThesisLine)}</p>
+                ) : null}
               </div>
             </div>
 
@@ -746,7 +763,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   const paras = reasoningParagraphs.filter((p) => String(p ?? '').trim());
                   const primaryReason = paras[0];
                   const remainingReasons = paras.slice(1);
-                  const partnerConfidence = displayStartup.partner?.confidence;
                   return (
                     <div
                       className={`memoRecommendationBlock${showRulingStatus ? '' : ' memoRecommendationBlock--lead'}`}
@@ -758,12 +774,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                           <p className={`memoDocRecommendation memoDocRecommendation--${decisionBadgeVariant.toLowerCase()}`}>
                             {decisionHeadline}.
                           </p>
-                          {partnerConfidence != null && (
-                            <p className="memoDocConfidence">
-                              <span className="memoNum">{Math.round(partnerConfidence * 100)}%</span>
-                              {' partner confidence'}
-                            </p>
-                          )}
                         </div>
                       )}
                       {primaryReason && (

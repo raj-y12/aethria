@@ -200,17 +200,39 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 13px;
+  gap: 0;
 }
-.memoDocHeaderMain { flex: 1 1 auto; min-width: 0; }
+.memoDocHeaderMain {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+.memoKicker {
+  font-family: var(--memo-font-mono);
+  font-size: 0.66rem;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+  margin: 0 0 10px 0;
+}
+.memoTitleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px 18px;
+  flex-wrap: wrap;
+  width: 100%;
+}
 .memoCompany {
   font-family: var(--memo-font-ui);
   font-weight: 600;
-  font-size: 1.8rem;
-  line-height: 1.16;
-  letter-spacing: 0;
-  margin: 0 0 8px 0;
+  font-size: clamp(2rem, 4vw, 2.875rem);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  margin: 0;
   color: var(--color-oxford);
+  overflow-wrap: anywhere;
 }
 .memoDocTagline {
   font-family: var(--memo-font-ui);
@@ -225,9 +247,21 @@
 .memoMeta {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--memo-ink-faint);
   margin: 0;
+  white-space: nowrap;
+}
+.memoThesisLine {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.58;
+  letter-spacing: 0;
+  color: var(--memo-ink-muted);
+  margin: 14px 0 0 0;
+  max-width: 38rem;
+  text-wrap: pretty;
 }
 .memoMetaSep {
   font: inherit;
@@ -257,13 +291,6 @@
 .memoDocRecommendation--invest { color: var(--color-oxford); }
 .memoDocRecommendation--monitor { color: var(--color-oxford); }
 .memoDocRecommendation--pass { color: var(--color-oxford); }
-.memoDocConfidence {
-  font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-label);
-  letter-spacing: 0.06em;
-  color: var(--memo-ink-muted);
-  margin: 0;
-}
 .memoDocEscalation {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
@@ -858,12 +885,12 @@
   font-size: var(--memo-size-ui);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--memo-ink-strong);
+  color: rgba(var(--color-oxford-rgb), 0.76);
   margin: 0 0 13px 0;
   display: flex;
   align-items: center;
   gap: 12px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.35;
 }
 .memoDocContestedKicker {

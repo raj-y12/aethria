@@ -13,6 +13,7 @@ with [Backend] / [App] / [Web] / [Agents] so you can see API and frontend activi
 """
 import os
 import re
+import socket
 import subprocess
 import sys
 import threading
@@ -260,6 +261,17 @@ def _stop_process(proc: subprocess.Popen | None) -> None:
             pass
 
 
+def _wait_for_tcp(host: str, port: int, timeout_seconds: float = 20.0) -> bool:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                return True
+        except OSError:
+            time.sleep(0.15)
+    return False
+
+
 def main() -> int:
     if load_dotenv and ENV_FILE.exists():
         load_dotenv(ENV_FILE, override=True)
@@ -290,6 +302,15 @@ def main() -> int:
             stderr=subprocess.STDOUT,
             env={**os.environ, "PYTHONUNBUFFERED": "1"},
         )
+        if backend_proc.poll() is not None:
+            print("  [run.py] Backend process exited before accepting connections.", flush=True)
+            return 1
+        if not _wait_for_tcp("127.0.0.1", BACKEND_PORT):
+            print(f"  [run.py] Backend did not accept TCP connections on 127.0.0.1:{BACKEND_PORT} within 20s.", flush=True)
+            return 1
+        if backend_proc.poll() is not None:
+            print("  [run.py] Backend process exited during startup.", flush=True)
+            return 1
         app_proc = subprocess.Popen(
             ["npm", "run", "dev"],
             cwd=str(APP_FRONTEND_DIR),
@@ -303,7 +324,7 @@ def main() -> int:
             cwd=str(WEB_FRONTEND_DIR),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            env={**os.environ, "VITE_API_URL": f"http://localhost:{BACKEND_PORT}"},
+            env={**os.environ, "VITE_API_URL": f"http://127.0.0.1:{BACKEND_PORT}"},
             shell=os.name == "nt",
         )
         # When using Supabase, agents need a user_id (AETHRIA_AGENT_USER_ID or run_system.py --user-id).

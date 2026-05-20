@@ -156,14 +156,14 @@ interface WorkGridRow {
 
 function formatRowDate(value: string): string {
   if (!value) return '';
-  return new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  return new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase();
 }
 
 function formatUnresolvedAgeDays(value: string): string {
   const time = new Date(value).getTime();
   if (!Number.isFinite(time)) return '';
   const days = Math.max(0, Math.floor((Date.now() - time) / (24 * 60 * 60 * 1000)));
-  return `${days} day${days === 1 ? '' : 's'}`;
+  return `${days} DAY${days === 1 ? '' : 'S'}`;
 }
 
 function getUnresolvedAt(startup: Startup): string | null {
@@ -597,7 +597,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                     ? 'bg-oxford/[0.018]'
                     : '';
           const rowHoverClass = isSelected ? '' : 'hover:bg-oxford/[0.025]';
-          const metaSectorHead = (startup.scout.sector || '').split('/')[0].trim();
+          const metaSectorHead = (startup.scout.sector || '').split('/')[0].trim().toUpperCase();
           const metaHasDate = Boolean(row.sortKeyValue);
           const metaHasUnresolved = Boolean(row.unresolvedAt) && !row.isDecided;
           const metaHasSector = Boolean(metaSectorHead);
@@ -692,14 +692,14 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                     {metaHasFunding && (
                       <>
                         {(metaHasDate || metaHasSector) && <span className="type-meta text-oxford/25">·</span>}
-                        <span className="type-meta text-oxford/35">{startup.scout.funding_stage}</span>
+                        <span className="type-meta text-oxford/35">{startup.scout.funding_stage?.toUpperCase()}</span>
                       </>
                     )}
                     {metaHasUnresolved && (
                       <>
                         {(metaHasDate || metaHasSector || metaHasFunding) && <span className="type-meta text-oxford/25">·</span>}
                         <span className="type-meta text-oxford/38 tabular-nums" title="Days this item has been unresolved">
-                          Unresolved {formatUnresolvedAgeDays(row.unresolvedAt ?? '')}
+                          UNRESOLVED {formatUnresolvedAgeDays(row.unresolvedAt ?? '')}
                         </span>
                       </>
                     )}
@@ -709,7 +709,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                           <span className="type-meta text-oxford/25">·</span>
                         )}
                         <span className="type-meta text-oxford/38">
-                          {row.adverseItems.length} diligence flag{row.adverseItems.length === 1 ? '' : 's'}
+                          {row.adverseItems.length} DILIGENCE FLAG{row.adverseItems.length === 1 ? '' : 'S'}
                         </span>
                       </>
                     )}
@@ -718,7 +718,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                         {(metaHasDate || metaHasSector || metaHasFunding || metaHasUnresolved || metaHasDiligenceFlags) && (
                           <span className="type-meta text-oxford/25">·</span>
                         )}
-                        <span className="type-meta text-oxford/38">On monitor</span>
+                        <span className="type-meta text-oxford/38">ON MONITOR</span>
                       </>
                     )}
                     {metaHasLookup && (
@@ -726,7 +726,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                         {(metaHasDate || metaHasSector || metaHasFunding || metaHasUnresolved || metaHasDiligenceFlags || metaHasMonitor) && (
                           <span className="type-meta text-oxford/25">·</span>
                         )}
-                        <span className="type-meta tracking-[0.08em] text-lookup">Lookup</span>
+                        <span className="type-meta tracking-[0.08em] text-lookup">LOOKUP</span>
                       </>
                     )}
                     {metaHasScore && (
