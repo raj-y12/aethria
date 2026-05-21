@@ -284,7 +284,13 @@ class Reviewer(ABC):
     
     SYSTEM_PROMPT: str = ""  # Set in __init__ from resources
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gpt-5-nano",
+        tenant_user_id: str = "",
+        use_resource_fund_thesis_fallback: bool = True,
+    ):
         """
         Initialize a Reviewer.
         
@@ -299,6 +305,7 @@ class Reviewer(ABC):
         self.model = model
         self._last_token_usage = 0
         self._tenant_user_id = (tenant_user_id or "").strip()
+        self._use_resource_fund_thesis_fallback = bool(use_resource_fund_thesis_fallback)
         reviewer_rules, rubric = _load_reviewer_resources()
         self.SYSTEM_PROMPT = _build_system_prompt(reviewer_rules, rubric)
         self.reviewer_type = getattr(self, 'reviewer_type', 'default')
@@ -440,12 +447,14 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     + "\n---\n"
                 )
 
-            try:
-                from core.fund_thesis_resolver import format_fund_thesis_context_for_prompt
+            resource_thesis_block = ""
+            if self._use_resource_fund_thesis_fallback:
+                try:
+                    from core.fund_thesis_resolver import format_fund_thesis_context_for_prompt
 
-                resource_thesis_block = format_fund_thesis_context_for_prompt()
-            except Exception:
-                resource_thesis_block = ""
+                    resource_thesis_block = format_fund_thesis_context_for_prompt()
+                except Exception:
+                    resource_thesis_block = ""
 
             thesis_block = ""
             ctx = getattr(self, "_fund_thesis_ctx", None)

@@ -686,6 +686,93 @@ def _to_iso(v) -> str | None:
     return str(v) if v else None
 
 
+def _parse_iso_datetime(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+def _is_after(left: Any, right: Any) -> bool:
+    ldt = _parse_iso_datetime(left)
+    rdt = _parse_iso_datetime(right)
+    if ldt is None or rdt is None:
+        return False
+    if ldt.tzinfo is None and rdt.tzinfo is not None:
+        ldt = ldt.replace(tzinfo=timezone.utc)
+    if rdt.tzinfo is None and ldt.tzinfo is not None:
+        rdt = rdt.replace(tzinfo=timezone.utc)
+    return ldt > rdt
+
+
+def _startup_has_human_ruling(raw: Dict[str, Any]) -> bool:
+    hr = raw.get("human_resolution")
+    return isinstance(hr, dict) and bool(hr.get("resolved_at") or hr.get("decision"))
+
+
+def _default_queue_reason(raw: Dict[str, Any]) -> str:
+    partner = raw.get("partner_info") if isinstance(raw.get("partner_info"), dict) else {}
+    review = raw.get("review_info") if isinstance(raw.get("review_info"), dict) else None
+    if _startup_has_human_ruling(raw):
+        return "Human ruling recorded."
+    if partner.get("human_review_required"):
+        return "Human ruling required."
+    if partner.get("recommendation"):
+        return f"Partner recommends {str(partner.get('recommendation')).lower()}."
+    if review:
+        return "Reviewer output ready for partner judgement."
+    return "New discovery awaiting review."
+
+
+def _default_priority_reason(raw: Dict[str, Any]) -> str:
+    scout = raw.get("scout_info") if isinstance(raw.get("scout_info"), dict) else {}
+    review = raw.get("review_info") if isinstance(raw.get("review_info"), dict) else {}
+    sector = (scout.get("sector") or "").split("/")[0].strip()
+    score = review.get("overall_score") or review.get("aggregate_score")
+    if not isinstance(score, (int, float)):
+        nums = [
+            review.get("market_score"),
+            review.get("product_score"),
+            review.get("technical_score"),
+            review.get("execution_score"),
+        ]
+        vals = [float(v) for v in nums if isinstance(v, (int, float))]
+        score = (sum(vals) / len(vals) * 10) if vals else None
+    elif score <= 10:
+        score = score * 10
+    parts = [f"Priority {round(float(score))}" if isinstance(score, (int, float)) else "Priority pending"]
+    reason = _default_queue_reason(raw).rstrip(".")
+    if reason:
+        parts.append(reason)
+    if sector:
+        parts.append(sector)
+    return " · ".join(parts)
+
+
+def _get_user_last_seen_at(user_id: Optional[str]) -> Optional[str]:
+    if not user_id:
+        return None
+    try:
+        row = (
+            get_service_client()
+            .table("user_state")
+            .select("last_seen_at")
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        return (row.data or {}).get("last_seen_at")
+    except Exception as e:
+        logging.getLogger("api").debug("Could not load user_state last_seen_at: %s", e)
+        return None
+
+
 def _partner_recommendation_from_stored(
     partner_doc: Any,
     legacy_decision: Optional[str] = None,
@@ -748,7 +835,7 @@ def _mirror_structured_scoring_aliases(review: Dict[str, Any]) -> None:
     review["score_breakdown"] = sc
 
 
-def _backend_to_frontend(raw: dict) -> dict:
+def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> dict:
     """Transform backend startup dict to app-front-end Startup shape."""
     sid = raw.get("startup_id", "")
     scout = raw.get("scout_info") or {}
@@ -764,6 +851,10 @@ def _backend_to_frontend(raw: dict) -> dict:
         timestamps["partnered_at"] = _to_iso(partner["partnered_at"])
     if raw.get("unresolved_at"):
         timestamps["unresolved_at"] = _to_iso(raw.get("unresolved_at"))
+    first_seen_at = _to_iso(raw.get("first_seen_at") or raw.get("created_at") or scout.get("discovered_at"))
+    timestamps["first_seen_at"] = first_seen_at
+    timestamps["last_seen_by_user_at"] = _to_iso(raw.get("last_seen_by_user_at"))
+    timestamps["acknowledged_at"] = _to_iso(raw.get("acknowledged_at"))
 
     out = {
         "id": sid,
@@ -797,7 +888,12 @@ def _backend_to_frontend(raw: dict) -> dict:
         "timestamps": timestamps,
         "human_resolution": raw.get("human_resolution"),
         "conviction_state": raw.get("conviction_state"),
+        "agent_trace": raw.get("agent_trace"),
         "unresolved_at": _to_iso(raw.get("unresolved_at")),
+        "is_new_to_user": raw.get("acknowledged_at") is None and not _startup_has_human_ruling(raw),
+        "changed_since_last_visit": _is_after(raw.get("updated_at"), last_seen_at),
+        "queue_reason": raw.get("queue_reason") or _default_queue_reason(raw),
+        "priority_reason": raw.get("priority_reason") or _default_priority_reason(raw),
     }
 
     if review:
@@ -900,10 +996,15 @@ def _memo_partial_payload(startup: Startup) -> Dict[str, Any]:
         "scout": fe["scout"],
         "review": fe.get("review"),
         "partner": fe.get("partner"),
+        "agent_trace": fe.get("agent_trace"),
     }
 
 
-def _list_projection_to_frontend(row: Dict[str, Any]) -> Dict[str, Any]:
+def _list_projection_to_frontend(
+    row: Dict[str, Any],
+    *,
+    last_seen_at: Optional[str] = None,
+) -> Dict[str, Any]:
     """Map DB list-projection row to frontend Startup-like payload (no memo, no heavy scout blobs)."""
     sid = str(row.get("startup_id") or "")
     conf = row.get("list_confidence")
@@ -916,7 +1017,13 @@ def _list_projection_to_frontend(row: Dict[str, Any]) -> Dict[str, Any]:
         "reviewed_at": _to_iso(row.get("list_reviewed_at")) if row.get("list_reviewed_at") else None,
         "partnered_at": _to_iso(row.get("list_partnered_at")) if row.get("list_partnered_at") else None,
         "unresolved_at": _to_iso(row.get("unresolved_at")) if row.get("unresolved_at") else None,
+        "first_seen_at": _to_iso(row.get("first_seen_at") or row.get("created_at")),
+        "last_seen_by_user_at": _to_iso(row.get("last_seen_by_user_at")),
+        "acknowledged_at": _to_iso(row.get("acknowledged_at")),
     }
+    has_human_ruling = isinstance(row.get("human_resolution"), dict) and bool(
+        row.get("human_resolution", {}).get("resolved_at") or row.get("human_resolution", {}).get("decision")
+    )
     out: Dict[str, Any] = {
         "id": sid,
         "scout": {
@@ -937,6 +1044,10 @@ def _list_projection_to_frontend(row: Dict[str, Any]) -> Dict[str, Any]:
         "human_resolution": row.get("human_resolution"),
         "conviction_state": row.get("conviction_state"),
         "unresolved_at": _to_iso(row.get("unresolved_at")) if row.get("unresolved_at") else None,
+        "is_new_to_user": row.get("acknowledged_at") is None and not has_human_ruling,
+        "changed_since_last_visit": _is_after(row.get("updated_at"), last_seen_at),
+        "queue_reason": row.get("queue_reason") or "",
+        "priority_reason": row.get("priority_reason") or "",
     }
     if row.get("list_verdict") or row.get("list_score") is not None or row.get("short_summary"):
         score = row.get("list_score")
@@ -970,6 +1081,17 @@ def _list_projection_to_frontend(row: Dict[str, Any]) -> Dict[str, Any]:
         }
     else:
         out["partner"] = None
+    raw_for_reason = {
+        "startup_id": sid,
+        "scout_info": out["scout"],
+        "review_info": out.get("review"),
+        "partner_info": out.get("partner"),
+        "human_resolution": row.get("human_resolution"),
+    }
+    if not out["queue_reason"]:
+        out["queue_reason"] = _default_queue_reason(raw_for_reason)
+    if not out["priority_reason"]:
+        out["priority_reason"] = _default_priority_reason(raw_for_reason)
     return out
 
 
@@ -1057,15 +1179,16 @@ def _get_storage(request: Request):
 @app.get("/api/startups")
 def get_startups(request: Request):
     storage = _get_storage(request)
+    last_seen_at = _get_user_last_seen_at(getattr(request.state, "user_id", None))
     if isinstance(storage, SupabaseStartupsStorage):
         rows = storage.get_list_projection_rows()
         if rows is not None:
-            return [_list_projection_to_frontend(r) for r in rows]
+            return [_list_projection_to_frontend(r, last_seen_at=last_seen_at) for r in rows]
         raw_list = storage.get_all()
-        full = [_backend_to_frontend(r) for r in raw_list]
+        full = [_backend_to_frontend(r, last_seen_at=last_seen_at) for r in raw_list]
         return [_thin_list_from_full_frontend(x) for x in full]
     raw_list = storage.get_all()
-    full = [_backend_to_frontend(r) for r in raw_list]
+    full = [_backend_to_frontend(r, last_seen_at=last_seen_at) for r in raw_list]
     return [_thin_list_from_full_frontend(x) for x in full]
 
 
@@ -1100,7 +1223,33 @@ def get_startup_detail(request: Request, startup_id: str):
     raw = storage.get_by_id(startup_id)
     if not raw:
         raise HTTPException(status_code=404, detail="Startup not found")
-    return _backend_to_frontend(raw)
+    return _backend_to_frontend(raw, last_seen_at=_get_user_last_seen_at(getattr(request.state, "user_id", None)))
+
+
+@app.post("/api/startups/{startup_id}/acknowledge")
+async def acknowledge_startup(request: Request, startup_id: str):
+    """Mark a startup as seen by the current user when they open the memo."""
+    storage = _get_storage(request)
+    existing = storage.get_by_id(startup_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Startup not found")
+    seen_at = _now_iso()
+    ok = storage.update_startup_partial(
+        startup_id,
+        {
+            "acknowledged_at": seen_at,
+            "last_seen_by_user_at": seen_at,
+        },
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="Startup not found")
+    updated = storage.get_by_id(startup_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Startup not found")
+    return _backend_to_frontend(
+        updated,
+        last_seen_at=_get_user_last_seen_at(getattr(request.state, "user_id", None)),
+    )
 
 
 @app.get("/api/startups/{startup_id}/memo")
@@ -1849,7 +1998,6 @@ async def agents_status(request: Request):
             supabase_configured
             and openai_configured
             and _lookup_queue is not None
-            and thesis_ready
         ),
         "thesis_ready": thesis_ready,
         "active_thesis_version_id": active_thesis_version_id,

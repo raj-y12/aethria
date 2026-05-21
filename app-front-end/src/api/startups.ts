@@ -24,10 +24,24 @@ export async function fetchStartupDetail(startupId: string): Promise<Startup | n
   return data && typeof data === 'object' && typeof data.id === 'string' ? (data as Startup) : null;
 }
 
+export async function acknowledgeStartup(startupId: string): Promise<Startup | null> {
+  const res = await authedFetch(
+    `${API_BASE}/api/startups/${encodeURIComponent(startupId)}/acknowledge`,
+    {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+    }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data && typeof data === 'object' && typeof data.id === 'string' ? (data as Startup) : null;
+}
+
 export type MemoPartialPayload = {
   scout: Startup['scout'];
   review: Startup['review'] | null;
   partner: Startup['partner'] | null;
+  agent_trace?: Startup['agent_trace'];
 };
 
 export type MemoApiResponse = {
@@ -47,6 +61,7 @@ function parseMemoPartial(data: unknown): MemoPartialPayload | null {
     scout: scout as Startup['scout'],
     review: (o.review as Startup['review'] | null) ?? null,
     partner: (o.partner as Startup['partner'] | null) ?? null,
+    agent_trace: (o.agent_trace as Startup['agent_trace']) ?? null,
   };
 }
 

@@ -14,6 +14,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from models import Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
 from pipeline_state import pipeline_stage_log, upsert_pipeline_state
+from agent_trace import (
+    build_partner_trace,
+    build_review_trace,
+    build_scout_trace,
+    handoff_quality_from_trace,
+    merge_stage_trace,
+)
 from utils.reference_validation import is_generic_reference
 from utils.storage import _merge_startup_dict_patch
 
@@ -23,13 +30,21 @@ TABLE = "startups"
 _TRANSIENT_ERRNOS = (35, 11)
 _RETRY_ATTEMPTS = 4
 _BASE_RETRY_DELAY_SECONDS = 0.08
+_QUEUE_AWARENESS_COLUMNS = (
+    "first_seen_at",
+    "last_seen_by_user_at",
+    "acknowledged_at",
+    "queue_reason",
+    "priority_reason",
+)
 
 _LIST_SELECT = (
     "startup_id, display_name, list_one_line, list_sector, list_scout_type, list_origin_type, "
     "list_lookup_id, list_lookup_query, list_lookup_website, list_confidence, list_score, list_verdict, "
     "list_consensus_verdict, list_reviewer_disagreement, list_reviewed_at, list_partnered_at, "
     "short_summary, partner_decision, partner_human_review_required, partner_info, human_resolution, "
-    "conviction_state, unresolved_at, created_at, updated_at"
+    "conviction_state, unresolved_at, first_seen_at, last_seen_by_user_at, acknowledged_at, "
+    "queue_reason, priority_reason, created_at, updated_at"
 )
 _LIST_SELECT_LEGACY_NO_UNRESOLVED = (
     "startup_id, display_name, list_one_line, list_sector, list_scout_type, list_origin_type, "
@@ -39,8 +54,58 @@ _LIST_SELECT_LEGACY_NO_UNRESOLVED = (
     "conviction_state, created_at, updated_at"
 )
 _MEMO_PARTIAL_SELECT = (
-    "startup_id, scout_info, review_info, partner_info, conviction_state, investment_memo_markdown"
+    "startup_id, scout_info, review_info, partner_info, conviction_state, agent_trace, investment_memo_markdown"
 )
+
+
+def _score_from_review(review_info: Any) -> Optional[int]:
+    if not review_info:
+        return None
+    if hasattr(review_info, "overall_score") and getattr(review_info, "overall_score") is not None:
+        try:
+            return max(0, min(100, round(float(getattr(review_info, "overall_score")) * 10)))
+        except (TypeError, ValueError):
+            return None
+    scores: List[float] = []
+    for attr in ("market_score", "product_score", "technical_score", "execution_score"):
+        val = getattr(review_info, attr, None)
+        if val is None:
+            continue
+        try:
+            scores.append(float(val))
+        except (TypeError, ValueError):
+            continue
+    if not scores:
+        return None
+    return max(0, min(100, round((sum(scores) / len(scores)) * 10)))
+
+
+def _queue_reasons_for_startup(startup: Startup) -> Tuple[str, str]:
+    sector = (startup.scout_info.sector or "").split("/")[0].strip()
+    score = _score_from_review(startup.review_info)
+    priority_parts = [f"Priority {score}" if score is not None else "Priority pending"]
+
+    human_resolution = startup.human_resolution if isinstance(startup.human_resolution, dict) else None
+    if human_resolution and human_resolution.get("resolved_at"):
+        decision = str(human_resolution.get("decision") or "recorded").upper()
+        queue_reason = f"Human ruling recorded: {decision}."
+        priority_parts.append("Human ruled")
+    elif startup.partner_info and startup.partner_info.human_review_required:
+        queue_reason = "Human ruling required."
+        priority_parts.append("Human ruling required")
+    elif startup.partner_info and startup.partner_info.recommendation:
+        rec = startup.partner_info.recommendation
+        queue_reason = f"Partner recommends {rec.lower()}."
+        priority_parts.append(f"Partner {rec}")
+    elif startup.review_info:
+        queue_reason = "Reviewer output ready for partner judgement."
+        priority_parts.append("Reviewed")
+    else:
+        queue_reason = "New discovery awaiting review."
+        priority_parts.append("New signal")
+    if sector:
+        priority_parts.append(sector)
+    return queue_reason, " · ".join(priority_parts)
 
 
 def _row_to_dict(row: dict) -> dict:
@@ -54,8 +119,14 @@ def _row_to_dict(row: dict) -> dict:
         "version": row.get("version", 1),
         "human_resolution": row.get("human_resolution"),
         "conviction_state": row.get("conviction_state"),
+        "agent_trace": row.get("agent_trace"),
         "investment_memo_markdown": row.get("investment_memo_markdown"),
         "unresolved_at": row.get("unresolved_at"),
+        "first_seen_at": row.get("first_seen_at"),
+        "last_seen_by_user_at": row.get("last_seen_by_user_at"),
+        "acknowledged_at": row.get("acknowledged_at"),
+        "queue_reason": row.get("queue_reason"),
+        "priority_reason": row.get("priority_reason"),
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
     }
@@ -73,7 +144,13 @@ def _dict_to_row(d: dict, user_id: str) -> dict:
         "version": d.get("version", 1),
         "human_resolution": d.get("human_resolution"),
         "conviction_state": d.get("conviction_state"),
+        "agent_trace": d.get("agent_trace"),
         "unresolved_at": d.get("unresolved_at"),
+        "first_seen_at": d.get("first_seen_at"),
+        "last_seen_by_user_at": d.get("last_seen_by_user_at"),
+        "acknowledged_at": d.get("acknowledged_at"),
+        "queue_reason": d.get("queue_reason"),
+        "priority_reason": d.get("priority_reason"),
         "created_at": d.get("created_at"),
         "updated_at": d.get("updated_at"),
     }
@@ -84,6 +161,20 @@ def _dict_to_row(d: dict, user_id: str) -> dict:
 def _is_missing_unresolved_at_error(exc: Exception) -> bool:
     text = str(exc).lower()
     return "unresolved_at" in text and (
+        "does not exist" in text or "schema cache" in text or "42703" in text
+    )
+
+
+def _is_missing_agent_trace_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "agent_trace" in text and (
+        "does not exist" in text or "schema cache" in text or "42703" in text
+    )
+
+
+def _is_missing_queue_awareness_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return any(column in text for column in _QUEUE_AWARENESS_COLUMNS) and (
         "does not exist" in text or "schema cache" in text or "42703" in text
     )
 
@@ -119,6 +210,15 @@ class SupabaseStartupsStorage:
         assert last_exc is not None
         raise last_exc
 
+    def _settings_for_trace(self) -> dict:
+        try:
+            from utils.settings_loader import load_settings
+
+            return load_settings(self._user_id)
+        except Exception as e:
+            self.logger.debug("agent_trace settings unavailable: %s", e)
+            return {}
+
     def _fetch_page_raw(self, offset: int, limit: int) -> List[dict]:
         try:
             r = (
@@ -153,20 +253,45 @@ class SupabaseStartupsStorage:
     def upsert_startup_dict(self, d: dict) -> None:
         """Single-row upsert on (user_id, startup_id)."""
         row = _dict_to_row(d, self._user_id)
-        try:
-            self._client.table(TABLE).upsert(row, on_conflict="user_id,startup_id").execute()
-        except Exception as e:
-            if _is_missing_unresolved_at_error(e):
-                legacy = dict(row)
-                legacy.pop("unresolved_at", None)
-                self.logger.warning(
-                    "Supabase unresolved_at column missing; retrying upsert without unresolved state. "
-                    "Apply migration 20260512000001_unresolved_state.sql to persist unresolved dates."
-                )
+        legacy = dict(row)
+        warned: set[str] = set()
+        for _ in range(4):
+            try:
                 self._client.table(TABLE).upsert(legacy, on_conflict="user_id,startup_id").execute()
                 return
-            self.logger.error("Supabase upsert failed for %s: %s", row.get("startup_id"), e)
-            raise
+            except Exception as e:
+                if _is_missing_agent_trace_error(e) and "agent_trace" in legacy:
+                    legacy.pop("agent_trace", None)
+                    if "agent_trace" not in warned:
+                        warned.add("agent_trace")
+                        self.logger.warning(
+                            "Supabase agent_trace column missing; retrying upsert without trace. "
+                            "Apply the startup_agent_trace migration to persist handoff traces."
+                        )
+                    continue
+                if _is_missing_unresolved_at_error(e) and "unresolved_at" in legacy:
+                    legacy.pop("unresolved_at", None)
+                    if "unresolved_at" not in warned:
+                        warned.add("unresolved_at")
+                        self.logger.warning(
+                            "Supabase unresolved_at column missing; retrying upsert without unresolved state. "
+                            "Apply migration 20260512000001_unresolved_state.sql to persist unresolved dates."
+                        )
+                    continue
+                if _is_missing_queue_awareness_error(e) and any(c in legacy for c in _QUEUE_AWARENESS_COLUMNS):
+                    for column in _QUEUE_AWARENESS_COLUMNS:
+                        legacy.pop(column, None)
+                    if "queue_awareness" not in warned:
+                        warned.add("queue_awareness")
+                        self.logger.warning(
+                            "Supabase queue awareness columns missing; retrying upsert without queue state. "
+                            "Apply migration 20260521000002_startup_queue_awareness.sql."
+                        )
+                    continue
+                self.logger.error("Supabase upsert failed for %s: %s", row.get("startup_id"), e)
+                raise
+        self.logger.error("Supabase upsert failed after legacy column retries for %s", row.get("startup_id"))
+        raise RuntimeError("Supabase upsert failed after legacy column retries")
 
     def update_startup_partial(self, startup_id: str, patch: dict) -> bool:
         """Read-merge-write one row; patch keys are top-level startup fields (shallow merge for JSON blobs)."""
@@ -180,6 +305,8 @@ class SupabaseStartupsStorage:
         except Exception as e:
             self.logger.error("Invalid startup after patch %s: %s", startup_id, e)
             return False
+        if "queue_reason" not in patch and "priority_reason" not in patch:
+            merged.queue_reason, merged.priority_reason = _queue_reasons_for_startup(merged)
         merged.update_timestamp()
         self.upsert_startup_dict(merged.to_dict())
         return True
@@ -201,10 +328,10 @@ class SupabaseStartupsStorage:
                 )
             )
         except Exception as e:
-            if _is_missing_unresolved_at_error(e):
+            if _is_missing_unresolved_at_error(e) or _is_missing_queue_awareness_error(e):
                 self.logger.warning(
-                    "List projection unresolved_at column missing; using legacy projection. "
-                    "Apply migration 20260512000001_unresolved_state.sql to enable unresolved dates."
+                    "List projection queue column missing; using legacy projection. "
+                    "Apply unresolved/queue awareness migrations to enable full queue state."
                 )
                 try:
                     r = self._execute_with_retry(
@@ -296,13 +423,25 @@ class SupabaseStartupsStorage:
         return out
 
     def add_startup(self, scout_info: ScoutInfo, *, pipeline_run_id: Optional[str] = None) -> str:
+        pr = (pipeline_run_id or "").strip() or None
         startup = Startup(
             startup_id=scout_info.startup_id,
             scout_info=scout_info,
             financials=Financials(),
         )
+        startup.agent_trace = merge_stage_trace(
+            startup.agent_trace,
+            "scout",
+            build_scout_trace(
+                scout_info.model_dump(mode="json"),
+                pipeline_run_id=pr,
+                active_thesis=None,
+                settings=self._settings_for_trace(),
+            ),
+        )
         startup.unresolved_at = startup.created_at
-        pr = (pipeline_run_id or "").strip() or None
+        startup.first_seen_at = startup.created_at
+        startup.queue_reason, startup.priority_reason = _queue_reasons_for_startup(startup)
         try:
             r = (
                 self._client.table(TABLE)
@@ -410,6 +549,23 @@ class SupabaseStartupsStorage:
                 gap_reference_urls=enrichment_gap_reference_urls,
             )
         st.review_info = review_info
+        review_payload = (
+            dict(enrichment_review_output)
+            if isinstance(enrichment_review_output, dict)
+            else review_info.model_dump(mode="json")
+        )
+        st.agent_trace = merge_stage_trace(
+            st.agent_trace,
+            "reviewer",
+            build_review_trace(
+                review_payload,
+                scout=st.scout_info.model_dump(mode="json"),
+                pipeline_run_id=pr,
+                gap_reference_urls=enrichment_gap_reference_urls,
+                settings=self._settings_for_trace(),
+            ),
+        )
+        st.queue_reason, st.priority_reason = _queue_reasons_for_startup(st)
         st.update_timestamp()
         try:
             self.upsert_startup_dict(st.to_dict())
@@ -461,7 +617,21 @@ class SupabaseStartupsStorage:
                 )
             return False
         st.partner_info = partner_info
+        handoff_quality = handoff_quality_from_trace(st.agent_trace)
+        st.agent_trace = merge_stage_trace(
+            st.agent_trace,
+            "partner",
+            build_partner_trace(
+                partner_info.model_dump(mode="json"),
+                scout=st.scout_info.model_dump(mode="json"),
+                review=st.review_info.model_dump(mode="json") if st.review_info else {},
+                pipeline_run_id=pr,
+                handoff_quality=handoff_quality,
+                settings=self._settings_for_trace(),
+            ),
+        )
         st.unresolved_at = partner_info.partnered_at if partner_info.human_review_required else None
+        st.queue_reason, st.priority_reason = _queue_reasons_for_startup(st)
         if investment_memo_markdown is not None:
             st.investment_memo_markdown = investment_memo_markdown
         st.update_timestamp()

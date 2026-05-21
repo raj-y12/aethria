@@ -18,13 +18,13 @@ import {
 } from '../lib/dealState';
 import { extractAdverseRegister } from '../lib/adverseRegister';
 import {
-  bandForScore,
   computeConfiguredScore,
   createDefaultFundConfiguration,
   isStartupStaleByConfig,
   type FundConfiguration,
 } from '../lib/fundConfiguration';
 
+type QueueView = 'PRIORITY' | 'NEW' | 'STALE' | 'ESCALATED';
 type SourceFilter = 'ALL' | 'SCOUT' | 'LOOKUP';
 type DecisionFilter =
   | 'ALL'
@@ -39,7 +39,7 @@ type DecisionFilter =
   | 'DECIDED'
   | 'AWAITING_REVIEW';
 type ReviewFilter = 'ALL' | 'STRONG' | 'MEDIUM' | 'WEAK' | 'UNREVIEWED';
-type SortFilter = 'QUEUE_PRIORITY' | 'NEWEST' | 'OLDEST' | 'UNRESOLVED_OLDEST' | 'CONFIDENCE_HIGH' | 'CONFIDENCE_LOW' | 'NAME_AZ';
+type SortFilter = 'QUEUE_PRIORITY' | 'NEWEST' | 'OLDEST' | 'UNRESOLVED_OLDEST';
 
 function getReviewerVerdict(s: Startup) {
   return getReviewerQualityBand(s.review);
@@ -72,17 +72,25 @@ function startupNeedsRuling(startup: Startup): boolean {
   return !isDealDecided(startup) && Boolean(startup.review || startup.partner?.recommendation);
 }
 
-const FilterButton = ({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    aria-pressed={active}
-    className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'text-oxford font-semibold' : 'text-oxford/40 hover:text-oxford/70'
-      }`}
-  >
-    {label}
-  </button>
-);
+const QUEUE_VIEW_LABELS: { key: QueueView; label: string }[] = [
+  { key: 'PRIORITY', label: 'Priority' },
+  { key: 'NEW', label: 'New' },
+  { key: 'STALE', label: 'Stale' },
+  { key: 'ESCALATED', label: 'Escalated' },
+];
+
+const SORT_OPTIONS: { value: SortFilter; label: string; title: string }[] = [
+  { value: 'QUEUE_PRIORITY', label: '↕', title: 'Queue order' },
+  { value: 'NEWEST', label: '↓', title: 'Newest first' },
+  { value: 'OLDEST', label: '↑', title: 'Oldest first' },
+  { value: 'UNRESOLVED_OLDEST', label: '↥', title: 'Longest unresolved' },
+];
+
+const SOURCE_FILTER_CHIPS: { key: SourceFilter; label: string }[] = [
+  { key: 'ALL', label: 'ALL' },
+  { key: 'SCOUT', label: 'SCOUT' },
+  { key: 'LOOKUP', label: 'LOOKUP' },
+];
 
 function AdvancedChip({
   active,
@@ -104,6 +112,19 @@ function AdvancedChip({
     </button>
   );
 }
+
+const QueueTab = ({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={active}
+    className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'text-oxford font-semibold' : 'text-oxford/40 hover:text-oxford/70'
+      }`}
+  >
+    {label}
+    <span className={`ml-phi-1 tabular-nums ${active ? 'text-oxford/55' : 'text-oxford/28'}`}>{count}</span>
+  </button>
+);
 
 interface WorkGridProps {
   startups: Startup[];
@@ -140,7 +161,6 @@ interface WorkGridRow {
   queueState: ReturnType<typeof getDealQueueState>;
   adverseItems: ReturnType<typeof extractAdverseRegister>;
   configuredScore: number;
-  configuredBand: string;
   hasAdverse: boolean;
   hasHighAdverse: boolean;
   ageDays: number | null;
@@ -150,8 +170,11 @@ interface WorkGridRow {
   isStale: boolean;
   isEscalated: boolean;
   needsRuling: boolean;
+  isNewToUser: boolean;
+  changedSinceLastVisit: boolean;
   sortKeyValue: string;
   unresolvedAt: string | null;
+  firstSeenAt: string;
 }
 
 function formatRowDate(value: string): string {
@@ -275,6 +298,19 @@ function rowOneLiner(row: WorkGridRow, attention: ReturnType<typeof getRowAttent
   return null;
 }
 
+function rowReasonLine(row: WorkGridRow): string {
+  const sector = (row.startup.scout.sector || '').split('/')[0].trim();
+  const parts = [`Priority ${row.configuredScore}`];
+  if (row.isNewToUser || row.changedSinceLastVisit) parts.push('New signal');
+  if (row.isEscalated) parts.push('Human ruling required');
+  else if (row.isStale) parts.push(row.ageDays != null ? `Stale ${row.ageDays}d` : 'Stale');
+  else if (row.needsRuling) parts.push(row.startup.partner?.recommendation ? `Partner ${row.startup.partner.recommendation}` : 'Ready for judgement');
+  else if (!row.startup.review) parts.push('Awaiting review');
+  if (sector) parts.push(sector);
+  if (row.sourceBadge === 'LOOKUP') parts.push('Lookup');
+  return parts.join(' · ');
+}
+
 function rowMatchesDecisionFilter(row: WorkGridRow, filter: DecisionFilter): boolean {
   if (filter === 'ALL') return true;
   const visibleRecommendation = getVisibleRecommendation(row.startup);
@@ -293,9 +329,29 @@ function rowMatchesDecisionFilter(row: WorkGridRow, filter: DecisionFilter): boo
   return false;
 }
 
+function rowMatchesQueueView(row: WorkGridRow, view: QueueView): boolean {
+  if (view === 'PRIORITY') return true;
+  if (view === 'NEW') return row.isNewToUser;
+  if (view === 'STALE') return row.isStale;
+  return !row.isDecided && row.isEscalated;
+}
+
+function priorityRank(row: WorkGridRow): number {
+  return row.isDecided
+    ? 4
+    : row.hasHighAdverse || row.isEscalated
+      ? 0
+      : row.isStale
+        ? 1
+        : row.startup.review
+          ? 2
+          : queueAttentionRank(row.startup);
+}
+
 const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConfiguration }: WorkGridProps): JSX.Element => {
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
   const config = fundConfiguration ?? createDefaultFundConfiguration();
+  const [queueView, setQueueView] = useState<QueueView>('PRIORITY');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('ALL');
   const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>('ALL');
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('ALL');
@@ -366,7 +422,6 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         queueState,
         adverseItems,
         configuredScore,
-        configuredBand: bandForScore(configuredScore, config.scoreBands).label,
         hasAdverse: adverseItems.length > 0,
         hasHighAdverse: adverseItems.some((item) => item.severity === 'high'),
         ageDays: getDealAgeDays(startup),
@@ -376,41 +431,15 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         isStale,
         isEscalated: queueState === 'escalated',
         needsRuling: startupNeedsRuling(startup),
+        isNewToUser: Boolean(startup.is_new_to_user),
+        changedSinceLastVisit: Boolean(startup.changed_since_last_visit),
         sortKeyValue: sortKey(startup),
         unresolvedAt,
+        firstSeenAt: startup.timestamps?.first_seen_at ?? startup.timestamps?.discovered_at ?? '',
       };
     });
-    const sorted = [...rows];
-    switch (sortFilter) {
-      case 'QUEUE_PRIORITY':
-        sorted.sort((a, b) => {
-          const ar = a.isDecided ? 4 : a.hasHighAdverse || a.isEscalated ? 0 : a.isStale ? 1 : a.startup.review ? 2 : queueAttentionRank(a.startup);
-          const br = b.isDecided ? 4 : b.hasHighAdverse || b.isEscalated ? 0 : b.isStale ? 1 : b.startup.review ? 2 : queueAttentionRank(b.startup);
-          if (ar !== br) return ar - br;
-          return b.sortKeyValue.localeCompare(a.sortKeyValue);
-        });
-        break;
-      case 'OLDEST':
-        sorted.sort((a, b) => a.sortKeyValue.localeCompare(b.sortKeyValue));
-        break;
-      case 'UNRESOLVED_OLDEST':
-        sorted.sort((a, b) => (a.unresolvedAt ?? '9999').localeCompare(b.unresolvedAt ?? '9999'));
-        break;
-      case 'CONFIDENCE_HIGH':
-        sorted.sort((a, b) => (b.startup.scout.confidence ?? 0) - (a.startup.scout.confidence ?? 0));
-        break;
-      case 'CONFIDENCE_LOW':
-        sorted.sort((a, b) => (a.startup.scout.confidence ?? 0) - (b.startup.scout.confidence ?? 0));
-        break;
-      case 'NAME_AZ':
-        sorted.sort((a, b) => (a.startup.scout.name ?? '').localeCompare(b.startup.scout.name ?? ''));
-        break;
-      case 'NEWEST':
-      default:
-        sorted.sort((a, b) => b.sortKeyValue.localeCompare(a.sortKeyValue));
-        break;
-    }
-    const filtered = sorted.filter((row) => {
+    const filtered = rows.filter((row) => {
+      if (!rowMatchesQueueView(row, queueView)) return false;
       if (sourceFilter === 'LOOKUP' && row.sourceBadge !== 'LOOKUP') return false;
       if (sourceFilter === 'SCOUT' && row.sourceBadge !== 'SCOUT') return false;
       if (!rowMatchesDecisionFilter(row, decisionFilter)) return false;
@@ -418,8 +447,83 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
       if (reviewFilter !== 'ALL' && reviewFilter !== 'UNREVIEWED' && row.reviewBand !== reviewFilter) return false;
       return true;
     });
-    return filtered;
-  }, [startups, stableIndex, sourceFilter, decisionFilter, reviewFilter, sortFilter, watchlistSet, config]);
+    const sorted = [...filtered];
+    if (sortFilter === 'QUEUE_PRIORITY') {
+      if (queueView === 'NEW') {
+        sorted.sort((a, b) => b.firstSeenAt.localeCompare(a.firstSeenAt));
+      } else if (queueView === 'STALE') {
+        sorted.sort((a, b) => (a.unresolvedAt ?? '9999').localeCompare(b.unresolvedAt ?? '9999'));
+      } else {
+        sorted.sort((a, b) => {
+          const ar = priorityRank(a);
+          const br = priorityRank(b);
+          if (ar !== br) return ar - br;
+          return b.sortKeyValue.localeCompare(a.sortKeyValue);
+        });
+      }
+    } else {
+      switch (sortFilter) {
+        case 'OLDEST':
+          sorted.sort((a, b) => a.sortKeyValue.localeCompare(b.sortKeyValue));
+          break;
+        case 'UNRESOLVED_OLDEST':
+          sorted.sort((a, b) => (a.unresolvedAt ?? '9999').localeCompare(b.unresolvedAt ?? '9999'));
+          break;
+        case 'NEWEST':
+        default:
+          sorted.sort((a, b) => b.sortKeyValue.localeCompare(a.sortKeyValue));
+          break;
+      }
+    }
+    return sorted;
+  }, [startups, stableIndex, queueView, sourceFilter, decisionFilter, reviewFilter, sortFilter, watchlistSet, config]);
+
+  const allRows = useMemo(() => {
+    const rows: WorkGridRow[] = startups.map((startup) => {
+      const adverseItems = extractAdverseRegister(startup);
+      const queueState = getDealQueueState(startup);
+      const isDecided = isDealDecided(startup);
+      const configuredScore = computeConfiguredScore(startup, config);
+      const isStale = isStartupStaleByConfig(startup, config);
+      const unresolvedAt = getUnresolvedAt(startup);
+      return {
+        startup,
+        sourceBadge: getSourceBadge(startup),
+        reviewBand: getReviewerVerdict(startup),
+        decisionVariant: getDecisionBadgeVariant(startup),
+        queueState,
+        adverseItems,
+        configuredScore,
+        hasAdverse: adverseItems.length > 0,
+        hasHighAdverse: adverseItems.some((item) => item.severity === 'high'),
+        ageDays: getDealAgeDays(startup),
+        displayIndex: (stableIndex.get(startup.id) ?? 0).toString().padStart(2, '0'),
+        onMonitorList: watchlistSet.has(startup.id),
+        isDecided,
+        isStale,
+        isEscalated: queueState === 'escalated',
+        needsRuling: startupNeedsRuling(startup),
+        isNewToUser: Boolean(startup.is_new_to_user),
+        changedSinceLastVisit: Boolean(startup.changed_since_last_visit),
+        sortKeyValue: sortKey(startup),
+        unresolvedAt,
+        firstSeenAt: startup.timestamps?.first_seen_at ?? startup.timestamps?.discovered_at ?? '',
+      };
+    });
+    return rows;
+  }, [startups, stableIndex, watchlistSet, config]);
+
+  const intakeRows = useMemo(
+    () => [...allRows].filter((row) => row.isNewToUser).sort((a, b) => b.firstSeenAt.localeCompare(a.firstSeenAt)),
+    [allRows]
+  );
+
+  const viewCounts = useMemo(() => ({
+    PRIORITY: allRows.length,
+    NEW: allRows.filter((row) => row.isNewToUser).length,
+    STALE: allRows.filter((row) => row.isStale).length,
+    ESCALATED: allRows.filter((row) => !row.isDecided && row.isEscalated).length,
+  }), [allRows]);
 
   // Arrow-key navigation between rows for power-user keyboard flow.
   const handleRowKeyDown = useCallback(
@@ -463,40 +567,47 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
           </div>
 
           <div className="flex min-w-0 flex-wrap items-center gap-x-phi-3 gap-y-phi-1">
-            <div className="flex items-center gap-0" role="group" aria-label="Deal source filters">
-              <FilterButton active={sourceFilter === 'ALL'} label="ALL" onClick={() => setSourceFilter('ALL')} />
-              <FilterButton active={sourceFilter === 'SCOUT'} label="SCOUT" onClick={() => setSourceFilter('SCOUT')} />
-              <FilterButton active={sourceFilter === 'LOOKUP'} label="LOOKUP" onClick={() => setSourceFilter('LOOKUP')} />
+            <div className="flex items-center gap-0" role="group" aria-label="Queue views">
+              {QUEUE_VIEW_LABELS.map(({ key, label }) => (
+                <QueueTab
+                  key={key}
+                  active={queueView === key}
+                  label={label}
+                  count={viewCounts[key]}
+                  onClick={() => setQueueView(key)}
+                />
+              ))}
             </div>
 
-            <div className="ml-auto flex items-center gap-x-phi-3">
+            <div className="ml-auto flex items-center gap-x-phi-2">
               <div className="relative shrink-0">
                 <select
                   value={sortFilter}
                   onChange={(e) => setSortFilter(e.target.value as SortFilter)}
-                  aria-label="Sort deals"
-                  className="appearance-none min-h-[36px] border-b border-transparent bg-transparent type-meta text-oxford/38 hover:text-oxford/70 transition-colors pr-6 text-right outline-none cursor-pointer focus-visible:border-oxford/45 focus-visible:text-oxford"
+                  aria-label={SORT_OPTIONS.find((o) => o.value === sortFilter)?.title ?? 'Sort deals'}
+                  title={SORT_OPTIONS.find((o) => o.value === sortFilter)?.title}
+                  className="appearance-none h-9 w-9 border-0 bg-transparent font-mono text-[15px] leading-none text-oxford/45 hover:text-oxford/75 transition-colors text-center outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-oxford/35"
                 >
-                  <option value="QUEUE_PRIORITY">PRIORITY</option>
-                  <option value="NEWEST">NEWEST</option>
-                  <option value="OLDEST">OLDEST</option>
-                  <option value="UNRESOLVED_OLDEST">UNRESOLVED</option>
-                  <option value="CONFIDENCE_HIGH">SIGNAL ↓</option>
-                  <option value="CONFIDENCE_LOW">SIGNAL ↑</option>
-                  <option value="NAME_AZ">NAME A–Z</option>
+                  {SORT_OPTIONS.map(({ value, label, title }) => (
+                    <option key={value} value={value} title={title}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
-                <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-oxford/20" aria-hidden>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
-                </span>
               </div>
 
               <button
                 type="button"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                 aria-expanded={showAdvancedFilters}
-                className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 shrink-0 ${showAdvancedFilters ? 'text-oxford font-semibold' : 'text-oxford/40 hover:text-oxford/70'}`}
+                aria-label={showAdvancedFilters ? 'Hide filters' : 'More filters'}
+                className={`inline-flex h-9 w-9 shrink-0 items-center justify-center font-mono text-[17px] leading-none transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+                  showAdvancedFilters || hasActiveFilters
+                    ? 'text-oxford'
+                    : 'text-oxford/40 hover:text-oxford/70'
+                }`}
               >
-                {showAdvancedFilters ? 'HIDE' : 'REFINE'}
+                <span aria-hidden>{showAdvancedFilters ? '−' : '+'}</span>
               </button>
             </div>
           </div>
@@ -513,6 +624,20 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
               aria-label="Advanced queue filters"
               className="mt-phi-2 border-t border-oxford/[0.06] pt-phi-2"
             >
+              <div role="group" aria-label="Deal source" className="mb-phi-3 flex min-w-0 flex-col gap-phi-1">
+                <p className={productText.mutedLabel}>Source</p>
+                <div className="flex flex-wrap gap-phi-2">
+                  {SOURCE_FILTER_CHIPS.map(({ key, label }) => (
+                    <AdvancedChip
+                      key={key}
+                      active={sourceFilter === key}
+                      label={label}
+                      onClick={() => setSourceFilter(key)}
+                    />
+                  ))}
+                </div>
+              </div>
+
               <div className="grid min-w-0 gap-x-phi-6 gap-y-phi-2 md:grid-cols-3">
                 <div role="group" aria-label="Attention and queue state" className="flex min-w-0 flex-col gap-phi-1">
                   <p className={`${productText.mutedLabel}`}>Attention</p>
@@ -552,8 +677,36 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         </AnimatePresence>
       </header>
 
+      {queueView === 'PRIORITY' && intakeRows.length > 0 && (
+        <section className="border-b border-oxford/[0.08] bg-paper px-phi-4 py-phi-3" aria-label="New intake">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-phi-3 gap-y-phi-2">
+            <p className="type-meta uppercase tracking-[0.12em] text-oxford/42">Intake</p>
+            {intakeRows.slice(0, 3).map((row) => (
+              <button
+                key={row.startup.id}
+                type="button"
+                onClick={() => onStartupClick(row.startup)}
+                className="min-h-[34px] max-w-full border-l border-oxford/[0.12] pl-phi-3 pr-phi-2 text-left transition-colors hover:bg-oxford/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+              >
+                <span className="type-meta block truncate text-oxford/70">{row.startup.scout.name}</span>
+                <span className="type-meta block truncate normal-case tracking-normal text-oxford/38">{rowReasonLine(row)}</span>
+              </button>
+            ))}
+            {intakeRows.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setQueueView('NEW')}
+                className="type-meta min-h-[34px] px-phi-2 text-oxford/42 hover:text-oxford/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+              >
+                +{intakeRows.length - 3} intake
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+
       <motion.div
-        key={`${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
+        key={`${queueView}-${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
         className="flex w-full min-w-0 flex-col relative [contain:layout_style]"
         initial={reduceMotion ? false : 'hidden'}
         animate="visible"
@@ -567,14 +720,27 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
               <p className="mt-phi-2 type-body text-oxford/55">
                 Adjust the filters or return to queue priority. Current thresholds still classify stale work after {config.thresholds.staleAfterHours} hours.
               </p>
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="mt-phi-4 type-meta min-h-[44px] text-oxford/60 hover:text-oxford transition-colors"
-                >
-                  Reset view
-                </button>
+              {(hasActiveFilters || queueView !== 'PRIORITY') && (
+                <div className="mt-phi-4 flex flex-wrap items-center gap-x-phi-4">
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      onClick={resetFilters}
+                      className="type-meta min-h-[44px] text-oxford/60 hover:text-oxford transition-colors"
+                    >
+                      Reset filters
+                    </button>
+                  )}
+                  {queueView !== 'PRIORITY' && (
+                    <button
+                      type="button"
+                      onClick={() => setQueueView('PRIORITY')}
+                      className="type-meta min-h-[44px] text-oxford/60 hover:text-oxford transition-colors"
+                    >
+                      Priority view
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -597,15 +763,11 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                     ? 'bg-oxford/[0.018]'
                     : '';
           const rowHoverClass = isSelected ? '' : 'hover:bg-oxford/[0.025]';
-          const metaSectorHead = (startup.scout.sector || '').split('/')[0].trim().toUpperCase();
           const metaHasDate = Boolean(row.sortKeyValue);
           const metaHasUnresolved = Boolean(row.unresolvedAt) && !row.isDecided;
-          const metaHasSector = Boolean(metaSectorHead);
           const metaHasFunding = Boolean(startup.scout.funding_stage);
           const metaHasDiligenceFlags = row.hasAdverse && !row.hasHighAdverse;
           const metaHasMonitor = row.onMonitorList;
-          const metaHasLookup = row.sourceBadge === 'LOOKUP';
-          const metaHasScore = showJudgmentScore(row);
 
           const rowAria = `${startup.scout.name}, ${startup.scout.sector ?? 'Unknown sector'}.${
             row.isDecided ? ' Decided.' : row.needsRuling ? ' Needs ruling.' : ''
@@ -660,10 +822,17 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-phi-2 gap-y-phi-1 self-start">
                       {row.reviewBand && <VerdictBandBadge band={row.reviewBand} />}
-                      {(row.isEscalated || row.decisionVariant === 'escalation') && <DecisionBadge variant="escalation" />}
-                      {!row.isEscalated && row.decisionVariant !== 'escalation' && <DecisionBadge variant={row.decisionVariant} />}
+                      {(row.isEscalated || row.decisionVariant === 'escalation') && (
+                        <DecisionBadge variant="escalation" />
+                      )}
+                      {!row.isEscalated && row.decisionVariant !== 'escalation' && (
+                        <DecisionBadge variant={row.decisionVariant} />
+                      )}
                     </div>
                   </div>
+                  <p className="mt-phi-2 type-meta leading-relaxed tracking-[0.08em] text-oxford/45">
+                    {rowReasonLine(row)}
+                  </p>
                   {rowOneLiner(row, attention) ? (
                     <p
                       className={`mt-phi-2 type-body-sm leading-relaxed ${
@@ -683,21 +852,15 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                         {formatRowDate(row.sortKeyValue)}
                       </span>
                     )}
-                    {metaHasSector && (
-                      <>
-                        {metaHasDate && <span className="type-meta text-oxford/25">·</span>}
-                        <span className="type-meta text-oxford/45">{metaSectorHead}</span>
-                      </>
-                    )}
                     {metaHasFunding && (
                       <>
-                        {(metaHasDate || metaHasSector) && <span className="type-meta text-oxford/25">·</span>}
+                        {metaHasDate && <span className="type-meta text-oxford/25">·</span>}
                         <span className="type-meta text-oxford/35">{startup.scout.funding_stage?.toUpperCase()}</span>
                       </>
                     )}
                     {metaHasUnresolved && (
                       <>
-                        {(metaHasDate || metaHasSector || metaHasFunding) && <span className="type-meta text-oxford/25">·</span>}
+                        {(metaHasDate || metaHasFunding) && <span className="type-meta text-oxford/25">·</span>}
                         <span className="type-meta text-oxford/38 tabular-nums" title="Days this item has been unresolved">
                           UNRESOLVED {formatUnresolvedAgeDays(row.unresolvedAt ?? '')}
                         </span>
@@ -705,7 +868,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                     )}
                     {metaHasDiligenceFlags && (
                       <>
-                        {(metaHasDate || metaHasSector || metaHasFunding || metaHasUnresolved) && (
+                        {(metaHasDate || metaHasFunding || metaHasUnresolved) && (
                           <span className="type-meta text-oxford/25">·</span>
                         )}
                         <span className="type-meta text-oxford/38">
@@ -715,35 +878,10 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                     )}
                     {metaHasMonitor && (
                       <>
-                        {(metaHasDate || metaHasSector || metaHasFunding || metaHasUnresolved || metaHasDiligenceFlags) && (
+                        {(metaHasDate || metaHasFunding || metaHasUnresolved || metaHasDiligenceFlags) && (
                           <span className="type-meta text-oxford/25">·</span>
                         )}
                         <span className="type-meta text-oxford/38">ON MONITOR</span>
-                      </>
-                    )}
-                    {metaHasLookup && (
-                      <>
-                        {(metaHasDate || metaHasSector || metaHasFunding || metaHasUnresolved || metaHasDiligenceFlags || metaHasMonitor) && (
-                          <span className="type-meta text-oxford/25">·</span>
-                        )}
-                        <span className="type-meta tracking-[0.08em] text-lookup">LOOKUP</span>
-                      </>
-                    )}
-                    {metaHasScore && (
-                      <>
-                        {(metaHasDate ||
-                          metaHasSector ||
-                          metaHasFunding ||
-                          metaHasUnresolved ||
-                          metaHasDiligenceFlags ||
-                          metaHasMonitor ||
-                          metaHasLookup) && <span className="type-meta text-oxford/25">·</span>}
-                        <span
-                          className="type-meta tracking-[0.06em] tabular-nums text-oxford/55"
-                          title="Configured weighted score"
-                        >
-                          {row.configuredScore}%
-                        </span>
                       </>
                     )}
                   </div>
@@ -758,9 +896,5 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     </div>
   );
 };
-
-function showJudgmentScore(row: WorkGridRow): boolean {
-  return row.startup.review != null || row.startup.partner?.recommendation != null;
-}
 
 export default WorkGrid;

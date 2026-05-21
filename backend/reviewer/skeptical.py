@@ -19,7 +19,18 @@ Your additional lens:
 - Flag any assumption that has not been validated with evidence
 - Your role is to protect the firm from bad investments"""
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gpt-5-nano",
+        tenant_user_id: str = "",
+        use_resource_fund_thesis_fallback: bool = True,
+    ):
         self.reviewer_type = "skeptical"
-        super().__init__(api_key, model=model, tenant_user_id=tenant_user_id)
+        super().__init__(
+            api_key,
+            model=model,
+            tenant_user_id=tenant_user_id,
+            use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
+        )
         self.SYSTEM_PROMPT = self.SYSTEM_PROMPT + self.SKEPTICAL_ADDENDUM

@@ -1,7 +1,8 @@
-import { useState, useLayoutEffect, useEffect, lazy, Suspense } from 'react';
+import { useState, useLayoutEffect, useEffect, useRef, lazy, Suspense } from 'react';
 import { useLocation, Navigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
 import { setTokenGetter } from './api/auth';
+import { triggerAgents } from './api/agents';
 import MainLayout from './components/MainLayout';
 import GrainOverlay from './components/GrainOverlay';
 import LoadingAnimation from './components/LoadingAnimation';
@@ -21,6 +22,7 @@ function AppShell() {
   const { pathname } = useLocation();
   const isSettingsRoute = pathname.startsWith(SETTINGS_ROOT);
   const [isSystemPanelOpen, setIsSystemPanelOpen] = useState(false);
+  const triggeredAgentsRef = useRef(false);
   const systemData = useSystemData({
     systemPanelOpen: !isSettingsRoute && isSystemPanelOpen,
   });
@@ -43,6 +45,14 @@ function AppShell() {
     if (!isSettingsRoute) return;
     setIsSystemPanelOpen(false);
   }, [isSettingsRoute]);
+
+  useEffect(() => {
+    if (!agentsEnabled || isSettingsRoute || triggeredAgentsRef.current) return;
+    triggeredAgentsRef.current = true;
+    void triggerAgents().catch(() => {
+      triggeredAgentsRef.current = false;
+    });
+  }, [agentsEnabled, isSettingsRoute]);
 
   if (loading) {
     return <LoadingAnimation />;

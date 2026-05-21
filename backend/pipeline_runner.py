@@ -379,27 +379,7 @@ async def run_on_demand_lookup(
         )
         return None
 
-    try:
-        active = get_active_thesis(get_service_client(), user_id)
-        if active is None:
-            logger.warning("[%s] Lookup skipped (fund thesis): missing", user_id[:12])
-            _visible_logger.warning("[%s] Lookup skipped: fund thesis missing — create one in Settings", user_id[:12])
-            _record_lookup_failure(
-                user_id,
-                lid,
-                "Fund thesis is missing. Add a thesis in Settings.",
-            )
-            return None
-        thesis_ctx = active.as_engine_context()
-    except FundThesisIncompleteError as e:
-        logger.warning("[%s] Lookup skipped (fund thesis): %s", user_id[:12], e)
-        _visible_logger.warning("[%s] Lookup skipped: fund thesis incomplete — %s", user_id[:12], e)
-        _record_lookup_failure(
-            user_id,
-            lid,
-            "Fund thesis could not be loaded or auto-created. Check Supabase and migrations, or add a thesis in Settings.",
-        )
-        return None
+    thesis_ctx = None
 
     try:
         settings = load_settings(user_id)
@@ -434,6 +414,7 @@ async def run_on_demand_lookup(
         deal_memory=deal_memory,
         tenant_user_id=user_id,
         active_thesis=thesis_ctx,
+        use_resource_fund_thesis_fallback=False,
     )
     portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
     portfolio_store = PortfolioStore(data_dir=portfolio_dir, user_id=user_id)
@@ -446,6 +427,7 @@ async def run_on_demand_lookup(
         portfolio_store=portfolio_store,
         tenant_user_id=user_id,
         fund_thesis=thesis_ctx,
+        use_resource_fund_thesis_fallback=False,
     )
 
     try:

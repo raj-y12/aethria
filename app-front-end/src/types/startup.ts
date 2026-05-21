@@ -233,6 +233,9 @@ export interface Timestamps {
   reviewed_at?: string;
   partnered_at?: string;
   unresolved_at?: string | null;
+  first_seen_at?: string | null;
+  last_seen_by_user_at?: string | null;
+  acknowledged_at?: string | null;
 }
 
 export type RulingDecision = 'YES' | 'NO' | 'MAYBE';
@@ -267,6 +270,8 @@ export interface Startup {
   scout: Scout;
   review?: Review | null;
   partner?: Partner | null;
+  /** Structured backend audit trail for Scout -> Reviewer -> Partner handoffs. */
+  agent_trace?: Record<string, unknown> | null;
   timestamps?: Timestamps;
   /** Optional human override applied to a Partner decision (escalation resolution). */
   human_resolution?: {
@@ -276,6 +281,10 @@ export interface Startup {
   } | null;
   conviction_state?: ConvictionState | null;
   unresolved_at?: string | null;
+  is_new_to_user?: boolean;
+  changed_since_last_visit?: boolean;
+  queue_reason?: string | null;
+  priority_reason?: string | null;
 }
 
 // ─── System Intelligence / Meta-Agent Types ───────────────────────────────────

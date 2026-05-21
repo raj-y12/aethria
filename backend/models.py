@@ -374,6 +374,17 @@ class Startup(BaseModel):
     # When the item entered an unresolved state: initial processing, failed/incomplete
     # processing, pending human review, or unresolved escalation.
     unresolved_at: Optional[datetime] = None
+
+    # Queue awareness: newly discovered companies remain visible until opened
+    # or ruled on by the user.
+    first_seen_at: Optional[datetime] = None
+    last_seen_by_user_at: Optional[datetime] = None
+    acknowledged_at: Optional[datetime] = None
+    queue_reason: Optional[str] = None
+    priority_reason: Optional[str] = None
+
+    # Structured cross-stage audit trail for Scout -> Reviewer -> Partner handoffs.
+    agent_trace: Optional[Dict[str, Any]] = None
     
     # Financials (can be populated at any stage)
     financials: Financials = Field(default_factory=Financials)
@@ -411,10 +422,19 @@ class Startup(BaseModel):
         """Create Startup from dict. Handles ISO timestamp strings and null timestamps (uses now() for required datetimes)."""
         data = dict(data)
         # Normalize top-level timestamps
-        for key in ("created_at", "updated_at", "unresolved_at"):
+        for key in (
+            "created_at",
+            "updated_at",
+            "unresolved_at",
+            "first_seen_at",
+            "last_seen_by_user_at",
+            "acknowledged_at",
+        ):
             if key in data:
                 v = cls._normalize_timestamp(data[key])
-                data[key] = v if v is not None else (datetime.now() if key != "unresolved_at" else None)
+                data[key] = v if v is not None else (
+                    datetime.now() if key in ("created_at", "updated_at") else None
+                )
         # Nested: scout_info.discovered_at
         if "scout_info" in data and isinstance(data["scout_info"], dict):
             si = dict(data["scout_info"])

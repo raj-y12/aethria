@@ -30,7 +30,7 @@ import {
 import type { Startup } from '../types/startup';
 import type { SystemData } from '../hooks/useSystemData';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './InvestmentMemoContent';
-import { queueOnDemandLookup, fetchStartupDetail, fetchLookupJobStatus } from '../api/startups';
+import { acknowledgeStartup, queueOnDemandLookup, fetchStartupDetail, fetchLookupJobStatus } from '../api/startups';
 import {
   fetchAgentsStatus,
   fetchLoopStatus,
@@ -327,11 +327,51 @@ export default function MainLayout({
   const anyOverlayOpen = verdictOrMemoOpen || judgementsAsOverlay;
   const useModal = selectedStartup && !isDesktop;
 
+  const markStartupAcknowledged = useCallback((startup: Startup) => {
+    const now = new Date().toISOString();
+    const optimistic: Startup = {
+      ...startup,
+      is_new_to_user: false,
+      timestamps: {
+        ...(startup.timestamps ?? {}),
+        acknowledged_at: startup.timestamps?.acknowledged_at ?? now,
+        last_seen_by_user_at: now,
+      },
+    };
+    queryClient.setQueryData<Startup[]>(['startups', 'list'], (prev) =>
+      prev?.map((s) => (s.id === startup.id ? { ...s, ...optimistic } : s)) ?? prev
+    );
+    queryClient.setQueryData<Startup | null>(['startup', 'detail', startup.id], (prev) =>
+      prev ? { ...prev, ...optimistic } : prev
+    );
+    setSelectedStartup((current) => (current?.id === startup.id ? { ...current, ...optimistic } : current));
+    void acknowledgeStartup(startup.id).then((updated) => {
+      if (!updated) return;
+      queryClient.setQueryData<Startup[]>(['startups', 'list'], (prev) =>
+        prev?.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)) ?? prev
+      );
+      queryClient.setQueryData<Startup | null>(['startup', 'detail', updated.id], updated);
+      setSelectedStartup((current) => (current?.id === updated.id ? updated : current));
+    });
+  }, [queryClient]);
+
   const handleStartupClick = useCallback((startup: Startup) => {
     restoreRefVerdictMemo.current = document.activeElement as HTMLElement | null;
     setRightPanel('memo');
-    setSelectedStartup(startup);
-  }, []);
+    const acknowledgedStartup = startup.is_new_to_user
+      ? {
+          ...startup,
+          is_new_to_user: false,
+          timestamps: {
+            ...(startup.timestamps ?? {}),
+            acknowledged_at: startup.timestamps?.acknowledged_at ?? new Date().toISOString(),
+            last_seen_by_user_at: new Date().toISOString(),
+          },
+        }
+      : startup;
+    setSelectedStartup(acknowledgedStartup);
+    if (startup.is_new_to_user) markStartupAcknowledged(startup);
+  }, [markStartupAcknowledged]);
 
   const handleDecisionResolved = useCallback((nextStartup: Startup) => {
     queryClient.setQueryData<Startup[]>(['startups', 'list'], (prev) =>
@@ -467,11 +507,21 @@ export default function MainLayout({
       setLookupMessage(`Found ${matched.scout.name}. Running analyst review and scoring...`);
     }
     if (hasDecision && !pendingLookup.autoOpened) {
-      setSelectedStartup(matched);
+      const now = new Date().toISOString();
+      setSelectedStartup({
+        ...matched,
+        is_new_to_user: false,
+        timestamps: {
+          ...(matched.timestamps ?? {}),
+          acknowledged_at: matched.timestamps?.acknowledged_at ?? now,
+          last_seen_by_user_at: now,
+        },
+      });
       setRightPanel('memo');
+      if (matched.is_new_to_user) markStartupAcknowledged(matched);
       setPendingLookup((prev) => (prev ? { ...prev, autoOpened: true } : prev));
     }
-  }, [pendingLookup, pendingLookupMatch]);
+  }, [pendingLookup, pendingLookupMatch, markStartupAcknowledged]);
 
   const handleEscape = useCallback(() => {
     if (memoOpen) handleCloseMemo();

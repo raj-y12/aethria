@@ -165,6 +165,7 @@ class PartnerDecisionEngine:
         model: str = None,
         portfolio_store=None,
         tenant_user_id: str = "",
+        use_resource_fund_thesis_fallback: bool = True,
     ):
         """
         Initialize the decision engine.
@@ -179,6 +180,7 @@ class PartnerDecisionEngine:
         self.use_llm_fallback = use_llm_fallback
         self.logger = logging.getLogger("partner.decision")
         self.tenant_user_id = (tenant_user_id or "").strip()
+        self.use_resource_fund_thesis_fallback = bool(use_resource_fund_thesis_fallback)
         self.llm_call_count = 0
         self._rules: Dict[str, Any] = _load_partner_rules()
         self._fund_config: Dict[str, Any] = {}
@@ -286,6 +288,55 @@ class PartnerDecisionEngine:
         result["decision"] = legacy_from_recommendation(final_recommendation)
         result["assumption_risks"] = list(assumption_risks or [])
         result["next_action"] = self._normalize_next_action(raw_next)
+        return result
+
+    @staticmethod
+    def _handoff_quality_from_review(review_output: Dict[str, Any]) -> Dict[str, Any]:
+        raw = review_output.get("handoff_quality")
+        return raw if isinstance(raw, dict) else {}
+
+    def _apply_handoff_quality_fields(
+        self,
+        result: Dict[str, Any],
+        handoff_quality: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Escalate serious handoff quality issues without changing recommendation."""
+        if not isinstance(handoff_quality, dict) or not handoff_quality:
+            return result
+        flags = [
+            str(x).strip()
+            for x in (handoff_quality.get("quality_flags") or [])
+            if str(x).strip()
+        ]
+        serious = {
+            "weak_sources",
+            "missing_evidence",
+            "contested_review",
+            "low_signal_confidence",
+            "thesis_mismatch",
+        }
+        if bool(handoff_quality.get("human_review_recommended")) or any(f in serious for f in flags):
+            result["human_review_required"] = True
+        if flags:
+            existing = [
+                str(x).strip()
+                for x in (result.get("decision_drivers") or [])
+                if str(x).strip()
+            ]
+            result["decision_drivers"] = list(dict.fromkeys(existing + flags))
+        missing = [
+            str(x).strip()
+            for x in (handoff_quality.get("missing_evidence") or [])
+            if str(x).strip()
+        ]
+        if missing:
+            risks = [
+                str(x).strip()
+                for x in (result.get("risks") or [])
+                if str(x).strip()
+            ]
+            risk_lines = [f"Missing evidence: {m}" for m in missing]
+            result["risks"] = list(dict.fromkeys(risks + risk_lines))[:5]
         return result
 
     def _enforce_canonical_recommendation(
@@ -472,14 +523,15 @@ class PartnerDecisionEngine:
                 f"version_id: {fund_thesis.get('version_id', '')}\n"
                 f"{json.dumps(pj, ensure_ascii=False)[:8000]}\n"
             )
-        try:
-            from core.fund_thesis_resolver import format_fund_thesis_context_for_prompt
+        if self.use_resource_fund_thesis_fallback:
+            try:
+                from core.fund_thesis_resolver import format_fund_thesis_context_for_prompt
 
-            resource_ctx = "" if fund_thesis else format_fund_thesis_context_for_prompt()
-            if resource_ctx:
-                thesis_block = (thesis_block or "") + resource_ctx
-        except Exception:
-            pass
+                resource_ctx = "" if fund_thesis else format_fund_thesis_context_for_prompt()
+                if resource_ctx:
+                    thesis_block = (thesis_block or "") + resource_ctx
+            except Exception:
+                pass
 
         market_score = review_output.get("market_score", 0)
         product_score = review_output.get("product_score", 0)
@@ -586,6 +638,7 @@ class PartnerDecisionEngine:
 
         final_recommendation = self._canonical_recommendation(avg_score)
         reviewer_disagreement = bool(review_output.get("reviewer_disagreement", False))
+        handoff_quality = self._handoff_quality_from_review(review_output)
 
         tags = derive_situation_tags(
             effective_verdict=effective_verdict,
@@ -652,6 +705,7 @@ class PartnerDecisionEngine:
             result = self._apply_final_recommendation_fields(
                 result, final_recommendation, assumption_risks
             )
+            result = self._apply_handoff_quality_fields(result, handoff_quality)
             return self._finalize_thesis_soft_and_log(
                 result, review_output, scout_output, avg_score, avg_dims
             )
@@ -1239,6 +1293,10 @@ class PartnerDecisionEngine:
         result["decision_drivers"] = drivers
         result = self._apply_final_recommendation_fields(
             result, final_recommendation, assumption_risks
+        )
+        result = self._apply_handoff_quality_fields(
+            result,
+            self._handoff_quality_from_review(review_output),
         )
         return self._finalize_thesis_soft_and_log(
             result, review_output, scout_output, avg_score, avg_dims

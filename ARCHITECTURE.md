@@ -88,3 +88,21 @@ This avoids blocking UX while preserving deterministic state transitions.
 - **All-in-one local mode**: `python3 run.py` starts backend + both frontends and optionally agent process.
 - **Supabase production mode**: API handles trigger queue and background worker in same process; requires Supabase + OpenAI + Clerk env setup.
 - **Agent CLI mode**: `backend/run_system.py --user-id=<clerk_sub>` runs engines independently.
+
+## Agent Handoff Trace
+
+Aethria keeps the MVP pipeline simple, but each stage now emits a structured handoff trace on the startup row through `agent_trace`.
+
+Trace stages:
+- `scout`: discovery source coverage, scout confidence, missing thesis context, and source quality flags.
+- `reviewer`: reviewer consensus, score variance, structured signal confidence, missing evidence, conflicts, and thesis mismatch warnings.
+- `partner`: final recommendation explainability, decision drivers, quality flags consumed from earlier stages, and human-review escalation state.
+
+The trace is intentionally embedded JSON for now rather than a separate event bus or evidence graph. It gives the API and later UI surfaces a single audit object that explains what each stage saw, what it trusted, what was missing, and why the final recommendation happened.
+
+Quality gates are deterministic and conservative:
+- Fatal failures remain reserved for unusable model/schema/storage output.
+- Serious quality issues continue the pipeline but mark handoff quality and can set `human_review_required`.
+- Warnings are persisted so weak sources, missing data, contested reviews, and low confidence are visible instead of silently disappearing.
+
+The partner engine consumes the review handoff quality through the existing review payload. It does not change canonical score thresholds in this layer; it adds decision drivers, risks, and human-review escalation when evidence quality is weak or contested.

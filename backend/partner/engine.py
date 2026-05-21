@@ -16,6 +16,7 @@ from utils.storage import Storage
 from utils.settings_loader import get_runtime_limits, is_partners_enabled
 from portfolio.store import PortfolioStore
 from pipeline_state import pipeline_stage_log, upsert_pipeline_state
+from agent_trace import handoff_quality_from_trace
 
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ class PartnerEngine:
         deal_memory=None,
         tenant_user_id: str = "",
         fund_thesis: Optional[Dict[str, Any]] = None,
+        use_resource_fund_thesis_fallback: bool = True,
     ):
         """
         Initialize the Partner engine.
@@ -66,6 +68,7 @@ class PartnerEngine:
             api_key=api_key,
             portfolio_store=portfolio_store,
             tenant_user_id=self.tenant_user_id,
+            use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
         )
         self.fund_thesis: Optional[Dict[str, Any]] = fund_thesis
         # Max undecided to process per cycle (ramp: process a solid batch when backlog is high)
@@ -81,6 +84,7 @@ class PartnerEngine:
             return None
         scout_info = startup.scout_info
         review_info = startup.review_info
+        handoff_quality = handoff_quality_from_trace(getattr(startup, "agent_trace", None))
         return {
             "id": startup.startup_id,
             "scout": {
@@ -143,6 +147,7 @@ class PartnerEngine:
                     if review_info.reviews
                     else None
                 ),
+                "handoff_quality": handoff_quality,
             },
         }
 

@@ -40,6 +40,7 @@ PARTNER_REVIEW_PAYLOAD_KEYS = frozenset(
         "disagreement_summary",
         "aethria_view",
         "reviews",
+        "handoff_quality",
     }
 )
 

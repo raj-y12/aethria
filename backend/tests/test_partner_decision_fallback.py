@@ -116,6 +116,25 @@ def test_hard_low_score_stays_deterministic_no():
     assert "minimum pass threshold" in (out.get("rationale") or "").lower()
 
 
+def test_handoff_quality_recommends_human_review_without_changing_recommendation():
+    engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
+    review = _base_review()
+    review["handoff_quality"] = {
+        "human_review_recommended": True,
+        "quality_flags": ["weak_sources", "missing_evidence", "contested_review"],
+        "missing_evidence": ["founding_team", "traction"],
+    }
+
+    out = engine.decide(_base_scout(), review)
+
+    assert out.get("recommendation") == "MONITOR"
+    assert out.get("human_review_required") is True
+    drivers = out.get("decision_drivers") or []
+    assert "weak_sources" in drivers
+    assert "missing_evidence" in drivers
+    assert "contested_review" in drivers
+
+
 def test_saved_score_bands_drive_partner_recommendation(monkeypatch):
     import partner.decision as decision_mod
 

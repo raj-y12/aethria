@@ -49,6 +49,7 @@ class ReviewerEngine:
         deal_memory=None,
         tenant_user_id: str = "",
         active_thesis: Optional[Dict[str, Any]] = None,
+        use_resource_fund_thesis_fallback: bool = True,
     ):
         """
         Initialize the Reviewer engine.
@@ -70,6 +71,7 @@ class ReviewerEngine:
         self.cost_controller = cost_controller
         self.deal_memory = deal_memory
         self.active_thesis: Optional[Dict[str, Any]] = active_thesis
+        self.use_resource_fund_thesis_fallback = bool(use_resource_fund_thesis_fallback)
         self.backpressure_threshold = int(
             os.getenv("REVIEWER_BACKPRESSURE_THRESHOLD", "10")
         )
@@ -85,9 +87,24 @@ class ReviewerEngine:
         
         # Initialize Reviewers (default + persona reviewers)
         tid = self.tenant_user_id
-        self.reviewer = DefaultReviewer(api_key, model=model, tenant_user_id=tid)
-        self.skeptical_reviewer = SkepticalReviewer(api_key, model=model, tenant_user_id=tid)
-        self.opportunist_reviewer = OpportunistReviewer(api_key, model=model, tenant_user_id=tid)
+        self.reviewer = DefaultReviewer(
+            api_key,
+            model=model,
+            tenant_user_id=tid,
+            use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
+        )
+        self.skeptical_reviewer = SkepticalReviewer(
+            api_key,
+            model=model,
+            tenant_user_id=tid,
+            use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
+        )
+        self.opportunist_reviewer = OpportunistReviewer(
+            api_key,
+            model=model,
+            tenant_user_id=tid,
+            use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
+        )
         
         self.running = False
         self.last_cycle_stats: Dict[str, Any] = {}
