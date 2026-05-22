@@ -10,6 +10,7 @@ from typing import Any, Dict
 from config.scoring_config import DEBUG_SCORING, DEFAULT_SCORE, DIMENSION_WEIGHTS, OVERALL_DIMENSION_WEIGHTS
 from services.scoring.aggregation_layer import aggregate_all_dimensions
 from services.scoring.extraction_layer import extract_structured_signals
+from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.scoring.normalization_layer import (
     normalize_architecture,
     normalize_barriers,
@@ -48,9 +49,11 @@ class DeterministicScoringEngine:
         self,
         weights: Dict[str, Dict[str, float]] | None = None,
         dimension_weights: Dict[str, float] | None = None,
+        policy: Dict[str, Any] | None = None,
     ):
         self.weights = weights or DIMENSION_WEIGHTS
         self.dimension_weights = dimension_weights or OVERALL_DIMENSION_WEIGHTS
+        self.policy = policy or compile_policy_from_fund_config({})
         self.debug = os.getenv("DEBUG_SCORING", str(DEBUG_SCORING)).lower() in ("1", "true", "yes")
 
     def _normalize_market(self, signals: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -199,6 +202,88 @@ class DeterministicScoringEngine:
             return 0.0
         return round(weighted_sum / weight_total, 4)
 
+    @staticmethod
+    def _component_has_evidence(component: Dict[str, Any]) -> bool:
+        return component.get("value") not in (None, "", [], {}) or component.get("label") not in (None, "")
+
+    def _aggregate_policy_criteria(self, dimension: str, details: Dict[str, Any]) -> Dict[str, Any]:
+        dim_policy = ((self.policy.get("dimensions") or {}).get(dimension) or {})
+        criteria = dim_policy.get("criteria") if isinstance(dim_policy.get("criteria"), list) else []
+        components = details.get("components") if isinstance(details.get("components"), dict) else {}
+        if not criteria or not components:
+            return details
+
+        out_criteria: Dict[str, Dict[str, Any]] = {}
+        for criterion in criteria:
+            if not isinstance(criterion, dict):
+                continue
+            source_components = [
+                str(name)
+                for name in (criterion.get("source_components") or [])
+                if str(name) in components
+            ]
+            if not source_components:
+                source_components = list(components.keys())
+            weighted_sum = 0.0
+            weight_total = 0.0
+            confidences = []
+            present = 0
+            for name in source_components:
+                component = components.get(name) or {}
+                component_weight = float(self.weights.get(dimension, {}).get(name, 1.0))
+                weighted_sum += float(component.get("score", DEFAULT_SCORE)) * component_weight
+                weight_total += component_weight
+                try:
+                    confidences.append(max(0.0, min(1.0, float(component.get("confidence", 0.0)))))
+                except (TypeError, ValueError):
+                    confidences.append(0.0)
+                if self._component_has_evidence(component):
+                    present += 1
+            score = weighted_sum / weight_total if weight_total > 0 else DEFAULT_SCORE
+            completeness = present / len(source_components) if source_components else 0.0
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+            evidence_status = "complete" if completeness >= 1.0 else "partial" if completeness > 0 else "missing"
+            criterion_id = str(criterion.get("id") or criterion.get("name") or f"{dimension}_criterion")
+            reason = (
+                f"Computed from {', '.join(source_components)} signals."
+                if evidence_status == "complete"
+                else f"Computed from {', '.join(source_components)} signals with incomplete evidence."
+            )
+            missing_behavior = str(criterion.get("missing_data_behavior") or "").strip()
+            if evidence_status != "complete" and missing_behavior:
+                reason = f"{reason} Missing-data rule: {missing_behavior}"
+            out_criteria[criterion_id] = {
+                "score": round(max(0.0, min(10.0, score)), 2),
+                "confidence": round(avg_confidence * completeness, 4),
+                "weight": float(criterion.get("weight", 100.0)),
+                "evidence_status": evidence_status,
+                "missing_data_applied": evidence_status != "complete",
+                "reasoning": reason,
+                "source_components": source_components,
+                "name": criterion.get("name") or criterion_id,
+                "description": criterion.get("description") or "",
+            }
+
+        if not out_criteria:
+            return details
+        criterion_weighted_sum = 0.0
+        criterion_weight_total = 0.0
+        criterion_conf_weighted_sum = 0.0
+        for criterion in out_criteria.values():
+            weight = float(criterion.get("weight", 0.0))
+            criterion_weighted_sum += float(criterion.get("score", DEFAULT_SCORE)) * weight
+            criterion_conf_weighted_sum += float(criterion.get("confidence", 0.0)) * weight
+            criterion_weight_total += weight
+        updated = dict(details)
+        if criterion_weight_total > 0:
+            updated["score"] = round(
+                max(0.0, min(10.0, criterion_weighted_sum / criterion_weight_total)),
+                2,
+            )
+            updated["confidence"] = round(criterion_conf_weighted_sum / criterion_weight_total, 4)
+        updated["criteria"] = out_criteria
+        return updated
+
     def score(self, scout_output: Dict[str, Any], reviewer_output: Dict[str, Any]) -> Dict[str, Any]:
         extracted = extract_structured_signals(scout_output, reviewer_output)
         normalized = {
@@ -209,6 +294,10 @@ class DeterministicScoringEngine:
             "defensibility": self._normalize_defensibility(extracted.get("defensibility", {})),
         }
         aggregated = aggregate_all_dimensions(normalized, self.weights)
+        aggregated = {
+            dim: self._aggregate_policy_criteria(dim, details)
+            for dim, details in aggregated.items()
+        }
         output = {
             "market": aggregated.get("market", {"score": DEFAULT_SCORE, "confidence": 0.0, "components": {}}),
             "product": aggregated.get("product", {"score": DEFAULT_SCORE, "confidence": 0.0, "components": {}}),
@@ -218,6 +307,8 @@ class DeterministicScoringEngine:
             "overall_score": self._compute_overall_score(aggregated),
             "overall_confidence": self._compute_overall_confidence(aggregated),
             "raw_signals": extracted,
+            "policy_version_id": self.policy.get("policy_version_id"),
+            "policy_hash": self.policy.get("policy_hash"),
         }
         missing_components: Dict[str, list[str]] = {}
         for dim, details in output.items():

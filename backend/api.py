@@ -69,6 +69,8 @@ from meta.prompt_gating import (
 from meta.evaluator import run_prompt_evaluation
 from reviewer.engine import ReviewerEngine
 from reviewer.aethria_view import polish_aethria_view_for_api
+from services.scoring.policy_compiler import PolicyValidationError, compile_policy_from_fund_config
+from services.scoring.policy_store import publish_policy
 from portfolio.store import PortfolioStore
 from portfolio.rejection import RejectionAnalyzer
 from portfolio.cost_control import CostController
@@ -1518,6 +1520,36 @@ async def patch_settings(request: Request, body: dict):
     meta_agent["model"] = os.getenv("META_AGENT_MODEL", "gpt-5-nano")
     current["meta_agent"] = meta_agent
     return current
+
+
+@app.post("/api/settings/policy/preview")
+def preview_settings_policy(request: Request, body: dict | None = None):
+    """Compile the current or supplied fund_config draft without persisting it."""
+    user_id = request.state.user_id
+    payload = body if isinstance(body, dict) else {}
+    if isinstance(payload.get("fund_config"), dict):
+        fund_config = payload["fund_config"]
+    else:
+        settings = load_settings(user_id, use_cache=False)
+        fund_config = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
+    policy = compile_policy_from_fund_config(fund_config)
+    return {"policy": policy, "warnings": policy.get("warnings", [])}
+
+
+@app.post("/api/settings/policy/publish")
+def publish_settings_policy(request: Request, body: dict | None = None):
+    """Publish the current or supplied fund_config draft as an immutable scoring policy version."""
+    user_id = request.state.user_id
+    payload = body if isinstance(body, dict) else {}
+    fund_config = payload.get("fund_config") if isinstance(payload.get("fund_config"), dict) else None
+    try:
+        policy = publish_policy(user_id, fund_config=fund_config)
+    except PolicyValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "Policy validation failed", "errors": exc.errors},
+        ) from exc
+    return {"policy": policy}
 
 
 @app.get("/api/policy/active")

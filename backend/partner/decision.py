@@ -1439,6 +1439,11 @@ class PartnerDecisionEngine:
         sr_json = json.dumps(score_reasoning, ensure_ascii=False)
         if len(sr_json) > 3500:
             sr_json = sr_json[:3500] + "...(truncated)"
+        structured_scoring = review_output.get("structured_scoring") or {}
+        policy_version_id = structured_scoring.get("policy_version_id") if isinstance(structured_scoring, dict) else None
+        scoring_json = json.dumps(structured_scoring, ensure_ascii=False)
+        if len(scoring_json) > 4500:
+            scoring_json = scoring_json[:4500] + "...(truncated)"
 
         ds = review_output.get("defensibility_score")
         ds_disp = ds if ds is not None else "N/A"
@@ -1474,6 +1479,8 @@ technical_score: {review_output.get('technical_score', 0)}/10
 execution_score: {review_output.get('execution_score', 0)}/10
 defensibility_score: {ds_disp}/10
 score_reasoning (full JSON): {sr_json}
+policy_version_id: {policy_version_id or 'N/A'}
+structured_scoring_with_policy_criteria (truncated JSON): {scoring_json}
 
 THESIS ALIGNMENT (from review)
 thesis_alignment_score: {review_output.get('thesis_alignment_score')}

@@ -108,6 +108,19 @@ export interface ValidationError {
   errors: string[];
 }
 
+export interface PolicyPreviewResponse {
+  policy?: {
+    policy_version_id: string;
+    policy_hash: string;
+    generated_at?: string;
+    published_at?: string;
+    warnings?: string[];
+    dimensions?: Record<string, unknown>;
+  };
+  warnings?: string[];
+  error?: ValidationError;
+}
+
 export async function fetchSettings(): Promise<Settings> {
   const r = await authedFetch(`${API_BASE}/api/settings`, {
     headers: { Accept: 'application/json' },
@@ -134,4 +147,44 @@ export async function patchSettings(
     };
   }
   return { data: data as Settings };
+}
+
+export async function previewPolicy(
+  fundConfig: FundConfiguration
+): Promise<PolicyPreviewResponse> {
+  const res = await authedFetch(`${API_BASE}/api/settings/policy/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ fund_config: fundConfig }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return {
+      error: {
+        message: data?.detail?.message ?? 'Policy preview failed',
+        errors: data?.detail?.errors ?? [],
+      },
+    };
+  }
+  return data as PolicyPreviewResponse;
+}
+
+export async function publishPolicy(
+  fundConfig: FundConfiguration
+): Promise<PolicyPreviewResponse> {
+  const res = await authedFetch(`${API_BASE}/api/settings/policy/publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ fund_config: fundConfig }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return {
+      error: {
+        message: data?.detail?.message ?? 'Policy publish failed',
+        errors: data?.detail?.errors ?? [],
+      },
+    };
+  }
+  return data as PolicyPreviewResponse;
 }

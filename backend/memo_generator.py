@@ -27,6 +27,26 @@ SCORE_DIMENSIONS = [
 ]
 
 
+def _criterion_reasoning_for_dimension(structured_scoring: Dict[str, Any], dimension: str) -> Optional[str]:
+    details = structured_scoring.get(dimension) if isinstance(structured_scoring, dict) else None
+    if not isinstance(details, dict):
+        return None
+    criteria = details.get("criteria")
+    if not isinstance(criteria, dict) or not criteria:
+        return None
+    parts = []
+    for criterion in criteria.values():
+        if not isinstance(criterion, dict):
+            continue
+        name = str(criterion.get("name") or "Criterion").strip()
+        status = str(criterion.get("evidence_status") or "unknown").strip()
+        reason = str(criterion.get("reasoning") or "").strip()
+        missing = " Missing evidence applied." if criterion.get("missing_data_applied") else ""
+        if reason:
+            parts.append(f"{name} ({status}): {reason}{missing}")
+    return " ".join(parts) or None
+
+
 def _append_thesis_alignment_section(
     lines: list,
     startup: Startup,
@@ -255,8 +275,13 @@ class MemoGenerator:
             lines.append("## Reviewer Analysis")
             lines.append("")
             score_reasoning = getattr(ri, "score_reasoning", None) or {}
+            structured_scoring = getattr(ri, "structured_scoring", None) or {}
             lines.append("### Scores")
             lines.append("")
+            policy_version = structured_scoring.get("policy_version_id") if isinstance(structured_scoring, dict) else None
+            if policy_version:
+                lines.append(f"**Policy version:** `{policy_version}`")
+                lines.append("")
             lines.append(rubric_score_bands_markdown_footnote())
             lines.append("")
             lines.append("| Dimension | Score | Band | Reasoning |")
@@ -269,7 +294,9 @@ class MemoGenerator:
                     if score_val is not None
                     else None
                 ) or "—"
-                reasoning = (score_reasoning.get(dim_key) or "—").strip() if isinstance(score_reasoning, dict) else "—"
+                dim_id = dim_key.replace("_score", "")
+                policy_reasoning = _criterion_reasoning_for_dimension(structured_scoring, dim_id)
+                reasoning = policy_reasoning or ((score_reasoning.get(dim_key) or "—").strip() if isinstance(score_reasoning, dict) else "—")
                 if not reasoning:
                     reasoning = "—"
                 reasoning_esc = reasoning.replace("|", "\\|")

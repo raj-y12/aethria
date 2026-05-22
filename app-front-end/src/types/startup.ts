@@ -87,10 +87,23 @@ export interface ScoringComponent {
   confidence?: number | null;
 }
 
+export interface ScoringCriterion {
+  score: number;
+  confidence?: number | null;
+  weight: number;
+  evidence_status: 'complete' | 'partial' | 'missing' | string;
+  missing_data_applied: boolean;
+  reasoning: string;
+  source_components: string[];
+  name?: string | null;
+  description?: string | null;
+}
+
 export interface ScoringDimension {
   score: number;
   confidence?: number | null;
   components: Record<string, ScoringComponent>;
+  criteria?: Record<string, ScoringCriterion>;
   /** Narrative bullets explaining the score; populated when no per-component breakdown is available. */
   reasoning?: string[] | null;
   /** Notable weaknesses surfaced by the reviewer for this dimension. */
@@ -100,12 +113,15 @@ export interface ScoringDimension {
 }
 
 export interface StructuredScoring {
+  policy_version_id?: string | null;
+  policy_hash?: string | null;
   market: ScoringDimension;
   execution: ScoringDimension;
   product: ScoringDimension;
   technical: ScoringDimension;
   defensibility: ScoringDimension;
   overall_score: number;
+  overall_confidence?: number | null;
 }
 
 export interface Review {

@@ -18,6 +18,7 @@ from utils.storage import Storage
 from utils.settings_loader import dimension_weights_from_fund_config, get_runtime_limits, is_reviewers_enabled, load_settings
 from utils.scoring import DEFAULT_SCORE_SOURCE, compute_overall_score, enrich_scores
 from services.scoring import DeterministicScoringEngine
+from services.scoring.policy_store import load_active_policy
 from services.reviewer_resolution import apply_resolution_to_primary
 from reviewer.aethria_view import build_aethria_view
 from utils.reviewer_gap_retrieval import enrich_scout_for_reviewer_llm
@@ -114,13 +115,15 @@ class ReviewerEngine:
             settings = load_settings(self.tenant_user_id)
             fc = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
             dim_weights = dimension_weights_from_fund_config(fc)
+            policy = load_active_policy(self.tenant_user_id)
             if dim_weights:
                 self.logger.info(
                     "reviewer_settings user_id=%s scoring_weights=%s",
                     self.tenant_user_id[:24],
                     dim_weights,
                 )
-                return DeterministicScoringEngine(dimension_weights=dim_weights)
+                return DeterministicScoringEngine(dimension_weights=dim_weights, policy=policy)
+            return DeterministicScoringEngine(policy=policy)
         except Exception as e:
             self.logger.warning("Reviewer scoring settings unavailable, using default weights: %s", e)
         return DeterministicScoringEngine()
@@ -337,14 +340,26 @@ class ReviewerEngine:
         updated["score_source"] = (
             "Deterministic structured scoring (extraction -> normalization -> weighted aggregation)"
         )
-        updated["score_reasoning"] = {
-            "market_score": "Computed from TAM, growth, urgency, timing, and competition signals.",
-            "product_score": "Computed from extracted product-confidence signals.",
-            "technical_score": "Computed from extracted technical-confidence signals.",
-            "execution_score": "Computed from extracted execution-confidence signals.",
-            "defensibility_score": "Computed from extracted defensibility-confidence signals.",
-        }
+        updated["score_reasoning"] = self._score_reasoning_from_structured_trace(trace)
         return updated
+
+    @staticmethod
+    def _score_reasoning_from_structured_trace(trace: Dict[str, Any]) -> Dict[str, str]:
+        out: Dict[str, str] = {}
+        for dim in ("market", "product", "technical", "execution", "defensibility"):
+            details = trace.get(dim) if isinstance(trace.get(dim), dict) else {}
+            criteria = details.get("criteria") if isinstance(details.get("criteria"), dict) else {}
+            reason_parts = []
+            for criterion in criteria.values():
+                if not isinstance(criterion, dict):
+                    continue
+                name = str(criterion.get("name") or "Criterion")
+                status = str(criterion.get("evidence_status") or "unknown")
+                reason = str(criterion.get("reasoning") or "").strip()
+                if reason:
+                    reason_parts.append(f"{name} ({status}): {reason}")
+            out[f"{dim}_score"] = " ".join(reason_parts) or f"Computed from {dim} policy criteria."
+        return out
 
     @staticmethod
     def _derive_verdict_from_scores(primary: dict) -> None:

@@ -112,17 +112,46 @@ function SystemTelemetryRail({
 
   return (
     <article
-      className="relative min-w-0 border border-oxford/[0.08] bg-paper px-phi-4 py-phi-4"
+      className="flex min-w-0 flex-col border border-oxford/[0.08]"
       aria-label="Pipeline overview"
     >
-      <div className="flex items-start justify-between gap-phi-3">
+      <header className="flex items-center justify-between gap-phi-3 border-b border-oxford/[0.075] px-phi-4 py-phi-3">
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">
           Pipeline overview
         </p>
-        <span
-          className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[11px] uppercase tracking-[0.10em] ${statusTone}`}
+        <span className="inline-flex items-center gap-phi-2" aria-live="polite">
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-none ${pipelineLoopAlive && !pipelineHealthIssue ? 'bg-oxford signal-dot-breathe' : 'bg-oxford/24'}`}
+            aria-hidden
+          />
+          <span className="font-mono text-[10px] uppercase tracking-[0.10em] text-oxford/48">
+            {pipelineLoopAlive && !pipelineHealthIssue ? 'Live' : statusLabel}
+          </span>
+        </span>
+      </header>
+
+      <div className="border-b border-oxford/[0.075] px-phi-4 py-phi-4">
+        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+          {primaryLabel}
+        </p>
+        <p
+          className={`mt-phi-2 font-mono text-[clamp(2.25rem,4.4vw,3.25rem)] font-bold leading-none tracking-[-0.04em] tabular-nums ${hasEscalations ? 'text-escalation' : 'text-oxford'}`}
           aria-live="polite"
         >
+          {primaryValue.toLocaleString()}
+        </p>
+      </div>
+
+      <div className="relative flex min-h-[52px] items-center justify-between gap-phi-3 border-b border-oxford/[0.075] px-phi-4 py-phi-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45">
+            Pipeline status
+          </p>
+          <p className="mt-phi-1 truncate font-mono text-[9px] uppercase tracking-[0.08em] text-oxford/32">
+            {stageSummary}
+          </p>
+        </div>
+        <span className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[11px] uppercase tracking-[0.10em] ${statusTone}`}>
           <span className={`h-1.5 w-1.5 shrink-0 rounded-none ${statusDot}`} aria-hidden />
           {statusLabel}
           {pipelineHealthIssue ? (
@@ -137,61 +166,38 @@ function SystemTelemetryRail({
             </button>
           ) : null}
         </span>
+        {showIssueHelp && pipelineHealthIssue ? (
+          <span className="absolute right-phi-4 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford shadow-sm">
+            Pipeline has a problem and may not process updates right now.
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="mt-phi-2 block type-meta text-oxford/35 hover:text-oxford btn-interaction"
+            >
+              Open settings →
+            </button>
+          </span>
+        ) : null}
       </div>
 
-      <div className="mt-phi-4 grid gap-phi-4 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:items-end">
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">
-            {primaryLabel}
+      <div className="grid grid-cols-2 divide-x divide-oxford/[0.075]">
+        <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+            Total
           </p>
-          <p
-            className={`mt-phi-2 font-mono text-[clamp(2.25rem,4.4vw,3.25rem)] font-bold leading-none tracking-[-0.04em] tabular-nums ${hasEscalations ? 'text-escalation' : 'text-oxford'}`}
-            aria-live="polite"
-          >
-            {primaryValue.toLocaleString()}
+          <p className="font-mono text-[15px] font-semibold tabular-nums text-oxford">
+            {totalCount.toLocaleString()}
           </p>
         </div>
-
-        <div className="grid min-w-0 grid-cols-2 gap-x-phi-5 gap-y-phi-2 self-start md:self-end">
-          <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
-              Total
-            </p>
-            <p className="mt-phi-1 font-mono text-[15px] font-semibold tabular-nums text-oxford">
-              {totalCount.toLocaleString()}
-            </p>
-          </div>
-          <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
-              Decided
-            </p>
-            <p className="mt-phi-1 font-mono text-[15px] font-semibold tabular-nums text-oxford">
-              {decidedCount.toLocaleString()}
-            </p>
-          </div>
-          <div className="col-span-2 min-w-0 pt-phi-1">
-            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
-              Active stages
-            </p>
-            <p className="mt-phi-1 truncate font-mono text-[9px] uppercase tracking-[0.08em] text-oxford/32">
-              {stageSummary}
-            </p>
-          </div>
+        <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+            Decided
+          </p>
+          <p className="font-mono text-[15px] font-semibold tabular-nums text-oxford">
+            {decidedCount.toLocaleString()}
+          </p>
         </div>
       </div>
-
-      {showIssueHelp && pipelineHealthIssue ? (
-        <span className="absolute right-phi-4 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford shadow-sm">
-          Pipeline has a problem and may not process updates right now.
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="mt-phi-2 block type-meta text-oxford/35 hover:text-oxford btn-interaction"
-          >
-            Open settings →
-          </button>
-        </span>
-      ) : null}
     </article>
   );
 }

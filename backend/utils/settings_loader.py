@@ -39,6 +39,10 @@ DEFAULT_SETTINGS = {
         "versionLabel": "Fund Thesis v1",
         "version": 1,
         "lastSavedAt": None,
+        "activePolicyVersionId": None,
+        "draftPolicyHash": None,
+        "publishedPolicyHash": None,
+        "lastPublishedAt": None,
         "mandate": {
             "fundName": "",
             "mandateName": "Core mandate",

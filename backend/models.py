@@ -92,6 +92,10 @@ class FundConfig(BaseModel):
     versionLabel: str = "Fund Thesis v1"
     version: int = 1
     lastSavedAt: Optional[str] = None
+    activePolicyVersionId: Optional[str] = None
+    draftPolicyHash: Optional[str] = None
+    publishedPolicyHash: Optional[str] = None
+    lastPublishedAt: Optional[str] = None
     mandate: FundMandateConfig = Field(default_factory=FundMandateConfig)
     scoringWeights: List[ScoringWeightConfig] = Field(default_factory=list)
     scoreBands: List[ScoreBandConfig] = Field(default_factory=list)

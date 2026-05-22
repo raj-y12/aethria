@@ -99,12 +99,15 @@ export function normalizeStructuredScoring(review: Review | null | undefined): S
       isScoringDimension(defensibility)
     ) {
       return {
+        policy_version_id: candidate.policy_version_id,
+        policy_hash: candidate.policy_hash,
         market,
         execution,
         product,
         technical,
         defensibility,
         overall_score: candidate.overall_score,
+        overall_confidence: candidate.overall_confidence,
       };
     }
   }
@@ -162,6 +165,7 @@ export function normalizeStructuredScoring(review: Review | null | undefined): S
     execution,
     defensibility,
     overall_score: overallCandidate,
+    overall_confidence: null,
   };
 }
 

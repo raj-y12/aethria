@@ -1,4 +1,5 @@
 from services.scoring.scoring_engine import DeterministicScoringEngine
+from services.scoring.policy_compiler import compile_policy_from_fund_config
 
 
 def test_scoring_output_shape_snapshot():
@@ -25,6 +26,8 @@ def test_scoring_output_shape_snapshot():
         "overall_score",
         "overall_confidence",
         "raw_signals",
+        "policy_version_id",
+        "policy_hash",
     }
     assert 0.0 <= result["market"]["score"] <= 10.0
     assert "components" in result["market"]
@@ -33,6 +36,49 @@ def test_scoring_output_shape_snapshot():
     assert "value_prop" in result["product"]["components"]
     assert "complexity" in result["technical"]["components"]
     assert "brand" in result["defensibility"]["components"]
+
+
+def test_policy_criteria_are_included_with_legacy_components():
+    policy = compile_policy_from_fund_config(
+        {
+            "activePolicyVersionId": "policy_test_1234",
+            "rubric": [
+                {
+                    "id": "market_conviction",
+                    "dimension": "market",
+                    "name": "Market conviction",
+                    "weight": 100,
+                    "positiveSignals": "Evidence-backed market pull.",
+                    "negativeSignals": "Weak market evidence.",
+                    "missingDataBehavior": "Reduce conviction until evidence is supplied.",
+                    "examples": {
+                        "score3": "Weak",
+                        "score5": "Neutral",
+                        "score7": "Strong",
+                        "score9": "Exceptional",
+                    },
+                }
+            ],
+        }
+    )
+    engine = DeterministicScoringEngine(policy=policy)
+
+    result = engine.score({"est_tam": "$12B", "why_now": "Budget urgency is high."}, {})
+
+    assert result["policy_version_id"] == "policy_test_1234"
+    assert "components" in result["market"]
+    assert "criteria" in result["market"]
+    criterion = result["market"]["criteria"]["market_conviction"]
+    assert criterion["weight"] == 100.0
+    assert criterion["source_components"] == [
+        "tam",
+        "growth_rate",
+        "urgency",
+        "timing",
+        "competition",
+    ]
+    assert criterion["evidence_status"] in {"complete", "partial", "missing"}
+    assert isinstance(criterion["missing_data_applied"], bool)
 
 
 def test_missing_data_defaults_mid_scores():

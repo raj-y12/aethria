@@ -66,6 +66,7 @@ LIST_TABLES = {
     "portfolio_watchlist",
     "portfolio_signals",
     "portfolio_agent_metrics",
+    "fund_policy_versions",
     "meta_mutation_log",
     "meta_reports",
     "lookup_job_outcomes",

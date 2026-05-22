@@ -26,9 +26,18 @@ const DIMENSION_KEY_BY_TITLE: Record<string, string> = {
   Defensibility: 'defensibility',
 };
 
+function prettyName(name: string): string {
+  return name
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 export default function DimensionCard({ id, title, dimension }: DimensionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const criteriaEntries = Object.entries(dimension.criteria ?? {});
   const entries = Object.entries(dimension.components ?? {});
+  const hasCriteria = criteriaEntries.length > 0;
   const hasComponents = entries.length > 0;
   const reasoning = (dimension.reasoning ?? []).filter((s) => typeof s === 'string' && s.trim().length > 0);
   const weaknesses = (dimension.weaknesses ?? []).filter((s) => typeof s === 'string' && s.trim().length > 0);
@@ -36,11 +45,13 @@ export default function DimensionCard({ id, title, dimension }: DimensionCardPro
     ? dimension.score_label.trim()
     : null;
   const hasNarrative = reasoning.length > 0 || weaknesses.length > 0 || !!scoreLabel;
-  const hasDetail = hasComponents || hasNarrative;
+  const hasDetail = hasCriteria || hasComponents || hasNarrative;
   const band = getScoreBand(dimension.score).label;
   const dimKey = DIMENSION_KEY_BY_TITLE[title] ?? title.toLowerCase();
   const weights = DIMENSION_WEIGHTS[dimKey] ?? {};
   const confidenceLabel = formatConfidencePercent(dimension.confidence);
+  const lowConfidence = typeof dimension.confidence === 'number' && dimension.confidence < 0.3;
+  const scoreText = lowConfidence ? String(Math.round(dimension.score)) : dimension.score.toFixed(1);
 
   return (
     <article id={id} className="memoDocDimensionCard">
@@ -52,8 +63,9 @@ export default function DimensionCard({ id, title, dimension }: DimensionCardPro
               <span className="memoDocScoreBandTag">{band}</span>
             </div>
             <div className="memoDocDimensionScoreRow">
-              <p className="memoDocScorePanelNumber">{dimension.score.toFixed(1)}</p>
+              <p className="memoDocScorePanelNumber">{scoreText}</p>
               <p className="memoDocScorePanelMeta">Confidence {confidenceLabel}</p>
+              {lowConfidence && <p className="memoDocScorePanelMeta">Low confidence · reduced precision</p>}
             </div>
           </div>
           {hasDetail && (
@@ -73,10 +85,40 @@ export default function DimensionCard({ id, title, dimension }: DimensionCardPro
       {hasDetail && (
         <div
           id={`${id}-components`}
-          className={isExpanded ? (hasComponents ? 'memoDocComponentBars' : 'memoDocDimensionNarrative') : 'hidden'}
+          className={isExpanded ? ((hasCriteria || hasComponents) ? 'memoDocComponentBars' : 'memoDocDimensionNarrative') : 'hidden'}
           aria-hidden={!isExpanded}
         >
-          {hasComponents
+          {hasCriteria
+            ? criteriaEntries.map(([name, criterion]) => {
+                const score = Math.max(0, Math.min(10, criterion.score));
+                const pct = `${(score / 10) * 100}%`;
+                const criterionLowConfidence = typeof criterion.confidence === 'number' && criterion.confidence < 0.3;
+                return (
+                  <div key={`${id}-${name}`} className="memoDocComponentBar">
+                    <div className="memoDocComponentBarInner">
+                      <div className="memoDocComponentBarHeader">
+                        <p className="memoDocDimName">{criterion.name || prettyName(name)}</p>
+                        <p className="memoDocScorePanelMeta">
+                          <span>{criterionLowConfidence ? Math.round(score) : score.toFixed(1)}</span> · w {Math.round(criterion.weight)}%
+                        </p>
+                      </div>
+                      <div className="memoDocComponentTrack">
+                        <div className="memoDocComponentFill" style={{ width: pct }} />
+                      </div>
+                      <div className="memoDocComponentDetail">
+                        <p className="memoDocExpandedLabel">
+                          {criterion.missing_data_applied ? 'Missing evidence applied' : `Evidence: ${criterion.evidence_status}`}
+                        </p>
+                        <p className="memoDocDimText">{criterion.reasoning}</p>
+                        {criterion.source_components?.length > 0 && (
+                          <p className="memoDocScorePanelMeta">Signals: {criterion.source_components.join(', ')}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            : hasComponents
             ? entries.map(([name, component]) => (
                 <ComponentBar
                   key={`${id}-${name}`}

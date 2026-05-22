@@ -102,6 +102,10 @@ export interface FundConfiguration {
   versionLabel: string;
   version: number;
   lastSavedAt: string | null;
+  activePolicyVersionId?: string | null;
+  draftPolicyHash?: string | null;
+  publishedPolicyHash?: string | null;
+  lastPublishedAt?: string | null;
   mandate: FundMandateConfig;
   scoringWeights: ScoringWeight[];
   scoreBands: ScoreBand[];
@@ -160,6 +164,10 @@ export function createDefaultFundConfiguration(settings?: Settings | null): Fund
     versionLabel: 'Fund Thesis v2',
     version: 1,
     lastSavedAt: null,
+    activePolicyVersionId: null,
+    draftPolicyHash: null,
+    publishedPolicyHash: null,
+    lastPublishedAt: null,
     mandate: {
       fundName: identity?.fund_name ?? '',
       mandateName: identity?.stage_focus ? `${identity.stage_focus} mandate` : 'Core mandate',

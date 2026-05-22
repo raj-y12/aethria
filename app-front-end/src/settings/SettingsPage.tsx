@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import MobileHeader from '../components/MobileHeader';
 import LoadingAnimation from '../components/LoadingAnimation';
 import AgentLogoutModal from '../components/AgentLogoutModal';
-import { fetchSettings, patchSettings, type Settings } from '../api/settings';
+import { fetchSettings, patchSettings, previewPolicy, publishPolicy, type Settings } from '../api/settings';
 import { fetchMe } from '../api/me';
 import { fetchAgentsStatus, toggleAgents, type AgentsStatus } from '../api/agents';
 import {
@@ -54,13 +54,13 @@ const selectStyle: CSSProperties = { backgroundImage: SELECT_CHEVRON };
 
 const sections: Array<{ id: SectionId; label: string; short: string }> = [
   { id: 'mandate', label: 'Fund Mandate', short: 'Mandate' },
+  { id: 'budget', label: 'Operations', short: 'Ops' },
   { id: 'weights', label: 'Scoring Weights', short: 'Weights' },
   { id: 'bands', label: 'Score Bands', short: 'Bands' },
   { id: 'thresholds', label: 'Decision Thresholds', short: 'Thresholds' },
   { id: 'risk', label: 'Adverse / Risk', short: 'Risk' },
   { id: 'memo', label: 'Memo Output', short: 'Memo' },
   { id: 'rubric', label: 'Rubric Criteria', short: 'Rubric' },
-  { id: 'budget', label: 'Operations', short: 'Ops' },
   { id: 'account', label: 'Account', short: 'Account' },
 ];
 
@@ -367,6 +367,8 @@ export default function SettingsPage() {
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [thesisBusy, setThesisBusy] = useState(false);
+  const [policyBusy, setPolicyBusy] = useState(false);
+  const [policyPreviewHash, setPolicyPreviewHash] = useState<string | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState('');
   const [savedOperationsSnapshot, setSavedOperationsSnapshot] = useState('');
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
@@ -433,6 +435,7 @@ export default function SettingsPage() {
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
   const unsaved = serializeConfig(draft) !== savedSnapshot || serializeOperations(settings) !== savedOperationsSnapshot;
+  const policyUnpublished = !!policyPreviewHash && policyPreviewHash !== draft.publishedPolicyHash;
 
   const updateDraft = (updater: (current: FundConfiguration) => FundConfiguration) => {
     setDraft((current) => updater(current));
@@ -492,6 +495,56 @@ export default function SettingsPage() {
     setSavedSnapshot(serializeConfig(next));
     setStatus('Defaults restored locally. Save to sync backend-compatible fields.');
     setErrors([]);
+  };
+
+  const handlePreviewPolicy = async () => {
+    setPolicyBusy(true);
+    setErrors([]);
+    setStatus(null);
+    const result = await previewPolicy(draft);
+    setPolicyBusy(false);
+    if (result.error || !result.policy) {
+      setErrors(result.error?.errors.length ? result.error.errors : [result.error?.message ?? 'Policy preview failed']);
+      return;
+    }
+    setPolicyPreviewHash(result.policy.policy_hash);
+    setDraft((current) => ({ ...current, draftPolicyHash: result.policy?.policy_hash ?? null }));
+    const warningText = result.warnings?.length ? ` Warnings: ${result.warnings.join(' ')}` : '';
+    setStatus(`Policy preview ready. Draft hash ${result.policy.policy_hash}.${warningText}`);
+  };
+
+  const handlePublishPolicy = async () => {
+    setPolicyBusy(true);
+    setErrors([]);
+    setStatus(null);
+    const result = await publishPolicy(draft);
+    setPolicyBusy(false);
+    if (result.error || !result.policy) {
+      setErrors(result.error?.errors.length ? result.error.errors : [result.error?.message ?? 'Policy publish failed']);
+      return;
+    }
+    const published = {
+      ...draft,
+      activePolicyVersionId: result.policy.policy_version_id,
+      publishedPolicyHash: result.policy.policy_hash,
+      draftPolicyHash: result.policy.policy_hash,
+      lastPublishedAt: result.policy.published_at ?? new Date().toISOString(),
+    };
+    setDraft(published);
+    setConfiguration(published);
+    setPolicyPreviewHash(result.policy.policy_hash);
+    const refreshed = await fetchSettings().catch(() => null);
+    if (refreshed) {
+      setSettings(refreshed);
+      setSavedOperationsSnapshot(serializeOperations(refreshed));
+      if (refreshed.fund_config) {
+        setDraft(refreshed.fund_config);
+        setConfiguration(refreshed.fund_config);
+        setSavedSnapshot(serializeConfig(refreshed.fund_config));
+      }
+    }
+    await queryClient.invalidateQueries({ queryKey: ['settings'] });
+    setStatus(`Published scoring policy ${result.policy.policy_version_id}. New reviews will use this version.`);
   };
 
   const publishThesis = async () => {
@@ -674,6 +727,19 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
+                <SettingsSection id="budget" title="Operations" kicker="Runtime gates for background pipeline cycles. Company limits cap scout, reviewer, and partner batch size; budget settings drive CostController when enabled.">
+                  <div className="grid gap-phi-5 md:grid-cols-2">
+                    <ToggleRow id="scouts-enabled" checked={settings.agent_config.scouts_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, scouts_enabled: value } } : current)} label="Scouts enabled" />
+                    <ToggleRow id="reviewers-enabled" checked={settings.agent_config.reviewers_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, reviewers_enabled: value } } : current)} label="Reviewers enabled" />
+                    <ToggleRow id="partners-enabled" checked={settings.agent_config.partners_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, partners_enabled: value } } : current)} label="Partners enabled" />
+                    <ToggleRow id="budget-enabled" checked={settings.cost_budget.enabled} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, enabled: value } } : current)} label="Cost budget enabled" />
+                    <TextField id="max-agents" label="Companies per cycle" type="number" value={settings.agent_config.max_agents_per_run} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, max_agents_per_run: Number(value) } } : current)} min={1} />
+                    <TextField id="max-tokens" label="Token cap per day" type="number" value={settings.cost_budget.max_tokens_per_run} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, max_tokens_per_run: Number(value) } } : current)} min={0} />
+                    <TextField id="daily-cost" label="Daily cap (USD)" type="number" value={settings.cost_budget.daily_cost_ceiling} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, daily_cost_ceiling: Number(value) } } : current)} min={0} />
+                    <TextField id="cooldown-seconds" label="Agent cooldown seconds" type="number" value={settings.cost_budget.cooldown_seconds} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, cooldown_seconds: Number(value) } } : current)} min={0} />
+                  </div>
+                </SettingsSection>
+
                 <SettingsSection id="weights" title="Scoring Weights" kicker="Weights match the five reviewer dimensions used by deterministic backend scoring. Traction and timing remain sub-signals inside Execution and Market.">
                   <div className="flex flex-col gap-phi-4">
                     <div className="flex flex-wrap items-center justify-between gap-phi-4 border-b border-oxford/[0.06] pb-phi-4">
@@ -807,8 +873,35 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="rubric" title="Rubric Criteria Editor" kicker="Save display criteria for local rationale previews and future policy work. Current backend scoring uses the five core dimensions and versioned policy files.">
+                <SettingsSection id="rubric" title="Rubric Draft" kicker="Draft criteria do not affect scoring until published. Published policy versions are used by backend scoring and new memo assessment output.">
                   <div className="flex flex-col gap-phi-5">
+                    <div className="border-y border-oxford/[0.06] py-phi-4">
+                      <div className="grid gap-phi-3 md:grid-cols-3">
+                        <div>
+                          <p className={labelCls}>Active policy</p>
+                          <p className="mt-phi-1 type-body-sm text-oxford/60">{draft.activePolicyVersionId ?? 'No published policy'}</p>
+                        </div>
+                        <div>
+                          <p className={labelCls}>Published hash</p>
+                          <p className="mt-phi-1 type-body-sm text-oxford/60">{draft.publishedPolicyHash ?? 'n/a'}</p>
+                        </div>
+                        <div>
+                          <p className={labelCls}>Draft state</p>
+                          <p className="mt-phi-1 type-body-sm text-oxford/60">{policyUnpublished ? 'Preview differs from published policy' : 'No unpublished policy preview'}</p>
+                        </div>
+                      </div>
+                      <div className="mt-phi-4 flex flex-wrap items-center gap-phi-3">
+                        <button type="button" onClick={handlePreviewPolicy} disabled={policyBusy} className={actionBtnCls}>
+                          {policyBusy ? 'Working...' : 'Preview policy'}
+                        </button>
+                        <button type="button" onClick={handlePublishPolicy} disabled={policyBusy} className={solidBtnCls}>
+                          {policyBusy ? 'Publishing...' : 'Publish version'}
+                        </button>
+                        {draft.lastPublishedAt && (
+                          <p className="type-meta text-oxford/38">Last published {new Date(draft.lastPublishedAt).toLocaleString()}</p>
+                        )}
+                      </div>
+                    </div>
                     {draft.rubric.map((criterion) => (
                       <div key={criterion.id} className="border-t border-oxford/[0.06] pt-phi-5 first:border-t-0 first:pt-0">
                         <div className="grid gap-phi-5 md:grid-cols-[1fr_160px_90px]">
@@ -853,19 +946,6 @@ export default function SettingsPage() {
                     >
                       Add criterion
                     </button>
-                  </div>
-                </SettingsSection>
-
-                <SettingsSection id="budget" title="Operations" kicker="Runtime gates for background pipeline cycles. Company limits cap scout, reviewer, and partner batch size; budget settings drive CostController when enabled.">
-                  <div className="grid gap-phi-5 md:grid-cols-2">
-                    <ToggleRow id="scouts-enabled" checked={settings.agent_config.scouts_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, scouts_enabled: value } } : current)} label="Scouts enabled" />
-                    <ToggleRow id="reviewers-enabled" checked={settings.agent_config.reviewers_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, reviewers_enabled: value } } : current)} label="Reviewers enabled" />
-                    <ToggleRow id="partners-enabled" checked={settings.agent_config.partners_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, partners_enabled: value } } : current)} label="Partners enabled" />
-                    <ToggleRow id="budget-enabled" checked={settings.cost_budget.enabled} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, enabled: value } } : current)} label="Cost budget enabled" />
-                    <TextField id="max-agents" label="Companies per cycle" type="number" value={settings.agent_config.max_agents_per_run} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, max_agents_per_run: Number(value) } } : current)} min={1} />
-                    <TextField id="max-tokens" label="Token cap per day" type="number" value={settings.cost_budget.max_tokens_per_run} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, max_tokens_per_run: Number(value) } } : current)} min={0} />
-                    <TextField id="daily-cost" label="Daily cap (USD)" type="number" value={settings.cost_budget.daily_cost_ceiling} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, daily_cost_ceiling: Number(value) } } : current)} min={0} />
-                    <TextField id="cooldown-seconds" label="Agent cooldown seconds" type="number" value={settings.cost_budget.cooldown_seconds} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, cooldown_seconds: Number(value) } } : current)} min={0} />
                   </div>
                 </SettingsSection>
 
