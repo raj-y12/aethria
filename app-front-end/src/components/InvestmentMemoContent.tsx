@@ -236,7 +236,8 @@ function formatSectorAndCategory(startup: Startup): string {
 }
 
 function memoHeaderThesisLine(startup: Startup): string {
-  const scoutOneLine = startup.scout.one_line?.trim().toLowerCase();
+  const scoutOneLine = startup.scout.one_line?.trim();
+  if (scoutOneLine) return scoutOneLine;
   const candidates = [
     startup.partner?.snapshot?.key_signal,
     startup.partner?.decision_drivers?.[0],
@@ -252,7 +253,6 @@ function memoHeaderThesisLine(startup: Startup): string {
   for (const candidate of candidates) {
     const value = String(candidate ?? '').trim();
     if (!value) continue;
-    if (scoutOneLine && value.toLowerCase() === scoutOneLine) continue;
     return value;
   }
 
@@ -695,7 +695,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Document header ── */}
             <div className="memoDocHeader">
               <div className="memoDocHeaderMain">
-                <p className="memoKicker">INVESTMENT MEMO</p>
+                {!embedded ? <p className="memoKicker">INVESTMENT MEMO</p> : null}
                 <div className="memoTitleRow">
                   <h1 className="memoCompany" id="memo-title">{companyName || '—'}</h1>
                   {headerMeta ? <p className="memoMeta">{renderWithMonoNumbers(headerMeta)}</p> : null}
@@ -803,18 +803,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </section>
 
             </div>
-
-            {/* ── Executive summary ── */}
-            {showJudgment && (() => {
-              const summary = displayStartup.review?.overall_summary?.trim();
-              if (!summary) return null;
-              return (
-                <section className="memoDocSection" aria-labelledby="memo-exec-summary">
-                  <h2 className="memoDocSectionHead" id="memo-exec-summary">Executive Summary</h2>
-                  {summary && <p className="memoDocProse">{renderWithMonoNumbers(summary)}</p>}
-                </section>
-              );
-            })()}
 
             {/* ── Aethria view (thesis fit narrative) ── */}
             {(() => {
@@ -1251,19 +1239,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               <section className="memoDocSection memoRulingControls" aria-labelledby="memo-final-ruling">
                 <h2 className="memoDocSectionHead" id="memo-final-ruling">Commit Ruling</h2>
                 <p className="memoRulingIntro">{rulingIntro}</p>
-                {needsRiskAcknowledgement && (
-                  <div className="memoRiskAcknowledgement">
-                    <p>High-severity risks present. Mark reviewed when satisfied.</p>
-                    <button
-                      type="button"
-                      onClick={() => setRisksReviewed(true)}
-                      className="memoRiskAckButton"
-                      aria-pressed={risksReviewed}
-                    >
-                      {risksReviewed ? 'Risks reviewed' : 'Mark reviewed'}
-                    </button>
-                  </div>
-                )}
                 <div className="memoRulingPanel">
                   <div className="memoDecisionChoices" role="group" aria-label="Choose final ruling">
                     {([
@@ -1292,7 +1267,36 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     placeholder="Ruling rationale..."
                     aria-label="Final ruling rationale"
                   />
-                  <div className="memoRulingSubmitRow">
+                  {needsRiskAcknowledgement && (
+                    <div
+                      className={`memoRiskGate${risksReviewed ? ' memoRiskGate--complete' : ''}`}
+                      aria-live="polite"
+                    >
+                      <div className="memoRiskGateCopy">
+                        <span className="memoRiskGateKicker">
+                          {risksReviewed ? 'Risk review confirmed' : 'Risk review required'}
+                        </span>
+                        <p className="memoRiskGateText">
+                          {risksReviewed
+                            ? 'High-severity risks have been acknowledged. You can commit the ruling when ready.'
+                            : 'High-severity risks are present. Confirm that you have reviewed them before committing a final ruling.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setRisksReviewed(true)}
+                        className="memoRiskAckButton"
+                        aria-pressed={risksReviewed}
+                        disabled={rulingSaving || risksReviewed}
+                      >
+                        {risksReviewed ? 'Risk review acknowledged' : 'I have reviewed the high-severity risks'}
+                      </button>
+                    </div>
+                  )}
+                  <div className={`memoRulingSubmitRow${riskReviewOutstanding ? ' memoRulingSubmitRow--locked' : ''}`}>
+                    {riskReviewOutstanding && (
+                      <span className="memoRulingGateLabel">Final commit remains locked</span>
+                    )}
                     <button
                       type="button"
                       onClick={handleRulingSubmit}
@@ -1302,7 +1306,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       {rulingSaving ? 'Recording...' : 'Commit ruling'}
                     </button>
                     {riskReviewOutstanding && (
-                      <span className="memoRulingHint">Mark risks reviewed to commit.</span>
+                      <span className="memoRulingHint">Acknowledge the risk review to unlock this action.</span>
                     )}
                     {rulingError && <span className="memoRulingError">{rulingError}</span>}
                   </div>

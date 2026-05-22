@@ -163,6 +163,40 @@ def test_finalize_drops_company_irrelevant_sources(monkeypatch):
     assert "ai-market" not in refs
 
 
+def test_filter_references_by_url_probe_keeps_inconclusive_company_source(monkeypatch):
+    from utils.reference_verify import filter_references_by_url_probe
+
+    monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
+    monkeypatch.setattr(
+        "utils.reference_verify.probe_url_status",
+        lambda url, timeout=4.0: "inconclusive",
+    )
+    output = {
+        "references": [
+            "TinyPay official site - https://tinypay.example/",
+        ],
+    }
+    out = filter_references_by_url_probe(output)
+    assert out["references"] == ["TinyPay official site - https://tinypay.example/"]
+
+
+def test_filter_references_by_url_probe_drops_hard_dead_link(monkeypatch):
+    from utils.reference_verify import filter_references_by_url_probe
+
+    monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
+    monkeypatch.setattr(
+        "utils.reference_verify.probe_url_status",
+        lambda url, timeout=4.0: "unreachable",
+    )
+    output = {
+        "references": [
+            "TinyPay official site - https://tinypay.example/",
+        ],
+    }
+    out = filter_references_by_url_probe(output)
+    assert out["references"] == []
+
+
 def test_filter_references_to_allowlist_keeps_only_allowed_urls():
     from utils.reference_verify import filter_references_to_allowlist
 

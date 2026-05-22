@@ -201,35 +201,52 @@ def _soft_accept_url(url: str) -> bool:
     return any(host == s or host.endswith("." + s) for s in _SOFT_ACCEPT_HOST_SUFFIXES)
 
 
-def http_reachable(url: str, timeout: float = 4.0) -> bool:
+def probe_url_status(url: str, timeout: float = 4.0) -> str:
+    """
+    Probe URL status with a conservative tri-state result:
+    - reachable: request completed with a usable success/redirect code
+    - unreachable: request completed with a hard-negative status
+    - inconclusive: transport noise, rate limiting, auth walls, or other ambiguous failures
+    """
     ctx = ssl.create_default_context(cafile=certifi.where())
     headers = {"User-Agent": "AethriaReferenceCheck/1.0 (verification)"}
 
-    def get_fallback() -> bool:
+    def classify_http_code(code: int) -> str:
+        if 200 <= code < 400:
+            return "reachable"
+        if code in (401, 403, 405, 408, 409, 425, 429, 500, 502, 503, 504):
+            return "inconclusive"
+        return "unreachable"
+
+    def get_fallback() -> str:
         try:
             req = Request(url, method="GET", headers=headers)
             with urlopen(req, timeout=timeout, context=ctx) as resp:
                 code = getattr(resp, "status", None) or resp.getcode()
-                return 200 <= int(code) < 400
+                return classify_http_code(int(code))
         except HTTPError as e:
-            return 200 <= e.code < 400
+            return classify_http_code(int(e.code))
         except Exception:
-            return False
+            return "inconclusive"
 
     try:
         req = Request(url, method="HEAD", headers=headers)
         with urlopen(req, timeout=timeout, context=ctx) as resp:
             code = getattr(resp, "status", None) or resp.getcode()
-            return 200 <= int(code) < 400
+            return classify_http_code(int(code))
     except HTTPError as e:
         c = e.code
         if c in (405, 501):
             return get_fallback()
-        return 200 <= c < 400
+        return classify_http_code(int(c))
     except URLError:
-        return False
+        return "inconclusive"
     except Exception:
-        return False
+        return "inconclusive"
+
+
+def http_reachable(url: str, timeout: float = 4.0) -> bool:
+    return probe_url_status(url, timeout=timeout) == "reachable"
 
 
 def reference_string_verified(ref: str, timeout: float = 4.0) -> bool:
@@ -241,9 +258,10 @@ def reference_string_verified(ref: str, timeout: float = 4.0) -> bool:
     if not urls:
         return False
     for u in urls[:3]:
-        if http_reachable(u, timeout=timeout):
+        status = probe_url_status(u, timeout=timeout)
+        if status == "reachable":
             return True
-        if _soft_accept_url(u):
+        if status == "inconclusive" or _soft_accept_url(u):
             logger.info("reference_verify: soft-accept URL (probe inconclusive): %s", u[:80])
             return True
     return False
@@ -262,10 +280,23 @@ def filter_references_by_url_probe(output: Dict[str, Any], timeout: float = 4.0)
         s = r.strip()
         if not s:
             continue
-        if reference_string_verified(s, timeout=timeout):
+        urls = extract_http_urls(s)
+        hard_negative = False
+        soft_accept = False
+        for u in urls[:3]:
+            status = probe_url_status(u, timeout=timeout)
+            if status == "reachable":
+                soft_accept = True
+                break
+            if status == "inconclusive" or _soft_accept_url(u):
+                soft_accept = True
+                break
+            if status == "unreachable":
+                hard_negative = True
+        if soft_accept or not hard_negative:
             kept.append(s)
         else:
-            logger.warning("reference_verify: dropped unverified reference (probe failed/timeout): %s", s[:120])
+            logger.warning("reference_verify: dropped hard-dead reference: %s", s[:120])
     if not kept and refs:
         logger.warning(
             "reference_verify: all %d reference(s) failed URL probe — "

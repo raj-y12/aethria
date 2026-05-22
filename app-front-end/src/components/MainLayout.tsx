@@ -24,9 +24,7 @@ import {
   useFundConfiguration,
 } from '../hooks';
 import { transitionOrReduced } from '../design-system/motion';
-import {
-  UI_PANEL_CHROME_LABEL,
-} from '../design-system/ui-text';
+import { productInteraction } from '../design-system/productSystem';
 import type { Startup } from '../types/startup';
 import type { SystemData } from '../hooks/useSystemData';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './InvestmentMemoContent';
@@ -37,6 +35,7 @@ import {
 } from '../api/agents';
 import { fetchFundThesisSummary } from '../api/fundThesis';
 import { getQueryConfig } from '../lib/queryIntent';
+import { buildMandateSummaryLine } from '../lib/railSummaries';
 import { railEditorial } from '../design-system/railEditorial';
 import {
   getBacklogPressure,
@@ -47,15 +46,9 @@ import type { FundConfiguration } from '../lib/fundConfiguration';
 import { LookupResultSnapshot } from '@aethria/product-chrome';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 
-const SYSTEM_MEMO_HEADER_PADDING = 'py-phi-3';
 const SETTINGS_PATH = '/v1/settings';
 
-const PANEL_CHROME_ACTION_BTN_CLASS =
-  `${UI_PANEL_CHROME_LABEL} rounded-none border-0 bg-transparent p-0 cursor-pointer hover:text-oxford/80 transition-colors duration-150 ease-out btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 focus-visible:ring-inset`;
-
-/** Memo sheet header actions — same inactive styling as WorkGrid source `FilterButton`. */
-const MEMO_SHEET_ACTION_BTN_CLASS =
-  'type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 text-oxford/40 hover:text-oxford/70';
+const PANEL_CHROME_ACTION_BTN_CLASS = productInteraction.panelAction;
 
 type RailStageState = {
   key: string;
@@ -119,46 +112,17 @@ function SystemTelemetryRail({
 
   return (
     <article
-      className="flex min-w-0 flex-col border border-oxford/[0.08]"
+      className="relative min-w-0 border border-oxford/[0.08] bg-paper px-phi-4 py-phi-4"
       aria-label="Pipeline overview"
     >
-      <header className="flex items-center justify-between gap-phi-3 border-b border-oxford/[0.075] px-phi-4 py-phi-3">
+      <div className="flex items-start justify-between gap-phi-3">
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">
           Pipeline overview
         </p>
-        <span className="inline-flex items-center gap-phi-2" aria-live="polite">
-          <span
-            className={`h-1.5 w-1.5 shrink-0 rounded-none ${pipelineLoopAlive && !pipelineHealthIssue ? 'bg-oxford signal-dot-breathe' : 'bg-oxford/24'}`}
-            aria-hidden
-          />
-          <span className="font-mono text-[10px] uppercase tracking-[0.10em] text-oxford/48">
-            {pipelineLoopAlive && !pipelineHealthIssue ? 'Live' : statusLabel}
-          </span>
-        </span>
-      </header>
-
-      <div className="border-b border-oxford/[0.075] px-phi-4 py-phi-4">
-        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
-          {primaryLabel}
-        </p>
-        <p
-          className={`mt-phi-2 font-mono text-[clamp(2.25rem,4.4vw,3.25rem)] font-bold leading-none tracking-[-0.04em] tabular-nums ${hasEscalations ? 'text-escalation' : 'text-oxford'}`}
+        <span
+          className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[11px] uppercase tracking-[0.10em] ${statusTone}`}
           aria-live="polite"
         >
-          {primaryValue.toLocaleString()}
-        </p>
-      </div>
-
-      <div className="relative flex min-h-[52px] items-center justify-between gap-phi-3 border-b border-oxford/[0.075] px-phi-4 py-phi-3">
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45">
-            Pipeline status
-          </p>
-          <p className="mt-phi-1 truncate font-mono text-[9px] uppercase tracking-[0.08em] text-oxford/32">
-            {stageSummary}
-          </p>
-        </div>
-        <span className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[11px] uppercase tracking-[0.10em] ${statusTone}`}>
           <span className={`h-1.5 w-1.5 shrink-0 rounded-none ${statusDot}`} aria-hidden />
           {statusLabel}
           {pipelineHealthIssue ? (
@@ -173,38 +137,61 @@ function SystemTelemetryRail({
             </button>
           ) : null}
         </span>
-        {showIssueHelp && pipelineHealthIssue ? (
-          <span className="absolute right-phi-4 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford shadow-sm">
-            Pipeline has a problem and may not process updates right now.
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              className="mt-phi-2 block type-meta text-oxford/35 hover:text-oxford btn-interaction"
-            >
-              Open settings →
-            </button>
-          </span>
-        ) : null}
       </div>
 
-      <div className="grid grid-cols-2 divide-x divide-oxford/[0.075]">
-        <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
-            Total
+      <div className="mt-phi-4 grid gap-phi-4 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:items-end">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">
+            {primaryLabel}
           </p>
-          <p className="font-mono text-[15px] font-semibold tabular-nums text-oxford">
-            {totalCount.toLocaleString()}
+          <p
+            className={`mt-phi-2 font-mono text-[clamp(2.25rem,4.4vw,3.25rem)] font-bold leading-none tracking-[-0.04em] tabular-nums ${hasEscalations ? 'text-escalation' : 'text-oxford'}`}
+            aria-live="polite"
+          >
+            {primaryValue.toLocaleString()}
           </p>
         </div>
-        <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
-            Decided
-          </p>
-          <p className="font-mono text-[15px] font-semibold tabular-nums text-oxford">
-            {decidedCount.toLocaleString()}
-          </p>
+
+        <div className="grid min-w-0 grid-cols-2 gap-x-phi-5 gap-y-phi-2 self-start md:self-end">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+              Total
+            </p>
+            <p className="mt-phi-1 font-mono text-[15px] font-semibold tabular-nums text-oxford">
+              {totalCount.toLocaleString()}
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+              Decided
+            </p>
+            <p className="mt-phi-1 font-mono text-[15px] font-semibold tabular-nums text-oxford">
+              {decidedCount.toLocaleString()}
+            </p>
+          </div>
+          <div className="col-span-2 min-w-0 pt-phi-1">
+            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+              Active stages
+            </p>
+            <p className="mt-phi-1 truncate font-mono text-[9px] uppercase tracking-[0.08em] text-oxford/32">
+              {stageSummary}
+            </p>
+          </div>
         </div>
       </div>
+
+      {showIssueHelp && pipelineHealthIssue ? (
+        <span className="absolute right-phi-4 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford shadow-sm">
+          Pipeline has a problem and may not process updates right now.
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="mt-phi-2 block type-meta text-oxford/35 hover:text-oxford btn-interaction"
+          >
+            Open settings →
+          </button>
+        </span>
+      ) : null}
     </article>
   );
 }
@@ -652,6 +639,18 @@ export default function MainLayout({
     () => [...thesisTags.stages, ...thesisTags.geos, ...thesisTags.sectors],
     [thesisTags.geos, thesisTags.sectors, thesisTags.stages],
   );
+  const mandateSummaryLine = useMemo(
+    () =>
+      buildMandateSummaryLine({
+        stages: thesisTags.stages,
+        geos: thesisTags.geos,
+        sectors: thesisTags.sectors,
+      }),
+    [thesisTags.geos, thesisTags.sectors, thesisTags.stages],
+  );
+  const desktopMandateLine = hasThesis
+    ? mandateSummaryLine
+    : 'No active thesis';
   const hasThesisTags = thesisTagList.length > 0;
 
   const lookupSnapshotProps = useMemo(() => {
@@ -831,7 +830,7 @@ export default function MainLayout({
                       message={lookupMessage}
                       onClearMessage={() => setLookupMessage(null)}
                       lookupPhase={lookupPhaseLabel}
-                      alwaysOpen
+                      displayMode="embedded"
                     />
                     {lookupSnapshotProps ? (
                       <div className="mt-phi-3 min-w-0">
@@ -848,7 +847,10 @@ export default function MainLayout({
                 <article className="min-w-0 overflow-hidden border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }} aria-label="Fund thesis preview">
                   <p className={railEditorial.label}>Mandate</p>
                   <div className="flex min-w-0 items-center justify-between gap-phi-3">
-                    <p className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong}`}>
+                    <p
+                      className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong}`}
+                      title={mandateSummaryLine || undefined}
+                    >
                       {fundName || 'No fund configured'}
                     </p>
                     {hasThesis ? (
@@ -869,18 +871,14 @@ export default function MainLayout({
                       </div>
                     ) : null}
                   </div>
-                  {hasThesisTags && (
-                    <div className="mt-phi-3 flex max-h-[4.9rem] flex-wrap gap-phi-2 overflow-hidden">
-                      {thesisTagList.map((t, i) => (
-                        <span
-                          key={`mandate-${i}-${t}`}
-                          className={`bg-registerTint px-phi-2 py-phi-1 ${railEditorial.meta} text-oxford/45`}
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {desktopMandateLine ? (
+                    <p
+                      className="mt-phi-3 truncate font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/38"
+                      title={desktopMandateLine}
+                    >
+                      {desktopMandateLine}
+                    </p>
+                  ) : null}
                 </article>
 
                 {/* ── Account ─────────────────────────────────────────── */}
@@ -985,7 +983,10 @@ export default function MainLayout({
                 >
                   <p className={railEditorial.label}>Active mandate</p>
                   <div className="flex min-w-0 items-center justify-between gap-phi-3">
-                    <p className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong}`}>
+                    <p
+                      className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong}`}
+                      title={mandateSummaryLine || undefined}
+                    >
                       {fundName || 'No fund configured'}
                     </p>
                     {hasThesis ? (
@@ -1022,35 +1023,41 @@ export default function MainLayout({
               </div>
 
               <div
-                className="flex-1 min-h-0 overflow-y-auto overscroll-contain w-full min-w-0 rounded-none bg-paper"
+                className="flex-1 min-h-0 overflow-hidden w-full min-w-0 rounded-none bg-paper"
                 style={{ scrollbarGutter: 'stable' }}
               >
                 {rightPanel === 'system' ? (
-                  <SystemIntelligence
-                    startups={startups}
-                    signals={signals}
-                    rejectionAnalytics={rejectionAnalytics}
-                    watchlistAnalytics={watchlistAnalytics}
-                    concentrationAnalytics={concentrationAnalytics}
-                    systemHealth={systemHealth}
-                    metaReports={metaReports}
-                    scoutWeights={scoutWeights}
-                    calibrationState={calibrationState}
-                    metaPromptState={metaPromptState}
-                    metaEvalSet={metaEvalSet}
-                    metaInsights={metaInsights}
-                    fundConfiguration={fundConfiguration}
-                  />
-                ) : (
-                  <GhostTransition disableLift className="w-full min-w-0">
-                    <WorkGrid
+                  <div className="h-full overflow-y-auto overscroll-contain">
+                    <SystemIntelligence
                       startups={startups}
-                      onStartupClick={handleStartupClick}
-                      selectedId={selectedStartup?.id ?? null}
-                      watchlistIds={watchlistIds}
+                      signals={signals}
+                      rejectionAnalytics={rejectionAnalytics}
+                      watchlistAnalytics={watchlistAnalytics}
+                      concentrationAnalytics={concentrationAnalytics}
+                      systemHealth={systemHealth}
+                      metaReports={metaReports}
+                      scoutWeights={scoutWeights}
+                      calibrationState={calibrationState}
+                      metaPromptState={metaPromptState}
+                      metaEvalSet={metaEvalSet}
+                      metaInsights={metaInsights}
                       fundConfiguration={fundConfiguration}
                     />
-                  </GhostTransition>
+                  </div>
+                ) : (
+                  <div className="h-full overflow-y-auto overscroll-contain">
+                    <div className="min-h-full">
+                      <GhostTransition disableLift className="w-full min-w-0 min-h-full">
+                        <WorkGrid
+                          startups={startups}
+                          onStartupClick={handleStartupClick}
+                          selectedId={selectedStartup?.id ?? null}
+                          watchlistIds={watchlistIds}
+                          fundConfiguration={fundConfiguration}
+                        />
+                      </GhostTransition>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -1082,10 +1089,8 @@ export default function MainLayout({
                       className="h-full"
                     >
                       <PanelShell
-                        className="min-h-0 flex-1 bg-surface-canvas"
+                        className="min-h-0 flex-1 bg-paper"
                         title="Judgements"
-                        titleClassName={UI_PANEL_CHROME_LABEL}
-                        headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
                         actions={
                           <button
                             type="button"
@@ -1120,17 +1125,13 @@ export default function MainLayout({
                     >
                       <PanelShell
                         className="min-h-0 min-w-0 flex-1 w-full bg-paper"
-                        title=""
-                        showTitle={false}
-                        headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
-                        headerBorderClass=""
-                        headerJustifyClass="justify-end"
+                        title="Investment memo"
                         actions={
-                          <div className="flex min-h-[36px] items-center gap-0" role="group" aria-label="Memo controls">
+                          <div className="flex shrink-0 items-center gap-0" role="group" aria-label="Memo controls">
                             <button
                               type="button"
                               onClick={() => memoContentRef.current?.downloadPDF()}
-                              className={MEMO_SHEET_ACTION_BTN_CLASS}
+                              className={PANEL_CHROME_ACTION_BTN_CLASS}
                               aria-label="Download IC pack as PDF"
                             >
                               IC pack (PDF)
@@ -1138,7 +1139,7 @@ export default function MainLayout({
                             <button
                               type="button"
                               onClick={() => memoContentRef.current?.downloadMarkdown()}
-                              className={MEMO_SHEET_ACTION_BTN_CLASS}
+                              className={PANEL_CHROME_ACTION_BTN_CLASS}
                               aria-label="Download IC pack as Markdown"
                             >
                               IC pack (MD)
@@ -1146,7 +1147,7 @@ export default function MainLayout({
                             <button
                               type="button"
                               onClick={handleCloseMemo}
-                              className={MEMO_SHEET_ACTION_BTN_CLASS}
+                              className={PANEL_CHROME_ACTION_BTN_CLASS}
                               aria-label="Close memo"
                             >
                               Close
@@ -1256,8 +1257,6 @@ export default function MainLayout({
           >
             <PanelShell
               title="Judgements"
-              titleClassName={UI_PANEL_CHROME_LABEL}
-              headerPaddingClass={SYSTEM_MEMO_HEADER_PADDING}
               actions={
                 <button
                   type="button"
@@ -1270,7 +1269,7 @@ export default function MainLayout({
               }
               contentOverflowHidden
               contentClassName="flex-1 min-h-0 overflow-hidden"
-              className="h-full bg-surface-canvas"
+              className="h-full bg-paper"
             >
               <LiveIntelligenceFeed
                 startups={startups}

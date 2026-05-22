@@ -113,16 +113,52 @@ function AdvancedChip({
   );
 }
 
-const QueueTab = ({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) => (
+const QueueTab = ({
+  active,
+  label,
+  count,
+  onClick,
+  emphasize = false,
+  reduceMotion = false,
+}: {
+  active: boolean;
+  label: string;
+  count: number;
+  onClick: () => void;
+  emphasize?: boolean;
+  reduceMotion?: boolean;
+}) => (
   <button
     type="button"
     onClick={onClick}
     aria-pressed={active}
-    className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'text-oxford font-semibold' : 'text-oxford/40 hover:text-oxford/70'
-      }`}
+    className={`type-meta min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+      emphasize
+        ? active
+          ? 'rounded-full bg-oxford text-paper'
+          : 'rounded-full bg-oxford/[0.07] text-oxford hover:bg-oxford/[0.11]'
+        : active
+          ? 'text-oxford font-semibold'
+          : 'text-oxford/40 hover:text-oxford/70'
+    } uppercase tracking-[0.12em]`}
   >
     {label}
-    <span className={`ml-phi-1 tabular-nums ${active ? 'text-oxford/55' : 'text-oxford/28'}`}>{count}</span>
+    <motion.span
+      className={`ml-phi-1 inline-flex min-w-[1.5rem] items-center justify-center tabular-nums ${
+        emphasize
+          ? active
+            ? 'text-paper'
+            : 'rounded-full bg-paper px-phi-1 text-oxford'
+          : active
+            ? 'text-oxford/55'
+            : 'text-oxford/28'
+      }`}
+      initial={reduceMotion || !emphasize ? false : { scale: 0.92, opacity: 0.9 }}
+      animate={reduceMotion || !emphasize ? undefined : { scale: [0.92, 1.08, 1], opacity: [0.9, 1, 1] }}
+      transition={reduceMotion || !emphasize ? undefined : { duration: 0.42, ease: tokens.motion.ease }}
+    >
+      {count}
+    </motion.span>
   </button>
 );
 
@@ -280,13 +316,12 @@ function compactOneLiner(text: string): string {
 function rowOneLiner(row: WorkGridRow, attention: ReturnType<typeof getRowAttention>): string | null {
   const startup = row.startup;
   const candidates = [
+    startup.scout.one_line?.trim(),
+    startup.partner?.snapshot?.one_liner?.trim(),
     startup.partner?.snapshot?.key_signal?.trim(),
     startup.partner?.decision_drivers?.[0]?.trim(),
     row.adverseItems[0]?.title?.trim(),
-    startup.review?.aethria_view?.focal_question?.trim(),
-    startup.review?.overall_summary?.trim(),
     startup.scout.biggest_unknown?.trim(),
-    startup.scout.one_line?.trim(),
     attention.reason?.trim(),
   ].filter((value): value is string => Boolean(value));
 
@@ -300,15 +335,18 @@ function rowOneLiner(row: WorkGridRow, attention: ReturnType<typeof getRowAttent
 
 function rowReasonLine(row: WorkGridRow): string {
   const sector = (row.startup.scout.sector || '').split('/')[0].trim();
-  const parts = [`Priority ${row.configuredScore}`];
-  if (row.isNewToUser || row.changedSinceLastVisit) parts.push('New signal');
-  if (row.isEscalated) parts.push('Human ruling required');
-  else if (row.isStale) parts.push(row.ageDays != null ? `Stale ${row.ageDays}d` : 'Stale');
-  else if (row.needsRuling) parts.push(row.startup.partner?.recommendation ? `Partner ${row.startup.partner.recommendation}` : 'Ready for judgement');
-  else if (!row.startup.review) parts.push('Awaiting review');
+  const fundingStage = row.startup.scout.funding_stage?.trim();
+  const parts: string[] = [];
   if (sector) parts.push(sector);
-  if (row.sourceBadge === 'LOOKUP') parts.push('Lookup');
+  if (fundingStage && fundingStage.toLowerCase() !== 'unknown') parts.push(fundingStage);
   return parts.join(' · ');
+}
+
+function intakeStatusLabel(row: WorkGridRow): string {
+  if (row.isEscalated) return 'Needs ruling';
+  if (row.needsRuling) return row.startup.partner?.recommendation ? `Partner ${row.startup.partner.recommendation}` : 'Ready';
+  if (row.startup.review) return 'Reviewed';
+  return 'Awaiting review';
 }
 
 function rowMatchesDecisionFilter(row: WorkGridRow, filter: DecisionFilter): boolean {
@@ -524,7 +562,6 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     STALE: allRows.filter((row) => row.isStale).length,
     ESCALATED: allRows.filter((row) => !row.isDecided && row.isEscalated).length,
   }), [allRows]);
-
   // Arrow-key navigation between rows for power-user keyboard flow.
   const handleRowKeyDown = useCallback(
     (e: React.KeyboardEvent, row: (typeof orderedRows)[number], idx: number) => {
@@ -557,7 +594,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
 
   return (
     <div className="w-full font-sans bg-surface-canvas selection:bg-oxford selection:text-paper">
-      <header className="sticky top-0 z-20 border-b border-oxford/[0.08] bg-paper px-phi-3 py-phi-2 uppercase tracking-[0.06em]">
+      <header className="sticky top-0 z-20 bg-paper px-phi-3 py-phi-2 uppercase tracking-[0.06em]">
         <div className="flex min-w-0 flex-col gap-phi-2">
           <div className="min-w-0 flex flex-col gap-phi-1">
             <p className={productText.mutedLabel}>Decision queue</p>
@@ -574,6 +611,8 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                   active={queueView === key}
                   label={label}
                   count={viewCounts[key]}
+                  emphasize={key === 'NEW' && viewCounts.NEW > 0}
+                  reduceMotion={reduceMotion}
                   onClick={() => setQueueView(key)}
                 />
               ))}
@@ -679,28 +718,55 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
 
       {queueView === 'PRIORITY' && intakeRows.length > 0 && (
         <section className="border-b border-oxford/[0.08] bg-paper px-phi-4 py-phi-3" aria-label="New intake">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-phi-3 gap-y-phi-2">
-            <p className="type-meta uppercase tracking-[0.12em] text-oxford/42">Intake</p>
-            {intakeRows.slice(0, 3).map((row) => (
-              <button
-                key={row.startup.id}
-                type="button"
-                onClick={() => onStartupClick(row.startup)}
-                className="min-h-[34px] max-w-full border-l border-oxford/[0.12] pl-phi-3 pr-phi-2 text-left transition-colors hover:bg-oxford/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-              >
-                <span className="type-meta block truncate text-oxford/70">{row.startup.scout.name}</span>
-                <span className="type-meta block truncate normal-case tracking-normal text-oxford/38">{rowReasonLine(row)}</span>
-              </button>
-            ))}
-            {intakeRows.length > 3 && (
+          <div className="flex items-end justify-between gap-phi-3">
+            <div>
+              <p className="type-meta uppercase tracking-[0.12em] text-oxford/42">Fresh intake</p>
+              <p className="mt-phi-1 type-meta normal-case tracking-normal text-oxford/34">
+                New companies surface here first. Open one when it is ready for review or partner judgment.
+              </p>
+            </div>
+            {intakeRows.length > 4 && (
               <button
                 type="button"
                 onClick={() => setQueueView('NEW')}
-                className="type-meta min-h-[34px] px-phi-2 text-oxford/42 hover:text-oxford/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                className="type-meta min-h-[34px] shrink-0 text-oxford/42 hover:text-oxford/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
               >
-                +{intakeRows.length - 3} intake
+                View all {intakeRows.length}
               </button>
             )}
+          </div>
+          <div className="mt-phi-3 grid gap-px border-y border-oxford/[0.08]">
+            {intakeRows.slice(0, 4).map((row) => {
+              const oneLiner = rowOneLiner(row, getRowAttention(row));
+              const sector = (row.startup.scout.sector || '').split('/')[0].trim();
+              return (
+                <button
+                  key={row.startup.id}
+                  type="button"
+                  onClick={() => onStartupClick(row.startup)}
+                  className="grid min-h-[72px] gap-phi-2 bg-paper px-0 py-phi-3 text-left transition-colors hover:bg-oxford/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 sm:grid-cols-[minmax(0,1fr)_auto]"
+                >
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-phi-2">
+                      <span className="type-meta shrink-0 tabular-nums text-oxford/28">{row.displayIndex}</span>
+                      <span className="truncate type-body-emphasis text-oxford">{row.startup.scout.name}</span>
+                    </div>
+                    {oneLiner ? (
+                      <p className="mt-phi-1 line-clamp-2 max-w-[42rem] type-body-sm text-oxford/55">{oneLiner}</p>
+                    ) : (
+                      <p className="mt-phi-1 type-body-sm text-oxford/42">{rowReasonLine(row)}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-phi-2 sm:justify-end">
+                    <span className="type-meta text-oxford/34">{intakeStatusLabel(row)}</span>
+                    {sector && <span className="type-meta text-oxford/26">·</span>}
+                    {sector && <span className="type-meta text-oxford/34">{sector}</span>}
+                    <span className="type-meta text-oxford/26">·</span>
+                    <span className="type-meta text-oxford/34">{row.sourceBadge === 'LOOKUP' ? 'Lookup' : 'Scout'}</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </section>
       )}

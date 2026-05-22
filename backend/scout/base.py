@@ -365,13 +365,18 @@ class Scout(ABC):
             allowlist_urls.add(normalized_site)
         if grounded_enabled:
             log_pre_filter_cited_urls(out.get("references"))
-            out = self._apply_allowlist(out, allowlist_urls)
-            if fail_closed and not out.get("references"):
-                self.logger.warning(
-                    "grounded_citations: fail-closed; no allowlisted references survived (explicit_website=%s)",
-                    bool(explicit_website and str(explicit_website).strip()),
+            if fail_closed:
+                out = self._apply_allowlist(out, allowlist_urls)
+                if not out.get("references"):
+                    self.logger.warning(
+                        "grounded_citations: fail-closed; no allowlisted references survived (explicit_website=%s)",
+                        bool(explicit_website and str(explicit_website).strip()),
+                    )
+                    return None
+            else:
+                self.logger.info(
+                    "grounded_citations: fail-open mode; skipping strict allowlist enforcement"
                 )
-                return None
         return finalize_scout_references(
             out,
             anchor_hostname=self._reference_anchor_hostname(out, explicit_website=explicit_website),

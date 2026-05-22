@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
 import { productInteraction, productPanel, productText } from '../design-system/productSystem';
 
-export const PANEL_HEADER_CLASS =
-  `flex-none flex items-center justify-between ${productPanel.header}`;
-export const PANEL_TITLE_CLASS = productText.sectionLabel;
+export const PANEL_HEADER_CLASS = `${productPanel.header} justify-between`;
+export const PANEL_TITLE_CLASS = productText.mutedLabel;
 export const PANEL_TAB_BAR_CLASS =
   'flex-none flex gap-phi-1 px-phi-4 sm:px-phi-5 py-phi-2 bg-surface-canvas';
 export const PANEL_TAB_BUTTON_CLASS =
@@ -22,6 +21,8 @@ export interface PanelTab {
 interface PanelShellProps {
   title: string;
   actions?: ReactNode;
+  /** Optional complete header body; when provided, replaces the default title/actions row. */
+  headerContent?: ReactNode;
   tabs?: PanelTab[];
   activeTab?: string;
   onTabChange?: (id: string) => void;
@@ -57,6 +58,7 @@ interface PanelShellProps {
 export default function PanelShell({
   title,
   actions,
+  headerContent,
   tabs,
   activeTab,
   onTabChange,
@@ -64,7 +66,7 @@ export default function PanelShell({
   contentOverflowHidden,
   contentClassName,
   className = '',
-  headerPaddingClass = 'py-phi-4',
+  headerPaddingClass = '',
   headerBorderClass = '',
   headerJustifyClass = 'justify-between',
   showTitle = true,
@@ -82,10 +84,14 @@ export default function PanelShell({
   return (
     <div className={`flex h-full flex-col min-h-0 ${className}`}>
       <header
-        className={`flex-none flex items-center px-phi-4 ${headerPaddingClass} bg-surface-canvas uppercase tracking-[0.06em] ${headerBorderClass} ${headerJustifyClass} ${headerClassName}`.trim()}
+        className={`${productPanel.header} min-w-0 ${headerPaddingClass} ${headerBorderClass} ${headerJustifyClass} ${headerClassName}`.trim()}
       >
-        {showTitle ? <span className={titleCls}>{title}</span> : null}
-        {actions != null && <div className="flex items-center gap-phi-2">{actions}</div>}
+        {headerContent ?? (
+          <>
+            {showTitle ? <p className={`min-w-0 truncate ${titleCls}`}>{title}</p> : null}
+            {actions != null && <div className="ml-auto flex shrink-0 items-center gap-phi-2">{actions}</div>}
+          </>
+        )}
       </header>
 
       {tabs != null && tabs.length > 0 && (

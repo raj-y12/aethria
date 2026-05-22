@@ -12,7 +12,7 @@ interface AgentDispatchProps {
   /** Allow parent to clear the message (e.g. after a failed lookup) */
   onClearMessage?: () => void;
   lookupPhase: 'Scouting' | 'Reviewing' | 'Deciding' | null;
-  alwaysOpen?: boolean;
+  displayMode?: 'drawer' | 'embedded' | 'embeddedCompact';
 }
 
 function formatLookupMessage(msg: string): string {
@@ -204,40 +204,74 @@ export default function AgentDispatch({
   message,
   onClearMessage,
   lookupPhase,
-  alwaysOpen = false,
+  displayMode = 'drawer',
 }: AgentDispatchProps) {
-  const [expanded, setExpanded] = useState(alwaysOpen);
-  const isExpanded = alwaysOpen || expanded;
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isExpanded && inputRef.current && !alwaysOpen) inputRef.current.focus();
-  }, [alwaysOpen, isExpanded]);
-
-  useEffect(() => {
-    if (alwaysOpen || isBusy || message) setExpanded(true);
-  }, [alwaysOpen, isBusy, message]);
-
   const lookupMessage = message ? formatLookupMessage(message) : null;
-  const isActive = isBusy || !!lookupMessage;
+  const hasStatus = !!lookupMessage;
+  const isRunning = isBusy;
+  const isDrawer = displayMode === 'drawer';
+  const isCompactEmbedded = displayMode === 'embeddedCompact';
+  const [expanded, setExpanded] = useState(displayMode === 'embedded');
+  const isExpanded =
+    displayMode === 'embedded' ? true : isDrawer ? expanded : expanded || isRunning;
+
+  useEffect(() => {
+    if (isExpanded && inputRef.current && displayMode !== 'embedded') inputRef.current.focus();
+  }, [displayMode, isExpanded]);
+
+  const showCompactShell = isCompactEmbedded && !isExpanded;
+  const shellTone = isRunning ? 'Running' : hasStatus ? 'Status' : 'Ready';
+  const shellBody = lookupMessage ?? 'Dispatch a company lookup.';
 
   return (
     <div className="w-full">
-      {!alwaysOpen && (
+      {showCompactShell ? (
+        <div className="flex min-w-0 items-center justify-between gap-phi-3 border border-oxford/[0.08] bg-paper px-phi-3 py-phi-3">
+          <div className="min-w-0">
+            <p className={`${railEditorial.meta} text-oxford/68`}>{shellTone}</p>
+            <div className="mt-phi-1 flex min-w-0 items-start gap-phi-2">
+              <p className={`${railEditorial.meta} min-w-0 flex-1 ${hasStatus ? 'text-oxford/52' : 'text-oxford/32'}`}>
+                <span className="block truncate">{shellBody}</span>
+              </p>
+              {onClearMessage && hasStatus ? (
+                <button
+                  type="button"
+                  onClick={onClearMessage}
+                  className="shrink-0 type-meta text-oxford/25 hover:text-oxford/55 bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
+                  aria-label="Dismiss message"
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className={runBtnCls}
+          >
+            Run
+            <span className="transition-transform group-hover:translate-x-px">→</span>
+          </button>
+        </div>
+      ) : null}
+
+      {isDrawer && (
         <div className="w-full flex items-center gap-phi-3 px-phi-4 min-h-[44px] border-t border-oxford/[0.08]">
           <span className={`${productText.mutedLabel} shrink-0`}>Dispatch</span>
           <span
-            className={`flex-1 h-px bg-oxford/[0.06] ${isActive ? 'pulse-soft' : ''}`}
+            className={`flex-1 h-px bg-oxford/[0.06] ${isRunning ? 'pulse-soft' : ''}`}
             aria-hidden
           />
           <span className="flex items-center gap-phi-2 shrink-0">
-            {isActive && (
+            {isRunning && (
               <span className="h-1.5 w-1.5 shrink-0 bg-oxford/40 pulse-fast" aria-hidden />
             )}
             <span
-              className={`type-meta transition-colors ${isActive ? 'text-oxford/55' : 'text-oxford/25'}`}
+              className={`type-meta transition-colors ${isRunning ? 'text-oxford/55' : hasStatus ? 'text-oxford/40' : 'text-oxford/25'}`}
             >
-              {isBusy ? 'Running' : lookupMessage ? 'Active' : 'Ready'}
+              {isRunning ? 'Running' : hasStatus ? 'Status' : 'Ready'}
             </span>
           </span>
           <button
@@ -252,8 +286,22 @@ export default function AgentDispatch({
         </div>
       )}
 
-      {alwaysOpen ? (
+      {!showCompactShell && !isDrawer ? (
         <div className="min-w-0">
+          {isCompactEmbedded && !isRunning ? (
+            <div className="mb-phi-2 flex items-center justify-between gap-phi-3">
+              <p className={`${railEditorial.meta} text-oxford/36`}>
+                {hasStatus ? 'Latest dispatch status.' : 'Ready for a targeted lookup.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setExpanded(false)}
+                className="type-meta text-oxford/28 hover:text-oxford/55 bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
+              >
+                Hide
+              </button>
+            </div>
+          ) : null}
           <DispatchPanelBody
             inputRef={inputRef}
             input={input}
@@ -265,9 +313,12 @@ export default function AgentDispatch({
             onClearMessage={onClearMessage}
             lookupPhase={lookupPhase}
             variant="embedded"
+            onInputKeyDown={(e) => {
+              if (isCompactEmbedded && e.key === 'Escape' && !isRunning) setExpanded(false);
+            }}
           />
         </div>
-      ) : (
+      ) : !showCompactShell ? (
         <div
           className={`grid ${isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
           style={{
@@ -294,7 +345,7 @@ export default function AgentDispatch({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

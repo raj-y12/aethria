@@ -12,6 +12,9 @@ export const productText = {
 export const productInteraction = {
   action:
     'type-label-section min-h-[44px] rounded-none border-0 bg-transparent p-0 text-oxford/55 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 focus-visible:ring-offset-0',
+  /** Panel header actions (memo exports, close) — same scale as WorkGrid queue tabs. */
+  panelAction:
+    'type-label-section min-h-[36px] rounded-none border-0 bg-transparent px-phi-3 text-oxford/45 transition-colors hover:text-oxford/72 disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset',
   quiet:
     'transition-colors duration-150 hover:bg-oxford/[0.035] focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 focus-visible:ring-inset',
   selected: 'bg-surface-selected text-oxford',
@@ -20,8 +23,9 @@ export const productInteraction = {
 
 export const productPanel = {
   shell: 'bg-paper text-oxford',
+  /** Matches WorkGrid sticky toolbar — shared rhythm across center + right columns. */
   header:
-    'flex-none border-b border-oxford/[0.08] bg-paper px-phi-5 py-phi-4 uppercase tracking-[0.06em]',
+    'flex-none flex items-center bg-paper px-phi-3 py-phi-2 uppercase tracking-[0.06em]',
   section: 'border-t border-oxford/[0.075] py-phi-6 first:border-t-0 first:pt-0',
   rule: 'border-t border-oxford/[0.075]',
   inset: 'bg-oxford/[0.025]',
