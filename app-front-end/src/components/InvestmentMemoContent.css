@@ -719,16 +719,22 @@
   transition: color 140ms ease, border-color 140ms ease, opacity 140ms ease;
 }
 .memoRiskAckButton {
-  min-height: 48px;
+  min-height: 42px;
   justify-self: start;
-  padding: 0 16px;
-  border-color: color-mix(in srgb, var(--color-accent) 34%, rgba(var(--color-oxford-rgb), 0.12));
-  background: color-mix(in srgb, var(--color-accent) 9%, rgba(var(--color-paper-rgb), 0.82));
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
   color: color-mix(in srgb, var(--color-accent) 74%, rgba(var(--color-oxford-rgb), 0.92));
+  text-align: left;
 }
 .memoRiskAckButton:hover,
 .memoRulingSubmit:hover,
-.memoDecisionChoice:hover { color: var(--color-oxford); }
+.memoDecisionChoice:hover {
+  color: var(--color-oxford);
+}
+.memoRiskAckButton:hover {
+  color: color-mix(in srgb, var(--color-accent) 86%, rgba(var(--color-oxford-rgb), 0.92));
+}
 .memoRiskAckButton:focus,
 .memoRulingSubmit:focus,
 .memoDecisionChoice:focus { outline: none; }
@@ -742,11 +748,10 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 20px 22px 22px;
-  border: 1px solid rgba(var(--color-oxford-rgb), 0.08);
-  background:
-    linear-gradient(180deg, rgba(var(--color-paper-rgb), 0.92) 0%, rgba(var(--color-paper-rgb), 0.78) 100%);
-  box-shadow: 0 18px 44px rgba(11, 21, 35, 0.04);
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
   transition: opacity 160ms ease;
 }
 .memoRulingIntro {
@@ -793,20 +798,20 @@
 .memoDecisionChoices {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
 }
 .memoDecisionChoice {
-  min-height: 52px;
-  padding: 0 14px;
+  min-height: 46px;
+  padding: 0 10px;
   text-align: center;
   justify-content: center;
-  border-color: rgba(var(--color-oxford-rgb), 0.1);
-  background: rgba(var(--color-paper-rgb), 0.72);
+  border-color: transparent;
+  background: rgba(var(--color-oxford-rgb), 0.035);
 }
 .memoDecisionChoice[aria-pressed="true"] {
   color: var(--color-oxford);
-  border-color: rgba(var(--color-oxford-rgb), 0.22);
-  background: rgba(var(--color-oxford-rgb), 0.06);
+  border-color: transparent;
+  background: rgba(var(--color-oxford-rgb), 0.075);
   font-weight: 600;
 }
 .memoDecisionChoice:disabled,
@@ -818,11 +823,12 @@
 }
 .memoRulingTextarea {
   width: 100%;
-  min-height: 88px;
+  min-height: 104px;
   resize: vertical;
-  border: 1px solid rgba(var(--color-oxford-rgb), 0.1);
-  background: rgba(var(--color-paper-rgb), 0.78);
-  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.14);
+  background: rgba(var(--color-oxford-rgb), 0.025);
+  padding: 16px 18px;
   outline: none;
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-ui);
@@ -830,24 +836,25 @@
   color: rgba(var(--color-oxford-rgb), 0.78);
 }
 .memoRulingTextarea::placeholder { color: rgba(var(--color-oxford-rgb), 0.25); }
-.memoRulingTextarea:focus { border-color: rgba(var(--color-oxford-rgb), 0.34); }
+.memoRulingTextarea:focus {
+  border-color: rgba(var(--color-oxford-rgb), 0.34);
+  background: rgba(var(--color-paper-rgb), 0.56);
+}
 .memoRiskGate {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 16px;
-  align-items: center;
-  padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 18%, rgba(var(--color-oxford-rgb), 0.06));
-  background:
-    linear-gradient(180deg, rgba(var(--color-paper-rgb), 0.94) 0%, color-mix(in srgb, var(--color-accent) 4%, rgba(var(--color-paper-rgb), 0.84)) 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 2px 0 0;
+  border: none;
+  background: transparent;
 }
 .memoRiskGate--complete {
-  border-color: rgba(var(--color-oxford-rgb), 0.14);
-  background:
-    linear-gradient(180deg, rgba(var(--color-paper-rgb), 0.94) 0%, rgba(var(--color-oxford-rgb), 0.03) 100%);
+  background: transparent;
 }
 .memoRiskGateCopy {
   min-width: 0;
+  width: 100%;
 }
 .memoRiskGateKicker,
 .memoRulingGateLabel {
@@ -866,7 +873,7 @@
 }
 .memoRiskGateText {
   margin: 0;
-  max-width: 42rem;
+  max-width: 44rem;
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-ui);
   line-height: 1.6;
@@ -875,18 +882,25 @@
 .memoRulingSubmitRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px 18px;
-  padding: 14px 16px 0;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.07);
 }
 .memoRulingSubmitRow--locked {
   opacity: 0.68;
 }
+.memoRulingSubmitRow--locked .memoRulingSubmit {
+  order: 2;
+}
+.memoRulingSubmitRow--locked .memoRulingGateLabel,
+.memoRulingSubmitRow--locked .memoRulingHint {
+  order: 1;
+}
 .memoRulingSubmit {
-  min-height: 48px;
-  padding: 0 18px;
-  border-color: rgba(var(--color-oxford-rgb), 0.12);
+  min-height: 44px;
+  padding: 0 20px;
+  border-color: transparent;
   background: rgba(var(--color-oxford-rgb), 0.92);
   color: rgba(var(--color-paper-rgb), 0.96);
 }
@@ -897,7 +911,12 @@
   letter-spacing: 0.06em;
 }
 .memoRulingGateLabel,
-.memoRulingHint { color: rgba(var(--color-oxford-rgb), 0.42); }
+.memoRulingHint {
+  color: rgba(var(--color-oxford-rgb), 0.42);
+}
+.memoRulingGateLabel {
+  color: rgba(var(--color-oxford-rgb), 0.50);
+}
 .memoRulingError { color: color-mix(in srgb, var(--color-accent) 72%, transparent); }
 .memoRulingSubmit:disabled {
   border-color: rgba(var(--color-oxford-rgb), 0.08);
@@ -1024,19 +1043,61 @@
   margin: 0;
 }
 
-/* === Assessment scorecard === */
-.memoDocScoreScope { padding: 4px 0 0 0; }
-.memoDocScoreOverview { border: none; background: transparent; padding: 0; }
-.memoDocDimensionCard { border: none; background: transparent; padding: 8px 0; }
+/* === Assessment editorial spread === */
+.memoAssessmentSection .memoDocSectionHead {
+  margin-bottom: clamp(18px, 3vw, 28px);
+}
+.memoDocScoreScope {
+  position: relative;
+  padding: clamp(4px, 1.5vw, 10px) 0 0;
+}
+.memoDocScoreOverview,
+.memoScoreDimensionStack,
+.memoAssessmentReadouts {
+  position: relative;
+  z-index: 1;
+}
+.memoDocScoreOverview {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
 .memoScoreDimensionStack {
-  margin-top: 18px;
-  display: flex;
-  flex-direction: column;
+  margin-top: clamp(30px, 4vw, 44px);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(16px, 2.5vw, 28px);
+  align-items: start;
+}
+.memoDocDimensionCard {
+  border: none;
+  background: transparent;
+  padding: 0;
+  min-width: 0;
+}
+.memoAssessmentReadouts {
+  margin-top: clamp(34px, 5vw, 58px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 34px);
+}
+.memoAssessmentReadout {
+  min-width: 0;
+}
+.memoAssessmentReadout .memoList {
   gap: 10px;
+}
+.memoAssessmentReadout .memoListItem {
+  font-size: var(--memo-size-secondary);
+  line-height: 1.58;
+}
+.memoPanel--embedded .memoScoreDimensionStack,
+.memoPanel--embedded .memoAssessmentReadouts {
+  grid-template-columns: 1fr;
 }
 .memoScoreMissing {
   margin-top: 8px;
-  border: 1px solid rgba(var(--color-oxford-rgb), 0.10);
+  border: none;
   background: rgba(var(--color-oxford-rgb), 0.02);
   padding: 12px;
 }
@@ -1057,7 +1118,7 @@
   font-size: var(--memo-size-micro);
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.30);
+  color: rgba(var(--color-oxford-rgb), 0.38);
   border: none;
   padding: 0;
   line-height: 1.2;
@@ -1065,12 +1126,12 @@
 .memoDocScoreScale {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
-  margin: 5px 0 0;
+  gap: 5px 14px;
+  margin: 12px 0 0;
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
-  letter-spacing: 0.06em;
-  color: rgba(var(--color-oxford-rgb), 0.60);
+  letter-spacing: 0.04em;
+  color: rgba(var(--color-oxford-rgb), 0.42);
 }
 .memoDocScoreScale span { white-space: nowrap; }
 .memoDocScoreLegend {
@@ -1091,28 +1152,26 @@
 .memoDocScoreLegend span + span { padding-left: 0; border-left: none; }
 .memoDocScoreLegend strong { color: rgba(var(--color-oxford-rgb), 0.60); font-weight: 600; }
 .memoDocOverallScoreRow {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 21px;
+  display: block;
   margin-bottom: 0;
 }
 .memoDocOverallScoreBlock {
-  min-width: 140px;
+  min-width: 0;
+  max-width: 43rem;
 }
 .memoDocOverallScoreMain {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
+  gap: 11px;
   min-width: 0;
-  margin-top: 5px;
+  margin-top: 2px;
 }
 .memoDocOverallScoreValue {
   margin: 0;
   font-family: var(--memo-font-mono);
-  font-size: 1.5rem;
+  font-size: clamp(2.75rem, 6vw, 4.5rem);
   font-weight: 700;
-  line-height: 0.95;
+  line-height: 0.9;
   letter-spacing: 0;
   color: var(--color-oxford);
   font-variant-numeric: tabular-nums;
@@ -1151,34 +1210,47 @@
 .memoDocTooltipBtn:hover { color: var(--color-oxford); }
 .memoDocDimensionHeader {
   width: 100%;
-  padding-bottom: 8px;
+  padding-bottom: 12px;
 }
 .memoDocDimensionTopline {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 7.2rem;
+  flex-direction: column;
 }
 .memoDocDimensionTitleGroup {
   min-width: 0;
+  display: flex;
+  min-height: 6.3rem;
+  flex-direction: column;
+  justify-content: space-between;
 }
 .memoDocDimensionTitleRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 7px 9px;
+  flex-direction: column;
 }
 .memoDocDimensionScoreRow {
-  margin-top: 5px;
+  margin-top: 14px;
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px 9px;
 }
 .memoDocDimensionDetailBtn {
   min-height: 36px;
-  min-width: 84px;
-  padding: 4px 8px;
-  transition: color 140ms ease;
+  min-width: 0;
+  padding: 0;
+  align-self: flex-start;
+  color: rgba(var(--color-oxford-rgb), 0.38);
+  transition: color 140ms ease, transform 140ms ease;
+}
+.memoDocDimensionDetailBtn:hover {
+  transform: translateY(-1px);
 }
 .memoDocTooltipPanel {
   margin: 13px 0 0 0;
@@ -1225,9 +1297,9 @@
 .memoDocScorePanelTitle {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: var(--memo-ink-muted);
+  color: rgba(var(--color-oxford-rgb), 0.46);
 }
 .memoDocScorePanelValue {
   font-family: var(--memo-font-mono);
@@ -1240,9 +1312,11 @@
   color: var(--memo-ink-strong);
 }
 .memoDocScorePanelNumber {
-  min-width: 2.5rem;
-  font-size: var(--memo-size-body);
-  font-weight: 600;
+  min-width: 0;
+  font-family: var(--memo-font-mono);
+  font-size: clamp(1.85rem, 4vw, 3rem);
+  font-weight: 700;
+  line-height: 0.95;
   color: var(--memo-ink-strong);
   font-variant-numeric: tabular-nums;
 }
@@ -1251,7 +1325,7 @@
   font-family: var(--memo-font-mono);
   display: inline-flex;
   align-items: baseline;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 10px;
   font-size: var(--memo-size-label);
   letter-spacing: 0.06em;
@@ -1324,12 +1398,12 @@
 }
 /* Narrative drawer for dimensions without per-component breakdown (flat-score fallback). */
 .memoDocDimensionNarrative {
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  padding-top: 0;
+  border-top: none;
 }
 .memoDocDimensionNarrativeLabel {
   font-family: var(--memo-font-mono);
@@ -1373,11 +1447,8 @@
   line-height: 1.62;
 }
 .memoDocComponentBar {
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
-  padding: 10px 0;
-}
-.memoDocComponentBar:first-child {
   border-top: none;
+  padding: 12px 0;
 }
 .memoDocComponentBarInner {
   width: 100%;
@@ -1385,27 +1456,27 @@
 }
 .memoDocComponentBarHeader {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
 }
 .memoDocComponentTrack {
   position: relative;
-  margin-top: 6px;
-  height: 1px;
+  margin-top: 8px;
+  height: 3px;
   width: 100%;
   overflow: hidden;
-  background: rgba(var(--color-oxford-rgb), 0.10);
+  background: rgba(var(--color-oxford-rgb), 0.065);
 }
 .memoDocComponentFill {
   position: absolute;
   inset: 0;
   height: 100%;
   transform-origin: left;
-  background: rgba(var(--color-oxford-rgb), 0.40);
+  background: rgba(var(--color-oxford-rgb), 0.42);
 }
 .memoDocComponentDetail {
-  margin-top: 8px;
+  margin-top: 9px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1431,6 +1502,156 @@
   line-height: 1.6;
   color: var(--memo-ink-muted);
   margin: 14px 0 0 0;
+}
+
+.memoScoreRationale {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.memoScoreRationaleLead {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.memoScoreRationaleTitle {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--memo-ink-strong);
+}
+.memoScoreRationaleBody,
+.memoScoreRationaleMeaning {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.58;
+  color: var(--memo-ink);
+}
+.memoScoreRationaleMeaning {
+  color: var(--memo-ink-muted);
+}
+.memoScoreLowConfidence {
+  margin: 4px 0 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--color-accent) 72%, rgba(var(--color-oxford-rgb), 0.76));
+}
+.memoScoreEvidenceSummary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 11px;
+  margin: 0;
+}
+.memoScoreEvidenceSummary div {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 0.34fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+}
+.memoScoreEvidenceSummary dt {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.08em;
+  text-transform: none;
+  color: rgba(var(--color-oxford-rgb), 0.42);
+}
+.memoScoreEvidenceSummary dd {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.56;
+  color: var(--memo-ink);
+}
+.memoScoreDriverTable {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.memoScoreDriverRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(5.5rem, auto);
+  gap: 12px;
+  align-items: baseline;
+}
+.memoScoreDriverName {
+  min-width: 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--memo-ink-strong);
+  overflow-wrap: anywhere;
+}
+.memoScoreDriverScore {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: rgba(var(--color-oxford-rgb), 0.68);
+}
+.memoScoreDriverTone {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.35;
+  color: var(--memo-ink-muted);
+}
+.memoScoreDriverRow--missing .memoScoreDriverScore,
+.memoScoreDriverRow--missing .memoScoreDriverTone {
+  color: color-mix(in srgb, var(--color-accent) 62%, rgba(var(--color-oxford-rgb), 0.54));
+}
+.memoScoreCalculation {
+  margin-top: 2px;
+}
+.memoScoreCalculation summary {
+  width: fit-content;
+  cursor: pointer;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.06em;
+  color: rgba(var(--color-oxford-rgb), 0.38);
+  list-style-position: outside;
+}
+.memoScoreCalculation summary:hover {
+  color: rgba(var(--color-oxford-rgb), 0.64);
+}
+.memoScoreCalculation summary:focus {
+  outline: none;
+}
+.memoScoreCalculation summary:focus-visible {
+  outline: 2px solid rgba(var(--color-oxford-rgb), 0.20);
+  outline-offset: 3px;
+}
+.memoScoreCalculationBody {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.memoScoreCalculationRow {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-label);
+  line-height: 1.55;
+  color: rgba(var(--color-oxford-rgb), 0.50);
+}
+.memoScoreCalculationRow p {
+  margin: 0;
+}
+.memoScoreCalculationName {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.08em;
+  color: rgba(var(--color-oxford-rgb), 0.62);
 }
 
 /* === Thesis alignment tiles === */
@@ -1691,13 +1912,20 @@
 
 @media (max-width: 1100px) {
   .memoPanel { width: 100%; flex-basis: auto; }
+  .memoScoreDimensionStack { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .memoDocScorecardRow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .memoDocScoreStack { grid-template-columns: 1fr; }
 }
 @media (max-width: 840px) {
+  .memoScoreDimensionStack,
+  .memoAssessmentReadouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .memoDocScorecardRow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
+  .memoScoreDimensionStack,
+  .memoAssessmentReadouts { grid-template-columns: 1fr; }
+  .memoDocDimensionTopline,
+  .memoDocDimensionTitleGroup { min-height: 0; }
   .memoDocScorecardRow { grid-template-columns: 1fr; }
   .memoDocOverallScoreRow { align-items: flex-start; }
 }

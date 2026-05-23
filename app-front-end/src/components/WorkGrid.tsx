@@ -135,8 +135,8 @@ const QueueTab = ({
     className={`type-meta min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
       emphasize
         ? active
-          ? 'rounded-full bg-oxford text-paper'
-          : 'rounded-full bg-oxford/[0.07] text-oxford hover:bg-oxford/[0.11]'
+          ? 'rounded-none bg-oxford text-paper'
+          : 'rounded-none bg-oxford/[0.07] text-oxford hover:bg-oxford/[0.11]'
         : active
           ? 'text-oxford font-semibold'
           : 'text-oxford/40 hover:text-oxford/70'
@@ -148,7 +148,7 @@ const QueueTab = ({
         emphasize
           ? active
             ? 'text-paper'
-            : 'rounded-full bg-paper px-phi-1 text-oxford'
+            : 'rounded-none bg-paper px-phi-1 text-oxford'
           : active
             ? 'text-oxford/55'
             : 'text-oxford/28'

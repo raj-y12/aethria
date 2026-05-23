@@ -915,6 +915,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               const compItems = (displayStartup.review?.competition_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const bizItems = (displayStartup.review?.business_model_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const hasScores = !!structuredScoring;
+              const assessmentReadouts = [
+                { label: 'Team', items: teamItems },
+                { label: 'Competitive Landscape', items: compItems },
+                { label: 'Business Model', items: bizItems },
+              ].filter((section) => section.items.length > 0);
               if (
                 !displayStartup.review &&
                 !teamItems.length &&
@@ -928,6 +933,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 <MemoPlainSection
                   id={`${contentKey}-assessment`}
                   title="Assessment"
+                  className="memoAssessmentSection"
                 >
 
                   {config.memo.includeScoreReasoning && hasScores && (
@@ -963,43 +969,21 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </div>
                   )}
 
-                  {teamItems.length > 0 && (
-                    <div className="memoDocSubsection">
-                      <p className="memoDocSubhead">Team</p>
-                      <ul className="memoList">
-                        {teamItems.map((item, i) => (
-                          <li key={i} className="memoListItem">
-                            <span className="memoBullet" aria-hidden>·</span>
-                            <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {compItems.length > 0 && (
-                    <div className="memoDocSubsection">
-                      <p className="memoDocSubhead">Competitive Landscape</p>
-                      <ul className="memoList">
-                        {compItems.map((item, i) => (
-                          <li key={i} className="memoListItem">
-                            <span className="memoBullet" aria-hidden>·</span>
-                            <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {bizItems.length > 0 && (
-                    <div className="memoDocSubsection">
-                      <p className="memoDocSubhead">Business Model</p>
-                      <ul className="memoList">
-                        {bizItems.map((item, i) => (
-                          <li key={i} className="memoListItem">
-                            <span className="memoBullet" aria-hidden>·</span>
-                            <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                          </li>
-                        ))}
-                      </ul>
+                  {assessmentReadouts.length > 0 && (
+                    <div className="memoAssessmentReadouts">
+                      {assessmentReadouts.map((section) => (
+                        <article key={section.label} className="memoAssessmentReadout">
+                          <p className="memoDocSubhead">{section.label}</p>
+                          <ul className="memoList">
+                            {section.items.map((item, i) => (
+                              <li key={i} className="memoListItem">
+                                <span className="memoBullet" aria-hidden>·</span>
+                                <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </article>
+                      ))}
                     </div>
                   )}
                 </MemoPlainSection>
