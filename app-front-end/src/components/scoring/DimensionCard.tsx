@@ -88,8 +88,10 @@ export default function DimensionCard({ id, title, dimension }: DimensionCardPro
           className={isExpanded ? ((hasCriteria || hasComponents) ? 'memoDocComponentBars' : 'memoDocDimensionNarrative') : 'hidden'}
           aria-hidden={!isExpanded}
         >
-          {hasCriteria
-            ? criteriaEntries.map(([name, criterion]) => {
+          {hasCriteria && (
+            <div className="memoDocDimensionNarrativeBlock">
+              <p className="memoDocDimensionNarrativeHead">Policy rationale</p>
+              {criteriaEntries.map(([name, criterion]) => {
                 const score = Math.max(0, Math.min(10, criterion.score));
                 const pct = `${(score / 10) * 100}%`;
                 const criterionLowConfidence = typeof criterion.confidence === 'number' && criterion.confidence < 0.3;
@@ -111,23 +113,31 @@ export default function DimensionCard({ id, title, dimension }: DimensionCardPro
                         </p>
                         <p className="memoDocDimText">{criterion.reasoning}</p>
                         {criterion.source_components?.length > 0 && (
-                          <p className="memoDocScorePanelMeta">Signals: {criterion.source_components.join(', ')}</p>
+                          <p className="memoDocScorePanelMeta">Policy inputs: {criterion.source_components.join(', ')}</p>
                         )}
                       </div>
                     </div>
                   </div>
                 );
-              })
-            : hasComponents
-            ? entries.map(([name, component]) => (
+              })}
+            </div>
+          )}
+
+          {hasComponents && (
+            <div className="memoDocDimensionNarrativeBlock">
+              {hasCriteria && <p className="memoDocDimensionNarrativeHead">Evidence drivers</p>}
+              {entries.map(([name, component]) => (
                 <ComponentBar
                   key={`${id}-${name}`}
                   name={name}
                   component={component}
                   weight={weights[name] ?? 0}
                 />
-              ))
-            : (
+              ))}
+            </div>
+          )}
+
+          {!hasCriteria && !hasComponents && (
               <>
                 {scoreLabel && (
                   <p className="memoDocDimensionNarrativeLabel">{scoreLabel}</p>
