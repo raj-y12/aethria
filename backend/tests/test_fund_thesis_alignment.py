@@ -1,6 +1,7 @@
 """Rule-based thesis alignment and embedding helpers (no OpenAI)."""
 from fund_thesis import (
     ActiveThesis,
+    _review_thesis_fields,
     rule_based_thesis_alignment,
     thesis_context_has_embeddings,
     thesis_has_embeddings,
@@ -88,3 +89,24 @@ def test_rule_based_exclusion_penalty():
     out = rule_based_thesis_alignment(scout, pj)
     assert out["thesis_alignment_score"] < 0.6
     assert out["thesis_matches_fund"] is False
+
+
+def test_review_thesis_fields_fund_alignment_fallback():
+    ri = {
+        "fund_thesis_alignment_score": 0.82,
+        "fund_thesis_version_id": "version-abc",
+    }
+    score, matches, vid = _review_thesis_fields(ri)
+    assert score == 0.82
+    assert matches is None
+    assert vid == "version-abc"
+
+
+def test_review_thesis_fields_prefers_primary_score():
+    ri = {
+        "thesis_alignment_score": 0.55,
+        "fund_thesis_alignment_score": 0.9,
+        "fund_thesis_version_id": "v1",
+    }
+    score, _, _ = _review_thesis_fields(ri)
+    assert score == 0.55

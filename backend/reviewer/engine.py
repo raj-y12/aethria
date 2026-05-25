@@ -337,28 +337,57 @@ class ReviewerEngine:
         updated["execution_score"] = int(round(float(trace["execution"]["score"])))
         updated["defensibility_score"] = int(round(float(trace["defensibility"]["score"])))
         updated["structured_scoring"] = trace
-        updated["score_source"] = (
-            "Deterministic structured scoring (extraction -> normalization -> weighted aggregation)"
-        )
+        updated["score_source"] = "Structured assessment framework"
         updated["score_reasoning"] = self._score_reasoning_from_structured_trace(trace)
         return updated
 
     @staticmethod
     def _score_reasoning_from_structured_trace(trace: Dict[str, Any]) -> Dict[str, str]:
+        from config.scoring_config import DIMENSION_SCORE_BANDS, get_confidence_level, MISSING_EVIDENCE_ITEMS
+
         out: Dict[str, str] = {}
         for dim in ("market", "product", "technical", "execution", "defensibility"):
             details = trace.get(dim) if isinstance(trace.get(dim), dict) else {}
-            criteria = details.get("criteria") if isinstance(details.get("criteria"), dict) else {}
-            reason_parts = []
-            for criterion in criteria.values():
-                if not isinstance(criterion, dict):
+            score = float(details.get("score", 5.0))
+            confidence = float(details.get("confidence", 0.0))
+            components = details.get("components") if isinstance(details.get("components"), dict) else {}
+
+            rounded_score = max(1, min(10, round(score)))
+            band_desc = DIMENSION_SCORE_BANDS.get(dim, {}).get(rounded_score, "")
+            conf_level = get_confidence_level(confidence)
+
+            evidence_parts: List[str] = []
+            concerns: List[str] = []
+            missing_count = 0
+
+            for comp_name, comp in components.items():
+                if not isinstance(comp, dict):
                     continue
-                name = str(criterion.get("name") or "Criterion")
-                status = str(criterion.get("evidence_status") or "unknown")
-                reason = str(criterion.get("reasoning") or "").strip()
-                if reason:
-                    reason_parts.append(f"{name} ({status}): {reason}")
-            out[f"{dim}_score"] = " ".join(reason_parts) or f"Computed from {dim} policy criteria."
+                reasoning = str(comp.get("reasoning") or "").strip()
+                comp_score = float(comp.get("score", 5.0))
+                has_value = comp.get("value") is not None or comp.get("label") is not None
+                if not has_value:
+                    missing_count += 1
+                elif reasoning and comp_score >= 6.5:
+                    evidence_parts.append(reasoning)
+                elif reasoning and comp_score < 5.0:
+                    concerns.append(reasoning)
+
+            parts: List[str] = []
+            if band_desc:
+                parts.append(band_desc)
+            if evidence_parts:
+                parts.append(f"Evidence: {' '.join(evidence_parts[:3])}")
+            if concerns:
+                parts.append(f"Concerns: {' '.join(concerns[:2])}")
+            if missing_count > 0:
+                dim_missing = MISSING_EVIDENCE_ITEMS.get(dim, [])
+                missing_items = dim_missing[:missing_count] if dim_missing else [f"{missing_count} signal(s)"]
+                parts.append(f"Missing: {', '.join(missing_items)}")
+            if conf_level != "high":
+                parts.append(f"Confidence is {conf_level}. Additional diligence could shift this score.")
+
+            out[f"{dim}_score"] = " ".join(parts) if parts else band_desc or f"Assessment based on available {dim} evidence."
         return out
 
     @staticmethod

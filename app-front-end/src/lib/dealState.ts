@@ -79,8 +79,18 @@ export function getDealLastActivityIso(startup: Startup): string {
     ?? '';
 }
 
+export function getDealUnresolvedStartIso(startup: Startup): string {
+  if (isDealHumanResolved(startup)) return startup.human_resolution?.resolved_at ?? '';
+  return startup.unresolved_at
+    ?? startup.timestamps?.unresolved_at
+    ?? startup.timestamps?.partnered_at
+    ?? startup.timestamps?.reviewed_at
+    ?? startup.timestamps?.discovered_at
+    ?? '';
+}
+
 export function getDealAgeDays(startup: Startup, now = Date.now()): number | null {
-  const raw = getDealLastActivityIso(startup);
+  const raw = getDealUnresolvedStartIso(startup);
   if (!raw) return null;
   const time = new Date(raw).getTime();
   if (!Number.isFinite(time)) return null;

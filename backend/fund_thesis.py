@@ -374,9 +374,19 @@ def _bootstrap_default_thesis_or_raise(client: Any, uid: str) -> None:
         active_vid = str(av).strip() if av else ""
 
         if thesis_id and active_vid:
-            # active_version_id already set — nothing to do (concurrent request beat us here).
-            logger.debug("[FundThesis] Bootstrap skipped; active_version_id already set for user_id=%s", uid[:24])
-            return
+            try:
+                _resolve_active_thesis_unsafe(client, uid)
+                logger.debug(
+                    "[FundThesis] Bootstrap skipped; active thesis already resolvable for user_id=%s",
+                    uid[:24],
+                )
+                return
+            except FundThesisMissingError:
+                logger.info(
+                    "[FundThesis] active_version_id stale for user_id=%s; re-linking latest version",
+                    uid[:24],
+                )
+                active_vid = ""
 
         if thesis_id:
             # Thesis row exists but no active_version_id — find the most recent version.
@@ -408,6 +418,48 @@ def _bootstrap_default_thesis_or_raise(client: Any, uid: str) -> None:
                     raise FundThesisMissingError(f"bootstrap re-link failed: {e}") from e
 
     # No fund_thesis row or no versions at all — create the default from scratch.
+    # Re-check: a concurrent request may have created versions while we were deciding.
+    try:
+        tr2 = client.table("fund_thesis").select("id,active_version_id").eq("user_id", uid).limit(1).execute()
+        trows2 = getattr(tr2, "data", None) or []
+    except Exception as e:
+        raise FundThesisMissingError(f"bootstrap fund_thesis re-check failed: {e}") from e
+    if trows2:
+        thesis_id2 = str(trows2[0].get("id") or "").strip()
+        av2 = trows2[0].get("active_version_id")
+        active_vid2 = str(av2).strip() if av2 else ""
+        if thesis_id2 and active_vid2:
+            try:
+                _resolve_active_thesis_unsafe(client, uid)
+                return
+            except FundThesisMissingError:
+                pass
+        if thesis_id2:
+            try:
+                vr2 = (
+                    client.table("fund_thesis_versions")
+                    .select("id,version_number")
+                    .eq("thesis_id", thesis_id2)
+                    .eq("user_id", uid)
+                    .order("version_number", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                vrows2 = getattr(vr2, "data", None) or []
+            except Exception as e:
+                raise FundThesisMissingError(f"bootstrap versions re-check failed: {e}") from e
+            if vrows2:
+                latest_vid = str(vrows2[0]["id"])
+                now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                client.table("fund_thesis").update(
+                    {"active_version_id": latest_vid, "updated_at": now_iso}
+                ).eq("id", thesis_id2).eq("user_id", uid).execute()
+                logger.info(
+                    "[FundThesis] Re-linked active_version_id after concurrent bootstrap for user_id=%s",
+                    uid[:24],
+                )
+                return
+
     raw = generate_default_thesis_raw_text()
     try:
         create_fund_thesis_version_for_user(
@@ -494,6 +546,8 @@ def _review_thesis_fields(ri: Any) -> tuple[Optional[float], Optional[bool], Opt
     if not isinstance(ri, dict):
         return None, None, None
     score_raw = ri.get("thesis_alignment_score")
+    if score_raw is None:
+        score_raw = ri.get("fund_thesis_alignment_score")
     score: Optional[float] = None
     if score_raw is not None:
         try:

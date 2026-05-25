@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import logging
 from utils.storage import Storage
 from portfolio.store import PortfolioStore
+from portfolio.engine import PortfolioEngine
 from portfolio.execution import ExecutionAgent
 from portfolio.signals import SignalTracker
 from portfolio.feedback import FeedbackLoop
@@ -201,3 +202,71 @@ def test_cost_controller_uses_saved_runtime_limits(monkeypatch, tmp_path):
 
     assert cost_controller.cooldowns["scout"] == 9
     assert cost_controller.get_budget_status("scout")["tokens_limit"] == 100
+
+
+class _FakeDiscoveryStorage:
+    def __init__(self, entries):
+        self._entries = entries
+
+    def get_all(self):
+        return self._entries
+
+
+def _portfolio_entry(startup_id, recommendation):
+    return {
+        "scout_info": {
+            "id": startup_id,
+            "name": startup_id,
+            "one_line": f"{startup_id} summary",
+            "sector": "AI",
+            "problem": "Manual research is slow",
+            "solution": "Automated diligence",
+            "target_users": "Seed funds",
+            "why_now": "More startup data is online",
+            "scout_type": "market_driven",
+            "confidence": 0.8,
+        },
+        "review_info": {
+            "key_risks": ["Data quality"],
+            "market_score": 8,
+            "product_score": 7,
+            "technical_score": 7,
+            "execution_score": 8,
+            "verdict": "STRONG",
+        },
+        "partner_info": {
+            "recommendation": recommendation,
+            "confidence": 8,
+            "rationale": f"{recommendation} rationale",
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_portfolio_engine_routes_partner_recommendations(monkeypatch, tmp_path):
+    monkeypatch.delenv("USE_SUPABASE_STORAGE", raising=False)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+
+    store = PortfolioStore(data_dir=str(tmp_path / "portfolio"))
+    discovery_storage = _FakeDiscoveryStorage(
+        [
+            _portfolio_entry("invest-startup", "INVEST"),
+            _portfolio_entry("monitor-startup", "MONITOR"),
+            _portfolio_entry("pass-startup", "PASS"),
+        ]
+    )
+    engine = PortfolioEngine(
+        discovery_storage=discovery_storage,
+        portfolio_store=store,
+        execution_interval=0,
+        signal_interval=999999,
+        feedback_interval=999999,
+        health_interval=999999,
+    )
+
+    await engine._run_execution()
+
+    assert [r["startup_id"] for r in store.get_all_portfolio()] == ["invest-startup"]
+    assert [r["startup_id"] for r in store.get_all_watchlist()] == ["monitor-startup"]
+    assert [r["startup_id"] for r in store.get_all_rejections()] == ["pass-startup"]

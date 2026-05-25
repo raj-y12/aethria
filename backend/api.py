@@ -35,6 +35,7 @@ from fastapi.responses import JSONResponse
 from utils.storage import Storage
 from utils.settings_loader import (
     DEFAULT_SETTINGS,
+    fund_config_content_changed,
     fund_config_raw_text,
     fund_config_to_thesis_parsed_json,
     get_settings_path,
@@ -71,6 +72,7 @@ from reviewer.engine import ReviewerEngine
 from reviewer.aethria_view import polish_aethria_view_for_api
 from services.scoring.policy_compiler import PolicyValidationError, compile_policy_from_fund_config
 from services.scoring.policy_store import publish_policy
+from services.scoring.presentation_layer import serialize_scoring_presentation
 from portfolio.store import PortfolioStore
 from portfolio.rejection import RejectionAnalyzer
 from portfolio.cost_control import CostController
@@ -88,7 +90,11 @@ from fund_thesis import (
     get_active_thesis,
     thesis_has_embeddings,
 )
-from fund_thesis_ops import activate_fund_thesis_version, create_fund_thesis_version_for_user
+from fund_thesis_ops import (
+    activate_fund_thesis_version,
+    create_fund_thesis_version_for_user,
+    sync_fund_config_to_active_thesis,
+)
 from models import FundConfig, FundMemory, Startup, UserPreferences
 from conviction_state import build_conviction_patch
 from core import policy_resolver
@@ -837,6 +843,31 @@ def _mirror_structured_scoring_aliases(review: Dict[str, Any]) -> None:
     review["score_breakdown"] = sc
 
 
+def _build_scoring_presentation(
+    structured_scoring: Dict[str, Any] | None,
+    *,
+    scout: Dict[str, Any] | None = None,
+    review: Dict[str, Any] | None = None,
+) -> Dict[str, Any] | None:
+    """Build the investor-facing presentation DTO from raw scoring data."""
+    if not structured_scoring or not isinstance(structured_scoring, dict):
+        return None
+    if "overall_score" not in structured_scoring:
+        return None
+    try:
+        ctx: Dict[str, Any] = {}
+        if scout:
+            ctx["scout"] = scout
+        if review:
+            ctx["reviewer_output"] = review
+        return serialize_scoring_presentation(
+            structured_scoring,
+            startup_context=ctx or None,
+        )
+    except Exception:
+        return None
+
+
 def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> dict:
     """Transform backend startup dict to app-front-end Startup shape."""
     sid = raw.get("startup_id", "")
@@ -972,6 +1003,11 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
             "weighted_defensibility_score": review_enriched.get("weighted_defensibility_score"),
             "confidence_adjusted_score": review_enriched.get("confidence_adjusted_score"),
             "structured_scoring": review_enriched.get("structured_scoring"),
+            "scoring_presentation": _build_scoring_presentation(
+                review_enriched.get("structured_scoring"),
+                scout=scout,
+                review=review_enriched,
+            ),
             "structured_signals": review_enriched.get("structured_signals"),
             "resolution_notes": review_enriched.get("resolution_notes"),
             "disagreement_summary": review_enriched.get("disagreement_summary"),
@@ -1476,8 +1512,18 @@ async def patch_settings(request: Request, body: dict):
                 next_config = dict(body[section])
                 prev = current.get("fund_config") if isinstance(current.get("fund_config"), dict) else {}
                 prev_version = int(prev.get("version") or 1) if isinstance(prev, dict) else 1
-                next_config["version"] = prev_version + 1
-                next_config["lastSavedAt"] = _now_iso()
+                content_changed = fund_config_content_changed(prev, next_config)
+                if content_changed:
+                    next_version = prev_version + 1
+                    next_config["version"] = next_version
+                    next_config["versionLabel"] = f"Fund Thesis v{next_version}"
+                    next_config["lastSavedAt"] = _now_iso()
+                else:
+                    next_config["version"] = prev_version
+                    next_config["versionLabel"] = str(
+                        prev.get("versionLabel") or f"Fund Thesis v{prev_version}"
+                    )
+                    next_config["lastSavedAt"] = prev.get("lastSavedAt")
                 current[section] = next_config
             elif section in ("user_preferences", "fund_memory"):
                 current[section] = body[section]
@@ -1488,20 +1534,26 @@ async def patch_settings(request: Request, body: dict):
 
     if isinstance(body.get("fund_config"), dict):
         fc = current.get("fund_config") if isinstance(current.get("fund_config"), dict) else {}
-        raw_text = fund_config_raw_text(fc).strip()
-        if raw_text:
+        if fund_config_raw_text(fc).strip():
             try:
                 api_key = os.getenv("OPENAI_API_KEY", "").strip()
-                create_fund_thesis_version_for_user(
+                sync_out = sync_fund_config_to_active_thesis(
                     get_service_client(),
                     user_id=user_id,
-                    raw_text=raw_text,
+                    fund_config=fc,
                     api_key=api_key,
-                    parsed_json_override=fund_config_to_thesis_parsed_json(fc),
-                    additional_parsed_fields={"settings_version": fc.get("version")},
-                    skip_embedding=not bool(api_key),
                 )
-                _logger_agents.info("[%s] Synced fund_config to active fund thesis", user_id[:12])
+                if sync_out.get("skipped"):
+                    _logger_agents.debug(
+                        "[%s] fund_config thesis sync skipped (unchanged)",
+                        user_id[:12],
+                    )
+                else:
+                    _logger_agents.info(
+                        "[%s] Synced fund_config to fund thesis v%s",
+                        user_id[:12],
+                        sync_out.get("version_number"),
+                    )
             except Exception as e:
                 _logger_agents.warning("[%s] fund_config thesis sync failed: %s", user_id[:12], e)
 
@@ -2269,12 +2321,14 @@ async def api_post_fund_thesis_version(request: Request):
             parsed_json_override=po,
             pipeline_run_id=pipeline_run_id,
             skip_embedding=skip_embedding,
+            skip_if_unchanged=True,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
-    return {"status": "created", **out}
+    status = "unchanged" if out.get("skipped") else "created"
+    return {"status": status, **out}
 
 
 @app.patch("/api/fund-thesis/active")

@@ -89,21 +89,26 @@ def _dimension_weights(fund_config: Dict[str, Any]) -> Dict[str, float]:
 
 
 def _default_criterion(dimension: str) -> Dict[str, Any]:
-    label = dimension.replace("_", " ").title()
+    from config.scoring_config import CANONICAL_DIMENSIONS, DIMENSION_SCORE_BANDS
+
+    canonical = CANONICAL_DIMENSIONS.get(dimension, {})
+    label = canonical.get("label", dimension.replace("_", " ").title())
+    description = canonical.get("description", f"Default {label.lower()} scoring policy from deterministic backend signals.")
+    bands = DIMENSION_SCORE_BANDS.get(dimension, {})
     return {
         "id": f"{dimension}_default",
         "dimension": dimension,
         "name": f"{label} conviction",
-        "description": f"Default {label.lower()} scoring policy from deterministic backend signals.",
+        "description": description,
         "weight": 100.0,
         "positive_signals": "Evidence-backed signal that compounds with the fund mandate.",
         "negative_signals": "Unresolved weakness, shallow evidence, or signal that contradicts the mandate.",
         "missing_data_behavior": "Treat as diligence debt and reduce confidence until evidence is supplied.",
         "score_anchors": {
-            "score3": "Structurally weak or unsupported by evidence.",
-            "score5": "Plausible but not yet differentiated.",
-            "score7": "Strong signal with some diligence still open.",
-            "score9": "Exceptional signal, well evidenced, and hard to replicate.",
+            "score3": bands.get(3, "Below threshold. Significant gaps in evidence or capability."),
+            "score5": bands.get(5, "Promising but incomplete validation. Further diligence needed."),
+            "score7": bands.get(7, "Strong opportunity with evidence-backed signals."),
+            "score9": bands.get(9, "Exceptional opportunity with multiple reinforcing signals."),
         },
         "source_components": list(EXPECTED_COMPONENTS[dimension]),
     }

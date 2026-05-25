@@ -104,6 +104,7 @@ def create_fund_thesis_version_for_user(
     pipeline_run_id: Optional[str] = None,
     additional_parsed_fields: Optional[Dict[str, Any]] = None,
     skip_embedding: bool = False,
+    skip_if_unchanged: bool = False,
 ) -> Dict[str, Any]:
     """
     Ensure fund_thesis row, append new version, optional embed, activate, pipeline link.
@@ -130,6 +131,22 @@ def create_fund_thesis_version_for_user(
         merged = dict(parsed)
         merged.update(additional_parsed_fields)
         parsed = merged
+
+    if skip_if_unchanged:
+        from fund_thesis import get_active_thesis
+        from utils.settings_loader import thesis_payload_fingerprint
+
+        active = get_active_thesis(client, uid)
+        if active is not None:
+            incoming = thesis_payload_fingerprint(raw_text=raw, parsed_json=parsed)
+            current = thesis_payload_fingerprint(raw_text=active.raw_text, parsed_json=active.parsed_json)
+            if incoming == current:
+                return {
+                    "thesis_id": active.thesis_id,
+                    "version_id": active.version_id,
+                    "version_number": active.version_number,
+                    "skipped": True,
+                }
 
     if skip_embedding:
         vector: List[float] = []
@@ -219,7 +236,53 @@ def create_fund_thesis_version_for_user(
         "thesis_id": thesis_id,
         "version_id": version_id,
         "version_number": next_v,
+        "skipped": False,
     }
+
+
+def sync_fund_config_to_active_thesis(
+    client: Any,
+    *,
+    user_id: str,
+    fund_config: Dict[str, Any],
+    api_key: str = "",
+    pipeline_run_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Create a thesis version only when fund_config mandate/scoring content changed vs active thesis.
+    """
+    from utils.settings_loader import fund_config_matches_thesis_payload, fund_config_raw_text, fund_config_to_thesis_parsed_json
+    from fund_thesis import get_active_thesis
+
+    uid = require_user_id(user_id, context="sync_fund_config_to_active_thesis")
+    fc = fund_config if isinstance(fund_config, dict) else {}
+    raw_text = fund_config_raw_text(fc).strip()
+    if not raw_text:
+        return {"skipped": True, "reason": "empty_raw_text"}
+
+    active = get_active_thesis(client, uid)
+    if active is not None and fund_config_matches_thesis_payload(
+        raw_text=active.raw_text,
+        parsed_json=active.parsed_json,
+        fund_config=fc,
+    ):
+        return {
+            "skipped": True,
+            "thesis_id": active.thesis_id,
+            "version_id": active.version_id,
+            "version_number": active.version_number,
+        }
+
+    return create_fund_thesis_version_for_user(
+        client,
+        user_id=uid,
+        raw_text=raw_text,
+        api_key=api_key,
+        parsed_json_override=fund_config_to_thesis_parsed_json(fc),
+        pipeline_run_id=pipeline_run_id,
+        skip_embedding=not bool((api_key or "").strip()),
+        skip_if_unchanged=False,
+    )
 
 
 def activate_fund_thesis_version(

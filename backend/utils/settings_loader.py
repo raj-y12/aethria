@@ -4,12 +4,13 @@ Backed by Supabase settings table so UI toggles control backend agents.
 Settings are keyed by user_id so each user has their own settings.
 user_id must always be passed explicitly when using Supabase (no run_context).
 """
+import hashlib
 import json
 import logging
 import os
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from supabase_doc_store import doc_get, doc_set
 
@@ -273,6 +274,70 @@ def fund_config_raw_text(fund_config: dict) -> str:
         f"Minimum traction: {mandate.get('minimumTraction') or ''}",
     ]
     return "\n".join(line for line in lines if line and not line.endswith(": "))
+
+
+_FUND_CONFIG_META_KEYS = frozenset(
+    {
+        "version",
+        "versionLabel",
+        "lastSavedAt",
+        "activePolicyVersionId",
+        "draftPolicyHash",
+        "publishedPolicyHash",
+        "lastPublishedAt",
+    }
+)
+
+
+def _canonical_json_blob(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def fund_config_content_fingerprint(fund_config: dict) -> str:
+    """Stable hash of mandate + scoring content (ignores version metadata)."""
+    if not isinstance(fund_config, dict):
+        return hashlib.sha256(b"{}").hexdigest()
+    stripped = {k: v for k, v in fund_config.items() if k not in _FUND_CONFIG_META_KEYS}
+    payload = {
+        "raw": fund_config_raw_text(stripped).strip(),
+        "parsed": fund_config_to_thesis_parsed_json(stripped),
+    }
+    return hashlib.sha256(_canonical_json_blob(payload).encode("utf-8")).hexdigest()
+
+
+def fund_config_content_changed(prev: dict, nxt: dict) -> bool:
+    if not isinstance(prev, dict) or not prev:
+        return bool(nxt)
+    if not isinstance(nxt, dict):
+        return False
+    return fund_config_content_fingerprint(prev) != fund_config_content_fingerprint(nxt)
+
+
+def normalize_thesis_parsed_json(parsed: Optional[dict]) -> dict:
+    """Drop volatile keys before comparing thesis payloads."""
+    if not isinstance(parsed, dict):
+        return {}
+    out = dict(parsed)
+    for key in ("settings_version", "source"):
+        out.pop(key, None)
+    return out
+
+
+def thesis_payload_fingerprint(*, raw_text: str, parsed_json: Optional[dict]) -> str:
+    payload = {
+        "raw": (raw_text or "").strip(),
+        "parsed": normalize_thesis_parsed_json(parsed_json),
+    }
+    return hashlib.sha256(_canonical_json_blob(payload).encode("utf-8")).hexdigest()
+
+
+def fund_config_matches_thesis_payload(*, raw_text: str, parsed_json: Optional[dict], fund_config: dict) -> bool:
+    expected = thesis_payload_fingerprint(
+        raw_text=fund_config_raw_text(fund_config),
+        parsed_json=fund_config_to_thesis_parsed_json(fund_config),
+    )
+    actual = thesis_payload_fingerprint(raw_text=raw_text, parsed_json=parsed_json)
+    return expected == actual
 
 
 def dimension_weights_from_fund_config(fund_config: dict) -> dict[str, float]:

@@ -37,16 +37,14 @@ import { fetchFundThesisSummary } from '../api/fundThesis';
 import { getQueryConfig } from '../lib/queryIntent';
 import { buildMandateSummaryLine } from '../lib/railSummaries';
 import { railEditorial } from '../design-system/railEditorial';
-import {
-  getBacklogPressure,
-  isDealPendingPartnerDecision,
-  isDealUnreviewed,
-} from '../lib/dealState';
-import type { FundConfiguration } from '../lib/fundConfiguration';
+import { isDealHumanResolved, isDealUnresolved } from '../lib/dealState';
 import { LookupResultSnapshot } from '@aethria/product-chrome';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 
 const SETTINGS_PATH = '/v1/settings';
+
+/** Set true to show lookup result card in the Dispatch rail. */
+const SHOW_LOOKUP_RESULT_SNAPSHOT = false;
 
 const PANEL_CHROME_ACTION_BTN_CLASS = productInteraction.panelAction;
 
@@ -59,7 +57,8 @@ type RailStageState = {
 function SystemTelemetryRail({
   totalCount,
   openInProgressCount,
-  decidedCount,
+  agentDecidedCount,
+  humanRuledCount,
   pendingEscalations,
   pipelineEnabled,
   pipelineLoopAlive,
@@ -71,7 +70,8 @@ function SystemTelemetryRail({
 }: {
   totalCount: number;
   openInProgressCount: number;
-  decidedCount: number;
+  agentDecidedCount: number;
+  humanRuledCount: number;
   pendingEscalations: number;
   pipelineEnabled: boolean;
   pipelineLoopAlive: boolean;
@@ -89,7 +89,7 @@ function SystemTelemetryRail({
     : pipelineHealthIssue
       ? 'ISSUE'
       : pipelineLoopAlive
-        ? 'ACTIVE'
+        ? 'LIVE'
         : 'IDLE';
   const statusTone = pipelineHealthIssue
     ? 'text-escalation'
@@ -108,7 +108,8 @@ function SystemTelemetryRail({
   const stageSummary = stages
     .filter((stage) => stage.enabled)
     .map((stage) => stage.label)
-    .join(' · ') || 'No agents enabled';
+    .join(' · ');
+  const pipelineStatusTitle = pipelineEnabled ? stageSummary || 'Pipeline status' : 'Pipeline status';
 
   return (
     <article
@@ -119,15 +120,6 @@ function SystemTelemetryRail({
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">
           Pipeline overview
         </p>
-        <span className="inline-flex items-center gap-phi-2" aria-live="polite">
-          <span
-            className={`h-1.5 w-1.5 shrink-0 rounded-none ${pipelineLoopAlive && !pipelineHealthIssue ? 'bg-oxford signal-dot-breathe' : 'bg-oxford/24'}`}
-            aria-hidden
-          />
-          <span className="font-mono text-[10px] uppercase tracking-[0.10em] text-oxford/48">
-            {pipelineLoopAlive && !pipelineHealthIssue ? 'Live' : statusLabel}
-          </span>
-        </span>
       </header>
 
       <div className="border-b border-oxford/[0.075] px-phi-4 py-phi-4">
@@ -145,10 +137,7 @@ function SystemTelemetryRail({
       <div className="relative flex min-h-[52px] items-center justify-between gap-phi-3 border-b border-oxford/[0.075] px-phi-4 py-phi-3">
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45">
-            Pipeline status
-          </p>
-          <p className="mt-phi-1 truncate font-mono text-[9px] uppercase tracking-[0.08em] text-oxford/32">
-            {stageSummary}
+            {pipelineStatusTitle}
           </p>
         </div>
         <span className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[11px] uppercase tracking-[0.10em] ${statusTone}`}>
@@ -180,7 +169,7 @@ function SystemTelemetryRail({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-2 divide-x divide-oxford/[0.075]">
+      <div className="grid grid-cols-3 divide-x divide-oxford/[0.075]">
         <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
             Total
@@ -191,10 +180,18 @@ function SystemTelemetryRail({
         </div>
         <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
-            Decided
+            Recs
           </p>
           <p className="font-mono text-[15px] font-semibold tabular-nums text-oxford">
-            {decidedCount.toLocaleString()}
+            {agentDecidedCount.toLocaleString()}
+          </p>
+        </div>
+        <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+            Human ruled
+          </p>
+          <p className="font-mono text-[15px] font-semibold tabular-nums text-oxford">
+            {humanRuledCount.toLocaleString()}
           </p>
         </div>
       </div>
@@ -208,52 +205,21 @@ interface MainLayoutProps {
   onSystemPanelOpenChange?: (open: boolean) => void;
 }
 
-function EmptyMemoPressure({ startups, fundConfiguration }: { startups: Startup[]; fundConfiguration: FundConfiguration }) {
-  const pressure = useMemo(() => getBacklogPressure(startups), [startups]);
-  const oldestName = pressure.oldest?.startup.scout.name;
-  const oldestAge = pressure.oldest?.ageDays;
+function EmptyMemoPressure({ pendingEscalations }: { pendingEscalations: number }) {
+  const hasEscalations = pendingEscalations > 0;
+  const footnote = hasEscalations
+    ? `${pendingEscalations.toLocaleString()} escalation${pendingEscalations === 1 ? '' : 's'} waiting — start with a flagged row.`
+    : 'Pipeline counts are in the left rail.';
 
   return (
     <div className="flex h-full min-h-0 items-center justify-center bg-paper px-phi-7 py-phi-7">
-      <div className="w-full max-w-[34rem]">
-        <p className="type-label-section tracking-[0.12em] text-oxford/45">Decision queue</p>
-        <p className="mt-phi-3 font-display text-[1.9rem] font-medium leading-[0.98] tracking-0 text-oxford sm:text-[2.6rem]">
-          Conviction queue requires review.
+      <article className="w-full max-w-[28rem]" aria-label="Conviction queue empty state">
+        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45">Conviction queue</p>
+        <p className={`mt-phi-3 ${railEditorial.bodyStrong} leading-[1.25]`}>
+          Select a matter from the queue to open the memo.
         </p>
-        <dl className="mt-phi-6 grid grid-cols-3 gap-x-phi-5 gap-y-phi-4 border-y border-oxford/[0.08] py-phi-4">
-          <div>
-            <dt className="type-meta text-oxford/35">Pending</dt>
-            <dd className="mt-phi-1 font-mono text-[1.35rem] font-semibold leading-none text-oxford tabular-nums">
-              {pressure.pendingCount}
-            </dd>
-          </div>
-          <div>
-            <dt className="type-meta text-oxford/35">Adverse</dt>
-            <dd className={`mt-phi-1 font-mono text-[1.35rem] font-semibold leading-none tabular-nums ${pressure.adverseCount > 0 ? 'text-escalation/80' : 'text-oxford'}`}>
-              {pressure.adverseCount}
-            </dd>
-          </div>
-          <div>
-            <dt className="type-meta text-oxford/35">Oldest</dt>
-            <dd className="mt-phi-1 font-mono text-[1.35rem] font-semibold leading-none text-oxford tabular-nums">
-              {oldestAge != null && oldestAge >= 0 ? `${oldestAge}d` : '—'}
-            </dd>
-          </div>
-        </dl>
-        <div className="mt-phi-4 grid gap-phi-2 border-b border-oxford/[0.06] pb-phi-4">
-          <p className="type-meta text-oxford/38">
-            Stale threshold <span className="font-mono tabular-nums text-oxford/62">{fundConfiguration.thresholds.staleAfterHours}h</span>
-          </p>
-          <p className="type-meta text-oxford/38">
-            Risk posture <span className="text-oxford/62">{fundConfiguration.risk.sensitivity}</span>
-          </p>
-        </div>
-        <p className="mt-phi-4 type-meta leading-relaxed text-oxford/42">
-          {oldestName && oldestAge != null && oldestAge >= 0
-            ? `${oldestName} is the oldest unresolved matter in the queue.`
-            : 'Select a matter to inspect the current ruling surface.'}
-        </p>
-      </div>
+        <p className={`mt-phi-3 ${railEditorial.meta} leading-relaxed text-oxford/36`}>{footnote}</p>
+      </article>
     </div>
   );
 }
@@ -277,10 +243,13 @@ export default function MainLayout({
     metaEvalSet,
     systemHealth,
     metaInsights,
+    fundThesisRuntime,
+    fundThesisRuntimeLoading,
+    fundThesisRuntimeError,
     liveGate,
   } = data;
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
-  const [rightPanel, setRightPanel] = useState<'memo' | 'feed' | 'system' | null>(null);
+  const [rightPanel, setRightPanel] = useState<'feed' | 'system' | null>(null);
   const [lookupInput, setLookupInput] = useState('');
   const [lookupBusy, setLookupBusy] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
@@ -350,7 +319,6 @@ export default function MainLayout({
 
   const handleStartupClick = useCallback((startup: Startup) => {
     restoreRefVerdictMemo.current = document.activeElement as HTMLElement | null;
-    setRightPanel('memo');
     const acknowledgedStartup = startup.is_new_to_user
       ? {
           ...startup,
@@ -378,7 +346,6 @@ export default function MainLayout({
 
   const handleCloseMemo = useCallback(() => {
     setSelectedStartup(null);
-    setRightPanel(null);
   }, []);
 
   const handleCloseJudgements = useCallback(() => {
@@ -510,7 +477,6 @@ export default function MainLayout({
           last_seen_by_user_at: now,
         },
       });
-      setRightPanel('memo');
       if (matched.is_new_to_user) markStartupAcknowledged(matched);
       setPendingLookup((prev) => (prev ? { ...prev, autoOpened: true } : prev));
     }
@@ -528,9 +494,9 @@ export default function MainLayout({
   useRestoreFocus(judgementsAsOverlay, { current: null }, !verdictOrMemoOpen);
   useFocusTrap(judgementsAsOverlay, judgementsPanelRef);
 
-  const openInProgressCount =
-    startups.filter(isDealUnreviewed).length + startups.filter(isDealPendingPartnerDecision).length;
-  const decidedCount = startups.filter((startup) => Boolean(startup.partner?.recommendation)).length;
+  const openInProgressCount = startups.filter(isDealUnresolved).length;
+  const agentDecidedCount = startups.filter((startup) => Boolean(startup.partner?.recommendation) && !isDealHumanResolved(startup)).length;
+  const humanRuledCount = startups.filter(isDealHumanResolved).length;
   const pendingEscalations = data.pendingEscalationCount ?? data.settings?.system_health?.pending_escalations ?? 0;
   const agentConfig = data.settings?.agent_config;
   const pipelineEnabled =
@@ -568,13 +534,21 @@ export default function MainLayout({
   const pipelineHealthIssue =
     pipelineEnabled &&
     agentsStatus != null &&
-    (!agentsStatus.worker_ready || !agentsStatus.supabase_configured || !agentsStatus.openai_configured);
+    (
+      !agentsStatus.worker_ready ||
+      !agentsStatus.supabase_configured ||
+      !agentsStatus.openai_configured ||
+      !agentsStatus.agents_will_run ||
+      agentsStatus.thesis_ready === false
+    );
+  const pipelineLoopAlive = Boolean(loopStatus?.loop_alive && agentsStatus?.agents_will_run === true && !pipelineHealthIssue);
   const pipelineStateLabel = !pipelineEnabled
     ? 'Off'
     : pipelineHealthIssue
       ? 'Issue'
-      : 'On';
-  const pipelineLoopAlive = Boolean(loopStatus?.loop_alive);
+      : pipelineLoopAlive
+        ? 'Live'
+        : 'Idle';
   const pipelineStages: RailStageState[] = [
     { key: 'scout', label: 'Scout', enabled: Boolean(agentConfig?.scouts_enabled) },
     { key: 'review', label: 'Review', enabled: Boolean(agentConfig?.reviewers_enabled) },
@@ -667,7 +641,6 @@ export default function MainLayout({
   const handleOpenLookupMemo = useCallback(() => {
     if (!pendingLookupMatch) return;
     setSelectedStartup(pendingLookupMatch);
-    setRightPanel('memo');
     setPendingLookup((prev) => (prev ? { ...prev, autoOpened: true } : prev));
   }, [pendingLookupMatch]);
 
@@ -807,11 +780,12 @@ export default function MainLayout({
                 </div>
 
                 {/* ── Pipeline overview ──────────────────────────────── */}
-                <section aria-label="Pipeline overview" className="min-w-0 border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}>
+                <section aria-label="Pipeline overview" className="min-w-0" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}>
                   <SystemTelemetryRail
                     totalCount={startups.length}
                     openInProgressCount={openInProgressCount}
-                    decidedCount={decidedCount}
+                    agentDecidedCount={agentDecidedCount}
+                    humanRuledCount={humanRuledCount}
                     pendingEscalations={pendingEscalations}
                     pipelineEnabled={pipelineEnabled}
                     pipelineLoopAlive={pipelineLoopAlive}
@@ -838,7 +812,7 @@ export default function MainLayout({
                       lookupPhase={lookupPhaseLabel}
                       displayMode="embedded"
                     />
-                    {lookupSnapshotProps ? (
+                    {SHOW_LOOKUP_RESULT_SNAPSHOT && lookupSnapshotProps ? (
                       <div className="mt-phi-3 min-w-0">
                         <LookupResultSnapshot
                           {...lookupSnapshotProps}
@@ -863,7 +837,7 @@ export default function MainLayout({
                       <div
                         className="flex shrink-0 items-center gap-phi-2"
                         aria-live="polite"
-                        title="Active mandate linked to pipeline"
+                        title="Active mandate used by the system"
                       >
                         <span
                           className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
@@ -872,14 +846,14 @@ export default function MainLayout({
                         <span
                           className={`${railEditorial.meta} uppercase text-oxford/45 pulse-soft [animation-delay:900ms]`}
                         >
-                          Live
+                          In use
                         </span>
                       </div>
                     ) : null}
                   </div>
                   {desktopMandateLine ? (
                     <p
-                      className="mt-phi-3 truncate font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/38"
+                      className="mt-phi-3 truncate font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45"
                       title={desktopMandateLine}
                     >
                       {desktopMandateLine}
@@ -906,7 +880,7 @@ export default function MainLayout({
                   <div className="min-w-0 flex flex-col gap-phi-2">
                     <p className="type-meta text-oxford/30">Live overview</p>
                     <p className="type-meta text-oxford/60">
-                      {startups.length} total · {openInProgressCount} open/in-progress · {decidedCount} decided · {pendingEscalations} escalated
+                      {startups.length} total · {openInProgressCount} open/in-progress · {agentDecidedCount} recs · {humanRuledCount} human-ruled · {pendingEscalations} need ruling
                       {signals.length > 0 ? ` · ${signals.length} signals` : ''}
                     </p>
                   </div>
@@ -914,7 +888,7 @@ export default function MainLayout({
                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-phi-3 gap-y-phi-1 xl:justify-end">
                       <span className="type-meta text-oxford/30">Pipeline</span>
                       <span className="relative inline-flex items-center gap-phi-2">
-                        {pipelineStateLabel === 'On' && (
+                        {pipelineStateLabel === 'Live' && (
                           <span
                             className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/60 pulse-soft"
                             aria-hidden
@@ -956,7 +930,7 @@ export default function MainLayout({
                     </div>
                     {pendingEscalations > 0 && (
                       <span className="type-meta text-escalation/85">
-                        {pendingEscalations} escalation{pendingEscalations === 1 ? '' : 's'}
+                        {pendingEscalations} need human ruling
                       </span>
                     )}
                   </div>
@@ -972,7 +946,7 @@ export default function MainLayout({
                     onClearMessage={() => setLookupMessage(null)}
                     lookupPhase={lookupPhaseLabel}
                   />
-                  {lookupSnapshotProps ? (
+                  {SHOW_LOOKUP_RESULT_SNAPSHOT && lookupSnapshotProps ? (
                     <div className="mt-phi-3 min-w-0">
                       <LookupResultSnapshot {...lookupSnapshotProps} onOpenMemo={handleOpenLookupMemo} />
                     </div>
@@ -999,7 +973,7 @@ export default function MainLayout({
                       <div
                         className="flex shrink-0 items-center gap-phi-2"
                         aria-live="polite"
-                        title="Active mandate linked to pipeline"
+                        title="Active mandate used by the system"
                       >
                         <span
                           className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
@@ -1008,7 +982,7 @@ export default function MainLayout({
                         <span
                           className={`${railEditorial.meta} uppercase text-oxford/45 pulse-soft [animation-delay:900ms]`}
                         >
-                          Live
+                          In use
                         </span>
                       </div>
                     ) : null}
@@ -1018,7 +992,7 @@ export default function MainLayout({
                       {thesisTagList.map((t, i) => (
                         <span
                           key={`mandate-mobile-${i}-${t}`}
-                          className={`px-phi-2 py-phi-1 ${railEditorial.meta} text-oxford/45 bg-registerTint`}
+                          className={`px-phi-2 py-phi-1 ${railEditorial.meta} text-oxford/32 bg-registerTint`}
                         >
                           {t}
                         </span>
@@ -1036,6 +1010,8 @@ export default function MainLayout({
                   <div className="h-full overflow-y-auto overscroll-contain">
                     <SystemIntelligence
                       startups={startups}
+                      onStartupClick={handleStartupClick}
+                      selectedStartupId={selectedStartup?.id ?? null}
                       signals={signals}
                       rejectionAnalytics={rejectionAnalytics}
                       watchlistAnalytics={watchlistAnalytics}
@@ -1047,6 +1023,9 @@ export default function MainLayout({
                       metaPromptState={metaPromptState}
                       metaEvalSet={metaEvalSet}
                       metaInsights={metaInsights}
+                      fundThesisRuntime={fundThesisRuntime}
+                      fundThesisRuntimeLoading={fundThesisRuntimeLoading}
+                      fundThesisRuntimeError={fundThesisRuntimeError}
                       fundConfiguration={fundConfiguration}
                     />
                   </div>
@@ -1077,7 +1056,7 @@ export default function MainLayout({
                   rightPanel === 'feed'
                     ? 'Judgements'
                     : selectedStartup
-                      ? 'Investment memo'
+                      ? 'Memo'
                       : 'Detail'
                 }
               >
@@ -1131,7 +1110,7 @@ export default function MainLayout({
                     >
                       <PanelShell
                         className="min-h-0 min-w-0 flex-1 w-full bg-paper"
-                        title="Investment memo"
+                        title="Memo"
                         actions={
                           <div className="flex shrink-0 items-center gap-0" role="group" aria-label="Memo controls">
                             <button
@@ -1201,7 +1180,7 @@ export default function MainLayout({
                       })}
                       className="h-full"
                     >
-                      <EmptyMemoPressure startups={startups} fundConfiguration={fundConfiguration} />
+                      <EmptyMemoPressure pendingEscalations={pendingEscalations} />
                     </motion.div>
                   )}
                 </AnimatePresence>

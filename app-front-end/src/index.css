@@ -11,6 +11,7 @@
   --color-oxford: #001433;
   --color-oxford-rgb: 0, 20, 51;
   --color-paper: #f4f1ea;
+  --color-paper-rgb: 244, 241, 234;
   /** Slightly darker paper — selected rows, recessed surfaces (same hue family as paper). */
   --color-paper-deep: #e7e0d4;
   /** Subtle lift for raised chrome (aligned with web marketing paper family). */

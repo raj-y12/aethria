@@ -81,7 +81,7 @@ export async function fetchFundThesisRuntime(): Promise<FundThesisRuntime> {
 export async function postFundThesisVersion(
   rawText: string,
   options?: { skip_embedding?: boolean; parsed_json?: Record<string, unknown> },
-): Promise<{ version_id: string; version_number: number }> {
+): Promise<{ status: string; version_id: string; version_number: number }> {
   const body: Record<string, unknown> = { raw_text: rawText };
   if (options?.skip_embedding === true) body.skip_embedding = true;
   if (options?.parsed_json != null) body.parsed_json = options.parsed_json;
@@ -91,8 +91,12 @@ export async function postFundThesisVersion(
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
-  const data = (await res.json()) as { version_id: string; version_number: number };
-  return { version_id: data.version_id, version_number: data.version_number };
+  const data = (await res.json()) as { status?: string; version_id: string; version_number: number };
+  return {
+    status: data.status ?? 'created',
+    version_id: data.version_id,
+    version_number: data.version_number,
+  };
 }
 
 export async function patchFundThesisActiveVersion(versionId: string): Promise<void> {

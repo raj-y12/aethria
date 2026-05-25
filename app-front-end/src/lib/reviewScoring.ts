@@ -176,3 +176,80 @@ export function formatReviewOverallStructuredScore(review: Review | null | undef
   }
   return '—';
 }
+
+const INTERNAL_REASONING_PATTERNS = [
+  /^Computed from\b/i,
+  /\bfrom scout payload\b/i,
+  /\bfrom scout narrative\b/i,
+  /\bfrom reviewer\b/i,
+  /\bGrowth inferred from\b/i,
+  /\bTAM from scout\b/i,
+  /\bextracted? from\b/i,
+  /\bpolicy[_\s]?hash\b/i,
+  /\bpolicy[_\s]?version\b/i,
+  /\bsource_components?\b/i,
+  /\bnormalize_/i,
+  /\b_extract_/i,
+  /\bclassify_/i,
+  /\braw extraction\b/i,
+  /\bMissing-data rule:/i,
+  /\bsignal pipeline\b/i,
+  /\bscoring_engine\b/i,
+  /\baggregation_layer\b/i,
+  /\bnormalization_layer\b/i,
+  /\bextraction_layer\b/i,
+  /\bpolicy_compiler\b/i,
+  /\bWeight \d+%/i,
+  /\bEvidence partial\b/i,
+  /\bEvidence: missing\b/i,
+  /\bEvidence: complete\b/i,
+  /\bStructured scoring\b/i,
+  /\bNormalization\b/i,
+  /\bAggregation\b/i,
+  /\bRule engine\b/i,
+  /\bPolicy inputs\b/i,
+  /\bComponent weights\b/i,
+];
+
+/**
+ * Strip internal/debug reasoning from user-facing text.
+ * Returns cleaned string or null if the entire string is internal.
+ */
+export function sanitizeReasoning(text: string | null | undefined): string | null {
+  if (!text || typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  for (const pattern of INTERNAL_REASONING_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      const sentences = trimmed.split(/(?<=[.!?])\s+/);
+      const clean = sentences.filter((s) => {
+        const st = s.trim();
+        return st.length > 0 && !INTERNAL_REASONING_PATTERNS.some((p) => p.test(st));
+      });
+      return clean.length > 0 ? clean.join(' ') : null;
+    }
+  }
+  return trimmed;
+}
+
+/**
+ * Check whether a component has concrete evidence vs missing/neutral.
+ * Returns 'complete', 'partial', or 'missing'.
+ */
+export function assessEvidenceStatus(component: {
+  value?: string | null;
+  label?: string | null;
+  evidence?: string | null;
+  score?: number;
+  confidence?: number | null;
+}): 'complete' | 'partial' | 'missing' {
+  const value = String(component.value ?? '').trim();
+  const label = String(component.label ?? '').trim();
+  const evidence = String(component.evidence ?? '').trim();
+  const hasConcrete = (value.length > 0 && !/^\[?\s*missing/i.test(value))
+    || (label.length > 0 && !/^\[?\s*missing/i.test(label));
+  if (!hasConcrete) return 'missing';
+  if (!evidence && (component.confidence == null || component.confidence < 0.4)) return 'partial';
+  return 'complete';
+}

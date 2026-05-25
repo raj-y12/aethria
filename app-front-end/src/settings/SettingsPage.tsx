@@ -18,22 +18,27 @@ import { railEditorial } from '../design-system/railEditorial';
 import { userProfileAppearance } from '../design-system/clerk-appearance';
 import { useAgentsEnabled, useFundConfiguration, useMediaQuery } from '../hooks';
 import {
+  CANONICAL_DIMENSIONS,
+  CANONICAL_DIMENSION_KEYS,
+  DIMENSION_SCORE_BANDS,
+  UNIVERSAL_SCORE_BANDS,
   DEFAULT_SCORE_BANDS,
-  bandForScore,
+  DEFAULT_VERDICT_BADGES,
+  badgeTextColorForBackground,
+  applyThesisVersionMetadata,
+  buildFundConfigThesisPayload,
   clearFundConfiguration,
-  computeConfiguredScore,
   getWeightImpactText,
   mapFundConfigToSettings,
+  thesisVersionLabel,
   normalizeWeights,
   validateScoreBands,
   validateWeights,
-  type DecisionLabel,
+  type CoreDimensionKey,
   type FundConfiguration,
   type MemoStyle,
   type MemoTone,
   type RiskSensitivity,
-  type RubricCriterion,
-  type ScoringDimensionKey,
 } from '../lib/fundConfiguration';
 
 type SectionId =
@@ -56,19 +61,16 @@ const sections: Array<{ id: SectionId; label: string; short: string }> = [
   { id: 'mandate', label: 'Fund Mandate', short: 'Mandate' },
   { id: 'budget', label: 'Operations', short: 'Ops' },
   { id: 'weights', label: 'Scoring Weights', short: 'Weights' },
-  { id: 'bands', label: 'Score Bands', short: 'Bands' },
+  { id: 'bands', label: 'Verdict Badges', short: 'Badges' },
   { id: 'thresholds', label: 'Decision Thresholds', short: 'Thresholds' },
   { id: 'risk', label: 'Adverse / Risk', short: 'Risk' },
   { id: 'memo', label: 'Memo Output', short: 'Memo' },
   { id: 'rubric', label: 'Rubric Criteria', short: 'Rubric' },
-  { id: 'account', label: 'Account', short: 'Account' },
 ];
 
 const stageOptions = ['Pre-seed', 'Seed', 'Series A', 'Series B+'];
 const geographyOptions = ['US', 'Europe', 'UK/Ireland', 'Global'];
 const sectorOptions = ['B2B SaaS', 'AI', 'Infrastructure', 'Fintech', 'Healthcare', 'Devtools', 'Climate'];
-const decisionLabels: DecisionLabel[] = ['Pass', 'Monitor', 'Review', 'Escalate', 'Strong Proceed'];
-
 const inputCls =
   'w-full rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 type-body-sm text-oxford outline-none transition-colors placeholder:text-oxford/25 focus:border-oxford/45';
 const selectCls =
@@ -82,7 +84,10 @@ const solidBtnCls =
   'type-label-section inline-flex min-h-[36px] items-center justify-center rounded-none bg-oxford px-phi-4 text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
 
 function serializeConfig(config: FundConfiguration): string {
-  const { lastSavedAt, ...rest } = config;
+  const rest = { ...config } as Record<string, unknown>;
+  for (const key of ['lastSavedAt', 'version', 'versionLabel', 'activePolicyVersionId', 'draftPolicyHash', 'publishedPolicyHash', 'lastPublishedAt']) {
+    delete rest[key];
+  }
   return JSON.stringify(rest);
 }
 
@@ -100,6 +105,7 @@ function TextField({
   value,
   onChange,
   hint,
+  disabled = false,
   type = 'text',
   min,
   max,
@@ -110,6 +116,7 @@ function TextField({
   value: string | number;
   onChange: (value: string | number) => void;
   hint?: string;
+  disabled?: boolean;
   type?: 'text' | 'number';
   min?: number;
   max?: number;
@@ -125,11 +132,26 @@ function TextField({
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(type === 'number' ? Number(event.target.value) || 0 : event.target.value)}
-        className={inputCls}
+        className={`${inputCls} disabled:cursor-not-allowed disabled:text-oxford/35 disabled:opacity-60`}
       />
       {hint && <p className={metaCls}>{hint}</p>}
     </div>
+  );
+}
+
+function BadgeSwatch({ label, backgroundColor }: { label: string; backgroundColor: string }) {
+  return (
+    <span
+      className="inline-flex min-h-[26px] items-center justify-center rounded-none px-phi-2 type-meta tracking-badge uppercase"
+      style={{
+        backgroundColor,
+        color: badgeTextColorForBackground(backgroundColor),
+      }}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -258,35 +280,9 @@ function SettingsSection({
 }
 
 function PreviewPanel({ config }: { config: FundConfiguration }) {
-  const sample = useMemo(() => ({
-    id: 'sample',
-    scout: {
-      id: 'sample-scout',
-      scout_type: 'Preview',
-      name: 'Sample Infrastructure AI Co.',
-      one_line: 'Automates compliance-heavy engineering workflows for regulated teams.',
-      sector: 'AI / Infrastructure',
-      why_now: 'Regulatory burden and AI-native engineering stacks are converging.',
-      confidence: 0.72,
-      funding_stage: 'Seed',
-    },
-    review: {
-      market_score: 8,
-      product_score: 7,
-      technical_score: 8,
-      execution_score: 7,
-      defensibility_score: 6,
-      thesis_alignment_score: 0.78,
-      thesis_matches_fund: true,
-      key_risks: ['Early traction remains narrow.'],
-    },
-    timestamps: { discovered_at: new Date().toISOString() },
-  }), []);
-  const score = computeConfiguredScore(sample, config);
-  const band = bandForScore(score, config.scoreBands);
   const weightTotal = validateWeights(config.scoringWeights).total;
   return (
-    <aside className="hidden min-h-0 border-l border-oxford/[0.08] pl-phi-5 xl:flex xl:flex-col">
+    <aside className="hidden min-h-0 border-l border-oxford/[0.08] pl-phi-5 xl:sticky xl:top-phi-6 xl:flex xl:max-h-[calc(100vh-3rem)] xl:flex-col xl:overflow-y-auto">
       <p className="type-label-section text-oxford/55">Configuration Preview</p>
       <div className="mt-phi-5 flex flex-col gap-phi-5">
         <div>
@@ -301,7 +297,15 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
           <p className={`mt-phi-2 font-mono text-[1.65rem] tabular-nums ${weightTotal === 100 ? 'text-oxford' : 'text-escalation/75'}`}>{weightTotal}%</p>
         </div>
         <div className="border-t border-oxford/[0.06] pt-phi-4">
-          <p className="type-meta text-oxford/35">Decision bands</p>
+          <p className="type-meta text-oxford/35">Verdict badges</p>
+          <div className="mt-phi-3 flex flex-wrap gap-phi-2">
+            {config.verdictBadges.map((item) => (
+              <BadgeSwatch key={item.id} label={item.id} backgroundColor={item.backgroundColor} />
+            ))}
+          </div>
+        </div>
+        <div className="border-t border-oxford/[0.06] pt-phi-4">
+          <p className="type-meta text-oxford/35">Percentage bands</p>
           <div className="mt-phi-3 flex flex-col gap-phi-2">
             {config.scoreBands.map((item) => (
               <p key={item.id} className="type-meta text-oxford/52">
@@ -318,32 +322,14 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
         </div>
         <div className="border-t border-oxford/[0.06] pt-phi-4">
           <p className="type-meta text-oxford/35">Sample outcome</p>
-          <p className="mt-phi-2 type-body-emphasis text-oxford">{band.label}</p>
+          <p className="mt-phi-2 type-body-emphasis text-oxford">Verdict display settings</p>
           <p className="mt-phi-1 type-body-sm text-oxford/55">
-            Weighted score <span className="font-mono tabular-nums">{score}</span>. Current settings would route this company as {band.label.toLowerCase()}.
+            Percentage bands shape configured score language in the app; badge colours shape the visible chips.
           </p>
         </div>
       </div>
     </aside>
   );
-}
-
-function buildThesisText(config: FundConfiguration): string {
-  const mandate = config.mandate;
-  return [
-    `Fund: ${mandate.fundName || 'Unnamed fund'}`,
-    `Mandate: ${mandate.mandateName}`,
-    `Stages: ${mandate.preferredStages.join(', ') || 'Not specified'}`,
-    `Geographies: ${[...mandate.geographies, mandate.customGeography].filter(Boolean).join(', ') || 'Not specified'}`,
-    `Sectors: ${[...mandate.sectors, mandate.customSectors].filter(Boolean).join(', ') || 'Not specified'}`,
-    `Excluded sectors: ${mandate.excludedSectors || 'None specified'}`,
-    `Business models: ${mandate.businessModels || 'Not specified'}`,
-    `Check size: ${mandate.checkSizeMin}-${mandate.checkSizeMax}`,
-    `Ownership target: ${mandate.ownershipTarget}%`,
-    `Minimum traction: ${mandate.minimumTraction || 'Not specified'}`,
-    '',
-    mandate.thesisText,
-  ].join('\n');
 }
 
 export default function SettingsPage() {
@@ -403,6 +389,13 @@ export default function SettingsPage() {
   }, [configuration]);
 
   useEffect(() => {
+    const versionNumber = thesisSummary?.active_version_number;
+    if (versionNumber == null || versionNumber < 1) return;
+    setConfiguration((current) => applyThesisVersionMetadata(current, versionNumber));
+    setDraft((current) => applyThesisVersionMetadata(current, versionNumber));
+  }, [thesisSummary?.active_version_number]);
+
+  useEffect(() => {
     const root = contentScrollRef.current;
     if (!root) return;
 
@@ -434,8 +427,17 @@ export default function SettingsPage() {
 
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
+  const scoreBandByVerdict = useMemo(
+    () => new Map(draft.scoreBands.map((band) => [band.label.toUpperCase(), band])),
+    [draft.scoreBands]
+  );
   const unsaved = serializeConfig(draft) !== savedSnapshot || serializeOperations(settings) !== savedOperationsSnapshot;
   const policyUnpublished = !!policyPreviewHash && policyPreviewHash !== draft.publishedPolicyHash;
+  const thesisPublishDisabledReason = agentsStatus == null
+    ? 'Checking storage readiness...'
+    : !agentsStatus.supabase_configured
+      ? 'Supabase storage is required to publish fund thesis versions.'
+      : null;
 
   const updateDraft = (updater: (current: FundConfiguration) => FundConfiguration) => {
     setDraft((current) => updater(current));
@@ -484,6 +486,14 @@ export default function SettingsPage() {
       setSavedOperationsSnapshot(serializeOperations(result.data));
     }
     await queryClient.invalidateQueries({ queryKey: ['settings'] });
+    const summary = await fetchFundThesisSummary().catch(() => null);
+    if (summary?.active_version_number != null) {
+      setThesisSummary(summary);
+      const labeled = applyThesisVersionMetadata(saved, summary.active_version_number);
+      setDraft(labeled);
+      setConfiguration(labeled);
+      setSavedSnapshot(serializeConfig(labeled));
+    }
     setStatus('Saved. Runtime limits and backend-compatible fund fields are synced; display-only memo and rubric options remain available in the app.');
     setSaving(false);
   };
@@ -551,10 +561,27 @@ export default function SettingsPage() {
     setThesisBusy(true);
     setErrors([]);
     try {
-      await postFundThesisVersion(buildThesisText(draft).trim());
+      const payload = buildFundConfigThesisPayload(draft);
+      const result = await postFundThesisVersion(payload.raw_text, {
+        parsed_json: payload.parsed_json,
+        skip_embedding: agentsStatus?.openai_configured !== true,
+      });
       const summary = await fetchFundThesisSummary();
       setThesisSummary(summary);
-      setStatus('Mandate published as a fund thesis version.');
+      await queryClient.invalidateQueries({ queryKey: ['fund-thesis'] });
+      const versionNumber = summary?.active_version_number ?? result.version_number;
+      const labeled = applyThesisVersionMetadata(draft, versionNumber);
+      setDraft(labeled);
+      setConfiguration(labeled);
+      setSavedSnapshot(serializeConfig(labeled));
+      const unchanged = result.status === 'unchanged';
+      setStatus(
+        unchanged
+          ? `Active fund thesis is already ${thesisVersionLabel(versionNumber)} — no new version created.`
+          : agentsStatus?.openai_configured === true
+            ? `Mandate published as ${thesisVersionLabel(versionNumber)}.`
+            : `Mandate published as ${thesisVersionLabel(versionNumber)} (rule-based; embeddings skipped until OpenAI is configured).`
+      );
     } catch (error: unknown) {
       setErrors([error instanceof Error ? error.message : 'Could not publish thesis']);
     } finally {
@@ -717,11 +744,11 @@ export default function SettingsPage() {
                     <TextField id="minimum-traction" label="Minimum traction expectations" value={draft.mandate.minimumTraction} onChange={(value) => updateMandate('minimumTraction', String(value))} />
                     <TextAreaField id="thesis-text" label="Notes / thesis text" rows={7} value={draft.mandate.thesisText} onChange={(value) => updateMandate('thesisText', value)} />
                     <div className="flex flex-wrap items-center gap-phi-4 border-t border-oxford/[0.06] pt-phi-4">
-                      <button type="button" onClick={publishThesis} disabled={thesisBusy || !agentsStatus?.supabase_configured} className={actionBtnCls}>
+                      <button type="button" onClick={publishThesis} disabled={thesisBusy || thesisPublishDisabledReason != null} className={actionBtnCls}>
                         {thesisBusy ? 'Publishing...' : 'Publish fund thesis version'}
                       </button>
                       <p className="type-meta text-oxford/38">
-                        {thesisSummary ? `Active thesis v${thesisSummary.active_version_number}` : 'No active thesis loaded'}
+                        {thesisPublishDisabledReason ?? (thesisSummary ? `Active thesis v${thesisSummary.active_version_number}` : 'No active thesis loaded')}
                       </p>
                     </div>
                   </div>
@@ -775,35 +802,85 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="bands" title="Score Bands" kicker="Bands convert raw configured scores into recommendation language and queue priority. Boundaries must be continuous and non-overlapping.">
+                <SettingsSection id="bands" title="Verdict Badges" kicker="Configure the current verdict bands and badge colours. Bands must stay continuous and non-overlapping.">
                   <div className="flex flex-col gap-phi-4">
                     {!bandValidation.valid && (
                       <div className="border border-escalation/25 bg-escalation/[0.035] px-phi-4 py-phi-3">
                         {bandValidation.errors.map((error) => <p key={error} className="type-body-sm text-escalation/75">{error}</p>)}
                       </div>
                     )}
-                    {draft.scoreBands.map((band) => (
-                      <div key={band.id} className="grid gap-phi-3 border-b border-oxford/[0.055] py-phi-4 sm:grid-cols-[1fr_86px_86px_150px] sm:items-end">
-                        <p className="type-body-emphasis text-oxford">{band.label}</p>
-                        <TextField id={`${band.id}-min`} label="Min" type="number" value={band.min} onChange={(value) => updateDraft((current) => ({ ...current, scoreBands: current.scoreBands.map((item) => item.id === band.id ? { ...item, min: Number(value) } : item) }))} min={0} max={100} />
-                        <TextField id={`${band.id}-max`} label="Max" type="number" value={band.max} onChange={(value) => updateDraft((current) => ({ ...current, scoreBands: current.scoreBands.map((item) => item.id === band.id ? { ...item, max: Number(value) } : item) }))} min={0} max={100} />
-                        <div className="flex flex-col gap-phi-2">
-                          <label htmlFor={`${band.id}-label`} className={labelCls}>Decision label</label>
-                          <select
-                            id={`${band.id}-label`}
-                            value={band.label}
-                            onChange={(event) => updateDraft((current) => ({ ...current, scoreBands: current.scoreBands.map((item) => item.id === band.id ? { ...item, label: event.target.value as DecisionLabel } : item) }))}
-                            className={selectCls}
-                            style={selectStyle}
-                          >
-                            {decisionLabels.map((label) => <option key={label} value={label}>{label}</option>)}
-                          </select>
-                        </div>
+                    <div className="border-b border-oxford/[0.055] pb-phi-4">
+                      <p className="type-body-sm leading-relaxed text-oxford/52">
+                        Percentage bands map configured scores to PASS, MONITOR, and INVEST. Badge colours update visible verdict chips.
+                      </p>
+                    </div>
+                    <div className="border-b border-oxford/[0.055]">
+                      <div className="hidden border-b border-oxford/[0.055] pb-phi-2 sm:grid sm:grid-cols-[minmax(130px,1fr)_160px_180px] sm:gap-phi-4">
+                        <p className={labelCls}>Name</p>
+                        <p className={labelCls}>Colour</p>
+                        <p className={labelCls}>Percentages</p>
                       </div>
-                    ))}
-                    <button type="button" onClick={() => updateDraft((current) => ({ ...current, scoreBands: DEFAULT_SCORE_BANDS }))} className={actionBtnCls}>
-                      Restore default bands
-                    </button>
+                      {draft.verdictBadges.map((badge) => (
+                        <div key={badge.id} className="grid gap-phi-3 border-b border-oxford/[0.055] py-phi-4 last:border-0 sm:grid-cols-[minmax(130px,1fr)_160px_180px] sm:items-center sm:gap-phi-4">
+                          <div>
+                            <p className="type-body-emphasis text-oxford">{badge.label}</p>
+                            <p className="mt-phi-1 type-meta text-oxford/38">{badge.id}</p>
+                          </div>
+                          <label htmlFor={`${badge.id}-colour`} className="flex min-w-0 cursor-pointer items-center gap-phi-2">
+                            <input
+                              id={`${badge.id}-colour`}
+                              type="color"
+                              value={badge.backgroundColor}
+                              onChange={(event) => updateDraft((current) => ({
+                                ...current,
+                                verdictBadges: current.verdictBadges.map((item) => item.id === badge.id ? { ...item, backgroundColor: event.target.value } : item),
+                              }))}
+                              className="h-8 w-8 shrink-0 cursor-pointer rounded-none border border-oxford/[0.10] bg-transparent p-0.5"
+                              aria-label={`${badge.label} badge colour`}
+                            />
+                            <BadgeSwatch label={badge.id} backgroundColor={badge.backgroundColor} />
+                          </label>
+                          {scoreBandByVerdict.get(badge.id) ? (
+                            <div className="grid grid-cols-2 gap-phi-3">
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={scoreBandByVerdict.get(badge.id)?.min ?? 0}
+                                onChange={(event) => updateDraft((current) => ({
+                                  ...current,
+                                  scoreBands: current.scoreBands.map((item) => item.label.toUpperCase() === badge.id ? { ...item, min: Number(event.target.value) || 0 } : item),
+                                }))}
+                                className={`${inputCls} font-mono tabular-nums`}
+                                aria-label={`${badge.label} minimum percentage`}
+                              />
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={scoreBandByVerdict.get(badge.id)?.max ?? 0}
+                                onChange={(event) => updateDraft((current) => ({
+                                  ...current,
+                                  scoreBands: current.scoreBands.map((item) => item.label.toUpperCase() === badge.id ? { ...item, max: Number(event.target.value) || 0 } : item),
+                                }))}
+                                className={`${inputCls} font-mono tabular-nums`}
+                                aria-label={`${badge.label} maximum percentage`}
+                              />
+                            </div>
+                          ) : (
+                            <p className="type-meta text-oxford/36">Reviewer badge</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-phi-4">
+                      <button type="button" onClick={() => updateDraft((current) => ({ ...current, scoreBands: DEFAULT_SCORE_BANDS }))} className={actionBtnCls}>
+                        Restore default bands
+                      </button>
+                      <button type="button" onClick={() => updateDraft((current) => ({ ...current, verdictBadges: DEFAULT_VERDICT_BADGES }))} className={actionBtnCls}>
+                        Restore default badge colours
+                      </button>
+                    </div>
                   </div>
                 </SettingsSection>
 
@@ -836,10 +913,10 @@ export default function SettingsPage() {
                       <ToggleRow id="risk-high-only" checked={draft.risk.onlyGateHighSeverity} onChange={(value) => updateRisk('onlyGateHighSeverity', value)} label="Only gate high severity risks" hint="Power users can leave medium adverse items visible without slowing the ruling action." />
                     </div>
                     <div className="grid gap-phi-5 md:grid-cols-2">
-                      <TextField id="founder-penalty" label="Missing founder/team data penalty" type="number" value={draft.risk.missingFounderPenalty} onChange={(value) => updateRisk('missingFounderPenalty', Number(value))} min={0} max={100} />
-                      <TextField id="traction-penalty" label="Missing traction data penalty" type="number" value={draft.risk.missingTractionPenalty} onChange={(value) => updateRisk('missingTractionPenalty', Number(value))} min={0} max={100} />
-                      <TextField id="contradiction-penalty" label="Contradiction penalty" type="number" value={draft.risk.contradictionPenalty} onChange={(value) => updateRisk('contradictionPenalty', Number(value))} min={0} max={100} />
-                      <TextField id="weak-source-penalty" label="Weak-source penalty" type="number" value={draft.risk.weakSourcePenalty} onChange={(value) => updateRisk('weakSourcePenalty', Number(value))} min={0} max={100} />
+                      <TextField id="founder-penalty" label="Missing founder/team data penalty" type="number" value={draft.risk.missingFounderPenalty} onChange={(value) => updateRisk('missingFounderPenalty', Number(value))} min={0} max={100} disabled hint="Saved for policy display only; backend reviewers do not apply this penalty." />
+                      <TextField id="traction-penalty" label="Missing traction data penalty" type="number" value={draft.risk.missingTractionPenalty} onChange={(value) => updateRisk('missingTractionPenalty', Number(value))} min={0} max={100} disabled hint="Saved for policy display only; backend reviewers do not apply this penalty." />
+                      <TextField id="contradiction-penalty" label="Contradiction penalty" type="number" value={draft.risk.contradictionPenalty} onChange={(value) => updateRisk('contradictionPenalty', Number(value))} min={0} max={100} disabled hint="Saved for policy display only; backend reviewers do not apply this penalty." />
+                      <TextField id="weak-source-penalty" label="Weak-source penalty" type="number" value={draft.risk.weakSourcePenalty} onChange={(value) => updateRisk('weakSourcePenalty', Number(value))} min={0} max={100} disabled hint="Saved for policy display only; backend reviewers do not apply this penalty." />
                     </div>
                   </div>
                 </SettingsSection>
@@ -873,7 +950,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="rubric" title="Rubric Draft" kicker="Draft criteria do not affect scoring until published. Published policy versions are used by backend scoring and new memo assessment output.">
+                <SettingsSection id="rubric" title="Evaluation Framework" kicker="Aethria's institutional scoring framework. Dimensions are fixed to ensure score consistency across all evaluations. Publish policy versions to activate weight changes.">
                   <div className="flex flex-col gap-phi-5">
                     <div className="border-y border-oxford/[0.06] py-phi-4">
                       <div className="grid gap-phi-3 md:grid-cols-3">
@@ -902,50 +979,43 @@ export default function SettingsPage() {
                         )}
                       </div>
                     </div>
-                    {draft.rubric.map((criterion) => (
-                      <div key={criterion.id} className="border-t border-oxford/[0.06] pt-phi-5 first:border-t-0 first:pt-0">
-                        <div className="grid gap-phi-5 md:grid-cols-[1fr_160px_90px]">
-                          <TextField id={`${criterion.id}-name`} label="Criterion name" value={criterion.name} onChange={(value) => updateDraft((current) => ({ ...current, rubric: updateCriterion(current.rubric, criterion.id, { name: String(value) }) }))} />
-                          <div className="flex flex-col gap-phi-2">
-                            <label htmlFor={`${criterion.id}-dimension`} className={labelCls}>Dimension</label>
-                            <select id={`${criterion.id}-dimension`} value={criterion.dimension} onChange={(event) => updateDraft((current) => ({ ...current, rubric: updateCriterion(current.rubric, criterion.id, { dimension: event.target.value as ScoringDimensionKey }) }))} className={selectCls} style={selectStyle}>
-                              {draft.scoringWeights.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
-                            </select>
+
+                    <div className="border-b border-oxford/[0.06] pb-phi-4">
+                      <p className="type-body-sm leading-relaxed text-oxford/52">
+                        Every startup is evaluated across five institutional dimensions. Score definitions are fixed to ensure a 7 in Market always means the same thing regardless of fund configuration. You can adjust dimension weights to reflect your fund's investment priorities.
+                      </p>
+                    </div>
+
+                    <div className="border-b border-oxford/[0.06] pb-phi-5">
+                      <p className={sectionLabelCls}>Score scale</p>
+                      <div className="mt-phi-4 flex flex-col gap-phi-3">
+                        {UNIVERSAL_SCORE_BANDS.map((band) => (
+                          <div key={band.label} className="grid gap-phi-3 md:grid-cols-[100px_minmax(0,1fr)]">
+                            <p className="font-mono text-[1rem] tabular-nums text-oxford/60">{band.range[0]}-{band.range[1]}</p>
+                            <div>
+                              <p className="type-body-emphasis text-oxford">{band.label}</p>
+                              <p className="mt-phi-1 type-meta leading-snug text-oxford/45">{band.description}</p>
+                            </div>
                           </div>
-                          <TextField id={`${criterion.id}-weight`} label="Weight" type="number" value={criterion.weight} onChange={(value) => updateDraft((current) => ({ ...current, rubric: updateCriterion(current.rubric, criterion.id, { weight: Number(value) }) }))} min={0} max={100} />
-                        </div>
-                        <div className="mt-phi-4 grid gap-phi-4">
-                          <TextAreaField id={`${criterion.id}-description`} label="Description" rows={2} value={criterion.description} onChange={(value) => updateDraft((current) => ({ ...current, rubric: updateCriterion(current.rubric, criterion.id, { description: value }) }))} />
-                          <div className="grid gap-phi-4 md:grid-cols-2">
-                            <TextAreaField id={`${criterion.id}-positive`} label="Positive signals" rows={2} value={criterion.positiveSignals} onChange={(value) => updateDraft((current) => ({ ...current, rubric: updateCriterion(current.rubric, criterion.id, { positiveSignals: value }) }))} />
-                            <TextAreaField id={`${criterion.id}-negative`} label="Negative signals" rows={2} value={criterion.negativeSignals} onChange={(value) => updateDraft((current) => ({ ...current, rubric: updateCriterion(current.rubric, criterion.id, { negativeSignals: value }) }))} />
-                          </div>
-                          <TextField id={`${criterion.id}-missing`} label="Missing-data behavior" value={criterion.missingDataBehavior} onChange={(value) => updateDraft((current) => ({ ...current, rubric: updateCriterion(current.rubric, criterion.id, { missingDataBehavior: String(value) }) }))} />
-                          <div className="grid gap-phi-4 md:grid-cols-4">
-                            {(['score3', 'score5', 'score7', 'score9'] as const).map((scoreKey) => (
-                              <TextAreaField
-                                key={scoreKey}
-                                id={`${criterion.id}-${scoreKey}`}
-                                label={scoreKey.replace('score', 'Earns ')}
-                                rows={2}
-                                value={criterion.examples[scoreKey]}
-                                onChange={(value) => updateDraft((current) => ({ ...current, rubric: updateCriterion(current.rubric, criterion.id, { examples: { ...criterion.examples, [scoreKey]: value } }) }))}
-                              />
-                            ))}
-                          </div>
-                          <button type="button" onClick={() => updateDraft((current) => ({ ...current, rubric: current.rubric.filter((item) => item.id !== criterion.id) }))} className={`${actionBtnCls} self-start`}>
-                            Remove criterion
-                          </button>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => updateDraft((current) => ({ ...current, rubric: [...current.rubric, newCriterion(current.scoringWeights[0]?.key ?? 'market')] }))}
-                      className={`${solidBtnCls} self-start`}
-                    >
-                      Add criterion
-                    </button>
+                    </div>
+
+                    {CANONICAL_DIMENSION_KEYS.map((dimKey) => {
+                      const dim = CANONICAL_DIMENSIONS[dimKey];
+                      const bands = DIMENSION_SCORE_BANDS[dimKey];
+                      return (
+                        <DimensionFrameworkCard
+                          key={dimKey}
+                          dimensionKey={dimKey}
+                          label={dim.label}
+                          description={dim.description}
+                          bands={bands}
+                          labelCls={labelCls}
+                          metaCls={metaCls}
+                        />
+                      );
+                    })}
                   </div>
                 </SettingsSection>
 
@@ -987,30 +1057,52 @@ export default function SettingsPage() {
   );
 }
 
-function updateCriterion(
-  rubric: RubricCriterion[],
-  id: string,
-  patch: Partial<RubricCriterion>
-): RubricCriterion[] {
-  return rubric.map((item) => item.id === id ? { ...item, ...patch } : item);
-}
-
-function newCriterion(dimension: ScoringDimensionKey): RubricCriterion {
-  const id = `criterion-${Date.now()}`;
-  return {
-    id,
-    dimension,
-    name: 'New criterion',
-    description: '',
-    weight: 25,
-    positiveSignals: '',
-    negativeSignals: '',
-    missingDataBehavior: 'Reduce confidence until evidence is supplied.',
-    examples: {
-      score3: '',
-      score5: '',
-      score7: '',
-      score9: '',
-    },
-  };
+function DimensionFrameworkCard({
+  dimensionKey,
+  label,
+  description,
+  bands,
+  labelCls,
+  metaCls,
+}: {
+  dimensionKey: CoreDimensionKey;
+  label: string;
+  description: string;
+  bands: Record<number, string>;
+  labelCls: string;
+  metaCls: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const anchorScores = [3, 5, 7, 9] as const;
+  return (
+    <div className="border-t border-oxford/[0.06] pt-phi-5 first:border-t-0 first:pt-0">
+      <div className="flex items-start justify-between gap-phi-4">
+        <div className="min-w-0">
+          <p className="type-body-emphasis text-oxford">{label}</p>
+          <p className="mt-phi-1 type-body-sm leading-relaxed text-oxford/50">{description}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((prev) => !prev)}
+          className="type-meta shrink-0 text-oxford/40 transition-colors hover:text-oxford/65"
+          aria-expanded={expanded}
+        >
+          {expanded ? 'Hide scale' : 'Show scale'}
+        </button>
+      </div>
+      {expanded && (
+        <div className="mt-phi-4 flex flex-col gap-phi-3 border-t border-oxford/[0.04] pt-phi-4">
+          {anchorScores.map((score) => (
+            <div key={`${dimensionKey}-${score}`} className="grid gap-phi-2 md:grid-cols-[48px_minmax(0,1fr)]">
+              <p className="font-mono text-[0.85rem] tabular-nums text-oxford/55">{score}/10</p>
+              <p className={metaCls}>{bands[score]}</p>
+            </div>
+          ))}
+          <p className={`${labelCls} mt-phi-2`}>
+            These definitions are institutional and cannot be modified per fund.
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }

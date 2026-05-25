@@ -123,7 +123,7 @@ const QueueTab = ({
 }: {
   active: boolean;
   label: string;
-  count: number;
+  count?: number;
   onClick: () => void;
   emphasize?: boolean;
   reduceMotion?: boolean;
@@ -143,22 +143,24 @@ const QueueTab = ({
     } uppercase tracking-[0.12em]`}
   >
     {label}
-    <motion.span
-      className={`ml-phi-1 inline-flex min-w-[1.5rem] items-center justify-center tabular-nums ${
-        emphasize
-          ? active
-            ? 'text-paper'
-            : 'rounded-none bg-paper px-phi-1 text-oxford'
-          : active
-            ? 'text-oxford/55'
-            : 'text-oxford/28'
-      }`}
-      initial={reduceMotion || !emphasize ? false : { scale: 0.92, opacity: 0.9 }}
-      animate={reduceMotion || !emphasize ? undefined : { scale: [0.92, 1.08, 1], opacity: [0.9, 1, 1] }}
-      transition={reduceMotion || !emphasize ? undefined : { duration: 0.42, ease: tokens.motion.ease }}
-    >
-      {count}
-    </motion.span>
+    {count != null ? (
+      <motion.span
+        className={`ml-phi-1 inline-flex min-w-[1.5rem] items-center justify-center tabular-nums ${
+          emphasize
+            ? active
+              ? 'text-paper'
+              : 'rounded-none bg-paper px-phi-1 text-oxford'
+            : active
+              ? 'text-oxford/55'
+              : 'text-oxford/28'
+        }`}
+        initial={reduceMotion || !emphasize ? false : { scale: 0.92, opacity: 0.9 }}
+        animate={reduceMotion || !emphasize ? undefined : { scale: [0.92, 1.08, 1], opacity: [0.9, 1, 1] }}
+        transition={reduceMotion || !emphasize ? undefined : { duration: 0.42, ease: tokens.motion.ease }}
+      >
+        {count}
+      </motion.span>
+    ) : null}
   </button>
 );
 
@@ -242,7 +244,7 @@ function getRowAttention(row: WorkGridRow): { label: string; reason: string; ton
   }
   if (row.isEscalated || row.hasHighAdverse) {
     return {
-      label: row.isEscalated ? 'Escalation' : 'Red flag',
+      label: row.isEscalated ? 'Needs ruling' : 'Red flag',
       reason: firstAdverse?.title || 'Human review required before conviction can form.',
       tone: 'critical',
     };
@@ -610,7 +612,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                   key={key}
                   active={queueView === key}
                   label={label}
-                  count={viewCounts[key]}
+                  count={key === 'NEW' ? viewCounts.NEW : undefined}
                   emphasize={key === 'NEW' && viewCounts.NEW > 0}
                   reduceMotion={reduceMotion}
                   onClick={() => setQueueView(key)}
@@ -625,7 +627,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                   onChange={(e) => setSortFilter(e.target.value as SortFilter)}
                   aria-label={SORT_OPTIONS.find((o) => o.value === sortFilter)?.title ?? 'Sort deals'}
                   title={SORT_OPTIONS.find((o) => o.value === sortFilter)?.title}
-                  className="appearance-none h-9 w-9 border-0 bg-transparent font-mono text-[15px] leading-none text-oxford/45 hover:text-oxford/75 transition-colors text-center outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-oxford/35"
+                  className="appearance-none h-9 w-9 border-0 bg-transparent font-mono text-[15px] leading-none text-oxford/45 hover:text-oxford/75 transition-colors text-center outline-none cursor-pointer focus:outline-none focus-visible:outline-none focus-visible:ring-0"
                 >
                   {SORT_OPTIONS.map(({ value, label, title }) => (
                     <option key={value} value={value} title={title}>
@@ -887,12 +889,12 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                       </h2>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-phi-2 gap-y-phi-1 self-start">
-                      {row.reviewBand && <VerdictBandBadge band={row.reviewBand} />}
+                      {row.reviewBand && <VerdictBandBadge band={row.reviewBand} badges={config.verdictBadges} />}
                       {(row.isEscalated || row.decisionVariant === 'escalation') && (
                         <DecisionBadge variant="escalation" />
                       )}
                       {!row.isEscalated && row.decisionVariant !== 'escalation' && (
-                        <DecisionBadge variant={row.decisionVariant} />
+                        <DecisionBadge variant={row.decisionVariant} badges={config.verdictBadges} />
                       )}
                     </div>
                   </div>

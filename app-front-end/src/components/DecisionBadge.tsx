@@ -1,6 +1,8 @@
+import type { CSSProperties } from 'react';
 import { DECISION_LABELS } from '../design-system/semantics';
 import { DECISION_BADGE_CLASS } from '../design-system/verdictBadgeTokens';
 import type { DecisionBadgeVariant } from '../lib/decisionBadgeVariant';
+import { badgeTextColorForBackground, type VerdictBadgeConfig } from '../lib/fundConfiguration';
 
 export type { DecisionBadgeVariant };
 
@@ -19,11 +21,23 @@ export const DECISION_BADGE_LABEL: Record<DecisionBadgeVariant, string> = {
   escalation: 'ESCALATION',
 };
 
-export default function DecisionBadge({ variant }: { variant: DecisionBadgeVariant }) {
+function badgeStyle(variant: DecisionBadgeVariant, badges?: VerdictBadgeConfig[]): CSSProperties | undefined {
+  if (variant !== 'INVEST' && variant !== 'MONITOR' && variant !== 'PASS') return undefined;
+  const backgroundColor = badges?.find((badge) => badge.id === variant)?.backgroundColor;
+  if (!backgroundColor) return undefined;
+  return {
+    backgroundColor,
+    color: badgeTextColorForBackground(backgroundColor),
+  };
+}
+
+export default function DecisionBadge({ variant, badges }: { variant: DecisionBadgeVariant; badges?: VerdictBadgeConfig[] }) {
   const text = DECISION_BADGE_LABEL[variant];
+  const style = badgeStyle(variant, badges);
   return (
     <span
       className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-meta tracking-badge uppercase py-phi-1 px-phi-2 ${DECISION_BADGE_CLASS[variant]}`}
+      style={style}
       aria-label={text}
     >
       {text}

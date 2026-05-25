@@ -17,6 +17,7 @@ import {
   fetchCalibrationState,
   fetchMetaInsights,
 } from '../api/meta';
+import { fetchFundThesisRuntime, type FundThesisRuntime } from '../api/fundThesis';
 import { fetchSettings } from '../api/settings';
 import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { useQueryLiveGate } from './useQueryLiveGate';
@@ -58,6 +59,9 @@ export interface SystemData {
   metaEvalSet: MetaEvalSet;
   systemHealth: SystemHealthSnapshot | null;
   metaInsights: MetaInsightsPayload | null;
+  fundThesisRuntime: FundThesisRuntime | null;
+  fundThesisRuntimeLoading: boolean;
+  fundThesisRuntimeError: string | null;
   settings: Settings | null;
   pendingEscalationCount: number;
   startupsError: string | null;
@@ -94,6 +98,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
       void queryClient.invalidateQueries({ queryKey: ['analytics'] });
       void queryClient.invalidateQueries({ queryKey: ['analytics', 'system-health'] });
       void queryClient.invalidateQueries({ queryKey: ['meta', 'insights'] });
+      void queryClient.invalidateQueries({ queryKey: ['fund-thesis'] });
     }
   }, [systemPanelOpen, isTabVisible, queryClient]);
 
@@ -202,6 +207,13 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     ...getQueryConfig('STATIC'),
   });
 
+  const fundThesisRuntimeQuery = useQuery({
+    queryKey: ['fund-thesis', 'runtime'],
+    queryFn: () => fetchFundThesisRuntime().catch(() => null),
+    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 120_000 }),
+    refetchInterval: isTabVisible ? 120_000 : false,
+  });
+
   const settingsQuery = useQuery({
     queryKey: ['settings'],
     queryFn: () => fetchSettings().catch(() => null),
@@ -238,6 +250,9 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     metaEvalSet: metaEvalSetQuery.data ?? { startup_ids: [], count: 0, max: 50 },
     systemHealth: systemHealthQuery.data ?? null,
     metaInsights: metaInsightsQuery.data ?? null,
+    fundThesisRuntime: fundThesisRuntimeQuery.data ?? null,
+    fundThesisRuntimeLoading: fundThesisRuntimeQuery.isPending,
+    fundThesisRuntimeError: fundThesisRuntimeQuery.isError ? 'Could not load thesis runtime' : null,
     settings: settingsQuery.data ?? null,
     pendingEscalationCount,
     startupsError: startupsQuery.isError ? 'Could not load startups' : null,

@@ -124,6 +124,66 @@ export interface StructuredScoring {
   overall_confidence?: number | null;
 }
 
+export interface PresentationComponent {
+  id: string;
+  label: string;
+  score: number;
+  band: string;
+  has_evidence: boolean;
+  interpretation: string;
+}
+
+export interface PresentationMissingEvidence {
+  label: string;
+  explanation: string;
+}
+
+export interface PresentationDimension {
+  id: string;
+  label: string;
+  score: number;
+  band: string;
+  headline: string;
+  score_interpretation: string;
+  analyst_summary: string;
+  /** Four-part analyst justification (replaces generic copy when present). */
+  score_justification?: string;
+  supports: string[];
+  weakens: string[];
+  missing_evidence: PresentationMissingEvidence[];
+  diligence_actions: string[];
+  confidence_label: string;
+  confidence_tooltip: string;
+  components: PresentationComponent[];
+  consistency_status?: 'consistent' | 'mildly_inconsistent' | 'materially_inconsistent';
+  consistency_explanation?: string;
+  consistency_penalty?: number;
+  positive_signal_strength?: number;
+  positive_signal_count?: number;
+  negative_signal_strength?: number;
+  negative_signal_count?: number;
+  evidence_coverage?: string;
+  evidence_coverage_warning?: string;
+  why_not_higher?: string[];
+  implied_score_range?: [number, number];
+  /** Soft, non-blocking analyst note when narrative and score may diverge. */
+  analyst_review_note?: string;
+}
+
+export interface ScoringConsistencyAudit {
+  overall_status: 'consistent' | 'mildly_inconsistent' | 'materially_inconsistent';
+  review_notes?: string[];
+}
+
+export interface ScoringPresentation {
+  overall_score: number;
+  overall_band: string;
+  confidence_label: string;
+  confidence_tooltip: string;
+  dimensions: PresentationDimension[];
+  consistency_audit?: ScoringConsistencyAudit;
+}
+
 export interface Review {
   market_score?: number;
   product_score?: number;
@@ -202,6 +262,8 @@ export interface Review {
   scoring?: StructuredScoring | null;
   structured_scoring?: StructuredScoring | null;
   score_breakdown?: StructuredScoring | null;
+  /** Investor-facing presentation DTO — the ONLY scoring data the UI should render. */
+  scoring_presentation?: ScoringPresentation | null;
   market?: ScoringDimension | null;
   execution?: ScoringDimension | null;
   product?: ScoringDimension | null;

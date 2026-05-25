@@ -105,9 +105,10 @@ function DispatchPanelBody({
     ? 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-medium font-sans text-[13px] leading-[1.5] text-oxford placeholder:text-oxford/28 outline-none disabled:cursor-not-allowed'
     : 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/28 outline-none disabled:cursor-not-allowed';
 
+  const showStatusSlot = isBusy || !!lookupMessage;
   const statusSlotCls = embedded
-    ? 'mt-phi-2 grid min-h-[44px] content-start gap-phi-1'
-    : 'mt-phi-3 grid min-h-[48px] content-start gap-phi-1';
+    ? `mt-phi-2 grid content-start gap-phi-1${showStatusSlot ? ' min-h-[44px]' : ''}`
+    : `mt-phi-3 grid content-start gap-phi-1${showStatusSlot ? ' min-h-[48px]' : ''}`;
 
   const statusLeft = (() => {
     if (lookupMessage) {
@@ -133,13 +134,7 @@ function DispatchPanelBody({
         </>
       );
     }
-    if (!isBusy) {
-      return (
-        <p className={embedded ? `${railEditorial.meta} text-oxford/28` : 'type-meta text-oxford/30'}>
-          Name or URL, then Enter.
-        </p>
-      );
-    }
+    if (!isBusy) return null;
     return <p className={embedded ? `${railEditorial.meta} text-oxford/32` : 'type-meta text-oxford/35'}>Dispatch active.</p>;
   })();
 
@@ -187,10 +182,14 @@ function DispatchPanelBody({
         )}
       </div>
 
-      <div className={statusSlotCls}>
-        <div className="flex min-w-0 flex-1 items-center gap-phi-2">{statusLeft}</div>
-        <LookupPhaseLine lookupPhase={isBusy ? lookupPhase : null} />
-      </div>
+      {showStatusSlot ? (
+        <div className={statusSlotCls}>
+          {statusLeft ? (
+            <div className="flex min-w-0 flex-1 items-center gap-phi-2">{statusLeft}</div>
+          ) : null}
+          <LookupPhaseLine lookupPhase={isBusy ? lookupPhase : null} />
+        </div>
+      ) : null}
     </>
   );
 }

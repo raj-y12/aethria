@@ -2,7 +2,7 @@ import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useSt
 import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
 import './InvestmentMemoContent.css';
-import type { Review, ScoringDimensionKey, Startup, AethriaView } from '../types/startup';
+import type { Review, ScoringDimensionKey, Startup, AethriaView, StructuredScoring, SingleReview } from '../types/startup';
 import { normalizeStructuredScoring } from '../lib/reviewScoring';
 import {
   buildMemoPDF,
@@ -17,7 +17,7 @@ import { UI_DETAIL_EMPTY_HINT } from '../design-system/ui-text';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import ScoreOverview from './scoring/ScoreOverview';
-import DimensionCard from './scoring/DimensionCard';
+import AssessmentDimensionStrip from './scoring/AssessmentDimensionStrip';
 import { DECISION_BADGE_LABEL } from './DecisionBadge';
 import { getDecisionBadgeVariant, type DecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 import { resolveEscalation } from '../api/escalations';
@@ -400,6 +400,126 @@ function MemoPlainSection({
   );
 }
 
+function pickCanonicalStructuredScoring(review: Review | null | undefined): StructuredScoring | null {
+  return review?.structured_scoring ?? review?.scoring ?? review?.score_breakdown ?? null;
+}
+
+function jsonStable(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '';
+  }
+}
+
+function buildMemoScoreDebugPayload(
+  startupId: string,
+  review: Review | null | undefined,
+  normalized: StructuredScoring | null
+) {
+  const canonical = pickCanonicalStructuredScoring(review);
+  const canonicalJson = jsonStable(canonical);
+  const normalizedDiffers = normalized != null && jsonStable(normalized) !== canonicalJson;
+
+  const consensusSignals = review?.structured_signals ?? null;
+  const consensusSignalsJson = jsonStable(consensusSignals);
+
+  const reviewerRows = (review?.reviews ?? []).map((row: SingleReview) => {
+    const extended = row as SingleReview & { structured_scoring?: StructuredScoring | null };
+    const rowScoring = extended.structured_scoring ?? null;
+    const rowSignals = row.structured_signals ?? null;
+    const entry: Record<string, unknown> = {
+      reviewer_type: row.reviewer_type,
+      verdict: row.verdict,
+      score_source: row.score_source ?? null,
+      market_score: row.market_score,
+      product_score: row.product_score,
+      technical_score: row.technical_score,
+      execution_score: row.execution_score,
+      defensibility_score: row.defensibility_score,
+    };
+    if (rowScoring && jsonStable(rowScoring) !== canonicalJson) {
+      entry.structured_scoring = rowScoring;
+    }
+    if (rowSignals && jsonStable(rowSignals) !== consensusSignalsJson) {
+      entry.structured_signals = rowSignals;
+    }
+    return entry;
+  });
+
+  return {
+    startup_id: startupId,
+    _note:
+      'Single copy of scoring data. API fields scoring/score_breakdown are aliases only (not stored separately in Supabase).',
+    structured_scoring: canonical,
+    ...(normalizedDiffers ? { normalized_ui: normalized } : {}),
+    consensus: {
+      flat_scores: {
+        market_score: review?.market_score ?? null,
+        product_score: review?.product_score ?? null,
+        technical_score: review?.technical_score ?? null,
+        execution_score: review?.execution_score ?? null,
+        defensibility_score: review?.defensibility_score ?? null,
+      },
+      overall_score: review?.overall_score ?? null,
+      aggregate_score: review?.aggregate_score ?? null,
+      overall_rubric_band: review?.overall_rubric_band ?? null,
+      score_source: review?.score_source ?? null,
+      structured_signals: consensusSignals,
+      reviewer_disagreement: review?.reviewer_disagreement ?? null,
+      score_variance: review?.score_variance ?? null,
+    },
+    reviewers: reviewerRows,
+  };
+}
+
+function MemoScoreDebugPayload({
+  startupId,
+  review,
+  normalized,
+}: {
+  startupId: string;
+  review: Review | null | undefined;
+  normalized: StructuredScoring | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const json = useMemo(
+    () => JSON.stringify(buildMemoScoreDebugPayload(startupId, review, normalized), null, 2),
+    [startupId, review, normalized]
+  );
+
+  const handleCopy = () => {
+    void navigator.clipboard?.writeText(json).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div className="memoScoreDebug" aria-label="Assessment scoring debug payload">
+      <div className="memoScoreDebugHead">
+        <button
+          type="button"
+          className="memoScoreDebugToggle"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+        >
+          Debug payload
+        </button>
+        <button type="button" className="memoAction" onClick={handleCopy}>
+          {copied ? 'Copied' : 'Copy JSON'}
+        </button>
+      </div>
+      {open && (
+        <pre className="memoScoreDebugPre">
+          <code>{json}</code>
+        </pre>
+      )}
+    </div>
+  );
+}
+
 const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, InvestmentMemoContentProps>(function InvestmentMemoContent(
   { startup, onClose, embedded = false, onMemoPipelineReady, onDecisionResolved, fundConfiguration, peerStartups = [] },
   ref
@@ -624,6 +744,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
   const structuredScoring = useMemo(
     () => normalizeStructuredScoring(displayStartup?.review ?? null),
+    [displayStartup?.review]
+  );
+
+  const scoringPresentation = useMemo(
+    () => displayStartup?.review?.scoring_presentation ?? null,
     [displayStartup?.review]
   );
   const nextStepText = displayStartup ? getNextStepText(displayStartup) : '';
@@ -940,17 +1065,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     <div className="memoDocScoreScope">
                       {structuredScoring && (
                         <>
-                          <ScoreOverview scoring={structuredScoring} />
-                          <div className="memoScoreDimensionStack">
-                            {SCORING_DIMENSIONS.map((dimension) => (
-                              <DimensionCard
-                                key={dimension.key}
-                                id={dimension.id}
-                                title={dimension.label}
-                                dimension={structuredScoring[dimension.key]}
-                              />
-                            ))}
-                          </div>
+                          <ScoreOverview scoring={structuredScoring} presentation={scoringPresentation} />
+                          <AssessmentDimensionStrip
+                            dimensions={SCORING_DIMENSIONS}
+                            scoring={structuredScoring}
+                            presentation={scoringPresentation}
+                            contentKey={contentKey}
+                          />
                         </>
                       )}
                       {(displayStartup.review?.improvement_to_9?.length ?? 0) > 0 && (
@@ -965,6 +1086,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                             ))}
                           </ul>
                         </div>
+                      )}
+                      {import.meta.env.DEV && (
+                        <MemoScoreDebugPayload
+                          startupId={displayStartup.id}
+                          review={displayStartup.review}
+                          normalized={structuredScoring}
+                        />
                       )}
                     </div>
                   )}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
@@ -6,12 +6,14 @@ import type {
   Startup, SignalItem, RejectionAnalytics, WatchlistAnalytics,
   ConcentrationAnalytics, MetaCycleReport, MetaPromptState, MetaEvalSet, PromptEvaluateResult, ScoutWeights, CalibrationState,
   HumanFeedbackSummary, SystemHealthSnapshot, MetaInsightsPayload,
+  CalibrationChangeSummary, WeightUpdateSummary, PromptMutationSummary,
 } from '../types/startup';
+import type { FundThesisRuntime } from '../api/fundThesis';
 import { triggerMetaCycle, promoteMetaPrompt, resetMetaPrompt, saveMetaEvalSet, runPromptEvaluation } from '../api/meta';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import EmptyState from './EmptyState';
-import { fetchFundThesisRuntime, type FundThesisRuntime } from '../api/fundThesis';
+import DecisionBadge, { DECISION_BADGE_LABEL, type DecisionBadgeVariant } from './DecisionBadge';
 import { buildFundIntelligenceSnapshot } from '../lib/institutionalConviction';
 import { createDefaultFundConfiguration, type FundConfiguration } from '../lib/fundConfiguration';
 
@@ -27,6 +29,8 @@ const TABS: { key: Tab; label: string }[] = [
 
 interface SystemIntelligenceProps {
   startups: Startup[];
+  onStartupClick?: (startup: Startup) => void;
+  selectedStartupId?: string | null;
   signals: SignalItem[];
   rejectionAnalytics: RejectionAnalytics;
   watchlistAnalytics: WatchlistAnalytics;
@@ -38,7 +42,26 @@ interface SystemIntelligenceProps {
   metaPromptState: MetaPromptState;
   metaEvalSet: MetaEvalSet;
   metaInsights: MetaInsightsPayload | null;
+  fundThesisRuntime: FundThesisRuntime | null;
+  fundThesisRuntimeLoading?: boolean;
+  fundThesisRuntimeError?: string | null;
   fundConfiguration?: FundConfiguration;
+}
+
+function mandateTagList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+}
+
+function formatAlignmentPct(score: number | null | undefined): string {
+  if (score == null || Number.isNaN(score)) return '--';
+  return `${Math.round(score * 100)}%`;
+}
+
+function formatDrift(drift: number | null | undefined): string {
+  if (drift == null || Number.isNaN(drift)) return '--';
+  const rounded = Math.round(drift * 1000) / 1000;
+  return rounded > 0 ? `+${rounded.toFixed(2)}` : rounded.toFixed(2);
 }
 
 const REVIEWER_EVAL_AGENTS = new Set(['DefaultReviewer', 'SkepticalReviewer', 'OpportunistReviewer']);
@@ -73,16 +96,40 @@ function TacticalBar({ pct, delay = 0 }: { pct: number; delay?: number }) {
 }
 
 /* ─── ROW WRAPPER ─── */
-function RowWrapper({ children, index, onClick, isSelected }: { children: React.ReactNode; index: number; onClick?: () => void; isSelected?: boolean }) {
+function RowWrapper({
+  children,
+  index,
+  onClick,
+  isSelected,
+  ariaLabel,
+}: {
+  children: React.ReactNode;
+  index: number;
+  onClick?: () => void;
+  isSelected?: boolean;
+  ariaLabel?: string;
+}) {
   const reduceMotion = usePrefersReducedMotion();
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!onClick) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick();
+    }
+  };
   return (
     <motion.div
       initial={reduceMotion ? {} : { opacity: 0, transform: 'translateY(6px)' }}
       animate={{ opacity: 1, transform: 'translateY(0px)' }}
       transition={{ delay: Math.min(index * 0.03, 0.3), duration: 0.4, ease: tokens.motion.ease }}
-      className={`group relative py-phi-4 px-phi-4 transition-colors duration-200 ease-smooth ${onClick ? 'cursor-pointer' : ''
+      className={`group relative py-phi-4 px-phi-4 transition-colors duration-200 ease-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${onClick ? 'cursor-pointer' : ''
         } ${isSelected ? 'bg-surface-selected' : 'hover:bg-registerTint'}`}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-pressed={onClick ? isSelected : undefined}
+      aria-label={onClick ? ariaLabel : undefined}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
     >
       <div className="grid grid-cols-1 gap-phi-3 items-start lg:grid-cols-[26px_minmax(0,1fr)_auto]">
         {children}
@@ -149,25 +196,39 @@ function SignalsTab({ signals }: { signals: SignalItem[] }) {
   );
 }
 
+function humanResolutionBadgeVariant(decision: 'YES' | 'NO' | 'MAYBE'): DecisionBadgeVariant {
+  if (decision === 'YES') return 'INVEST';
+  if (decision === 'MAYBE') return 'MONITOR';
+  return 'PASS';
+}
+
 /* ─── DECISIONS ─── */
-function DecisionsTab({ startups }: { startups: Startup[] }) {
+function DecisionsTab({
+  startups,
+  onStartupClick,
+  selectedStartupId,
+}: {
+  startups: Startup[];
+  onStartupClick?: (startup: Startup) => void;
+  selectedStartupId?: string | null;
+}) {
   const decisions = startups
     .filter((startup) => startup.human_resolution?.decision)
     .map((startup) => {
-      const raw = startup.human_resolution?.decision;
-      const mapped =
-        raw === 'YES'
-          ? 'Invest'
-          : raw === 'MAYBE'
-            ? 'Monitor'
-            : 'Pass';
+      const raw = startup.human_resolution!.decision as 'YES' | 'NO' | 'MAYBE';
       return {
+        startup,
         id: startup.id,
         name: startup.scout?.name?.trim() || startup.id,
-        decision: mapped,
+        badgeVariant: humanResolutionBadgeVariant(raw),
         notes: startup.human_resolution?.notes?.trim() ?? '',
         resolvedAt: startup.human_resolution?.resolved_at,
       };
+    })
+    .sort((a, b) => {
+      const ta = a.resolvedAt ? new Date(a.resolvedAt).getTime() : 0;
+      const tb = b.resolvedAt ? new Date(b.resolvedAt).getTime() : 0;
+      return tb - ta;
     });
 
   if (decisions.length === 0) {
@@ -182,44 +243,45 @@ function DecisionsTab({ startups }: { startups: Startup[] }) {
   }
 
   return (
-    <div className="flex flex-col relative">
-      {decisions.map((item, i) => (
-        <RowWrapper key={item.id} index={i}>
-          <div className="flex flex-col gap-phi-2 min-w-0">
-            <span className="font-mono type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums">
-              {(i + 1).toString().padStart(2, '0')}
-            </span>
-            <div className="flex flex-col gap-phi-1">
-              <span className="type-meta uppercase tracking-[0.12em] text-oxford/35">Decision</span>
-              <span className="type-meta text-oxford/70">{item.decision}</span>
-            </div>
-          </div>
+    <div className="flex flex-col relative divide-y divide-oxford/[0.06]">
+      {decisions.map((item, i) => {
+        const resolvedLabel = item.resolvedAt
+          ? new Date(item.resolvedAt).toLocaleDateString('en-GB')
+          : 'date unknown';
+        return (
+        <RowWrapper
+          key={item.id}
+          index={i}
+          onClick={onStartupClick ? () => onStartupClick(item.startup) : undefined}
+          isSelected={selectedStartupId === item.id}
+          ariaLabel={`Open memo for ${item.name}, ${DECISION_BADGE_LABEL[item.badgeVariant]}, resolved ${resolvedLabel}`}
+        >
+          <span className="font-mono type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums pt-px">
+            {(i + 1).toString().padStart(2, '0')}
+          </span>
 
           <div className="flex min-w-0 flex-col gap-phi-2">
-            <div className="flex items-center gap-phi-2">
-              <span className="type-meta uppercase tracking-[0.12em] text-oxford/40">Startup</span>
-              <span className="type-meta text-oxford/20">·</span>
-              <span className="type-label-tab text-oxford/75 truncate">{item.name}</span>
+            <div className="flex flex-wrap items-center gap-x-phi-3 gap-y-phi-2">
+              <span className="type-label-tab text-oxford/80 truncate">{item.name}</span>
+              <DecisionBadge variant={item.badgeVariant} />
             </div>
             {item.notes ? (
-              <p className="type-note text-oxford/62 leading-relaxed max-w-2xl">
+              <p className="type-note text-oxford/60 leading-relaxed max-w-2xl">
                 {item.notes}
               </p>
             ) : (
-              <p className="type-meta text-oxford/40">No notes provided</p>
+              <p className="type-meta text-oxford/40">No notes</p>
             )}
           </div>
 
-          <div className="flex min-w-0 flex-col items-start gap-phi-5 lg:items-end">
-            <div className="flex flex-col items-start lg:items-end gap-phi-2">
-              <span className="type-meta uppercase tracking-[0.12em] text-oxford/35">Resolved</span>
-              <span className="font-mono type-meta text-oxford/50 tabular-nums">
-                {item.resolvedAt ? new Date(item.resolvedAt).toLocaleDateString('en-GB') : '--'}
-              </span>
-            </div>
+          <div className="min-w-0 lg:text-right shrink-0">
+            <span className="font-mono type-meta text-oxford/45 tabular-nums">
+              {item.resolvedAt ? new Date(item.resolvedAt).toLocaleDateString('en-GB') : '—'}
+            </span>
           </div>
         </RowWrapper>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -290,7 +352,7 @@ function CalibrationTab({ startups, fundConfiguration }: { startups: Startup[]; 
 /* ─── SECTION WRAPPER ─── */
 function TabSection({ title, label, children }: { title: string; label?: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-phi-4 px-phi-4 py-phi-7">
+    <section className="flex flex-col gap-phi-4 px-phi-4 pt-phi-7 pb-phi-7 first:pt-phi-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
         <h3 className="type-meta uppercase tracking-[0.12em] text-oxford/50">{title}</h3>
         {label ? <span className="type-meta uppercase tracking-[0.12em] text-oxford/30">{label}</span> : null}
@@ -410,24 +472,34 @@ function AnalyticsTab({ rejection, watchlist, concentration, systemHealth }: {
   );
 }
 
+function MandateTagGroup({ label, tags }: { label: string; tags: string[] }) {
+  return (
+    <div className="flex flex-col gap-phi-3">
+      <span className="type-meta text-oxford/30 uppercase tracking-[0.12em]">{label}</span>
+      {tags.length > 0 ? (
+        <div className="flex flex-wrap gap-phi-2 mt-phi-1">
+          {tags.map((s) => (
+            <span key={s} className="type-meta bg-registerTint px-phi-2 py-phi-1 text-oxford/55">{s}</span>
+          ))}
+        </div>
+      ) : (
+        <p className="type-meta text-oxford/40">Not specified</p>
+      )}
+    </div>
+  );
+}
+
 /* ─── FUND THESIS ─── */
-function InstitutionalMandateTab() {
-  const [data, setData] = useState<FundThesisRuntime | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  const load = useCallback(() => {
-    fetchFundThesisRuntime()
-      .then(setData)
-      .catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Failed to load'));
-  }, []);
-
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 120_000);
-    return () => clearInterval(t);
-  }, [load]);
-
-  if (err) {
+function InstitutionalMandateTab({
+  data,
+  loading,
+  error,
+}: {
+  data: FundThesisRuntime | null;
+  loading?: boolean;
+  error?: string | null;
+}) {
+  if (error) {
     return (
       <div className="py-phi-8 px-phi-4 flex items-center justify-center">
         <EmptyState label="Fund Thesis" body="Could not load thesis data. Check your API connection and try again." />
@@ -435,13 +507,15 @@ function InstitutionalMandateTab() {
     );
   }
 
-  if (!data) return (
-    <div className="px-phi-4 py-phi-6">
-      <p className="type-meta text-oxford/45 uppercase tracking-[0.12em]">Loading...</p>
-    </div>
-  );
+  if (loading && !data) {
+    return (
+      <div className="px-phi-4 py-phi-4">
+        <p className="type-meta text-oxford/45 uppercase tracking-[0.12em]">Loading...</p>
+      </div>
+    );
+  }
 
-  if (data.mode === 'missing' || (!data.parsed_json && data.thesis_ready === false)) {
+  if (!data || data.mode === 'missing' || (!data.parsed_json && data.thesis_ready === false)) {
     return (
       <div className="py-phi-8 px-phi-4 flex items-center justify-center">
         <EmptyState label="Fund Thesis" body="No active thesis configured. Set up your investment mandate in Settings to enable thesis-aligned scouting." />
@@ -450,53 +524,71 @@ function InstitutionalMandateTab() {
   }
 
   const pj = data.parsed_json ?? {};
-  const sectors = Array.isArray(pj.sectors) ? (pj.sectors as string[]) : [];
-  const stages = Array.isArray(pj.stage_focus) ? (pj.stage_focus as string[]) : [];
+  const sectors = mandateTagList(pj.sectors);
+  const stages = mandateTagList(pj.stage_focus);
+  const reviewedCount = data.alignment_stats?.reviewed_with_thesis_count ?? 0;
+  const pctMatch = data.alignment_stats?.pct_matching_thesis;
+  const mandateMode = data.thesis_mode === 'embedding' ? 'AI Enhanced' : 'Rule Based';
 
   return (
     <div className="flex flex-col">
       <TabSection title="Portfolio Mandate" label={`v${data.active_version_number ?? '01'}`}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-phi-5">
           <div className="flex flex-col gap-phi-5">
-            <div className="flex flex-col gap-phi-3">
-              <span className="type-meta text-oxford/30 uppercase tracking-[0.12em]">Target Sectors</span>
-              <div className="flex flex-wrap gap-phi-2 mt-phi-1">
-                {sectors.map(s => <span key={s} className="type-meta bg-registerTint px-phi-2 py-phi-1 text-oxford/55">{s}</span>)}
-              </div>
-            </div>
-            <div className="flex flex-col gap-phi-3">
-              <span className="type-meta text-oxford/30 uppercase tracking-[0.12em]">Stage Focus</span>
-              <div className="flex flex-wrap gap-phi-2 mt-phi-1">
-                {stages.map(s => <span key={s} className="type-meta bg-registerTint px-phi-2 py-phi-1 text-oxford/55">{s}</span>)}
-              </div>
-            </div>
+            <MandateTagGroup label="Target Sectors" tags={sectors} />
+            <MandateTagGroup label="Stage Focus" tags={stages} />
           </div>
           <div className="flex flex-col gap-phi-3 p-phi-4 bg-registerTint">
             <span className="type-meta text-oxford/30 uppercase tracking-[0.12em]">Agent Directive</span>
             <p className="type-body text-oxford/60 leading-relaxed italic">
-              Scouts are calibrated to prioritize {sectors[0] || 'core sector'} opportunities within {stages[0] || 'targeted stage'} cycles.
-              Mandate mode: <span className="text-oxford/80">{data.thesis_mode === 'embedding' ? 'AI Enhanced' : 'Rule Based'}</span>.
+              Scouts prioritize {sectors[0] || 'core sector'} at {stages[0] || 'target stage'}.
+              {' '}
+              <span className="text-oxford/80">{mandateMode}</span> mandate.
             </p>
           </div>
         </div>
       </TabSection>
 
-      <TabSection title="Alignment">
+      <TabSection title="Alignment" label={reviewedCount > 0 ? `${reviewedCount} reviewed` : undefined}>
         <div className="grid grid-cols-3 gap-phi-4">
           <div className="bg-registerTint px-phi-3 py-phi-3">
-            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.pct_matching_thesis ?? '--'}%</span>
+            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">
+              {pctMatch != null ? `${pctMatch}%` : '--'}
+            </span>
             <span className="type-meta text-oxford/50">Mandate match</span>
           </div>
           <div className="bg-registerTint px-phi-3 py-phi-3">
-            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.avg_alignment_score ?? '--'}</span>
+            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">
+              {formatAlignmentPct(data.alignment_stats?.avg_alignment_score)}
+            </span>
             <span className="type-meta text-oxford/50">Mean alignment</span>
           </div>
           <div className="bg-registerTint px-phi-3 py-phi-3">
-            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">{data.alignment_stats?.drift_vs_previous ?? '0.00'}</span>
+            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">
+              {formatDrift(data.alignment_stats?.drift_vs_previous)}
+            </span>
             <span className="type-meta text-oxford/50">Drift</span>
           </div>
         </div>
       </TabSection>
+
+      {(data.version_timeline?.length ?? 0) > 0 && (
+        <TabSection title="Version History">
+          <ul className="flex flex-col border border-oxford/[0.06] bg-oxford/[0.01] divide-y divide-oxford/[0.06]">
+            {(data.version_timeline ?? []).slice(0, 5).map((v) => (
+              <li key={v.id} className="flex flex-wrap items-baseline justify-between gap-phi-3 px-phi-4 py-phi-3">
+                <span className="type-meta text-oxford/65">
+                  v{v.version_number}
+                  {v.is_active ? ' · active' : ''}
+                </span>
+                <span className="font-mono type-meta text-oxford/40 tabular-nums">
+                  {v.created_at ? new Date(v.created_at).toLocaleDateString('en-GB') : '—'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </TabSection>
+      )}
     </div>
   );
 }
@@ -536,28 +628,37 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
   };
 
   const lastReport = reports.length > 0 ? reports[0] : null;
-  const proposalCount =
-    (lastReport?.prompt_proposals?.length ?? lastReport?.mutations_applied?.length ?? 0);
+  const proposalCount = Math.max(
+    lastReport?.prompt_proposals?.length ?? 0,
+    lastReport?.mutations_applied?.length ?? 0,
+  );
+  const calibrationCount = lastReport?.calibration_changes?.length ?? 0;
 
   const agentFromLibraryKey = (libraryKey: string) => libraryKey.split(':')[0] ?? '';
 
-  const humanFb: HumanFeedbackSummary | undefined = lastReport?.signal_summary?.human_feedback;
+  const humanFb: HumanFeedbackSummary | undefined =
+    lastReport?.signal_summary?.human_feedback ?? insights?.signal_summary?.human_feedback;
   const humanFbLine =
     humanFb && humanFb.recent_count > 0
       ? `Recorded ${humanFb.recent_count} analyst confirmations in the last correction signal (Invest ${humanFb.by_outcome?.YES ?? 0}, Pass ${humanFb.by_outcome?.NO ?? 0}, Monitor ${humanFb.by_outcome?.MAYBE ?? 0}${humanFb.disagreed_with_ai_count ? `; ${humanFb.disagreed_with_ai_count} differed from the AI recommendation at resolve time` : ''}).`
       : null;
 
-  const whatChangedTotal =
-    (insights?.what_changed?.mutations_applied?.length ?? 0) +
-    (insights?.what_changed?.prompt_proposals?.length ?? 0) +
-    (insights?.what_changed?.weight_updates?.length ?? 0) +
-    (insights?.what_changed?.calibration_changes?.length ?? 0);
+  const wc = insights?.what_changed;
+  const insightPromptCount = Math.max(wc?.mutations_applied?.length ?? 0, wc?.prompt_proposals?.length ?? 0);
+  const insightWeightCount = wc?.weight_updates?.length ?? 0;
+  const insightCalibrationCount = wc?.calibration_changes?.length ?? 0;
+  const whatChangedTotal = insightPromptCount + insightWeightCount + insightCalibrationCount;
+  const insightMutations = (
+    (wc?.mutations_applied?.length ? wc.mutations_applied : wc?.prompt_proposals) ?? []
+  ) as PromptMutationSummary[];
+  const insightWeights = (wc?.weight_updates ?? []) as WeightUpdateSummary[];
+  const insightCalibrations = (wc?.calibration_changes ?? []) as CalibrationChangeSummary[];
   const showLatestInsight =
     !!insights?.latest && ((insights?.why?.length ?? 0) > 0 || whatChangedTotal > 0);
 
   return (
     <div className="flex flex-col">
-      <div className="px-phi-4 py-phi-5 border-b border-oxford/[0.06]">
+      <div className="px-phi-4 pt-phi-4 pb-phi-5 border-b border-oxford/[0.06]">
         <p className="type-body text-oxford/65 leading-relaxed max-w-2xl">
           This tab runs the scheduled correction cycle: it proposes updates to scouts, reviewers, and score thresholds.
           When you confirm <span className="text-oxford/80">Invest</span>, <span className="text-oxford/80">Pass</span>, or{' '}
@@ -579,7 +680,51 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
                 <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">Cycle</span>
               </div>
             )}
+            {whatChangedTotal > 0 && (
+              <>
+                {insightPromptCount > 0 && (
+                  <div className="flex flex-col gap-phi-1">
+                    <span className="font-mono font-semibold text-xl tabular-nums text-oxford">{insightPromptCount}</span>
+                    <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">Prompts</span>
+                  </div>
+                )}
+                {insightWeightCount > 0 && (
+                  <div className="flex flex-col gap-phi-1">
+                    <span className="font-mono font-semibold text-xl tabular-nums text-oxford">{insightWeightCount}</span>
+                    <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">Weights</span>
+                  </div>
+                )}
+                {insightCalibrationCount > 0 && (
+                  <div className="flex flex-col gap-phi-1">
+                    <span className="font-mono font-semibold text-xl tabular-nums text-oxford">{insightCalibrationCount}</span>
+                    <span className="type-meta text-oxford/40 uppercase tracking-[0.1em]">Calibration</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
+          {whatChangedTotal > 0 && (
+            <div className="flex flex-col gap-phi-3 mb-phi-4 border border-oxford/[0.06] bg-oxford/[0.01] divide-y divide-oxford/[0.06]">
+              {insightMutations.map((m, i) => (
+                <p key={`mut-${m.agent_target}-${i}`} className="type-meta text-oxford/55 leading-relaxed px-phi-4 py-phi-3">
+                  <span className="text-oxford/70">{m.agent_target}</span>
+                  {m.reasoning ? ` — ${m.reasoning}` : ''}
+                </p>
+              ))}
+              {insightWeights.map((w, i) => (
+                <p key={`wt-${w.agent_target}-${i}`} className="type-meta text-oxford/55 leading-relaxed px-phi-4 py-phi-3 font-mono">
+                  {w.agent_target}: {Math.round((w.previous_weight ?? 0) * 100)}% → {Math.round((w.new_weight ?? 0) * 100)}%
+                </p>
+              ))}
+              {insightCalibrations.map((c, i) => (
+                <p key={`cal-${c.parameter}-${i}`} className="type-meta text-oxford/55 leading-relaxed px-phi-4 py-phi-3">
+                  <span className="text-oxford/70">{c.parameter.replace(/_/g, ' ')}</span>
+                  {c.direction ? ` (${c.direction})` : ''}
+                  {c.reasoning ? ` — ${c.reasoning}` : ''}
+                </p>
+              ))}
+            </div>
+          )}
           {(insights?.why?.length ?? 0) > 0 && (
             <div className="flex flex-col gap-phi-2">
               <span className="type-meta text-oxford/35 uppercase tracking-[0.12em]">Why (no-action / guardrails)</span>
@@ -597,6 +742,7 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
               { label: 'Ran', value: new Date(lastReport.ran_at).toLocaleDateString('en-GB') },
               { label: 'Prompt proposals', value: proposalCount },
               { label: 'Weight updates', value: (lastReport.weight_updates ?? []).length },
+              { label: 'Calibration', value: calibrationCount },
             ].map((s) => (
               <div key={s.label} className="flex flex-col gap-phi-1">
                 <span className="font-mono font-semibold text-[clamp(18px,1.6vw,24px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">{s.value}</span>
@@ -926,11 +1072,23 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
               systemHealth={props.systemHealth}
             />
           )}
-          {activeTab === 'decisions' && <DecisionsTab startups={props.startups} />}
+          {activeTab === 'decisions' && (
+            <DecisionsTab
+              startups={props.startups}
+              onStartupClick={props.onStartupClick}
+              selectedStartupId={props.selectedStartupId}
+            />
+          )}
           {activeTab === 'calibration' && (
             <CalibrationTab startups={props.startups} fundConfiguration={props.fundConfiguration} />
           )}
-          {activeTab === 'thesis' && <InstitutionalMandateTab />}
+          {activeTab === 'thesis' && (
+            <InstitutionalMandateTab
+              data={props.fundThesisRuntime}
+              loading={props.fundThesisRuntimeLoading}
+              error={props.fundThesisRuntimeError}
+            />
+          )}
           {activeTab === 'meta' && (
             <MetaCommandTab
               reports={props.metaReports}

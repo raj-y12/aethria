@@ -22,6 +22,7 @@ from portfolio.health import HealthMonitor
 from portfolio.rejection import RejectionAnalyzer
 from analytics.clustering import ClusterAnalyzer
 from utils.storage import Storage
+from utils.partner_codes import legacy_from_recommendation
 
 
 logger = logging.getLogger(__name__)
@@ -153,6 +154,11 @@ class PortfolioEngine:
                 if human_resolution and human_resolution.get("decision"):
                     partner_data = dict(partner_data)
                     partner_data["decision"] = human_resolution["decision"]
+                elif partner_data.get("recommendation") and not partner_data.get("decision"):
+                    partner_data = dict(partner_data)
+                    partner_data["decision"] = legacy_from_recommendation(
+                        partner_data.get("recommendation")
+                    )
                 
                 startup_id = startup_data.get("id") if startup_data else entry.get("startup_id", entry.get("id"))
                 

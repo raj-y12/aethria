@@ -158,6 +158,67 @@
   max-width: 39rem;
   width: 100%;
 }
+
+/* Embedded column (3-col shell): between full memo and compact rail — readable, not shouty. */
+.memoPanel--embedded .memoCompany {
+  font-size: clamp(1.75rem, 3.6vw, 2.5rem);
+  letter-spacing: -0.03em;
+}
+.memoPanel--embedded .memoDocRecommendation {
+  font-size: clamp(1.5rem, 2.6vw, 2rem);
+  font-weight: 600;
+}
+.memoPanel--embedded .memoDocOverallScoreValue {
+  font-size: clamp(2.125rem, 4vw, 3.25rem);
+}
+.memoPanel--embedded .memoDocScorePanelNumber {
+  font-size: clamp(1.5rem, 3.2vw, 2.375rem);
+}
+.memoPanel--embedded .memoDocDivider {
+  margin-top: clamp(14px, 2.2vw, 22px);
+}
+.memoPanel--embedded .memoDecisionCluster {
+  margin-top: 24px;
+}
+.memoPanel--embedded .memoDecisionCluster .memoDocSection + .memoDocSection {
+  margin-top: 22px;
+}
+.memoPanel--embedded .memoDocJudgmentTop {
+  margin-bottom: 14px;
+}
+.memoPanel--embedded .memoRecommendationBlock {
+  margin-top: 22px;
+}
+.memoPanel--embedded .memoDocSection {
+  margin-top: clamp(32px, 4.1vw, 48px);
+}
+.memoPanel--embedded .memoDocSection + .memoDocSection {
+  margin-top: clamp(28px, 3.4vw, 42px);
+}
+.memoPanel--embedded .memoDocVerdictSection {
+  margin-top: clamp(34px, 4.2vw, 48px);
+}
+.memoPanel--embedded .memoAssessmentSection .memoDocSectionHead {
+  margin-bottom: clamp(14px, 2.4vw, 24px);
+}
+.memoPanel--embedded .memoScoreDimensionStack {
+  margin-top: clamp(24px, 3.4vw, 36px);
+  gap: clamp(14px, 2.2vw, 24px);
+}
+.memoPanel--embedded .memoAssessmentReadouts {
+  margin-top: clamp(28px, 3.8vw, 48px);
+  gap: clamp(16px, 2.6vw, 28px);
+}
+.memoPanel--embedded .memoSourcesSection {
+  margin-top: clamp(28px, 3.6vw, 40px);
+}
+.memoPanel--embedded .memoPipelineSection {
+  margin-top: clamp(22px, 3vw, 34px);
+}
+.memoPanel--embedded .memoSummaryCallout.memoGenCallout {
+  padding: 30px 13px;
+}
+
 .memoDocSection {
   margin-top: clamp(38px, 4.8vw, 58px);
   border-top: none;
@@ -728,7 +789,6 @@
   text-align: left;
 }
 .memoRiskAckButton:hover,
-.memoRulingSubmit:hover,
 .memoDecisionChoice:hover {
   color: var(--color-oxford);
 }
@@ -901,8 +961,12 @@
   min-height: 44px;
   padding: 0 20px;
   border-color: transparent;
-  background: rgba(var(--color-oxford-rgb), 0.92);
-  color: rgba(var(--color-paper-rgb), 0.96);
+  background: var(--color-oxford);
+  color: var(--text-inverse);
+}
+.memoRulingSubmit:hover:not(:disabled) {
+  background: rgba(var(--color-oxford-rgb), 0.88);
+  color: var(--color-paper);
 }
 .memoRulingHint,
 .memoRulingError {
@@ -1050,6 +1114,46 @@
 .memoDocScoreScope {
   position: relative;
   padding: clamp(4px, 1.5vw, 10px) 0 0;
+}
+.memoScoreDebug {
+  margin-top: clamp(22px, 3vw, 34px);
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.1);
+  padding-top: 12px;
+}
+.memoScoreDebugHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.memoScoreDebugToggle {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--memo-ink-muted);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.memoScoreDebugToggle:hover {
+  color: var(--memo-ink);
+}
+.memoScoreDebugPre {
+  margin: 12px 0 0;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.1);
+  background: rgba(var(--color-oxford-rgb), 0.02);
+  padding: 12px 14px;
+  font-family: var(--memo-font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--memo-ink);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .memoDocScoreOverview,
 .memoScoreDimensionStack,
@@ -1378,6 +1482,52 @@
   transition: color 150ms ease;
   line-height: 1.1;
 }
+.memoDocScoreBtn[aria-selected="true"] .memoDocScoreDim,
+.memoDocScoreBtn[aria-pressed="true"] .memoDocScoreDim {
+  color: rgba(var(--color-oxford-rgb), 0.60);
+}
+.memoDocScoreBtn[aria-selected="true"] .memoDocScoreVal,
+.memoDocScoreBtn[aria-pressed="true"] .memoDocScoreVal {
+  color: var(--color-oxford);
+}
+.memoAssessmentDimensionStrip {
+  margin-top: clamp(16px, 2.4vw, 24px);
+}
+.memoAssessmentDimensionStrip .memoDocScoreBtn {
+  gap: 6px;
+  padding: 10px 4px 8px;
+  min-height: 56px;
+}
+.memoAssessmentDimensionStrip .memoDocScoreDim {
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.10em;
+}
+.memoAssessmentDimensionStrip .memoDocScoreVal {
+  font-size: clamp(1.5rem, 2.8vw, 2.25rem);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.memoDimensionDetailPanel {
+  margin-top: clamp(14px, 2vw, 20px);
+  padding-top: clamp(14px, 2vw, 20px);
+  border-top: 1px solid var(--memo-rule);
+}
+.memoDimensionDetailPanelMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.memoPanel--embedded .memoAssessmentDimensionStrip .memoDocScorecardRow {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(4px, 0.8vw, 10px);
+}
+.memoPanel--embedded .memoAssessmentDimensionStrip .memoDocScoreVal {
+  font-size: clamp(1.375rem, 2.4vw, 1.875rem);
+}
 .memoDocExpandedBody { padding: 4px 0 18px calc(7.5rem + 13px); }
 .memoDocExpandedLabel {
   margin: 0 0 6px 0;
@@ -1541,6 +1691,23 @@
   line-height: 1.5;
   color: color-mix(in srgb, var(--color-accent) 72%, rgba(var(--color-oxford-rgb), 0.76));
 }
+.memoScoreAnalystNote {
+  margin: 8px 0 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: var(--memo-ink-muted);
+}
+.memoScoreWhyNotHigher {
+  margin-top: 12px;
+}
+.memoScoreEvidenceWarning {
+  margin: 8px 0 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--color-accent) 68%, rgba(var(--color-oxford-rgb), 0.7));
+}
 .memoScoreEvidenceSummary {
   display: grid;
   grid-template-columns: 1fr;
@@ -1571,13 +1738,12 @@
 .memoScoreDriverTable {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 12px;
 }
 .memoScoreDriverRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(5.5rem, auto);
-  gap: 12px;
-  align-items: baseline;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .memoScoreDriverName {
   min-width: 0;
@@ -1652,6 +1818,122 @@
   font-size: var(--memo-size-label);
   letter-spacing: 0.08em;
   color: rgba(var(--color-oxford-rgb), 0.62);
+}
+
+/* === Presentation DTO styles === */
+.memoScoreHeadline {
+  font-weight: 500;
+  color: var(--memo-ink-strong);
+}
+.memoScoreAnalystSummary {
+  margin: 4px 0 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.6;
+  color: var(--memo-ink);
+}
+.memoScoreEvidenceList,
+.memoScoreDiligenceList {
+  margin: 0;
+  padding: 0 0 0 1em;
+  list-style: disc;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.64;
+  color: var(--memo-ink);
+}
+.memoScoreEvidenceList li,
+.memoScoreDiligenceList li {
+  margin: 2px 0;
+}
+.memoScoreEvidenceEmpty {
+  color: var(--memo-ink-muted);
+  font-style: italic;
+}
+.memoScoreMissingList {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.memoScoreMissingItem {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.memoScoreMissingItem dt {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  font-weight: 500;
+  color: var(--memo-ink);
+}
+.memoScoreMissingItem dd {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-label);
+  line-height: 1.5;
+  color: var(--memo-ink-muted);
+}
+.memoDocEvidenceConfidence {
+  margin: 4px 0 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-label);
+  color: var(--memo-ink-muted);
+  cursor: default;
+}
+
+/* Analyst summary table */
+.memoScoreAnalystTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+}
+.memoScoreAnalystTable thead tr {
+  border-bottom: 1px solid var(--memo-rule);
+}
+.memoScoreAnalystTable th {
+  text-align: left;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: rgba(var(--color-oxford-rgb), 0.40);
+  padding: 0 8px 6px 0;
+}
+.memoScoreAnalystTable th:nth-child(2) {
+  text-align: center;
+  width: 3.2rem;
+}
+.memoScoreAnalystTable td {
+  padding: 6px 8px 6px 0;
+  vertical-align: baseline;
+  line-height: 1.45;
+  color: var(--memo-ink);
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.03);
+}
+.memoScoreAnalystTable td:first-child {
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--memo-ink-strong);
+}
+.memoScoreAnalystTable td:nth-child(2) {
+  text-align: center;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  color: var(--memo-ink-muted);
+}
+.memoScoreAnalystTable td:nth-child(3) {
+  color: var(--memo-ink-muted);
+  font-size: var(--memo-size-label);
+}
+.memoScoreAnalystTable--missing td {
+  color: var(--memo-ink-faint);
+}
+.memoScoreAnalystTable--missing td:first-child {
+  color: var(--memo-ink-muted);
+  font-weight: 400;
 }
 
 /* === Thesis alignment tiles === */

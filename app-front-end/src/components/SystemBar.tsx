@@ -9,7 +9,7 @@ import AgentLogoutModal from './AgentLogoutModal';
 
 interface SystemBarProps {
   agentConfig?: unknown;
-  rightPanel?: 'memo' | 'feed' | 'system' | null;
+  rightPanel?: 'feed' | 'system' | null;
   variant?: 'fixed' | 'embedded';
   onShowDeals?: () => void;
   onShowFeed?: () => void;

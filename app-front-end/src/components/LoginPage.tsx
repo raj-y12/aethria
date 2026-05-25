@@ -337,7 +337,7 @@ export default function LoginPage() {
                     flexDirection: 'row',
                     alignItems: 'flex-start',
                     justifyContent: 'center',
-                    gap: 'clamp(32px, 6vw, 80px)',
+                    gap: 'clamp(48px, 8vw, 120px)',
                     marginBottom: '64px',
                     flexWrap: 'wrap',
                   }}
@@ -353,7 +353,7 @@ export default function LoginPage() {
                       <div
                         style={{
                           fontFamily: "var(--font-mono)",
-                          fontSize: 'clamp(34px, 5vw, 56px)',
+                          fontSize: 'clamp(52px, 10vw, 96px)',
                           fontWeight: 700,
                           lineHeight: 1,
                           color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',

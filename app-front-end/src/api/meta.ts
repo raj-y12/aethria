@@ -21,9 +21,9 @@ export async function fetchMetaReports(): Promise<MetaCycleReport[]> {
   return Array.isArray(data) ? data : [];
 }
 
-export async function fetchMetaInsights(): Promise<MetaInsightsPayload> {
+export async function fetchMetaInsights(): Promise<MetaInsightsPayload | null> {
   const res = await authedFetch(`${API_BASE}/api/meta/insights`, { headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`Meta insights failed: ${res.status}`);
+  if (!res.ok) return null;
   return res.json() as Promise<MetaInsightsPayload>;
 }
 

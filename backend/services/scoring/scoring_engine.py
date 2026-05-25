@@ -125,12 +125,51 @@ class DeterministicScoringEngine:
                 return True
         return False
 
+    _HIGH_LABELS = frozenset({
+        "high", "very_high", "very high", "strong", "rapid", "fast", "hyper",
+        "explosive", "excellent", "exceptional", "critical", "elite",
+        "extreme", "dominant", "world_class", "world class", "top",
+        "significant", "substantial", "robust", "mature", "complex",
+        "deeptech", "scaling", "strong_scale",
+    })
+
+    _LOW_LABELS = frozenset({
+        "low", "weak", "none", "minimal", "slow", "flat", "poor",
+        "unknown", "clunky", "simple", "easy", "vague", "unclear",
+    })
+
+    @staticmethod
+    def _check_label_score_contradiction(
+        label: Any, score: float, confidence: float
+    ) -> tuple[float, float, str]:
+        """Detect when a label's semantic meaning contradicts the numeric score.
+
+        Returns (adjusted_score, adjusted_confidence, reasoning_suffix).
+        """
+        if not isinstance(label, str):
+            return score, confidence, ""
+        key = label.strip().lower()
+        if not key:
+            return score, confidence, ""
+
+        if key in DeterministicScoringEngine._HIGH_LABELS and score <= DEFAULT_SCORE + 0.5:
+            return score, min(confidence, 0.35), (
+                f"Label '{label}' suggests strong performance but evidence is insufficient "
+                f"to support a score above {score:.1f}. Verification required."
+            )
+        if key in DeterministicScoringEngine._LOW_LABELS and score >= 7.0:
+            return score, min(confidence, 0.35), (
+                f"Label '{label}' suggests weak performance but score reads {score:.1f}. "
+                f"Evidence should be reviewed for accuracy."
+            )
+        return score, confidence, ""
+
     @classmethod
     def _neutral_component(cls, signal: Dict[str, Any], reasoning: str = "") -> Dict[str, Any]:
         return {
             "score": float(DEFAULT_SCORE),
             "confidence": 0.2,
-            "reasoning": reasoning or signal.get("reasoning", "Signal missing; neutral fallback applied."),
+            "reasoning": reasoning or signal.get("reasoning", "Evidence not available. Diligence required to establish baseline."),
             "value": None,
         }
 
@@ -141,10 +180,16 @@ class DeterministicScoringEngine:
             return DeterministicScoringEngine._neutral_component(signal)
         confidence = signal.get("confidence", 0.5)
         score = normalizer(value)
+        score, confidence, reasoning_suffix = DeterministicScoringEngine._check_label_score_contradiction(
+            value, score, confidence
+        )
+        base_reasoning = signal.get("reasoning", "")
+        if reasoning_suffix:
+            base_reasoning = f"{base_reasoning} {reasoning_suffix}".strip() if base_reasoning else reasoning_suffix
         normalized = {
             "score": float(score),
             "confidence": confidence,
-            "reasoning": signal.get("reasoning", ""),
+            "reasoning": base_reasoning,
         }
         if signal.get("evidence") is not None:
             normalized["evidence"] = signal.get("evidence")
@@ -165,10 +210,16 @@ class DeterministicScoringEngine:
             return DeterministicScoringEngine._neutral_component(signal)
         confidence = signal.get("confidence", 0.5)
         score = normalizer(value)
+        score, confidence, reasoning_suffix = DeterministicScoringEngine._check_label_score_contradiction(
+            value, score, confidence
+        )
+        base_reasoning = signal.get("reasoning", "")
+        if reasoning_suffix:
+            base_reasoning = f"{base_reasoning} {reasoning_suffix}".strip() if base_reasoning else reasoning_suffix
         normalized = {
             "score": float(score),
             "confidence": confidence,
-            "reasoning": signal.get("reasoning", ""),
+            "reasoning": base_reasoning,
         }
         if signal.get("evidence") is not None:
             normalized["evidence"] = signal.get("evidence")
@@ -204,7 +255,17 @@ class DeterministicScoringEngine:
 
     @staticmethod
     def _component_has_evidence(component: Dict[str, Any]) -> bool:
-        return component.get("value") not in (None, "", [], {}) or component.get("label") not in (None, "")
+        value = component.get("value")
+        label = component.get("label")
+        if value is None and label is None:
+            return False
+        if isinstance(value, str) and DeterministicScoringEngine._is_missing_marker(value):
+            return False
+        if isinstance(label, str) and DeterministicScoringEngine._is_missing_marker(label):
+            return False
+        if value in ("", [], {}):
+            return label not in (None, "")
+        return True
 
     def _aggregate_policy_criteria(self, dimension: str, details: Dict[str, Any]) -> Dict[str, Any]:
         dim_policy = ((self.policy.get("dimensions") or {}).get(dimension) or {})
@@ -244,14 +305,42 @@ class DeterministicScoringEngine:
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
             evidence_status = "complete" if completeness >= 1.0 else "partial" if completeness > 0 else "missing"
             criterion_id = str(criterion.get("id") or criterion.get("name") or f"{dimension}_criterion")
-            reason = (
-                f"Computed from {', '.join(source_components)} signals."
-                if evidence_status == "complete"
-                else f"Computed from {', '.join(source_components)} signals with incomplete evidence."
-            )
-            missing_behavior = str(criterion.get("missing_data_behavior") or "").strip()
-            if evidence_status != "complete" and missing_behavior:
-                reason = f"{reason} Missing-data rule: {missing_behavior}"
+
+            from config.scoring_config import DIMENSION_SCORE_BANDS, get_confidence_level, MISSING_EVIDENCE_ITEMS
+
+            rounded_score = max(1, min(10, round(score)))
+            band_text = DIMENSION_SCORE_BANDS.get(dimension, {}).get(rounded_score, "")
+            conf_level = get_confidence_level(avg_confidence * completeness)
+
+            strong_signals = []
+            weak_signals = []
+            missing_signal_names = []
+            for name in source_components:
+                component = components.get(name) or {}
+                comp_reasoning = str(component.get("reasoning") or "").strip()
+                comp_score = float(component.get("score", DEFAULT_SCORE))
+                if not self._component_has_evidence(component):
+                    missing_signal_names.append(name.replace("_", " "))
+                elif comp_reasoning and comp_score >= 7.0:
+                    strong_signals.append(comp_reasoning)
+                elif comp_reasoning and comp_score < 5.0:
+                    weak_signals.append(comp_reasoning)
+
+            reason_parts: list[str] = []
+            if band_text:
+                reason_parts.append(band_text)
+            if strong_signals:
+                reason_parts.append(f"Evidence: {' '.join(strong_signals[:2])}")
+            if weak_signals:
+                reason_parts.append(f"Concerns: {' '.join(weak_signals[:2])}")
+            if missing_signal_names:
+                dim_missing = MISSING_EVIDENCE_ITEMS.get(dimension, [])
+                missing_items = dim_missing[:len(missing_signal_names)] if dim_missing else missing_signal_names
+                reason_parts.append(f"Missing: {', '.join(missing_items[:3])}")
+            if conf_level != "high":
+                reason_parts.append(f"Confidence is {conf_level}. Additional diligence could shift this assessment.")
+            reason = " ".join(reason_parts) if reason_parts else band_text or criterion.get("description") or ""
+
             out_criteria[criterion_id] = {
                 "score": round(max(0.0, min(10.0, score)), 2),
                 "confidence": round(avg_confidence * completeness, 4),

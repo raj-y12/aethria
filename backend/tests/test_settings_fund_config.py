@@ -1,10 +1,14 @@
 from utils.settings_loader import (
     dimension_weights_from_fund_config,
+    fund_config_content_changed,
+    fund_config_content_fingerprint,
+    fund_config_matches_thesis_payload,
     fund_config_raw_text,
     fund_config_to_thesis_parsed_json,
     load_settings,
     recommendation_for_score_from_fund_config,
     save_settings,
+    thesis_payload_fingerprint,
 )
 
 
@@ -32,6 +36,28 @@ def _fund_config():
         "risk": {"sensitivity": "conservative"},
         "thresholds": {"partnerReview": 60, "escalation": 75},
     }
+
+
+def test_fund_config_content_fingerprint_ignores_version_metadata():
+    base = _fund_config()
+    bumped = {**base, "version": 99, "versionLabel": "Fund Thesis v99", "lastSavedAt": "now"}
+    assert fund_config_content_fingerprint(base) == fund_config_content_fingerprint(bumped)
+    assert not fund_config_content_changed(base, bumped)
+
+
+def test_fund_config_content_changed_detects_mandate_edit():
+    base = _fund_config()
+    edited = {**base, "mandate": {**base["mandate"], "thesisText": "Different mandate."}}
+    assert fund_config_content_changed(base, edited)
+
+
+def test_fund_config_matches_thesis_payload():
+    fc = _fund_config()
+    raw = fund_config_raw_text(fc)
+    parsed = fund_config_to_thesis_parsed_json(fc)
+    assert fund_config_matches_thesis_payload(raw_text=raw, parsed_json=parsed, fund_config=fc)
+    other_fp = thesis_payload_fingerprint(raw_text=raw + "\nextra", parsed_json=parsed)
+    assert other_fp != thesis_payload_fingerprint(raw_text=raw, parsed_json=parsed)
 
 
 def test_fund_config_maps_to_active_thesis_shape():

@@ -76,12 +76,49 @@ def normalize_growth(value: Any) -> float:
     return 4.0
 
 
+_LABEL_SYNONYMS: dict[str, str] = {
+    "rapid": "fast",
+    "explosive": "hyper",
+    "very_high": "high",
+    "very high": "high",
+    "extremely_high": "extreme",
+    "extremely high": "extreme",
+    "significant": "strong",
+    "substantial": "strong",
+    "established": "recognized",
+    "nascent": "emerging",
+    "lightweight": "simple",
+    "sophisticated": "complex",
+    "advanced": "mature",
+    "solid": "strong",
+    "excellent": "strong",
+    "minimal": "low",
+    "top": "elite",
+    "world_class": "elite",
+    "world class": "elite",
+    "considerable": "high",
+    "dominant": "very_high",
+    "unmatched": "extreme",
+    "proven": "credible_team",
+    "experienced": "credible_team",
+    "pre_revenue": "early_adoption",
+    "pre-revenue": "early_adoption",
+    "seed": "early_adoption",
+    "growth": "scaling",
+}
+
+
 def _map_label(value: Any, mapping: dict[str, float]) -> float:
     if value is None:
         return DEFAULT_SCORE
     key = str(value).strip().lower()
     if not key:
         return DEFAULT_SCORE
+    if key in mapping:
+        return _clamp(mapping[key])
+    resolved = _LABEL_SYNONYMS.get(key)
+    if resolved and resolved in mapping:
+        return _clamp(mapping[resolved])
     return _clamp(mapping.get(key, DEFAULT_SCORE))
 
 

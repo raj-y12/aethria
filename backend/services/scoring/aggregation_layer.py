@@ -14,6 +14,25 @@ def _to_float(value: Any, default: float = DEFAULT_SCORE) -> float:
         return default
 
 
+_MISSING_RE = __import__("re").compile(r"^\s*\[?\s*missing(?::[^\]]*)?\]?\s*$", __import__("re").IGNORECASE)
+
+
+def _has_concrete_evidence(comp: Dict[str, Any]) -> bool:
+    """True only when the component carries a real value/label, not a missing marker."""
+    for key in ("value", "label"):
+        raw = comp.get(key)
+        if raw is None:
+            continue
+        if isinstance(raw, str):
+            text = raw.strip()
+            if not text or _MISSING_RE.match(text):
+                continue
+            return True
+        if raw not in ("", [], {}):
+            return True
+    return False
+
+
 def compute_confidence(components: Dict[str, Dict[str, Any]]) -> float:
     if not components:
         return 0.0
@@ -23,9 +42,7 @@ def compute_confidence(components: Dict[str, Dict[str, Any]]) -> float:
     for comp in components.values():
         c = max(0.0, min(1.0, _to_float(comp.get("confidence"), 0.0)))
         confidences.append(c)
-        has_value = comp.get("value") not in (None, "", [], {})
-        has_label = comp.get("label") not in (None, "")
-        if has_value or has_label:
+        if _has_concrete_evidence(comp):
             present += 1
     avg_conf = sum(confidences) / len(confidences) if confidences else 0.0
     completeness = present / total if total else 0.0
