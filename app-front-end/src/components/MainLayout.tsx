@@ -846,7 +846,7 @@ export default function MainLayout({
                         <span
                           className={`${railEditorial.meta} uppercase text-oxford/45 pulse-soft [animation-delay:900ms]`}
                         >
-                          In use
+                          Active
                         </span>
                       </div>
                     ) : null}
@@ -982,7 +982,7 @@ export default function MainLayout({
                         <span
                           className={`${railEditorial.meta} uppercase text-oxford/45 pulse-soft [animation-delay:900ms]`}
                         >
-                          In use
+                          Active
                         </span>
                       </div>
                     ) : null}
