@@ -15,7 +15,7 @@ import {
 import { railEditorial } from '../design-system/railEditorial';
 import { useAgentsEnabled, useFundConfiguration, useMediaQuery } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
-import { applyDecisionLadder, validateDecisionLadder } from '../lib/decisionLadder';
+import { applyDecisionThresholds, DEFAULT_DECISION_BOUNDARIES, validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
   CANONICAL_DIMENSIONS,
   CANONICAL_DIMENSION_KEYS,
@@ -59,7 +59,7 @@ const sections: Array<{ id: SectionId; label: string; short: string }> = [
   { id: 'budget', label: 'Operations', short: 'Ops' },
   { id: 'weights', label: 'Scoring Weights', short: 'Weights' },
   { id: 'bands', label: 'Verdict Badges', short: 'Badges' },
-  { id: 'thresholds', label: 'Decision Ladder', short: 'Ladder' },
+  { id: 'thresholds', label: 'Decision Thresholds', short: 'Thresholds' },
   { id: 'risk', label: 'Adverse / Risk', short: 'Risk' },
   { id: 'memo', label: 'Memo Output', short: 'Memo' },
   { id: 'rubric', label: 'Rubric Criteria', short: 'Rubric' },
@@ -371,7 +371,7 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
             </div>
           </div>
           <div className="border-t border-oxford/[0.06] pt-phi-4">
-            <p className="type-meta text-oxford/35">Decision ladder</p>
+            <p className="type-meta text-oxford/35">Score cutoffs</p>
             <div className="mt-phi-3 flex flex-col gap-phi-2">
               {config.scoreBands.map((item) => (
                 <p key={item.id} className="type-meta text-oxford/52">
@@ -494,7 +494,7 @@ export default function SettingsPage() {
 
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
-  const ladderValidation = useMemo(() => validateDecisionLadder(draft), [draft]);
+  const thresholdValidation = useMemo(() => validateDecisionThresholds(draft), [draft]);
   const scoreBandByVerdict = useMemo(
     () => new Map(draft.scoreBands.map((band) => [band.label.toUpperCase(), band])),
     [draft.scoreBands]
@@ -530,7 +530,7 @@ export default function SettingsPage() {
     const nextErrors = [
       ...(weightValidation.valid ? [] : [`Scoring weights total ${weightValidation.total}%, not 100%.`]),
       ...bandValidation.errors,
-      ...ladderValidation.errors,
+      ...thresholdValidation.errors,
     ];
     if (nextErrors.length) {
       setErrors(nextErrors);
@@ -867,7 +867,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="bands" title="Verdict Badges" kicker="Badge colours for grid chips. Pass / Monitor / Invest score cutoffs are edited in Decision Ladder so Partner policy and labels stay aligned.">
+                <SettingsSection id="bands" title="Verdict Badges" kicker="Badge colours for grid chips. Score ranges come from Decision Thresholds.">
                   <div className="flex flex-col gap-phi-4">
                     {!bandValidation.valid && (
                       <div className="border border-escalation/25 bg-escalation/[0.035] px-phi-4 py-phi-3">
@@ -877,7 +877,7 @@ export default function SettingsPage() {
                     <div className="border-b border-oxford/[0.055] pb-phi-4">
                       <p className="type-body-sm leading-relaxed text-oxford/52">
                         Colours apply to INVEST, MONITOR, and PASS chips. Percentage ranges sync from{' '}
-                        <a href="#thresholds" className="text-oxford/72 underline underline-offset-2 hover:text-oxford">Decision Ladder</a>.
+                        <a href="#thresholds" className="text-oxford/72 underline underline-offset-2 hover:text-oxford">Decision Thresholds</a>.
                       </p>
                     </div>
                     <div className="border-b border-oxford/[0.055]">
@@ -919,14 +919,10 @@ export default function SettingsPage() {
                     <div className="flex flex-wrap gap-phi-4">
                       <button
                         type="button"
-                        onClick={() => updateDraft((current) => applyDecisionLadder(current, {
-                          passMonitorBoundary: 60,
-                          monitorInvestBoundary: 80,
-                          autoPassCeiling: 39,
-                        }))}
+                        onClick={() => updateDraft((current) => applyDecisionThresholds(current, DEFAULT_DECISION_BOUNDARIES))}
                         className={actionBtnCls}
                       >
-                        Restore default ladder
+                        Restore default cutoffs
                       </button>
                       <button type="button" onClick={() => updateDraft((current) => ({ ...current, verdictBadges: DEFAULT_VERDICT_BADGES }))} className={actionBtnCls}>
                         Restore default badge colours
@@ -935,7 +931,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="thresholds" title="Decision Ladder" kicker="Set Pass / Monitor / Invest cutoffs once; grid labels, Partner score bars, and badge ranges stay in sync. Stale queue and evidence flags are grouped below the ladder.">
+                <SettingsSection id="thresholds" title="Decision Thresholds" kicker="Pass, Monitor, and Invest cutoffs — synced with Partner scoring and badge ranges.">
                   <DecisionThresholdsPanel draft={draft} updateDraft={updateDraft} updateThreshold={updateThreshold} />
                 </SettingsSection>
 
