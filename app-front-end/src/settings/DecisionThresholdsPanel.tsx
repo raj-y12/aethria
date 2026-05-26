@@ -74,11 +74,19 @@ function ScoreInput({
   onCommit: (value: number) => void;
 }) {
   const [text, setText] = useState(String(value));
-  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
-    if (!focused) setText(String(value));
-  }, [value, focused]);
+    setText(String(value));
+  }, [value]);
+
+  const handleChange = (raw: string) => {
+    const nextText = raw.replace(/[^\d]/g, '');
+    setText(nextText);
+    if (nextText === '') return;
+    const parsed = Number.parseInt(nextText, 10);
+    if (!Number.isFinite(parsed) || parsed < min || parsed > max) return;
+    if (parsed !== value) onCommit(parsed);
+  };
 
   return (
     <div className="flex min-w-0 flex-col gap-phi-2">
@@ -90,16 +98,11 @@ function ScoreInput({
           inputMode="numeric"
           pattern="[0-9]*"
           value={text}
-          onFocus={() => setFocused(true)}
-          onChange={(event) => setText(event.target.value.replace(/[^\d]/g, ''))}
+          onChange={(event) => handleChange(event.target.value)}
           onBlur={() => {
-            setFocused(false);
             const next = commitScoreInput(text, min, max, value);
-            onCommit(next);
+            if (next !== value) onCommit(next);
             setText(String(next));
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
           }}
           className={inputCls}
           aria-describedby={suffix ? `${id}-suffix` : undefined}
@@ -128,11 +131,10 @@ function DecimalInput({
   onCommit: (value: number) => void;
 }) {
   const [text, setText] = useState(String(value));
-  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
-    if (!focused) setText(String(value));
-  }, [value, focused]);
+    setText(String(value));
+  }, [value]);
 
   return (
     <div className="flex min-w-0 flex-col gap-phi-2">
@@ -142,17 +144,19 @@ function DecimalInput({
         type="text"
         inputMode="decimal"
         value={text}
-        onFocus={() => setFocused(true)}
-        onChange={(event) => setText(event.target.value.replace(/[^\d.]/g, ''))}
+        onChange={(event) => {
+          const nextText = event.target.value.replace(/[^\d.]/g, '');
+          setText(nextText);
+          if (nextText === '' || nextText === '.') return;
+          const parsed = Number.parseFloat(nextText);
+          if (!Number.isFinite(parsed) || parsed < min || parsed > max) return;
+          if (parsed !== value) onCommit(parsed);
+        }}
         onBlur={() => {
-          setFocused(false);
           const parsed = Number.parseFloat(text);
           const next = Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : value;
-          onCommit(next);
+          if (next !== value) onCommit(next);
           setText(String(next));
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
         }}
         className={inputCls}
       />
