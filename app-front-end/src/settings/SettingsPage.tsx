@@ -14,12 +14,13 @@ import {
 } from '../api/fundThesis';
 import { railEditorial } from '../design-system/railEditorial';
 import { useAgentsEnabled, useFundConfiguration, useMediaQuery } from '../hooks';
+import DecisionThresholdsPanel from './DecisionThresholdsPanel';
+import { applyDecisionLadder, validateDecisionLadder } from '../lib/decisionLadder';
 import {
   CANONICAL_DIMENSIONS,
   CANONICAL_DIMENSION_KEYS,
   DIMENSION_SCORE_BANDS,
   UNIVERSAL_SCORE_BANDS,
-  DEFAULT_SCORE_BANDS,
   DEFAULT_VERDICT_BADGES,
   badgeTextColorForBackground,
   applyThesisVersionMetadata,
@@ -58,7 +59,7 @@ const sections: Array<{ id: SectionId; label: string; short: string }> = [
   { id: 'budget', label: 'Operations', short: 'Ops' },
   { id: 'weights', label: 'Scoring Weights', short: 'Weights' },
   { id: 'bands', label: 'Verdict Badges', short: 'Badges' },
-  { id: 'thresholds', label: 'Decision Thresholds', short: 'Thresholds' },
+  { id: 'thresholds', label: 'Decision Ladder', short: 'Ladder' },
   { id: 'risk', label: 'Adverse / Risk', short: 'Risk' },
   { id: 'memo', label: 'Memo Output', short: 'Memo' },
   { id: 'rubric', label: 'Rubric Criteria', short: 'Rubric' },
@@ -370,13 +371,16 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
             </div>
           </div>
           <div className="border-t border-oxford/[0.06] pt-phi-4">
-            <p className="type-meta text-oxford/35">Percentage bands</p>
+            <p className="type-meta text-oxford/35">Decision ladder</p>
             <div className="mt-phi-3 flex flex-col gap-phi-2">
               {config.scoreBands.map((item) => (
                 <p key={item.id} className="type-meta text-oxford/52">
-                  <span className="font-mono tabular-nums">{item.min}-{item.max}</span> {item.label}
+                  <span className="font-mono tabular-nums">{item.min}–{item.max}</span> {item.label}
                 </p>
               ))}
+              <p className="type-meta text-oxford/38">
+                Stale after {config.thresholds.staleAfterHours}h · confidence ≥ {config.thresholds.confidenceFloor}
+              </p>
             </div>
           </div>
           <div className="border-t border-oxford/[0.06] pt-phi-4">
@@ -490,6 +494,7 @@ export default function SettingsPage() {
 
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
+  const ladderValidation = useMemo(() => validateDecisionLadder(draft), [draft]);
   const scoreBandByVerdict = useMemo(
     () => new Map(draft.scoreBands.map((band) => [band.label.toUpperCase(), band])),
     [draft.scoreBands]
@@ -525,6 +530,7 @@ export default function SettingsPage() {
     const nextErrors = [
       ...(weightValidation.valid ? [] : [`Scoring weights total ${weightValidation.total}%, not 100%.`]),
       ...bandValidation.errors,
+      ...ladderValidation.errors,
     ];
     if (nextErrors.length) {
       setErrors(nextErrors);
@@ -861,7 +867,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="bands" title="Verdict Badges" kicker="Configure the current verdict bands and badge colours. Bands must stay continuous and non-overlapping.">
+                <SettingsSection id="bands" title="Verdict Badges" kicker="Badge colours for grid chips. Pass / Monitor / Invest score cutoffs are edited in Decision Ladder so Partner policy and labels stay aligned.">
                   <div className="flex flex-col gap-phi-4">
                     {!bandValidation.valid && (
                       <div className="border border-escalation/25 bg-escalation/[0.035] px-phi-4 py-phi-3">
@@ -870,7 +876,8 @@ export default function SettingsPage() {
                     )}
                     <div className="border-b border-oxford/[0.055] pb-phi-4">
                       <p className="type-body-sm leading-relaxed text-oxford/52">
-                        Percentage bands map configured scores to PASS, MONITOR, and INVEST. Badge colours update visible verdict chips.
+                        Colours apply to INVEST, MONITOR, and PASS chips. Percentage ranges sync from{' '}
+                        <a href="#thresholds" className="text-oxford/72 underline underline-offset-2 hover:text-oxford">Decision Ladder</a>.
                       </p>
                     </div>
                     <div className="border-b border-oxford/[0.055]">
@@ -900,32 +907,9 @@ export default function SettingsPage() {
                             <BadgeSwatch label={badge.id} backgroundColor={badge.backgroundColor} />
                           </label>
                           {scoreBandByVerdict.get(badge.id) ? (
-                            <div className="grid grid-cols-2 gap-phi-3">
-                              <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={scoreBandByVerdict.get(badge.id)?.min ?? 0}
-                                onChange={(event) => updateDraft((current) => ({
-                                  ...current,
-                                  scoreBands: current.scoreBands.map((item) => item.label.toUpperCase() === badge.id ? { ...item, min: Number(event.target.value) || 0 } : item),
-                                }))}
-                                className={`${inputCls} font-mono tabular-nums`}
-                                aria-label={`${badge.label} minimum percentage`}
-                              />
-                              <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={scoreBandByVerdict.get(badge.id)?.max ?? 0}
-                                onChange={(event) => updateDraft((current) => ({
-                                  ...current,
-                                  scoreBands: current.scoreBands.map((item) => item.label.toUpperCase() === badge.id ? { ...item, max: Number(event.target.value) || 0 } : item),
-                                }))}
-                                className={`${inputCls} font-mono tabular-nums`}
-                                aria-label={`${badge.label} maximum percentage`}
-                              />
-                            </div>
+                            <p className="font-mono text-sm tabular-nums text-oxford/55">
+                              {scoreBandByVerdict.get(badge.id)?.min}–{scoreBandByVerdict.get(badge.id)?.max}%
+                            </p>
                           ) : (
                             <p className="type-meta text-oxford/36">Reviewer badge</p>
                           )}
@@ -933,8 +917,16 @@ export default function SettingsPage() {
                       ))}
                     </div>
                     <div className="flex flex-wrap gap-phi-4">
-                      <button type="button" onClick={() => updateDraft((current) => ({ ...current, scoreBands: DEFAULT_SCORE_BANDS }))} className={actionBtnCls}>
-                        Restore default bands
+                      <button
+                        type="button"
+                        onClick={() => updateDraft((current) => applyDecisionLadder(current, {
+                          passMonitorBoundary: 60,
+                          monitorInvestBoundary: 80,
+                          autoPassCeiling: 39,
+                        }))}
+                        className={actionBtnCls}
+                      >
+                        Restore default ladder
                       </button>
                       <button type="button" onClick={() => updateDraft((current) => ({ ...current, verdictBadges: DEFAULT_VERDICT_BADGES }))} className={actionBtnCls}>
                         Restore default badge colours
@@ -943,16 +935,8 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="thresholds" title="Decision Thresholds" kicker="Thresholds shape app routing, stale detection, and recommendation language. Partner rules still come from versioned backend policy.">
-                  <div className="grid gap-phi-5 md:grid-cols-2">
-                    <TextField id="auto-pass" label="Auto-pass threshold" type="number" value={draft.thresholds.autoPass} onChange={(value) => updateThreshold('autoPass', Number(value))} min={0} max={100} />
-                    <TextField id="monitor-threshold" label="Monitor threshold" type="number" value={draft.thresholds.monitor} onChange={(value) => updateThreshold('monitor', Number(value))} min={0} max={100} />
-                    <TextField id="escalation-threshold" label="Escalation threshold" type="number" value={draft.thresholds.escalation} onChange={(value) => updateThreshold('escalation', Number(value))} min={0} max={100} />
-                    <TextField id="partner-review-threshold" label="Partner-review threshold" type="number" value={draft.thresholds.partnerReview} onChange={(value) => updateThreshold('partnerReview', Number(value))} min={0} max={100} />
-                    <TextField id="stale-after" label="Stale after hours" type="number" value={draft.thresholds.staleAfterHours} onChange={(value) => updateThreshold('staleAfterHours', Number(value))} min={1} />
-                    <TextField id="confidence-floor" label="Confidence floor" type="number" step={0.01} value={draft.thresholds.confidenceFloor} onChange={(value) => updateThreshold('confidenceFloor', Number(value))} min={0} max={1} />
-                    <TextField id="missing-data-threshold" label="Missing-data threshold" type="number" value={draft.thresholds.missingDataThreshold} onChange={(value) => updateThreshold('missingDataThreshold', Number(value))} min={0} max={100} />
-                  </div>
+                <SettingsSection id="thresholds" title="Decision Ladder" kicker="Set Pass / Monitor / Invest cutoffs once; grid labels, Partner score bars, and badge ranges stay in sync. Stale queue and evidence flags are grouped below the ladder.">
+                  <DecisionThresholdsPanel draft={draft} updateDraft={updateDraft} updateThreshold={updateThreshold} />
                 </SettingsSection>
 
                 <SettingsSection id="risk" title="Adverse / Risk Sensitivity" kicker="Controls app-level risk acknowledgement and ruling UX. Reviewer scoring and partner policy still use backend evidence and policy rules.">

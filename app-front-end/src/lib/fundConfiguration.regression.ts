@@ -1,4 +1,9 @@
 import {
+  applyDecisionLadder,
+  getDecisionLadderBoundaries,
+  validateDecisionLadder,
+} from './decisionLadder';
+import {
   DEFAULT_VERDICT_BADGES,
   badgeTextColorForBackground,
   createDefaultFundConfiguration,
@@ -64,4 +69,25 @@ const resolvedStartup = {
 
 if (isStartupStaleByConfig(resolvedStartup, config, now)) {
   throw new Error('Human-resolved startups must never be stale.');
+}
+
+const synced = applyDecisionLadder(config, { passMonitorBoundary: 62, monitorInvestBoundary: 82 });
+const ladder = getDecisionLadderBoundaries(synced);
+if (ladder.passMonitorBoundary !== 62 || ladder.monitorInvestBoundary !== 82) {
+  throw new Error('Decision ladder must persist boundary edits.');
+}
+const passBand = synced.scoreBands.find((band) => band.id === 'pass');
+const monitorBand = synced.scoreBands.find((band) => band.id === 'monitor');
+const investBand = synced.scoreBands.find((band) => band.id === 'invest');
+if (!passBand || passBand.max !== 61 || !monitorBand || monitorBand.min !== 62 || monitorBand.max !== 81) {
+  throw new Error('Decision ladder must sync score bands with boundaries.');
+}
+if (!investBand || investBand.min !== 82) {
+  throw new Error('Decision ladder must sync invest band minimum.');
+}
+if (synced.thresholds.partnerReview !== 62 || synced.thresholds.escalation !== 82) {
+  throw new Error('Decision ladder must sync Partner thresholds.');
+}
+if (!validateDecisionLadder(synced).valid) {
+  throw new Error('Synced ladder must pass validation.');
 }
