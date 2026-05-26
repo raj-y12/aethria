@@ -24,6 +24,7 @@ if load_dotenv:
         load_dotenv()
 
 from tenant_context import TenantContext
+from pipeline_concurrency import pipeline_execution_slot
 from supabase_doc_store import list_upsert
 from utils.settings_loader import load_settings, is_thesis_reprocess_agents_enabled
 from supabase_client import get_service_client
@@ -104,6 +105,11 @@ async def run_one_pipeline_cycle(user_id: str) -> None:
         logger.warning("run_one_pipeline_cycle: skipped (empty user_id)")
         return
     user_id = user_id.strip()
+    async with pipeline_execution_slot(user_id):
+        await _run_one_pipeline_cycle_inner(user_id)
+
+
+async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
     tenant = TenantContext(user_id=user_id)
     logger.info(
         "event=tenant_context user_id=%s module=pipeline_cycle",
@@ -341,6 +347,26 @@ async def run_on_demand_lookup(
         return None
 
     user_id = user_id.strip()
+    async with pipeline_execution_slot(user_id):
+        return await _run_on_demand_lookup_inner(
+            user_id,
+            company,
+            website=website,
+            lookup_query=lookup_query,
+            lookup_input_type=lookup_input_type,
+            lookup_id=lookup_id,
+        )
+
+
+async def _run_on_demand_lookup_inner(
+    user_id: str,
+    company: str,
+    *,
+    website: Optional[str] = None,
+    lookup_query: Optional[str] = None,
+    lookup_input_type: Optional[str] = None,
+    lookup_id: Optional[str] = None,
+) -> Optional[str]:
     tenant = TenantContext(user_id=user_id)
     logger.info(
         "event=tenant_context user_id=%s module=on_demand_lookup",

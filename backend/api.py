@@ -119,6 +119,14 @@ _LOOKUP_TRAILING_QUALIFIERS = {"company", "startup", "website", "profile"}
 _per_user_loops: Dict[str, asyncio.Task] = {}
 _loops_lock: Optional[asyncio.Lock] = None  # initialised inside lifespan (event loop must exist)
 AGENT_LOOP_INTERVAL_SECONDS = int(os.getenv("AGENT_LOOP_INTERVAL_SECONDS", "300"))
+# On small Render instances, resuming every user's loop at startup can OOM before the app is healthy.
+RESUME_AGENT_LOOPS_ON_STARTUP = os.getenv("RESUME_AGENT_LOOPS_ON_STARTUP", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+# 0 = no cap; otherwise max persistent loops resumed after restart.
+MAX_RESUMED_AGENT_LOOPS = max(0, int(os.getenv("MAX_RESUMED_AGENT_LOOPS", "0")))
 _ADMIN_LOGIN_MAX_FAILURES = int(os.getenv("ADMIN_LOGIN_MAX_FAILURES", "5"))
 _ADMIN_LOGIN_WINDOW_SECONDS = int(os.getenv("ADMIN_LOGIN_WINDOW_SECONDS", "300"))
 _admin_login_attempts: Dict[str, List[float]] = {}
@@ -279,6 +287,11 @@ async def _resume_all_user_loops() -> None:
     Queries Supabase settings for all users with any agent enabled
     and resumes their persistent loops (handles server restarts gracefully).
     """
+    if not RESUME_AGENT_LOOPS_ON_STARTUP:
+        _logger_agents.info(
+            "[AGENT LOOP] Skipping resume on startup (RESUME_AGENT_LOOPS_ON_STARTUP=false)"
+        )
+        return
     use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
     if not use_supabase:
         return
@@ -288,6 +301,12 @@ async def _resume_all_user_loops() -> None:
         rows = getattr(rows_resp, "data", None) or []
         resumed = 0
         for row in rows:
+            if MAX_RESUMED_AGENT_LOOPS and resumed >= MAX_RESUMED_AGENT_LOOPS:
+                _logger_agents.warning(
+                    "[AGENT LOOP] Resume cap reached (%d); remaining users will start loops on next login/trigger",
+                    MAX_RESUMED_AGENT_LOOPS,
+                )
+                break
             uid = (row.get("user_id") or "").strip()
             if not uid:
                 continue
@@ -2184,6 +2203,23 @@ def api_get_fund_thesis(request: Request):
 @app.get("/api/fund-thesis/runtime")
 def get_fund_thesis_runtime(request: Request):
     """Lightweight thesis runtime (mode / embeddings) for System panel; alignment extras without parsed_json."""
+    try:
+        return _get_fund_thesis_runtime_impl(request)
+    except FundThesisQueryError:
+        raise HTTPException(status_code=503, detail="Thesis query failed; please retry") from None
+    except OSError as e:
+        # EAGAIN under memory/socket pressure on small hosts (e.g. Render OOM edge).
+        if getattr(e, "errno", None) == 11:
+            raise HTTPException(status_code=503, detail="Thesis query failed; please retry") from e
+        raise
+    except Exception as e:
+        err_name = type(e).__name__
+        if err_name in ("ReadError", "ConnectError", "TimeoutException", "HTTPError"):
+            raise HTTPException(status_code=503, detail="Thesis query failed; please retry") from e
+        raise
+
+
+def _get_fund_thesis_runtime_impl(request: Request):
     _require_supabase_for_thesis()
     uid = request.state.user_id
     client = get_service_client()
@@ -2245,6 +2281,7 @@ def get_fund_thesis_runtime(request: Request):
         uid,
         active_version_id=active.version_id,
         previous_version_id=prev_id,
+        row_limit=int(os.getenv("FUND_THESIS_RUNTIME_ALIGNMENT_ROW_LIMIT", "500")),
     )
 
     tr = (

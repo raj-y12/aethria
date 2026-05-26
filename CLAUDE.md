@@ -112,6 +112,10 @@ PARTNER_USE_LLM=true
 META_AGENT_ENABLED=true
 ```
 
+### Render / small instances (memory)
+
+See `AGENTS.md` — use `MAX_CONCURRENT_PIPELINE_CYCLES=1`, `RESUME_AGENT_LOOPS_ON_STARTUP=false`, and consider a larger Render plan if many users run agents concurrently.
+
 ### Running locally
 
 ```bash

@@ -572,6 +572,7 @@ def compute_thesis_alignment_stats(
     *,
     active_version_id: str,
     previous_version_id: Optional[str] = None,
+    row_limit: int = 2000,
 ) -> Dict[str, Any]:
     """
     Scan startups.review_info for thesis alignment fields (best-effort, bounded page size).
@@ -584,13 +585,14 @@ def compute_thesis_alignment_stats(
     scores_prev: List[float] = []
     match_active = 0
     total_active = 0
+    row_limit = max(1, min(int(row_limit), 2000))
     try:
         r = (
             client.table("startups")
             .select("review_info")
             .eq("user_id", uid)
             .not_.is_("review_info", "null")
-            .limit(2000)
+            .limit(row_limit)
             .execute()
         )
         rows = getattr(r, "data", None) or []

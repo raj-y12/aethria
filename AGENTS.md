@@ -112,6 +112,21 @@ PARTNER_USE_LLM=true
 META_AGENT_ENABLED=true
 ```
 
+### Render / small instances (memory)
+
+The API runs scout/reviewer/partner pipelines in-process. On Render Starter (~512MB), OOM is common if many users have agents enabled or cycles overlap.
+
+Recommended production env:
+
+```
+MAX_CONCURRENT_PIPELINE_CYCLES=1
+RESUME_AGENT_LOOPS_ON_STARTUP=false
+MAX_RESUMED_AGENT_LOOPS=3
+FUND_THESIS_RUNTIME_ALIGNMENT_ROW_LIMIT=500
+```
+
+Users with agents enabled still get cycles via `POST /api/agents/trigger` on login and the persistent loop started for that session. Upgrade the Render instance if you need many simultaneous agent loops after cold start.
+
 ### Running locally
 
 ```bash
