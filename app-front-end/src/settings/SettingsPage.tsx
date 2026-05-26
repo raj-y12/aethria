@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useClerk } from '@clerk/react-router';
-import { UserProfile } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
 import MobileHeader from '../components/MobileHeader';
 import LoadingAnimation from '../components/LoadingAnimation';
 import AgentLogoutModal from '../components/AgentLogoutModal';
 import { fetchSettings, patchSettings, previewPolicy, publishPolicy, type Settings } from '../api/settings';
-import { fetchMe } from '../api/me';
 import { fetchAgentsStatus, toggleAgents, type AgentsStatus } from '../api/agents';
 import {
   fetchFundThesisSummary,
@@ -15,7 +13,6 @@ import {
   type FundThesisSummary,
 } from '../api/fundThesis';
 import { railEditorial } from '../design-system/railEditorial';
-import { userProfileAppearance } from '../design-system/clerk-appearance';
 import { useAgentsEnabled, useFundConfiguration, useMediaQuery } from '../hooks';
 import {
   CANONICAL_DIMENSIONS,
@@ -49,8 +46,7 @@ type SectionId =
   | 'risk'
   | 'memo'
   | 'rubric'
-  | 'budget'
-  | 'account';
+  | 'budget';
 
 const SELECT_CHEVRON =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%231a2b48' fill-opacity='0.45' d='M0 3h10L5 8z'/%3E%3C/svg%3E\")";
@@ -348,8 +344,6 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<SectionId>('mandate');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userIdCopied, setUserIdCopied] = useState(false);
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [thesisBusy, setThesisBusy] = useState(false);
@@ -377,7 +371,6 @@ export default function SettingsPage() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    fetchMe().then((me) => { if (!cancelled && me) setUserId(me.user_id); }).catch(() => undefined);
     fetchAgentsStatus().then((data) => { if (!cancelled) setAgentsStatus(data ?? null); }).catch(() => undefined);
     fetchFundThesisSummary().then((data) => { if (!cancelled) setThesisSummary(data); }).catch(() => undefined);
     return () => { cancelled = true; };
@@ -1016,25 +1009,6 @@ export default function SettingsPage() {
                         />
                       );
                     })}
-                  </div>
-                </SettingsSection>
-
-                <SettingsSection id="account" title="Account" kicker="Identity and local operator details.">
-                  <div className="flex flex-col gap-phi-5">
-                    <div className="aethria-clerk-profile min-h-[320px]">
-                      <UserProfile appearance={userProfileAppearance} routing="hash" />
-                    </div>
-                    {userId && (
-                      <div className="border-t border-oxford/[0.06] pt-phi-4">
-                        <p className={labelCls}>User ID</p>
-                        <div className="mt-phi-3 flex flex-wrap items-center gap-phi-3">
-                          <code className="type-meta bg-oxford/[0.05] px-phi-3 py-phi-2 text-oxford/55" aria-hidden>{userId.replace(/./g, '*')}</code>
-                          <button type="button" onClick={() => navigator.clipboard?.writeText(userId).then(() => { setUserIdCopied(true); setTimeout(() => setUserIdCopied(false), 2000); })} className={actionBtnCls}>
-                            {userIdCopied ? 'Copied' : 'Copy'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </SettingsSection>
               </div>
