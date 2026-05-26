@@ -95,6 +95,74 @@ function serializeOperations(settings: Settings | null): string {
   });
 }
 
+function formatSettingsSavedAt(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 'Saved';
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function SettingsSidebarFooter({
+  unsaved,
+  lastSavedAt,
+  saving,
+  onSave,
+  onReset,
+}: {
+  unsaved: boolean;
+  lastSavedAt?: string | null;
+  saving: boolean;
+  onSave: () => void;
+  onReset: () => void;
+}) {
+  const statusDetail = unsaved
+    ? 'Changes not synced'
+    : lastSavedAt
+      ? formatSettingsSavedAt(lastSavedAt)
+      : 'Save to persist fund configuration';
+
+  return (
+    <div className="mt-auto shrink-0 border-t border-oxford/[0.08] pt-phi-5" aria-label="Save draft">
+      <div className="flex items-start gap-phi-2" aria-live="polite">
+        <span
+          className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-none ${unsaved ? 'bg-escalation/70 signal-dot-breathe' : 'bg-oxford/30'}`}
+          aria-hidden
+        />
+        <div className="min-w-0">
+          <p className={railEditorial.meta}>Draft status</p>
+          <p className={`mt-phi-1 type-body-sm leading-snug ${unsaved ? 'text-oxford' : 'text-oxford/50'}`}>
+            {unsaved ? 'Unsaved changes' : statusDetail}
+          </p>
+        </div>
+      </div>
+      <div className="mt-phi-4 flex flex-col gap-phi-2">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving || !unsaved}
+          className={`${solidBtnCls} w-full justify-center`}
+        >
+          {saving ? 'Saving…' : 'Save changes'}
+        </button>
+        <button
+          type="button"
+          onClick={onReset}
+          disabled={saving}
+          className={`${actionBtnCls} w-full justify-center`}
+          title="Restore local defaults; save to sync compatible fields to the backend"
+        >
+          Reset to defaults
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function TextField({
   id,
   label,
@@ -278,50 +346,52 @@ function SettingsSection({
 function PreviewPanel({ config }: { config: FundConfiguration }) {
   const weightTotal = validateWeights(config.scoringWeights).total;
   return (
-    <aside className="hidden min-h-0 border-l border-oxford/[0.08] pl-phi-5 xl:sticky xl:top-phi-6 xl:flex xl:max-h-[calc(100vh-3rem)] xl:flex-col xl:overflow-y-auto">
-      <p className="type-label-section text-oxford/55">Configuration Preview</p>
-      <div className="mt-phi-5 flex flex-col gap-phi-5">
-        <div>
-          <p className="type-meta text-oxford/35">Mandate</p>
-          <p className="mt-phi-2 type-body-emphasis text-oxford">{config.mandate.fundName || 'Unnamed fund'}</p>
-          <p className="mt-phi-1 type-body-sm text-oxford/52">
-            {[...config.mandate.preferredStages, ...config.mandate.geographies].filter(Boolean).join(' / ') || 'No mandate scope set'}
-          </p>
-        </div>
-        <div className="border-t border-oxford/[0.06] pt-phi-4">
-          <p className="type-meta text-oxford/35">Total scoring weight</p>
-          <p className={`mt-phi-2 font-mono text-[1.65rem] tabular-nums ${weightTotal === 100 ? 'text-oxford' : 'text-escalation/75'}`}>{weightTotal}%</p>
-        </div>
-        <div className="border-t border-oxford/[0.06] pt-phi-4">
-          <p className="type-meta text-oxford/35">Verdict badges</p>
-          <div className="mt-phi-3 flex flex-wrap gap-phi-2">
-            {config.verdictBadges.map((item) => (
-              <BadgeSwatch key={item.id} label={item.id} backgroundColor={item.backgroundColor} />
-            ))}
+    <aside className="relative hidden min-h-full shrink-0 self-stretch border-l border-oxford/[0.08] xl:block">
+      <div className="sticky top-0 z-[1] flex max-h-[calc(100dvh)] flex-col overflow-y-auto bg-paper px-phi-5 pt-phi-6 pb-phi-6">
+        <p className="type-label-section text-oxford/55">Configuration Preview</p>
+        <div className="mt-phi-4 flex flex-col gap-phi-5">
+          <div>
+            <p className="type-meta text-oxford/35">Mandate</p>
+            <p className="mt-phi-2 type-body-emphasis text-oxford">{config.mandate.fundName || 'Unnamed fund'}</p>
+            <p className="mt-phi-1 type-body-sm text-oxford/52">
+              {[...config.mandate.preferredStages, ...config.mandate.geographies].filter(Boolean).join(' / ') || 'No mandate scope set'}
+            </p>
           </div>
-        </div>
-        <div className="border-t border-oxford/[0.06] pt-phi-4">
-          <p className="type-meta text-oxford/35">Percentage bands</p>
-          <div className="mt-phi-3 flex flex-col gap-phi-2">
-            {config.scoreBands.map((item) => (
-              <p key={item.id} className="type-meta text-oxford/52">
-                <span className="font-mono tabular-nums">{item.min}-{item.max}</span> {item.label}
-              </p>
-            ))}
+          <div className="border-t border-oxford/[0.06] pt-phi-4">
+            <p className="type-meta text-oxford/35">Total scoring weight</p>
+            <p className={`mt-phi-2 font-mono text-[1.65rem] tabular-nums ${weightTotal === 100 ? 'text-oxford' : 'text-escalation/75'}`}>{weightTotal}%</p>
           </div>
-        </div>
-        <div className="border-t border-oxford/[0.06] pt-phi-4">
-          <p className="type-meta text-oxford/35">Risk gating</p>
-          <p className="mt-phi-2 type-body-sm text-oxford/55">
-            {config.risk.requireAcknowledgement ? `${config.risk.sensitivity} sensitivity` : 'Acknowledgement disabled'}
-          </p>
-        </div>
-        <div className="border-t border-oxford/[0.06] pt-phi-4">
-          <p className="type-meta text-oxford/35">Sample outcome</p>
-          <p className="mt-phi-2 type-body-emphasis text-oxford">Verdict display settings</p>
-          <p className="mt-phi-1 type-body-sm text-oxford/55">
-            Percentage bands shape configured score language in the app; badge colours shape the visible chips.
-          </p>
+          <div className="border-t border-oxford/[0.06] pt-phi-4">
+            <p className="type-meta text-oxford/35">Verdict badges</p>
+            <div className="mt-phi-3 flex flex-wrap gap-phi-2">
+              {config.verdictBadges.map((item) => (
+                <BadgeSwatch key={item.id} label={item.id} backgroundColor={item.backgroundColor} />
+              ))}
+            </div>
+          </div>
+          <div className="border-t border-oxford/[0.06] pt-phi-4">
+            <p className="type-meta text-oxford/35">Percentage bands</p>
+            <div className="mt-phi-3 flex flex-col gap-phi-2">
+              {config.scoreBands.map((item) => (
+                <p key={item.id} className="type-meta text-oxford/52">
+                  <span className="font-mono tabular-nums">{item.min}-{item.max}</span> {item.label}
+                </p>
+              ))}
+            </div>
+          </div>
+          <div className="border-t border-oxford/[0.06] pt-phi-4">
+            <p className="type-meta text-oxford/35">Risk gating</p>
+            <p className="mt-phi-2 type-body-sm text-oxford/55">
+              {config.risk.requireAcknowledgement ? `${config.risk.sensitivity} sensitivity` : 'Acknowledgement disabled'}
+            </p>
+          </div>
+          <div className="border-t border-oxford/[0.06] pt-phi-4">
+            <p className="type-meta text-oxford/35">Sample outcome</p>
+            <p className="mt-phi-2 type-body-emphasis text-oxford">Verdict display settings</p>
+            <p className="mt-phi-1 type-body-sm text-oxford/55">
+              Percentage bands shape configured score language in the app; badge colours shape the visible chips.
+            </p>
+          </div>
         </div>
       </div>
     </aside>
@@ -487,7 +557,7 @@ export default function SettingsPage() {
       setConfiguration(labeled);
       setSavedSnapshot(serializeConfig(labeled));
     }
-    setStatus('Saved. Runtime limits and backend-compatible fund fields are synced; display-only memo and rubric options remain available in the app.');
+    setStatus(null);
     setSaving(false);
   };
 
@@ -496,7 +566,7 @@ export default function SettingsPage() {
     setConfiguration(next);
     setDraft(next);
     setSavedSnapshot(serializeConfig(next));
-    setStatus('Defaults restored locally. Save to sync backend-compatible fields.');
+    setStatus(null);
     setErrors([]);
   };
 
@@ -630,7 +700,7 @@ export default function SettingsPage() {
       <main className="flex min-h-0 flex-1 overflow-hidden bg-paper">
         <div className="w-3 shrink-0 self-stretch bg-oxford sm:w-6 md:w-10" aria-hidden />
 
-        <aside className="hidden w-[18rem] shrink-0 flex-col border-r border-oxford/[0.08] px-phi-5 py-phi-5 lg:flex">
+        <aside className="hidden min-h-0 w-[18rem] shrink-0 flex-col border-r border-oxford/[0.08] px-phi-5 py-phi-5 lg:flex">
           <div className="pb-phi-6">
             <Link
               to="/v1"
@@ -647,7 +717,7 @@ export default function SettingsPage() {
             </Link>
           </div>
           <p className="type-label-section text-oxford/45">Fund Configuration</p>
-          <nav className="mt-phi-5 flex flex-col gap-phi-1" aria-label="Settings sections">
+          <nav className="mt-phi-5 flex min-h-0 flex-1 flex-col gap-phi-1 overflow-y-auto" aria-label="Settings sections">
             {sections.map((section) => (
               <a
                 key={section.id}
@@ -664,17 +734,13 @@ export default function SettingsPage() {
               </a>
             ))}
           </nav>
-          <div className="mt-auto border-t border-oxford/[0.08] pt-phi-5">
-            <p className="type-meta text-oxford/38">
-              {unsaved ? 'Unsaved changes' : draft.lastSavedAt ? `Last saved ${new Date(draft.lastSavedAt).toLocaleString()}` : 'Not saved yet'}
-            </p>
-            <div className="mt-phi-3 flex items-center gap-phi-4">
-              <button type="button" onClick={handleSave} disabled={saving} className={solidBtnCls}>
-                {saving ? 'Saving...' : 'Save changes'}
-              </button>
-              <button type="button" onClick={handleReset} className={actionBtnCls}>Reset</button>
-            </div>
-          </div>
+          <SettingsSidebarFooter
+            unsaved={unsaved}
+            lastSavedAt={draft.lastSavedAt}
+            saving={saving}
+            onSave={() => void handleSave()}
+            onReset={handleReset}
+          />
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -690,9 +756,9 @@ export default function SettingsPage() {
             </button>
           </div>
 
-          <div ref={contentScrollRef} className="min-h-0 flex-1 overflow-y-auto scroll-smooth px-phi-5 py-phi-6 lg:px-phi-7">
-            <div className="grid min-h-full gap-phi-7 xl:grid-cols-[minmax(0,1fr)_18rem]">
-              <div className="min-w-0">
+          <div ref={contentScrollRef} className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
+            <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_18rem]">
+              <div className="min-w-0 px-phi-5 py-phi-6 lg:px-phi-7">
                 <header className="mb-phi-7 max-w-[54rem]">
                   <p className="type-label-section text-oxford/45">{draft.versionLabel}</p>
                   <h1 className="mt-phi-3 font-display text-[2.2rem] font-medium leading-[0.98] tracking-0 text-oxford sm:text-[3rem]">
