@@ -33,6 +33,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from utils.storage import Storage
+from security.rate_limiter import (
+    FixedWindowRateLimiter,
+    RateLimitPolicy,
+    build_security_store,
+    rate_limit_exceeded,
+    security_event_detail,
+)
+from security.request_guards import require_authenticated_user, validate_route_id
 from utils.settings_loader import (
     DEFAULT_SETTINGS,
     fund_config_content_changed,
@@ -130,6 +138,19 @@ MAX_RESUMED_AGENT_LOOPS = max(0, int(os.getenv("MAX_RESUMED_AGENT_LOOPS", "0")))
 _ADMIN_LOGIN_MAX_FAILURES = int(os.getenv("ADMIN_LOGIN_MAX_FAILURES", "5"))
 _ADMIN_LOGIN_WINDOW_SECONDS = int(os.getenv("ADMIN_LOGIN_WINDOW_SECONDS", "300"))
 _admin_login_attempts: Dict[str, List[float]] = {}
+_security_store = None
+
+_LOOKUP_MINUTE_POLICY = RateLimitPolicy("lookup_minute", limit=5, window_seconds=60)
+_LOOKUP_DAY_POLICY = RateLimitPolicy("lookup_day", limit=50, window_seconds=86400)
+_AGENT_TRIGGER_POLICY = RateLimitPolicy("agent_trigger_minute", limit=1, window_seconds=60)
+_META_TRIGGER_POLICY = RateLimitPolicy("meta_trigger_hour", limit=1, window_seconds=3600)
+_SETTINGS_MUTATION_POLICY = RateLimitPolicy("settings_mutation_minute", limit=30, window_seconds=60)
+_ADMIN_LOGIN_POLICY = RateLimitPolicy("admin_login_minute", limit=10, window_seconds=60)
+_ADMIN_OVERVIEW_POLICY = RateLimitPolicy("admin_overview_minute", limit=30, window_seconds=60)
+
+_AGENT_TRIGGER_LOCK_TTL_SECONDS = int(os.getenv("AGENT_TRIGGER_LOCK_TTL_SECONDS", "900"))
+_LOOKUP_LOCK_TTL_SECONDS = int(os.getenv("LOOKUP_LOCK_TTL_SECONDS", "900"))
+_META_TRIGGER_LOCK_TTL_SECONDS = int(os.getenv("META_TRIGGER_LOCK_TTL_SECONDS", "900"))
 
 
 def _safe_table_execute(fn, *, default_data, warn_label: str):
@@ -154,6 +175,7 @@ async def _agent_worker() -> None:
             except Exception as e:
                 _logger_agents.exception("Pipeline cycle error for user %s: %s", user_id[:12] if user_id else "?", e)
             finally:
+                _release_security_lock(str(job.get("lock_key") or "").strip() or None)
                 _agent_queue.task_done()
         except asyncio.CancelledError:
             break
@@ -183,6 +205,7 @@ async def _lookup_worker() -> None:
                     e,
                 )
             finally:
+                _release_security_lock(str(job.get("lock_key") or "").strip() or None)
                 _lookup_queue.task_done()
         except asyncio.CancelledError:
             break
@@ -380,6 +403,55 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+def _get_security_store():
+    global _security_store
+    if _security_store is None:
+        _security_store = build_security_store()
+    return _security_store
+
+
+def _enforce_rate_limits(key: str, policies: List[RateLimitPolicy]):
+    limiter = FixedWindowRateLimiter(store=_get_security_store())
+    for policy in policies:
+        decision = limiter.check(key, policy)
+        if not decision.allowed:
+            return rate_limit_exceeded(retry_after_seconds=decision.retry_after_seconds)
+    return None
+
+
+def _acquire_security_lock(key: str, *, ttl_seconds: int) -> bool:
+    return bool(_get_security_store().acquire_lock(f"lock:{key}", ttl_seconds=ttl_seconds))
+
+
+def _release_security_lock(key: Optional[str]) -> None:
+    if not key:
+        return
+    try:
+        _get_security_store().release_lock(f"lock:{key}")
+    except Exception as exc:
+        _logger_agents.debug("security lock release failed key=%s error=%s", key, exc)
+
+
+def _client_host(request: Request) -> str:
+    forwarded = str(request.headers.get("x-forwarded-for") or "").split(",", 1)[0].strip()
+    if forwarded:
+        return forwarded
+    return (request.client.host if request.client else "") or "unknown"
+
+
+def _is_production_env() -> bool:
+    env = (os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or os.getenv("FASTAPI_ENV") or "").lower()
+    return env in ("production", "prod")
+
+
+def _admin_dashboard_enabled() -> bool:
+    raw = os.getenv("ADMIN_DASHBOARD_ENABLED")
+    if _is_production_env():
+        return str(raw or "").lower() in ("1", "true", "yes")
+    return str(raw or "true").lower() not in ("0", "false", "no")
+
+
 # Public paths that skip Clerk JWT auth
 _PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc", "/redoc/", "/openapi.json/"}
 _ADMIN_PATH_PREFIX = "/api/admin/"
@@ -389,6 +461,12 @@ async def clerk_auth_middleware(request: Request, call_next):
     """Extract Bearer token, verify Clerk JWT, attach user_id to request.state. Return 401 if invalid."""
     if request.method == "OPTIONS":
         return await call_next(request)
+    if (
+        _is_production_env()
+        and str(os.getenv("PUBLIC_API_DOCS_ENABLED") or "").lower() not in ("1", "true", "yes")
+        and (request.url.path in {"/docs", "/openapi.json", "/redoc", "/redoc/", "/openapi.json/"})
+    ):
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
     if (
         request.url.path in _PUBLIC_PATHS
         or request.url.path.rstrip("/") in _PUBLIC_PATHS
@@ -1276,6 +1354,7 @@ async def lookup_job_status(request: Request, lookup_id: str = ""):
 @app.get("/api/startups/{startup_id}")
 def get_startup_detail(request: Request, startup_id: str):
     """Full scout/review/partner JSON for one startup (on-demand; not used for grid polling)."""
+    validate_route_id(startup_id, field_name="startup_id")
     storage = _get_storage(request)
     raw = storage.get_by_id(startup_id)
     if not raw:
@@ -1286,6 +1365,7 @@ def get_startup_detail(request: Request, startup_id: str):
 @app.post("/api/startups/{startup_id}/acknowledge")
 async def acknowledge_startup(request: Request, startup_id: str):
     """Mark a startup as seen by the current user when they open the memo."""
+    validate_route_id(startup_id, field_name="startup_id")
     storage = _get_storage(request)
     existing = storage.get_by_id(startup_id)
     if not existing:
@@ -1318,6 +1398,7 @@ def get_startup_memo(request: Request, startup_id: str):
     """
     from pipeline_state import get_pipeline_state_row
 
+    validate_route_id(startup_id, field_name="startup_id")
     storage = _get_storage(request)
     uid = request.state.user_id
     if isinstance(storage, SupabaseStartupsStorage):
@@ -1443,12 +1524,23 @@ def _clear_admin_login_failures(request: Request) -> None:
 @app.post("/api/admin/login")
 def admin_login(request: Request, body: dict):
     """Exchange the configured master admin secret for a short-lived admin token."""
+    if not _admin_dashboard_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+    limited = _enforce_rate_limits(f"admin_login:ip:{_client_host(request)}", [_ADMIN_LOGIN_POLICY])
+    if limited is not None:
+        record_admin_audit_event(
+            event="admin_login",
+            success=False,
+            client_host=_admin_login_key(request),
+            detail=security_event_detail(reason="rate_limited"),
+        )
+        return limited
     if _admin_login_is_limited(request):
         record_admin_audit_event(
             event="admin_login",
             success=False,
             client_host=_admin_login_key(request),
-            detail={"reason": "rate_limited"},
+            detail=security_event_detail(reason="failed_secret_rate_limited"),
         )
         raise HTTPException(status_code=429, detail="Too many failed admin login attempts")
     secret = str(body.get("secret") or "")
@@ -1458,7 +1550,7 @@ def admin_login(request: Request, body: dict):
             event="admin_login",
             success=False,
             client_host=_admin_login_key(request),
-            detail={"reason": "invalid_secret"},
+            detail=security_event_detail(reason="invalid_secret"),
         )
         raise HTTPException(status_code=401, detail="Invalid admin secret")
     _clear_admin_login_failures(request)
@@ -1478,12 +1570,24 @@ def admin_login(request: Request, body: dict):
 @app.get("/api/admin/overview")
 def admin_overview(request: Request):
     """Cross-tenant admin overview. Guarded by the separate admin token."""
-    _require_admin_claims(request)
+    if not _admin_dashboard_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+    claims = _require_admin_claims(request)
+    rate_key = f"admin_overview:token:{claims.get('jti') or _client_host(request)}"
+    limited = _enforce_rate_limits(rate_key, [_ADMIN_OVERVIEW_POLICY])
+    if limited is not None:
+        record_admin_audit_event(
+            event="admin_overview",
+            success=False,
+            client_host=_admin_login_key(request),
+            detail=security_event_detail(reason="rate_limited", jti=claims.get("jti")),
+        )
+        return limited
     record_admin_audit_event(
         event="admin_overview",
         success=True,
         client_host=_admin_login_key(request),
-        detail={},
+        detail=security_event_detail(jti=claims.get("jti")),
     )
     loop_status_by_user = {
         user_id: task is not None and not task.done()
@@ -1518,10 +1622,13 @@ def get_settings(request: Request):
 @app.patch("/api/settings")
 async def patch_settings(request: Request, body: dict):
     """Update current user's settings. Validates server-side; returns 422 on validation errors."""
+    user_id = require_authenticated_user(request)
+    limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    if limited is not None:
+        return limited
     errors = _validate_settings(body)
     if errors:
         raise HTTPException(status_code=422, detail={"message": "Validation failed", "errors": errors})
-    user_id = request.state.user_id
     current = load_settings(user_id)
     for section in ("fund_config", "user_preferences", "fund_memory", "fund_identity", "cost_budget", "agent_config", "portfolio"):
         if section in body and isinstance(body[section], dict):
@@ -1596,7 +1703,10 @@ async def patch_settings(request: Request, body: dict):
 @app.post("/api/settings/policy/preview")
 def preview_settings_policy(request: Request, body: dict | None = None):
     """Compile the current or supplied fund_config draft without persisting it."""
-    user_id = request.state.user_id
+    user_id = require_authenticated_user(request)
+    limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    if limited is not None:
+        return limited
     payload = body if isinstance(body, dict) else {}
     if isinstance(payload.get("fund_config"), dict):
         fund_config = payload["fund_config"]
@@ -1610,7 +1720,10 @@ def preview_settings_policy(request: Request, body: dict | None = None):
 @app.post("/api/settings/policy/publish")
 def publish_settings_policy(request: Request, body: dict | None = None):
     """Publish the current or supplied fund_config draft as an immutable scoring policy version."""
-    user_id = request.state.user_id
+    user_id = require_authenticated_user(request)
+    limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    if limited is not None:
+        return limited
     payload = body if isinstance(body, dict) else {}
     fund_config = payload.get("fund_config") if isinstance(payload.get("fund_config"), dict) else None
     try:
@@ -2430,7 +2543,7 @@ async def trigger_agents(request: Request):
     When the user has agents enabled in settings, one scout/reviewer/partner
     cycle is queued and run in the background. Multiple users get independent runs.
     """
-    user_id = request.state.user_id
+    user_id = require_authenticated_user(request)
     use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
     if not use_supabase:
         _logger_agents.info(
@@ -2474,6 +2587,16 @@ async def trigger_agents(request: Request):
             status_code=503,
             content={"status": "unavailable", "reason": "worker_not_ready"},
         )
+    lock_key = f"user:{user_id}:agent_trigger"
+    if not _acquire_security_lock(lock_key, ttl_seconds=_AGENT_TRIGGER_LOCK_TTL_SECONDS):
+        return JSONResponse(
+            status_code=202,
+            content={"status": "already_queued", "user_id": user_id},
+        )
+    limited = _enforce_rate_limits(f"user:{user_id}:agent_trigger", [_AGENT_TRIGGER_POLICY])
+    if limited is not None:
+        _release_security_lock(lock_key)
+        return limited
     try:
         svc = get_service_client()
         thesis = get_active_thesis(svc, user_id)
@@ -2485,6 +2608,7 @@ async def trigger_agents(request: Request):
                 "trigger_agents skipped user=%s reason=thesis_required",
                 user_id[:12],
             )
+            _release_security_lock(lock_key)
             return JSONResponse(
                 status_code=200,
                 content={"status": "skipped", "reason": "thesis_required"},
@@ -2494,11 +2618,15 @@ async def trigger_agents(request: Request):
             "trigger_agents skipped user=%s reason=thesis_required_incomplete",
             user_id[:12],
         )
+        _release_security_lock(lock_key)
         return JSONResponse(
             status_code=200,
             content={"status": "skipped", "reason": "thesis_required"},
         )
-    await _agent_queue.put({"type": "cycle", "user_id": user_id})
+    except Exception:
+        _release_security_lock(lock_key)
+        raise
+    await _agent_queue.put({"type": "cycle", "user_id": user_id, "lock_key": lock_key})
     _logger_agents.info("trigger_agents queued user=%s", user_id[:12])
     _logger_visible.info("trigger_agents queued user=%s", user_id[:12])
     # Also ensure the persistent loop is alive for this user
@@ -2524,7 +2652,10 @@ async def toggle_agents(request: Request):
       - Disables all three individual agent toggles (scouts, reviewers, partners).
       - Loop naturally stops on next iteration check (or is cancelled if running).
     """
-    user_id = request.state.user_id
+    user_id = require_authenticated_user(request)
+    limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    if limited is not None:
+        return limited
 
     body: Dict[str, Any] = {}
     try:
@@ -2691,6 +2822,7 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
         raise HTTPException(status_code=422, detail="lookup_input is required")
     if len(lookup_input) > 300:
         raise HTTPException(status_code=422, detail="lookup_input is too long")
+    user_id = require_authenticated_user(request)
     lookup_id = _coerce_lookup_id(body.get("lookup_id"))
     parsed = _parse_lookup_input(lookup_input)
     company_name = str(parsed.get("company_name") or "").strip()
@@ -2701,7 +2833,21 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
             status_code=503,
             content={"status": "unavailable", "reason": "lookup_worker_not_ready"},
         )
-    user_id = request.state.user_id
+    lock_key = f"user:{user_id}:lookup:{lookup_id}"
+    if not _acquire_security_lock(lock_key, ttl_seconds=_LOOKUP_LOCK_TTL_SECONDS):
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "already_queued",
+                "user_id": user_id,
+                "lookup_id": lookup_id,
+                "mode": "on_demand_lookup",
+            },
+        )
+    limited = _enforce_rate_limits(f"user:{user_id}:lookup", [_LOOKUP_MINUTE_POLICY, _LOOKUP_DAY_POLICY])
+    if limited is not None:
+        _release_security_lock(lock_key)
+        return limited
     await _lookup_queue.put(
         {
             "user_id": user_id,
@@ -2710,6 +2856,7 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
             "lookup_query": parsed.get("lookup_query"),
             "lookup_input_type": parsed.get("lookup_input_type"),
             "lookup_id": lookup_id,
+            "lock_key": lock_key,
         }
     )
     return JSONResponse(
@@ -2736,12 +2883,23 @@ async def trigger_meta_cycle(request: Request):
     Meta-Agent is disabled or returns no report, we surface a no-op
     status so the UI can display a graceful message.
     """
-    agent = MetaAgent(user_id=request.state.user_id)
-    report = await agent.run_cycle()
-    if not report:
-        return {"status": "no-op", "cycle_number": 0}
-    cycle_number = int(report.get("cycle_number", 0))
-    return {"status": "ok", "cycle_number": cycle_number}
+    uid = require_authenticated_user(request)
+    lock_key = f"user:{uid}:meta_trigger"
+    if not _acquire_security_lock(lock_key, ttl_seconds=_META_TRIGGER_LOCK_TTL_SECONDS):
+        return JSONResponse(status_code=202, content={"status": "already_running", "cycle_number": 0})
+    limited = _enforce_rate_limits(f"user:{uid}:meta_trigger", [_META_TRIGGER_POLICY])
+    if limited is not None:
+        _release_security_lock(lock_key)
+        return limited
+    try:
+        agent = MetaAgent(user_id=uid)
+        report = await agent.run_cycle()
+        if not report:
+            return {"status": "no-op", "cycle_number": 0}
+        cycle_number = int(report.get("cycle_number", 0))
+        return {"status": "ok", "cycle_number": cycle_number}
+    finally:
+        _release_security_lock(lock_key)
 
 
 @app.get("/api/escalations")
@@ -2777,6 +2935,11 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
     Resolve an escalation by writing human_resolution to the startup record.
     Body: {decision: "YES"|"NO"|"MAYBE", notes: str}
     """
+    validate_route_id(startup_id, field_name="startup_id")
+    uid = require_authenticated_user(request)
+    limited = _enforce_rate_limits(f"user:{uid}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    if limited is not None:
+        return limited
     decision = str(body.get("decision", "")).upper()
     notes = body.get("notes") or ""
     risk_acknowledged = bool(body.get("risk_acknowledged", False))
@@ -3128,9 +3291,10 @@ async def get_activity_summary(request: Request):
 @app.post("/api/activity/seen")
 async def mark_activity_seen(request: Request):
     """Mark the current time as last_seen_at. Called when the user dismisses the summary modal."""
-    user_id: str = getattr(request.state, "user_id", None)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    user_id = require_authenticated_user(request)
+    limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    if limited is not None:
+        return limited
     svc = get_service_client()
     try:
         svc.table("user_state").upsert(

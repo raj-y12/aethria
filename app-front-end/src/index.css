@@ -78,7 +78,7 @@
    * Spacing: Fibonacci sequence — each step × φ ≈ next value.
    * Tailwind classes: p-phi-1 … p-phi-9, gap-phi-4, mt-phi-6, etc.
    * Type: body 14px → title 23px (×φ) → hero 37px (×φ²). Line-height = φ.
-   * Columns: sidebar 38.2% (1/φ²) : content 61.8% (1/φ).
+   * Workspace columns: sidebar ~22% : queue ~38% : memo ~40% (see .aethria-workspace-grid).
    * ─────────────────────────────────────────────────────────────────────── */
   --phi: 1.618034;
   --space-1: 3px;    /* micro: icon padding, divider gap */
@@ -90,15 +90,98 @@
   --space-7: 55px;   /* panel gap */
   --space-8: 89px;   /* page bottom padding */
   --space-9: 144px;  /* major layout gap */
-  /* Column ratio */
-  --col-sidebar: 38.2%;
-  --col-content: 61.8%;
+  /* Secondary type rhythm (~10% below canonical body-sm / data; labels stay 11px floor) */
+  --type-body-sm-size: 12px;
+  --type-data-size: 12px;
+  --type-body-sm-leading: 1.48;
+  --type-meta-leading: 1.45;
+  /* Queue row vertical padding — ambient compressed; selected stays immersive */
+  --queue-pad-ambient: 14px;
+  --queue-pad-ambient-alt: 15px;
+  --queue-pad-interrupt: 16px;
+  --queue-pad-selected: 26px;
+  --queue-row-gap: var(--space-5);
+  /* Selected queue title ↔ embedded memo company name */
+  --case-title-size: clamp(25px, 2.45vw, 34px);
+  --case-title-leading: 1.08;
+  --case-title-tracking: -0.02em;
+  /* Workspace trio — 22% / 38% / 40% (sidebar / queue / memo) */
+  --col-sidebar: 22%;
+  --col-queue: 38%;
+  --col-memo: 40%;
+  --layout-sidebar-min: 220px;
+  --layout-col-gap: var(--space-5);
+  --queue-content-measure: 42rem;
+  --memo-editorial-measure: 44rem;
 
   /* Semantic surfaces — mirror tokens.surface + Tailwind bg-surface-* */
   --surface-canvas: var(--color-paper);
   --surface-raised: var(--color-paper-bright);
   --surface-recessed: var(--color-paper-deep);
   --surface-selected: var(--color-register-tint);
+}
+
+/* 13" MacBook / constrained laptop — tighten Fibonacci spacing ~10% (primary type unchanged) */
+@media screen and (min-width: 1024px) and (max-width: 1512px) {
+  :root {
+    --space-4: 11px;
+    --space-5: 19px;
+    --space-6: 30px;
+    --space-7: 49px;
+    --space-8: 80px;
+    --space-9: 128px;
+    --layout-col-gap: var(--space-4);
+    --queue-row-gap: var(--space-5);
+    --queue-content-measure: 40rem;
+    --memo-editorial-measure: 42rem;
+  }
+}
+
+/* Three-column workspace — queue-led operational layout (lg+).
+ * display:grid comes from Tailwind `lg:grid` on the element (utilities load after this file;
+ * a display:grid rule here would lose to `flex` otherwise). */
+@media screen and (min-width: 1024px) {
+  .aethria-workspace-grid {
+    grid-template-rows: minmax(0, 1fr);
+    gap: var(--layout-col-gap);
+    min-height: 0;
+    overflow: hidden;
+    /* 22% / 38% / 40% — sidebar | queue | memo */
+    grid-template-columns:
+      minmax(var(--layout-sidebar-min), 22fr)
+      minmax(0, 38fr)
+      minmax(0, 40fr);
+  }
+
+  .aethria-workspace-grid > * {
+    min-width: 0;
+  }
+
+  .aethria-queue-surface {
+    width: 100%;
+    max-width: var(--queue-content-measure);
+    min-width: 0;
+  }
+
+  .queue-row-prose {
+    max-width: min(100%, var(--queue-content-measure));
+  }
+
+  .aethria-queue-list {
+    gap: var(--queue-row-gap);
+  }
+}
+
+@media screen and (min-width: 1024px) and (max-width: 1512px) {
+  .aethria-workspace-sidebar > .paper-dot-grid {
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
+
+  .memoShellContent--workspace {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
 }
 
 /* Editorial paper texture (ported from web-front-end) */
@@ -172,8 +255,8 @@
   }
   .btn-aethria-solid {
     @apply inline-flex items-center justify-center cursor-pointer rounded-none bg-oxford text-paper font-mono text-[11px] uppercase tracking-[0.12em] whitespace-nowrap transition-opacity duration-150 ease-in-out btn-interaction;
-    height: 44px;
-    padding: 0 20px;
+    height: 36px;
+    padding: 0 40px;
   }
   .btn-aethria-solid:hover {
     @apply opacity-90;
@@ -302,8 +385,8 @@
   }
   .type-body-sm {
     font-family: var(--font-sans);
-    font-size: 13px;
-    line-height: 1.5;
+    font-size: var(--type-body-sm-size, 12px);
+    line-height: var(--type-body-sm-leading, 1.48);
   }
   .type-body-emphasis {
     font-family: var(--font-sans);
@@ -321,28 +404,28 @@
   .type-label-section {
     font-family: "Space Mono", ui-monospace, monospace;
     font-size: 11px;
-    line-height: 1.5;
+    line-height: var(--type-meta-leading, 1.45);
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
   .type-label-tab {
     font-family: "Space Mono", ui-monospace, monospace;
     font-size: 11px;
-    line-height: 1.5;
+    line-height: var(--type-meta-leading, 1.45);
     letter-spacing: 0.10em;
     text-transform: uppercase;
   }
   .type-meta {
     font-family: "Space Mono", ui-monospace, monospace;
     font-size: 11px;
-    line-height: 1.5;
+    line-height: var(--type-meta-leading, 1.45);
     letter-spacing: 0.06em;
   }
   /** Data figures in lists / pipe strip — mono, tabular. */
   .type-data {
     font-family: "Space Mono", ui-monospace, monospace;
-    font-size: 13px;
-    line-height: 1.4;
+    font-size: var(--type-data-size, 12px);
+    line-height: 1.38;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
     letter-spacing: -0.02em;

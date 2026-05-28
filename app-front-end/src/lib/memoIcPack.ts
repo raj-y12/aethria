@@ -1,5 +1,5 @@
 /**
- * IC-style memo export: shared sections for PDF + Markdown, pipeline replay metadata.
+ * IC-style memo export: PDF pack sections and pipeline replay metadata.
  */
 import type { jsPDF } from 'jspdf';
 import type { Startup } from '../types/startup';
@@ -184,7 +184,7 @@ export function getPipelineReplaySteps(startup: Startup): PipelineReplayStep[] {
 }
 
 /**
- * Ordered sections for investment committee pack (PDF + Markdown bodies).
+ * Ordered sections for investment committee PDF pack.
  */
 export function buildIcPackSections(startup: Startup): IcSection[] {
   const sections: IcSection[] = [];
@@ -404,29 +404,6 @@ export async function buildMemoPDF(startup: Startup): Promise<jsPDF> {
   }
 
   return doc;
-}
-
-export function buildIcMarkdown(startup: Startup): string {
-  const name = startup.scout.name ?? 'Company';
-  const lines: string[] = [
-    `# Investment committee memorandum`,
-    ``,
-    `**${name}**`,
-    ``,
-    `> CONFIDENTIAL — For investment committee use only.`,
-    ``,
-    `Prepared: ${fmtDate(new Date().toISOString())}`,
-    ``,
-  ];
-
-  for (const sec of buildIcPackSections(startup)) {
-    lines.push(`## ${sec.title}`);
-    lines.push('');
-    lines.push(...sec.lines);
-    lines.push('');
-  }
-
-  return lines.join('\n');
 }
 
 export function icPackSafeBaseName(startup: Startup): string {

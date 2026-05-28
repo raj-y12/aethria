@@ -47,6 +47,7 @@ const SETTINGS_PATH = '/v1/settings';
 const SHOW_LOOKUP_RESULT_SNAPSHOT = false;
 
 const PANEL_CHROME_ACTION_BTN_CLASS = productInteraction.panelAction;
+const PANEL_CHROME_INLINE_ACTION_BTN_CLASS = productInteraction.panelActionInline;
 
 type RailStageState = {
   key: string;
@@ -170,27 +171,27 @@ function SystemTelemetryRail({
       </div>
 
       <div className="grid grid-cols-3 divide-x divide-oxford/[0.075]">
-        <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+        <div className="flex min-h-[56px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-2">
+          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
             Total
           </p>
-          <p className="font-mono text-[15px] font-semibold tabular-nums text-oxford">
+          <p className="font-mono text-[14px] font-semibold tabular-nums text-oxford">
             {totalCount.toLocaleString()}
           </p>
         </div>
-        <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+        <div className="flex min-h-[56px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-2">
+          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
             Recs
           </p>
-          <p className="font-mono text-[15px] font-semibold tabular-nums text-oxford">
+          <p className="font-mono text-[14px] font-semibold tabular-nums text-oxford">
             {agentDecidedCount.toLocaleString()}
           </p>
         </div>
-        <div className="flex min-h-[64px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-3">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+        <div className="flex min-h-[56px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-2">
+          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
             Human ruled
           </p>
-          <p className="font-mono text-[15px] font-semibold tabular-nums text-oxford">
+          <p className="font-mono text-[14px] font-semibold tabular-nums text-oxford">
             {humanRuledCount.toLocaleString()}
           </p>
         </div>
@@ -754,8 +755,8 @@ export default function MainLayout({
           aria-hidden="true"
         />
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
-          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[minmax(240px,0.8fr)_minmax(460px,1.2fr)_minmax(0,1.4fr)] lg:grid-rows-[minmax(0,1fr)] min-h-0 overflow-hidden gap-phi-5 lg:gap-phi-5 bg-paper">
-            <aside className="paper-dot-grid hidden lg:flex h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden">
+          <div className="flex-1 flex min-h-0 flex-col overflow-hidden bg-paper lg:grid aethria-workspace-grid">
+            <aside className="aethria-workspace-sidebar paper-dot-grid hidden lg:flex h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden">
               <div className="paper-dot-grid flex h-full min-h-0 flex-col justify-between overflow-hidden px-phi-4" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)', paddingBottom: 'clamp(5px, 0.6vw, 8px)' }}>
 
                 {/* ── Wordmark + pipeline status ─────────────────────── */}
@@ -1111,35 +1112,28 @@ export default function MainLayout({
                       <PanelShell
                         className="min-h-0 min-w-0 flex-1 w-full bg-paper"
                         title="Memo"
+                        headerClassName="!items-start !py-0 !pt-phi-2 !pb-phi-2 min-h-[46px]"
                         actions={
-                          <div className="flex shrink-0 items-center gap-0" role="group" aria-label="Memo controls">
+                          <div className="flex shrink-0 items-start gap-0" role="group" aria-label="Memo controls">
                             <button
                               type="button"
                               onClick={() => memoContentRef.current?.downloadPDF()}
-                              className={PANEL_CHROME_ACTION_BTN_CLASS}
+                              className={PANEL_CHROME_INLINE_ACTION_BTN_CLASS}
                               aria-label="Download IC pack as PDF"
                             >
                               IC pack (PDF)
                             </button>
                             <button
                               type="button"
-                              onClick={() => memoContentRef.current?.downloadMarkdown()}
-                              className={PANEL_CHROME_ACTION_BTN_CLASS}
-                              aria-label="Download IC pack as Markdown"
-                            >
-                              IC pack (MD)
-                            </button>
-                            <button
-                              type="button"
                               onClick={handleCloseMemo}
-                              className={PANEL_CHROME_ACTION_BTN_CLASS}
+                              className={PANEL_CHROME_INLINE_ACTION_BTN_CLASS}
                               aria-label="Close memo"
                             >
                               Close
                             </button>
                           </div>
                         }
-                        contentClassName="memoShellContent bg-paper px-phi-4 py-phi-3 sm:px-phi-5 sm:py-phi-4"
+                        contentClassName="memoShellContent memoShellContent--workspace bg-paper px-phi-4 py-phi-3 sm:px-phi-5 sm:py-phi-4"
                       >
                         {/*
                           Enter-only when swapping deals: `mode="wait"` on AnimatePresence forced a full

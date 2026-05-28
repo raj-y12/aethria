@@ -1,4 +1,4 @@
-const bodyMetrics = 'font-sans text-[13px] leading-[1.5]';
+const bodyMetrics = 'font-sans text-[12px] leading-[1.48]';
 
 export const railEditorial = {
   /** Primary wordmark — both MainLayout and SettingsPage asides (Playfair Display). Title case in markup. */
@@ -11,7 +11,7 @@ export const railEditorial = {
    * Bottom margin shrinks on smaller desktop viewports to keep sections compact.
    */
   label:
-    'mt-0 mr-0 ml-0 mb-[clamp(8px,1.2vw,18px)] flex items-center gap-3 font-mono text-[11px] font-normal uppercase tracking-[0.12em] text-oxford/60',
+    'mt-0 mr-0 ml-0 mb-[clamp(7px,1.1vw,16px)] flex items-center gap-2 font-mono text-[11px] font-normal uppercase tracking-[0.12em] text-oxford/60',
 
   /** Standard rail body text. */
   body: `${bodyMetrics} text-oxford/65`,
@@ -27,7 +27,7 @@ export const railEditorial = {
     'font-mono font-semibold tabular-nums leading-none tracking-[-0.02em] text-[clamp(20px,2.4vw,38px)]',
 
   /** Label beside a stat number. */
-  statLabel: 'font-mono text-[10px] leading-none uppercase tracking-[0.10em] text-oxford/35',
+  statLabel: 'font-mono text-[11px] leading-none uppercase tracking-[0.10em] text-oxford/35',
 
   /** Sub-captions, timestamps, link text. */
   meta: 'font-mono text-[10px] leading-[1.4] text-oxford/32 tracking-[0.06em]',

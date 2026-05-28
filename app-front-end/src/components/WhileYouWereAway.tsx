@@ -69,7 +69,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
           transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE, delay: reduceMotion ? 0 : 0.1 }}
           style={{
             fontFamily: "var(--font-display)",
-            fontSize: 'clamp(32px, 4.5vw, 56px)',
+            fontSize: 'clamp(28px, 3.5vw, 44px)',
             fontWeight: 500,
             color: 'var(--color-oxford)',
             lineHeight: 1.1,
@@ -127,7 +127,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
                 style={{
                   fontFamily: "var(--font-mono)",
                   fontSize: 'clamp(52px, 10vw, 96px)',
-                  fontWeight: 700,
+                  fontWeight: 400,
                   lineHeight: 1,
                   color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
                   letterSpacing: '-0.03em',
@@ -159,7 +159,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
           whileTap={reduceMotion ? {} : { scale: 0.97 }}
           onClick={onDismiss}
           className="group btn-aethria-solid"
-          style={{ padding: '0 48px' }}
+          style={{ padding: '0 72px' }}
         >
           <span className="flex items-center justify-center">
             <span>Enter Aethria</span>
@@ -167,11 +167,32 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
               className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
               aria-hidden
             >
-              {' →'}
+              {'\u00a0→'}
             </span>
           </span>
         </motion.button>
       </div>
+
+      <motion.footer
+        initial={reduceMotion ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0, transition: { duration: reduceMotion ? 0 : 0.2, ease: EASE } }}
+        transition={{ duration: reduceMotion ? 0 : 1, ease: EASE, delay: reduceMotion ? 0 : 1 }}
+        className="fixed bottom-0 left-0 z-[10000] w-full p-phi-6 flex justify-center pointer-events-none"
+      >
+        <p
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: '11px',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: 'rgba(var(--color-oxford-rgb), 0.55)',
+            margin: 0,
+          }}
+        >
+          Secure Session · Institutional Access
+        </p>
+      </motion.footer>
     </motion.div>
   );
 }

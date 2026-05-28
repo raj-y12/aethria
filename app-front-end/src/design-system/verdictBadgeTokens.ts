@@ -24,3 +24,17 @@ export const REVIEWER_BADGE_CLASS: Record<ReviewerQualityBand, string> = {
   WEAK: 'bg-[#eabfb7] text-[#5e2621]',
 };
 
+/**
+ * Queue attention annotation tags — restrained filled markers (not outline chips).
+ * burgundy = human intervention / unresolved tension
+ * gold = caution / incomplete confidence
+ * positive = strong conviction interrupt (quieter than burgundy)
+ */
+export type QueueAnnotationVariant = 'burgundy' | 'gold' | 'positive';
+
+export const QUEUE_ANNOTATION_CLASS: Record<QueueAnnotationVariant, string> = {
+  burgundy: 'bg-[#7D2B3A] text-[#F4F1EA]',
+  gold: 'bg-[#d9c9a3] text-[#4a3810]',
+  positive: 'bg-[#b5d4bc] text-[#17442d]',
+};
+

@@ -260,7 +260,7 @@ export default function LoginPage() {
               <h1
                 style={{
                   fontFamily: "var(--font-display)",
-                  fontSize: 'clamp(36px, 5vw, 64px)',
+                  fontSize: 'clamp(28px, 3.5vw, 44px)',
                   fontWeight: 500,
                   color: 'var(--color-oxford)',
                   lineHeight: 1.1,
@@ -354,7 +354,7 @@ export default function LoginPage() {
                         style={{
                           fontFamily: "var(--font-mono)",
                           fontSize: 'clamp(52px, 10vw, 96px)',
-                          fontWeight: 700,
+                          fontWeight: 400,
                           lineHeight: 1,
                           color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
                           letterSpacing: '-0.03em',
@@ -402,7 +402,7 @@ export default function LoginPage() {
                   whileTap={reduceMotion ? {} : { scale: 0.97 }}
                   onClick={handleEnterSystem}
                   className="group btn-aethria-solid"
-                  style={{ padding: '0 48px' }}
+                  style={{ padding: '0 72px' }}
                 >
                   <span className="flex items-center justify-center">
                     <span>Enter Aethria</span>
@@ -423,7 +423,7 @@ export default function LoginPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12, transition: { duration: 0.28, ease: EASE } }}
               transition={{ duration: 0.6, ease: EASE, delay: 0.5 }}
-              className="w-full max-w-[280px]"
+              className="w-full max-w-[360px]"
             >
               <form
                 onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
@@ -532,8 +532,17 @@ export default function LoginPage() {
         transition={{ duration: 1, delay: 1 }}
         className="fixed bottom-0 left-0 z-20 w-full p-phi-6 flex justify-center pointer-events-none"
       >
-        <p className="type-meta text-[11px] tracking-[0.08em] text-oxford/22">
-          Protocol 4.1 · Secure Perimeter
+        <p
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: '11px',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: 'rgba(var(--color-oxford-rgb), 0.55)',
+            margin: 0,
+          }}
+        >
+          Secure Session · Institutional Access
         </p>
       </motion.footer>
       </div>

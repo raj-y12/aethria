@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Set
 from utils.reference_verify import extract_http_urls, normalize_url_for_match
 from utils.settings_loader import get_scout_retrieval_provider
 from utils.tavily_client import tavily_search
+from security.prompt_safety import flag_prompt_injection, isolate_untrusted_text, prompt_safety_instruction
 
 logger = logging.getLogger("retrieval_grounding")
 
@@ -184,10 +185,17 @@ def render_sources_for_prompt(sources: List[Dict[str, str]]) -> str:
         return "No retrieved sources available."
     lines: List[str] = [
         "Retrieved sources (ONLY these may be cited):",
+        prompt_safety_instruction(),
     ]
     for s in sources:
+        snippet = isolate_untrusted_text(
+            s["snippet"],
+            label=f'{s["source_id"]} snippet',
+        )
+        safety = flag_prompt_injection(s["snippet"])
+        suffix = " safety=PROMPT_INJECTION_SUSPECTED" if safety.suspicious else ""
         lines.append(
-            f'[{s["source_id"]}] title="{s["title"]}" url="{s["url"]}" snippet="{s["snippet"]}"'
+            f'[{s["source_id"]}] title="{s["title"]}" url="{s["url"]}"{suffix} snippet="{snippet}"'
         )
     return "\n".join(lines)
 

@@ -122,7 +122,7 @@ function RowWrapper({
       initial={reduceMotion ? {} : { opacity: 0, transform: 'translateY(6px)' }}
       animate={{ opacity: 1, transform: 'translateY(0px)' }}
       transition={{ delay: Math.min(index * 0.03, 0.3), duration: 0.4, ease: tokens.motion.ease }}
-      className={`group relative py-phi-4 px-phi-4 transition-colors duration-200 ease-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${onClick ? 'cursor-pointer' : ''
+      className={`group relative py-phi-3 px-phi-4 transition-colors duration-200 ease-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${onClick ? 'cursor-pointer' : ''
         } ${isSelected ? 'bg-surface-selected' : 'hover:bg-registerTint'}`}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -142,7 +142,7 @@ function RowWrapper({
 function SignalsTab({ signals }: { signals: SignalItem[] }) {
   if (signals.length === 0) {
     return (
-      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
+      <div className="py-phi-6 px-phi-4 flex items-center justify-center">
         <EmptyState label="Signals" body="No high-priority events detected in the last cycle." />
       </div>
     );
@@ -233,7 +233,7 @@ function DecisionsTab({
 
   if (decisions.length === 0) {
     return (
-      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
+      <div className="py-phi-6 px-phi-4 flex items-center justify-center">
         <EmptyState
           label="Human resolutions"
           body="No escalation resolutions yet. When you resolve a human review from the deal grid, the outcome and notes appear here. Partner verdicts stay on each deal row."
@@ -293,7 +293,7 @@ function CalibrationTab({ startups, fundConfiguration }: { startups: Startup[]; 
 
   if (!startups.length || !hasDecisions) {
     return (
-      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
+      <div className="py-phi-6 px-phi-4 flex items-center justify-center">
         <EmptyState
           label="Calibration"
           body="Calibration will emerge as decisions accumulate."
@@ -352,7 +352,7 @@ function CalibrationTab({ startups, fundConfiguration }: { startups: Startup[]; 
 /* ─── SECTION WRAPPER ─── */
 function TabSection({ title, label, children }: { title: string; label?: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-phi-4 px-phi-4 pt-phi-7 pb-phi-7 first:pt-phi-4">
+    <section className="flex flex-col gap-phi-3 px-phi-4 pt-phi-5 pb-phi-5 first:pt-phi-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
         <h3 className="type-meta uppercase tracking-[0.12em] text-oxford/50">{title}</h3>
         {label ? <span className="type-meta uppercase tracking-[0.12em] text-oxford/30">{label}</span> : null}
@@ -501,7 +501,7 @@ function InstitutionalMandateTab({
 }) {
   if (error) {
     return (
-      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
+      <div className="py-phi-6 px-phi-4 flex items-center justify-center">
         <EmptyState label="Fund Thesis" body="Could not load thesis data. Check your API connection and try again." />
       </div>
     );
@@ -517,7 +517,7 @@ function InstitutionalMandateTab({
 
   if (!data || data.mode === 'missing' || (!data.parsed_json && data.thesis_ready === false)) {
     return (
-      <div className="py-phi-8 px-phi-4 flex items-center justify-center">
+      <div className="py-phi-6 px-phi-4 flex items-center justify-center">
         <EmptyState label="Fund Thesis" body="No active thesis configured. Set up your investment mandate in Settings to enable thesis-aligned scouting." />
       </div>
     );

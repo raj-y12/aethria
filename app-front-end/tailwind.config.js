@@ -110,15 +110,15 @@ export default {
        * CSS vars: --space-1 … --space-9 (set in index.css :root).
        */
       spacing: {
-        'phi-1': '3px',    // micro gap, icon padding
-        'phi-2': '5px',    // tight inline gap
-        'phi-3': '8px',    // compact component padding
-        'phi-4': '13px',   // element gap, section gap
-        'phi-5': '21px',   // card padding, page padding-x
-        'phi-6': '34px',   // section padding, page padding-y
-        'phi-7': '55px',   // panel gap
-        'phi-8': '89px',   // page bottom padding
-        'phi-9': '144px',  // major layout gap
+        'phi-1': 'var(--space-1)',
+        'phi-2': 'var(--space-2)',
+        'phi-3': 'var(--space-3)',
+        'phi-4': 'var(--space-4)',
+        'phi-5': 'var(--space-5)',
+        'phi-6': 'var(--space-6)',
+        'phi-7': 'var(--space-7)',
+        'phi-8': 'var(--space-8)',
+        'phi-9': 'var(--space-9)',
       },
     },
   },

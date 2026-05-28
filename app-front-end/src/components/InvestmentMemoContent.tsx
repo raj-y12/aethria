@@ -2,11 +2,10 @@ import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useSt
 import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
 import './InvestmentMemoContent.css';
-import type { Review, ScoringDimensionKey, Startup, AethriaView, StructuredScoring, SingleReview } from '../types/startup';
+import type { Review, ScoringDimensionKey, Startup, AethriaView } from '../types/startup';
 import { normalizeStructuredScoring } from '../lib/reviewScoring';
 import {
   buildMemoPDF,
-  buildIcMarkdown,
   icPackSafeBaseName,
   getPipelineReplaySteps,
   type PipelineReplayStep,
@@ -120,7 +119,6 @@ export interface InvestmentMemoContentProps {
 
 export interface InvestmentMemoContentHandle {
   downloadPDF: () => void;
-  downloadMarkdown: () => void;
 }
 
 function normalizeParagraphs(value: unknown): string[] {
@@ -139,6 +137,25 @@ function normalizeListItemText(value: unknown): string {
   return String(value ?? "")
     .replace(/^\s*[•·*-]\s+/, "")
     .trim();
+}
+
+function normalizeMemoKey(value: unknown): string {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function uniqueMemoRows<T extends { val?: string | null }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = normalizeMemoKey(row.val);
+    if (!key) return false;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 const MEMO_NUMBER_TOKEN_REGEX = /(?:[$€£¥]\s*)?\d[\d,]*(?:\.\d+)?(?:%|x|X|k|K|m|M|b|B)?(?:\/\d+(?:\.\d+)?)?/g;
@@ -219,6 +236,14 @@ function parseNextStepItems(raw: string): string[] {
   }
 
   return [];
+}
+
+function firstNonEmpty(...values: Array<unknown>): string {
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (text) return text;
+  }
+  return '';
 }
 
 function getPartnerEconomicBadgeVariant(startup: Startup): 'INVEST' | 'PASS' | 'MONITOR' | null {
@@ -400,126 +425,6 @@ function MemoPlainSection({
   );
 }
 
-function pickCanonicalStructuredScoring(review: Review | null | undefined): StructuredScoring | null {
-  return review?.structured_scoring ?? review?.scoring ?? review?.score_breakdown ?? null;
-}
-
-function jsonStable(value: unknown): string {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return '';
-  }
-}
-
-function buildMemoScoreDebugPayload(
-  startupId: string,
-  review: Review | null | undefined,
-  normalized: StructuredScoring | null
-) {
-  const canonical = pickCanonicalStructuredScoring(review);
-  const canonicalJson = jsonStable(canonical);
-  const normalizedDiffers = normalized != null && jsonStable(normalized) !== canonicalJson;
-
-  const consensusSignals = review?.structured_signals ?? null;
-  const consensusSignalsJson = jsonStable(consensusSignals);
-
-  const reviewerRows = (review?.reviews ?? []).map((row: SingleReview) => {
-    const extended = row as SingleReview & { structured_scoring?: StructuredScoring | null };
-    const rowScoring = extended.structured_scoring ?? null;
-    const rowSignals = row.structured_signals ?? null;
-    const entry: Record<string, unknown> = {
-      reviewer_type: row.reviewer_type,
-      verdict: row.verdict,
-      score_source: row.score_source ?? null,
-      market_score: row.market_score,
-      product_score: row.product_score,
-      technical_score: row.technical_score,
-      execution_score: row.execution_score,
-      defensibility_score: row.defensibility_score,
-    };
-    if (rowScoring && jsonStable(rowScoring) !== canonicalJson) {
-      entry.structured_scoring = rowScoring;
-    }
-    if (rowSignals && jsonStable(rowSignals) !== consensusSignalsJson) {
-      entry.structured_signals = rowSignals;
-    }
-    return entry;
-  });
-
-  return {
-    startup_id: startupId,
-    _note:
-      'Single copy of scoring data. API fields scoring/score_breakdown are aliases only (not stored separately in Supabase).',
-    structured_scoring: canonical,
-    ...(normalizedDiffers ? { normalized_ui: normalized } : {}),
-    consensus: {
-      flat_scores: {
-        market_score: review?.market_score ?? null,
-        product_score: review?.product_score ?? null,
-        technical_score: review?.technical_score ?? null,
-        execution_score: review?.execution_score ?? null,
-        defensibility_score: review?.defensibility_score ?? null,
-      },
-      overall_score: review?.overall_score ?? null,
-      aggregate_score: review?.aggregate_score ?? null,
-      overall_rubric_band: review?.overall_rubric_band ?? null,
-      score_source: review?.score_source ?? null,
-      structured_signals: consensusSignals,
-      reviewer_disagreement: review?.reviewer_disagreement ?? null,
-      score_variance: review?.score_variance ?? null,
-    },
-    reviewers: reviewerRows,
-  };
-}
-
-function MemoScoreDebugPayload({
-  startupId,
-  review,
-  normalized,
-}: {
-  startupId: string;
-  review: Review | null | undefined;
-  normalized: StructuredScoring | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const json = useMemo(
-    () => JSON.stringify(buildMemoScoreDebugPayload(startupId, review, normalized), null, 2),
-    [startupId, review, normalized]
-  );
-
-  const handleCopy = () => {
-    void navigator.clipboard?.writeText(json).then(() => {
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  return (
-    <div className="memoScoreDebug" aria-label="Assessment scoring debug payload">
-      <div className="memoScoreDebugHead">
-        <button
-          type="button"
-          className="memoScoreDebugToggle"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-        >
-          Debug payload
-        </button>
-        <button type="button" className="memoAction" onClick={handleCopy}>
-          {copied ? 'Copied' : 'Copy JSON'}
-        </button>
-      </div>
-      {open && (
-        <pre className="memoScoreDebugPre">
-          <code>{json}</code>
-        </pre>
-      )}
-    </div>
-  );
-}
-
 const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, InvestmentMemoContentProps>(function InvestmentMemoContent(
   { startup, onClose, embedded = false, onMemoPipelineReady, onDecisionResolved, fundConfiguration, peerStartups = [] },
   ref
@@ -562,25 +467,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     doc.save(`${icPackSafeBaseName(displayStartup)}-ic-pack.pdf`);
   }, [displayStartup]);
 
-  const handleDownloadMarkdown = useCallback(() => {
-    if (!displayStartup) return;
-    const md = buildIcMarkdown(displayStartup);
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${icPackSafeBaseName(displayStartup)}-ic-pack.md`;
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }, [displayStartup]);
-
   useImperativeHandle(
     ref,
-    () => ({ downloadPDF: handleDownloadPDF, downloadMarkdown: handleDownloadMarkdown }),
-    [handleDownloadPDF, handleDownloadMarkdown]
+    () => ({ downloadPDF: handleDownloadPDF }),
+    [handleDownloadPDF]
   );
 
   const contentKey = displayStartup?.id ?? startup?.id ?? 'empty';
@@ -753,6 +643,31 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   );
   const nextStepText = displayStartup ? getNextStepText(displayStartup) : '';
   const nextStepItems = useMemo(() => parseNextStepItems(nextStepText), [nextStepText]);
+  const thesisAlignmentBrief = useMemo(() => {
+    const review = displayStartup?.review;
+    if (!review) return '';
+    const score = review.thesis_alignment_score;
+    if (score != null) {
+      const ten = score <= 1 ? score * 10 : score;
+      return `${ten.toFixed(0)}/10 thesis alignment`;
+    }
+    if (review.thesis_matches_fund != null) return review.thesis_matches_fund ? 'Mandate aligned' : 'Mandate conflict';
+    return firstNonEmpty(review.aethria_view?.thesis_fit_line, review.thesis_fit_points?.[0], review.thesis_deviation_points?.[0]);
+  }, [displayStartup?.review]);
+  const openingRiskItems = useMemo(() => {
+    const items = [
+      ...adverseRegister.map((item) => item.title),
+      ...missingEvidenceItems,
+      ...riskFactors.risks,
+    ].map((item) => normalizeListItemText(item)).filter(Boolean);
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      const key = normalizeMemoKey(item);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 2);
+  }, [adverseRegister, missingEvidenceItems, riskFactors.risks]);
   const pipelineReplaySteps = useMemo(
     () => (displayStartup ? getPipelineReplaySteps(displayStartup) : []),
     [displayStartup]
@@ -788,7 +703,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           {onClose && (
             <div className="memoHeaderActions">
               <button type="button" onClick={handleDownloadPDF} className={actionBtnCls}>IC Pack (PDF)</button>
-              <button type="button" onClick={handleDownloadMarkdown} className={actionBtnCls}>IC Pack (MD)</button>
               <button type="button" onClick={onClose} className={actionBtnCls}>Close</button>
             </div>
           )}
@@ -832,6 +746,55 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             </div>
 
             <div className="memoDocDivider" aria-hidden />
+
+            <section className="memoOpeningBrief" aria-label="Decision brief">
+              <div className="memoOpeningBriefDecision">
+                <div className="memoOpeningBriefJudgment">
+                  <p className="memoOpeningBriefLabel">Recommendation</p>
+                  <p className="memoOpeningBriefRecommendation">
+                    {showJudgment ? renderWithMonoNumbers(decisionHeadline) : 'Pending'}
+                  </p>
+                  <p className="memoOpeningBriefConviction">
+                    {displayStartup.review?.overall_score != null
+                      ? renderWithMonoNumbers(`${displayStartup.review.overall_score}/10 conviction`)
+                      : thesisAlignmentBrief
+                        ? renderWithMonoNumbers(thesisAlignmentBrief)
+                        : 'Conviction forming'}
+                  </p>
+                </div>
+                <div className="memoOpeningBriefAnnotations">
+                  <div className="memoOpeningBriefNote">
+                    <p className="memoOpeningBriefLabel">Thesis</p>
+                    <p>{thesisAlignmentBrief ? renderWithMonoNumbers(thesisAlignmentBrief) : 'No thesis read yet'}</p>
+                  </div>
+                  <div className="memoOpeningBriefNote memoOpeningBriefNote--constraint">
+                    <p className="memoOpeningBriefLabel">Constraint</p>
+                    <p>
+                      {openingRiskItems.length > 0
+                        ? renderWithMonoNumbers(openingRiskItems.join(' · '))
+                        : nextStepText
+                          ? renderWithMonoNumbers(nextStepItems[0] ?? nextStepText)
+                          : 'No material blocker surfaced yet'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="memoOpeningBriefPrimary">
+                <p className="memoOpeningBriefLabel">Why this is on the docket</p>
+                <p className="memoOpeningBriefText">
+                  {renderWithMonoNumbers(
+                    firstNonEmpty(
+                      headerThesisLine,
+                      displayStartup.partner?.snapshot?.key_signal,
+                      displayStartup.partner?.decision_drivers?.[0],
+                      displayStartup.review?.overall_summary,
+                      displayStartup.scout.primary_thesis,
+                      'Awaiting enough evidence to form an investment view.'
+                    )
+                  )}
+                </p>
+              </div>
+            </section>
 
             {/* ── Generating state ── */}
             {memoPipeline === 'generating' && (
@@ -953,17 +916,18 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               );
             })()}
 
-            {/* ── Company Overview ── */}
+            {/* ── Company and product ── */}
             {(() => {
-              const rows = [
-                { key: 'Problem', val: displayStartup.scout.problem?.trim() },
-                { key: 'Solution', val: displayStartup.scout.solution?.trim() },
-                { key: 'Target Market', val: displayStartup.scout.target_users?.trim() },
-              ].filter((r) => r.val);
+              const rows = uniqueMemoRows([
+                { key: 'What it is', val: displayStartup.scout.solution?.trim() || displayStartup.scout.one_line?.trim() },
+                { key: 'Customer pain', val: displayStartup.scout.problem?.trim() },
+                { key: 'Target buyer', val: displayStartup.scout.target_users?.trim() },
+                { key: 'Product edge', val: displayStartup.partner?.product_edge?.trim() },
+              ]);
               if (!rows.length) return null;
               return (
                 <section className="memoDocSection" aria-labelledby="memo-overview">
-                  <h2 className="memoDocSectionHead" id="memo-overview">Company Overview</h2>
+                  <h2 className="memoDocSectionHead" id="memo-overview">Company and Product</h2>
                   <dl className="memoDocDL">
                     {rows.map((r) => (
                       <div key={r.key} className="memoDocDLRow">
@@ -976,18 +940,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               );
             })()}
 
-            {/* ── The Case ── */}
+            {/* ── Market case ── */}
             {(() => {
-              const rows = [
-                { key: 'Why Now', val: (displayStartup.partner?.why_this_matters || displayStartup.scout.why_now)?.trim() },
-                { key: 'Market', val: displayStartup.partner?.market_insight?.trim() },
-                { key: 'Product Edge', val: displayStartup.partner?.product_edge?.trim() },
-                { key: 'Traction', val: displayStartup.partner?.traction_signals?.trim() },
-              ].filter((r) => r.val);
+              const rows = uniqueMemoRows([
+                { key: 'Why now', val: (displayStartup.partner?.why_this_matters || displayStartup.scout.why_now)?.trim() },
+                { key: 'Market read', val: displayStartup.partner?.market_insight?.trim() },
+                { key: 'Evidence', val: displayStartup.partner?.traction_signals?.trim() },
+              ]);
               if (!rows.length) return null;
               return (
                 <section className="memoDocSection" aria-labelledby="memo-case">
-                  <h2 className="memoDocSectionHead" id="memo-case">The Case</h2>
+                  <h2 className="memoDocSectionHead" id="memo-case">Market Case</h2>
                   <dl className="memoDocDL">
                     {rows.map((r) => (
                       <div key={r.key} className="memoDocDLRow">
@@ -1086,13 +1049,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                             ))}
                           </ul>
                         </div>
-                      )}
-                      {import.meta.env.DEV && (
-                        <MemoScoreDebugPayload
-                          startupId={displayStartup.id}
-                          review={displayStartup.review}
-                          normalized={structuredScoring}
-                        />
                       )}
                     </div>
                   )}
@@ -1194,19 +1150,19 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               return (
                 <MemoDisclosureSection
                   id={`${contentKey}-reviewer-panel`}
-                  title="Reviewer Panel"
-                  summary={isContested ? 'Contested reviewer read' : `${reviews.length} reviewer reads`}
+                  title="Reviewer Read"
+                  summary={isContested ? 'Where conviction diverges' : `${reviews.length} internal reads`}
                   initialOpen={isContested || !config.memo.deepDiveCollapsed}
                 >
                   {isContested && (
                     <p className="memoDocProse">
-                      Reviewer personas did not fully agree. The headline scores lean more conservative where their reads diverged.
+                      The reviewer read is not unanimous. The useful signal is the shape of disagreement: which part of the case is carrying conviction, and which part is still soft.
                     </p>
                   )}
-                  <div className="memoDocReviewerTable" role="group" aria-label="Per-reviewer scores and verdicts">
+                  <div className="memoDocReviewerTable" role="group" aria-label="Reviewer conviction and disagreement">
                     {reviews.map((rv, idx) => {
                       const isSelected = idx === selectedReviewerIdx;
-                      const scoreRow = `Mkt ${rv.market_score}  ·  Prd ${rv.product_score}  ·  Tch ${rv.technical_score}  ·  Exc ${rv.execution_score}  ·  Def ${rv.defensibility_score}`;
+                      const scoreRow = `Market ${rv.market_score} · Product ${rv.product_score} · Technical ${rv.technical_score} · Execution ${rv.execution_score} · Defensibility ${rv.defensibility_score}`;
                       return (
                         <button
                           key={rv.reviewer_type}

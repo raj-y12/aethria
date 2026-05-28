@@ -124,7 +124,8 @@ export const tokens = {
     hero: { size: '37px', lineHeight: 1.2, letterSpacing: '-0.02em', font: 'display' as const },
     title: { size: '23px', lineHeight: 1.382, letterSpacing: '-0.02em', font: 'body' as const },
     body: { size: '14px', lineHeight: 1.618, letterSpacing: '0', font: 'body' as const },
-    bodySm: { size: '13px', lineHeight: 1.618, letterSpacing: '0', font: 'body' as const },
+    /** Secondary body — 12px (~8% below 14px body); primary body stays 14px. */
+    bodySm: { size: '12px', lineHeight: 1.48, letterSpacing: '0', font: 'body' as const },
     labelSection: { size: '11px', lineHeight: 1.5, letterSpacing: '0.12em', font: 'mono' as const },
     labelTab: { size: '11px', lineHeight: 1.5, letterSpacing: '0.10em', font: 'mono' as const },
     meta: { size: '11px', lineHeight: 1.5, letterSpacing: '0.06em', font: 'mono' as const },

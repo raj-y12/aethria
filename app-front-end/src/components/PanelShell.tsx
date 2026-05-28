@@ -89,7 +89,7 @@ export default function PanelShell({
         {headerContent ?? (
           <>
             {showTitle ? <p className={`min-w-0 truncate ${titleCls}`}>{title}</p> : null}
-            {actions != null && <div className="ml-auto flex shrink-0 items-center gap-phi-2">{actions}</div>}
+            {actions != null && <div className="ml-auto flex shrink-0 items-start gap-phi-2">{actions}</div>}
           </>
         )}
       </header>

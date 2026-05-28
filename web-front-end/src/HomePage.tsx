@@ -188,10 +188,10 @@ export default function HomePage() {
               </span>
             </motion.h1>
             <p
-              className="absolute z-[2] right-[max(1.25rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] font-mono text-[10px] tracking-[0.18em] uppercase text-[var(--text-inverse-secondary)] md:right-8 md:bottom-7 md:text-[11px]"
+              className="absolute z-[2] right-[max(1.25rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] font-mono text-[11px] tracking-[0.1em] uppercase text-[var(--text-inverse-secondary)] md:right-8 md:bottom-7"
               aria-hidden
             >
-              Protocol 4.1 · Oxford surface
+              Secure Session · Institutional Access
             </p>
           </div>
           </div>

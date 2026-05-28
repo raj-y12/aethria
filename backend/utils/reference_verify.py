@@ -313,6 +313,42 @@ def _company_tokens(company_name: Optional[str]) -> List[str]:
     return [t for t in text.split() if len(t) >= 3 and t not in stop]
 
 
+def _text_tokens(value: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", (value or "").lower()))
+
+
+def _host_identity_tokens(host: str) -> set[str]:
+    h = (host or "").lower().strip(".")
+    if not h:
+        return set()
+    reg = registrable_domain(h)
+    slug = reg.split(".", 1)[0]
+    parts = set(re.findall(r"[a-z0-9]+", slug))
+    parts.add(slug)
+    return {p for p in parts if p}
+
+
+def _reference_company_match(ref: str, *, company_name: Optional[str], host: str) -> bool:
+    tokens = _company_tokens(company_name)
+    if not tokens:
+        return True
+    ref_tokens = _text_tokens(ref)
+    host_tokens = _host_identity_tokens(host)
+    all_tokens = set(tokens)
+    compact = "".join(tokens)
+
+    if compact and compact in host_tokens:
+        return True
+    if all_tokens.issubset(ref_tokens):
+        return True
+    if all_tokens.issubset(host_tokens):
+        return True
+    if len(tokens) == 1:
+        token = tokens[0]
+        return token in ref_tokens or token in host_tokens
+    return False
+
+
 def _reference_support_note(ref: str, company_name: Optional[str]) -> str:
     lowered = ref.lower()
     if any(x in lowered for x in ("funding", "raised", "series", "seed", "investor")):
@@ -344,7 +380,7 @@ def _rank_reference(ref: str, company_name: Optional[str], anchor_hostname: Opti
         score += 35
     lowered = ref.lower()
     for token in _company_tokens(company_name):
-        if token in lowered or (host and token in host):
+        if token in _text_tokens(lowered) or (host and token in _host_identity_tokens(host)):
             score += 20
     if any(x in lowered for x in ("2026", "2025", "2024", "2023", "raised", "launch", "announces")):
         score += 8
@@ -387,7 +423,7 @@ def filter_references_by_company_relevance(
             ah = anchor_hostname.lower().removeprefix("www.")
             hh = host.removeprefix("www.")
             anchor_match = hh == ah or hh.endswith("." + ah)
-        token_match = any(t in lowered or (host and t in host) for t in tokens)
+        token_match = _reference_company_match(ref, company_name=company_name, host=host)
         if not (anchor_match or token_match):
             logger.warning(
                 "reference_verify: dropped company-irrelevant reference company=%s ref=%s",

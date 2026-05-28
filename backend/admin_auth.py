@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hmac
 import os
+from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
@@ -53,6 +54,7 @@ def issue_admin_token(*, now: datetime | None = None) -> str:
     expires_at = issued_at + timedelta(minutes=_admin_token_ttl_minutes())
     payload: Dict[str, Any] = {
         "scope": "admin",
+        "jti": str(uuid4()),
         "iat": int(issued_at.timestamp()),
         "exp": int(expires_at.timestamp()),
     }
@@ -82,4 +84,3 @@ def verify_admin_token(token: str, *, now: datetime | None = None) -> Dict[str, 
         raise ValueError("expired admin token")
 
     return claims
-
