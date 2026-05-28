@@ -857,13 +857,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       aria-labelledby="memo-investment-judgment"
                     >
                       <h2 className="memoDocSectionHead" id="memo-investment-judgment">Investment Judgement</h2>
-                      {decisionBadgeVariant && (
-                        <div className="memoDocJudgmentTop">
-                          <p className={`memoDocRecommendation memoDocRecommendation--${decisionBadgeVariant.toLowerCase()}`}>
-                            {decisionHeadline}.
-                          </p>
-                        </div>
-                      )}
                       {primaryReason && (
                         <p className="memoDocProse memoDocPrimaryReason">{renderWithMonoNumbers(primaryReason)}</p>
                       )}
