@@ -1,6 +1,8 @@
 from types import SimpleNamespace
+import asyncio
 
 from fastapi.testclient import TestClient
+import pytest
 
 
 class _FakeQueue:
@@ -83,7 +85,7 @@ def test_duplicate_lookup_id_is_coalesced_without_second_enqueue(monkeypatch):
     assert len(queue.items) == 1
 
 
-def test_agent_trigger_duplicate_is_coalesced_without_second_enqueue(monkeypatch):
+def test_manual_agent_trigger_when_ops_off_is_coalesced_without_second_enqueue(monkeypatch):
     import api
     from security.rate_limiter import InMemorySecurityStore
 
@@ -94,15 +96,9 @@ def test_agent_trigger_duplicate_is_coalesced_without_second_enqueue(monkeypatch
     monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
     monkeypatch.setattr(api, "_agent_queue", queue)
-    monkeypatch.setattr(api, "load_settings", lambda user_id: {"agent_config": {"scouts_enabled": True}})
+    monkeypatch.setattr(api, "load_settings", lambda user_id: {"agent_config": {"scouts_enabled": False}})
     monkeypatch.setattr(api, "get_service_client", lambda: SimpleNamespace())
     monkeypatch.setattr(api, "get_active_thesis", lambda client, user_id: SimpleNamespace())
-    monkeypatch.setattr(api, "_ensure_user_loop", lambda user_id: None)
-
-    async def noop(user_id):
-        return None
-
-    monkeypatch.setattr(api, "_ensure_user_loop", noop)
 
     client = TestClient(api.app)
     first = client.post("/api/agents/trigger", headers=_auth_headers())
@@ -112,6 +108,100 @@ def test_agent_trigger_duplicate_is_coalesced_without_second_enqueue(monkeypatch
     assert second.status_code == 202
     assert second.json()["status"] == "already_queued"
     assert len(queue.items) == 1
+    assert queue.items[0]["manual_one_shot"] is True
+
+
+def test_agent_trigger_ignores_when_persistent_loop_already_running(monkeypatch):
+    import api
+    from security.rate_limiter import InMemorySecurityStore
+
+    class _LiveTask:
+        def done(self):
+            return False
+
+    queue = _FakeQueue()
+    monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service")
+    monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
+    monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
+    monkeypatch.setattr(api, "_agent_queue", queue)
+    monkeypatch.setitem(api._per_user_loops, "user_a", _LiveTask())
+    monkeypatch.setattr(api, "load_settings", lambda user_id: {"agent_config": {"scouts_enabled": True}})
+    monkeypatch.setattr(api, "get_service_client", lambda: SimpleNamespace())
+    monkeypatch.setattr(api, "get_active_thesis", lambda client, user_id: SimpleNamespace())
+
+    client = TestClient(api.app)
+    response = client.post("/api/agents/trigger", headers=_auth_headers())
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "loop_running"
+    assert queue.items == []
+
+
+def test_agent_trigger_starts_persistent_loop_without_queueing_when_ops_on(monkeypatch):
+    import api
+    from security.rate_limiter import InMemorySecurityStore
+
+    queue = _FakeQueue()
+    started = []
+
+    async def fake_ensure_user_loop(user_id):
+        started.append(user_id)
+        return True
+
+    monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service")
+    monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
+    monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
+    monkeypatch.setattr(api, "_agent_queue", queue)
+    monkeypatch.setattr(api, "_loops_lock", object())
+    monkeypatch.setattr(api, "_ensure_user_loop", fake_ensure_user_loop)
+    monkeypatch.setattr(api, "load_settings", lambda user_id: {"agent_config": {"scouts_enabled": True}})
+    monkeypatch.setattr(api, "get_service_client", lambda: SimpleNamespace())
+    monkeypatch.setattr(api, "get_active_thesis", lambda client, user_id: SimpleNamespace())
+
+    client = TestClient(api.app)
+    response = client.post("/api/agents/trigger", headers=_auth_headers())
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "loop_started"
+    assert started == ["user_a"]
+    assert queue.items == []
+
+
+@pytest.mark.asyncio
+async def test_persistent_agent_loop_runs_cycles_sequentially_and_stops_when_disabled(monkeypatch):
+    import api
+
+    states = iter([
+        {"agent_config": {"scouts_enabled": True}},
+        {"agent_config": {"scouts_enabled": False, "reviewers_enabled": False, "partners_enabled": False}},
+    ])
+    active_cycles = 0
+    max_active_cycles = 0
+    calls = []
+
+    async def fake_run_one_pipeline_cycle(user_id):
+        nonlocal active_cycles, max_active_cycles
+        active_cycles += 1
+        max_active_cycles = max(max_active_cycles, active_cycles)
+        calls.append(user_id)
+        await asyncio.sleep(0)
+        active_cycles -= 1
+
+    monkeypatch.setattr(api, "load_settings", lambda user_id, use_cache=False: next(states))
+    monkeypatch.setattr(api, "run_one_pipeline_cycle", fake_run_one_pipeline_cycle)
+    monkeypatch.setattr(api, "_update_agent_run_status", lambda user_id, status: asyncio.sleep(0))
+    monkeypatch.setattr(api, "AGENT_LOOP_INTERVAL_SECONDS", 0)
+    monkeypatch.setitem(api._per_user_loops, "user_loop", asyncio.current_task())
+
+    await api._user_agent_loop("user_loop")
+
+    assert calls == ["user_loop"]
+    assert max_active_cycles == 1
+    assert "user_loop" not in api._per_user_loops
 
 
 def test_admin_token_includes_jti(monkeypatch):

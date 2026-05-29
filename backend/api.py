@@ -1,14 +1,17 @@
 """
 FastAPI server for Aethria.
 Serves app-front-end: GET /api/startups, GET/PATCH /settings.
-Per-user agent pipeline: POST /api/agents/trigger enqueues a run for the authenticated user.
+Per-user agent pipeline: POST /api/agents/trigger starts or reuses a persistent user loop when Ops/Agents is on.
+When Ops/Agents is off, the same endpoint can enqueue a manual one-shot run.
 On-demand lookup uses a separate queue/worker so it is not blocked by full scout/reviewer/partner cycles.
 """
 import asyncio
+import gc
 import json
 import logging
 import os
 import re
+import time
 from uuid import uuid4
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -85,6 +88,7 @@ from portfolio.store import PortfolioStore
 from portfolio.rejection import RejectionAnalyzer
 from portfolio.cost_control import CostController
 from pipeline_runner import (
+    _rss_mb as _pipeline_rss_mb,
     reprocess_startups_missing_fund_thesis,
     run_one_pipeline_cycle,
     run_on_demand_lookup,
@@ -125,6 +129,7 @@ _LOOKUP_TRAILING_QUALIFIERS = {"company", "startup", "website", "profile"}
 # Per-user persistent agent loops: user_id -> asyncio.Task
 # Protected by _loops_lock to prevent duplicate tasks per user.
 _per_user_loops: Dict[str, asyncio.Task] = {}
+_per_user_loop_wake_events: Dict[str, asyncio.Event] = {}
 _loops_lock: Optional[asyncio.Lock] = None  # initialised inside lifespan (event loop must exist)
 AGENT_LOOP_INTERVAL_SECONDS = int(os.getenv("AGENT_LOOP_INTERVAL_SECONDS", "300"))
 # On small Render instances, resuming every user's loop at startup can OOM before the app is healthy.
@@ -176,7 +181,10 @@ async def _agent_worker() -> None:
             job = await _agent_queue.get()
             user_id = str(job.get("user_id") or "").strip()
             try:
-                await run_one_pipeline_cycle(user_id)
+                await run_one_pipeline_cycle(
+                    user_id,
+                    manual_one_shot=bool(job.get("manual_one_shot")),
+                )
             except Exception as e:
                 _logger_agents.exception("Pipeline cycle error for user %s: %s", user_id[:12] if user_id else "?", e)
             finally:
@@ -230,6 +238,20 @@ def _is_user_agents_enabled(user_id: str) -> bool:
         return False
 
 
+def _agents_enabled_from_settings(settings: Dict[str, Any]) -> bool:
+    ac = settings.get("agent_config") or {}
+    return bool(
+        ac.get("scouts_enabled", False)
+        or ac.get("reviewers_enabled", False)
+        or ac.get("partners_enabled", False)
+    )
+
+
+def _is_user_loop_alive(user_id: str) -> bool:
+    task = _per_user_loops.get(user_id)
+    return task is not None and not task.done()
+
+
 async def _update_agent_run_status(user_id: str, status: str) -> None:
     """Best-effort: write agents_status (and last_started_at when running) into settings doc."""
     try:
@@ -254,59 +276,114 @@ async def _user_agent_loop(user_id: str) -> None:
         while True:
             # Re-check enabled flag at the top of every iteration (settings can change)
             if not _is_user_agents_enabled(user_id):
-                _logger_agents.info("[AGENT LOOP] Agents disabled — stopping loop for user %s", user_id[:12])
+                _logger_agents.info("[AGENT LOOP] Stopped because Ops/Agents is OFF for user %s", user_id[:12])
+                _logger_visible.info("[AGENT LOOP] Stopped because Ops/Agents is OFF for user %s", user_id[:12])
                 await _update_agent_run_status(user_id, "stopped")
                 break
+            cycle_started_at = time.perf_counter()
+            _logger_agents.info(
+                "[AGENT LOOP] Cycle started user=%s rss_mb_before=%.1f",
+                user_id[:12],
+                _pipeline_rss_mb(),
+            )
             try:
                 await run_one_pipeline_cycle(user_id)
+                _logger_agents.info(
+                    "[AGENT LOOP] Cycle completed user=%s duration_s=%.2f rss_mb_after=%.1f",
+                    user_id[:12],
+                    time.perf_counter() - cycle_started_at,
+                    _pipeline_rss_mb(),
+                )
                 await _update_agent_run_status(user_id, "running")
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                _logger_agents.exception("[AGENT LOOP] Cycle error for user %s: %s", user_id[:12], exc)
+                _logger_agents.exception(
+                    "[AGENT LOOP] Cycle failed user=%s duration_s=%.2f rss_mb_after=%.1f error=%s",
+                    user_id[:12],
+                    time.perf_counter() - cycle_started_at,
+                    _pipeline_rss_mb(),
+                    exc,
+                )
                 await _update_agent_run_status(user_id, "error")
-            await asyncio.sleep(AGENT_LOOP_INTERVAL_SECONDS)
+            finally:
+                gc.collect()
+                _logger_agents.info(
+                    "[AGENT LOOP] Cycle cleanup complete user=%s rss_mb_after_cleanup=%.1f",
+                    user_id[:12],
+                    _pipeline_rss_mb(),
+                )
+            if not _is_user_agents_enabled(user_id):
+                _logger_agents.info("[AGENT LOOP] Stopped because Ops/Agents is OFF for user %s", user_id[:12])
+                _logger_visible.info("[AGENT LOOP] Stopped because Ops/Agents is OFF for user %s", user_id[:12])
+                await _update_agent_run_status(user_id, "stopped")
+                break
+            _logger_agents.info(
+                "[AGENT LOOP] Loop sleeping user=%s sleep_seconds=%s",
+                user_id[:12],
+                AGENT_LOOP_INTERVAL_SECONDS,
+            )
+            wake_event = _per_user_loop_wake_events.get(user_id)
+            if wake_event is None:
+                await asyncio.sleep(AGENT_LOOP_INTERVAL_SECONDS)
+            else:
+                try:
+                    await asyncio.wait_for(
+                        wake_event.wait(),
+                        timeout=AGENT_LOOP_INTERVAL_SECONDS,
+                    )
+                except asyncio.TimeoutError:
+                    pass
+                wake_event.clear()
     except asyncio.CancelledError:
         _logger_agents.info("[AGENT LOOP] Cancelled for user %s", user_id[:12])
         raise
     finally:
         # Remove self from registry when done (cancelled or naturally stopped)
         _per_user_loops.pop(user_id, None)
+        _per_user_loop_wake_events.pop(user_id, None)
         _logger_agents.info("[AGENT LOOP] Exiting loop for user %s", user_id[:12])
 
 
-async def _ensure_user_loop(user_id: str) -> None:
+async def _ensure_user_loop(user_id: str) -> bool:
     """Start a persistent loop for user_id if one is not already alive."""
     global _loops_lock
     if _loops_lock is None:
-        return
+        return False
     async with _loops_lock:
         task = _per_user_loops.get(user_id)
         if task is not None and not task.done():
-            _logger_agents.debug("[AGENT LOOP] Loop already alive for user %s — skipping", user_id[:12])
-            return
+            _logger_agents.info(
+                "[AGENT LOOP] Trigger ignored because loop already running for user %s",
+                user_id[:12],
+            )
+            return False
         t = asyncio.create_task(
             _user_agent_loop(user_id),
             name=f"agent_loop_{user_id[:12]}",
         )
         _per_user_loops[user_id] = t
+        _per_user_loop_wake_events[user_id] = asyncio.Event()
         _logger_agents.info("[AGENT LOOP] Registered loop task for user %s", user_id[:12])
+        return True
 
 
 async def _stop_user_loop(user_id: str) -> None:
-    """Cancel and remove the loop for user_id (idempotent)."""
+    """Signal the loop to stop after the active disposable cycle finishes."""
     global _loops_lock
     if _loops_lock is None:
         return
     async with _loops_lock:
-        task = _per_user_loops.pop(user_id, None)
+        task = _per_user_loops.get(user_id)
+        wake_event = _per_user_loop_wake_events.get(user_id)
+        if wake_event is not None:
+            wake_event.set()
     if task and not task.done():
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-    _logger_agents.info("[AGENT LOOP] Stopped loop for user %s", user_id[:12])
+        _logger_agents.info("[AGENT LOOP] Stop requested for user %s", user_id[:12])
+    else:
+        _per_user_loops.pop(user_id, None)
+        _per_user_loop_wake_events.pop(user_id, None)
+        _logger_agents.info("[AGENT LOOP] No live loop to stop for user %s", user_id[:12])
 
 
 async def _resume_all_user_loops() -> None:
@@ -2550,9 +2627,9 @@ async def api_post_fund_thesis_reprocess_missing(
 @app.post("/api/agents/trigger")
 async def trigger_agents(request: Request):
     """
-    Enqueue a pipeline run for the current user (per-user agents).
-    When the user has agents enabled in settings, one scout/reviewer/partner
-    cycle is queued and run in the background. Multiple users get independent runs.
+    Trigger agent execution for the current user.
+    When Ops/Agents is on, start or reuse the user's persistent loop.
+    When Ops/Agents is off, enqueue a manual one-shot cycle.
     """
     user_id = require_authenticated_user(request)
     use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
@@ -2579,17 +2656,27 @@ async def trigger_agents(request: Request):
             status_code=200,
             content={"status": "skipped", "reason": "settings_unavailable"},
         )
-    ac = settings.get("agent_config") or {}
-    if not (ac.get("scouts_enabled", False) or ac.get("reviewers_enabled", False) or ac.get("partners_enabled", False)):
+    agents_enabled = _agents_enabled_from_settings(settings)
+    if agents_enabled and _is_user_loop_alive(user_id):
         _logger_agents.info(
-            "trigger_agents skipped user=%s reason=agents_disabled",
+            "trigger_agents ignored user=%s reason=loop_already_running",
+            user_id[:12],
+        )
+        _logger_visible.info("[AGENT LOOP] Trigger ignored because loop already running for user %s", user_id[:12])
+        return JSONResponse(
+            status_code=202,
+            content={"status": "loop_running", "user_id": user_id},
+        )
+    if agents_enabled and _loops_lock is None:
+        _logger_agents.warning(
+            "trigger_agents unavailable user=%s reason=loop_registry_not_ready",
             user_id[:12],
         )
         return JSONResponse(
-            status_code=200,
-            content={"status": "skipped", "reason": "agents_disabled"},
+            status_code=503,
+            content={"status": "unavailable", "reason": "loop_registry_not_ready"},
         )
-    if _agent_queue is None:
+    if not agents_enabled and _agent_queue is None:
         _logger_agents.warning(
             "trigger_agents unavailable user=%s reason=worker_not_ready",
             user_id[:12],
@@ -2637,11 +2724,26 @@ async def trigger_agents(request: Request):
     except Exception:
         _release_security_lock(lock_key)
         raise
-    await _agent_queue.put({"type": "cycle", "user_id": user_id, "lock_key": lock_key})
-    _logger_agents.info("trigger_agents queued user=%s", user_id[:12])
-    _logger_visible.info("trigger_agents queued user=%s", user_id[:12])
-    # Also ensure the persistent loop is alive for this user
-    await _ensure_user_loop(user_id)
+    if agents_enabled:
+        _release_security_lock(lock_key)
+        started = await _ensure_user_loop(user_id)
+        status = "loop_started" if started else "loop_running"
+        _logger_agents.info("trigger_agents %s user=%s", status, user_id[:12])
+        return JSONResponse(
+            status_code=202,
+            content={"status": status, "user_id": user_id},
+        )
+
+    await _agent_queue.put(
+        {
+            "type": "cycle",
+            "user_id": user_id,
+            "lock_key": lock_key,
+            "manual_one_shot": True,
+        }
+    )
+    _logger_agents.info("trigger_agents queued manual one-shot user=%s", user_id[:12])
+    _logger_visible.info("trigger_agents queued manual one-shot user=%s", user_id[:12])
     return JSONResponse(
         status_code=202,
         content={"status": "queued", "user_id": user_id},
@@ -2661,7 +2763,7 @@ async def toggle_agents(request: Request):
 
     When enabled=false:
       - Disables all three individual agent toggles (scouts, reviewers, partners).
-      - Loop naturally stops on next iteration check (or is cancelled if running).
+      - Loop naturally stops after the active cycle finishes or the sleep is woken.
     """
     user_id = require_authenticated_user(request)
     limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])

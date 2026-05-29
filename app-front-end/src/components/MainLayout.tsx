@@ -63,6 +63,7 @@ function SystemTelemetryRail({
   pendingEscalations,
   pipelineEnabled,
   pipelineLoopAlive,
+  pipelineStopping,
   pipelineHealthIssue,
   stages,
   showIssueHelp,
@@ -76,6 +77,7 @@ function SystemTelemetryRail({
   pendingEscalations: number;
   pipelineEnabled: boolean;
   pipelineLoopAlive: boolean;
+  pipelineStopping: boolean;
   pipelineHealthIssue: boolean;
   stages: RailStageState[];
   showIssueHelp: boolean;
@@ -85,7 +87,9 @@ function SystemTelemetryRail({
   const hasEscalations = pendingEscalations > 0;
   const primaryLabel = hasEscalations ? 'Escalations' : 'Open / in-progress';
   const primaryValue = hasEscalations ? pendingEscalations : openInProgressCount;
-  const statusLabel = !pipelineEnabled
+  const statusLabel = pipelineStopping
+    ? 'STOPPING'
+    : !pipelineEnabled
     ? 'OFF'
     : pipelineHealthIssue
       ? 'ISSUE'
@@ -94,6 +98,8 @@ function SystemTelemetryRail({
         : 'IDLE';
   const statusTone = pipelineHealthIssue
     ? 'text-escalation'
+    : pipelineStopping
+      ? 'text-oxford/55'
     : !pipelineEnabled
       ? 'text-oxford/28'
       : pipelineLoopAlive
@@ -101,6 +107,8 @@ function SystemTelemetryRail({
         : 'text-oxford/45';
   const statusDot = pipelineHealthIssue
     ? 'bg-escalation'
+    : pipelineStopping
+      ? 'bg-oxford/45 pulse-soft'
     : !pipelineEnabled
       ? 'bg-oxford/18'
       : pipelineLoopAlive
@@ -542,8 +550,11 @@ export default function MainLayout({
       !agentsStatus.agents_will_run ||
       agentsStatus.thesis_ready === false
     );
+  const pipelineStopping = Boolean(loopStatus?.loop_alive && loopStatus?.agents_enabled === false && !pipelineHealthIssue);
   const pipelineLoopAlive = Boolean(loopStatus?.loop_alive && agentsStatus?.agents_will_run === true && !pipelineHealthIssue);
-  const pipelineStateLabel = !pipelineEnabled
+  const pipelineStateLabel = pipelineStopping
+    ? 'Stopping'
+    : !pipelineEnabled
     ? 'Off'
     : pipelineHealthIssue
       ? 'Issue'
@@ -790,6 +801,7 @@ export default function MainLayout({
                     pendingEscalations={pendingEscalations}
                     pipelineEnabled={pipelineEnabled}
                     pipelineLoopAlive={pipelineLoopAlive}
+                    pipelineStopping={pipelineStopping}
                     pipelineHealthIssue={pipelineHealthIssue}
                     stages={pipelineStages}
                     showIssueHelp={showPipelineIssueHelp}

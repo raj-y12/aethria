@@ -7,6 +7,7 @@ import gc
 import logging
 import os
 import resource
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 from uuid import uuid4
@@ -72,10 +73,18 @@ def _visible_info(message: str, *args: object) -> None:
 
 
 def _rss_mb() -> float:
-    """Best-effort resident memory in MB for small-instance diagnostics."""
+    """Best-effort current resident memory in MB for small-instance diagnostics."""
+    try:
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        with open("/proc/self/statm", "r", encoding="utf-8") as f:
+            parts = f.read().split()
+        if len(parts) >= 2:
+            return round((int(parts[1]) * page_size) / (1024 * 1024), 1)
+    except Exception:
+        pass
     try:
         rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        # macOS reports bytes; Linux reports KiB.
+        # Fallback: macOS reports bytes; Linux reports high-water KiB.
         return round((rss / (1024 * 1024)) if rss > 10_000_000 else (rss / 1024), 1)
     except Exception:
         return -1.0
@@ -111,17 +120,17 @@ def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str)
         )
 
 
-async def run_one_pipeline_cycle(user_id: str) -> None:
+async def run_one_pipeline_cycle(user_id: str, *, manual_one_shot: bool = False) -> None:
     """Run one cycle of scout, reviewer, partner, portfolio, and meta for the given user."""
     if not user_id or not user_id.strip():
         logger.warning("run_one_pipeline_cycle: skipped (empty user_id)")
         return
     user_id = user_id.strip()
     async with pipeline_execution_slot(user_id):
-        await _run_one_pipeline_cycle_inner(user_id)
+        await _run_one_pipeline_cycle_inner(user_id, manual_one_shot=manual_one_shot)
 
 
-async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
+async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool = False) -> None:
     tenant = TenantContext(user_id=user_id)
     logger.info(
         "event=tenant_context user_id=%s module=pipeline_cycle",
@@ -144,8 +153,14 @@ async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
     reviewers_enabled = bool(ac.get("reviewers_enabled", False))
     partners_enabled = bool(ac.get("partners_enabled", False))
     if not (scouts_enabled or reviewers_enabled or partners_enabled):
-        logger.info("[%s] Agents disabled in settings, skipping", user_id[:12])
-        return
+        if manual_one_shot:
+            scouts_enabled = True
+            reviewers_enabled = True
+            partners_enabled = True
+            logger.info("[%s] Manual one-shot pipeline using all stages while Ops/Agents is off", user_id[:12])
+        else:
+            logger.info("[%s] Agents disabled in settings, skipping", user_id[:12])
+            return
     logger.debug(
         "[%s] agent gates: scouts=%s reviewers=%s partners=%s",
         user_id[:12],
@@ -224,6 +239,10 @@ async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
         fund_thesis=thesis_ctx,
     )
 
+    started_at = time.perf_counter()
+    agents_executed = 0
+    total_startups_before: Optional[int] = None
+    total_startups_after: Optional[int] = None
     try:
         pipeline_run_id = str(uuid4())
         logger.info(
@@ -233,12 +252,15 @@ async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
             _rss_mb(),
         )
         _activity_startups_before = 0
+        _activity_startups_found = 0
+        try:
+            _r = get_service_client().table("startups").select("startup_id", count="exact").eq("user_id", user_id).execute()
+            total_startups_before = int(getattr(_r, "count", None) or 0)
+            _activity_startups_before = total_startups_before
+        except Exception:
+            pass
         if scouts_enabled:
-            try:
-                _r = get_service_client().table("startups").select("startup_id", count="exact").eq("user_id", user_id).execute()
-                _activity_startups_before = int(getattr(_r, "count", None) or 0)
-            except Exception:
-                pass
+            agents_executed += len(getattr(scout_engine, "scouts", []) or [])
             await scout_engine.run_cycle(pipeline_run_id=pipeline_run_id)
         else:
             logger.info("[%s] Scout stage skipped (disabled in settings)", user_id[:12])
@@ -247,6 +269,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
         _activity_decided_count = 0
         _activity_escalations_count = 0
         if reviewers_enabled:
+            agents_executed += 3
             unreviewed_before = _safe_stage_count(storage, "count_unreviewed", user_id)
             if (unreviewed_before or 0) > 0:
                 _visible_info(
@@ -273,6 +296,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
             logger.info("[%s] Reviewer stage skipped (disabled in settings)", user_id[:12])
 
         if partners_enabled:
+            agents_executed += 1
             undecided_before = _safe_stage_count(storage, "count_undecided", user_id)
             if (undecided_before or 0) > 0:
                 _visible_info(
@@ -306,6 +330,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
         portfolio_engine.last_signal = datetime.now() - timedelta(days=1)
         portfolio_engine.last_feedback = datetime.now() - timedelta(days=1)
         portfolio_engine.last_health = datetime.now() - timedelta(days=1)
+        agents_executed += 1
         await portfolio_engine.run_cycle()
 
         try:
@@ -314,6 +339,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
                 reviewer_engine=reviewer_engine,
                 user_id=user_id,
             )
+            agents_executed += 1
             await meta_agent.run_cycle()
         except Exception as meta_err:
             logger.warning("[%s] Meta-agent cycle skipped: %s", user_id[:12], meta_err)
@@ -321,9 +347,10 @@ async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
         # Persist activity metrics for the "While you were away" summary
         try:
             _startups_after = 0
+            _r2 = get_service_client().table("startups").select("startup_id", count="exact").eq("user_id", user_id).execute()
+            total_startups_after = int(getattr(_r2, "count", None) or 0)
             if scouts_enabled:
-                _r2 = get_service_client().table("startups").select("startup_id", count="exact").eq("user_id", user_id).execute()
-                _startups_after = int(getattr(_r2, "count", None) or 0)
+                _startups_after = total_startups_after
             _activity_startups_found = max(0, _startups_after - _activity_startups_before)
             get_service_client().table("pipeline_activity").insert({
                 "user_id": user_id,
@@ -336,9 +363,22 @@ async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
             logger.warning("[%s] Could not persist pipeline_activity: %s", user_id[:12], _act_err)
 
         gc.collect()
-        logger.info("[%s] Pipeline cycle completed rss_mb_end=%.1f", user_id[:12], _rss_mb())
+        logger.info(
+            "[%s] Pipeline cycle completed rss_mb_end=%.1f duration_s=%.2f startups_before=%s startups_after=%s startups_found=%s reviewed=%s decided=%s escalations=%s agents_executed=%s",
+            user_id[:12],
+            _rss_mb(),
+            time.perf_counter() - started_at,
+            total_startups_before,
+            total_startups_after,
+            _activity_startups_found,
+            _activity_reviewed_count,
+            _activity_decided_count,
+            _activity_escalations_count,
+            agents_executed,
+        )
     except Exception as e:
         logger.exception("[%s] Pipeline cycle error: %s", user_id[:12], e)
+        raise
     finally:
         gc.collect()
 

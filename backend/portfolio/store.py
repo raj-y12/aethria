@@ -15,7 +15,7 @@ import fcntl
 import os
 
 from tenant_context import require_user_id
-from supabase_doc_store import list_get_all, list_upsert
+from supabase_doc_store import list_get_all, list_get_by_id, list_upsert
 from supabase_client import get_service_client
 from portfolio.schemas import (
     StartupRecord,
@@ -283,8 +283,7 @@ class PortfolioStore:
             if file_key == "startups":
                 return self._upsert_startup_supabase(record)
             uid = self._supabase_uid()
-            records = list_get_all(table, user_id=uid)
-            existing = next((r for r in records if r.get("id") == record_id), None)
+            existing = list_get_by_id(table, record_id, user_id=uid)
             if existing is not None:
                 record["version"] = existing.get("version", 0) + 1
                 self.logger.info(f"Updated {file_key} record {record_id} to version {record['version']}")
