@@ -253,6 +253,7 @@ def sync_fund_config_to_active_thesis(
     """
     from utils.settings_loader import fund_config_matches_thesis_payload, fund_config_raw_text, fund_config_to_thesis_parsed_json
     from fund_thesis import get_active_thesis
+    from tenant_context import require_user_id
 
     uid = require_user_id(user_id, context="sync_fund_config_to_active_thesis")
     fc = fund_config if isinstance(fund_config, dict) else {}

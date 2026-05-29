@@ -136,3 +136,30 @@ def test_runtime_limits_load_from_saved_settings(monkeypatch):
     assert limits["max_tokens_per_run"] == 321
     assert limits["cooldown_seconds"] == 7
     assert limits["daily_cost_ceiling"] == 0.25
+
+
+def test_sync_fund_config_to_active_thesis_validates_user_id_without_name_error(monkeypatch):
+    import fund_thesis
+    from fund_thesis_ops import sync_fund_config_to_active_thesis
+
+    fc = _fund_config()
+    raw = fund_config_raw_text(fc)
+    parsed = fund_config_to_thesis_parsed_json(fc)
+
+    class ActiveThesis:
+        raw_text = raw
+        parsed_json = parsed
+        thesis_id = "thesis_1"
+        version_id = "version_1"
+        version_number = 1
+
+    monkeypatch.setattr(fund_thesis, "get_active_thesis", lambda client, user_id: ActiveThesis())
+
+    result = sync_fund_config_to_active_thesis(
+        object(),
+        user_id="user_settings",
+        fund_config=fc,
+    )
+
+    assert result["skipped"] is True
+    assert result["version_id"] == "version_1"
