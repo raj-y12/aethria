@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Placeholder env for backend jobs. Unit tests mock or skip live integrations;
+# integration tests marked @pytest.mark.skip are not run in CI.
+env:
+  OPENAI_API_KEY: sk-ci-placeholder-not-a-real-key
+  USE_SUPABASE_STORAGE: "0"
+  SKIP_REFERENCE_URL_VERIFY: "1"
+  RESUME_AGENT_LOOPS_ON_STARTUP: "false"
+
+jobs:
+  app-frontend:
+    name: App frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app-front-end
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app-front-end/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          # main.tsx requires Clerk at build time (import.meta.env is inlined).
+          VITE_CLERK_PUBLISHABLE_KEY: pk_test_ci_placeholder
+          VITE_API_URL: http://127.0.0.1:8000
+        run: npm run build
+
+  web-frontend:
+    name: Web frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-front-end
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web-front-end/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          VITE_API_URL: http://127.0.0.1:8000
+          VITE_APP_URL: http://127.0.0.1:3000
+        run: npm run build
+
+  backend-deps:
+    name: Backend dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-py3.12-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pytest pytest-asyncio
+
+  backend-import:
+    name: Backend import check
+    needs: backend-deps
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-py3.12-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify imports
+        run: python -c "import api; print('import api: ok')"
+
+  backend-tests:
+    name: Backend tests
+    needs: backend-deps
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-py3.12-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest pytest-asyncio
+
+      - name: Run tests
+        run: python -m pytest tests/ -v -o asyncio_mode=auto
+
+  backend-docker:
+    name: Backend Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -f backend/Dockerfile .
