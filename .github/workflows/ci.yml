@@ -9,9 +9,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Placeholder env for backend jobs. Unit tests mock or skip live integrations;
-# integration tests marked @pytest.mark.skip are not run in CI.
+# Run JavaScript-based actions on Node 24 (GitHub deprecation of Node 20 actions).
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   OPENAI_API_KEY: sk-ci-placeholder-not-a-real-key
   USE_SUPABASE_STORAGE: "0"
   SKIP_REFERENCE_URL_VERIFY: "1"
@@ -153,5 +153,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Ensure Docker build files are present
+        run: |
+          test -f backend/Dockerfile || {
+            echo "::error::backend/Dockerfile is missing from the repository. Commit backend/Dockerfile and .dockerignore."
+            exit 1
+          }
+          test -d resources || {
+            echo "::error::resources/ is missing from the repository (required by backend/Dockerfile COPY)."
+            exit 1
+          }
+
+      - uses: docker/setup-buildx-action@v3
+
       - name: Build image
-        run: docker build -f backend/Dockerfile .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: false
+          tags: aethria-backend:ci
+          load: true
