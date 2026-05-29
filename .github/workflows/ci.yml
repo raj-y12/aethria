@@ -116,7 +116,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Verify imports
-        run: python -c "import api; print('import api: ok')"
+        run: python -c "import api"
 
   backend-tests:
     name: Backend tests
