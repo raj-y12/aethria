@@ -311,12 +311,19 @@ class SupabaseStartupsStorage:
         self.upsert_startup_dict(merged.to_dict())
         return True
 
-    def get_list_projection_rows(self) -> Optional[List[dict]]:
+    def get_list_projection_rows(
+        self,
+        *,
+        limit: Optional[int] = None,
+        offset: int = 0,
+    ) -> Optional[List[dict]]:
         """Thin columns for GET /api/startups list (low egress).
 
         Returns None if the query failed (caller must not fall back to full-row fetch).
         Returns [] when the query succeeded but the tenant has no rows.
         """
+        lim = max(1, min(int(limit if limit is not None else 500), 500))
+        off = max(0, int(offset or 0))
         try:
             r = self._execute_with_retry(
                 lambda: (
@@ -324,6 +331,7 @@ class SupabaseStartupsStorage:
                     .select(_LIST_SELECT)
                     .eq("user_id", self._user_id)
                     .order("updated_at", desc=True)
+                    .range(off, off + lim - 1)
                     .execute()
                 )
             )
@@ -340,6 +348,7 @@ class SupabaseStartupsStorage:
                             .select(_LIST_SELECT_LEGACY_NO_UNRESOLVED)
                             .eq("user_id", self._user_id)
                             .order("updated_at", desc=True)
+                            .range(off, off + lim - 1)
                             .execute()
                         )
                     )
@@ -445,27 +454,37 @@ class SupabaseStartupsStorage:
         try:
             r = (
                 self._client.table(TABLE)
-                .select("startup_id, display_name")
+                .select("startup_id")
                 .eq("user_id", self._user_id)
+                .eq("startup_id", startup.startup_id)
+                .limit(1)
                 .execute()
             )
-            existing_rows = (r.data or []) if hasattr(r, "data") else []
-        except Exception as e:
-            self.logger.warning("Duplicate check select failed: %s", e)
-            existing_rows = []
-
-        new_name = (startup.scout_info.name or "").strip().lower()
-        for row in existing_rows:
-            if row.get("startup_id") == startup.startup_id:
+            if ((r.data or []) if hasattr(r, "data") else []):
                 self.logger.warning("Startup %s already exists; skipping add", startup.startup_id)
                 return startup.startup_id
-            dn = (row.get("display_name") or "").strip().lower()
-            if dn and dn == new_name:
-                self.logger.info(
-                    "Duplicate company name detected in storage; skipping add: %s",
-                    startup.scout_info.name,
+        except Exception as e:
+            self.logger.warning("Duplicate id check select failed: %s", e)
+
+        new_name = (startup.scout_info.name or "").strip()
+        if new_name:
+            try:
+                r = (
+                    self._client.table(TABLE)
+                    .select("startup_id")
+                    .eq("user_id", self._user_id)
+                    .eq("display_name", new_name)
+                    .limit(1)
+                    .execute()
                 )
-                return startup.startup_id
+                if ((r.data or []) if hasattr(r, "data") else []):
+                    self.logger.info(
+                        "Duplicate company name detected in storage; skipping add: %s",
+                        startup.scout_info.name,
+                    )
+                    return startup.startup_id
+            except Exception as e:
+                self.logger.warning("Duplicate name check select failed: %s", e)
 
         sid = startup.startup_id
         if pr:

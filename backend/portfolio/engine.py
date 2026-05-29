@@ -91,6 +91,14 @@ class PortfolioEngine:
         self.cost_controller = CostController(user_id=tenant_uid)
         self.health_monitor = HealthMonitor(self.portfolio_store, discovery_storage=self.discovery_storage)
         self.cluster_analyzer = ClusterAnalyzer(user_id=offline)
+        self.execution_scan_limit = max(
+            1,
+            min(int(os.getenv("PORTFOLIO_EXECUTION_SCAN_LIMIT", "200")), 500),
+        )
+        self.cluster_analysis_limit = max(
+            1,
+            min(int(os.getenv("PORTFOLIO_CLUSTER_ANALYSIS_LIMIT", "500")), 1000),
+        )
         
         # Intervals
         self.execution_interval = execution_interval
@@ -135,8 +143,12 @@ class PortfolioEngine:
     async def _run_execution(self):
         """Run Execution Agent to process new decisions."""
         try:
-            # Get all entries from discovery storage
-            all_entries = self.discovery_storage.get_all()
+            all_entries = self._get_execution_entries()
+            existing_decision_startup_ids = {
+                d.get("startup_id")
+                for d in self.portfolio_store.get_all_decisions()
+                if d.get("startup_id")
+            }
             
             processed_count = 0
             
@@ -169,12 +181,7 @@ class PortfolioEngine:
                     self.portfolio_store.add_startup(startup_data, agent_id="scout_v1")
                 
                 # Check if decision already recorded
-                decisions = self.portfolio_store.get_all_decisions()
-                decision_exists = any(
-                    d.get("startup_id") == startup_id for d in decisions
-                )
-                
-                if not decision_exists:
+                if startup_id not in existing_decision_startup_ids:
                     # Add decision
                     decision_id = self.portfolio_store.add_decision(
                         startup_id=startup_id,
@@ -199,12 +206,22 @@ class PortfolioEngine:
                     )
                     
                     processed_count += 1
+                    existing_decision_startup_ids.add(startup_id)
             
             if processed_count > 0:
                 self.logger.info(f"Processed {processed_count} new decisions")
+            del all_entries
+            del existing_decision_startup_ids
         
         except Exception as e:
             self.logger.error(f"Error in execution cycle: {e}", exc_info=True)
+
+    def _get_execution_entries(self):
+        """Bounded partner-decision scan for portfolio execution."""
+        if hasattr(self.discovery_storage, "get_startups_with_decision"):
+            startups = self.discovery_storage.get_startups_with_decision(limit=self.execution_scan_limit)
+            return [s.to_dict() if hasattr(s, "to_dict") else s for s in startups]
+        return self.discovery_storage.get_all()[: self.execution_scan_limit]
     
     async def _run_signals(self):
         """Run Signal Tracker to check watchlist."""
@@ -282,11 +299,7 @@ class PortfolioEngine:
         except Exception as e:
             self.logger.error(f"Error in health cycle: {e}", exc_info=True)
 
-        try:
-            all_startups = self.discovery_storage.get_all()
-            self.cluster_analyzer.analyze(all_startups)
-        except Exception as e:
-            self.logger.error(f"Error in cluster analysis: {e}", exc_info=True)
+        # HealthMonitor runs the same clustering pass with bounded reads.
     
     async def run_forever(self):
         """Run Portfolio Engine continuously."""

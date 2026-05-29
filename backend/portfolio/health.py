@@ -8,6 +8,7 @@ Monitors system for:
 - Memory bloat
 """
 import logging
+import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -39,6 +40,10 @@ class HealthMonitor:
         self.cluster_analyzer = ClusterAnalyzer(user_id=uid)
         self.logger = logging.getLogger("health.monitor")
         self.health_records = []  # In-memory cache
+        self.cluster_analysis_limit = max(
+            1,
+            min(int(os.getenv("PORTFOLIO_CLUSTER_ANALYSIS_LIMIT", "500")), 1000),
+        )
     
     def check_health(self) -> List[str]:
         """
@@ -152,11 +157,19 @@ class HealthMonitor:
         if not self.discovery_storage:
             return
         try:
-            all_startups = self.discovery_storage.get_all()
+            if hasattr(self.discovery_storage, "get_startups_paginated"):
+                all_startups, _next_offset = self.discovery_storage.get_startups_paginated(
+                    limit=self.cluster_analysis_limit,
+                    offset=0,
+                )
+            else:
+                all_startups = self.discovery_storage.get_all()[: self.cluster_analysis_limit]
             result = self.cluster_analyzer.analyze(all_startups)
+            del result
             oversaturated = self.cluster_analyzer.get_oversaturated_sectors()
             if oversaturated:
                 self.logger.warning(f"Oversaturated sectors: {oversaturated}")
+            del all_startups
         except Exception as e:
             self.logger.warning(f"Cluster analysis failed: {e}")
 

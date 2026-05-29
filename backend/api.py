@@ -151,6 +151,11 @@ _ADMIN_OVERVIEW_POLICY = RateLimitPolicy("admin_overview_minute", limit=30, wind
 _AGENT_TRIGGER_LOCK_TTL_SECONDS = int(os.getenv("AGENT_TRIGGER_LOCK_TTL_SECONDS", "900"))
 _LOOKUP_LOCK_TTL_SECONDS = int(os.getenv("LOOKUP_LOCK_TTL_SECONDS", "900"))
 _META_TRIGGER_LOCK_TTL_SECONDS = int(os.getenv("META_TRIGGER_LOCK_TTL_SECONDS", "900"))
+DEFAULT_STARTUPS_LIST_LIMIT = max(1, min(int(os.getenv("STARTUPS_LIST_DEFAULT_LIMIT", "250")), 500))
+MAX_STARTUPS_LIST_LIMIT = max(
+    DEFAULT_STARTUPS_LIST_LIMIT,
+    min(int(os.getenv("STARTUPS_LIST_MAX_LIMIT", "500")), 1000),
+)
 
 
 def _safe_table_execute(fn, *, default_data, warn_label: str):
@@ -1312,14 +1317,20 @@ def _get_storage(request: Request):
 
 
 @app.get("/api/startups")
-def get_startups(request: Request):
+def get_startups(
+    request: Request,
+    limit: int = DEFAULT_STARTUPS_LIST_LIMIT,
+    offset: int = 0,
+):
+    limit = max(1, min(int(limit or DEFAULT_STARTUPS_LIST_LIMIT), MAX_STARTUPS_LIST_LIMIT))
+    offset = max(0, int(offset or 0))
     storage = _get_storage(request)
     last_seen_at = _get_user_last_seen_at(getattr(request.state, "user_id", None))
     if isinstance(storage, SupabaseStartupsStorage):
-        rows = storage.get_list_projection_rows()
+        rows = storage.get_list_projection_rows(limit=limit, offset=offset)
         if rows is not None:
             return [_list_projection_to_frontend(r, last_seen_at=last_seen_at) for r in rows]
-        raw_list = storage.get_all()
+        raw_list, _next_offset = storage.get_startups_paginated(limit=limit, offset=offset)
         full = [_backend_to_frontend(r, last_seen_at=last_seen_at) for r in raw_list]
         return [_thin_list_from_full_frontend(x) for x in full]
     raw_list = storage.get_all()

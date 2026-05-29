@@ -3,8 +3,10 @@ Run one pipeline cycle (scout → reviewer → partner → portfolio → meta) f
 Used by the per-user agent queue: explicit user_id on every storage path (no run_context).
 """
 import asyncio
+import gc
 import logging
 import os
+import resource
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 from uuid import uuid4
@@ -67,6 +69,16 @@ def _visible_info(message: str, *args: object) -> None:
     """Log to both pipeline logger and uvicorn logger for local dev visibility."""
     logger.info(message, *args)
     _visible_logger.info(message, *args)
+
+
+def _rss_mb() -> float:
+    """Best-effort resident memory in MB for small-instance diagnostics."""
+    try:
+        rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # macOS reports bytes; Linux reports KiB.
+        return round((rss / (1024 * 1024)) if rss > 10_000_000 else (rss / 1024), 1)
+    except Exception:
+        return -1.0
 
 
 def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str) -> None:
@@ -215,9 +227,10 @@ async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
     try:
         pipeline_run_id = str(uuid4())
         logger.info(
-            "[%s] pipeline_run_id=%s module=pipeline_cycle",
+            "[%s] pipeline_run_id=%s module=pipeline_cycle rss_mb_start=%.1f",
             user_id[:12],
             pipeline_run_id,
+            _rss_mb(),
         )
         _activity_startups_before = 0
         if scouts_enabled:
@@ -322,9 +335,12 @@ async def _run_one_pipeline_cycle_inner(user_id: str) -> None:
         except Exception as _act_err:
             logger.warning("[%s] Could not persist pipeline_activity: %s", user_id[:12], _act_err)
 
-        logger.info("[%s] Pipeline cycle completed", user_id[:12])
+        gc.collect()
+        logger.info("[%s] Pipeline cycle completed rss_mb_end=%.1f", user_id[:12], _rss_mb())
     except Exception as e:
         logger.exception("[%s] Pipeline cycle error: %s", user_id[:12], e)
+    finally:
+        gc.collect()
 
 
 async def run_on_demand_lookup(
@@ -459,9 +475,10 @@ async def _run_on_demand_lookup_inner(
     try:
         lookup_run_id = str(uuid4())
         logger.info(
-            "[%s] on_demand_lookup pipeline_run_id=%s",
+            "[%s] on_demand_lookup pipeline_run_id=%s rss_mb_start=%.1f",
             user_id[:12],
             lookup_run_id,
+            _rss_mb(),
         )
         startup_id = await scout_engine.run_named_lookup(
             company_name=company,
@@ -513,7 +530,13 @@ async def _run_on_demand_lookup_inner(
                 await asyncio.sleep(0.6 * attempt)
         if not decided:
             logger.warning("[%s] On-demand lookup not decided yet: %s", user_id[:12], startup_id)
-        logger.info("[%s] On-demand lookup completed for %s (%s)", user_id[:12], company, startup_id)
+        logger.info(
+            "[%s] On-demand lookup completed for %s (%s) rss_mb_end=%.1f",
+            user_id[:12],
+            company,
+            startup_id,
+            _rss_mb(),
+        )
         return startup_id
     except Exception as e:
         logger.exception("[%s] On-demand lookup error (%s): %s", user_id[:12], company, e)
@@ -523,6 +546,8 @@ async def _run_on_demand_lookup_inner(
             "Lookup failed with an unexpected error. Try again or check server logs.",
         )
         return None
+    finally:
+        gc.collect()
 
 
 async def reprocess_startups_missing_fund_thesis(
