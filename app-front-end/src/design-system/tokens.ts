@@ -1,5 +1,5 @@
 /**
- * Aethria design tokens — aligned with brand_assets and web-front-end.
+ * Aethria design tokens — aligned with docs/design/brand-assets and web-front-end.
  *
  * Palette: deep blue #001433, paper #F4F1EA, paperBright/paperDeep variants,
  * inverse on deep blue #F4F1EA; body text uses blue-tinted charcoal #26313f, not black.

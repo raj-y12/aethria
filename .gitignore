@@ -1,12 +1,39 @@
+# macOS / editor noise
 .DS_Store
-.env
-scripts/
-unused_components/
-node_modules/
-.vite/
-__pycache__/
-.pytest_cache/
-*.py[cod]
 .cursorignore
+
+# Local environment files. Keep examples committed.
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# JavaScript / frontend generated files
+node_modules/
+dist/
+build/
+.vite/
+
+# Python generated files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+ENV/
+
+# Logs and runtime output
+logs/
+*.log
+
+# Local agent/worktree state
 app-front-end/.superpowers/
 .worktrees/
+
+# Archived experiments and local maintenance scratch space
+scripts/
+unused_components/

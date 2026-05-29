@@ -2,11 +2,23 @@
 
 Aethria is an autonomous dealflow operating system for venture teams.
 
-This repository contains:
-- `backend`: FastAPI API, Scout/Reviewer/Partner/Portfolio agents, Meta-Agent, storage adapters.
-- `app-front-end`: Authenticated product UI for pipeline operations and memo workflows.
-- `web-front-end`: Public marketing and access-request experience.
-- `supabase`: SQL/migration assets for production persistence.
+## Current Layout
+
+The current deploy roots are intentionally unchanged:
+
+- `backend/`: FastAPI API, Scout/Reviewer/Partner/Portfolio agents, Meta-Agent, storage adapters.
+- `app-front-end/`: authenticated product UI for pipeline operations and memo workflows.
+- `web-front-end/`: public marketing and access-request experience.
+- `supabase/`: SQL/migration assets for production persistence.
+
+Supporting material lives outside the deploy roots:
+
+- `docs/`: product, architecture, API, environment, deployment, and pitch documentation.
+- `docs/pitch/`: investor narrative, deck drafts, and pitch collateral.
+- `docs/design/brand-assets/`: brand asset source files and generated brand imagery.
+- `resources/`: runtime configuration and contracts, including partner rules.
+- `packages/`: shared or experimental package work that is not a current deploy root.
+- `scripts/`: repository maintenance scripts.
 
 ## Runtime Topology
 
@@ -53,16 +65,9 @@ Core user-scoped artifacts include settings, startups, escalations, portfolio de
 
 ## Environment Notes
 
-Backend/agents commonly require:
-- `OPENAI_API_KEY`
-- `USE_SUPABASE_STORAGE` (`1|true|yes` for Supabase mode)
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `CLERK_JWKS_URL`
+See [docs/env.md](docs/env.md) for service-specific environment variables.
 
-Frontend commonly requires:
-- `VITE_CLERK_PUBLISHABLE_KEY` (app frontend)
-- `VITE_API_URL` (optional in local app frontend, used in web waitlist integration)
+See [docs/deployment.md](docs/deployment.md) for current Vercel and Render deploy-root assumptions.
 
 ## Developer Commands
 
