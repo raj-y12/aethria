@@ -125,6 +125,7 @@ export default function DispatchCommandBar({
       ? progress!.name || progress!.query
       : 'Look up a company';
   const bottomLabel = result ? 'Close · Esc' : running ? 'Continue in background →' : 'Cancel · Esc';
+  const view = result ? 'result' : running ? 'progress' : 'compose';
 
   const modal = (
     <AnimatePresence>
@@ -141,6 +142,15 @@ export default function DispatchCommandBar({
           aria-modal="true"
           aria-label="Look up a company"
         >
+          <AnimatePresence mode="wait">
+          <motion.div
+            key={view}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transform: 'translateY(-8px)' }}
+            transition={{ duration: 0.26, ease: EASE }}
+            className="flex w-full flex-col items-center"
+          >
           <motion.p
             initial={{ opacity: 0, transform: 'translateY(10px)' }}
             animate={{ opacity: 1, transform: 'translateY(0px)' }}
@@ -218,6 +228,8 @@ export default function DispatchCommandBar({
               </motion.div>
             </>
           )}
+          </motion.div>
+          </AnimatePresence>
 
           <motion.button
             initial={{ opacity: 0, transform: 'translateY(10px)' }}

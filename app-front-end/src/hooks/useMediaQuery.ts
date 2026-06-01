@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react';
  * Returns true when the viewport matches the given media query.
  */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
+  // Initialize synchronously from the real viewport so the first paint already
+  // matches the correct breakpoint. Defaulting to `false` caused mobile-only
+  // chrome to flash for one frame before the effect corrected it.
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return false;
+    return window.matchMedia(query).matches;
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) {

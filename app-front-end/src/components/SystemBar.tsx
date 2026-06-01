@@ -17,6 +17,8 @@ interface SystemBarProps {
   onClose?: () => void;
   /** Opens the full-screen dispatch (company lookup) takeover. */
   onDispatch?: () => void;
+  /** True while a background lookup is running — shows a breathing dot on Dispatch. */
+  dispatchActive?: boolean;
   navLink?: { href: string; label: string };
 }
 
@@ -46,6 +48,7 @@ function SpineNavButton({
   shortcut,
   compact,
   surface = 'oxford',
+  running = false,
 }: {
   label: string;
   active: boolean;
@@ -54,6 +57,8 @@ function SpineNavButton({
   shortcut?: string;
   compact?: boolean;
   surface?: 'oxford' | 'paper';
+  /** Shows a breathing dot before the label (e.g. a lookup running in the background). */
+  running?: boolean;
 }) {
   const onPaper = surface === 'paper';
   const textActive = onPaper ? 'text-oxford' : 'text-white';
@@ -78,7 +83,15 @@ function SpineNavButton({
       aria-pressed={ariaPressed}
       aria-current={active ? 'page' : undefined}
     >
-      <span>{label}</span>
+      <span className="inline-flex min-w-0 items-center gap-phi-2">
+        {running ? (
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-none signal-dot-breathe ${onPaper ? 'bg-oxford' : 'bg-white'}`}
+            aria-hidden
+          />
+        ) : null}
+        <span className="truncate">{label}</span>
+      </span>
       {shortcut ? (
         <span
           className={`tabular-nums transition-colors ${active ? shortcutActive : shortcutIdle}`}
@@ -99,6 +112,7 @@ export default function SystemBar({
   onShowSystem,
   onClose,
   onDispatch,
+  dispatchActive = false,
   navLink,
 }: SystemBarProps) {
   const reduceMotion = usePrefersReducedMotion();
@@ -221,6 +235,7 @@ export default function SystemBar({
                   shortcut="⌘K"
                   compact
                   surface="paper"
+                  running={dispatchActive}
                 />
               ) : null}
           </div>

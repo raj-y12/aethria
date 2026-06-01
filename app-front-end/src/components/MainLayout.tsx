@@ -45,9 +45,6 @@ import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 
 const SETTINGS_PATH = '/v1/settings';
 
-/** Set true to show lookup result card in the Dispatch rail. */
-const SHOW_LOOKUP_RESULT_SNAPSHOT = false;
-
 const PANEL_CHROME_ACTION_BTN_CLASS = productInteraction.panelAction;
 const PANEL_CHROME_INLINE_ACTION_BTN_CLASS = productInteraction.panelActionInline;
 
@@ -828,6 +825,7 @@ export default function MainLayout({
                       onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
                       onClose={() => setRightPanel(null)}
                       onDispatch={() => setCommandBarOpen(true)}
+                      dispatchActive={lookupWorking}
                     />
                   </div>
                 </div>
@@ -958,11 +956,6 @@ export default function MainLayout({
                     onClearMessage={() => setLookupMessage(null)}
                     lookupPhase={lookupPhaseLabel}
                   />
-                  {SHOW_LOOKUP_RESULT_SNAPSHOT && lookupSnapshotProps ? (
-                    <div className="mt-phi-3 min-w-0">
-                      <LookupResultSnapshot {...lookupSnapshotProps} onOpenMemo={handleOpenLookupMemo} />
-                    </div>
-                  ) : null}
                 </div>
               </header>
 
