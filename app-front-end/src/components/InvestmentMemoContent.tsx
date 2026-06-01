@@ -1030,7 +1030,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Investment case ── */}
             {investmentCasePoints.length > 0 && (
               <section className="memoDocSection memoCaseSection" aria-labelledby="memo-case">
-                <h2 className="memoDocSectionHead" id="memo-case">The Case</h2>
+                <h2 className="memoDocSectionHead" id="memo-case">Why Now</h2>
                 <ol className="memoCaseList">
                   {investmentCasePoints.map((point, i) => (
                     <li key={i} className={`memoCasePoint${i === 0 ? ' memoCasePoint--lead' : ''}`}>
@@ -1279,7 +1279,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Risk register ── */}
             {(adverseRegister.length > 0 || riskFactors.risks.length > 0 || riskFactors.mitigation.length > 0 || missingEvidenceItems.length > 0) && (
               <section className="memoDocSection memoRiskRegisterSection" aria-labelledby="memo-risk-register">
-                <h2 className="memoDocSectionHead" id="memo-risk-register">Risk Register</h2>
+                <h2 className="memoDocSectionHead" id="memo-risk-register">Risks</h2>
                 {adverseRegister.length > 0 && (
                   <p className="memoEvStatLine">
                     {renderWithMonoNumbers(`${highAdverseCount} high · ${adverseRegister.length} material`)}

@@ -2,12 +2,12 @@ export const LOGIN_ENTRY_SESSION_KEY = 'aethria_just_logged_in';
 
 export type LoginEntryTransition = {
   contentExitMs: number;
-  overlayMs: number;
+  appRevealMs: number;
   navigateDelayMs: number;
 };
 
 export function getLoginEntryTransition(reduceMotion: boolean): LoginEntryTransition {
   return reduceMotion
-    ? { contentExitMs: 0, overlayMs: 80, navigateDelayMs: 0 }
-    : { contentExitMs: 260, overlayMs: 520, navigateDelayMs: 420 };
+    ? { contentExitMs: 0, appRevealMs: 80, navigateDelayMs: 0 }
+    : { contentExitMs: 140, appRevealMs: 180, navigateDelayMs: 140 };
 }

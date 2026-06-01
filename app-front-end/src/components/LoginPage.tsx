@@ -231,10 +231,8 @@ export default function LoginPage() {
         className="w-full max-w-[40rem] flex flex-col items-center"
         animate={
           entering
-            ? reduceMotion
-              ? { opacity: 0 }
-              : { opacity: 0, y: -14, filter: 'blur(6px)' }
-            : { opacity: 1, y: 0, filter: 'blur(0px)' }
+            ? { opacity: 0 }
+            : { opacity: 1 }
         }
         transition={{
           duration: entryTransition.contentExitMs / 1000,
@@ -577,29 +575,6 @@ export default function LoginPage() {
         </p>
       </motion.footer>
       </div>
-      <AnimatePresence>
-        {entering && (
-          <motion.div
-            aria-hidden
-            className="fixed inset-0 z-50 pointer-events-none bg-oxford"
-            initial={
-              reduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, clipPath: 'inset(50% 50% 50% 50%)' }
-            }
-            animate={
-              reduceMotion
-                ? { opacity: 1 }
-                : { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' }
-            }
-            exit={{ opacity: 0 }}
-            transition={{
-              duration: entryTransition.overlayMs / 1000,
-              ease: EASE,
-            }}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

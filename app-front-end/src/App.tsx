@@ -15,7 +15,7 @@ import { useAgentsEnabled } from './hooks/useAgentsEnabled';
 import { useActivitySummary } from './hooks/useActivitySummary';
 import { usePrefersReducedMotion } from './hooks';
 import LoginPage from './components/LoginPage';
-import { LOGIN_ENTRY_SESSION_KEY } from './lib/loginEntryTransition';
+import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from './lib/loginEntryTransition';
 
 const APP_ROOT = '/v1';
 const SETTINGS_ROOT = `${APP_ROOT}/settings`;
@@ -28,6 +28,7 @@ function AppShell() {
   const [arrivedFromLogin] = useState(() => sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY) === '1');
   const triggeredAgentsRef = useRef(false);
   const reduceMotion = usePrefersReducedMotion();
+  const entryTransition = getLoginEntryTransition(reduceMotion);
   const systemData = useSystemData({
     systemPanelOpen: !isSettingsRoute && isSystemPanelOpen,
   });
@@ -72,13 +73,11 @@ function AppShell() {
       className="min-h-[100dvh]"
       initial={
         arrivedFromLogin
-          ? reduceMotion
-            ? { opacity: 0 }
-            : { opacity: 0, y: 10, filter: 'blur(8px)' }
+          ? { opacity: 0 }
           : false
       }
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      transition={{ duration: reduceMotion ? 0.08 : 0.42, ease: [0.16, 1, 0.3, 1] }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: entryTransition.appRevealMs / 1000, ease: [0.16, 1, 0.3, 1] }}
     >
       <GrainOverlay opacity={0.028} />
       {isSettingsRoute ? (
