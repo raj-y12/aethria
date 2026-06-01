@@ -99,7 +99,10 @@ export function buildLookupSnapshotProps(
   const band = getReviewerQualityBand(review);
   if (!band && !scoring) return null;
 
-  const verdict = band ? `${band}.` : 'REVIEWING.';
+  // Lead with the partner recommendation (INVEST / MONITOR / PASS) — the decision,
+  // not the reviewer quality band (STRONG/MEDIUM/WEAK). Fall back to band, then status.
+  const recommendation = startup.partner?.recommendation;
+  const verdict = recommendation ? `${recommendation}.` : band ? `${band}.` : 'REVIEWING.';
   const sector = startup.scout.sector?.trim();
   const stage = startup.scout.funding_stage?.trim();
   const metaParts = [sector, stage].filter(Boolean);

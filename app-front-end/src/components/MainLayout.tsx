@@ -619,10 +619,22 @@ export default function MainLayout({
     : 'No active thesis';
   const hasThesisTags = thesisTagList.length > 0;
 
+  // The queue row is thin (no per-dimension scores). Fetch full detail once the
+  // lookup has a decision so the result overview shows real MKT/EXEC/… numbers.
+  const lookupDetailQuery = useQuery({
+    queryKey: ['startup', 'detail', pendingLookupMatch?.id],
+    queryFn: () => fetchStartupDetail(pendingLookupMatch!.id),
+    enabled: Boolean(
+      commandBarOpen && pendingLookupMatch?.id && pendingLookupMatch?.partner?.recommendation
+    ),
+    ...getQueryConfig('STATIC'),
+  });
+
   const lookupSnapshotProps = useMemo(() => {
-    if (!pendingLookupMatch) return null;
-    return buildLookupSnapshotProps(pendingLookupMatch, pendingLookup?.queryLabel);
-  }, [pendingLookupMatch, pendingLookup?.queryLabel]);
+    const src = lookupDetailQuery.data ?? pendingLookupMatch;
+    if (!src) return null;
+    return buildLookupSnapshotProps(src, pendingLookup?.queryLabel);
+  }, [lookupDetailQuery.data, pendingLookupMatch, pendingLookup?.queryLabel]);
 
   // In-flight lookup → drives the takeover's progressive reveal (null once decided).
   const lookupProgress = useMemo(() => {

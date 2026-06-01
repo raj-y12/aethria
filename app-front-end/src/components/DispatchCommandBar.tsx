@@ -118,7 +118,7 @@ export default function DispatchCommandBar({
     return () => window.clearTimeout(id);
   }, [open]);
 
-  const eyebrow = result ? 'Lookup Complete' : running ? 'Analyzing' : 'Dispatch';
+  const eyebrow = result ? 'Dispatch Complete' : running ? 'Analyzing' : 'Dispatch';
   const title = result
     ? 'Here’s what we found'
     : running
@@ -164,7 +164,9 @@ export default function DispatchCommandBar({
             initial={{ opacity: 0, transform: 'translateY(12px)' }}
             animate={{ opacity: 1, transform: 'translateY(0px)' }}
             transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
-            className="type-display text-center text-[clamp(28px,4vw,52px)] font-medium text-oxford leading-[1.1] m-0 max-w-[15ch]"
+            className={`type-display text-center text-[clamp(28px,4vw,52px)] font-medium text-oxford leading-[1.1] m-0 ${
+              result ? 'max-w-none whitespace-nowrap' : 'max-w-[15ch]'
+            }`}
           >
             {title}
           </motion.h1>
