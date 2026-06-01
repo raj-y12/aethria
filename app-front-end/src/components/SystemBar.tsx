@@ -15,6 +15,8 @@ interface SystemBarProps {
   onShowFeed?: () => void;
   onShowSystem?: () => void;
   onClose?: () => void;
+  /** Opens the full-screen dispatch (company lookup) takeover. */
+  onDispatch?: () => void;
   navLink?: { href: string; label: string };
 }
 
@@ -96,6 +98,7 @@ export default function SystemBar({
   onShowFeed,
   onShowSystem,
   onClose,
+  onDispatch,
   navLink,
 }: SystemBarProps) {
   const reduceMotion = usePrefersReducedMotion();
@@ -209,6 +212,17 @@ export default function SystemBar({
                 compact
                 surface="paper"
               />
+              {onDispatch ? (
+                <SpineNavButton
+                  label="Dispatch"
+                  active={false}
+                  ariaPressed={false}
+                  onClick={() => onDispatch()}
+                  shortcut="⌘K"
+                  compact
+                  surface="paper"
+                />
+              ) : null}
           </div>
         ) : null}
       </div>

@@ -779,7 +779,7 @@ export default function MainLayout({
                   </div>
 
                   {/* Nav */}
-                  <div className="mt-phi-3 -mx-phi-4">
+                  <div className="mt-phi-3 aethria-rail-nav-bleed">
                     <SystemBar
                       variant="embedded"
                       rightPanel={rightPanel}
@@ -787,6 +787,7 @@ export default function MainLayout({
                       onShowFeed={() => setRightPanel((panel) => (panel === 'feed' ? null : 'feed'))}
                       onShowSystem={() => setRightPanel((panel) => (panel === 'system' ? null : 'system'))}
                       onClose={() => setRightPanel(null)}
+                      onDispatch={() => setCommandBarOpen(true)}
                     />
                   </div>
                 </div>
@@ -810,20 +811,6 @@ export default function MainLayout({
                   />
                 </section>
 
-                {/* ── Dispatch trigger (opens ⌘K command bar) ──────────── */}
-                <button
-                  type="button"
-                  onClick={() => setCommandBarOpen(true)}
-                  className="group flex w-full min-w-0 items-center gap-phi-2 border-t border-oxford/[0.075] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-                  style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}
-                  aria-label="Look up a company (Command/Ctrl K)"
-                >
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/30 transition-colors group-hover:bg-oxford/60" aria-hidden />
-                  <span className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong} text-oxford/55 transition-colors group-hover:text-oxford`}>
-                    {lookupWorking ? (lookupMessage ?? 'Lookup running…') : 'Look up a company'}
-                  </span>
-                  <kbd className={`${railEditorial.meta} shrink-0 uppercase text-oxford/35`}>⌘K</kbd>
-                </button>
 
                 {/* ── Mandate (single status pill) ─────────────────────── */}
                 <button

@@ -83,7 +83,7 @@ const solidBtnCls =
 const RAIL_CLAMP_PAD = { paddingTop: 'clamp(5px, 0.6vw, 8px)', paddingBottom: 'clamp(5px, 0.6vw, 8px)' } as const;
 
 function settingsRailNavCls(active: boolean): string {
-  return `group type-label-tab w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 min-h-[32px] px-phi-4 py-phi-1 ${
+  return `group type-label-tab flex w-full min-h-[32px] items-center justify-start px-phi-4 py-phi-1 cursor-pointer btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
     active
       ? 'text-oxford bg-surface-selected'
       : 'text-oxford/50 hover:text-oxford/80 hover:bg-oxford/[0.04]'
@@ -94,14 +94,17 @@ function WorkspaceExitButton({ className = 'w-full' }: { className?: string }) {
   return (
     <Link
       to="/v1"
-      className={`btn-aethria ${className}`}
+      className={`group btn-aethria-solid ${className}`}
       aria-label="Return to conviction workspace"
     >
-      <span className="flex items-center justify-center gap-phi-2">
-        <span aria-hidden className="font-mono text-[11px] leading-none tracking-[0.12em]">
-          ←
-        </span>
+      <span className="flex items-center justify-center">
         <span>Workspace</span>
+        <span
+          className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
+          aria-hidden
+        >
+          {'\u00a0→'}
+        </span>
       </span>
     </Link>
   );
@@ -771,15 +774,16 @@ export default function SettingsPage() {
                     >
                       Aethria
                     </Link>
-                    <div className="mt-phi-3 flex flex-col gap-phi-3">
+                    <div className="mt-phi-3">
                       <WorkspaceExitButton />
-                      <p className={railEditorial.label}>Fund configuration</p>
                     </div>
                   </div>
-                  <nav
-                    className="mt-phi-2 -mx-phi-4 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto"
-                    aria-label="Settings sections"
-                  >
+                  <div className="aethria-rail-nav-bleed mt-phi-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                    <p className={`${railEditorial.label} shrink-0 px-phi-4`}>Fund configuration</p>
+                    <nav
+                      className="mt-phi-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto [scrollbar-gutter:stable]"
+                      aria-label="Settings sections"
+                    >
                     {sections.map((section) => (
                       <a
                         key={section.id}
@@ -796,7 +800,8 @@ export default function SettingsPage() {
                         {section.short}
                       </a>
                     ))}
-                  </nav>
+                    </nav>
+                  </div>
                 </div>
                 <SettingsSidebarFooter
                   unsaved={unsaved}

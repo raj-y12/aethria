@@ -172,10 +172,19 @@
   }
 }
 
+/* Full-bleed nav bands inside .paper-dot-grid rails — negate horizontal padding exactly. */
+.aethria-rail-nav-bleed {
+  margin-inline: calc(-1 * var(--space-4));
+}
+
 @media screen and (min-width: 1024px) and (max-width: 1512px) {
   .aethria-workspace-sidebar > .paper-dot-grid {
     padding-left: var(--space-3);
     padding-right: var(--space-3);
+  }
+
+  .aethria-workspace-sidebar > .paper-dot-grid .aethria-rail-nav-bleed {
+    margin-inline: calc(-1 * var(--space-3));
   }
 
   .memoShellContent--workspace {
