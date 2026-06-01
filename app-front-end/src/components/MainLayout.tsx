@@ -454,7 +454,7 @@ export default function MainLayout({
     const hasDecision = !!matched.partner?.recommendation;
     if (hasDecision) {
       setLookupMessage(
-        `Lookup complete: ${matched.scout.name} was analyzed successfully. Opening memo now...`
+        `Lookup complete: ${matched.scout.name} analyzed. Review the result and open the memo.`
       );
     } else if (matched.review) {
       setLookupMessage(
@@ -463,21 +463,9 @@ export default function MainLayout({
     } else {
       setLookupMessage(`Found ${matched.scout.name}. Running analyst review and scoring...`);
     }
-    if (hasDecision && !pendingLookup.autoOpened) {
-      const now = new Date().toISOString();
-      setSelectedStartup({
-        ...matched,
-        is_new_to_user: false,
-        timestamps: {
-          ...(matched.timestamps ?? {}),
-          acknowledged_at: matched.timestamps?.acknowledged_at ?? now,
-          last_seen_by_user_at: now,
-        },
-      });
-      if (matched.is_new_to_user) markStartupAcknowledged(matched);
-      setPendingLookup((prev) => (prev ? { ...prev, autoOpened: true } : prev));
-    }
-  }, [pendingLookup, pendingLookupMatch, markStartupAcknowledged]);
+    // No silent auto-navigation: the takeover surfaces the result overview with an
+    // "Open memo" action (handleOpenLookupMemo) so the user advances deliberately.
+  }, [pendingLookup, pendingLookupMatch]);
 
   const handleEscape = useCallback(() => {
     if (memoOpen) handleCloseMemo();
@@ -640,15 +628,33 @@ export default function MainLayout({
 
   const handleOpenLookupMemo = useCallback(() => {
     if (!pendingLookupMatch) return;
-    setSelectedStartup(pendingLookupMatch);
+    const now = new Date().toISOString();
+    setSelectedStartup({
+      ...pendingLookupMatch,
+      is_new_to_user: false,
+      timestamps: {
+        ...(pendingLookupMatch.timestamps ?? {}),
+        acknowledged_at: pendingLookupMatch.timestamps?.acknowledged_at ?? now,
+        last_seen_by_user_at: now,
+      },
+    });
+    if (pendingLookupMatch.is_new_to_user) markStartupAcknowledged(pendingLookupMatch);
     setPendingLookup((prev) => (prev ? { ...prev, autoOpened: true } : prev));
+    setCommandBarOpen(false); // close the takeover so the memo is visible
+  }, [pendingLookupMatch, markStartupAcknowledged]);
+
+  // Closing the takeover with a finished-but-unopened lookup clears it so the
+  // next lookup isn't blocked by the in-flight guard.
+  const handleCloseDispatch = useCallback(() => {
+    setCommandBarOpen(false);
+    setPendingLookup((prev) => (prev && !prev.autoOpened && pendingLookupMatch ? null : prev));
   }, [pendingLookupMatch]);
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-paper">
       <DispatchCommandBar
         open={commandBarOpen}
-        onClose={() => setCommandBarOpen(false)}
+        onClose={handleCloseDispatch}
         input={lookupInput}
         setInput={setLookupInput}
         onSubmit={() => void handleLookupSubmit()}
@@ -657,6 +663,11 @@ export default function MainLayout({
         message={lookupMessage}
         onClearMessage={() => setLookupMessage(null)}
         lookupPhase={lookupPhaseLabel}
+        result={
+          pendingLookupMatch?.partner?.recommendation && lookupSnapshotProps ? (
+            <LookupResultSnapshot {...lookupSnapshotProps} onOpenMemo={handleOpenLookupMemo} />
+          ) : null
+        }
       />
       {/* Mobile / tablet top nav — desktop keeps the vertical SystemBar only */}
       {!isDesktop && (

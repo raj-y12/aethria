@@ -73,10 +73,12 @@ function AppShell() {
       className="min-h-[100dvh]"
       initial={
         arrivedFromLogin
-          ? { opacity: 0 }
+          ? reduceMotion
+            ? { opacity: 0 }
+            : { opacity: 0, y: 16 }
           : false
       }
-      animate={{ opacity: 1 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: entryTransition.appRevealMs / 1000, ease: [0.16, 1, 0.3, 1] }}
     >
       <GrainOverlay opacity={0.028} />
@@ -99,9 +101,11 @@ function App() {
   const { pathname } = useLocation();
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const [tokenReady, setTokenReady] = useState(false);
+  const loginEntryHandoffRef = useRef(false);
 
   useLayoutEffect(() => {
     if (!isSignedIn) {
+      loginEntryHandoffRef.current = false;
       setTokenGetter(null);
       setTokenReady(false);
       return;
@@ -138,6 +142,10 @@ function App() {
   const isAdminRoute = pathname === ADMIN_ROOT || pathname.startsWith(ADMIN_ROOT + '/');
   const isAppRoute = pathname === APP_ROOT || pathname.startsWith(APP_ROOT + '/');
   const isSettingsRoute = pathname.startsWith(SETTINGS_ROOT);
+  if ((isAppRoute || isSettingsRoute) && sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY) === '1') {
+    loginEntryHandoffRef.current = true;
+  }
+  const hasLoginEntryHandoff = loginEntryHandoffRef.current;
 
   if (isAdminRoute) {
     return (
@@ -163,7 +171,7 @@ function App() {
     if (!isSignedIn) {
       return <Navigate to="/sign-in" replace />;
     }
-    if (!tokenReady) {
+    if (!tokenReady && !hasLoginEntryHandoff) {
       return <LoadingAnimation />;
     }
     return <AppShell />;

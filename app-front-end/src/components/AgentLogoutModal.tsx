@@ -118,7 +118,7 @@ export default function AgentLogoutModal({
           </motion.p>
 
           {/* Actions — vertical stack, centered */}
-          <div className="flex flex-col items-center gap-phi-4 w-full max-w-xs">
+          <div className="flex flex-col items-center gap-phi-4 w-full max-w-sm">
             {actionError ? (
               <p
                 className="type-meta text-center text-oxford/70 border border-oxford/15 px-3 py-2 w-full"
@@ -137,7 +137,7 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
                   onClick={onKeepRunning}
                   disabled={busy}
-                  className="w-full min-h-[44px] px-phi-7 py-[14px] bg-oxford text-paper type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
+                  className="w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Keep pipeline running
                 </motion.button>
@@ -149,7 +149,7 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
                   onClick={() => void handleTurnOff()}
                   disabled={busy}
-                  className="w-full min-h-[44px] text-oxford/50 hover:text-oxford type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-colors disabled:opacity-50"
+                  className="w-full btn-aethria disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {busy ? 'Pausing pipeline...' : 'Pause pipeline and log out'}
                 </motion.button>
@@ -163,7 +163,7 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
                   onClick={onKeepRunning}
                   disabled={busy}
-                  className="w-full min-h-[44px] px-phi-7 py-[14px] bg-oxford text-paper type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
+                  className="w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Log out
                 </motion.button>
@@ -175,7 +175,7 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
                   onClick={() => void handleTurnOn()}
                   disabled={busy}
-                  className="w-full min-h-[44px] text-oxford/50 hover:text-oxford type-meta uppercase tracking-[0.12em] btn-interaction cursor-pointer transition-colors disabled:opacity-50"
+                  className="w-full btn-aethria disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {busy ? 'Starting pipeline...' : 'Start pipeline and log out'}
                 </motion.button>
@@ -187,9 +187,10 @@ export default function AgentLogoutModal({
               initial={{ opacity: 0, transform: 'translateY(10px)' }}
               animate={{ opacity: 1, transform: 'translateY(0px)' }}
               transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.39 }}
+              type="button"
               onClick={onCancel}
               disabled={busy}
-              className="mt-phi-4 min-h-[44px] type-meta uppercase tracking-[0.12em] text-oxford/30 hover:text-oxford/50 btn-interaction cursor-pointer transition-colors disabled:opacity-50 border-b border-oxford/10 pb-0.5"
+              className="mt-phi-2 type-meta uppercase tracking-[0.12em] text-oxford/30 hover:text-oxford/50 btn-interaction cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-40 border-b border-oxford/10 pb-0.5"
             >
               Cancel
             </motion.button>

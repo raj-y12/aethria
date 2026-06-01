@@ -94,18 +94,10 @@ function WorkspaceExitButton({ className = 'w-full' }: { className?: string }) {
   return (
     <Link
       to="/v1"
-      className={`group btn-aethria-solid ${className}`}
+      className={`btn-aethria-solid ${className}`}
       aria-label="Return to conviction workspace"
     >
-      <span className="flex items-center justify-center">
-        <span>Workspace</span>
-        <span
-          className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
-          aria-hidden
-        >
-          {'\u00a0→'}
-        </span>
-      </span>
+      Workspace
     </Link>
   );
 }
@@ -180,23 +172,9 @@ function SettingsSidebarFooter({
           type="button"
           onClick={onSave}
           disabled={saving || !unsaved}
-          className="group w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
+          className="w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <span className="flex items-center justify-center">
-            {saving ? (
-              <span>Saving…</span>
-            ) : (
-              <>
-                <span>Save changes</span>
-                <span
-                  className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6 group-disabled:w-2"
-                  aria-hidden
-                >
-                  {'\u00a0→'}
-                </span>
-              </>
-            )}
-          </span>
+          {saving ? 'Saving…' : 'Save changes'}
         </button>
         <button
           type="button"
@@ -826,23 +804,9 @@ export default function SettingsPage() {
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="group btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
+                className="btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <span className="flex items-center justify-center">
-                  {saving ? (
-                    <span>Saving…</span>
-                  ) : (
-                    <>
-                      <span>Save</span>
-                      <span
-                        className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
-                        aria-hidden
-                      >
-                        {'\u00a0→'}
-                      </span>
-                    </>
-                  )}
-                </span>
+                {saving ? 'Saving…' : 'Save'}
               </button>
               </div>
 

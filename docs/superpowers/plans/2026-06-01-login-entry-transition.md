@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the abrupt hard reload after `Enter Aethria` with a minimal in-app transition into `/v1`.
+**Goal:** Replace the abrupt hard reload after `Enter Aethria` with a smooth in-app transition into `/v1`.
 
-**Architecture:** Keep the behavior inside the existing React Router and Framer Motion stack. Add a small transition helper for timing, make `LoginPage` fade out before `navigate('/v1')`, and let `AppShell` fade in once when it is reached from login.
+**Architecture:** Keep the behavior inside the existing React Router and Framer Motion stack. Add a small transition helper for timing, make `LoginPage` exit with the same `opacity + y` motion used by the sign-in page, preserve the handoff through the token-ready gate, and let `AppShell` enter with matching `opacity + y` motion.
 
 **Tech Stack:** React, React Router, Framer Motion, existing `usePrefersReducedMotion`, Node assertion tests.
 
@@ -30,9 +30,9 @@ import {
 
 assert.equal(LOGIN_ENTRY_SESSION_KEY, 'aethria_just_logged_in');
 assert.deepEqual(getLoginEntryTransition(false), {
-  contentExitMs: 140,
-  appRevealMs: 180,
-  navigateDelayMs: 140,
+  contentExitMs: 280,
+  appRevealMs: 550,
+  navigateDelayMs: 260,
 });
 assert.deepEqual(getLoginEntryTransition(true), {
   contentExitMs: 0,
@@ -44,7 +44,13 @@ const loginPage = readFileSync(resolve(import.meta.dirname, '../src/components/L
 assert.equal(loginPage.includes('window.location.replace'), false);
 assert.equal(loginPage.includes('clipPath'), false);
 assert.equal(loginPage.includes("filter: 'blur"), false);
+assert.equal(loginPage.includes('y: -12'), true);
 assert.equal(loginPage.includes("navigate('/v1'"), true);
+
+const app = readFileSync(resolve(import.meta.dirname, '../src/App.tsx'), 'utf8');
+assert.equal(app.includes('hasLoginEntryHandoff'), true);
+assert.equal(app.includes('!tokenReady && !hasLoginEntryHandoff'), true);
+assert.equal(app.includes('y: 16'), true);
 
 console.log('login entry transition tests passed');
 ```
@@ -67,14 +73,14 @@ export const LOGIN_ENTRY_SESSION_KEY = 'aethria_just_logged_in';
 
 export type LoginEntryTransition = {
   contentExitMs: number;
-  overlayMs: number;
+  appRevealMs: number;
   navigateDelayMs: number;
 };
 
 export function getLoginEntryTransition(reduceMotion: boolean): LoginEntryTransition {
   return reduceMotion
-    ? { contentExitMs: 0, overlayMs: 80, navigateDelayMs: 0 }
-    : { contentExitMs: 260, overlayMs: 520, navigateDelayMs: 420 };
+    ? { contentExitMs: 0, appRevealMs: 80, navigateDelayMs: 0 }
+    : { contentExitMs: 280, appRevealMs: 550, navigateDelayMs: 260 };
 }
 ```
 
@@ -93,9 +99,9 @@ Expected: FAIL because `LoginPage.tsx` still contains `window.location.replace`.
 
 Use `getLoginEntryTransition(reduceMotion)` in `handleEnterSystem`. Set the existing session key, enter a short `entering` state, and call `navigate('/v1', { replace: true })` after `navigateDelayMs`.
 
-- [ ] **Step 2: Add minimal content exit motion**
+- [ ] **Step 2: Add sign-in-style content exit motion**
 
-Wrap the login content in a `motion.div` that only fades out when entering. Do not add blur, wipes, full-screen overlays, or dramatic movement.
+Wrap the login content in a `motion.div` that fades and moves up by 12px when entering. Do not add blur, wipes, full-screen overlays, or dramatic movement.
 
 - [ ] **Step 3: Run test to verify it passes**
 
@@ -110,7 +116,7 @@ Expected: PASS.
 
 - [ ] **Step 1: Add one-time app reveal**
 
-Read `LOGIN_ENTRY_SESSION_KEY` in `AppShell` and wrap the app content in a short opacity-only `motion.div` reveal when arriving from login.
+Read `LOGIN_ENTRY_SESSION_KEY` in `AppShell`, preserve the handoff through the token-ready route guard, and wrap the app content in a matching `opacity + y` reveal when arriving from login.
 
 - [ ] **Step 2: Verify build**
 

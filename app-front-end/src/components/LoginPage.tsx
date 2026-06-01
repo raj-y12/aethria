@@ -231,8 +231,10 @@ export default function LoginPage() {
         className="w-full max-w-[40rem] flex flex-col items-center"
         animate={
           entering
-            ? { opacity: 0 }
-            : { opacity: 1 }
+            ? reduceMotion
+              ? { opacity: 0 }
+              : { opacity: 0, y: -12 }
+            : { opacity: 1, y: 0 }
         }
         transition={{
           duration: entryTransition.contentExitMs / 1000,

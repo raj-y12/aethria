@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import AgentDispatch from './AgentDispatch';
@@ -16,6 +16,8 @@ interface DispatchCommandBarProps {
   message: string | null;
   onClearMessage?: () => void;
   lookupPhase: 'Scouting' | 'Reviewing' | 'Deciding' | null;
+  /** Result overview (LookupResultSnapshot) shown once the lookup has a decision. */
+  result?: ReactNode;
 }
 
 /**
@@ -35,21 +37,24 @@ export default function DispatchCommandBar({
   message,
   onClearMessage,
   lookupPhase,
+  result,
 }: DispatchCommandBarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // Closeable once a result is ready, even if the pipeline is still finishing.
+  const closeable = !isBusy || !!result;
 
-  // Esc closes (no-op while a lookup is mid-flight so running status isn't lost).
+  // Esc closes (no-op while a lookup is mid-flight with no result yet).
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isBusy) {
+      if (e.key === 'Escape' && closeable) {
         e.preventDefault();
         onClose();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, isBusy, onClose]);
+  }, [open, closeable, onClose]);
 
   // Autofocus the input on open.
   useEffect(() => {
@@ -81,7 +86,7 @@ export default function DispatchCommandBar({
             transition={{ duration: 0.45, ease: EASE, delay: 0.05 }}
             className="type-meta uppercase tracking-[0.16em] text-oxford/40 mb-phi-3"
           >
-            Company Lookup
+            {result ? 'Lookup Complete' : 'Company Lookup'}
           </motion.p>
 
           <motion.h1
@@ -90,36 +95,49 @@ export default function DispatchCommandBar({
             transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
             className="type-display text-center text-[clamp(28px,4vw,52px)] font-medium text-oxford leading-[1.1] m-0 max-w-[15ch]"
           >
-            Look up a company
+            {result ? 'Here’s what we found' : 'Look up a company'}
           </motion.h1>
 
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, ease: EASE, delay: 0.18 }}
-            className="type-body text-center text-oxford/50 mt-phi-3 mb-phi-8 max-w-[34ch]"
-          >
-            Search any company — evaluated against your active mandate. The result lands in the queue.
-          </motion.p>
+          {result ? (
+            <motion.div
+              initial={{ opacity: 0, transform: 'translateY(10px)' }}
+              animate={{ opacity: 1, transform: 'translateY(0px)' }}
+              transition={{ duration: 0.45, ease: EASE, delay: 0.16 }}
+              className="mt-phi-6 w-full max-w-lg"
+            >
+              {result}
+            </motion.div>
+          ) : (
+            <>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, ease: EASE, delay: 0.18 }}
+                className="type-body text-center text-oxford/50 mt-phi-3 mb-phi-8 max-w-[34ch]"
+              >
+                Search any company — evaluated against your active mandate. The result lands in the queue.
+              </motion.p>
 
-          <motion.div
-            initial={{ opacity: 0, transform: 'translateY(10px)' }}
-            animate={{ opacity: 1, transform: 'translateY(0px)' }}
-            transition={{ duration: 0.45, ease: EASE, delay: 0.25 }}
-            className="w-full max-w-md"
-          >
-            <AgentDispatch
-              input={input}
-              setInput={setInput}
-              onSubmit={onSubmit}
-              onCancel={onCancel}
-              isBusy={isBusy}
-              message={message}
-              onClearMessage={onClearMessage}
-              lookupPhase={lookupPhase}
-              displayMode="embedded"
-            />
-          </motion.div>
+              <motion.div
+                initial={{ opacity: 0, transform: 'translateY(10px)' }}
+                animate={{ opacity: 1, transform: 'translateY(0px)' }}
+                transition={{ duration: 0.45, ease: EASE, delay: 0.25 }}
+                className="w-full max-w-md"
+              >
+                <AgentDispatch
+                  input={input}
+                  setInput={setInput}
+                  onSubmit={onSubmit}
+                  onCancel={onCancel}
+                  isBusy={isBusy}
+                  message={message}
+                  onClearMessage={onClearMessage}
+                  lookupPhase={lookupPhase}
+                  displayMode="embedded"
+                />
+              </motion.div>
+            </>
+          )}
 
           <motion.button
             initial={{ opacity: 0, transform: 'translateY(10px)' }}
@@ -127,10 +145,10 @@ export default function DispatchCommandBar({
             transition={{ duration: 0.45, ease: EASE, delay: 0.32 }}
             type="button"
             onClick={onClose}
-            disabled={isBusy}
-            className="mt-phi-7 min-h-[44px] type-meta uppercase tracking-[0.12em] text-oxford/30 hover:text-oxford/50 btn-interaction cursor-pointer transition-colors disabled:opacity-50 border-b border-oxford/10 pb-0.5"
+            disabled={!closeable}
+            className="mt-phi-7 type-meta uppercase tracking-[0.12em] text-oxford/30 hover:text-oxford/50 btn-interaction cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-40 border-b border-oxford/10 pb-0.5"
           >
-            Cancel · Esc
+            {result ? 'Close · Esc' : 'Cancel · Esc'}
           </motion.button>
         </motion.div>
       )}
