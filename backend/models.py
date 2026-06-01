@@ -333,6 +333,13 @@ class PartnerInfo(BaseModel):
     llm_fallback_reason: Optional[str] = None
     prompt_version: Optional[str] = None
     decision_drivers: Optional[List[str]] = None
+    # Mandate-fit gate — company quality and fund fit as separate judgments
+    company_quality: Optional[float] = None          # 0-10, conviction-bearing avg score
+    fund_fit: Optional[float] = None                 # 0-10, thesis alignment
+    fund_fit_label: Optional[str] = None             # Strong fit | Partial fit | Weak fit | Outside thesis
+    fund_fit_confidence: Optional[float] = None      # 0-1
+    mandate_gate: Optional[str] = None               # clear | weak_fit | outside_thesis | held | no_mandate
+    mandate_override_required: Optional[bool] = None # strong company held off-thesis, needs IC exception
 
 
 class Financials(BaseModel):

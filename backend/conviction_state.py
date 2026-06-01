@@ -57,6 +57,7 @@ def build_conviction_patch(
     rationale: str,
     resolved_at: str,
     risk_acknowledged: bool = False,
+    mandate_exception: bool = False,
     config_version: Optional[str] = None,
 ) -> Dict[str, Any]:
     previous_decision = _current_decision(existing)
@@ -130,6 +131,11 @@ def build_conviction_patch(
         "notes": rationale,
         "resolved_at": resolved_at,
     }
+    if mandate_exception:
+        # Audit trail: a human knowingly invested past the mandate-fit gate.
+        hr["mandate_exception"] = True
+        record["mandate_exception"] = True
+        current_ruling["mandate_exception"] = True
     partner_patch: Dict[str, Any] = {}
     if isinstance(existing.get("partner_info"), dict):
         partner_patch = {
@@ -137,6 +143,10 @@ def build_conviction_patch(
             "recommendation": LEGACY_TO_RECOMMENDATION.get(decision, existing["partner_info"].get("recommendation")),
             "human_review_required": False,
         }
+        if mandate_exception:
+            # Exception granted: clear the hold, but keep the fit read honest.
+            partner_patch["mandate_override_required"] = False
+            partner_patch["mandate_gate"] = "exception_granted"
 
     return {
         "human_resolution": hr,

@@ -461,7 +461,31 @@ async def _run_on_demand_lookup_inner(
         )
         return None
 
+    # On-demand lookup is intentionally OPEN: an analyst may look up any company,
+    # even one outside the fund's mandate. But evaluation must still be MANDATE-AWARE
+    # so the reviewer can score thesis alignment and the partner can frame fund fit
+    # ("strong company, weak mandate fit", "outside thesis but worth an exception").
+    # Unlike the periodic pipeline, a missing/incomplete thesis does NOT block the
+    # lookup — it just runs thesis-blind and we log that the fund lens is unavailable.
     thesis_ctx = None
+    try:
+        svc = get_service_client()
+        active = get_active_thesis(svc, user_id)
+        if active is None:
+            try:
+                _bootstrap_default_thesis_or_raise(svc, user_id)
+                active = get_active_thesis(svc, user_id)
+            except Exception as e:
+                logger.info("[%s] Lookup: default thesis bootstrap skipped: %s", user_id[:12], e)
+        if active is not None:
+            thesis_ctx = active.as_engine_context()
+            logger.info("[%s] Lookup will evaluate against active thesis", user_id[:12])
+        else:
+            logger.info("[%s] Lookup running thesis-blind (no active mandate)", user_id[:12])
+    except FundThesisIncompleteError as e:
+        logger.info("[%s] Lookup running thesis-blind (thesis incomplete): %s", user_id[:12], e)
+    except Exception as e:
+        logger.warning("[%s] Lookup: failed to load active thesis, running thesis-blind: %s", user_id[:12], e)
 
     try:
         settings = load_settings(user_id)

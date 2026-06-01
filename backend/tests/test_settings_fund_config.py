@@ -70,6 +70,16 @@ def test_fund_config_maps_to_active_thesis_shape():
     assert parsed["source"] == "settings.fund_config"
 
 
+def test_published_mandate_signal_distinguishes_user_config_from_default():
+    """The onboarding gate keys off parsed_json.is_default: the bootstrap default
+    carries it, a user-published fund_config must not."""
+    from fund_thesis import DEFAULT_THESIS_PARSED_JSON
+
+    assert DEFAULT_THESIS_PARSED_JSON.get("is_default") is True
+    user_parsed = fund_config_to_thesis_parsed_json(_fund_config())
+    assert not user_parsed.get("is_default")
+
+
 def test_fund_config_raw_text_and_policy_weights():
     fc = _fund_config()
     raw = fund_config_raw_text(fc)

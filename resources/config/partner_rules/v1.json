@@ -1,6 +1,17 @@
 {
-  "version": "1.1",
-  "description": "Partner decision rules: verdict mapping, score thresholds, critical risks, contradictory scores, red flags, and LLM fallback triggers.",
+  "version": "1.2",
+  "description": "Partner decision rules: verdict mapping, score thresholds, mandate-fit gate, critical risks, contradictory scores, red flags, and LLM fallback triggers.",
+  "mandate_fit": {
+    "_comment": "Separates company quality (avg score) from fund fit (thesis alignment). A strong company that is off-thesis is HELD for an explicit IC exception rather than auto-recommended INVEST. Alignment thresholds are 0-1 (reviewer thesis_alignment_score).",
+    "enabled": true,
+    "strong_fit_min": 0.7,
+    "partial_fit_min": 0.5,
+    "weak_fit_min": 0.3,
+    "gate_invest_below": 0.3,
+    "held_recommendation": "MONITOR",
+    "held_next_action": "Mandate exception review - strong company, off-thesis. IC must grant an explicit exception to proceed.",
+    "low_confidence_max": 0.4
+  },
   "quality_labels": {
     "STRONG": "Investment-grade",
     "MEDIUM": "Promising but incomplete",

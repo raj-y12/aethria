@@ -37,6 +37,13 @@ class PartnerOutput(TypedDict, total=False):
     conviction_level: Optional[int]
     assumption_risks: Optional[List[str]]
     decision_drivers: Optional[List[str]]
+    # Mandate-fit gate — company quality and fund fit kept as separate judgments
+    company_quality: Optional[float]          # 0-10, conviction-bearing avg score
+    fund_fit: Optional[float]                 # 0-10, thesis alignment
+    fund_fit_label: Optional[str]             # Strong fit | Partial fit | Weak fit | Outside thesis
+    fund_fit_confidence: Optional[float]      # 0-1
+    mandate_gate: Optional[str]               # clear | weak_fit | outside_thesis | held | no_mandate
+    mandate_override_required: Optional[bool] # strong company held off-thesis, needs IC exception
 
 
 VALID_RECOMMENDATIONS = ["INVEST", "PASS", "MONITOR"]

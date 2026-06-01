@@ -2256,6 +2256,7 @@ async def agents_status(request: Request):
     )
     openai_configured = bool(os.getenv("OPENAI_API_KEY", "").strip())
     thesis_ready = False
+    mandate_published = False
     active_thesis_version_id: Optional[str] = None
     thesis_error: Optional[str] = None
     if supabase_configured:
@@ -2266,6 +2267,9 @@ async def agents_status(request: Request):
             else:
                 thesis_ready = True
                 active_thesis_version_id = t.version_id
+                # The bootstrap default mandate carries is_default=True. A fund has
+                # only "published" once it has deliberately replaced that default.
+                mandate_published = not bool((t.parsed_json or {}).get("is_default"))
         except FundThesisIncompleteError:
             thesis_error = "incomplete"
         except Exception as e:
@@ -2304,6 +2308,7 @@ async def agents_status(request: Request):
             and _lookup_queue is not None
         ),
         "thesis_ready": thesis_ready,
+        "mandate_published": mandate_published,
         "active_thesis_version_id": active_thesis_version_id,
         "thesis_error": thesis_error,
     }
@@ -3056,6 +3061,8 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
     decision = str(body.get("decision", "")).upper()
     notes = body.get("notes") or ""
     risk_acknowledged = bool(body.get("risk_acknowledged", False))
+    # A mandate exception only applies to an affirmative ruling on a held deal.
+    mandate_exception = bool(body.get("mandate_exception", False)) and decision == "YES"
     if decision not in ("YES", "NO", "MAYBE"):
         raise HTTPException(status_code=422, detail="decision must be YES, NO, or MAYBE")
 
@@ -3076,6 +3083,7 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
         rationale=str(notes),
         resolved_at=resolved_at,
         risk_acknowledged=risk_acknowledged,
+        mandate_exception=mandate_exception,
         config_version=str(config_version) if config_version else None,
     )
     patch["unresolved_at"] = None
@@ -3111,6 +3119,7 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
                     and ai_rec != LEGACY_TO_RECOMMENDATION.get(decision)
                 ),
                 "notes": str(notes)[:4000],
+                "mandate_exception": mandate_exception,
                 "resolved_at": resolved_at,
             },
             user_id=request.state.user_id,

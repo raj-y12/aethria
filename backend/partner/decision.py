@@ -457,7 +457,7 @@ class PartnerDecisionEngine:
 
         return thesis, why_this_matters, snapshot, market_insight, product_edge, traction_signals
 
-    def _finalize_thesis_soft_and_log(
+    def _finalize_thesis_and_mandate_gate(
         self,
         result: Dict[str, Any],
         review_output: Dict[str, Any],
@@ -465,27 +465,118 @@ class PartnerDecisionEngine:
         avg_score: float,
         avg_dims: int,
     ) -> Dict[str, Any]:
-        thesis_adjusted = False
-        tas = self._optional_thesis_alignment_score(review_output)
-        if result.get("recommendation") == "PASS" and tas is not None and tas < 0.3:
+        """
+        Separate the two judgments a fund actually cares about and gate on the second:
+          - company_quality: conviction-bearing average score (0-10).
+          - fund_fit: thesis alignment (0-10) + label + confidence.
+
+        A strong company that is off-thesis is NOT auto-recommended INVEST — it is HELD
+        (mandate_override_required) for an explicit IC exception. Thresholds live in the
+        versioned `mandate_fit` block of partner_rules, never hardcoded here.
+        """
+        mf = self._get_rules().get("mandate_fit")
+        mf = mf if isinstance(mf, dict) else {}
+        tas = self._optional_thesis_alignment_score(review_output)  # 0-1 or None
+
+        result["company_quality"] = round(float(avg_score), 2)
+
+        if tas is None:
+            # Thesis-blind (no active mandate / alignment not computed): nothing to gate.
+            result["fund_fit"] = None
+            result["fund_fit_label"] = None
+            result["fund_fit_confidence"] = None
+            result["mandate_gate"] = "no_mandate"
+            result["mandate_override_required"] = False
+            self._log_finalize(scout_output, avg_score, avg_dims, "no_mandate", result)
+            return result
+
+        strong_min = float(mf.get("strong_fit_min", 0.7))
+        partial_min = float(mf.get("partial_fit_min", 0.5))
+        weak_min = float(mf.get("weak_fit_min", 0.3))
+        gate_below = float(mf.get("gate_invest_below", 0.3))
+        low_conf_max = float(mf.get("low_confidence_max", 0.4))
+        enabled = bool(mf.get("enabled", True))
+
+        conf_raw = review_output.get("thesis_alignment_confidence")
+        try:
+            conf = float(conf_raw) if conf_raw is not None else None
+        except (TypeError, ValueError):
+            conf = None
+
+        if tas >= strong_min:
+            label = "Strong fit"
+        elif tas >= partial_min:
+            label = "Partial fit"
+        elif tas >= weak_min:
+            label = "Weak fit"
+        else:
+            label = "Outside thesis"
+
+        result["fund_fit"] = round(tas * 10.0, 2)
+        result["fund_fit_label"] = label
+        result["fund_fit_confidence"] = conf
+
+        # An explicit IC exception lets a strong-but-off-thesis company proceed.
+        override = bool(
+            review_output.get("mandate_exception")
+            or scout_output.get("mandate_exception")
+            or result.get("mandate_override")
+        )
+
+        gate = "clear"
+        override_required = False
+
+        def _append_note(note: str) -> None:
             r = (result.get("decision_rationale") or "").rstrip()
-            if "Clear thesis mismatch." not in r:
-                result["decision_rationale"] = r + " Clear thesis mismatch."
-            thesis_adjusted = True
-        elif tas is not None and tas < 0.4:
-            r = (result.get("decision_rationale") or "").rstrip()
-            if "Low thesis alignment." not in r:
-                result["decision_rationale"] = r + " Low thesis alignment."
-            thesis_adjusted = True
+            if note not in r:
+                merged = (r + " " + note).strip()
+                result["decision_rationale"] = merged
+                result["rationale"] = merged
+
+        if enabled and result.get("recommendation") == "INVEST" and tas < gate_below and not override:
+            held = mf.get("held_recommendation", "MONITOR")
+            result = self._apply_final_recommendation_fields(
+                result, held, result.get("assumption_risks")
+            )
+            result["next_action"] = self._normalize_next_action(
+                mf.get("held_next_action", "Mandate exception review required.")
+            )
+            result["human_review_required"] = True
+            override_required = True
+            gate = "held"
+            _append_note("Held for mandate exception: strong company, outside this fund's thesis.")
+        elif tas < weak_min:
+            gate = "outside_thesis"
+            _append_note("Clear thesis mismatch.")
+        elif tas < partial_min:
+            gate = "weak_fit"
+            _append_note("Low thesis alignment.")
+
+        if conf is not None and conf < low_conf_max:
+            result["human_review_required"] = True
+
+        result["mandate_gate"] = gate
+        result["mandate_override_required"] = override_required
+        self._log_finalize(scout_output, avg_score, avg_dims, gate, result)
+        return result
+
+    def _log_finalize(
+        self,
+        scout_output: Dict[str, Any],
+        avg_score: float,
+        avg_dims: int,
+        gate: str,
+        result: Dict[str, Any],
+    ) -> None:
         self.logger.info(
-            "partner_decide company=%s avg_score=%.2f avg_dims=%d thesis_soft=%s final=%s",
+            "partner_decide company=%s avg_score=%.2f avg_dims=%d mandate_gate=%s fund_fit=%s final=%s",
             scout_output.get("name", ""),
             avg_score,
             avg_dims,
-            thesis_adjusted,
+            gate,
+            result.get("fund_fit"),
             result.get("recommendation"),
         )
-        return result
 
     def _record_llm_stat(self, key: str) -> None:
         self._llm_stats[key] = int(self._llm_stats.get(key, 0)) + 1
@@ -706,7 +797,7 @@ class PartnerDecisionEngine:
                 result, final_recommendation, assumption_risks
             )
             result = self._apply_handoff_quality_fields(result, handoff_quality)
-            return self._finalize_thesis_soft_and_log(
+            return self._finalize_thesis_and_mandate_gate(
                 result, review_output, scout_output, avg_score, avg_dims
             )
 
@@ -1298,7 +1389,7 @@ class PartnerDecisionEngine:
             result,
             self._handoff_quality_from_review(review_output),
         )
-        return self._finalize_thesis_soft_and_log(
+        return self._finalize_thesis_and_mandate_gate(
             result, review_output, scout_output, avg_score, avg_dims
         )
 
