@@ -6,8 +6,7 @@ import type { ReactNode } from 'react';
 import { DECISION_LABELS } from '../../design-system/semantics';
 import type { DecisionBadgeVariant } from '../../lib/decisionBadgeVariant';
 import {
-  QUEUE_CONVICTION_CLASS,
-  formatQueueConviction,
+  getQueueConvictionPct,
   getVisibleRecommendation,
   type QueueRowContext,
 } from '../../lib/queueAttentionDriver';
@@ -60,18 +59,22 @@ export default function QueueVerdictLine({
   badges?: unknown;
 }) {
   const recommendation = getVisibleRecommendation(ctx.startup);
-  const conviction = formatQueueConviction(ctx);
-  const convictionClass = QUEUE_CONVICTION_CLASS[prominent ? 'prominent' : 'ambient'];
+  const convictionPct = getQueueConvictionPct(ctx);
   const badgeVariant = queueDecisionBadgeVariant(decisionVariant, recommendation);
 
+  // Conviction is a single bold integer — a clean right-anchor number, no "%".
   const convictionEl =
-    conviction !== '—' ? (
+    convictionPct != null ? (
       <>
         <span className={prominent ? 'text-oxford/30' : 'text-oxford/24'} aria-hidden>
           ·
         </span>
-        <span className={`font-mono uppercase ${prominent ? 'text-[11px]' : 'text-[10px]'} ${convictionClass}`}>
-          {conviction}
+        <span
+          className={`font-mono tabular-nums ${
+            prominent ? 'text-[12px] font-semibold text-oxford/75' : 'text-[11px] font-medium text-oxford/55'
+          }`}
+        >
+          {convictionPct}
         </span>
       </>
     ) : null;
@@ -81,7 +84,7 @@ export default function QueueVerdictLine({
     return (
       <div
         className="inline-flex flex-wrap items-baseline justify-end gap-x-phi-2 gap-y-0"
-        aria-label={`${recommendation}, ${conviction} conviction`}
+        aria-label={`${recommendation}${convictionPct != null ? `, ${convictionPct} conviction` : ''}`}
       >
         <QueueVerdictText prominent={prominent}>{label}</QueueVerdictText>
         {convictionEl}

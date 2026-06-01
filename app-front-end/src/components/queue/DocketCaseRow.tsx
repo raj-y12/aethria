@@ -203,19 +203,16 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
           </motion.div>
 
           <AnimatePresence initial={false} mode="popLayout">
-            {oneLiner ? (
+            {/* Description lives only on the selected row — ambient rows stay calm. */}
+            {isSelected && oneLiner ? (
               <motion.p
-                key={isSelected ? 'oneliner-selected' : 'oneliner-ambient'}
+                key="oneliner-selected"
                 layout
                 initial={reduceMotion ? false : { opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
                 transition={contentTransition}
-                className={
-                  isSelected
-                    ? 'mt-phi-3 queue-row-prose text-[14px] leading-[1.55] text-oxford/72'
-                    : 'mt-0.5 line-clamp-1 queue-row-prose type-body-sm text-oxford/46'
-                }
+                className="mt-phi-3 queue-row-prose text-[14px] leading-[1.55] text-oxford/72"
               >
                 {oneLiner}
               </motion.p>
