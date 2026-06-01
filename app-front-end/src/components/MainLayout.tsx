@@ -633,8 +633,8 @@ export default function MainLayout({
   const lookupSnapshotProps = useMemo(() => {
     const src = lookupDetailQuery.data ?? pendingLookupMatch;
     if (!src) return null;
-    return buildLookupSnapshotProps(src, pendingLookup?.queryLabel);
-  }, [lookupDetailQuery.data, pendingLookupMatch, pendingLookup?.queryLabel]);
+    return buildLookupSnapshotProps(src, pendingLookup?.queryLabel, fundConfiguration?.verdictBadges);
+  }, [lookupDetailQuery.data, pendingLookupMatch, pendingLookup?.queryLabel, fundConfiguration?.verdictBadges]);
 
   // In-flight lookup → drives the takeover's progressive reveal (null once decided).
   const lookupProgress = useMemo(() => {
@@ -862,24 +862,46 @@ export default function MainLayout({
                 </section>
 
 
-                {/* ── Mandate (single status pill) ─────────────────────── */}
+                {/* ── Mandate card ─────────────────────────────────────── */}
                 <button
                   type="button"
                   onClick={() => navigate(SETTINGS_PATH)}
-                  className="group flex w-full min-w-0 items-center gap-phi-2 border-t border-oxford/[0.075] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-                  style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}
+                  className="group flex w-full min-w-0 flex-col gap-phi-2 border border-oxford/[0.08] px-phi-4 py-phi-3 text-left transition-colors hover:border-oxford/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                  style={{ marginTop: 'clamp(5px, 0.6vw, 8px)' }}
                   title={mandateSummaryLine || desktopMandateLine || undefined}
                   aria-label={hasThesis ? `Active mandate: ${fundName || 'configured'} — open settings` : 'No active thesis — open settings'}
                 >
-                  <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-none ${hasThesis ? 'bg-oxford signal-dot-breathe' : 'bg-oxford/25'}`}
-                    aria-hidden
-                  />
-                  <span className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong} transition-colors group-hover:text-oxford`}>
+                  {/* Eyebrow + live status */}
+                  <div className="flex items-center justify-between gap-phi-2">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+                      Mandate
+                      {hasThesis && fundThesisSummary?.active_version_number != null
+                        ? ` · v${fundThesisSummary.active_version_number}`
+                        : ''}
+                    </span>
+                    <span
+                      className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] ${hasThesis ? 'text-oxford/45' : 'text-escalation/80'}`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-none ${hasThesis ? 'bg-oxford signal-dot-breathe' : 'bg-escalation/70'}`}
+                        aria-hidden
+                      />
+                      {hasThesis ? 'Active' : 'Set up'}
+                    </span>
+                  </div>
+
+                  {/* Fund name — hero line */}
+                  <span className={`min-w-0 truncate ${railEditorial.bodyStrong} transition-colors group-hover:text-oxford`}>
                     {hasThesis ? (fundName || 'Active mandate') : 'No active thesis'}
                   </span>
-                  <span className={`${railEditorial.meta} shrink-0 uppercase ${hasThesis ? 'text-oxford/40' : 'text-escalation/75'}`}>
-                    {hasThesis ? 'Active' : 'Set up'}
+
+                  {/* Mandate summary (stage · geo · sector) or setup prompt */}
+                  <span
+                    className={`min-w-0 truncate ${railEditorial.meta} transition-colors ${hasThesis ? 'text-oxford/38 group-hover:text-oxford/55' : 'text-oxford/45 group-hover:text-oxford/65'}`}
+                  >
+                    {hasThesis
+                      ? mandateSummaryLine || 'Open thesis →'
+                      : 'Configure to start the pipeline →'}
                   </span>
                 </button>
 

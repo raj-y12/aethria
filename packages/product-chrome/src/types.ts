@@ -31,6 +31,10 @@ export type LookupResultSnapshotProps = {
   queryLabel?: string;
   metaLine?: string;
   verdict: string;
+  /** When set, the verdict renders as a filled badge in this colour (matches the queue). */
+  verdictColor?: string | null;
+  /** Text colour for the filled verdict badge (computed for contrast by the caller). */
+  verdictTextColor?: string | null;
   summary: string;
   dimensions: LookupDimensionScore[];
   thesisLine?: string;

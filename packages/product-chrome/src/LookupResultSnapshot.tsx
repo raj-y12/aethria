@@ -15,6 +15,8 @@ export default function LookupResultSnapshot({
   queryLabel,
   metaLine,
   verdict,
+  verdictColor,
+  verdictTextColor,
   summary,
   dimensions,
   thesisLine,
@@ -96,7 +98,20 @@ export default function LookupResultSnapshot({
           </h3>
         ) : null}
 
-        <p className={cx(isMemo ? '' : showCompanyName && companyName ? 'mt-2' : '', verdictSize)}>{verdict}</p>
+        {verdictColor ? (
+          <span
+            className={cx(
+              'inline-block font-mono uppercase leading-none tracking-[0.12em]',
+              showCompanyName && companyName ? 'mt-2' : '',
+              compact ? 'px-2 py-[5px] text-[12px]' : 'px-2.5 py-1.5 text-[13px]',
+            )}
+            style={{ backgroundColor: verdictColor, color: verdictTextColor ?? undefined }}
+          >
+            {verdict.replace(/\.$/, '')}
+          </span>
+        ) : (
+          <p className={cx(isMemo ? '' : showCompanyName && companyName ? 'mt-2' : '', verdictSize)}>{verdict}</p>
+        )}
         <p
           className={cx(
             'font-sans leading-[1.6] text-oxford/58',
