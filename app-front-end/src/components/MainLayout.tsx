@@ -122,34 +122,26 @@ function SystemTelemetryRail({
 
   return (
     <article
-      className="flex min-w-0 flex-col border border-oxford/[0.08]"
+      className="flex min-w-0 flex-col gap-phi-3 border border-oxford/[0.08] px-phi-4 py-phi-3"
       aria-label="Pipeline overview"
     >
-      <header className="flex items-center justify-between gap-phi-3 border-b border-oxford/[0.075] px-phi-4 py-phi-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">
-          Pipeline overview
-        </p>
-      </header>
-
-      <div className="border-b border-oxford/[0.075] px-phi-4 py-phi-4">
-        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
-          {primaryLabel}
-        </p>
-        <p
-          className={`mt-phi-2 font-mono text-[clamp(2.25rem,4.4vw,3.25rem)] font-bold leading-none tracking-[-0.04em] tabular-nums ${hasEscalations ? 'text-escalation' : 'text-oxford'}`}
-          aria-live="polite"
-        >
-          {primaryValue.toLocaleString()}
-        </p>
-      </div>
-
-      <div className="relative flex min-h-[52px] items-center justify-between gap-phi-3 border-b border-oxford/[0.075] px-phi-4 py-phi-3">
+      {/* Hero indicator + pipeline status, one glanceable row */}
+      <div className="relative flex items-end justify-between gap-phi-3">
         <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45">
-            {pipelineStatusTitle}
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
+            {primaryLabel}
+          </p>
+          <p
+            className={`mt-phi-1 font-mono text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-none tracking-[-0.04em] tabular-nums ${hasEscalations ? 'text-escalation' : 'text-oxford'}`}
+            aria-live="polite"
+          >
+            {primaryValue.toLocaleString()}
           </p>
         </div>
-        <span className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[11px] uppercase tracking-[0.10em] ${statusTone}`}>
+        <span
+          className={`inline-flex shrink-0 items-center gap-phi-2 pb-px font-mono text-[11px] uppercase tracking-[0.10em] ${statusTone}`}
+          title={pipelineStatusTitle}
+        >
           <span className={`h-1.5 w-1.5 shrink-0 rounded-none ${statusDot}`} aria-hidden />
           {statusLabel}
           {pipelineHealthIssue ? (
@@ -165,7 +157,7 @@ function SystemTelemetryRail({
           ) : null}
         </span>
         {showIssueHelp && pipelineHealthIssue ? (
-          <span className="absolute right-phi-4 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford shadow-sm">
+          <span className="absolute right-0 top-[calc(100%+8px)] z-20 w-56 border border-field-border bg-paper p-phi-3 text-left normal-case tracking-normal type-label-section leading-phi text-oxford shadow-sm">
             Pipeline has a problem and may not process updates right now.
             <button
               type="button"
@@ -178,32 +170,14 @@ function SystemTelemetryRail({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-3 divide-x divide-oxford/[0.075]">
-        <div className="flex min-h-[56px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-2">
-          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
-            Total
-          </p>
-          <p className="font-mono text-[14px] font-semibold tabular-nums text-oxford">
-            {totalCount.toLocaleString()}
-          </p>
-        </div>
-        <div className="flex min-h-[56px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-2">
-          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
-            Recs
-          </p>
-          <p className="font-mono text-[14px] font-semibold tabular-nums text-oxford">
-            {agentDecidedCount.toLocaleString()}
-          </p>
-        </div>
-        <div className="flex min-h-[56px] flex-col justify-center gap-phi-1 px-phi-4 py-phi-2">
-          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
-            Human ruled
-          </p>
-          <p className="font-mono text-[14px] font-semibold tabular-nums text-oxford">
-            {humanRuledCount.toLocaleString()}
-          </p>
-        </div>
-      </div>
+      {/* Dense metric readout — all counts on one line */}
+      <p className="border-t border-oxford/[0.075] pt-phi-3 font-mono text-[11px] tracking-[0.04em] tabular-nums text-oxford/45">
+        <span className="font-semibold text-oxford">{totalCount.toLocaleString()}</span> total
+        <span className="mx-phi-2 text-oxford/20" aria-hidden>·</span>
+        <span className="font-semibold text-oxford">{agentDecidedCount.toLocaleString()}</span> rec
+        <span className="mx-phi-2 text-oxford/20" aria-hidden>·</span>
+        <span className="font-semibold text-oxford">{humanRuledCount.toLocaleString()}</span> ruled
+      </p>
     </article>
   );
 }

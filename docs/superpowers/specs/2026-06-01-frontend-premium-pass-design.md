@@ -18,11 +18,10 @@ Premium comes from **hierarchy + restraint**, not new styling. Every surface get
 - **Support** — the single number/verdict that matters (clear, secondary).
 - **Recede** — everything else: faint mono, smaller, or removed entirely.
 
-**Hard constraints:**
-- **No font/family changes.** Hierarchy is achieved only via size, weight, color/opacity, spacing, and removing competing text.
-- **No multi-page split.** The single-surface cockpit is the product's identity and stays.
-- **No new dependencies.** Framer Motion only (already in use).
-- **No backend changes** in this track.
+**Constraints:**
+- **No multi-page routing.** This is the ONE hard exclusion. The single-surface cockpit is the product's identity and stays.
+- **Keep existing font families** (per the owner's stated preference). Hierarchy is achieved via size, weight, color/opacity, spacing, and removing competing text — not typeface swaps. Revisit only if the owner asks.
+- **Everything else is in scope.** Palette/spacing tokens, component structure, dependencies, and backend glue may all change where it makes the product feel more premium. (Deep backend bulletproofing remains its own separate spec, but small backend changes that serve the frontend — e.g. a list-projection field — are fine here.)
 
 ## Surface 1 — Deal Queue
 
@@ -62,9 +61,10 @@ Premium comes from **hierarchy + restraint**, not new styling. Every surface get
 
 ## Out of scope (YAGNI)
 
-- Multi-page routing, org/fund collaboration, durable queues, MetaAgent governance.
-- Any backend or schema change.
-- New fonts, new color palette, new animation library.
+- **Multi-page routing** — the one hard exclusion; the cockpit stays single-surface.
+- **Font-family swaps** — keep existing typefaces (owner preference; revisit on request).
+- Deep backend bulletproofing, org/fund collaboration, durable queues, and MetaAgent governance
+  remain *separate* specs — not because they're forbidden, but to keep this pass focused.
 
 ## Verification
 
