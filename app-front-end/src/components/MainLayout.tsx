@@ -13,6 +13,7 @@ import LiveIntelligenceFeed from './LiveIntelligenceFeed';
 import GhostTransition from './GhostTransition';
 import SystemIntelligence from './SystemIntelligence';
 import AgentDispatch from './AgentDispatch';
+import DispatchCommandBar from './DispatchCommandBar';
 import AccountRailPanel from './AccountRailPanel';
 import {
   useScrollLock,
@@ -246,6 +247,7 @@ export default function MainLayout({
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const reduceMotion = usePrefersReducedMotion();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [commandBarOpen, setCommandBarOpen] = useState(false);
   const restoreRefVerdictMemo = useRef<HTMLElement | null>(null);
   const judgementsPanelRef = useRef<HTMLDivElement | null>(null);
   const memoContentRef = useRef<InvestmentMemoContentHandle | null>(null);
@@ -367,6 +369,18 @@ export default function MainLayout({
     setLookupBusy(false);
     setPendingLookup(null);
     setLookupMessage(null);
+  }, []);
+
+  // ⌘K / Ctrl+K opens the dispatch command bar from anywhere in the cockpit.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setCommandBarOpen(true);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, []);
 
   const pendingLookupMatch = useMemo(() => {
@@ -632,6 +646,18 @@ export default function MainLayout({
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-paper">
+      <DispatchCommandBar
+        open={commandBarOpen}
+        onClose={() => setCommandBarOpen(false)}
+        input={lookupInput}
+        setInput={setLookupInput}
+        onSubmit={() => void handleLookupSubmit()}
+        onCancel={handleLookupCancel}
+        isBusy={lookupWorking}
+        message={lookupMessage}
+        onClearMessage={() => setLookupMessage(null)}
+        lookupPhase={lookupPhaseLabel}
+      />
       {/* Mobile / tablet top nav — desktop keeps the vertical SystemBar only */}
       {!isDesktop && (
         <>
@@ -784,31 +810,20 @@ export default function MainLayout({
                   />
                 </section>
 
-                {/* ── Dispatch (on-demand lookup) ─────────────────────── */}
-                <div className="min-w-0 border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}>
-                  <p className={railEditorial.label}>Dispatch</p>
-                  <div className="mt-phi-2 min-w-0">
-                    <AgentDispatch
-                      input={lookupInput}
-                      setInput={setLookupInput}
-                      onSubmit={() => void handleLookupSubmit()}
-                      onCancel={handleLookupCancel}
-                      isBusy={lookupWorking}
-                      message={lookupMessage}
-                      onClearMessage={() => setLookupMessage(null)}
-                      lookupPhase={lookupPhaseLabel}
-                      displayMode="embedded"
-                    />
-                    {SHOW_LOOKUP_RESULT_SNAPSHOT && lookupSnapshotProps ? (
-                      <div className="mt-phi-3 min-w-0">
-                        <LookupResultSnapshot
-                          {...lookupSnapshotProps}
-                          onOpenMemo={handleOpenLookupMemo}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
+                {/* ── Dispatch trigger (opens ⌘K command bar) ──────────── */}
+                <button
+                  type="button"
+                  onClick={() => setCommandBarOpen(true)}
+                  className="group flex w-full min-w-0 items-center gap-phi-2 border-t border-oxford/[0.075] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                  style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}
+                  aria-label="Look up a company (Command/Ctrl K)"
+                >
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford/30 transition-colors group-hover:bg-oxford/60" aria-hidden />
+                  <span className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong} text-oxford/55 transition-colors group-hover:text-oxford`}>
+                    {lookupWorking ? (lookupMessage ?? 'Lookup running…') : 'Look up a company'}
+                  </span>
+                  <kbd className={`${railEditorial.meta} shrink-0 uppercase text-oxford/35`}>⌘K</kbd>
+                </button>
 
                 {/* ── Mandate (single status pill) ─────────────────────── */}
                 <button

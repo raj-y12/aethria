@@ -6,6 +6,7 @@ import { usePrefersReducedMotion } from '../hooks';
 import GrainOverlay from './GrainOverlay';
 import CountUp from './CountUp';
 import { fetchActivitySummaryWithToken, type ActivitySummary } from '../api/activity';
+import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from '../lib/loginEntryTransition';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -58,12 +59,22 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [entering, setEntering] = useState(false);
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
   const passwordRef = useRef<HTMLInputElement>(null);
   const hasRedirectedRef = useRef(false);
   const formShakeRef = useRef<HTMLDivElement>(null);
+  const enterTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (enterTimeoutRef.current !== null) {
+        window.clearTimeout(enterTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Auto-redirect already signed-in users
   useEffect(() => {
@@ -85,9 +96,14 @@ export default function LoginPage() {
   }, [error, reduceMotion]);
 
   const handleEnterSystem = useCallback(() => {
-    sessionStorage.setItem('aethria_just_logged_in', '1');
-    window.location.replace('/v1');
-  }, []);
+    if (entering) return;
+    const transition = getLoginEntryTransition(reduceMotion);
+    sessionStorage.setItem(LOGIN_ENTRY_SESSION_KEY, '1');
+    setEntering(true);
+    enterTimeoutRef.current = window.setTimeout(() => {
+      navigate('/v1', { replace: true });
+    }, transition.navigateDelayMs);
+  }, [entering, navigate, reduceMotion]);
 
   const handleSubmit = useCallback(async () => {
     if (loading || phase === 'welcome') return;
@@ -202,6 +218,7 @@ export default function LoginPage() {
 
   const stats = activity ? STATS_CONFIG(activity) : null;
   const enterDelay = stats ? 0.22 + stats.length * 0.07 + 0.1 : 0.2;
+  const entryTransition = getLoginEntryTransition(reduceMotion);
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
@@ -210,7 +227,20 @@ export default function LoginPage() {
         className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-hidden"
         style={{ padding: 'clamp(24px, 5vw, 56px)' }}
       >
-      <div className="w-full max-w-[40rem] flex flex-col items-center">
+      <motion.div
+        className="w-full max-w-[40rem] flex flex-col items-center"
+        animate={
+          entering
+            ? reduceMotion
+              ? { opacity: 0 }
+              : { opacity: 0, y: -14, filter: 'blur(6px)' }
+            : { opacity: 1, y: 0, filter: 'blur(0px)' }
+        }
+        transition={{
+          duration: entryTransition.contentExitMs / 1000,
+          ease: EASE,
+        }}
+      >
 
         {/* Eyebrow */}
         <AnimatePresence mode="wait">
@@ -401,6 +431,7 @@ export default function LoginPage() {
                   transition={{ duration: 0.4, ease: EASE, delay: enterDelay }}
                   whileTap={reduceMotion ? {} : { scale: 0.97 }}
                   onClick={handleEnterSystem}
+                  disabled={entering}
                   className="group btn-aethria-solid"
                   style={{ padding: '0 72px' }}
                 >
@@ -523,13 +554,13 @@ export default function LoginPage() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
 
       {/* Footer */}
       <motion.footer
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1, delay: 1 }}
+        animate={{ opacity: entering ? 0 : 1 }}
+        transition={{ duration: entering ? entryTransition.contentExitMs / 1000 : 1, delay: entering ? 0 : 1 }}
         className="fixed bottom-0 left-0 z-20 w-full p-phi-6 flex justify-center pointer-events-none"
       >
         <p
@@ -546,6 +577,29 @@ export default function LoginPage() {
         </p>
       </motion.footer>
       </div>
+      <AnimatePresence>
+        {entering && (
+          <motion.div
+            aria-hidden
+            className="fixed inset-0 z-50 pointer-events-none bg-oxford"
+            initial={
+              reduceMotion
+                ? { opacity: 0 }
+                : { opacity: 0, clipPath: 'inset(50% 50% 50% 50%)' }
+            }
+            animate={
+              reduceMotion
+                ? { opacity: 1 }
+                : { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' }
+            }
+            exit={{ opacity: 0 }}
+            transition={{
+              duration: entryTransition.overlayMs / 1000,
+              ease: EASE,
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

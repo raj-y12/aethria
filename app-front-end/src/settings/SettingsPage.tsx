@@ -80,6 +80,16 @@ const actionBtnCls =
 const solidBtnCls =
   'type-label-section inline-flex min-h-[36px] items-center justify-center rounded-none bg-oxford px-phi-4 text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
 
+const RAIL_CLAMP_PAD = { paddingTop: 'clamp(5px, 0.6vw, 8px)', paddingBottom: 'clamp(5px, 0.6vw, 8px)' } as const;
+
+function settingsRailNavCls(active: boolean): string {
+  return `group type-label-tab w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 min-h-[32px] px-phi-4 py-phi-1 ${
+    active
+      ? 'text-oxford bg-surface-selected'
+      : 'text-oxford/50 hover:text-oxford/80 hover:bg-oxford/[0.04]'
+  }`;
+}
+
 function serializeConfig(config: FundConfiguration): string {
   const rest = { ...config } as Record<string, unknown>;
   for (const key of ['lastSavedAt', 'version', 'versionLabel', 'activePolicyVersionId', 'draftPolicyHash', 'publishedPolicyHash', 'lastPublishedAt']) {
@@ -128,7 +138,11 @@ function SettingsSidebarFooter({
       : 'Save to persist fund configuration';
 
   return (
-    <div className="mt-auto shrink-0 border-t border-oxford/[0.08] pt-phi-5" aria-label="Save draft">
+    <div
+      className="min-w-0 shrink-0 border-t border-oxford/[0.075]"
+      style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}
+      aria-label="Save draft"
+    >
       <div className="flex items-start gap-phi-2" aria-live="polite">
         <span
           className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-none ${unsaved ? 'bg-escalation/70 signal-dot-breathe' : 'bg-oxford/30'}`}
@@ -704,66 +718,85 @@ export default function SettingsPage() {
       )}
 
       <main className="flex min-h-0 flex-1 overflow-hidden bg-paper">
-        <div className="w-3 shrink-0 self-stretch bg-oxford sm:w-6 md:w-10" aria-hidden />
+        <div
+          className="w-4 shrink-0 self-stretch origin-top sm:w-7 md:w-10"
+          style={{ backgroundColor: 'var(--color-oxford)' }}
+          aria-hidden
+        />
 
-        <aside className="hidden min-h-0 w-[18rem] shrink-0 flex-col border-r border-oxford/[0.08] px-phi-5 py-phi-5 lg:flex">
-          <div className="pb-phi-6">
-            <Link
-              to="/v1"
-              className={`${railEditorial.wordmark} block hover:opacity-80 transition-opacity btn-interaction`}
-              aria-label="Aethria — return to workspace"
-            >
-              Aethria
-            </Link>
-            <Link
-              to="/v1"
-              className="type-meta mt-phi-2 inline-flex min-h-[44px] items-center uppercase text-oxford/35 transition-colors hover:text-oxford/60 btn-interaction"
-            >
-              Return to conviction workspace
-            </Link>
-          </div>
-          <p className="type-label-section text-oxford/45">Fund Configuration</p>
-          <nav className="mt-phi-5 flex min-h-0 flex-1 flex-col gap-phi-1 overflow-y-auto" aria-label="Settings sections">
-            {sections.map((section) => (
-              <a
-                key={section.id}
-                href={`#${section.id}`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  setActiveSection(section.id);
-                  const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${section.id}`);
-                  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
-                className={`type-label-tab min-h-[36px] px-phi-3 py-phi-2 transition-colors ${activeSection === section.id ? 'bg-surface-selected text-oxford' : 'text-oxford/40 hover:bg-oxford/[0.03] hover:text-oxford/70'}`}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper lg:grid aethria-settings-grid">
+            <aside className="aethria-workspace-sidebar paper-dot-grid hidden h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden lg:flex">
+              <div
+                className="paper-dot-grid flex h-full min-h-0 flex-col justify-between overflow-hidden px-phi-4"
+                style={RAIL_CLAMP_PAD}
               >
-                {section.short}
-              </a>
-            ))}
-          </nav>
-          <SettingsSidebarFooter
-            unsaved={unsaved}
-            lastSavedAt={draft.lastSavedAt}
-            saving={saving}
-            onSave={() => void handleSave()}
-            onReset={handleReset}
-          />
-        </aside>
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                  <div className="min-w-0 shrink-0">
+                    <Link
+                      to="/v1"
+                      className={`${railEditorial.wordmark} inline-block hover:opacity-80 transition-opacity btn-interaction`}
+                      aria-label="Aethria — return to workspace"
+                    >
+                      Aethria
+                    </Link>
+                    <div className="mt-phi-3 -mx-phi-4 flex flex-col gap-0.5">
+                      <Link
+                        to="/v1"
+                        className={settingsRailNavCls(false)}
+                      >
+                        Return to conviction workspace
+                      </Link>
+                      <p className={`${railEditorial.label} px-phi-4`}>Fund configuration</p>
+                    </div>
+                  </div>
+                  <nav
+                    className="mt-phi-2 -mx-phi-4 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto"
+                    aria-label="Settings sections"
+                  >
+                    {sections.map((section) => (
+                      <a
+                        key={section.id}
+                        href={`#${section.id}`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setActiveSection(section.id);
+                          const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${section.id}`);
+                          target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }}
+                        className={settingsRailNavCls(activeSection === section.id)}
+                        aria-current={activeSection === section.id ? 'true' : undefined}
+                      >
+                        {section.short}
+                      </a>
+                    ))}
+                  </nav>
+                </div>
+                <SettingsSidebarFooter
+                  unsaved={unsaved}
+                  lastSavedAt={draft.lastSavedAt}
+                  saving={saving}
+                  onSave={() => void handleSave()}
+                  onReset={handleReset}
+                />
+              </div>
+            </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-oxford/[0.08] px-phi-5 py-phi-4 lg:hidden">
+            <div className="flex min-h-0 min-w-0 flex-col overflow-hidden lg:h-full lg:min-h-0">
+              <div className="flex items-center justify-between border-b border-oxford/[0.08] px-phi-5 py-phi-4 lg:hidden">
             <div>
               <p className={sectionLabelCls}>Fund Configuration</p>
               <Link to="/v1" className="mt-phi-1 inline-flex type-meta text-oxford/38 transition-colors hover:text-oxford">
                 {unsaved ? 'Unsaved changes' : 'Return to workspace'}
               </Link>
             </div>
-            <button type="button" onClick={handleSave} disabled={saving} className={solidBtnCls}>
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-          </div>
+              <button type="button" onClick={handleSave} disabled={saving} className={solidBtnCls}>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+              </div>
 
-          <div ref={contentScrollRef} className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
-            <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_18rem]">
+              <div ref={contentScrollRef} className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
+            <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]">
               <div className="min-w-0 px-phi-5 py-phi-6 lg:px-phi-7">
                 <header className="mb-phi-7 max-w-[54rem]">
                   <p className="type-label-section text-oxford/45">{draft.versionLabel}</p>
@@ -1060,6 +1093,8 @@ export default function SettingsPage() {
               </div>
 
               <PreviewPanel config={draft} />
+            </div>
+          </div>
             </div>
           </div>
         </div>

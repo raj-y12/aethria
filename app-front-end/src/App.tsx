@@ -1,6 +1,7 @@
 import { useState, useLayoutEffect, useEffect, useRef, lazy, Suspense } from 'react';
 import { useLocation, Navigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
+import { motion } from 'framer-motion';
 import { setTokenGetter } from './api/auth';
 import { triggerAgents } from './api/agents';
 import MainLayout from './components/MainLayout';
@@ -12,7 +13,9 @@ import WhileYouWereAway from './components/WhileYouWereAway';
 import { useSystemData } from './hooks/useSystemData';
 import { useAgentsEnabled } from './hooks/useAgentsEnabled';
 import { useActivitySummary } from './hooks/useActivitySummary';
+import { usePrefersReducedMotion } from './hooks';
 import LoginPage from './components/LoginPage';
+import { LOGIN_ENTRY_SESSION_KEY } from './lib/loginEntryTransition';
 
 const APP_ROOT = '/v1';
 const SETTINGS_ROOT = `${APP_ROOT}/settings`;
@@ -22,7 +25,9 @@ function AppShell() {
   const { pathname } = useLocation();
   const isSettingsRoute = pathname.startsWith(SETTINGS_ROOT);
   const [isSystemPanelOpen, setIsSystemPanelOpen] = useState(false);
+  const [arrivedFromLogin] = useState(() => sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY) === '1');
   const triggeredAgentsRef = useRef(false);
+  const reduceMotion = usePrefersReducedMotion();
   const systemData = useSystemData({
     systemPanelOpen: !isSettingsRoute && isSystemPanelOpen,
   });
@@ -54,7 +59,7 @@ function AppShell() {
     });
   }, [agentsEnabled, isSettingsRoute]);
 
-  if (loading) {
+  if (loading && !arrivedFromLogin) {
     return <LoadingAnimation />;
   }
 
@@ -63,7 +68,18 @@ function AppShell() {
   }
 
   return (
-    <>
+    <motion.div
+      className="min-h-[100dvh]"
+      initial={
+        arrivedFromLogin
+          ? reduceMotion
+            ? { opacity: 0 }
+            : { opacity: 0, y: 10, filter: 'blur(8px)' }
+          : false
+      }
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      transition={{ duration: reduceMotion ? 0.08 : 0.42, ease: [0.16, 1, 0.3, 1] }}
+    >
       <GrainOverlay opacity={0.028} />
       {isSettingsRoute ? (
         <Suspense fallback={<LoadingAnimation />}>
@@ -76,7 +92,7 @@ function AppShell() {
           onSystemPanelOpenChange={setIsSystemPanelOpen}
         />
       )}
-    </>
+    </motion.div>
   );
 }
 

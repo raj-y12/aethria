@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchActivitySummary, markActivitySeen, ActivitySummary } from '../api/activity';
+import { LOGIN_ENTRY_SESSION_KEY } from '../lib/loginEntryTransition';
 
 export interface UseActivitySummaryResult {
   loading: boolean;
@@ -15,9 +16,9 @@ export function useActivitySummary(): UseActivitySummaryResult {
 
   useEffect(() => {
     // Skip if we just logged in — LoginPage already showed the activity summary
-    const justLoggedIn = sessionStorage.getItem('aethria_just_logged_in');
+    const justLoggedIn = sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY);
     if (justLoggedIn) {
-      sessionStorage.removeItem('aethria_just_logged_in');
+      sessionStorage.removeItem(LOGIN_ENTRY_SESSION_KEY);
       setLoading(false);
       return;
     }
