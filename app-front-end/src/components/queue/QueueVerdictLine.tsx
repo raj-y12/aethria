@@ -1,9 +1,11 @@
 /**
- * Queue verdict — typography only (no filled pills).
- * One calm line: recommendation + conviction, pipeline state, or escalation interrupt.
+ * Queue verdict — filled decision badge + conviction integer.
+ * The verdict is the one per-row signal that earns colour: a soft-palette filled
+ * chip (DecisionBadge) makes INVEST / PASS / MONITOR scannable at a glance.
+ * Pipeline/escalation interrupt states stay as calm text.
  */
 import type { ReactNode } from 'react';
-import { DECISION_LABELS } from '../../design-system/semantics';
+import DecisionBadge from '../DecisionBadge';
 import type { DecisionBadgeVariant } from '../../lib/decisionBadgeVariant';
 import {
   getQueueConvictionPct,
@@ -80,13 +82,17 @@ export default function QueueVerdictLine({
     ) : null;
 
   if (recommendation) {
-    const label = (DECISION_LABELS[recommendation] ?? recommendation).toUpperCase();
     return (
       <div
-        className="inline-flex flex-wrap items-baseline justify-end gap-x-phi-2 gap-y-0"
+        className="inline-flex flex-wrap items-center justify-end gap-x-phi-2 gap-y-0"
         aria-label={`${recommendation}${convictionPct != null ? `, ${convictionPct} conviction` : ''}`}
       >
-        <QueueVerdictText prominent={prominent}>{label}</QueueVerdictText>
+        <DecisionBadge
+          variant={recommendation}
+          queue
+          prominent={prominent}
+          badges={ctx.fundConfiguration?.verdictBadges}
+        />
         {convictionEl}
       </div>
     );
