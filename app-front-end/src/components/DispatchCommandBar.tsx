@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import AgentDispatch from './AgentDispatch';
-import { usePrefersReducedMotion } from '../hooks';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -19,9 +19,10 @@ interface DispatchCommandBarProps {
 }
 
 /**
- * ⌘K command bar for on-demand lookup. Dispatch is an action, not a destination —
- * so it lives behind a keystroke and a centered overlay rather than an always-on
- * rail input. Reuses AgentDispatch (embedded) for the input/run/status UI.
+ * ⌘K dispatch — full-screen takeover styled to match AgentLogoutModal
+ * (eyebrow → display title → subtitle → centered input). Dispatch is an action,
+ * not a destination, so it lives behind a keystroke. Reuses AgentDispatch for
+ * the input/run/status UI.
  */
 export default function DispatchCommandBar({
   open,
@@ -35,11 +36,9 @@ export default function DispatchCommandBar({
   onClearMessage,
   lookupPhase,
 }: DispatchCommandBarProps) {
-  const reduceMotion = usePrefersReducedMotion();
-  const cardRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Esc closes (unless a lookup is mid-flight, where Esc should be a no-op so the
-  // user doesn't accidentally lose the running status).
+  // Esc closes (no-op while a lookup is mid-flight so running status isn't lost).
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -48,53 +47,67 @@ export default function DispatchCommandBar({
         onClose();
       }
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [open, isBusy, onClose]);
 
-  // Autofocus the input when the bar opens.
+  // Autofocus the input on open.
   useEffect(() => {
     if (!open) return;
     const id = window.setTimeout(() => {
-      cardRef.current?.querySelector('input')?.focus();
-    }, 20);
+      containerRef.current?.querySelector('input')?.focus();
+    }, 30);
     return () => window.clearTimeout(id);
   }, [open]);
 
-  return (
+  const modal = (
     <AnimatePresence>
-      {open ? (
+      {open && (
         <motion.div
-          className="fixed inset-0 z-[120] flex items-start justify-center px-phi-4 pt-[14vh]"
-          initial={reduceMotion ? false : { opacity: 0 }}
+          key="dispatch-takeover"
+          ref={containerRef}
+          initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={reduceMotion ? { opacity: 0 } : { opacity: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.16, ease: EASE }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.4, ease: EASE }}
+          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-phi-6 bg-paper"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Look up a company"
         >
-          <div
-            className="absolute inset-0 bg-oxford/35 backdrop-blur-[2px]"
-            aria-hidden
-            onClick={() => {
-              if (!isBusy) onClose();
-            }}
-          />
-          <motion.div
-            ref={cardRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Look up a company"
-            className="relative w-full max-w-[560px] border border-oxford/15 bg-paper px-phi-5 py-phi-4 shadow-[0_24px_60px_-20px_rgba(0,20,51,0.35)]"
-            initial={reduceMotion ? false : { opacity: 0, y: -10, scale: 0.99 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.99 }}
-            transition={{ duration: reduceMotion ? 0 : 0.2, ease: EASE }}
+          <motion.p
+            initial={{ opacity: 0, transform: 'translateY(10px)' }}
+            animate={{ opacity: 1, transform: 'translateY(0px)' }}
+            transition={{ duration: 0.45, ease: EASE, delay: 0.05 }}
+            className="type-meta uppercase tracking-[0.16em] text-oxford/40 mb-phi-3"
           >
-            <div className="mb-phi-2 flex items-baseline justify-between">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">
-                Look up a company
-              </p>
-              <kbd className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/30">Esc</kbd>
-            </div>
+            Company Lookup
+          </motion.p>
+
+          <motion.h1
+            initial={{ opacity: 0, transform: 'translateY(12px)' }}
+            animate={{ opacity: 1, transform: 'translateY(0px)' }}
+            transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
+            className="type-display text-center text-[clamp(28px,4vw,52px)] font-medium text-oxford leading-[1.1] m-0 max-w-[15ch]"
+          >
+            Look up a company
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, ease: EASE, delay: 0.18 }}
+            className="type-body text-center text-oxford/50 mt-phi-3 mb-phi-8 max-w-[34ch]"
+          >
+            Search any company — evaluated against your active mandate. The result lands in the queue.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, transform: 'translateY(10px)' }}
+            animate={{ opacity: 1, transform: 'translateY(0px)' }}
+            transition={{ duration: 0.45, ease: EASE, delay: 0.25 }}
+            className="w-full max-w-md"
+          >
             <AgentDispatch
               input={input}
               setInput={setInput}
@@ -106,12 +119,24 @@ export default function DispatchCommandBar({
               lookupPhase={lookupPhase}
               displayMode="embedded"
             />
-            <p className="mt-phi-3 font-mono text-[10px] tracking-[0.04em] text-oxford/30">
-              Searches any company — evaluated against your active mandate. Result lands in the queue.
-            </p>
           </motion.div>
+
+          <motion.button
+            initial={{ opacity: 0, transform: 'translateY(10px)' }}
+            animate={{ opacity: 1, transform: 'translateY(0px)' }}
+            transition={{ duration: 0.45, ease: EASE, delay: 0.32 }}
+            type="button"
+            onClick={onClose}
+            disabled={isBusy}
+            className="mt-phi-7 min-h-[44px] type-meta uppercase tracking-[0.12em] text-oxford/30 hover:text-oxford/50 btn-interaction cursor-pointer transition-colors disabled:opacity-50 border-b border-oxford/10 pb-0.5"
+          >
+            Cancel · Esc
+          </motion.button>
         </motion.div>
-      ) : null}
+      )}
     </AnimatePresence>
   );
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(modal, document.body);
 }

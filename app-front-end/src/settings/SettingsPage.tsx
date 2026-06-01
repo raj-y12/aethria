@@ -90,6 +90,23 @@ function settingsRailNavCls(active: boolean): string {
   }`;
 }
 
+function WorkspaceExitButton({ className = 'w-full' }: { className?: string }) {
+  return (
+    <Link
+      to="/v1"
+      className={`btn-aethria ${className}`}
+      aria-label="Return to conviction workspace"
+    >
+      <span className="flex items-center justify-center gap-phi-2">
+        <span aria-hidden className="font-mono text-[11px] leading-none tracking-[0.12em]">
+          ←
+        </span>
+        <span>Workspace</span>
+      </span>
+    </Link>
+  );
+}
+
 function serializeConfig(config: FundConfiguration): string {
   const rest = { ...config } as Record<string, unknown>;
   for (const key of ['lastSavedAt', 'version', 'versionLabel', 'activePolicyVersionId', 'draftPolicyHash', 'publishedPolicyHash', 'lastPublishedAt']) {
@@ -160,9 +177,23 @@ function SettingsSidebarFooter({
           type="button"
           onClick={onSave}
           disabled={saving || !unsaved}
-          className={`${solidBtnCls} w-full justify-center`}
+          className="group w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {saving ? 'Saving…' : 'Save changes'}
+          <span className="flex items-center justify-center">
+            {saving ? (
+              <span>Saving…</span>
+            ) : (
+              <>
+                <span>Save changes</span>
+                <span
+                  className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6 group-disabled:w-2"
+                  aria-hidden
+                >
+                  {'\u00a0→'}
+                </span>
+              </>
+            )}
+          </span>
         </button>
         <button
           type="button"
@@ -740,14 +771,9 @@ export default function SettingsPage() {
                     >
                       Aethria
                     </Link>
-                    <div className="mt-phi-3 -mx-phi-4 flex flex-col gap-0.5">
-                      <Link
-                        to="/v1"
-                        className={settingsRailNavCls(false)}
-                      >
-                        Return to conviction workspace
-                      </Link>
-                      <p className={`${railEditorial.label} px-phi-4`}>Fund configuration</p>
+                    <div className="mt-phi-3 flex flex-col gap-phi-3">
+                      <WorkspaceExitButton />
+                      <p className={railEditorial.label}>Fund configuration</p>
                     </div>
                   </div>
                   <nav
@@ -784,14 +810,34 @@ export default function SettingsPage() {
 
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:h-full lg:min-h-0">
               <div className="flex items-center justify-between border-b border-oxford/[0.08] px-phi-5 py-phi-4 lg:hidden">
-            <div>
+            <div className="flex min-w-0 flex-col gap-phi-2">
               <p className={sectionLabelCls}>Fund Configuration</p>
-              <Link to="/v1" className="mt-phi-1 inline-flex type-meta text-oxford/38 transition-colors hover:text-oxford">
-                {unsaved ? 'Unsaved changes' : 'Return to workspace'}
-              </Link>
+              <WorkspaceExitButton className="w-fit" />
+              {unsaved ? (
+                <p className="type-meta text-oxford/45">Unsaved changes</p>
+              ) : null}
             </div>
-              <button type="button" onClick={handleSave} disabled={saving} className={solidBtnCls}>
-                {saving ? 'Saving...' : 'Save'}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="group btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <span className="flex items-center justify-center">
+                  {saving ? (
+                    <span>Saving…</span>
+                  ) : (
+                    <>
+                      <span>Save</span>
+                      <span
+                        className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
+                        aria-hidden
+                      >
+                        {'\u00a0→'}
+                      </span>
+                    </>
+                  )}
+                </span>
               </button>
               </div>
 
