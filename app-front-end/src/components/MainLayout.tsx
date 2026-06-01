@@ -810,43 +810,26 @@ export default function MainLayout({
                   </div>
                 </div>
 
-                {/* ── Mandate ────────────────────────────────────────── */}
-                <article className="min-w-0 overflow-hidden border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }} aria-label="Fund thesis preview">
-                  <p className={railEditorial.label}>Mandate</p>
-                  <div className="flex min-w-0 items-center justify-between gap-phi-3">
-                    <p
-                      className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong}`}
-                      title={mandateSummaryLine || undefined}
-                    >
-                      {fundName || 'No fund configured'}
-                    </p>
-                    {hasThesis ? (
-                      <div
-                        className="flex shrink-0 items-center gap-phi-2"
-                        aria-live="polite"
-                        title="Active mandate used by the system"
-                      >
-                        <span
-                          className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe"
-                          aria-hidden
-                        />
-                        <span
-                          className={`${railEditorial.meta} uppercase text-oxford/45 pulse-soft [animation-delay:900ms]`}
-                        >
-                          Active
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-                  {desktopMandateLine ? (
-                    <p
-                      className="mt-phi-3 truncate font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/45"
-                      title={desktopMandateLine}
-                    >
-                      {desktopMandateLine}
-                    </p>
-                  ) : null}
-                </article>
+                {/* ── Mandate (single status pill) ─────────────────────── */}
+                <button
+                  type="button"
+                  onClick={() => navigate(SETTINGS_PATH)}
+                  className="group flex w-full min-w-0 items-center gap-phi-2 border-t border-oxford/[0.075] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                  style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}
+                  title={mandateSummaryLine || desktopMandateLine || undefined}
+                  aria-label={hasThesis ? `Active mandate: ${fundName || 'configured'} — open settings` : 'No active thesis — open settings'}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-none ${hasThesis ? 'bg-oxford signal-dot-breathe' : 'bg-oxford/25'}`}
+                    aria-hidden
+                  />
+                  <span className={`min-w-0 flex-1 truncate ${railEditorial.bodyStrong} transition-colors group-hover:text-oxford`}>
+                    {hasThesis ? (fundName || 'Active mandate') : 'No active thesis'}
+                  </span>
+                  <span className={`${railEditorial.meta} shrink-0 uppercase ${hasThesis ? 'text-oxford/40' : 'text-escalation/75'}`}>
+                    {hasThesis ? 'Active' : 'Set up'}
+                  </span>
+                </button>
 
                 {/* ── Account ─────────────────────────────────────────── */}
                 <div className="min-w-0 border-t border-oxford/[0.075]" style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}>
