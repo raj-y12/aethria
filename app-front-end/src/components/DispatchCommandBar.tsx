@@ -5,6 +5,14 @@ import AgentDispatch from './AgentDispatch';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
+export interface LookupProgress {
+  query: string;
+  name: string | null;
+  sector: string | null;
+  found: boolean;
+  reviewed: boolean;
+}
+
 interface DispatchCommandBarProps {
   open: boolean;
   onClose: () => void;
@@ -16,15 +24,60 @@ interface DispatchCommandBarProps {
   message: string | null;
   onClearMessage?: () => void;
   lookupPhase: 'Scouting' | 'Reviewing' | 'Deciding' | null;
+  /** In-flight lookup, drives progressive reveal. Null until a lookup is queued. */
+  progress?: LookupProgress | null;
   /** Result overview (LookupResultSnapshot) shown once the lookup has a decision. */
   result?: ReactNode;
 }
 
+type StepState = 'done' | 'active' | 'pending';
+
+function ProgressSteps({ progress }: { progress: LookupProgress }) {
+  const steps: { label: string; state: StepState }[] = [
+    { label: 'Discover', state: progress.found ? 'done' : 'active' },
+    { label: 'Review', state: progress.reviewed ? 'done' : progress.found ? 'active' : 'pending' },
+    { label: 'Decide', state: progress.reviewed ? 'active' : 'pending' },
+  ];
+  return (
+    <div className="flex items-center justify-center gap-phi-2" aria-label="Analysis progress">
+      {steps.map((step, i) => (
+        <div key={step.label} className="flex items-center gap-phi-2">
+          {i > 0 ? <span className="h-px w-6 bg-oxford/15" aria-hidden /> : null}
+          <span className="inline-flex items-center gap-phi-2">
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-none ${
+                step.state === 'done'
+                  ? 'bg-oxford'
+                  : step.state === 'active'
+                    ? 'bg-oxford signal-dot-breathe'
+                    : 'bg-oxford/20'
+              }`}
+              aria-hidden
+            />
+            <span
+              className={`font-mono text-[11px] uppercase tracking-[0.12em] ${
+                step.state === 'done'
+                  ? 'text-oxford/70'
+                  : step.state === 'active'
+                    ? 'text-oxford'
+                    : 'text-oxford/30'
+              }`}
+            >
+              {step.label}
+            </span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
- * ⌘K dispatch — full-screen takeover styled to match AgentLogoutModal
- * (eyebrow → display title → subtitle → centered input). Dispatch is an action,
- * not a destination, so it lives behind a keystroke. Reuses AgentDispatch for
- * the input/run/status UI.
+ * ⌘K dispatch — full-screen takeover styled to match AgentLogoutModal.
+ * Three views: input (compose) → progress (live reveal while analyzing) →
+ * result overview. Always dismissible: a running lookup continues in the
+ * background (result lands in the queue + a ready toast), so the analyst is
+ * never trapped waiting.
  */
 export default function DispatchCommandBar({
   open,
@@ -37,26 +90,26 @@ export default function DispatchCommandBar({
   message,
   onClearMessage,
   lookupPhase,
+  progress,
   result,
 }: DispatchCommandBarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // Closeable once a result is ready, even if the pipeline is still finishing.
-  const closeable = !isBusy || !!result;
+  const running = !!progress && !result;
 
-  // Esc closes (no-op while a lookup is mid-flight with no result yet).
+  // Esc always closes — a running lookup keeps going in the background.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && closeable) {
+      if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, closeable, onClose]);
+  }, [open, onClose]);
 
-  // Autofocus the input on open.
+  // Autofocus the input on open (only the compose view renders one).
   useEffect(() => {
     if (!open) return;
     const id = window.setTimeout(() => {
@@ -64,6 +117,14 @@ export default function DispatchCommandBar({
     }, 30);
     return () => window.clearTimeout(id);
   }, [open]);
+
+  const eyebrow = result ? 'Lookup Complete' : running ? 'Analyzing' : 'Dispatch';
+  const title = result
+    ? 'Here’s what we found'
+    : running
+      ? progress!.name || progress!.query
+      : 'Look up a company';
+  const bottomLabel = result ? 'Close · Esc' : running ? 'Continue in background →' : 'Cancel · Esc';
 
   const modal = (
     <AnimatePresence>
@@ -86,7 +147,7 @@ export default function DispatchCommandBar({
             transition={{ duration: 0.45, ease: EASE, delay: 0.05 }}
             className="type-meta uppercase tracking-[0.16em] text-oxford/40 mb-phi-3"
           >
-            {result ? 'Lookup Complete' : 'Company Lookup'}
+            {eyebrow}
           </motion.p>
 
           <motion.h1
@@ -95,7 +156,7 @@ export default function DispatchCommandBar({
             transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
             className="type-display text-center text-[clamp(28px,4vw,52px)] font-medium text-oxford leading-[1.1] m-0 max-w-[15ch]"
           >
-            {result ? 'Here’s what we found' : 'Look up a company'}
+            {title}
           </motion.h1>
 
           {result ? (
@@ -106,6 +167,25 @@ export default function DispatchCommandBar({
               className="mt-phi-6 w-full max-w-lg"
             >
               {result}
+            </motion.div>
+          ) : running ? (
+            <motion.div
+              initial={{ opacity: 0, transform: 'translateY(10px)' }}
+              animate={{ opacity: 1, transform: 'translateY(0px)' }}
+              transition={{ duration: 0.45, ease: EASE, delay: 0.16 }}
+              className="mt-phi-3 flex flex-col items-center gap-phi-5"
+            >
+              {progress!.sector ? (
+                <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
+                  {progress!.sector}
+                </p>
+              ) : null}
+              <ProgressSteps progress={progress!} />
+              {message ? (
+                <p className="type-body text-center text-oxford/45 max-w-[40ch]" aria-live="polite">
+                  {message}
+                </p>
+              ) : null}
             </motion.div>
           ) : (
             <>
@@ -145,10 +225,9 @@ export default function DispatchCommandBar({
             transition={{ duration: 0.45, ease: EASE, delay: 0.32 }}
             type="button"
             onClick={onClose}
-            disabled={!closeable}
-            className="mt-phi-7 type-meta uppercase tracking-[0.12em] text-oxford/30 hover:text-oxford/50 btn-interaction cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-40 border-b border-oxford/10 pb-0.5"
+            className="mt-phi-7 type-meta uppercase tracking-[0.12em] text-oxford/30 hover:text-oxford/50 btn-interaction cursor-pointer transition-colors border-b border-oxford/10 pb-0.5"
           >
-            {result ? 'Close · Esc' : 'Cancel · Esc'}
+            {bottomLabel}
           </motion.button>
         </motion.div>
       )}

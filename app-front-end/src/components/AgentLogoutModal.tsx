@@ -149,7 +149,7 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
                   onClick={() => void handleTurnOff()}
                   disabled={busy}
-                  className="w-full btn-aethria disabled:cursor-not-allowed disabled:opacity-40"
+                  className="w-full min-h-[44px] font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/50 hover:text-oxford btn-interaction transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {busy ? 'Pausing pipeline...' : 'Pause pipeline and log out'}
                 </motion.button>
@@ -175,7 +175,7 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
                   onClick={() => void handleTurnOn()}
                   disabled={busy}
-                  className="w-full btn-aethria disabled:cursor-not-allowed disabled:opacity-40"
+                  className="w-full min-h-[44px] font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/50 hover:text-oxford btn-interaction transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {busy ? 'Starting pipeline...' : 'Start pipeline and log out'}
                 </motion.button>

@@ -14,6 +14,7 @@ import GhostTransition from './GhostTransition';
 import SystemIntelligence from './SystemIntelligence';
 import AgentDispatch from './AgentDispatch';
 import DispatchCommandBar from './DispatchCommandBar';
+import LookupReadyToast from './LookupReadyToast';
 import AccountRailPanel from './AccountRailPanel';
 import {
   useScrollLock,
@@ -626,6 +627,27 @@ export default function MainLayout({
     return buildLookupSnapshotProps(pendingLookupMatch, pendingLookup?.queryLabel);
   }, [pendingLookupMatch, pendingLookup?.queryLabel]);
 
+  // In-flight lookup → drives the takeover's progressive reveal (null once decided).
+  const lookupProgress = useMemo(() => {
+    if (!pendingLookup) return null;
+    if (pendingLookupMatch?.partner?.recommendation) return null;
+    return {
+      query: pendingLookup.queryLabel,
+      name: pendingLookupMatch?.scout?.name ?? null,
+      sector: pendingLookupMatch?.scout?.sector ?? null,
+      found: !!pendingLookupMatch,
+      reviewed: !!pendingLookupMatch?.review,
+    };
+  }, [pendingLookup, pendingLookupMatch]);
+
+  // A finished background lookup the analyst hasn't opened yet → "ready" toast.
+  const lookupReady =
+    !commandBarOpen && pendingLookup != null && !pendingLookup.autoOpened
+      ? pendingLookupMatch?.partner?.recommendation
+        ? pendingLookupMatch
+        : null
+      : null;
+
   const handleOpenLookupMemo = useCallback(() => {
     if (!pendingLookupMatch) return;
     const now = new Date().toISOString();
@@ -663,11 +685,18 @@ export default function MainLayout({
         message={lookupMessage}
         onClearMessage={() => setLookupMessage(null)}
         lookupPhase={lookupPhaseLabel}
+        progress={lookupProgress}
         result={
           pendingLookupMatch?.partner?.recommendation && lookupSnapshotProps ? (
             <LookupResultSnapshot {...lookupSnapshotProps} onOpenMemo={handleOpenLookupMemo} />
           ) : null
         }
+      />
+      <LookupReadyToast
+        name={lookupReady?.scout?.name ?? null}
+        recommendation={lookupReady?.partner?.recommendation ?? null}
+        onOpen={handleOpenLookupMemo}
+        onDismiss={() => setPendingLookup((prev) => (prev ? { ...prev, autoOpened: true } : prev))}
       />
       {/* Mobile / tablet top nav — desktop keeps the vertical SystemBar only */}
       {!isDesktop && (
