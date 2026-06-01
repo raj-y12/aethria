@@ -157,20 +157,6 @@
     min-width: 0;
   }
 
-  .aethria-settings-grid {
-    grid-template-rows: minmax(0, 1fr);
-    gap: var(--layout-col-gap);
-    min-height: 0;
-    overflow: hidden;
-    grid-template-columns:
-      minmax(var(--layout-sidebar-min), 22fr)
-      minmax(0, 1fr);
-  }
-
-  .aethria-settings-grid > * {
-    min-width: 0;
-  }
-
   .aethria-queue-surface {
     width: 100%;
     max-width: var(--queue-content-measure);

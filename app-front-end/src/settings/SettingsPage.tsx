@@ -725,8 +725,8 @@ export default function SettingsPage() {
         />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper lg:grid aethria-settings-grid">
-            <aside className="aethria-workspace-sidebar paper-dot-grid hidden h-full min-h-0 max-h-full min-w-0 flex-col overflow-hidden lg:flex">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper lg:flex-row lg:gap-[var(--layout-col-gap)]">
+            <aside className="aethria-workspace-sidebar paper-dot-grid hidden h-full min-h-0 max-h-full w-[18rem] shrink-0 flex-col overflow-hidden lg:flex">
               <div
                 className="paper-dot-grid flex h-full min-h-0 flex-col justify-between overflow-hidden px-phi-4"
                 style={RAIL_CLAMP_PAD}
@@ -782,7 +782,7 @@ export default function SettingsPage() {
               </div>
             </aside>
 
-            <div className="flex min-h-0 min-w-0 flex-col overflow-hidden lg:h-full lg:min-h-0">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:h-full lg:min-h-0">
               <div className="flex items-center justify-between border-b border-oxford/[0.08] px-phi-5 py-phi-4 lg:hidden">
             <div>
               <p className={sectionLabelCls}>Fund Configuration</p>
