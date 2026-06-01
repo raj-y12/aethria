@@ -77,7 +77,7 @@ export default function DashboardPreview() {
               {[
                 {
                   label: 'FUND THESIS',
-                  body: 'Your investment mandate governs every decision. Scouts, reviewers, and partners all operate within your defined criteria — automatically, with no configuration drift.',
+                  body: 'Your investment mandate governs every decision. Scouts, reviewers, and partners operate against defined criteria with visible policy lineage.',
                 },
                 {
                   label: 'ON-DEMAND LOOKUP',

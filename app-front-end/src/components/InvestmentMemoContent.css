@@ -1118,6 +1118,1302 @@
   border-bottom: none;
 }
 
+/* ===================================================================
+   Editorial briefing — a partner-review note, not a dashboard.
+   Strong vertical rhythm, a serif standfirst for typographic contrast,
+   mono labels for structure, generous negative space.
+   =================================================================== */
+
+/* Executive cover */
+.memoCover .memoKicker { margin-bottom: 14px; }
+.memoCoverTitleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px 20px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.memoCoverStandfirst {
+  margin: clamp(12px, 1.6vw, 16px) 0 0;
+  max-width: 34rem;
+  font-family: var(--memo-font-display);
+  font-size: clamp(1rem, 1.35vw, 1.125rem);
+  line-height: 1.5;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--memo-ink-muted);
+  text-wrap: pretty;
+}
+.memoCoverRuling {
+  margin-top: clamp(26px, 3.4vw, 40px);
+  padding-top: clamp(20px, 2.6vw, 28px);
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.10);
+}
+.memoCoverRulingLabel {
+  margin: 0 0 10px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoCoverRulingWord {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  font-weight: 700;
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  color: var(--color-oxford);
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+.memoCoverRulingWord--pass {
+  color: color-mix(in srgb, var(--color-accent) 86%, var(--color-oxford));
+}
+.memoCoverRulingSupport {
+  margin: 12px 0 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  letter-spacing: 0.06em;
+  color: var(--memo-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.memoCoverRulingMeta { color: var(--memo-ink-faint); }
+.memoCoverStatus {
+  margin: 12px 0 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoCoverStatus--escalation {
+  color: color-mix(in srgb, var(--color-accent) 80%, transparent);
+}
+.memoCoverBrief {
+  margin: clamp(22px, 3vw, 30px) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.memoCoverBriefItem {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 0.2fr) minmax(0, 1fr);
+  gap: 8px 20px;
+  align-items: baseline;
+}
+.memoCoverBriefItem dt {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoCoverBriefItem dd {
+  margin: 0;
+  max-width: 34rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.5;
+  color: var(--memo-ink-strong);
+  font-weight: 500;
+}
+
+/* Editorial section rhythm — more air than the report had */
+.memoSnapshotSection,
+.memoCaseSection,
+.memoKillerSection,
+.memoConsensusSection {
+  margin-top: clamp(38px, 5vw, 60px);
+}
+
+/* Snapshot — briefing notes in a single column */
+.memoSnapshot { display: flex; flex-direction: column; gap: clamp(14px, 2vw, 20px); }
+.memoSnapshotRow {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 0.24fr) minmax(0, 1fr);
+  gap: 6px 24px;
+  align-items: baseline;
+}
+.memoSnapshotLabel {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoSnapshotText {
+  margin: 0;
+  max-width: 38rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.5;
+  color: var(--memo-ink-strong);
+}
+
+/* Investment case — observations, lead set in serif for weight */
+.memoCaseList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2vw, 20px);
+  max-width: 38rem;
+}
+.memoCasePoint {
+  position: relative;
+  margin: 0;
+  padding-left: 20px;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.55;
+  color: var(--memo-ink);
+}
+.memoCasePoint::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 9px;
+  height: 1px;
+  background: var(--memo-ink-faint);
+}
+.memoCasePoint--lead {
+  padding-left: 0;
+  font-family: var(--memo-font-display);
+  font-size: clamp(1.1875rem, 2vw, 1.5rem);
+  line-height: 1.34;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--memo-ink-strong);
+}
+.memoCasePoint--lead::before { display: none; }
+
+/* Investment killers — ranked, sharp, no chips */
+.memoKillerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--memo-rule);
+}
+.memoKiller {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+  gap: 0 18px;
+  align-items: start;
+  padding: clamp(14px, 1.8vw, 18px) 0;
+  border-bottom: 1px solid var(--memo-rule);
+}
+.memoKillerRank {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.04em;
+  color: var(--memo-ink-faint);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  padding-top: 0.12em;
+}
+.memoKillerStatement {
+  margin: 0;
+  max-width: 38rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.5;
+  color: var(--memo-ink-strong);
+}
+.memoKiller--high .memoKillerRank {
+  color: color-mix(in srgb, var(--color-accent) 78%, transparent);
+}
+.memoKiller--high .memoKillerStatement { font-weight: 500; }
+
+/* Reviewer consensus — overhear the partner discussion */
+.memoConsensusHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+  margin-bottom: clamp(16px, 2vw, 22px);
+}
+.memoConsensusVerdict {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--color-oxford);
+}
+.memoConsensusVerdictTag {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--memo-ink-faint);
+}
+.memoConsensusSpread {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  letter-spacing: 0.04em;
+  color: var(--memo-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.memoConsensusList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--memo-rule);
+}
+.memoConsensusRow {
+  display: grid;
+  grid-template-columns: 6.5rem 3rem minmax(0, 1fr);
+  gap: 0 clamp(14px, 2vw, 22px);
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--memo-rule);
+}
+.memoConsensusName {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--memo-ink-muted);
+}
+.memoConsensusScore {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-body);
+  font-weight: 700;
+  color: var(--color-oxford);
+  font-variant-numeric: tabular-nums;
+}
+.memoConsensusTake {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: var(--memo-ink);
+}
+
+/* Evidence pack — the depth the brief is freed from carrying */
+.memoEvidenceLead {
+  margin-top: clamp(44px, 6vw, 72px);
+  padding-top: clamp(18px, 2.4vw, 24px);
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.12);
+}
+.memoEvidenceKicker {
+  margin: 0 0 6px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--memo-ink-muted);
+}
+.memoEvidenceNote {
+  margin: 0;
+  max-width: 38rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.55;
+  color: var(--memo-ink-faint);
+}
+
+/* ===================================================================
+   Disclosure group — a calm cluster of expandable depth tucked beneath
+   a spine section. Each entry is a hairline-divided row that opens in
+   place: no boxes, no chrome, one consistent toggle.
+   =================================================================== */
+.memoDiscGroup {
+  margin-top: clamp(22px, 3vw, 34px);
+  border-top: 1px solid var(--memo-rule);
+}
+/* When a group sits directly inside a spine section (e.g. Thesis under
+   Scoring), let the section's own rhythm carry it — no double divider. */
+.memoScoringSection > .memoDiscGroup {
+  margin-top: clamp(26px, 3.4vw, 40px);
+}
+
+/* ===================================================================
+   Scoring — compressed: one-line overall, tight dimension rows,
+   justification only in the panel below the selected row.
+   =================================================================== */
+.memoScoringSection .memoDocScoreScope {
+  padding-top: 0;
+}
+.memoScoringMore.memoDiscGroup {
+  margin-top: clamp(16px, 2.2vw, 22px);
+}
+.memoScoreOverview {
+  max-width: 42rem;
+}
+.memoScoreOverviewLine {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.62);
+  font-variant-numeric: tabular-nums;
+}
+.memoScoreOverviewNote {
+  margin: 8px 0 0;
+  max-width: 40rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: rgba(var(--color-oxford-rgb), 0.52);
+}
+
+.memoAssessmentDimensionStrip {
+  margin-top: clamp(14px, 2vw, 20px);
+}
+.memoScoreBriefList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.memoScoreBriefRow {
+  width: 100%;
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 9px 0;
+  border-top: 1px solid var(--memo-rule);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--color-oxford);
+}
+.memoScoreBriefList li:first-child .memoScoreBriefRow {
+  border-top: none;
+  padding-top: 0;
+}
+.memoScoreBriefRow:focus { outline: none; }
+.memoScoreBriefRow:focus-visible {
+  outline: 2px solid rgba(var(--color-oxford-rgb), 0.22);
+  outline-offset: 2px;
+}
+.memoScoreBriefRow--active .memoScoreBriefName,
+.memoScoreBriefRow--active .memoScoreBriefScore {
+  color: var(--color-oxford);
+  font-weight: 600;
+}
+.memoScoreBriefName {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.48);
+}
+.memoScoreBriefScore {
+  flex: none;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  font-variant-numeric: tabular-nums;
+  color: rgba(var(--color-oxford-rgb), 0.68);
+}
+
+.memoDimensionDetailPanel {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  max-width: 42rem;
+}
+.memoScoreRationale--compact {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+.memoScoreCompactLead {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.48;
+  font-weight: 500;
+  color: var(--memo-ink-strong);
+}
+.memoScoreCompactSub,
+.memoScoreCompactNote {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: rgba(var(--color-oxford-rgb), 0.68);
+}
+.memoScoreCompactNote {
+  color: rgba(var(--color-oxford-rgb), 0.52);
+}
+.memoScoreCompactList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.memoScoreCompactList li {
+  position: relative;
+  padding-left: 0.75rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.45;
+  color: rgba(var(--color-oxford-rgb), 0.74);
+}
+.memoScoreCompactList li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: rgba(var(--color-oxford-rgb), 0.32);
+}
+.memoScoreCompactMore {
+  color: rgba(var(--color-oxford-rgb), 0.42);
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.06em;
+}
+.memoScoreCompactKicker {
+  margin: 0 0 4px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.38);
+}
+.memoScoreCompactDrivers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.memoScoreCompactDrivers li {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: baseline;
+  font-size: var(--memo-size-secondary);
+  line-height: 1.4;
+}
+.memoScoreCompactDriverLabel {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.04em;
+  color: rgba(var(--color-oxford-rgb), 0.52);
+}
+.memoScoreCompactDriverScore {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  font-variant-numeric: tabular-nums;
+  color: rgba(var(--color-oxford-rgb), 0.62);
+}
+.memoScoreCompactDriverText {
+  color: rgba(var(--color-oxford-rgb), 0.68);
+}
+.memoScoreCompactDetails {
+  margin: 0;
+}
+.memoScoreCompactDetails summary {
+  cursor: pointer;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.42);
+  list-style: none;
+}
+.memoScoreCompactDetails summary::-webkit-details-marker { display: none; }
+.memoScoreCompactDetails[open] summary {
+  margin-bottom: 6px;
+  color: rgba(var(--color-oxford-rgb), 0.55);
+}
+.memoScoreCompactDriversBlock {
+  margin-top: 2px;
+}
+
+/* ===================================================================
+   Scoring — compressed: one-line overall, tight dimension rows,
+   justification only in the panel below the selected row.
+   =================================================================== */
+.memoScoringSection .memoDocScoreScope {
+  padding-top: 0;
+}
+.memoScoringMore.memoDiscGroup {
+  margin-top: clamp(16px, 2.2vw, 22px);
+}
+.memoScoreOverview {
+  max-width: 42rem;
+}
+.memoScoreOverviewLine {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.62);
+  font-variant-numeric: tabular-nums;
+}
+.memoScoreOverviewNote {
+  margin: 8px 0 0;
+  max-width: 40rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: rgba(var(--color-oxford-rgb), 0.52);
+}
+
+.memoAssessmentDimensionStrip {
+  margin-top: clamp(14px, 2vw, 20px);
+}
+.memoScoreBriefList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.memoScoreBriefRow {
+  width: 100%;
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 9px 0;
+  border-top: 1px solid var(--memo-rule);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--color-oxford);
+}
+.memoScoreBriefRowTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+.memoScoreBriefNarrative {
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(var(--color-oxford-rgb), 0.55);
+}
+.memoScoreBriefList li:first-child .memoScoreBriefRow {
+  border-top: none;
+  padding-top: 0;
+}
+.memoScoreBriefRow:focus { outline: none; }
+.memoScoreBriefRow:focus-visible {
+  outline: 2px solid rgba(var(--color-oxford-rgb), 0.22);
+  outline-offset: 2px;
+}
+.memoScoreBriefRow--active .memoScoreBriefName,
+.memoScoreBriefRow--active .memoScoreBriefScore {
+  color: var(--color-oxford);
+  font-weight: 600;
+}
+.memoScoreBriefName {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.48);
+}
+.memoScoreBriefScore {
+  flex: none;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  font-variant-numeric: tabular-nums;
+  color: rgba(var(--color-oxford-rgb), 0.68);
+}
+
+.memoDimensionDetailPanel {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  max-width: 42rem;
+}
+.memoScoreRationale--compact {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+.memoScoreCompactLead {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.48;
+  font-weight: 500;
+  color: var(--memo-ink-strong);
+}
+.memoScoreCompactSub,
+.memoScoreCompactNote {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: rgba(var(--color-oxford-rgb), 0.68);
+}
+.memoScoreCompactNote {
+  color: rgba(var(--color-oxford-rgb), 0.52);
+}
+.memoScoreCompactList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.memoScoreCompactList li {
+  position: relative;
+  padding-left: 0.75rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.45;
+  color: rgba(var(--color-oxford-rgb), 0.74);
+}
+.memoScoreCompactList li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: rgba(var(--color-oxford-rgb), 0.32);
+}
+.memoScoreBasis {
+  margin: 2px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.memoScoreBasisRow {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 0.28fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+}
+.memoScoreBasisRow dt {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.38);
+}
+.memoScoreBasisRow dd {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.48;
+  color: rgba(var(--color-oxford-rgb), 0.74);
+}
+.memoScoreBasisRow--gap dd {
+  color: rgba(var(--color-oxford-rgb), 0.62);
+}
+.memoScoreCompactMore {
+  color: rgba(var(--color-oxford-rgb), 0.42);
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.06em;
+}
+.memoScoreCompactKicker {
+  margin: 0 0 4px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.38);
+}
+.memoScoreCompactDrivers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.memoScoreCompactDrivers li {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: baseline;
+  font-size: var(--memo-size-secondary);
+  line-height: 1.4;
+}
+.memoScoreCompactDriverLabel {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.04em;
+  color: rgba(var(--color-oxford-rgb), 0.52);
+}
+.memoScoreCompactDriverScore {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  font-variant-numeric: tabular-nums;
+  color: rgba(var(--color-oxford-rgb), 0.62);
+}
+.memoScoreCompactDriverText {
+  color: rgba(var(--color-oxford-rgb), 0.68);
+}
+.memoScoreCompactDetails {
+  margin: 0;
+}
+.memoScoreCompactDetails summary {
+  cursor: pointer;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.42);
+  list-style: none;
+}
+.memoScoreCompactDetails summary::-webkit-details-marker { display: none; }
+.memoScoreCompactDetails[open] summary {
+  margin-bottom: 6px;
+  color: rgba(var(--color-oxford-rgb), 0.55);
+}
+.memoScoreCompactDriversBlock {
+  margin-top: 2px;
+}
+.memoDiscGroup .memoDisclosureSection.memoDocSection {
+  margin-top: 0;
+  padding: 0;
+  border-top: 1px solid var(--memo-rule);
+}
+.memoDiscGroup .memoDisclosureSection:first-child {
+  border-top: none;
+}
+.memoDiscGroup .memoDisclosureToggle {
+  padding: clamp(15px, 2vw, 21px) 0;
+  align-items: baseline;
+}
+.memoDiscGroup .memoDisclosureBody {
+  padding-top: 0;
+  padding-bottom: clamp(20px, 2.8vw, 32px);
+}
+.memoDiscGroup .memoDisclosureTitle {
+  color: rgba(var(--color-oxford-rgb), 0.66);
+}
+.memoDiscGroup .memoDisclosureToggle:hover .memoDisclosureTitle {
+  color: var(--color-oxford);
+}
+
+/* Inline mono stat line — thesis alignment */
+.memoEvStatLine {
+  margin: 0 0 clamp(16px, 2vw, 22px);
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.62);
+}
+
+/* Risk register — single column, decisive items */
+.memoEvRiskList {
+  display: flex;
+  flex-direction: column;
+}
+.memoEvRisk {
+  padding: clamp(15px, 1.9vw, 19px) 0;
+  border-top: 1px solid var(--memo-rule);
+}
+.memoEvRisk:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+.memoEvRiskHead {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px 13px;
+  flex-wrap: wrap;
+}
+.memoEvRiskSeverity {
+  flex: none;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.40);
+}
+.memoEvRisk--high .memoEvRiskSeverity {
+  color: var(--color-accent);
+}
+.memoEvRiskTitle {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  font-weight: 600;
+  line-height: 1.42;
+  color: var(--memo-ink-strong);
+}
+.memoEvRiskWhy {
+  margin: 7px 0 0;
+  max-width: 42rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.6;
+  color: rgba(var(--color-oxford-rgb), 0.74);
+}
+.memoEvRiskMeta {
+  margin: 8px 0 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.05em;
+  color: rgba(var(--color-oxford-rgb), 0.38);
+}
+
+/* Sources — quiet supporting line under each reference */
+.memoSourceSupport {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: rgba(var(--color-oxford-rgb), 0.42);
+}
+
+.memoRulingSteps { margin-bottom: 18px; max-width: 38rem; }
+
+@media (max-width: 640px) {
+  .memoCoverBriefItem,
+  .memoSnapshotRow { grid-template-columns: 1fr; gap: 4px; }
+  .memoConsensusRow { grid-template-columns: 4rem 1fr; }
+  .memoConsensusTake { grid-column: 1 / -1; }
+}
+
+/* ===================================================================
+   Editorial briefing — a partner-review note, not a dashboard.
+   Strong vertical rhythm, a serif standfirst for typographic contrast,
+   mono labels for structure, generous negative space.
+   =================================================================== */
+
+/* Executive cover */
+.memoCover .memoKicker { margin-bottom: 14px; }
+.memoCoverTitleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px 20px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.memoCoverStandfirst {
+  margin: clamp(12px, 1.6vw, 16px) 0 0;
+  max-width: 34rem;
+  font-family: var(--memo-font-display);
+  font-size: clamp(1rem, 1.35vw, 1.125rem);
+  line-height: 1.5;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--memo-ink-muted);
+  text-wrap: pretty;
+}
+.memoCoverRuling {
+  margin-top: clamp(26px, 3.4vw, 40px);
+  padding-top: clamp(20px, 2.6vw, 28px);
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.10);
+}
+.memoCoverRulingLabel {
+  margin: 0 0 10px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoCoverRulingWord {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  font-weight: 700;
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  color: var(--color-oxford);
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+.memoCoverRulingWord--pass {
+  color: color-mix(in srgb, var(--color-accent) 86%, var(--color-oxford));
+}
+.memoCoverRulingSupport {
+  margin: 12px 0 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  letter-spacing: 0.06em;
+  color: var(--memo-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.memoCoverRulingMeta { color: var(--memo-ink-faint); }
+.memoCoverStatus {
+  margin: 12px 0 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoCoverStatus--escalation {
+  color: color-mix(in srgb, var(--color-accent) 80%, transparent);
+}
+.memoCoverBrief {
+  margin: clamp(22px, 3vw, 30px) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.memoCoverBriefItem {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 0.2fr) minmax(0, 1fr);
+  gap: 8px 20px;
+  align-items: baseline;
+}
+.memoCoverBriefItem dt {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoCoverBriefItem dd {
+  margin: 0;
+  max-width: 34rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.5;
+  color: var(--memo-ink-strong);
+  font-weight: 500;
+}
+
+/* Editorial section rhythm — more air than the report had */
+.memoSnapshotSection,
+.memoCaseSection,
+.memoKillerSection,
+.memoConsensusSection {
+  margin-top: clamp(38px, 5vw, 60px);
+}
+
+/* Snapshot — briefing notes in a single column */
+.memoSnapshot { display: flex; flex-direction: column; gap: clamp(14px, 2vw, 20px); }
+.memoSnapshotRow {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 0.24fr) minmax(0, 1fr);
+  gap: 6px 24px;
+  align-items: baseline;
+}
+.memoSnapshotLabel {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoSnapshotText {
+  margin: 0;
+  max-width: 38rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.5;
+  color: var(--memo-ink-strong);
+}
+
+/* Investment case — observations, lead set in serif for weight */
+.memoCaseList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2vw, 20px);
+  max-width: 38rem;
+}
+.memoCasePoint {
+  position: relative;
+  margin: 0;
+  padding-left: 20px;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.55;
+  color: var(--memo-ink);
+}
+.memoCasePoint::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 9px;
+  height: 1px;
+  background: var(--memo-ink-faint);
+}
+.memoCasePoint--lead {
+  padding-left: 0;
+  font-family: var(--memo-font-display);
+  font-size: clamp(1.1875rem, 2vw, 1.5rem);
+  line-height: 1.34;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--memo-ink-strong);
+}
+.memoCasePoint--lead::before { display: none; }
+
+/* Investment killers — ranked, sharp, no chips */
+.memoKillerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--memo-rule);
+}
+.memoKiller {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+  gap: 0 18px;
+  align-items: start;
+  padding: clamp(14px, 1.8vw, 18px) 0;
+  border-bottom: 1px solid var(--memo-rule);
+}
+.memoKillerRank {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.04em;
+  color: var(--memo-ink-faint);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  padding-top: 0.12em;
+}
+.memoKillerStatement {
+  margin: 0;
+  max-width: 38rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.5;
+  color: var(--memo-ink-strong);
+}
+.memoKiller--high .memoKillerRank {
+  color: color-mix(in srgb, var(--color-accent) 78%, transparent);
+}
+.memoKiller--high .memoKillerStatement { font-weight: 500; }
+
+/* Reviewer consensus — overhear the partner discussion */
+.memoConsensusHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+  margin-bottom: clamp(16px, 2vw, 22px);
+}
+.memoConsensusVerdict {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--color-oxford);
+}
+.memoConsensusVerdictTag {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--memo-ink-faint);
+}
+.memoConsensusSpread {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  letter-spacing: 0.04em;
+  color: var(--memo-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.memoConsensusList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--memo-rule);
+}
+.memoConsensusRow {
+  display: grid;
+  grid-template-columns: 6.5rem 3rem minmax(0, 1fr);
+  gap: 0 clamp(14px, 2vw, 22px);
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--memo-rule);
+}
+.memoConsensusName {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--memo-ink-muted);
+}
+.memoConsensusScore {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-body);
+  font-weight: 700;
+  color: var(--color-oxford);
+  font-variant-numeric: tabular-nums;
+}
+.memoConsensusTake {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: var(--memo-ink);
+}
+
+/* Evidence pack — the depth the brief is freed from carrying */
+.memoEvidenceLead {
+  margin-top: clamp(44px, 6vw, 72px);
+  padding-top: clamp(18px, 2.4vw, 24px);
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.12);
+}
+.memoEvidenceKicker {
+  margin: 0 0 6px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--memo-ink-muted);
+}
+.memoEvidenceNote {
+  margin: 0;
+  max-width: 38rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.55;
+  color: var(--memo-ink-faint);
+}
+
+/* ===================================================================
+   Disclosure group — a calm cluster of expandable depth tucked beneath
+   a spine section. Each entry is a hairline-divided row that opens in
+   place: no boxes, no chrome, one consistent toggle.
+   =================================================================== */
+.memoDiscGroup {
+  margin-top: clamp(22px, 3vw, 34px);
+  border-top: 1px solid var(--memo-rule);
+}
+/* When a group sits directly inside a spine section (e.g. Thesis under
+   Scoring), let the section's own rhythm carry it — no double divider. */
+.memoScoringSection > .memoDiscGroup {
+  margin-top: clamp(26px, 3.4vw, 40px);
+}
+.memoDiscGroup .memoDisclosureSection.memoDocSection {
+  margin-top: 0;
+  padding: 0;
+  border-top: 1px solid var(--memo-rule);
+}
+.memoDiscGroup .memoDisclosureSection:first-child {
+  border-top: none;
+}
+.memoDiscGroup .memoDisclosureToggle {
+  padding: clamp(15px, 2vw, 21px) 0;
+  align-items: baseline;
+}
+.memoDiscGroup .memoDisclosureBody {
+  padding-top: 0;
+  padding-bottom: clamp(20px, 2.8vw, 32px);
+}
+.memoDiscGroup .memoDisclosureTitle {
+  color: rgba(var(--color-oxford-rgb), 0.66);
+}
+.memoDiscGroup .memoDisclosureToggle:hover .memoDisclosureTitle {
+  color: var(--color-oxford);
+}
+
+/* Inline mono stat line — thesis alignment */
+.memoEvStatLine {
+  margin: 0 0 clamp(16px, 2vw, 22px);
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.62);
+}
+
+/* Risk register — single column, decisive items */
+.memoEvRiskList {
+  display: flex;
+  flex-direction: column;
+}
+.memoEvRisk {
+  padding: clamp(15px, 1.9vw, 19px) 0;
+  border-top: 1px solid var(--memo-rule);
+}
+.memoEvRisk:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+.memoEvRiskHead {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px 13px;
+  flex-wrap: wrap;
+}
+.memoEvRiskSeverity {
+  flex: none;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.40);
+}
+.memoEvRisk--high .memoEvRiskSeverity {
+  color: var(--color-accent);
+}
+.memoEvRiskTitle {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  font-weight: 600;
+  line-height: 1.42;
+  color: var(--memo-ink-strong);
+}
+.memoEvRiskWhy {
+  margin: 7px 0 0;
+  max-width: 42rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.6;
+  color: rgba(var(--color-oxford-rgb), 0.74);
+}
+.memoEvRiskMeta {
+  margin: 8px 0 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.05em;
+  color: rgba(var(--color-oxford-rgb), 0.38);
+}
+
+/* Sources — quiet supporting line under each reference */
+.memoSourceSupport {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: rgba(var(--color-oxford-rgb), 0.42);
+}
+
+.memoRulingSteps { margin-bottom: 18px; max-width: 38rem; }
+
+@media (max-width: 640px) {
+  .memoCoverBriefItem,
+  .memoSnapshotRow { grid-template-columns: 1fr; gap: 4px; }
+  .memoConsensusRow { grid-template-columns: 4rem 1fr; }
+  .memoConsensusTake { grid-column: 1 / -1; }
+}
+
 /* === Section heading === */
 .memoDocSectionHead {
   font-family: var(--memo-font-mono);
@@ -1257,13 +2553,14 @@
   min-width: 0;
 }
 .memoAssessmentReadouts {
-  margin-top: clamp(34px, 5vw, 58px);
+  margin-top: clamp(28px, 4vw, 44px);
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(20px, 3vw, 34px);
+  grid-template-columns: 1fr;
+  gap: clamp(22px, 3vw, 32px);
 }
 .memoAssessmentReadout {
   min-width: 0;
+  max-width: 42rem;
 }
 .memoAssessmentReadout .memoList {
   gap: 10px;
@@ -2295,6 +3592,125 @@
   .memoDocDimensionTitleGroup { min-height: 0; }
   .memoDocScorecardRow { grid-template-columns: 1fr; }
   .memoDocOverallScoreRow { align-items: flex-start; }
+  .memoScoreBasisRow {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+.memoPrecedentStrip {
+  margin-top: var(--phi-4);
+  padding-top: var(--phi-3);
+  border-top: 1px solid color-mix(in srgb, var(--color-oxford) 10%, transparent);
+}
+
+.memoPrecedentStripHead {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-oxford) 50%, transparent);
+  margin: 0 0 var(--phi-2);
+}
+
+.memoPrecedentStripList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--phi-3);
+}
+
+.memoPrecedentStripLink {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--phi-3);
+  text-decoration: none;
+  color: var(--color-oxford);
+}
+
+.memoPrecedentStripLink:hover .memoPrecedentStripName {
+  text-decoration: underline;
+}
+
+.memoPrecedentStripName {
+  font-weight: 500;
+}
+
+.memoPrecedentStripDecision {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--color-oxford) 55%, transparent);
+}
+
+.memoPrecedentStripRationale,
+.memoPrecedentStripMeta {
+  margin: var(--phi-1) 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--color-oxford) 62%, transparent);
+}
+
+.memoPrecedentStripMeta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.memoShareBanner {
+  margin: var(--phi-3) 0 0;
+  padding: var(--phi-2) var(--phi-3);
+  border: 1px solid color-mix(in srgb, var(--color-oxford) 12%, transparent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-oxford) 55%, transparent);
+}
+
+.memoPortfolioContext {
+  margin: var(--phi-4) 0 0;
+  padding-top: var(--phi-3);
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.1);
+}
+.memoPortfolioContextHead {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.45);
+  margin: 0 0 var(--phi-2);
+}
+.memoPortfolioContextList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--phi-2);
+}
+.memoPortfolioContextItem {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px 12px;
+  align-items: baseline;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.memoPortfolioContextType {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.5);
+}
+.memoPortfolioContextWhen {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgba(var(--color-oxford-rgb), 0.4);
 }
 @media (max-width: 640px) {
   .memoDocHeader { flex-direction: column; gap: 10px; }

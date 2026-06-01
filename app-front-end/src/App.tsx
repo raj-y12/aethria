@@ -101,26 +101,21 @@ function App() {
       return;
     }
     let cancelled = false;
-    const fallback = setTimeout(() => {
-      if (!cancelled) setTokenReady(true);
-    }, 5000);
 
-    async function tryGetToken(retries = 5) {
-      for (let i = 0; i < retries && !cancelled; i++) {
+    async function waitForToken() {
+      while (!cancelled) {
         const t = await getToken();
         if (t) {
           if (!cancelled) setTokenReady(true);
           return;
         }
-        await new Promise((r) => setTimeout(r, 300));
+        await new Promise((r) => setTimeout(r, 500));
       }
-      if (!cancelled) setTokenReady(true);
     }
-    tryGetToken();
+    waitForToken();
 
     return () => {
       cancelled = true;
-      clearTimeout(fallback);
     };
   }, [isSignedIn, getToken]);
 

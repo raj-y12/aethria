@@ -4,6 +4,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+@pytest.fixture(autouse=True)
+def _isolated_admin_security_state(monkeypatch):
+    import api
+    from security.rate_limiter import InMemorySecurityStore
+
+    api._admin_login_attempts.clear()
+    monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
+
+
 def test_admin_token_round_trip(monkeypatch):
     from admin_auth import issue_admin_token, verify_admin_token
 
@@ -161,4 +170,3 @@ def test_admin_overview_uses_admin_service_with_valid_token(monkeypatch):
     assert response.json()["users"] == [{"user_id": "user_a"}]
     assert events[0]["event"] == "admin_overview"
     assert events[0]["success"] is True
-

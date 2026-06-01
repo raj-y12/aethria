@@ -1170,6 +1170,7 @@ export default function MainLayout({
                             onDecisionResolved={handleDecisionResolved}
                             fundConfiguration={fundConfiguration}
                             peerStartups={startups}
+                            portfolioSignals={signals}
                           />
                         </motion.div>
                       </PanelShell>

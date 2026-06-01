@@ -338,7 +338,7 @@ export default function HomePage() {
                 <span className="italic font-normal opacity-80 text-[0.92em]">The system obeys.</span>
               </h2>
               <p className="mt-5 max-w-[44ch] font-sans text-[15px] leading-[1.7] text-[rgba(244,241,234,0.6)]">
-                Upload or write your investment thesis. Every scout, reviewer, and partner decision is gated against it — automatically, without re-configuration.
+                Upload or write your investment thesis. Every scout, reviewer, and partner decision is gated against that mandate with visible lineage.
               </p>
 
               <div className="mt-8" aria-hidden>
@@ -410,4 +410,3 @@ export default function HomePage() {
     </div>
   );
 }
-

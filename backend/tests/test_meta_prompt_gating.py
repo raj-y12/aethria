@@ -76,7 +76,11 @@ def test_mutator_apply_one_skips_set_prompt_without_auto_apply(monkeypatch):
 def test_mutator_apply_one_calls_set_prompt_when_auto_apply(monkeypatch):
     monkeypatch.setenv("META_AGENT_PROMPT_AUTO_APPLY", "true")
     signal = {"pipeline_health": {}}
-    mutator = PromptMutator(signal, cycle_number=8, user_id="test-user-meta-2")
+    with patch(
+        "utils.settings_loader.load_settings",
+        return_value={"workspace": {"meta_prompt_auto_apply": True}},
+    ):
+        mutator = PromptMutator(signal, cycle_number=8, user_id="test-user-meta-2")
     mock_scout = MagicMock()
     mock_scout.scout_type = "market_driven"
     mock_scout.system_prompt = "scout baseline " * 40

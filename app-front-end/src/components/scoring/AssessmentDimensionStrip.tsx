@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ScoringDimensionKey, ScoringPresentation, StructuredScoring } from '../../types/startup';
 import { normalizeConfidence } from './ConfidenceIndicator';
 import DimensionCard from './DimensionCard';
+import { dimensionBriefTake } from '../../lib/scoringRationale';
 
 export type AssessmentDimensionDef = {
   key: ScoringDimensionKey;
@@ -17,7 +18,8 @@ interface AssessmentDimensionStripProps {
 }
 
 function dimensionScoreLabel(score: number, confidence: number | null | undefined): string {
-  const lowConfidence = confidence != null && normalizeConfidence(confidence) != null && normalizeConfidence(confidence)! < 0.4;
+  const normalized = normalizeConfidence(confidence);
+  const lowConfidence = normalized != null && normalized < 0.4;
   return lowConfidence ? String(Math.round(score)) : score.toFixed(1);
 }
 
@@ -40,7 +42,7 @@ export default function AssessmentDimensionStrip({
 
   return (
     <div className="memoAssessmentDimensionStrip">
-      <div className="memoDocScorecardRow" role="tablist" aria-label="Assessment dimensions">
+      <ul className="memoScoreBriefList" role="tablist" aria-label="Assessment dimensions">
         {dimensions.map((dim) => {
           const dimension = scoring[dim.key];
           const presDim = presentation?.dimensions?.find((d) => d.id === dim.key);
@@ -48,28 +50,28 @@ export default function AssessmentDimensionStrip({
           const scoreText = presDim
             ? presDim.score.toFixed(1)
             : dimensionScoreLabel(dimension.score, dimension.confidence);
+          const narrative = dimensionBriefTake(dimension, presDim);
           return (
-            <button
-              key={dim.key}
-              type="button"
-              role="tab"
-              id={`${contentKey}-dim-tab-${dim.key}`}
-              aria-selected={selected}
-              aria-controls={`${dim.id}-detail`}
-              className="memoDocScoreBtn"
-              onClick={() => setActiveKey(dim.key)}
-            >
-              <span className="memoDocScoreDim">{dim.label}</span>
-              <span className="memoDocScoreVal">{scoreText}</span>
-              {selected ? (
-                <div className="memoDocScoreUnderline" aria-hidden />
-              ) : (
-                <div className="memoDocScoreColSpacer" aria-hidden />
-              )}
-            </button>
+            <li key={dim.key}>
+              <button
+                type="button"
+                role="tab"
+                id={`${contentKey}-dim-tab-${dim.key}`}
+                aria-selected={selected}
+                aria-controls={`${dim.id}-detail`}
+                className={`memoScoreBriefRow${selected ? ' memoScoreBriefRow--active' : ''}`}
+                onClick={() => setActiveKey(dim.key)}
+              >
+                <span className="memoScoreBriefRowTop">
+                  <span className="memoScoreBriefName">{dim.label}</span>
+                  <span className="memoScoreBriefScore">{scoreText}</span>
+                </span>
+                <span className="memoScoreBriefNarrative">{narrative}</span>
+              </button>
+            </li>
           );
         })}
-      </div>
+      </ul>
       <DimensionCard
         key={`${contentKey}-${activeDef.key}`}
         variant="detail"

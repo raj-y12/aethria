@@ -2,7 +2,7 @@ import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useSt
 import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
 import './InvestmentMemoContent.css';
-import type { Review, ScoringDimensionKey, Startup, AethriaView } from '../types/startup';
+import type { Review, ScoringDimensionKey, SignalItem, SingleReview, Startup } from '../types/startup';
 import { normalizeStructuredScoring } from '../lib/reviewScoring';
 import {
   buildMemoPDF,
@@ -17,6 +17,9 @@ import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import ScoreOverview from './scoring/ScoreOverview';
 import AssessmentDimensionStrip from './scoring/AssessmentDimensionStrip';
+import MemoRulingSection from './memo/MemoRulingSection';
+import MemoPrecedentStrip from './memo/MemoPrecedentStrip';
+import MemoPortfolioContext from './memo/MemoPortfolioContext';
 import { DECISION_BADGE_LABEL } from './DecisionBadge';
 import { getDecisionBadgeVariant, type DecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 import { resolveEscalation } from '../api/escalations';
@@ -25,7 +28,7 @@ import {
   isDealDecided,
   type RulingDecision,
 } from '../lib/dealState';
-import { extractAdverseRegister, type AdverseRegisterItem } from '../lib/adverseRegister';
+import { extractAdverseRegister, type AdverseRegisterItem, type AdverseSeverity } from '../lib/adverseRegister';
 import {
   createDefaultFundConfiguration,
   shouldGateRisk,
@@ -54,27 +57,6 @@ function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | null): St
   };
 }
 
-function memoSourceRows(startup: Startup) {
-  const structured = startup.scout.source_evidence ?? [];
-  if (structured.length > 0) {
-    return structured.map((item) => ({
-      reference: item.reference,
-      supports: item.supports || 'Company evidence',
-      href: item.url || memoReferenceHref(item.reference),
-      label: memoReferenceLabel(item.reference),
-    }));
-  }
-  return (startup.scout.references ?? [])
-    .map((r) => String(r ?? '').trim())
-    .filter(Boolean)
-    .map((ref) => ({
-      reference: ref,
-      supports: 'Company evidence',
-      href: memoReferenceHref(ref),
-      label: memoReferenceLabel(ref),
-    }));
-}
-
 const MEMO_GENERATING_DETAIL_AWAITING =
   'Reviewers are scoring this company against your fund thesis. Memo sections appear as outputs land.';
 const MEMO_GENERATING_DETAIL_UNDECIDED =
@@ -97,6 +79,27 @@ function memoGeneratingDetailForVariant(variant: DecisionBadgeVariant): string {
   }
 }
 
+function memoSourceRows(startup: Startup) {
+  const structured = startup.scout.source_evidence ?? [];
+  if (structured.length > 0) {
+    return structured.map((item) => ({
+      reference: item.reference,
+      supports: item.supports || 'Company evidence',
+      href: item.url || memoReferenceHref(item.reference),
+      label: memoReferenceLabel(item.reference),
+    }));
+  }
+  return (startup.scout.references ?? [])
+    .map((r) => String(r ?? '').trim())
+    .filter(Boolean)
+    .map((ref) => ({
+      reference: ref,
+      supports: 'Company evidence',
+      href: memoReferenceHref(ref),
+      label: memoReferenceLabel(ref),
+    }));
+}
+
 function reviewHasThesisAlignment(r: Review | null | undefined): boolean {
   if (!r) return false;
   return (
@@ -111,10 +114,13 @@ export interface InvestmentMemoContentProps {
   startup: Startup | null;
   onClose?: () => void;
   embedded?: boolean;
+  /** Share link / co-GP view: memo readable, ruling controls hidden. */
+  readOnly?: boolean;
   onMemoPipelineReady?: () => void;
   onDecisionResolved?: (startup: Startup) => void;
   fundConfiguration?: FundConfiguration;
   peerStartups?: Startup[];
+  portfolioSignals?: SignalItem[];
 }
 
 export interface InvestmentMemoContentHandle {
@@ -145,17 +151,6 @@ function normalizeMemoKey(value: unknown): string {
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-function uniqueMemoRows<T extends { val?: string | null }>(rows: T[]): T[] {
-  const seen = new Set<string>();
-  return rows.filter((row) => {
-    const key = normalizeMemoKey(row.val);
-    if (!key) return false;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 const MEMO_NUMBER_TOKEN_REGEX = /(?:[$€£¥]\s*)?\d[\d,]*(?:\.\d+)?(?:%|x|X|k|K|m|M|b|B)?(?:\/\d+(?:\.\d+)?)?/g;
@@ -369,6 +364,132 @@ function sourceSupportLine(source: ReturnType<typeof memoSourceRows>[number], sh
   return `${source.supports} · Scout confidence signal`;
 }
 
+const REVIEWER_LABELS: Record<string, string> = {
+  DefaultReviewer: 'Default',
+  SkepticalReviewer: 'Skeptical',
+  OpportunistReviewer: 'Opportunist',
+};
+
+const SENTENCE_BOUNDARY = /(?<=[.!?])\s+/;
+
+function collapseWhitespace(value: unknown): string {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function clipText(value: unknown, maxLen: number): string {
+  const text = collapseWhitespace(value);
+  if (text.length <= maxLen) return text;
+  return `${text.slice(0, maxLen - 1).replace(/[\s,;:.]+$/, '')}…`;
+}
+
+function firstSentence(value: unknown, maxLen = 180): string {
+  const text = collapseWhitespace(value);
+  if (!text) return '';
+  const first = text.split(SENTENCE_BOUNDARY)[0]?.trim() || text;
+  return clipText(first, maxLen);
+}
+
+function reviewerMeanScore(rv: SingleReview): number | null {
+  const vals = [
+    rv.market_score,
+    rv.product_score,
+    rv.technical_score,
+    rv.execution_score,
+    rv.defensibility_score,
+  ]
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v));
+  if (!vals.length) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+/**
+ * Investment case observations — partner-voiced reasons this might matter, drawn from
+ * narrative fields only (no scoring terms or system metadata). Deduped, capped at five.
+ */
+function buildInvestmentCase(startup: Startup, exclude: string): string[] {
+  const candidates = [
+    startup.partner?.why_this_matters,
+    startup.partner?.market_insight,
+    startup.partner?.product_edge,
+    startup.partner?.traction_signals,
+    startup.review?.aethria_view?.thesis_fit_line,
+    ...(startup.review?.investment_thesis ?? []),
+    ...(startup.partner?.decision_drivers ?? []),
+    startup.scout.why_now,
+    startup.scout.primary_thesis,
+  ];
+  const seen = new Set<string>();
+  const excludeKey = normalizeMemoKey(exclude);
+  if (excludeKey) seen.add(excludeKey);
+  const points: string[] = [];
+  for (const candidate of candidates) {
+    const text = collapseWhitespace(candidate);
+    if (!text) continue;
+    const key = normalizeMemoKey(text);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    points.push(clipText(text, 240));
+    if (points.length >= 5) break;
+  }
+  return points;
+}
+
+function buildSnapshotRows(startup: Startup, blocker: string): Array<{ label: string; text: string }> {
+  return [
+    {
+      label: 'What it does',
+      text: firstNonEmpty(startup.scout.solution, startup.scout.one_line, startup.partner?.snapshot?.one_liner),
+    },
+    {
+      label: 'Who it serves',
+      text: firstNonEmpty(startup.scout.target_users, startup.scout.problem),
+    },
+    {
+      label: 'Why Aethria flagged it',
+      text: firstNonEmpty(
+        startup.partner?.snapshot?.key_signal,
+        startup.partner?.decision_drivers?.[0],
+        startup.scout.why_now,
+        startup.partner?.why_this_matters,
+      ),
+    },
+    { label: 'What limits conviction', text: blocker },
+  ]
+    .map((row) => ({ label: row.label, text: clipText(row.text, 220) }))
+    .filter((row) => row.text);
+}
+
+interface MemoKiller {
+  statement: string;
+  severity: AdverseSeverity;
+}
+
+/** Ranked, deduped, compressed conviction-limiters. One strong statement beats three similar warnings. */
+function buildKillers(adverse: AdverseRegisterItem[], fallbackRisks: string[]): MemoKiller[] {
+  const seen = new Set<string>();
+  const killers: MemoKiller[] = [];
+  for (const item of adverse) {
+    const statement = clipText(item.whyItMatters || item.title, 220);
+    const key = normalizeMemoKey(statement);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    killers.push({ statement, severity: item.severity });
+    if (killers.length >= 4) break;
+  }
+  if (!killers.length) {
+    for (const risk of fallbackRisks) {
+      const statement = clipText(risk, 220);
+      const key = normalizeMemoKey(statement);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      killers.push({ statement, severity: 'medium' });
+      if (killers.length >= 3) break;
+    }
+  }
+  return killers;
+}
+
 function MemoDisclosureSection({
   id,
   title,
@@ -406,43 +527,29 @@ function MemoDisclosureSection({
   );
 }
 
-function MemoPlainSection({
-  id,
-  title,
-  children,
-  className = '',
-}: {
-  id: string;
-  title: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={`memoDocSection ${className}`.trim()} aria-labelledby={`${id}-title`}>
-      <h2 className="memoDocSectionHead" id={`${id}-title`}>{title}</h2>
-      {children}
-    </section>
-  );
-}
-
 const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, InvestmentMemoContentProps>(function InvestmentMemoContent(
-  { startup, onClose, embedded = false, onMemoPipelineReady, onDecisionResolved, fundConfiguration, peerStartups = [] },
+  {
+    startup,
+    onClose,
+    embedded = false,
+    readOnly = false,
+    onMemoPipelineReady,
+    onDecisionResolved,
+    fundConfiguration,
+    peerStartups = [],
+    portfolioSignals = [],
+  },
   ref
 ) {
   const config = fundConfiguration ?? createDefaultFundConfiguration();
   const reduceMotion = usePrefersReducedMotion();
   const wrapperCls = embedded ? 'memoPanel memoPanel--embedded' : 'memoPanel';
   const [selectedReviewerIdx, setSelectedReviewerIdx] = useState(0);
-  const [sourcesOpen, setSourcesOpen] = useState(false);
-  const [pipelineLogOpen, setPipelineLogOpen] = useState(false);
-  const [adverseOpen, setAdverseOpen] = useState(false);
-  const [reasoningOpen, setReasoningOpen] = useState(false);
   const [risksReviewed, setRisksReviewed] = useState(false);
   const [rulingDecision, setRulingDecision] = useState<RulingDecision | null>(null);
   const [rulingNotes, setRulingNotes] = useState('');
   const [rulingSaving, setRulingSaving] = useState(false);
   const [rulingError, setRulingError] = useState<string | null>(null);
-
   const [memoPartial, setMemoPartial] = useState<MemoPartialPayload | null>(null);
   const [memoPipeline, setMemoPipeline] = useState<'idle' | 'generating' | 'ready' | 'failed'>('idle');
   const [memoGateError, setMemoGateError] = useState<string | null>(null);
@@ -597,10 +704,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
   useEffect(() => {
     setSelectedReviewerIdx(0);
-    setSourcesOpen(!config.memo.deepDiveCollapsed);
-    setPipelineLogOpen(false);
-    setAdverseOpen(!config.memo.deepDiveCollapsed);
-    setReasoningOpen(false);
     setRisksReviewed(false);
     setRulingDecision(null);
     setRulingNotes('');
@@ -630,7 +733,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
       setRulingSaving(false);
       setRulingError('Ruling did not save. Retry once the API is reachable.');
     }
-  }, [displayStartup, onDecisionResolved, risksReviewed, rulingDecision, rulingNotes]);
+  }, [
+    displayStartup,
+    onDecisionResolved,
+    risksReviewed,
+    rulingDecision,
+    rulingNotes,
+  ]);
 
   const structuredScoring = useMemo(
     () => normalizeStructuredScoring(displayStartup?.review ?? null),
@@ -676,19 +785,73 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     () => pipelineReplayOneLiner(pipelineReplaySteps),
     [pipelineReplaySteps]
   );
+  // ── Editorial derivations ──
+  const coverStandfirst = displayStartup
+    ? firstSentence(
+        firstNonEmpty(
+          displayStartup.partner?.thesis,
+          displayStartup.review?.aethria_view?.headline,
+          displayStartup.partner?.why_this_matters,
+          headerThesisLine,
+          displayStartup.review?.overall_summary,
+        ),
+        220,
+      )
+    : '';
+  const coverBlocker = displayStartup
+    ? (openingRiskItems[0] ?? collapseWhitespace(displayStartup.scout.biggest_unknown))
+    : '';
+  const coverAction = displayStartup ? (nextStepItems[0] ?? collapseWhitespace(nextStepText)) : '';
+  const investmentCasePoints = useMemo(
+    () => (displayStartup ? buildInvestmentCase(displayStartup, coverStandfirst) : []),
+    [displayStartup, coverStandfirst]
+  );
+  const snapshotRows = useMemo(
+    () => (displayStartup ? buildSnapshotRows(displayStartup, coverBlocker) : []),
+    [displayStartup, coverBlocker]
+  );
+  const memoKillers = useMemo(
+    () => buildKillers(adverseRegister, riskFactors.risks),
+    [adverseRegister, riskFactors.risks]
+  );
+  const reviewerConsensusRows = useMemo(() => {
+    const reviews = displayStartup?.review?.reviews ?? [];
+    return reviews
+      .map((rv) => ({
+        key: rv.reviewer_type,
+        name: REVIEWER_LABELS[rv.reviewer_type] ?? rv.reviewer_type,
+        score: reviewerMeanScore(rv),
+        verdict: rv.verdict,
+        take: firstSentence(rv.overall_summary, 150),
+      }))
+      .filter((row) => row.score != null || row.take);
+  }, [displayStartup?.review?.reviews]);
+  const reviewerConsensus = useMemo(() => {
+    const scores = reviewerConsensusRows
+      .map((row) => row.score)
+      .filter((score): score is number => score != null);
+    const min = scores.length ? Math.min(...scores) : null;
+    const max = scores.length ? Math.max(...scores) : null;
+    const spread = min != null && max != null ? max - min : null;
+    const split =
+      displayStartup?.review?.reviewer_disagreement === true || (spread != null && spread >= 2);
+    const verdict =
+      displayStartup?.review?.consensus_verdict ?? displayStartup?.review?.derived_verdict ?? null;
+    return { min, max, spread, split, verdict };
+  }, [
+    reviewerConsensusRows,
+    displayStartup?.review?.reviewer_disagreement,
+    displayStartup?.review?.consensus_verdict,
+    displayStartup?.review?.derived_verdict,
+  ]);
 
-  const REVIEWER_LABELS: Record<string, string> = {
-    DefaultReviewer: 'Default',
-    SkepticalReviewer: 'Skeptical',
-    OpportunistReviewer: 'Opportunist',
-  };
   const rulingIntro =
     config.memo.tone === 'analyst'
       ? 'Record the fund view after reviewing the analyst read, material adverse items, and next action.'
       : 'Record the fund view after weighing the recommendation, material adverse items, and next action.';
 
   return (
-    <div className={wrapperCls}>
+    <article className={wrapperCls} aria-labelledby="memo-title">
       {/* Styles extracted to InvestmentMemoContent.css */}
 
       {!displayStartup ? (
@@ -699,7 +862,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           </div>
         </div>
       ) : (
-        <div className="memoScroll relative" role="region" aria-label="Investment memo">
+        <div
+          className={`memoScroll relative${embedded ? '' : ' memo-scroll-root'}`}
+          role="region"
+          aria-label="Investment memo"
+        >
           {onClose && (
             <div className="memoHeaderActions">
               <button type="button" onClick={handleDownloadPDF} className={actionBtnCls}>IC Pack (PDF)</button>
@@ -711,9 +878,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             <div className="memoGateStrip memoGateStrip--error">
               <motion.div
                 className="memoGateStripInner"
-                initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={transitionOrReduced(reduceMotion, { duration: 0.28, ease: [0.16, 1, 0.3, 1] })}
+                initial={
+                  reduceMotion
+                    ? { opacity: 1, transform: 'translateY(0px)' }
+                    : { opacity: 0, transform: 'translateY(8px)' }
+                }
+                animate={{ opacity: 1, transform: 'translateY(0px)' }}
+                transition={transitionOrReduced(reduceMotion, { duration: 0.28, ease: [0.23, 1, 0.32, 1] })}
                 role="alert"
               >
                 <p className="memoPipelineKicker">Pipeline</p>
@@ -726,75 +897,96 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           <motion.div
             className="memoBody"
             key={contentKey}
-            initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={transitionOrReduced(reduceMotion, { duration: 0.26, ease: [0.16, 1, 0.3, 1] })}
+            initial={
+              reduceMotion
+                ? { opacity: 1, transform: 'translateY(0px)' }
+                : { opacity: 0, transform: 'translateY(16px)' }
+            }
+            animate={{ opacity: 1, transform: 'translateY(0px)' }}
+            transition={transitionOrReduced(reduceMotion, { duration: 0.24, ease: [0.23, 1, 0.32, 1] })}
           >
 
-            {/* ── Document header ── */}
-            <div className="memoDocHeader">
-              <div className="memoDocHeaderMain">
-                {!embedded ? <p className="memoKicker">INVESTMENT MEMO</p> : null}
-                <div className="memoTitleRow">
-                  <h1 className="memoCompany" id="memo-title">{companyName || '—'}</h1>
-                  {headerMeta ? <p className="memoMeta">{renderWithMonoNumbers(headerMeta)}</p> : null}
-                </div>
-                {headerThesisLine ? (
-                  <p className="memoThesisLine">{renderWithMonoNumbers(headerThesisLine)}</p>
+            {/* ── Executive cover ── */}
+            <header className="memoCover">
+              {!embedded ? <p className="memoKicker">Investment Memo</p> : null}
+              <div className="memoCoverTitleRow">
+                <h1 className="type-title font-semibold text-oxford-ink-emphasis m-0" id="memo-title">
+                  {companyName || '—'}
+                </h1>
+                {headerMeta ? <p className="memoMeta">{renderWithMonoNumbers(headerMeta)}</p> : null}
+              </div>
+
+              {coverStandfirst ? (
+                <p className="memoCoverStandfirst">{renderWithMonoNumbers(coverStandfirst)}</p>
+              ) : null}
+
+              {readOnly ? (
+                <p className="memoShareBanner" role="status">
+                  Read-only view — share this link with a co-GP. Rulings and edits are disabled.
+                </p>
+              ) : null}
+
+              {showJudgment && precedentCandidates.length > 0 ? (
+                <MemoPrecedentStrip
+                  candidates={precedentCandidates}
+                  renderWithMonoNumbers={renderWithMonoNumbers}
+                />
+              ) : null}
+
+              <MemoPortfolioContext startupId={displayStartup.id} signals={portfolioSignals} />
+
+              <div className="memoCoverRuling">
+                <p className="memoCoverRulingLabel">Recommendation</p>
+                <p
+                  className={`memoCoverRulingWord memoCoverRulingWord--${(decisionBadgeVariant ?? 'pending').toLowerCase()}`}
+                >
+                  {showJudgment ? renderWithMonoNumbers(decisionHeadline) : 'Pending'}
+                </p>
+                <p className="memoCoverRulingSupport">
+                  {displayStartup.review?.overall_score != null
+                    ? renderWithMonoNumbers(`${displayStartup.review.overall_score}/10 conviction`)
+                    : thesisAlignmentBrief
+                      ? renderWithMonoNumbers(thesisAlignmentBrief)
+                      : 'Conviction forming'}
+                  {reviewerConsensus.verdict ? (
+                    <span className="memoCoverRulingMeta">
+                      {' · '}
+                      {reviewerConsensus.split ? 'reviewers split' : 'reviewers aligned'}
+                    </span>
+                  ) : null}
+                </p>
+                {showRulingStatus ? (
+                  <p
+                    className={`memoCoverStatus${
+                      showEscalationBadge && !isAlreadyDecided ? ' memoCoverStatus--escalation' : ''
+                    }`}
+                  >
+                    {isAlreadyDecided && displayStartup.human_resolution?.resolved_at
+                      ? `Recorded ruling — ${decisionLabel(displayStartup.human_resolution.decision)}`
+                      : showEscalationBadge
+                        ? 'Human ruling required'
+                        : 'Pipeline assembling recommendation'}
+                  </p>
                 ) : null}
               </div>
-            </div>
 
-            <div className="memoDocDivider" aria-hidden />
-
-            <section className="memoOpeningBrief" aria-label="Decision brief">
-              <div className="memoOpeningBriefDecision">
-                <div className="memoOpeningBriefJudgment">
-                  <p className="memoOpeningBriefLabel">Recommendation</p>
-                  <p className="memoOpeningBriefRecommendation">
-                    {showJudgment ? renderWithMonoNumbers(decisionHeadline) : 'Pending'}
-                  </p>
-                  <p className="memoOpeningBriefConviction">
-                    {displayStartup.review?.overall_score != null
-                      ? renderWithMonoNumbers(`${displayStartup.review.overall_score}/10 conviction`)
-                      : thesisAlignmentBrief
-                        ? renderWithMonoNumbers(thesisAlignmentBrief)
-                        : 'Conviction forming'}
-                  </p>
-                </div>
-                <div className="memoOpeningBriefAnnotations">
-                  <div className="memoOpeningBriefNote">
-                    <p className="memoOpeningBriefLabel">Thesis</p>
-                    <p>{thesisAlignmentBrief ? renderWithMonoNumbers(thesisAlignmentBrief) : 'No thesis read yet'}</p>
-                  </div>
-                  <div className="memoOpeningBriefNote memoOpeningBriefNote--constraint">
-                    <p className="memoOpeningBriefLabel">Constraint</p>
-                    <p>
-                      {openingRiskItems.length > 0
-                        ? renderWithMonoNumbers(openingRiskItems.join(' · '))
-                        : nextStepText
-                          ? renderWithMonoNumbers(nextStepItems[0] ?? nextStepText)
-                          : 'No material blocker surfaced yet'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="memoOpeningBriefPrimary">
-                <p className="memoOpeningBriefLabel">Why this is on the docket</p>
-                <p className="memoOpeningBriefText">
-                  {renderWithMonoNumbers(
-                    firstNonEmpty(
-                      headerThesisLine,
-                      displayStartup.partner?.snapshot?.key_signal,
-                      displayStartup.partner?.decision_drivers?.[0],
-                      displayStartup.review?.overall_summary,
-                      displayStartup.scout.primary_thesis,
-                      'Awaiting enough evidence to form an investment view.'
-                    )
-                  )}
-                </p>
-              </div>
-            </section>
+              {(coverBlocker || coverAction) && (
+                <dl className="memoCoverBrief">
+                  {coverBlocker ? (
+                    <div className="memoCoverBriefItem">
+                      <dt>Blocker</dt>
+                      <dd>{renderWithMonoNumbers(coverBlocker)}</dd>
+                    </div>
+                  ) : null}
+                  {coverAction ? (
+                    <div className="memoCoverBriefItem">
+                      <dt>Next move</dt>
+                      <dd>{renderWithMonoNumbers(coverAction)}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              )}
+            </header>
 
             {/* ── Generating state ── */}
             {memoPipeline === 'generating' && (
@@ -803,8 +995,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <p className="memoPipelineKicker">Investment memo</p>
                   <motion.p
                     className="memoGateTitle"
-                    animate={reduceMotion ? { opacity: 1 } : { opacity: [0.55, 1, 0.55] }}
-                    transition={reduceMotion ? { duration: 0 } : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                    animate={reduceMotion ? { opacity: 1 } : { opacity: [0.58, 1, 0.58] }}
+                    transition={
+                      reduceMotion
+                        ? { duration: 0 }
+                        : { duration: 2.4, repeat: Infinity, ease: [0.77, 0, 0.175, 1] }
+                    }
                   >
                     {memoGeneratingGateCopy.title}
                   </motion.p>
@@ -815,209 +1011,86 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </section>
             )}
 
-            <div className="memoDecisionCluster">
-              {/* ── Decision surface ── */}
-              <section className="memoDocSection memoDecisionSurface" aria-label="Judgment brief">
-                {showRulingStatus && (
-                <div
-                  className={`memoRulingStatus${
-                    showEscalationBadge && !isAlreadyDecided ? ' memoRulingStatus--escalation' : ''
-                  }`}
-                >
-                  <div>
-                    <div className="memoRulingLabelRow">
-                      <p className="memoRulingLabel">
-                        {isAlreadyDecided
-                          ? 'Recorded human ruling'
-                          : showEscalationBadge
-                            ? 'Human ruling required'
-                            : 'Pipeline assembling recommendation'}
-                      </p>
+
+            {/* ── Company snapshot ── */}
+            {snapshotRows.length > 0 && (
+              <section className="memoDocSection memoSnapshotSection" aria-labelledby="memo-snapshot">
+                <h2 className="memoDocSectionHead" id="memo-snapshot">Snapshot</h2>
+                <dl className="memoSnapshot">
+                  {snapshotRows.map((row) => (
+                    <div key={row.label} className="memoSnapshotRow">
+                      <dt className="memoSnapshotLabel">{row.label}</dt>
+                      <dd className="memoSnapshotText">{renderWithMonoNumbers(row.text)}</dd>
                     </div>
-                    {displayStartup.human_resolution?.resolved_at ? (
-                      <p className="memoRulingValue">
-                        {decisionLabel(displayStartup.human_resolution.decision)}
-                      </p>
-                    ) : showEscalationBadge ? null : (
-                      <p className="memoRulingValue">Awaiting recommendation</p>
-                    )}
-                  </div>
-                  {displayStartup.human_resolution?.notes ? (
-                    <p className="memoRulingNote">{renderWithMonoNumbers(displayStartup.human_resolution.notes)}</p>
-                  ) : null}
-                </div>
-                )}
-                {showJudgment && (() => {
-                  const paras = reasoningParagraphs.filter((p) => String(p ?? '').trim());
-                  const primaryReason = paras[0];
-                  const remainingReasons = paras.slice(1);
-                  return (
-                    <div
-                      className={`memoRecommendationBlock${showRulingStatus ? '' : ' memoRecommendationBlock--lead'}`}
-                      aria-labelledby="memo-investment-judgment"
-                    >
-                      <h2 className="memoDocSectionHead" id="memo-investment-judgment">Investment Judgement</h2>
-                      {primaryReason && (
-                        <p className="memoDocProse memoDocPrimaryReason">{renderWithMonoNumbers(primaryReason)}</p>
-                      )}
-                      {remainingReasons.length > 0 && (
-                        <div className="memoReasoningDisclosure">
-                          <button
-                            type="button"
-                            className="memoInlineDisclosure"
-                            onClick={() => setReasoningOpen((open) => !open)}
-                            aria-expanded={reasoningOpen}
-                            aria-controls={`${contentKey}-partner-rationale`}
-                          >
-                            {reasoningOpen ? 'Hide full rationale' : `Full rationale (${remainingReasons.length})`}
-                          </button>
-                          <div id={`${contentKey}-partner-rationale`} className={reasoningOpen ? 'memoReasoningBody' : 'hidden'}>
-                            {remainingReasons.map((p, i) => (
-                              <p key={i} className="memoDocProse">{renderWithMonoNumbers(p)}</p>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                  ))}
+                </dl>
               </section>
+            )}
 
-            </div>
+            {/* ── Investment case ── */}
+            {investmentCasePoints.length > 0 && (
+              <section className="memoDocSection memoCaseSection" aria-labelledby="memo-case">
+                <h2 className="memoDocSectionHead" id="memo-case">The Case</h2>
+                <ol className="memoCaseList">
+                  {investmentCasePoints.map((point, i) => (
+                    <li key={i} className={`memoCasePoint${i === 0 ? ' memoCasePoint--lead' : ''}`}>
+                      {renderWithMonoNumbers(point)}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
 
-            {/* ── Aethria view (thesis fit narrative) ── */}
-            {(() => {
-              const av = displayStartup.review?.aethria_view as AethriaView | undefined | null;
-              if (!av?.headline?.trim()) return null;
-              return (
-                <section className="memoDocSection" aria-labelledby="memo-aethria-view">
-                  <h2 className="memoDocSectionHead" id="memo-aethria-view">Aethria view</h2>
-                  <p className="memoDocProse memoDocLead">{renderWithMonoNumbers(av.headline)}</p>
-                  {av.thesis_fit_line?.trim() && (
-                    <p className="memoDocProse">{renderWithMonoNumbers(av.thesis_fit_line)}</p>
-                  )}
-                  {av.tension_summary?.trim() && (
-                    <p className="memoDocProse">{renderWithMonoNumbers(av.tension_summary)}</p>
-                  )}
-                  {av.focal_question?.trim() && (
-                    <p className="memoDocProse memoDocFocalInset">
-                      <span className="memoDocSubhead">Focal question</span>
-                      {renderWithMonoNumbers(av.focal_question)}
-                    </p>
-                  )}
-                </section>
-              );
-            })()}
+            {/* ── Investment killers ── */}
+            {memoKillers.length > 0 && (
+              <section className="memoDocSection memoKillerSection" aria-labelledby="memo-killers">
+                <h2 className="memoDocSectionHead" id="memo-killers">What Limits Conviction</h2>
+                <ol className="memoKillerList">
+                  {memoKillers.map((killer, i) => (
+                    <li key={i} className={`memoKiller memoKiller--${killer.severity}`}>
+                      <span className="memoKillerRank" aria-hidden>{String(i + 1).padStart(2, '0')}</span>
+                      <p className="memoKillerStatement">{renderWithMonoNumbers(killer.statement)}</p>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
 
-            {/* ── Company and product ── */}
-            {(() => {
-              const rows = uniqueMemoRows([
-                { key: 'What it is', val: displayStartup.scout.solution?.trim() || displayStartup.scout.one_line?.trim() },
-                { key: 'Customer pain', val: displayStartup.scout.problem?.trim() },
-                { key: 'Target buyer', val: displayStartup.scout.target_users?.trim() },
-                { key: 'Product edge', val: displayStartup.partner?.product_edge?.trim() },
-              ]);
-              if (!rows.length) return null;
-              return (
-                <section className="memoDocSection" aria-labelledby="memo-overview">
-                  <h2 className="memoDocSectionHead" id="memo-overview">Company and Product</h2>
-                  <dl className="memoDocDL">
-                    {rows.map((r) => (
-                      <div key={r.key} className="memoDocDLRow">
-                        <dt className="memoDocDT">{r.key}</dt>
-                        <dd className="memoDocDD">{renderWithMonoNumbers(r.val)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </section>
-              );
-            })()}
-
-            {/* ── Market case ── */}
-            {(() => {
-              const rows = uniqueMemoRows([
-                { key: 'Why now', val: (displayStartup.partner?.why_this_matters || displayStartup.scout.why_now)?.trim() },
-                { key: 'Market read', val: displayStartup.partner?.market_insight?.trim() },
-                { key: 'Evidence', val: displayStartup.partner?.traction_signals?.trim() },
-              ]);
-              if (!rows.length) return null;
-              return (
-                <section className="memoDocSection" aria-labelledby="memo-case">
-                  <h2 className="memoDocSectionHead" id="memo-case">Market Case</h2>
-                  <dl className="memoDocDL">
-                    {rows.map((r) => (
-                      <div key={r.key} className="memoDocDLRow">
-                        <dt className="memoDocDT">{r.key}</dt>
-                        <dd className="memoDocDD">{renderWithMonoNumbers(r.val)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </section>
-              );
-            })()}
-
-            {/* ── Investment Thesis ── */}
-            {(() => {
-              const thesis = (displayStartup.partner?.thesis || displayStartup.scout.primary_thesis)?.trim();
-              const assumptions = displayStartup.scout.key_assumptions?.filter((a) => String(a ?? '').trim());
-              const biggest = displayStartup.scout.biggest_unknown?.trim();
-              if (!thesis && !assumptions?.length && !biggest) return null;
-              return (
-                <section className="memoDocSection" aria-labelledby="memo-thesis">
-                  <h2 className="memoDocSectionHead" id="memo-thesis">Investment Thesis</h2>
-                  {thesis && <p className="memoDocProse memoDocThesis">{renderWithMonoNumbers(thesis)}</p>}
-                  {assumptions && assumptions.length > 0 && (
-                    <div className="memoDocSubsection">
-                      <p className="memoDocSubhead">Key Assumptions</p>
-                      <ul className="memoList">
-                        {assumptions.map((item, i) => (
-                          <li key={i} className="memoListItem">
-                            <span className="memoBullet" aria-hidden>·</span>
-                            <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {biggest && (
-                    <div className="memoDocSubsection">
-                      <p className="memoDocSubhead">Biggest Unknown</p>
-                      <p className="memoDocProse">{renderWithMonoNumbers(biggest)}</p>
-                    </div>
-                  )}
-                </section>
-              );
-            })()}
-
-            {/* ── Assessment ── */}
+            {/* ── Scoring ── */}
             {(() => {
               const isMissing = (s: string) => /^\[MISSING/i.test(String(s ?? '').trim());
               const teamItems = (displayStartup.review?.team_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const compItems = (displayStartup.review?.competition_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const bizItems = (displayStartup.review?.business_model_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const hasScores = !!structuredScoring;
+              const showScores = config.memo.includeScoreReasoning && hasScores;
+              const improvements = (displayStartup.review?.improvement_to_9 ?? []).filter((s) => String(s ?? '').trim());
               const assessmentReadouts = [
                 { label: 'Team', items: teamItems },
                 { label: 'Competitive Landscape', items: compItems },
                 { label: 'Business Model', items: bizItems },
               ].filter((section) => section.items.length > 0);
-              if (
-                !displayStartup.review &&
-                !teamItems.length &&
-                !compItems.length &&
-                !bizItems.length &&
-                !hasScores
-              ) {
+              const hasThesis = reviewHasThesisAlignment(displayStartup.review);
+              if (!showScores && assessmentReadouts.length === 0 && improvements.length === 0 && !hasThesis) {
                 return null;
               }
+              const r = displayStartup.review;
+              const rawAlign = r?.thesis_alignment_score;
+              const ten = rawAlign != null ? (rawAlign <= 1 ? rawAlign * 10 : rawAlign) : null;
+              const fund = r?.thesis_matches_fund;
+              const confRaw = r?.thesis_alignment_confidence;
+              const confPct = confRaw != null ? `${(confRaw * 100).toFixed(0)}%` : null;
+              const statLine = [
+                ten != null ? `${ten.toFixed(0)}/10 alignment` : null,
+                fund != null ? (fund ? 'Mandate aligned' : 'Mandate misaligned') : null,
+                confPct != null ? `${confPct} confidence` : null,
+              ].filter(Boolean).join('   ·   ');
+              const fitPoints = (r?.thesis_fit_points ?? []).filter((s) => String(s ?? '').trim());
+              const gapPoints = (r?.thesis_deviation_points ?? []).filter((s) => String(s ?? '').trim());
               return (
-                <MemoPlainSection
-                  id={`${contentKey}-assessment`}
-                  title="Assessment"
-                  className="memoAssessmentSection"
-                >
-
-                  {config.memo.includeScoreReasoning && hasScores && (
+                <section className="memoDocSection memoScoringSection" aria-labelledby="memo-scoring">
+                  <h2 className="memoDocSectionHead" id="memo-scoring">Scoring</h2>
+                  {showScores && (
                     <div className="memoDocScoreScope">
                       {structuredScoring && (
                         <>
@@ -1030,79 +1103,57 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                           />
                         </>
                       )}
-                      {(displayStartup.review?.improvement_to_9?.length ?? 0) > 0 && (
-                        <div className="memoDocSubsection">
-                          <p className="memoDocSubhead">What would make this a 9?</p>
-                          <ul className="memoList">
-                            {(displayStartup.review?.improvement_to_9 ?? []).map((item, i) => (
-                              <li key={i} className="memoListItem">
-                                <span className="memoBullet" aria-hidden>·</span>
-                                <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
                     </div>
                   )}
-
-                  {assessmentReadouts.length > 0 && (
-                    <div className="memoAssessmentReadouts">
-                      {assessmentReadouts.map((section) => (
-                        <article key={section.label} className="memoAssessmentReadout">
-                          <p className="memoDocSubhead">{section.label}</p>
-                          <ul className="memoList">
-                            {section.items.map((item, i) => (
-                              <li key={i} className="memoListItem">
-                                <span className="memoBullet" aria-hidden>·</span>
-                                <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </article>
-                      ))}
+                  {(improvements.length > 0 || assessmentReadouts.length > 0) && (
+                    <div className="memoDiscGroup memoScoringMore">
+                      <MemoDisclosureSection
+                        id={`${contentKey}-scoring-reads`}
+                        title="Analyst reads"
+                        summary={`${improvements.length + assessmentReadouts.length} note${improvements.length + assessmentReadouts.length === 1 ? '' : 's'}`}
+                        initialOpen={false}
+                      >
+                        {improvements.length > 0 && (
+                          <div className="memoDocSubsection">
+                            <p className="memoDocSubhead">Path to a 9</p>
+                            <ul className="memoList">
+                              {improvements.slice(0, 4).map((item, i) => (
+                                <li key={i} className="memoListItem">
+                                  <span className="memoBullet" aria-hidden>·</span>
+                                  <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {assessmentReadouts.map((section) => (
+                          <div key={section.label} className="memoDocSubsection">
+                            <p className="memoDocSubhead">{section.label}</p>
+                            <ul className="memoList">
+                              {section.items.slice(0, 3).map((item, i) => (
+                                <li key={i} className="memoListItem">
+                                  <span className="memoBullet" aria-hidden>·</span>
+                                  <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </MemoDisclosureSection>
                     </div>
                   )}
-                </MemoPlainSection>
-              );
-            })()}
-
-            {/* ── Thesis Alignment ── */}
-            {reviewHasThesisAlignment(displayStartup.review) && (() => {
-              const r = displayStartup.review!;
-              const rawAlign = r.thesis_alignment_score;
-              const ten = rawAlign != null ? (rawAlign <= 1 ? rawAlign * 10 : rawAlign) : null;
-              const fund = r.thesis_matches_fund;
-              const confRaw = r.thesis_alignment_confidence;
-              const confPct = confRaw != null ? `${(confRaw * 100).toFixed(0)}%` : null;
-              const tiles = [
-                ten != null ? { label: 'Alignment', val: `${ten.toFixed(0)}/10` } : null,
-                fund != null ? { label: 'Mandate', val: fund ? 'Aligned' : 'Misaligned' } : null,
-                confPct != null ? { label: 'Confidence', val: confPct } : null,
-              ].filter(Boolean) as { label: string; val: string }[];
-              const fitPoints = r.thesis_fit_points ?? [];
-              const gapPoints = r.thesis_deviation_points ?? [];
-              return (
-                <MemoPlainSection
-                  id={`${contentKey}-thesis-alignment`}
-                  title="Thesis Alignment"
-                >
-                  {tiles.length > 0 && (
-                    <div className="memoDocAlignTiles">
-                      {tiles.map((t) => (
-                        <div key={t.label} className="memoDocAlignTile">
-                          <p className="memoDocAlignTileLabel">{t.label}</p>
-                          <p className="memoDocAlignTileVal">{renderWithMonoNumbers(t.val)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {(fitPoints.length > 0 || gapPoints.length > 0) && (
-                    <dl className="memoDocDL">
-                      {fitPoints.length > 0 && (
-                        <div className="memoDocDLRow">
-                          <dt className="memoDocDT">Fits</dt>
-                          <dd className="memoDocDD">
+                  {hasThesis && (
+                    <div className="memoDiscGroup">
+                      <MemoDisclosureSection
+                        id={`${contentKey}-thesis-alignment`}
+                        title="Thesis alignment"
+                        summary={ten != null ? `${ten.toFixed(0)}/10` : fund != null ? (fund ? 'Aligned' : 'Misaligned') : undefined}
+                        initialOpen={!config.memo.deepDiveCollapsed}
+                      >
+                        {statLine && <p className="memoEvStatLine">{renderWithMonoNumbers(statLine)}</p>}
+                        {fitPoints.length > 0 && (
+                          <div className="memoDocSubsection">
+                            <p className="memoDocSubhead">Fits</p>
                             <ul className="memoList">
                               {fitPoints.map((item, i) => (
                                 <li key={i} className="memoListItem">
@@ -1111,13 +1162,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                                 </li>
                               ))}
                             </ul>
-                          </dd>
-                        </div>
-                      )}
-                      {gapPoints.length > 0 && (
-                        <div className="memoDocDLRow">
-                          <dt className="memoDocDT">Gaps</dt>
-                          <dd className="memoDocDD">
+                          </div>
+                        )}
+                        {gapPoints.length > 0 && (
+                          <div className="memoDocSubsection">
+                            <p className="memoDocSubhead">Gaps</p>
                             <ul className="memoList">
                               {gapPoints.map((item, i) => (
                                 <li key={i} className="memoListItem">
@@ -1126,118 +1175,137 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                                 </li>
                               ))}
                             </ul>
-                          </dd>
-                        </div>
-                      )}
-                    </dl>
+                          </div>
+                        )}
+                      </MemoDisclosureSection>
+                    </div>
                   )}
-                </MemoPlainSection>
+                </section>
               );
             })()}
 
-            {/* ── Reviewer Panel ── */}
+            {/* ── Reviewer consensus ── */}
+            {reviewerConsensusRows.length > 0 && (
+              <section className="memoDocSection memoConsensusSection" aria-labelledby="memo-consensus">
+                <h2 className="memoDocSectionHead" id="memo-consensus">Reviewer Consensus</h2>
+                <div className="memoConsensusHead">
+                  <p className="memoConsensusVerdict">
+                    {reviewerConsensus.split ? 'Split' : 'Aligned'}
+                    {reviewerConsensus.verdict ? (
+                      <span className="memoConsensusVerdictTag">{` · ${reviewerConsensus.verdict}`}</span>
+                    ) : null}
+                  </p>
+                  {reviewerConsensus.min != null && reviewerConsensus.max != null ? (
+                    <p className="memoConsensusSpread">
+                      {renderWithMonoNumbers(
+                        reviewerConsensus.min === reviewerConsensus.max
+                          ? `${reviewerConsensus.min.toFixed(1)}/10 across the panel`
+                          : `${reviewerConsensus.min.toFixed(1)}–${reviewerConsensus.max.toFixed(1)}/10 spread`
+                      )}
+                    </p>
+                  ) : null}
+                </div>
+                <ul className="memoConsensusList">
+                  {reviewerConsensusRows.map((row) => (
+                    <li key={row.key} className="memoConsensusRow">
+                      <span className="memoConsensusName">{row.name}</span>
+                      <span className="memoConsensusScore">
+                        {row.score != null ? renderWithMonoNumbers(row.score.toFixed(1)) : '—'}
+                      </span>
+                      <span className="memoConsensusTake">
+                        {renderWithMonoNumbers(row.take || row.verdict || '—')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {/* ── Reviewer detail ── */}
             {config.memo.style !== 'concise' && (displayStartup.review?.reviews?.length ?? 0) > 0 && (() => {
               const reviews = displayStartup.review!.reviews!;
               const isContested = displayStartup.review?.reviewer_disagreement === true;
               const selected = reviews[selectedReviewerIdx] ?? reviews[0];
               return (
-                <MemoDisclosureSection
-                  id={`${contentKey}-reviewer-panel`}
-                  title="Reviewer Read"
-                  summary={isContested ? 'Where conviction diverges' : `${reviews.length} internal reads`}
-                  initialOpen={isContested || !config.memo.deepDiveCollapsed}
-                >
-                  {isContested && (
-                    <p className="memoDocProse">
-                      The reviewer read is not unanimous. The useful signal is the shape of disagreement: which part of the case is carrying conviction, and which part is still soft.
-                    </p>
-                  )}
-                  <div className="memoDocReviewerTable" role="group" aria-label="Reviewer conviction and disagreement">
-                    {reviews.map((rv, idx) => {
-                      const isSelected = idx === selectedReviewerIdx;
-                      const scoreRow = `Market ${rv.market_score} · Product ${rv.product_score} · Technical ${rv.technical_score} · Execution ${rv.execution_score} · Defensibility ${rv.defensibility_score}`;
-                      return (
-                        <button
-                          key={rv.reviewer_type}
-                          type="button"
-                          className="memoDocReviewerRow"
-                          aria-pressed={isSelected}
-                          onClick={() => setSelectedReviewerIdx(idx)}
-                        >
-                          <span className="memoDocReviewerRowLabel">
-                            {REVIEWER_LABELS[rv.reviewer_type] ?? rv.reviewer_type}
-                          </span>
-                          <span className="memoDocReviewerRowVerdict">{rv.verdict}</span>
-                          <span className="memoDocReviewerRowScores">{renderWithMonoNumbers(scoreRow)}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {selected?.overall_summary && (
-                    <motion.div
-                      key={`${contentKey}:reviewer:${selectedReviewerIdx}`}
-                      className="memoDocReviewerDetail"
-                      initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={transitionOrReduced(reduceMotion, { duration: 0.18, ease: [0.16, 1, 0.3, 1] })}
-                    >
-                      <p className="memoDocReviewerDetailText">{renderWithMonoNumbers(selected.overall_summary)}</p>
-                    </motion.div>
-                  )}
-                </MemoDisclosureSection>
+                <div className="memoDiscGroup">
+                  <MemoDisclosureSection
+                    id={`${contentKey}-reviewer-panel`}
+                    title="Reviewer detail"
+                    summary={isContested ? 'Where conviction diverges' : `${reviews.length} internal reads`}
+                    initialOpen={isContested || !config.memo.deepDiveCollapsed}
+                  >
+                    {isContested && (
+                      <p className="memoDocProse">
+                        The reviewer read is not unanimous. The useful signal is the shape of disagreement: which part of the case is carrying conviction, and which part is still soft.
+                      </p>
+                    )}
+                    <div className="memoDocReviewerTable" role="group" aria-label="Reviewer conviction and disagreement">
+                      {reviews.map((rv, idx) => {
+                        const isSelected = idx === selectedReviewerIdx;
+                        const scoreRow = `M ${rv.market_score} · P ${rv.product_score} · T ${rv.technical_score} · E ${rv.execution_score} · D ${rv.defensibility_score}`;
+                        return (
+                          <button
+                            key={rv.reviewer_type}
+                            type="button"
+                            className="memoDocReviewerRow"
+                            aria-pressed={isSelected}
+                            onClick={() => setSelectedReviewerIdx(idx)}
+                          >
+                            <span className="memoDocReviewerRowLabel">
+                              {REVIEWER_LABELS[rv.reviewer_type] ?? rv.reviewer_type}
+                            </span>
+                            <span className="memoDocReviewerRowVerdict">{rv.verdict}</span>
+                            <span className="memoDocReviewerRowScores">{renderWithMonoNumbers(scoreRow)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selected?.overall_summary && (
+                      <motion.div
+                        key={`${contentKey}:reviewer:${selectedReviewerIdx}`}
+                        className="memoDocReviewerDetail"
+                        initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={transitionOrReduced(reduceMotion, { duration: 0.18, ease: [0.16, 1, 0.3, 1] })}
+                      >
+                        <p className="memoDocReviewerDetailText">{renderWithMonoNumbers(selected.overall_summary)}</p>
+                      </motion.div>
+                    )}
+                  </MemoDisclosureSection>
+                </div>
               );
             })()}
 
-            {/* ── Risks ── */}
+            {/* ── Risk register ── */}
             {(adverseRegister.length > 0 || riskFactors.risks.length > 0 || riskFactors.mitigation.length > 0 || missingEvidenceItems.length > 0) && (
-              <section className="memoDocSection memoRiskCheckpoint" aria-labelledby="memo-risk-checkpoint">
-                <h2 className="memoDocSectionHead" id="memo-risk-checkpoint">Risk Checkpoint</h2>
+              <section className="memoDocSection memoRiskRegisterSection" aria-labelledby="memo-risk-register">
+                <h2 className="memoDocSectionHead" id="memo-risk-register">Risk Register</h2>
                 {adverseRegister.length > 0 && (
-                  <>
-                    <button
-                      type="button"
-                      className="memoAdverseHeader"
-                      onClick={() => setAdverseOpen((open) => !open)}
-                      aria-expanded={adverseOpen}
-                      aria-controls={`${contentKey}-adverse-register`}
-                    >
-                      <span className="memoAdverseToggleTitle">Material Adverse</span>
-                      <span className="memoAdverseHeaderMeta">
-                        <span className="memoAdverseCount" aria-label={`${highAdverseCount} high severity, ${adverseRegister.length} material adverse items`}>
-                          <span className={highAdverseCount > 0 ? 'memoAdverseCountCritical' : undefined}>{highAdverseCount}</span>
-                          {' high'}
-                          <span aria-hidden> · </span>
-                          <span>{adverseRegister.length}</span>
-                          {' material'}
-                        </span>
-                        <span className="memoAdverseChevron" aria-hidden>{adverseOpen ? '−' : '+'}</span>
-                      </span>
-                    </button>
-                    {adverseOpen && (
-                      <div className="memoAdverseList" id={`${contentKey}-adverse-register`}>
-                        {adverseRegister.map((item) => (
-                          <article key={item.id} className={`memoAdverseItem memoAdverseItem--${item.severity}`}>
-                            <div className="memoAdverseSeverity">
-                              <span>{SEVERITY_LABEL[item.severity]}</span>
-                            </div>
-                            <div className="memoAdverseMain">
-                              <p className="memoAdverseTitle">{renderWithMonoNumbers(item.title)}</p>
-                              <p className="memoAdverseBody">{renderWithMonoNumbers(item.whyItMatters)}</p>
-                            </div>
-                            <div className="memoAdverseMeta">
-                              <span>{item.basis}</span>
-                              {item.missingData && <span>Missing data</span>}
-                              {item.source && <span>{item.source}</span>}
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </>
+                  <p className="memoEvStatLine">
+                    {renderWithMonoNumbers(`${highAdverseCount} high · ${adverseRegister.length} material`)}
+                  </p>
+                )}
+                {adverseRegister.length > 0 && (
+                  <div className="memoEvRiskList">
+                    {adverseRegister.map((item) => (
+                      <article key={item.id} className={`memoEvRisk memoEvRisk--${item.severity}`}>
+                        <p className="memoEvRiskHead">
+                          <span className="memoEvRiskSeverity">{SEVERITY_LABEL[item.severity]}</span>
+                          <span className="memoEvRiskTitle">{renderWithMonoNumbers(item.title)}</span>
+                        </p>
+                        <p className="memoEvRiskWhy">{renderWithMonoNumbers(item.whyItMatters)}</p>
+                        {(item.basis || item.missingData || item.source) && (
+                          <p className="memoEvRiskMeta">
+                            {[item.basis, item.missingData ? 'Missing data' : null, item.source].filter(Boolean).join('  ·  ')}
+                          </p>
+                        )}
+                      </article>
+                    ))}
+                  </div>
                 )}
                 {config.memo.includeMissingData && missingEvidenceItems.length > 0 && (
                   <div className="memoDocSubsection">
-                    <p className="memoDocSubhead">Missing Evidence</p>
+                    <p className="memoDocSubhead">Missing evidence</p>
                     <ul className="memoList">
                       {missingEvidenceItems.map((item, i) => (
                         <li key={i} className="memoListItem">
@@ -1250,7 +1318,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 )}
                 {adverseRegister.length === 0 && riskFactors.risks.length > 0 && (
                   <div className="memoDocSubsection">
-                    <p className="memoDocSubhead">Other Risks</p>
+                    <p className="memoDocSubhead">Other risks</p>
                     <ul className="memoList">
                       {riskFactors.risks.map((r, i) => (
                         <li key={i} className="memoListItem">
@@ -1263,7 +1331,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 )}
                 {riskFactors.mitigation.length > 0 && (
                   <div className="memoDocSubsection">
-                    <p className="memoDocSubhead">Mitigation Checklist</p>
+                    <p className="memoDocSubhead">Mitigation</p>
                     <ul className="memoList">
                       {riskFactors.mitigation.map((item, i) => (
                         <li key={i} className="memoListItem">
@@ -1277,107 +1345,54 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </section>
             )}
 
-            {/* ── Ruling ── */}
-            {nextStepText && (
-              <section className="memoDocSection memoNextActionSection" aria-labelledby="memo-next">
-                <h2 className="memoDocSectionHead" id="memo-next">Next Steps</h2>
-                {nextStepItems.length > 0 ? (
-                  <ul className="memoList">
-                    {nextStepItems.map((item, idx) => (
-                      <li key={idx} className="memoListItem">
-                        <span className="memoBullet"><span className="memoNum">{idx + 1}</span>.</span>
-                        <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="memoDocProse">{renderWithMonoNumbers(nextStepText)}</p>
-                )}
-              </section>
+            {/* ── Your ruling ── */}
+            {!readOnly && !isAlreadyDecided && showJudgment && (
+              <MemoRulingSection
+                rulingIntro={rulingIntro}
+                nextStepItems={nextStepItems}
+                rulingDecision={rulingDecision}
+                rulingNotes={rulingNotes}
+                rulingSaving={rulingSaving}
+                rulingError={rulingError}
+                needsRiskAcknowledgement={needsRiskAcknowledgement}
+                risksReviewed={risksReviewed}
+                riskReviewOutstanding={riskReviewOutstanding}
+                onSelectDecision={setRulingDecision}
+                onNotesChange={setRulingNotes}
+                onAcknowledgeRisks={() => setRisksReviewed(true)}
+                onSubmit={() => void handleRulingSubmit()}
+                renderWithMonoNumbers={renderWithMonoNumbers}
+                normalizeListItemText={normalizeListItemText}
+              />
             )}
 
-            {!isAlreadyDecided && showJudgment && (
-              <section className="memoDocSection memoRulingControls" aria-labelledby="memo-final-ruling">
-                <h2 className="memoDocSectionHead" id="memo-final-ruling">Commit Ruling</h2>
-                <p className="memoRulingIntro">{rulingIntro}</p>
-                <div className="memoRulingPanel">
-                  <div className="memoDecisionChoices" role="group" aria-label="Choose final ruling">
-                    {([
-                      ['YES', 'Invest'],
-                      ['MAYBE', 'Monitor'],
-                      ['NO', 'Pass'],
-                    ] as const).map(([decision, label]) => (
-                      <button
-                        key={decision}
-                        type="button"
-                        onClick={() => setRulingDecision(decision)}
-                        aria-pressed={rulingDecision === decision}
-                        disabled={rulingSaving}
-                        className="memoDecisionChoice"
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    value={rulingNotes}
-                    onChange={(e) => setRulingNotes(e.target.value)}
-                    disabled={rulingSaving}
-                    rows={2}
-                    className="memoRulingTextarea"
-                    placeholder="Ruling rationale..."
-                    aria-label="Final ruling rationale"
-                  />
-                  {needsRiskAcknowledgement && (
-                    <div
-                      className={`memoRiskGate${risksReviewed ? ' memoRiskGate--complete' : ''}`}
-                      aria-live="polite"
-                    >
-                      <div className="memoRiskGateCopy">
-                        <span className="memoRiskGateKicker">
-                          {risksReviewed ? 'Risk review confirmed' : 'Risk review required'}
-                        </span>
-                        <p className="memoRiskGateText">
-                          {risksReviewed
-                            ? 'High-severity risks have been acknowledged. You can commit the ruling when ready.'
-                            : 'High-severity risks are present. Confirm that you have reviewed them before committing a final ruling.'}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setRisksReviewed(true)}
-                        className="memoRiskAckButton"
-                        aria-pressed={risksReviewed}
-                        disabled={rulingSaving || risksReviewed}
-                      >
-                        {risksReviewed ? 'Risk review acknowledged' : 'I have reviewed the high-severity risks'}
-                      </button>
-                    </div>
-                  )}
-                  <div className={`memoRulingSubmitRow${riskReviewOutstanding ? ' memoRulingSubmitRow--locked' : ''}`}>
-                    {riskReviewOutstanding && (
-                      <span className="memoRulingGateLabel">Final commit remains locked</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleRulingSubmit}
-                      disabled={!rulingDecision || rulingNotes.trim().length < 5 || rulingSaving || riskReviewOutstanding}
-                      className="memoRulingSubmit"
-                    >
-                      {rulingSaving ? 'Recording...' : 'Commit ruling'}
-                    </button>
-                    {riskReviewOutstanding && (
-                      <span className="memoRulingHint">Acknowledge the risk review to unlock this action.</span>
-                    )}
-                    {rulingError && <span className="memoRulingError">{rulingError}</span>}
-                  </div>
-                </div>
-              </section>
+            {/* ── Supporting detail (sits under the ruling) ── */}
+            <div className="memoDiscGroup">
+            {/* ── Partner rationale ── */}
+            {showJudgment && reasoningParagraphs.length > 0 && (
+              <MemoDisclosureSection
+                id={`${contentKey}-rationale`}
+                title="Partner rationale"
+                summary={`${reasoningParagraphs.length} note${reasoningParagraphs.length === 1 ? '' : 's'}`}
+                initialOpen={!config.memo.deepDiveCollapsed}
+              >
+                {reasoningParagraphs.map((p, i) => (
+                  <p key={i} className="memoDocProse">{renderWithMonoNumbers(p)}</p>
+                ))}
+              </MemoDisclosureSection>
             )}
 
             {showJudgment && (convictionHistory.length > 0 || precedentCandidates.length > 0) && (
-              <section className="memoDocSection memoDecisionLedger" aria-labelledby="memo-decision-ledger">
-                <h2 className="memoDocSectionHead" id="memo-decision-ledger">Decision Ledger</h2>
+              <MemoDisclosureSection
+                id={`${contentKey}-ledger`}
+                title="Decision ledger"
+                summary={
+                  convictionHistory.length > 0
+                    ? `${convictionHistory.length} change${convictionHistory.length === 1 ? '' : 's'}`
+                    : `${precedentCandidates.length} precedent${precedentCandidates.length === 1 ? '' : 's'}`
+                }
+                initialOpen={false}
+              >
                 {convictionHistory.length > 0 && (
                   <ol className="memoLedgerList">
                     {[...convictionHistory].reverse().slice(0, 5).map((entry, index) => (
@@ -1413,124 +1428,83 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </ul>
                   </div>
                 )}
-              </section>
+              </MemoDisclosureSection>
             )}
 
-            {/* ── Decision Context (LLM trigger) ── */}
+            {/* ── Decision context (LLM trigger) ── */}
             {displayStartup.partner?.llm_fallback_reason && (
-              <div className="memoDocSection">
-                <dl className="memoDocDL">
-                  <div className="memoDocDLRow">
-                    <dt className="memoDocDT">Decision context</dt>
-                    <dd className="memoDocDD">{renderWithMonoNumbers(displayStartup.partner.llm_fallback_reason)}</dd>
-                  </div>
-                </dl>
-              </div>
+              <MemoDisclosureSection
+                id={`${contentKey}-context`}
+                title="Decision context"
+                summary="Why this needed judgement"
+                initialOpen={false}
+              >
+                <p className="memoDocProse">{renderWithMonoNumbers(displayStartup.partner.llm_fallback_reason)}</p>
+              </MemoDisclosureSection>
             )}
+            </div>
 
+            {/* ── Footer detail ── */}
+            <div className="memoDiscGroup">
             {/* ── Sources ── */}
             {config.memo.includeEvidenceExcerpts && memoSources.length > 0 && (
-              <section className="memoSourcesSection">
-                <button
-                  type="button"
-                  className="memoSourcesToggle"
-                  onClick={() => setSourcesOpen((v) => !v)}
-                  aria-expanded={sourcesOpen}
-                  aria-controls={`${contentKey}-sources-panel`}
-                >
-                  <span>Sources</span>
-                  <span className="memoSourcesPlus">{sourcesOpen ? '−' : '+'}</span>
-                </button>
-                <motion.div
-                  initial={false}
-                  animate={sourcesOpen ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
-                  transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.16, 1, 0.3, 1] })}
-                >
-                  <div
-                    id={`${contentKey}-sources-panel`}
-                    className={`min-h-0 overflow-hidden ${sourcesOpen ? '' : 'hidden'}`}
-                  >
-                    <div className="memoSourcesBody">
-                      <ul className="memoList">
-                        {memoSources
-                          .map((source, i) => {
-                            return (
-                              <li key={i} className="memoListItem">
-                                <span className="memoBullet">·</span>
-                                <span className="min-w-0">
-                                {source.href ? (
-                                  <a className="memoLink" href={source.href} target="_blank" rel="noreferrer">{renderWithMonoNumbers(source.label)}</a>
-                                ) : (
-                                  <span>{renderWithMonoNumbers(source.label)}</span>
-                                )}
-                                  <span className="block type-meta normal-case tracking-normal text-oxford/42">
-                                    {sourceSupportLine(source, config.memo.includeSourceConfidence)}
-                                  </span>
-                                </span>
-                              </li>
-                            );
-                          })}
-                      </ul>
-                    </div>
-                  </div>
-                </motion.div>
-              </section>
+              <MemoDisclosureSection
+                id={`${contentKey}-sources`}
+                title="Sources"
+                summary={`${memoSources.length} reference${memoSources.length === 1 ? '' : 's'}`}
+                initialOpen={!config.memo.deepDiveCollapsed}
+              >
+                <ul className="memoList">
+                  {memoSources.map((source, i) => (
+                    <li key={i} className="memoListItem">
+                      <span className="memoBullet">·</span>
+                      <span className="min-w-0">
+                        {source.href ? (
+                          <a className="memoLink" href={source.href} target="_blank" rel="noreferrer">{renderWithMonoNumbers(source.label)}</a>
+                        ) : (
+                          <span>{renderWithMonoNumbers(source.label)}</span>
+                        )}
+                        <span className="memoSourceSupport">
+                          {sourceSupportLine(source, config.memo.includeSourceConfidence)}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </MemoDisclosureSection>
             )}
 
-            {/* ── Run Log ── */}
+            {/* ── Run log ── */}
             {pipelineReplaySteps.length > 0 && (
-              <section
-                className="memoPipelineSection"
-                aria-label="Run log"
+              <MemoDisclosureSection
+                id={`${contentKey}-run-log`}
+                title="Run log"
+                summary={pipelineReplaySummary}
+                initialOpen={false}
               >
-                <button
-                  type="button"
-                  className="memoPipelineToggle"
-                  onClick={() => setPipelineLogOpen((v) => !v)}
-                  aria-expanded={pipelineLogOpen}
-                  aria-controls={`${contentKey}-pipeline-panel`}
-                >
-                  <span className="memoPipelineToggleTitle">
-                    <span className="memoPipelineKicker">Run log</span>
-                    <span className="memoPipelineOneLiner" title={pipelineReplaySummary}>
-                      {renderWithMonoNumbers(pipelineReplaySummary)}
-                    </span>
-                  </span>
-                  <span className="memoPipelinePlus">{pipelineLogOpen ? '−' : '+'}</span>
-                </button>
-                <motion.div
-                  initial={false}
-                  animate={pipelineLogOpen ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
-                  transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.16, 1, 0.3, 1] })}
-                >
-                  <div
-                    id={`${contentKey}-pipeline-panel`}
-                    className={`min-h-0 overflow-hidden ${pipelineLogOpen ? '' : 'hidden'}`}
-                  >
-                    <ol className="memoReplayList">
-                      {pipelineReplaySteps.map((step) => (
-                        <li key={step.id} className="memoReplayItem">
-                          <p className="memoReplayKicker">
-                            <span>{step.label}</span>
-                            <span className={step.done ? 'memoReplayBadge' : 'memoReplayBadge memoReplayBadge--pending'}>
-                              {step.done ? 'Done' : 'Pending'}
-                            </span>
-                          </p>
-                          <p className="memoReplayWhen">{renderWithMonoNumbers(step.atDisplay)}</p>
-                          <p className="memoReplayDetail">{renderWithMonoNumbers(step.detail)}</p>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                </motion.div>
-              </section>
+                <ol className="memoReplayList">
+                  {pipelineReplaySteps.map((step) => (
+                    <li key={step.id} className="memoReplayItem">
+                      <p className="memoReplayKicker">
+                        <span>{step.label}</span>
+                        <span className={step.done ? 'memoReplayBadge' : 'memoReplayBadge memoReplayBadge--pending'}>
+                          {step.done ? 'Done' : 'Pending'}
+                        </span>
+                      </p>
+                      <p className="memoReplayWhen">{renderWithMonoNumbers(step.atDisplay)}</p>
+                      <p className="memoReplayDetail">{renderWithMonoNumbers(step.detail)}</p>
+                    </li>
+                  ))}
+                </ol>
+              </MemoDisclosureSection>
             )}
+            </div>
 
 
           </motion.div>
         </div>
       )}
-    </div>
+    </article>
   );
 });
 
