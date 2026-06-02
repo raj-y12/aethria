@@ -109,8 +109,6 @@ export default function DispatchCommandBar({
   onCancel,
   isBusy,
   message,
-  onClearMessage,
-  lookupPhase,
   progress,
   result,
   chips = [],
@@ -310,9 +308,8 @@ export default function DispatchCommandBar({
                         onSubmit={handleSubmit}
                         onCancel={onCancel}
                         isBusy={isBusy}
-                        message={message}
-                        onClearMessage={onClearMessage}
-                        lookupPhase={lookupPhase}
+                        message={null}
+                        lookupPhase={null}
                         displayMode="embedded"
                       />
                     </div>

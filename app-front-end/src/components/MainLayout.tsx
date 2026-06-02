@@ -680,12 +680,11 @@ export default function MainLayout({
       },
     });
     if (pendingLookupMatch.is_new_to_user) markStartupAcknowledged(pendingLookupMatch);
-    // Opened → drop it from the stack and promote the next chip (if any).
-    const next = backgroundLookups[0] ?? null;
-    setBackgroundLookups((bg) => bg.slice(1));
-    setPendingLookup(next);
+    // Opened → clear the active lookup entirely (don't auto-jump to another).
+    // Any backgrounded lookups remain as chips, reachable on reopen.
+    setPendingLookup(null);
     setCommandBarOpen(false); // close the takeover so the memo is visible
-  }, [pendingLookupMatch, markStartupAcknowledged, backgroundLookups]);
+  }, [pendingLookupMatch, markStartupAcknowledged]);
 
   // Resolve a tracked lookup's startup row (status from the live list).
   const findLookupMatch = useCallback(

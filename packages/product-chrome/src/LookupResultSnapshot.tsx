@@ -37,7 +37,7 @@ export default function LookupResultSnapshot({
       ? 'font-sans text-[clamp(1.375rem,5vw,2rem)] font-semibold leading-tight tracking-[-0.03em] text-oxford md:text-[32px]'
       : 'font-sans text-[18px] font-semibold leading-tight text-oxford';
 
-  const showCompanyName = isMemo || !queryLabel;
+  const showCompanyName = true;
 
   return (
     <article
@@ -50,11 +50,10 @@ export default function LookupResultSnapshot({
             : `Intelligence snapshot for ${companyName}`
       }
     >
-      {isMemo || queryLabel ? (
+      {isMemo ? (
         <LookupCommandBar
-          label={isMemo ? 'MEMO' : 'LOOKUP'}
-          query={isMemo ? undefined : queryLabel}
-          trailing={isMemo ? 'close' : 'result'}
+          label="MEMO"
+          trailing="close"
           className="border-0 border-b border-solid border-oxford/10 bg-oxford/[0.025]"
         />
       ) : null}
