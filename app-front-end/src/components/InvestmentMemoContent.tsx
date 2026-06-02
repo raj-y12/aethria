@@ -35,6 +35,7 @@ import {
   type FundConfiguration,
 } from '../lib/fundConfiguration';
 import { findPrecedentCandidates } from '../lib/institutionalConviction';
+import { getNextStepText, parseNextStepItems } from '../lib/memoText';
 const MEMO_POLL_INITIAL_MS = 2000;
 const MEMO_POLL_MAX_MS = 15000;
 const MEMO_POLL_MAX_ATTEMPTS = 60;
@@ -191,46 +192,6 @@ function toJudgmentReasoning(startup: Startup): string[] {
   const rationale = startup.partner?.decision_rationale;
   if (!rationale) return [];
   return normalizeParagraphs(rationale);
-}
-
-function getNextStepText(startup: Startup): string {
-  return (startup.partner?.next_action ?? startup.partner?.next_step ?? '').trim();
-}
-
-function parseNextStepItems(raw: string): string[] {
-  const text = raw.trim();
-  if (!text) return [];
-
-  const lines = text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.replace(/^[-*•]\s+/, '').replace(/^\d+[\)\.]\s+/, '').trim())
-    .filter(Boolean);
-  if (lines.length >= 2) return lines;
-
-  const numberedMatches = [...text.matchAll(/(?:^|\s)\d+[\)\.]\s+/g)];
-  if (numberedMatches.length >= 2) {
-    const items: string[] = [];
-    for (let i = 0; i < numberedMatches.length; i++) {
-      const start = (numberedMatches[i].index ?? 0) + numberedMatches[i][0].length;
-      const end = i + 1 < numberedMatches.length ? (numberedMatches[i + 1].index ?? text.length) : text.length;
-      const item = text.slice(start, end).trim().replace(/\s+/g, ' ');
-      if (item) items.push(item.replace(/[;,\s]+$/, ''));
-    }
-    if (items.length >= 2) return items;
-  }
-
-  if (text.includes(' - ')) {
-    const parts = text.split(/\s-\s+/).map((p) => p.trim()).filter(Boolean);
-    if (parts.length >= 2) return parts;
-  }
-  if (text.includes(';')) {
-    const parts = text.split(';').map((p) => p.trim()).filter(Boolean);
-    if (parts.length >= 2) return parts;
-  }
-
-  return [];
 }
 
 function firstNonEmpty(...values: Array<unknown>): string {
@@ -860,12 +821,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     displayStartup?.review?.consensus_verdict,
     displayStartup?.review?.derived_verdict,
   ]);
-
-  const rulingIntro =
-    config.memo.tone === 'analyst'
-      ? 'Record the fund view after reviewing the analyst read, material adverse items, and next action.'
-      : 'Record the fund view after weighing the recommendation, material adverse items, and next action.';
-
   return (
     <article className={wrapperCls} aria-labelledby="memo-title">
       {/* Styles extracted to InvestmentMemoContent.css */}
@@ -970,19 +925,20 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     {renderWithMonoNumbers(coverRulingHeadline)}
                   </p>
                 )}
-                <p className="memoCoverRulingSupport">
-                  {displayStartup.review?.overall_score != null
-                    ? renderWithMonoNumbers(`${displayStartup.review.overall_score}/10 conviction`)
-                    : thesisAlignmentBrief
-                      ? renderWithMonoNumbers(thesisAlignmentBrief)
-                      : 'Conviction forming'}
+                <div className="memoCoverRulingSupport">
+                  <p className="memoCoverRulingConviction">
+                    {displayStartup.review?.overall_score != null
+                      ? renderWithMonoNumbers(`${displayStartup.review.overall_score}/10 conviction`)
+                      : thesisAlignmentBrief
+                        ? renderWithMonoNumbers(thesisAlignmentBrief)
+                        : 'Conviction forming'}
+                  </p>
                   {reviewerConsensus.verdict ? (
-                    <span className="memoCoverRulingMeta">
-                      {' · '}
-                      {reviewerConsensus.split ? 'reviewers split' : 'reviewers aligned'}
-                    </span>
+                    <p className="memoCoverRulingConsensus">
+                      {reviewerConsensus.split ? 'Reviewers split' : 'Reviewers aligned'}
+                    </p>
                   ) : null}
-                </p>
+                </div>
                 {coverStatusText ? (
                   <p
                     className={`memoCoverStatus${
@@ -995,7 +951,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 ) : null}
               </div>
 
-              {(coverBlocker || coverAction) && (
+              {!embedded && (coverBlocker || coverAction) ? (
                 <dl className="memoCoverBrief">
                   {coverBlocker ? (
                     <div className="memoCoverBriefItem">
@@ -1010,7 +966,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </div>
                   ) : null}
                 </dl>
-              )}
+              ) : null}
             </header>
 
             {/* ── Company snapshot ── */}
@@ -1027,6 +983,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </dl>
               </section>
             )}
+
+            {embedded && coverAction && !(showEscalationBadge && !isAlreadyDecided) ? (
+              <div className="memoCoverNextMove" aria-label="Next move">
+                <p className="memoCoverNextMoveLabel">Next move</p>
+                <p className="memoCoverNextMoveText">{renderWithMonoNumbers(coverAction)}</p>
+              </div>
+            ) : null}
 
             {/* ── Investment case ── */}
             {investmentCasePoints.length > 0 && (
@@ -1349,8 +1312,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Your ruling ── */}
             {!readOnly && !isAlreadyDecided && showJudgment && (
               <MemoRulingSection
-                rulingIntro={rulingIntro}
-                nextStepItems={nextStepItems}
                 rulingDecision={rulingDecision}
                 rulingNotes={rulingNotes}
                 rulingSaving={rulingSaving}
@@ -1362,8 +1323,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 onNotesChange={setRulingNotes}
                 onAcknowledgeRisks={() => setRisksReviewed(true)}
                 onSubmit={() => void handleRulingSubmit()}
-                renderWithMonoNumbers={renderWithMonoNumbers}
-                normalizeListItemText={normalizeListItemText}
               />
             )}
 

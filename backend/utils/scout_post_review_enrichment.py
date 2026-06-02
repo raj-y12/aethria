@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from models import ScoutInfo
 from utils.reference_verify import extract_http_urls, normalize_url_for_match
+from utils.scout_field_gaps import is_missing_tam, is_weak_funding_stage
 
 logger = logging.getLogger(__name__)
 
@@ -45,21 +46,6 @@ def _min_conf() -> float:
         return float(os.getenv("SCOUT_ENRICH_MIN_CONFIDENCE", "0.4"))
     except ValueError:
         return 0.4
-
-
-def _is_missing_tam(value: Any) -> bool:
-    if value is None:
-        return True
-    if isinstance(value, str) and not value.strip():
-        return True
-    return False
-
-
-def _is_weak_funding_stage(value: Any) -> bool:
-    if value is None:
-        return True
-    t = str(value).strip().lower()
-    return not t or t in ("unknown", "null", "n/a", "na")
 
 
 def _ref_url_keys(refs: Optional[List[Any]]) -> set[str]:
@@ -153,7 +139,7 @@ def merge_scout_info_enrichment(
     patches: Dict[str, Any] = {}
     min_c = _min_conf()
 
-    if _is_missing_tam(scout_info.est_tam):
+    if is_missing_tam(scout_info.est_tam):
         tam_s, conf = _tam_cell_from_review(review_output)
         if tam_s and conf >= min_c:
             # Ignore useless placeholder extraction
@@ -165,7 +151,7 @@ def merge_scout_info_enrichment(
                     conf,
                 )
 
-    if _is_weak_funding_stage(scout_info.funding_stage) and infer_funding_stage_from_review_text_enabled():
+    if is_weak_funding_stage(scout_info.funding_stage) and infer_funding_stage_from_review_text_enabled():
         inferred = infer_funding_stage_from_text(_collect_review_text_blobs(review_output))
         if inferred and inferred in _ALLOWED_FUNDING:
             patches["funding_stage"] = inferred

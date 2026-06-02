@@ -350,6 +350,7 @@ class Scout(ABC):
         grounded_enabled: bool,
         fail_closed: bool,
         explicit_website: Optional[str] = None,
+        for_lookup: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Allowlist filter + reference finalize. Returns None if fail-closed with no references."""
         out = dict(data)
@@ -383,9 +384,15 @@ class Scout(ABC):
                 self.logger.info(
                     "grounded_citations: fail-open mode; skipping strict allowlist enforcement"
                 )
+        # On-demand lookups are user-intentional: do NOT apply the parallel-slug
+        # impersonation anchor (and never the fund's own canonical site as anchor).
+        # It wrongly drops a same-named company's real references — e.g. looking up
+        # "Aethria" against the fund "Aethria" nukes aethria.com vs aethria.co.
+        # Company-token relevance + URL probes still validate the references.
+        anchor = None if for_lookup else self._reference_anchor_hostname(out, explicit_website=explicit_website)
         return finalize_scout_references(
             out,
-            anchor_hostname=self._reference_anchor_hostname(out, explicit_website=explicit_website),
+            anchor_hostname=anchor,
             company_name=str(out.get("name") or ""),
         )
 
@@ -665,6 +672,7 @@ class Scout(ABC):
         fail_closed: bool,
         explicit_website: Optional[str] = None,
         context_note: str = "",
+        for_lookup: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """
         Normalize → allowlist + URL finalize → validate; on failure run one repair LLM pass.
@@ -678,6 +686,7 @@ class Scout(ABC):
             grounded_enabled=grounded_enabled,
             fail_closed=fail_closed,
             explicit_website=explicit_website,
+            for_lookup=for_lookup,
         )
         if p is not None and self._scout_validates(p):
             return p
@@ -713,6 +722,7 @@ class Scout(ABC):
                 grounded_enabled=grounded_enabled,
                 fail_closed=fail_closed,
                 explicit_website=explicit_website,
+                for_lookup=for_lookup,
             )
             if p2 is not None and self._scout_validates(p2):
                 return p2
@@ -982,6 +992,7 @@ class Scout(ABC):
                 fail_closed=fail_closed,
                 explicit_website=site or None,
                 context_note=f'company lookup: "{company}"',
+                for_lookup=True,
             )
             if finalized is None:
                 return None

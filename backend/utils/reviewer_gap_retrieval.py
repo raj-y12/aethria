@@ -12,6 +12,7 @@ from typing import Any, Dict, List
 from urllib.parse import urlparse
 
 from utils.reference_verify import hostname_from_user_hint
+from utils.scout_field_gaps import is_missing_tam, is_weak_funding_stage
 
 logger = logging.getLogger(__name__)
 
@@ -28,26 +29,11 @@ def _only_when_gaps() -> bool:
     return _truthy("REVIEWER_GAP_RETRIEVAL_ONLY_WHEN_GAPS", "true")
 
 
-def _is_missing_tam(value: Any) -> bool:
-    if value is None:
-        return True
-    if isinstance(value, str) and not value.strip():
-        return True
-    return False
-
-
-def _is_weak_funding_stage(value: Any) -> bool:
-    if value is None:
-        return True
-    t = str(value).strip().lower()
-    return not t or t in ("unknown", "null", "n/a", "na")
-
-
 def scout_has_information_gaps(scout: Dict[str, Any]) -> bool:
     """True when Scout likely needs outside help for market / funding / corroboration."""
-    if _is_missing_tam(scout.get("est_tam")):
+    if is_missing_tam(scout.get("est_tam")):
         return True
-    if _is_weak_funding_stage(scout.get("funding_stage")):
+    if is_weak_funding_stage(scout.get("funding_stage")):
         return True
     refs = scout.get("references")
     if not isinstance(refs, list) or len([r for r in refs if isinstance(r, str) and r.strip()]) < 2:
@@ -68,9 +54,9 @@ def build_gap_queries(scout: Dict[str, Any]) -> List[str]:
     if not label:
         return []
     queries: List[str] = []
-    if _is_missing_tam(scout.get("est_tam")):
+    if is_missing_tam(scout.get("est_tam")):
         queries.append(f"{label} startup TAM market size addressable market revenue")
-    if _is_weak_funding_stage(scout.get("funding_stage")):
+    if is_weak_funding_stage(scout.get("funding_stage")):
         queries.append(f"{label} startup funding round investors valuation raised")
     queries.append(f"{label} startup founders team CEO traction customers pilots")
     # De-dupe while preserving order

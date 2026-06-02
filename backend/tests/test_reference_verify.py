@@ -35,6 +35,19 @@ def test_filter_anchor_conflicts():
     assert any("techcrunch" in r for r in out)
 
 
+def test_no_anchor_keeps_same_slug_other_tld():
+    """On-demand lookups pass anchor_hostname=None so a same-named company's real
+    references survive (e.g. looking up 'Aethria' must not drop aethria.com just
+    because the fund's site is aethria.co)."""
+    from utils.reference_verify import filter_references_anchor_conflicts
+
+    refs = ["Co https://aethria.com/about", "Co https://aethria.co/"]
+    out = filter_references_anchor_conflicts(refs, None)
+    joined = "".join(out)
+    assert "aethria.com" in joined
+    assert "aethria.co" in joined
+
+
 def test_schema_rejects_megacap_company_name_stripe():
     base = {
         "id": "550e8400-e29b-41d4-a716-446655440000",

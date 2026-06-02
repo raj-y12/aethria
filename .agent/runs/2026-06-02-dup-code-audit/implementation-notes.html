@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Duplicate code audit - Implementation Notes</title>
+  <style>
+    body { color: #202124; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.55; margin: 0 auto; max-width: 920px; padding: 40px 24px; }
+    h1, h2, h3 { line-height: 1.2; }
+    code { background: #f1f3f4; border-radius: 4px; padding: 2px 5px; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; }
+    th, td { border: 1px solid #dadce0; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #f8f9fa; }
+    .meta { background: #f8f9fa; border: 1px solid #dadce0; border-radius: 8px; padding: 16px; }
+    .timeline { background: #f8f9fa; border: 1px solid #dadce0; border-radius: 8px; max-height: 360px; overflow: auto; padding: 8px; }
+    .event { background: #fff; border: 1px solid #e8eaed; border-radius: 8px; margin: 8px 0; padding: 12px 14px; }
+    .badge { background: #e6f4ea; color: #137333; border-radius: 999px; display: inline-block; font-size: 12px; font-weight: 700; padding: 5px 8px; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <h1>Duplicate code audit</h1>
+  <div class="meta">
+    <p><strong>Goal ID:</strong> <code>2026-06-02-dup-code-audit</code></p>
+    <p><strong>Evidence:</strong> <code>evidence/jscpd-report.json</code></p>
+  </div>
+
+  <h2>Resume Here</h2>
+  <ul>
+    <li><strong>Status:</strong> Audit complete.</li>
+    <li><strong>Headline:</strong> Exact copy-paste duplication is low (~0.9%). Removable dead CSS + a few twin modules add ~1–1.3k lines. Architectural parallel paths (storage, engines) are the bigger story (~15–20% conceptual overlap in backend).</li>
+    <li><strong>Next action:</strong> User picks remediation tranche (quick wins vs storage refactor).</li>
+  </ul>
+
+  <h2>Codebase size</h2>
+  <table>
+    <tr><th>Area</th><th>Files</th><th>Lines</th></tr>
+    <tr><td>backend/*.py</td><td>156</td><td>34,624</td></tr>
+    <tr><td>app-front-end/src/*.ts</td><td>59</td><td>6,255</td></tr>
+    <tr><td>app-front-end/src/*.tsx</td><td>47</td><td>11,137</td></tr>
+    <tr><td>app-front-end/src/*.css</td><td>2</td><td>4,723</td></tr>
+    <tr><td><strong>Total audited</strong></td><td><strong>264</strong></td><td><strong>56,739</strong></td></tr>
+  </table>
+
+  <h2>Automated clone detection (jscpd)</h2>
+  <p>Config: min 8 lines, 60 tokens; ignored tests in path pattern but some test clones still reported via cross-file scan.</p>
+  <table>
+    <tr><th>Metric</th><th>Value</th></tr>
+    <tr><td>Lines scanned</td><td>35,758</td></tr>
+    <tr><td>Duplicated lines (exact clones)</td><td>315</td></tr>
+    <tr><td>Duplication rate</td><td><strong>0.88%</strong></td></tr>
+    <tr><td>Clone pairs</td><td>20</td></tr>
+  </table>
+
+  <h2>High-confidence removable duplicates</h2>
+  <table>
+    <tr><th>Location</th><th>Est. removable</th><th>Notes</th></tr>
+    <tr><td><code>InvestmentMemoContent.css</code></td><td>~900–1,200 lines</td><td>Second “Editorial briefing” block from L2084 mirrors L1171 (~913 lines, 51% similar, 373 exact-equal lines). ~30% of file is repeated non-comment lines.</td></tr>
+    <tr><td><code>InvestmentMemoContent.tsx</code> + <code>memoIcPack.ts</code></td><td>~80–120 lines</td><td>Duplicate helpers: <code>getNextStepText</code>, <code>parseNextStepItems</code>, paragraph normalization. 24 overlapping 12-line chunks.</td></tr>
+    <tr><td><code>pipeline_runner.py</code></td><td>~35–45 lines</td><td>Engine bootstrap block duplicated in <code>run_one_pipeline_cycle</code> and <code>run_on_demand_lookup</code> (L200–239 vs L495–537).</td></tr>
+    <tr><td><code>reviewer_gap_retrieval.py</code> + <code>scout_post_review_enrichment.py</code></td><td>~30–50 lines</td><td>Identical bodies: <code>_is_missing_tam</code>, <code>_is_weak_funding_stage</code>.</td></tr>
+    <tr><td><code>backend/tests/test_partner_flow.py</code> vs <code>test_end_to_end.py</code></td><td>~50–80 lines</td><td>71.8% line similarity — shared fixtures/setup.</td></tr>
+    <tr><td><code>run_scouts.py</code> vs <code>run_system.py</code></td><td>~17 lines</td><td>CLI bootstrap clone (jscpd).</td></tr>
+    <tr><td><strong>Subtotal quick wins</strong></td><td><strong>~1,050–1,300 lines</strong></td><td><strong>~2.9–3.6% of src</strong></td></tr>
+  </table>
+
+  <h2>Architectural redundancy (not exact clones)</h2>
+  <table>
+    <tr><th>Pattern</th><th>Lines involved</th><th>Assessment</th></tr>
+    <tr><td>Dual storage: <code>utils/storage.py</code>, <code>supabase_storage.py</code>, <code>portfolio/store.py</code>, <code>supabase_doc_store.py</code></td><td>~2,400</td><td>Parallel local vs Supabase CRUD; overlapping method names (<code>add_startup</code>, <code>get_startup</code>). Intentional for dev fallback but high maintenance.</td></tr>
+    <tr><td>Scout vs reviewer engines: <code>scout/base.py</code> (1054L) + <code>reviewer/base.py</code> (709L); engines 431L + 1125L</td><td>~3,300</td><td>~14–19% pairwise similarity. Shared patterns (_is_missing_token identical). Could share <code>AgentEngineBase</code>.</td></tr>
+    <tr><td><code>api.py</code> god file</td><td>3,468</td><td>Not duplicate code — concentration risk. Many routes could move to routers.</td></tr>
+    <tr><td><code>partner/decision.py</code></td><td>1,825</td><td>Large monolith; internal repetition likely but jscpd min threshold missed smaller clones.</td></tr>
+    <tr><td>Frontend god components: <code>MainLayout.tsx</code> (1447L), <code>SystemIntelligence.tsx</code> (1106L), <code>SettingsPage.tsx</code> (1178L)</td><td>~3,700</td><td>Size debt; jscpd found only small self-clones in <code>AgentLogoutModal</code>, <code>DimensionCard</code>.</td></tr>
+    <tr><td><code>AGENTS.md</code> vs <code>CLAUDE.md</code></td><td>~320</td><td>95.3% similar — doc duplication at repo root.</td></tr>
+  </table>
+
+  <h2>Frontend jscpd clones (all pairs)</h2>
+  <ul>
+    <li><code>AgentLogoutModal.tsx</code> — self-clones (keyboard/modal handlers), ~66 dup lines</li>
+    <li><code>DimensionCard.tsx</code> — self-clone 31 lines</li>
+    <li><code>DocketCaseRow.tsx</code>, <code>DecisionThresholdsPanel.tsx</code>, <code>api/settings.ts</code> — minor self-clones 10–13 lines each</li>
+  </ul>
+
+  <h2>Backend jscpd clones (top)</h2>
+  <ul>
+    <li><code>pipeline_runner.py</code> ↔ self (29L + 13L)</li>
+    <li><code>models.py</code> ↔ self (18L field blocks)</li>
+    <li><code>scoring_engine.py</code> ↔ self (23L)</li>
+    <li><code>utils/storage.py</code> — 6 clone hits (~72 lines)</li>
+    <li><code>scout/engine.py</code> ↔ <code>partner/engine.py</code> (13L)</li>
+  </ul>
+
+  <h2>Recommended remediation tranches</h2>
+  <h3>Tranche A — Safe, high ROI (&lt;1 day)</h3>
+  <ol>
+    <li>Delete duplicate CSS block in <code>InvestmentMemoContent.css</code></li>
+    <li>Extract shared memo text helpers to <code>lib/memoText.ts</code></li>
+    <li>Extract <code>build_pipeline_engines(...)</code> in <code>pipeline_runner.py</code></li>
+    <li>Merge gap/enrichment helpers into one module</li>
+    <li>Deduplicate test fixtures (<code>test_partner_flow</code> / <code>test_end_to_end</code>)</li>
+  </ol>
+  <h3>Tranche B — Medium (2–4 days)</h3>
+  <ol>
+    <li>Split <code>api.py</code> into route modules</li>
+    <li>Extract shared agent base from scout/reviewer</li>
+    <li>Consolidate <code>firstNonEmpty</code> / <code>collapseWhitespace</code> frontend utils</li>
+  </ol>
+  <h3>Tranche C — Large (1–2 weeks)</h3>
+  <ol>
+    <li>Unified storage interface; fold local JSON behind same API as Supabase</li>
+    <li>Split memo/MainLayout/Settings into section components</li>
+    <li>Single source for AGENTS.md / CLAUDE.md</li>
+  </ol>
+
+  <h2>Validation</h2>
+  <ul>
+    <li><code>npx jscpd backend app-front-end/src --min-lines 8 --min-tokens 60</code></li>
+    <li>Custom Python chunk + AST hash scripts (this audit)</li>
+    <li>Post-removal: <code>npm run build</code>, <code>pytest backend/tests</code></li>
+  </ul>
+
+  <h2>Progress Timeline</h2>
+  <div id="progress-timeline" class="timeline"></div>
+  <script>
+    const progressEvents = [
+      { ts: "2026-06-02T20:30:00Z", status: "created", phase: "start", actor: "agent", summary: "Goal ledger created." },
+      { ts: "2026-06-02T20:35:00Z", status: "done", phase: "audit", actor: "agent", summary: "jscpd + manual analysis complete. 0.88% exact dup; ~1.1k lines quick-win removable.", evidence: ["evidence/jscpd-report.json"] }
+    ];
+    function escapeHtml(v){return String(v||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");}
+    document.getElementById("progress-timeline").innerHTML = progressEvents.map(e=>`<article class="event"><span class="badge">${escapeHtml(e.status)}</span> <time>${escapeHtml(e.ts)}</time><p>${escapeHtml(e.summary)}</p></article>`).join("");
+  </script>
+</body>
+</html>

@@ -3,34 +3,25 @@
 Test complete flow: Scout → Review → Partner
 """
 import asyncio
-import sys
 import os
 import json
-from pathlib import Path
-from dotenv import load_dotenv
-
-# Load .env file from parent directory (project root)
-env_path = Path(__file__).parent.parent / ".env"
-if env_path.exists():
-    load_dotenv(env_path)
-else:
-    load_dotenv()
-
-# Add the backend directory to the path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 import logging
+import sys
+
 import pytest
+
+from integration_helpers import bootstrap_integration_test, require_openai_api_key
 from utils.storage import Storage
 from scout.engine import ScoutEngine
 from reviewer.engine import ReviewerEngine
 from partner.engine import PartnerEngine
 
+bootstrap_integration_test()
+
 
 @pytest.mark.skip(reason="Integration test — requires live OPENAI_API_KEY and tenant_user_id (run directly: python tests/test_partner_flow.py)")
 async def test_complete_flow():
     """Test the complete flow: Scout discovers → Reviewer evaluates → Partner decides."""
-    # Configure logging
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -39,11 +30,7 @@ async def test_complete_flow():
     
     logger = logging.getLogger("test")
     
-    # Get API key
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("ERROR: OPENAI_API_KEY environment variable is required")
-        sys.exit(1)
+    api_key = require_openai_api_key()
     
     # Use a test storage file
     storage_path = "data/test_partner_flow.json"

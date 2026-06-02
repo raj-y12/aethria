@@ -9,6 +9,7 @@ import os
 import resource
 import time
 from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -49,6 +50,74 @@ from fund_thesis import (
 
 logger = logging.getLogger("pipeline_runner")
 _visible_logger = logging.getLogger("uvicorn.error")
+
+
+@dataclass
+class _PipelineEngines:
+    scout_engine: ScoutEngine
+    reviewer_engine: ReviewerEngine
+    partner_engine: PartnerEngine
+    portfolio_store: PortfolioStore
+
+
+def _build_pipeline_engines(
+    *,
+    user_id: str,
+    storage: SupabaseStartupsStorage,
+    api_key: str,
+    settings: Dict[str, Any],
+    thesis_ctx,
+    use_resource_fund_thesis_fallback: bool = True,
+) -> _PipelineEngines:
+    cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
+    cost_controller = CostController(user_id=user_id) if cost_budget_enabled else None
+    deal_memory = DealMemory(user_id=user_id)
+    model = os.getenv("SCOUT_MODEL", "gpt-4o-mini")
+    reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-4o-mini")
+    use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
+    reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
+
+    scout_engine = ScoutEngine(
+        api_key=api_key,
+        storage=storage,
+        interval_seconds=300,
+        model=model,
+        cost_controller=cost_controller,
+        deal_memory=deal_memory,
+        tenant_user_id=user_id,
+        active_thesis=thesis_ctx,
+    )
+    reviewer_engine = ReviewerEngine(
+        api_key=api_key,
+        storage=storage,
+        interval_seconds=60,
+        model=reviewer_model,
+        batch_size=reviewer_batch_size,
+        cost_controller=cost_controller,
+        deal_memory=deal_memory,
+        tenant_user_id=user_id,
+        active_thesis=thesis_ctx,
+        use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
+    )
+    portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
+    portfolio_store = PortfolioStore(data_dir=portfolio_dir, user_id=user_id)
+    partner_engine = PartnerEngine(
+        storage=storage,
+        interval_seconds=30,
+        use_llm_fallback=use_llm_fallback,
+        cost_controller=cost_controller,
+        deal_memory=deal_memory,
+        portfolio_store=portfolio_store,
+        tenant_user_id=user_id,
+        fund_thesis=thesis_ctx,
+        use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
+    )
+    return _PipelineEngines(
+        scout_engine=scout_engine,
+        reviewer_engine=reviewer_engine,
+        partner_engine=partner_engine,
+        portfolio_store=portfolio_store,
+    )
 
 
 def _safe_stage_count(storage: SupabaseStartupsStorage, method_name: str, user_id: str) -> Optional[int]:
@@ -197,47 +266,17 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
         _visible_logger.warning("[%s] Pipeline skipped: fund thesis incomplete — %s", user_id[:12], e)
         return
 
-    cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
-    cost_controller = CostController(user_id=user_id) if cost_budget_enabled else None
-    deal_memory = DealMemory(user_id=user_id)
-    model = os.getenv("SCOUT_MODEL", "gpt-4o-mini")
-    reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-4o-mini")
-    use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
-    reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
-
-    scout_engine = ScoutEngine(
+    engines = _build_pipeline_engines(
+        user_id=user_id,
+        storage=storage,
         api_key=api_key,
-        storage=storage,
-        interval_seconds=300,
-        model=model,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        tenant_user_id=user_id,
-        active_thesis=thesis_ctx,
+        settings=settings,
+        thesis_ctx=thesis_ctx,
     )
-    reviewer_engine = ReviewerEngine(
-        api_key=api_key,
-        storage=storage,
-        interval_seconds=60,
-        model=reviewer_model,
-        batch_size=reviewer_batch_size,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        tenant_user_id=user_id,
-        active_thesis=thesis_ctx,
-    )
-    portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
-    portfolio_store = PortfolioStore(data_dir=portfolio_dir, user_id=user_id)
-    partner_engine = PartnerEngine(
-        storage=storage,
-        interval_seconds=30,
-        use_llm_fallback=use_llm_fallback,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        portfolio_store=portfolio_store,
-        tenant_user_id=user_id,
-        fund_thesis=thesis_ctx,
-    )
+    scout_engine = engines.scout_engine
+    reviewer_engine = engines.reviewer_engine
+    partner_engine = engines.partner_engine
+    portfolio_store = engines.portfolio_store
 
     started_at = time.perf_counter()
     agents_executed = 0
@@ -492,49 +531,17 @@ async def _run_on_demand_lookup_inner(
     except Exception as e:
         logger.warning("[%s] settings load failed during lookup; using defaults: %s", user_id[:12], e)
         settings = {"cost_budget": {}}
-    cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
-    cost_controller = CostController(user_id=user_id) if cost_budget_enabled else None
-    deal_memory = DealMemory(user_id=user_id)
-    model = os.getenv("SCOUT_MODEL", "gpt-4o-mini")
-    reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-4o-mini")
-    use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
-    reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
-
-    scout_engine = ScoutEngine(
-        api_key=api_key,
+    engines = _build_pipeline_engines(
+        user_id=user_id,
         storage=storage,
-        interval_seconds=300,
-        model=model,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        tenant_user_id=user_id,
-        active_thesis=thesis_ctx,
-    )
-    reviewer_engine = ReviewerEngine(
         api_key=api_key,
-        storage=storage,
-        interval_seconds=60,
-        model=reviewer_model,
-        batch_size=reviewer_batch_size,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        tenant_user_id=user_id,
-        active_thesis=thesis_ctx,
+        settings=settings,
+        thesis_ctx=thesis_ctx,
         use_resource_fund_thesis_fallback=False,
     )
-    portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
-    portfolio_store = PortfolioStore(data_dir=portfolio_dir, user_id=user_id)
-    partner_engine = PartnerEngine(
-        storage=storage,
-        interval_seconds=30,
-        use_llm_fallback=use_llm_fallback,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        portfolio_store=portfolio_store,
-        tenant_user_id=user_id,
-        fund_thesis=thesis_ctx,
-        use_resource_fund_thesis_fallback=False,
-    )
+    scout_engine = engines.scout_engine
+    reviewer_engine = engines.reviewer_engine
+    partner_engine = engines.partner_engine
 
     try:
         lookup_run_id = str(uuid4())
