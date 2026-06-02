@@ -45,6 +45,8 @@ import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 
 const SETTINGS_PATH = '/v1/settings';
 
+type TrackedLookup = { lookupId: string; queryLabel: string; autoOpened: boolean };
+
 const PANEL_CHROME_ACTION_BTN_CLASS = productInteraction.panelAction;
 const PANEL_CHROME_INLINE_ACTION_BTN_CLASS = productInteraction.panelActionInline;
 
@@ -236,11 +238,11 @@ export default function MainLayout({
   const [lookupBusy, setLookupBusy] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
   const [showPipelineIssueHelp, setShowPipelineIssueHelp] = useState(false);
-  const [pendingLookup, setPendingLookup] = useState<{
-    lookupId: string;
-    queryLabel: string;
-    autoOpened: boolean;
-  } | null>(null);
+  const [pendingLookup, setPendingLookup] = useState<TrackedLookup | null>(null);
+  // Other in-flight lookups the analyst started via "Look up another". The active
+  // one (pendingLookup) keeps the full polling machinery; these are chips that can
+  // be focused (swapped into active) and read their status from the startups list.
+  const [backgroundLookups, setBackgroundLookups] = useState<TrackedLookup[]>([]);
 
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const reduceMotion = usePrefersReducedMotion();
@@ -349,6 +351,11 @@ export default function MainLayout({
       const lookupId = crypto.randomUUID();
       const queued = await queueOnDemandLookup(value, lookupId);
       if (lookupRequestSeqRef.current !== requestSeq) return;
+      // Background the lookup currently in focus so it survives as a chip.
+      const current = pendingLookup;
+      if (current && !current.autoOpened && current.lookupId !== queued.lookupId) {
+        setBackgroundLookups((bg) => [current, ...bg.filter((l) => l.lookupId !== current.lookupId)]);
+      }
       setPendingLookup({
         lookupId: queued.lookupId,
         queryLabel: value,
@@ -673,9 +680,58 @@ export default function MainLayout({
       },
     });
     if (pendingLookupMatch.is_new_to_user) markStartupAcknowledged(pendingLookupMatch);
-    setPendingLookup((prev) => (prev ? { ...prev, autoOpened: true } : prev));
+    // Opened → drop it from the stack and promote the next chip (if any).
+    const next = backgroundLookups[0] ?? null;
+    setBackgroundLookups((bg) => bg.slice(1));
+    setPendingLookup(next);
     setCommandBarOpen(false); // close the takeover so the memo is visible
-  }, [pendingLookupMatch, markStartupAcknowledged]);
+  }, [pendingLookupMatch, markStartupAcknowledged, backgroundLookups]);
+
+  // Resolve a tracked lookup's startup row (status from the live list).
+  const findLookupMatch = useCallback(
+    (id: string) =>
+      startups.find(
+        (s) =>
+          (s.scout.origin_type ?? '').toLowerCase() === 'on_demand_lookup' &&
+          (s.scout.lookup_id ?? '').trim() === id.trim(),
+      ) ?? null,
+    [startups],
+  );
+
+  // Chips for the takeover: active lookup first, then backgrounded ones.
+  const lookupChips = useMemo(() => {
+    const all = [pendingLookup, ...backgroundLookups].filter(Boolean) as TrackedLookup[];
+    return all.map((l) => {
+      const m = findLookupMatch(l.lookupId);
+      const status: 'scouting' | 'reviewing' | 'decided' = m?.partner?.recommendation
+        ? 'decided'
+        : m?.review
+          ? 'reviewing'
+          : 'scouting';
+      return {
+        id: l.lookupId,
+        label: m?.scout?.name || l.queryLabel,
+        status,
+        active: l.lookupId === pendingLookup?.lookupId,
+      };
+    });
+  }, [pendingLookup, backgroundLookups, findLookupMatch]);
+
+  // Focus a backgrounded lookup: swap it into active, demote the current one.
+  const focusLookup = useCallback(
+    (id: string) => {
+      if (id === pendingLookup?.lookupId) return;
+      const target = backgroundLookups.find((l) => l.lookupId === id);
+      if (!target) return;
+      const demoted = pendingLookup && !pendingLookup.autoOpened ? pendingLookup : null;
+      setBackgroundLookups((bg) => {
+        const without = bg.filter((l) => l.lookupId !== id);
+        return demoted ? [demoted, ...without.filter((l) => l.lookupId !== demoted.lookupId)] : without;
+      });
+      setPendingLookup(target);
+    },
+    [pendingLookup, backgroundLookups],
+  );
 
   // Closing keeps the tracked lookup intact so reopening returns to its live
   // state (progress or result). It clears only when the analyst opens its memo
@@ -698,6 +754,8 @@ export default function MainLayout({
         onClearMessage={() => setLookupMessage(null)}
         lookupPhase={lookupPhaseLabel}
         progress={lookupProgress}
+        chips={lookupChips}
+        onFocusChip={focusLookup}
         result={
           pendingLookupMatch?.partner?.recommendation && lookupSnapshotProps ? (
             <LookupResultSnapshot {...lookupSnapshotProps} onOpenMemo={handleOpenLookupMemo} />

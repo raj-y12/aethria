@@ -13,6 +13,13 @@ export interface LookupProgress {
   reviewed: boolean;
 }
 
+export interface LookupChip {
+  id: string;
+  label: string;
+  status: 'scouting' | 'reviewing' | 'decided';
+  active: boolean;
+}
+
 interface DispatchCommandBarProps {
   open: boolean;
   onClose: () => void;
@@ -28,6 +35,9 @@ interface DispatchCommandBarProps {
   progress?: LookupProgress | null;
   /** Result overview (LookupResultSnapshot) shown once the lookup has a decision. */
   result?: ReactNode;
+  /** Tracked lookups (active + backgrounded) shown as a focusable chip stack. */
+  chips?: LookupChip[];
+  onFocusChip?: (id: string) => void;
 }
 
 type StepState = 'done' | 'active' | 'pending';
@@ -103,6 +113,8 @@ export default function DispatchCommandBar({
   lookupPhase,
   progress,
   result,
+  chips = [],
+  onFocusChip,
 }: DispatchCommandBarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // Local override: "Look up another" shows the compose view even while a prior
@@ -112,7 +124,6 @@ export default function DispatchCommandBar({
     if (!open) setCompose(false);
   }, [open]);
 
-  const hasTracked = !!progress || !!result;
   const view: 'result' | 'progress' | 'compose' = compose
     ? 'compose'
     : result
@@ -157,6 +168,9 @@ export default function DispatchCommandBar({
         : 'Look up a company';
   const bottomLabel =
     view === 'result' ? 'Close · Esc' : view === 'progress' ? 'Continue in background →' : 'Cancel · Esc';
+  // Show the stack when there's more than one, or in compose (so you keep context
+  // of the lookup you're stepping away from).
+  const showChips = chips.length >= 2 || (view === 'compose' && chips.length >= 1);
 
   const modal = (
     <AnimatePresence>
@@ -173,6 +187,46 @@ export default function DispatchCommandBar({
           aria-modal="true"
           aria-label="Look up a company"
         >
+          {showChips ? (
+            <motion.div
+              initial={{ opacity: 0, transform: 'translateY(-6px)' }}
+              animate={{ opacity: 1, transform: 'translateY(0px)' }}
+              transition={{ duration: 0.3, ease: EASE }}
+              className="mb-phi-7 flex flex-wrap items-center justify-center gap-phi-2"
+              aria-label="Tracked lookups"
+            >
+              {chips.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    onFocusChip?.(c.id);
+                    setCompose(false);
+                  }}
+                  aria-pressed={c.active}
+                  className={`inline-flex items-center gap-phi-2 border px-phi-3 py-phi-1 font-mono text-[10px] uppercase tracking-[0.1em] transition-colors btn-interaction ${
+                    c.active
+                      ? 'border-oxford/30 bg-oxford/[0.06] text-oxford'
+                      : 'border-oxford/12 text-oxford/45 hover:border-oxford/25 hover:text-oxford/70'
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-none ${
+                      c.status === 'decided'
+                        ? 'bg-oxford'
+                        : c.status === 'reviewing'
+                          ? 'bg-oxford signal-dot-breathe'
+                          : 'bg-oxford/30 signal-dot-breathe'
+                    }`}
+                    aria-hidden
+                  />
+                  <span className="max-w-[14ch] truncate">{c.label}</span>
+                  {c.status === 'decided' ? <span className="text-oxford/40" aria-hidden>✓</span> : null}
+                </button>
+              ))}
+            </motion.div>
+          ) : null}
+
           <AnimatePresence mode="wait">
             <motion.div
               key={view}
@@ -262,9 +316,6 @@ export default function DispatchCommandBar({
                         displayMode="embedded"
                       />
                     </div>
-                    {hasTracked ? (
-                      <QuietLink onClick={() => setCompose(false)}>← Back to current lookup</QuietLink>
-                    ) : null}
                   </motion.div>
                 </>
               )}
