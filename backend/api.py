@@ -31,6 +31,7 @@ if load_dotenv:
     else:
         load_dotenv()
 
+import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -125,6 +126,19 @@ _LOOKUP_LEADING_PHRASE_RE = re.compile(
     r"(?i)^\s*(?:find|lookup|look\s+up|search(?:\s+for)?|analy[sz]e|evaluate|check(?:\s+out)?|research)\s+"
 )
 _LOOKUP_TRAILING_QUALIFIERS = {"company", "startup", "website", "profile"}
+_LOOKUP_COMMAND_ONLY_PHRASES = {
+    "find",
+    "lookup",
+    "look up",
+    "search",
+    "search for",
+    "analyze",
+    "analyse",
+    "evaluate",
+    "check",
+    "check out",
+    "research",
+}
 
 # Per-user persistent agent loops: user_id -> asyncio.Task
 # Protected by _loops_lock to prevent duplicate tasks per user.
@@ -170,6 +184,23 @@ def _safe_table_execute(fn, *, default_data, warn_label: str):
     except Exception as e:
         _logger_agents.warning("%s failed; returning fallback: %s", warn_label, e)
         return default_data
+
+
+def _is_retryable_thesis_transport_error(err: Exception) -> bool:
+    if isinstance(err, httpx.HTTPError):
+        return True
+    if isinstance(err, OSError) and getattr(err, "errno", None) == 11:
+        return True
+    err_name = type(err).__name__
+    return err_name in {
+        "ReadError",
+        "ConnectError",
+        "TimeoutException",
+        "HTTPError",
+        "RemoteProtocolError",
+        "ProtocolError",
+        "TransportError",
+    }
 
 
 async def _agent_worker() -> None:
@@ -2419,8 +2450,7 @@ def get_fund_thesis_runtime(request: Request):
             raise HTTPException(status_code=503, detail="Thesis query failed; please retry") from e
         raise
     except Exception as e:
-        err_name = type(e).__name__
-        if err_name in ("ReadError", "ConnectError", "TimeoutException", "HTTPError"):
+        if _is_retryable_thesis_transport_error(e):
             raise HTTPException(status_code=503, detail="Thesis query failed; please retry") from e
         raise
 
@@ -2890,7 +2920,8 @@ def _parse_lookup_input(lookup_input: str) -> Dict[str, Optional[str]]:
             website = host or None
             # Strip the detected website token so company_name remains clean.
             candidate_name = re.sub(re.escape(token), " ", raw, flags=re.IGNORECASE).strip(" ,|-")
-            if candidate_name:
+            candidate_name = _normalize_lookup_company_phrase(candidate_name)
+            if candidate_name and not _is_lookup_command_only(candidate_name):
                 company_name = candidate_name
                 input_type = "context_query" if len(candidate_name.split()) > 3 else "company_name"
             elif website:
@@ -2926,6 +2957,12 @@ def _normalize_lookup_company_phrase(raw: str) -> str:
         if last in _LOOKUP_TRAILING_QUALIFIERS and not (last == "company" and starts_with_the):
             value = " ".join(tokens[:-1]).strip(" ,:;-")
     return value or raw.strip()
+
+
+def _is_lookup_command_only(value: str) -> bool:
+    normalized = re.sub(r"[^a-z ]+", " ", (value or "").lower())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized in _LOOKUP_COMMAND_ONLY_PHRASES
 
 
 @app.post("/api/startups/lookup")

@@ -8,9 +8,14 @@ import json
 import logging
 import asyncio
 import os
+import re
+import ssl
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
+from html import unescape
+import certifi
 from openai import OpenAI
 
 from scout.schema import ScoutOutput, validate_scout_output, generate_id
@@ -435,6 +440,123 @@ class Scout(ABC):
         return sorted(sources, key=score, reverse=True)
 
     @staticmethod
+    def _explicit_website_url(website_hint: Optional[str]) -> str:
+        site = (website_hint or "").strip()
+        if not site:
+            return ""
+        return site if site.lower().startswith(("http://", "https://")) else f"https://{site}"
+
+    @staticmethod
+    def _site_summary_from_html(html: str) -> str:
+        text = str(html or "")
+        if not text:
+            return ""
+
+        def clean(value: str) -> str:
+            value = re.sub(r"<[^>]+>", " ", value or "")
+            value = unescape(value)
+            value = re.sub(r"\s+", " ", value).strip()
+            return value
+
+        parts: list[str] = []
+        title_match = re.search(r"(?is)<title[^>]*>(.*?)</title>", text)
+        if title_match:
+            title = clean(title_match.group(1))
+            if title:
+                parts.append(f"Title: {title}")
+        meta_patterns = (
+            r"""(?is)<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["'][^>]*>""",
+            r"""(?is)<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["'][^>]*>""",
+            r"""(?is)<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["'][^>]*>""",
+            r"""(?is)<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["'][^>]*>""",
+        )
+        for pattern in meta_patterns:
+            match = re.search(pattern, text)
+            if not match:
+                continue
+            desc = clean(match.group(1))
+            if desc and desc not in " ".join(parts):
+                parts.append(f"Description: {desc}")
+                break
+        return " ".join(parts)[:900]
+
+    def _fetch_explicit_website_snippet(self, official_url: str) -> str:
+        if not official_url:
+            return ""
+        try:
+            timeout = float(os.getenv("LOOKUP_WEBSITE_FETCH_TIMEOUT", "5.0"))
+        except ValueError:
+            timeout = 5.0
+        timeout = max(1.0, min(timeout, 10.0))
+        try:
+            req = Request(
+                official_url,
+                headers={"User-Agent": "AethriaLookup/1.0 (official-site-summary)"},
+                method="GET",
+            )
+            ctx = ssl.create_default_context(cafile=certifi.where())
+            with urlopen(req, timeout=timeout, context=ctx) as resp:
+                raw = resp.read(160_000)
+            html = raw.decode("utf-8", errors="replace")
+            return self._site_summary_from_html(html)
+        except Exception as e:
+            self.logger.debug("official website summary fetch failed url=%s error=%s", official_url[:120], e)
+            return ""
+
+    def _add_explicit_website_source(
+        self,
+        source_pack: Dict[str, Any],
+        *,
+        company_name: str,
+        website_hint: Optional[str],
+    ) -> Dict[str, Any]:
+        """Promote a user-provided lookup website into the citable source pack."""
+        official_url = self._explicit_website_url(website_hint)
+        if not official_url:
+            return source_pack
+        anchor_host = hostname_from_user_hint(website_hint)
+        sources = []
+        for source in list(source_pack.get("sources") or []):
+            if not isinstance(source, dict):
+                continue
+            if anchor_host:
+                try:
+                    source_host = (urlparse(str(source.get("url") or "")).hostname or "").lower().strip(".")
+                except Exception:
+                    source_host = ""
+                if source_host != anchor_host and not source_host.endswith("." + anchor_host):
+                    continue
+            sources.append(source)
+        existing = {
+            str(source.get("url") or "").strip().lower().rstrip("/")
+            for source in sources
+            if isinstance(source, dict)
+        }
+        if official_url.lower().rstrip("/") not in existing:
+            snippet = self._fetch_explicit_website_snippet(official_url) or (
+                "User-provided official website/domain hint for the exact company "
+                "identity in this on-demand lookup."
+            )
+            sources.insert(
+                0,
+                {
+                    "source_id": "S1",
+                    "title": f"{company_name or 'Company'} official website",
+                    "url": official_url,
+                    "snippet": snippet,
+                },
+            )
+        for i, source in enumerate(sources):
+            if isinstance(source, dict):
+                source["source_id"] = f"S{i + 1}"
+        allowlist_urls = {str(source.get("url") or "").strip() for source in sources if isinstance(source, dict)}
+        allowlist_urls.discard("")
+        out = dict(source_pack)
+        out["sources"] = sources
+        out["url_allowlist"] = allowlist_urls
+        return out
+
+    @staticmethod
     def _lookup_anchor_tokens(company_name: str) -> list[str]:
         tokens: list[str] = []
         for raw in (company_name or "").lower().replace("/", " ").replace("-", " ").replace(".", " ").split():
@@ -748,6 +870,11 @@ class Scout(ABC):
                 )
                 source_pack["sources"] = self._rank_company_lookup_sources(
                     list(source_pack.get("sources") or []),
+                    company_name=company,
+                    website_hint=site or None,
+                )
+                source_pack = self._add_explicit_website_source(
+                    source_pack,
                     company_name=company,
                     website_hint=site or None,
                 )

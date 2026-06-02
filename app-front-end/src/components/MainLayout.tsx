@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router';
+import { useAuth } from '@clerk/react-router';
 import { tokens } from '../design-system/tokens';
 import SystemBar from './SystemBar';
 import MobileHeader from './MobileHeader';
@@ -42,10 +43,16 @@ import { railEditorial } from '../design-system/railEditorial';
 import { isDealHumanResolved, isDealUnresolved } from '../lib/dealState';
 import { LookupResultSnapshot } from '@aethria/product-chrome';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
+import {
+  getDispatchLookupStorageKey,
+  loadDispatchLookupSnapshot,
+  saveDispatchLookupSnapshot,
+  type PersistedDispatchLookup,
+} from '../lib/dispatchLookupPersistence';
 
 const SETTINGS_PATH = '/v1/settings';
 
-type TrackedLookup = { lookupId: string; queryLabel: string; autoOpened: boolean };
+type TrackedLookup = PersistedDispatchLookup;
 
 const PANEL_CHROME_ACTION_BTN_CLASS = productInteraction.panelAction;
 const PANEL_CHROME_INLINE_ACTION_BTN_CLASS = productInteraction.panelActionInline;
@@ -247,6 +254,7 @@ export default function MainLayout({
   startupsError,
   onSystemPanelOpenChange,
 }: MainLayoutProps) {
+  const { userId } = useAuth();
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
   const {
     startups,
@@ -273,6 +281,7 @@ export default function MainLayout({
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
   const [showPipelineIssueHelp, setShowPipelineIssueHelp] = useState(false);
   const [pendingLookup, setPendingLookup] = useState<TrackedLookup | null>(null);
+  const [hydratedDispatchStorageKey, setHydratedDispatchStorageKey] = useState<string | null>(null);
   // Other in-flight lookups the analyst started via "Look up another". The active
   // one (pendingLookup) keeps the full polling machinery; these are chips that can
   // be focused (swapped into active) and read their status from the startups list.
@@ -288,6 +297,7 @@ export default function MainLayout({
   const lookupRequestSeqRef = useRef(0);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const dispatchStorageKey = useMemo(() => getDispatchLookupStorageKey(userId), [userId]);
   const handleMemoPipelineReady = useCallback(() => {
     const id = selectedStartup?.id;
     if (id) void queryClient.invalidateQueries({ queryKey: ['startup', 'detail', id] });
@@ -412,6 +422,22 @@ export default function MainLayout({
     setPendingLookup(null);
     setLookupMessage(null);
   }, []);
+
+  useEffect(() => {
+    if (!dispatchStorageKey || hydratedDispatchStorageKey === dispatchStorageKey) return;
+    const restored = loadDispatchLookupSnapshot(window.localStorage, dispatchStorageKey);
+    setPendingLookup(restored.pendingLookup);
+    setBackgroundLookups(restored.backgroundLookups);
+    setHydratedDispatchStorageKey(dispatchStorageKey);
+  }, [dispatchStorageKey, hydratedDispatchStorageKey]);
+
+  useEffect(() => {
+    if (!dispatchStorageKey || hydratedDispatchStorageKey !== dispatchStorageKey) return;
+    saveDispatchLookupSnapshot(window.localStorage, dispatchStorageKey, {
+      pendingLookup,
+      backgroundLookups,
+    });
+  }, [backgroundLookups, dispatchStorageKey, hydratedDispatchStorageKey, pendingLookup]);
 
   // ⌘K / Ctrl+K opens the dispatch command bar from anywhere in the cockpit.
   useEffect(() => {

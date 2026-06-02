@@ -242,9 +242,6 @@
 .memoPanel--embedded .memoOpeningBriefNote p:last-child {
   margin-top: 6px;
 }
-.memoPanel--embedded .memoSummaryCallout.memoGenCallout {
-  padding: 30px 13px;
-}
 
 .memoDocSection {
   margin-top: clamp(32px, 4.2vw, 50px);
@@ -1192,6 +1189,15 @@
 .memoCoverStatus--escalation {
   color: color-mix(in srgb, var(--color-accent) 80%, transparent);
 }
+.memoCoverStatus--detail {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-ui);
+  line-height: 1.55;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--memo-ink-muted);
+  max-width: 38rem;
+}
 .memoCoverBrief {
   margin: clamp(22px, 3vw, 30px) 0 0;
   display: flex;
@@ -2062,6 +2068,15 @@
 }
 .memoCoverStatus--escalation {
   color: color-mix(in srgb, var(--color-accent) 80%, transparent);
+}
+.memoCoverStatus--detail {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-ui);
+  line-height: 1.55;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--memo-ink-muted);
+  max-width: 38rem;
 }
 .memoCoverBrief {
   margin: clamp(22px, 3vw, 30px) 0 0;
@@ -3547,24 +3562,6 @@
   margin: 0;
 }
 
-/* === Generating state === */
-.memoGeneratingSection { margin-top: 1.25rem; }
-.memoSummaryCallout { background: transparent; padding: 0; margin: 0; border: none; }
-.memoSummaryCallout.memoGenCallout {
-  background: var(--surface-selected);
-  padding: 34px 13px; /* py-phi-6 px-phi-4 — matches WorkGrid selected row */
-}
-.memoGenCallout .memoPipelineKicker { margin-bottom: 8px; }
-/* Pipeline gate title mirrors WorkGrid DecisionBadge: mono, uppercase, badge tracking */
-.memoGenCallout .memoGateTitle {
-  margin-top: 0;
-  font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-label);
-  line-height: 1.5;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.memoGenCallout .memoGateDetail { margin-bottom: 0; }
 
 @media (max-width: 1100px) {
   .memoPanel { width: 100%; flex-basis: auto; }

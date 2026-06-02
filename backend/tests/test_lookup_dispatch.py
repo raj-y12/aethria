@@ -28,3 +28,19 @@ def test_parse_lookup_input_keeps_embedded_website_disambiguation():
     assert parsed["company_name"] == "Aethria"
     assert parsed["website"] == "aethria.ai"
     assert parsed["lookup_input_type"] == "company_name"
+
+
+def test_parse_lookup_input_normalizes_command_prefix_before_embedded_website():
+    parsed = _parse_lookup_input("look up Aethria https://aethria.co")
+
+    assert parsed["company_name"] == "Aethria"
+    assert parsed["website"] == "aethria.co"
+    assert parsed["lookup_input_type"] == "company_name"
+
+
+def test_parse_lookup_input_command_plus_only_website_uses_domain_label():
+    parsed = _parse_lookup_input("find https://aethria.co")
+
+    assert parsed["company_name"] == "Aethria"
+    assert parsed["website"] == "aethria.co"
+    assert parsed["lookup_input_type"] == "website"

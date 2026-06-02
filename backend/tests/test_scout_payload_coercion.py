@@ -1,8 +1,59 @@
 from scout.base import Scout
+import json
 
 
 class DummyScout(Scout):
     pass
+
+
+class _FakeMessage:
+    def __init__(self, content):
+        self.content = content
+
+
+class _FakeChoice:
+    def __init__(self, content):
+        self.message = _FakeMessage(content)
+
+
+class _FakeResponse:
+    def __init__(self, content):
+        self.choices = [_FakeChoice(content)]
+        self.usage = None
+
+
+class _FakeChatCompletions:
+    def __init__(self):
+        self.prompt = None
+
+    def create(self, *, messages, **kwargs):
+        self.prompt = messages[1]["content"]
+        retrieved = self.prompt.split("Retrieved sources", 1)[1]
+        assert "https://aethria.co" in retrieved
+        payload = {
+            "id": "startup-aethria",
+            "scout_type": "market_driven",
+            "name": "Aethria",
+            "one_line": "Autonomous investment discovery and evaluation.",
+            "sector": "Investment Intelligence",
+            "problem": "Deal teams need faster startup discovery and evaluation.",
+            "solution": "Aethria runs scouts, reviewers, and partner-grade memos.",
+            "target_users": "Venture capital investors",
+            "why_now": "AI agents can automate more of the deal-flow workflow.",
+            "confidence": 0.8,
+            "primary_thesis": "Workflow automation wedge into venture investing.",
+            "key_assumptions": ["VC teams trust agentic sourcing", "Evidence quality remains high"],
+            "biggest_unknown": "Whether small teams adopt autonomous diligence.",
+            "funding_stage": "Unknown",
+            "est_tam": None,
+            "references": ["Aethria official website - https://aethria.co"],
+        }
+        return _FakeResponse(json.dumps(payload))
+
+
+class _FakeClient:
+    def __init__(self):
+        self.chat = type("Chat", (), {"completions": _FakeChatCompletions()})()
 
 
 def test_coerce_payload_fixes_missing_name_and_target_users():
@@ -27,6 +78,23 @@ def test_coerce_payload_fixes_missing_name_and_target_users():
     assert isinstance(out["confidence"], float)
     assert len(out["key_assumptions"]) >= 2
     assert isinstance(out["references"], list)
+
+
+def test_site_summary_from_html_extracts_title_and_description():
+    html = """
+    <html>
+      <head>
+        <title>Aethria · Investment Intelligence</title>
+        <meta name="description" content="Aethria — autonomous investment discovery and evaluation. Scouts, scores, memos." />
+      </head>
+      <body><div id="root"></div></body>
+    </html>
+    """
+
+    summary = DummyScout._site_summary_from_html(html)
+
+    assert "Aethria · Investment Intelligence" in summary
+    assert "autonomous investment discovery and evaluation" in summary
 
 
 def test_postprocess_fail_open_keeps_valid_non_allowlisted_references(monkeypatch):
@@ -105,3 +173,78 @@ def test_postprocess_fail_closed_still_enforces_allowlist(monkeypatch):
         explicit_website=None,
     )
     assert out is None
+
+
+def test_company_lookup_includes_explicit_website_in_citable_sources(monkeypatch):
+    monkeypatch.setenv("SKIP_REFERENCE_URL_VERIFY", "1")
+    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
+    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: False)
+    monkeypatch.setattr(
+        DummyScout,
+        "_fetch_explicit_website_snippet",
+        lambda self, url: "Title: Aethria · Investment Intelligence Description: Autonomous investment discovery.",
+    )
+    monkeypatch.setattr(
+        "scout.base.retrieve_source_pack_merged",
+        lambda **kwargs: {
+            "provider": "tavily",
+            "sources": [
+                {
+                    "source_id": "S1",
+                    "title": "Aether Secures Funding",
+                    "url": "https://example.com/aether",
+                    "snippet": "A similarly named company.",
+                }
+            ],
+            "url_allowlist": {"https://example.com/aether"},
+        },
+    )
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    scout.client = _FakeClient()
+
+    out = scout._call_llm_for_company_sync("Aethria", website="aethria.co")
+
+    assert out is not None
+    assert out["name"] == "Aethria"
+    assert any("https://aethria.co" in ref for ref in out["references"])
+
+
+def test_explicit_website_source_pack_discards_non_anchor_sources():
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+
+    out = scout._add_explicit_website_source(
+        {
+            "provider": "tavily",
+            "sources": [
+                {
+                    "source_id": "S1",
+                    "title": "Aethria Solutions",
+                    "url": "https://aethriasolutions.com",
+                    "snippet": "A different similarly named services company.",
+                },
+                {
+                    "source_id": "S2",
+                    "title": "Aethria product",
+                    "url": "https://aethria.co",
+                    "snippet": "The official product site.",
+                },
+            ],
+            "url_allowlist": {"https://aethriasolutions.com", "https://aethria.co"},
+        },
+        company_name="Aethria",
+        website_hint="aethria.co",
+    )
+
+    urls = [source["url"] for source in out["sources"]]
+    assert urls == ["https://aethria.co"]
+    assert out["url_allowlist"] == {"https://aethria.co"}

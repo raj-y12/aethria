@@ -559,14 +559,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [startup, memoPartial]
   );
 
-  const memoGeneratingGateCopy = useMemo(() => {
-    if (!displayStartup) return { title: '', detail: '' };
-    const variant = getDecisionBadgeVariant(displayStartup);
-    return {
-      title: DECISION_BADGE_LABEL[variant],
-      detail: memoGeneratingDetailForVariant(variant),
-    };
-  }, [displayStartup]);
+  const pipelineBadgeVariant = useMemo(
+    () => (displayStartup ? getDecisionBadgeVariant(displayStartup) : null),
+    [displayStartup]
+  );
+  const pipelineStatusDetail = useMemo(
+    () =>
+      pipelineBadgeVariant
+        ? memoGeneratingDetailForVariant(pipelineBadgeVariant)
+        : '',
+    [pipelineBadgeVariant]
+  );
 
   const handleDownloadPDF = useCallback(async () => {
     if (!displayStartup) return;
@@ -688,13 +691,26 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const needsRiskAcknowledgement = Boolean(
     displayStartup && shouldGateRisk(config, hasHighAdverse, adverseRegister.length > 0, isAlreadyDecided)
   );
-  const showRulingStatus =
-    memoPipeline !== 'generating'
-    && Boolean(
-      isAlreadyDecided
-      || (showEscalationBadge && !isAlreadyDecided)
-      || !showJudgment
-    );
+  const coverRulingHeadline = showJudgment
+    ? decisionHeadline
+    : pipelineBadgeVariant
+      ? DECISION_BADGE_LABEL[pipelineBadgeVariant]
+      : 'Pending';
+  const coverRulingVariantClass = (
+    (showJudgment ? decisionBadgeVariant : pipelineBadgeVariant) ?? 'pending'
+  )
+    .toString()
+    .toLowerCase();
+  const coverStatusText = isAlreadyDecided && displayStartup?.human_resolution?.resolved_at
+    ? `Recorded ruling — ${decisionLabel(displayStartup.human_resolution.decision)}`
+    : showEscalationBadge && !isAlreadyDecided
+      ? 'Human ruling required'
+      : memoPipeline === 'generating' && !showJudgment
+        ? pipelineStatusDetail
+        : !showJudgment
+          ? 'Pipeline assembling recommendation'
+          : null;
+  const showCoverPipelineDetail = memoPipeline === 'generating' && !showJudgment && !!coverStatusText;
   const riskReviewOutstanding = needsRiskAcknowledgement && !risksReviewed;
   const convictionHistory = displayStartup?.conviction_state?.decision_history ?? [];
   const precedentCandidates = useMemo(
@@ -937,11 +953,23 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
               <div className="memoCoverRuling">
                 <p className="memoCoverRulingLabel">Recommendation</p>
-                <p
-                  className={`memoCoverRulingWord memoCoverRulingWord--${(decisionBadgeVariant ?? 'pending').toLowerCase()}`}
-                >
-                  {showJudgment ? renderWithMonoNumbers(decisionHeadline) : 'Pending'}
-                </p>
+                {showCoverPipelineDetail ? (
+                  <motion.p
+                    className={`memoCoverRulingWord memoCoverRulingWord--${coverRulingVariantClass}`}
+                    animate={reduceMotion ? { opacity: 1 } : { opacity: [0.72, 1, 0.72] }}
+                    transition={
+                      reduceMotion
+                        ? { duration: 0 }
+                        : { duration: 2.4, repeat: Infinity, ease: [0.77, 0, 0.175, 1] }
+                    }
+                  >
+                    {renderWithMonoNumbers(coverRulingHeadline)}
+                  </motion.p>
+                ) : (
+                  <p className={`memoCoverRulingWord memoCoverRulingWord--${coverRulingVariantClass}`}>
+                    {renderWithMonoNumbers(coverRulingHeadline)}
+                  </p>
+                )}
                 <p className="memoCoverRulingSupport">
                   {displayStartup.review?.overall_score != null
                     ? renderWithMonoNumbers(`${displayStartup.review.overall_score}/10 conviction`)
@@ -955,17 +983,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </span>
                   ) : null}
                 </p>
-                {showRulingStatus ? (
+                {coverStatusText ? (
                   <p
                     className={`memoCoverStatus${
                       showEscalationBadge && !isAlreadyDecided ? ' memoCoverStatus--escalation' : ''
-                    }`}
+                    }${showCoverPipelineDetail ? ' memoCoverStatus--detail' : ''}`}
+                    {...(showCoverPipelineDetail ? { 'aria-live': 'polite' as const } : {})}
                   >
-                    {isAlreadyDecided && displayStartup.human_resolution?.resolved_at
-                      ? `Recorded ruling — ${decisionLabel(displayStartup.human_resolution.decision)}`
-                      : showEscalationBadge
-                        ? 'Human ruling required'
-                        : 'Pipeline assembling recommendation'}
+                    {renderWithMonoNumbers(coverStatusText)}
                   </p>
                 ) : null}
               </div>
@@ -987,30 +1012,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </dl>
               )}
             </header>
-
-            {/* ── Generating state ── */}
-            {memoPipeline === 'generating' && (
-              <section className="memoGeneratingSection" aria-live="polite">
-                <div className="memoSummaryCallout memoGenCallout">
-                  <p className="memoPipelineKicker">Investment memo</p>
-                  <motion.p
-                    className="memoGateTitle"
-                    animate={reduceMotion ? { opacity: 1 } : { opacity: [0.58, 1, 0.58] }}
-                    transition={
-                      reduceMotion
-                        ? { duration: 0 }
-                        : { duration: 2.4, repeat: Infinity, ease: [0.77, 0, 0.175, 1] }
-                    }
-                  >
-                    {memoGeneratingGateCopy.title}
-                  </motion.p>
-                  <p className="memoGateDetail">
-                    {renderWithMonoNumbers(memoGeneratingGateCopy.detail)}
-                  </p>
-                </div>
-              </section>
-            )}
-
 
             {/* ── Company snapshot ── */}
             {snapshotRows.length > 0 && (

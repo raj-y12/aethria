@@ -3,6 +3,7 @@
 from utils.reviewer_gap_retrieval import (
     build_gap_queries,
     enrich_scout_for_reviewer_llm,
+    fetch_reviewer_gap_pack,
     scout_has_information_gaps,
 )
 
@@ -75,3 +76,45 @@ def test_enrich_skips_when_disabled(monkeypatch):
         "user-1",
     )
     assert "_reviewer_web_supplement" not in out
+
+
+def test_reviewer_gap_retrieval_filters_to_lookup_website(monkeypatch):
+    monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL", "1")
+    monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL_ONLY_WHEN_GAPS", "1")
+
+    def fake_retrieve(**kwargs):
+        return {
+            "provider": "tavily",
+            "sources": [
+                {
+                    "source_id": "S1",
+                    "title": "Aethria Solutions",
+                    "url": "https://aethriasolutions.com",
+                    "snippet": "A different similarly named services company.",
+                },
+                {
+                    "source_id": "S2",
+                    "title": "Aethria",
+                    "url": "https://aethria.co",
+                    "snippet": "Official product site.",
+                },
+            ],
+            "url_allowlist": {"https://aethriasolutions.com", "https://aethria.co"},
+        }
+
+    monkeypatch.setattr("utils.retrieval_grounding.retrieve_source_pack_merged", fake_retrieve)
+    pack = fetch_reviewer_gap_pack(
+        {
+            "name": "Aethria",
+            "lookup_website": "aethria.co",
+            "est_tam": None,
+            "funding_stage": "Unknown",
+            "references": ["Aethria official website - https://aethria.co"],
+        },
+        "user-1",
+    )
+
+    assert pack is not None
+    urls = [source["url"] for source in pack["sources"]]
+    assert urls == ["https://aethria.co"]
+    assert pack["url_allowlist"] == {"https://aethria.co"}

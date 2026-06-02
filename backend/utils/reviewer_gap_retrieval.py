@@ -9,6 +9,9 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any, Dict, List
+from urllib.parse import urlparse
+
+from utils.reference_verify import hostname_from_user_hint
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +85,60 @@ def build_gap_queries(scout: Dict[str, Any]) -> List[str]:
     return out[:4]
 
 
+def _explicit_website_url(website_hint: Any) -> str:
+    site = str(website_hint or "").strip()
+    if not site:
+        return ""
+    return site if site.lower().startswith(("http://", "https://")) else f"https://{site}"
+
+
+def _restrict_pack_to_lookup_website(pack: Dict[str, Any], scout: Dict[str, Any]) -> Dict[str, Any]:
+    website = str(scout.get("lookup_website") or "").strip()
+    official_url = _explicit_website_url(website)
+    anchor_host = hostname_from_user_hint(website)
+    if not official_url or not anchor_host:
+        return pack
+    sources: List[Dict[str, Any]] = []
+    for source in list(pack.get("sources") or []):
+        if not isinstance(source, dict):
+            continue
+        try:
+            source_host = (urlparse(str(source.get("url") or "")).hostname or "").lower().strip(".")
+        except Exception:
+            source_host = ""
+        if source_host == anchor_host or source_host.endswith("." + anchor_host):
+            sources.append(source)
+    existing = {
+        str(source.get("url") or "").strip().lower().rstrip("/")
+        for source in sources
+        if isinstance(source, dict)
+    }
+    if official_url.lower().rstrip("/") not in existing:
+        sources.insert(
+            0,
+            {
+                "source_id": "S1",
+                "title": f"{scout.get('name') or 'Company'} official website",
+                "url": official_url,
+                "snippet": (
+                    f"User-provided official website/domain hint ({official_url}) for the exact "
+                    "company identity in this on-demand lookup."
+                ),
+            },
+        )
+    for i, source in enumerate(sources):
+        if isinstance(source, dict):
+            source["source_id"] = f"S{i + 1}"
+    out = dict(pack)
+    out["sources"] = sources
+    out["url_allowlist"] = {
+        str(source.get("url") or "").strip()
+        for source in sources
+        if isinstance(source, dict) and str(source.get("url") or "").strip()
+    }
+    return out
+
+
 def fetch_reviewer_gap_pack(scout: Dict[str, Any], user_id: str) -> Dict[str, Any] | None:
     """
     Run merged retrieval when enabled and gaps warrant it. Returns the source pack dict or None.
@@ -115,6 +172,7 @@ def fetch_reviewer_gap_pack(scout: Dict[str, Any], user_id: str) -> Dict[str, An
         max_per_query=max(max_per, 3),
         max_total_sources=max(min(max_total, 20), 5),
     )
+    pack = _restrict_pack_to_lookup_website(pack, scout)
     sources = pack.get("sources") or []
     if not sources:
         logger.info(
