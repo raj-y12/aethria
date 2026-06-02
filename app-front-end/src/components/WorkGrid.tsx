@@ -1,4 +1,5 @@
-import { useMemo, useState, useCallback, useRef } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 import { LayoutGroup, motion, type Variants } from 'framer-motion';
 import type { Startup } from '../types/startup';
 import { getReviewerQualityBand } from '../design-system/semantics';
@@ -13,7 +14,6 @@ import DecisionQueueHeader, {
   type SourceFilter,
 } from './queue/DecisionQueueHeader';
 import DocketCaseRow from './queue/DocketCaseRow';
-import FreshIntakeStrip from './queue/FreshIntakeStrip';
 import type { DocketRowModel } from './queue/queueRowShared';
 import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 import { queueAttentionRank } from '../lib/dealState';
@@ -127,6 +127,24 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
   const config = fundConfiguration ?? createDefaultFundConfiguration();
   const [queueView, setQueueView] = useState<QueueView>('PRIORITY');
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Deep-link from the rail attention cluster: ?queue=new|escalated|priority|stale.
+  useEffect(() => {
+    const q = searchParams.get('queue');
+    if (!q) return;
+    const map: Record<string, QueueView> = {
+      new: 'NEW',
+      escalated: 'ESCALATED',
+      priority: 'PRIORITY',
+      stale: 'STALE',
+      all: 'ALL',
+    };
+    const next = map[q.toLowerCase()];
+    if (next) setQueueView(next);
+    const params = new URLSearchParams(searchParams);
+    params.delete('queue');
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('ALL');
   const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>('ALL');
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('ALL');
@@ -239,11 +257,6 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     return sorted;
   }, [allModels, queueView, sourceFilter, decisionFilter, reviewFilter, sortFilter]);
 
-  const intakeModels = useMemo(
-    () => [...allModels].filter((row) => row.isNewToUser).sort((a, b) => b.sortKeyValue.localeCompare(a.sortKeyValue)),
-    [allModels]
-  );
-
   const handleRowKeyDown = useCallback(
     (e: React.KeyboardEvent, model: DocketRowModel, idx: number) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -294,21 +307,6 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         onResetFilters={resetFilters}
         reduceMotion={reduceMotion}
       />
-
-      {queueView === 'PRIORITY' && intakeModels.length > 0 && (
-        <FreshIntakeStrip
-          rows={intakeModels.slice(0, 4)}
-          totalNew={intakeModels.length}
-          onSelect={(model) => onStartupClick(model.startup)}
-          onViewAll={
-            intakeModels.length > 4
-              ? () => {
-                  setQueueView('NEW');
-                }
-              : undefined
-          }
-        />
-      )}
 
       <LayoutGroup id="decision-queue">
       <motion.div

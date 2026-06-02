@@ -66,16 +66,20 @@ function SystemTelemetryRail({
   pipelineLoopAlive,
   pipelineStopping,
   pipelineHealthIssue,
+  newCount,
   stages,
   showIssueHelp,
   onToggleIssueHelp,
   onOpenSettings,
+  onReviewEscalations,
+  onReviewNew,
 }: {
   totalCount: number;
   openInProgressCount: number;
   agentDecidedCount: number;
   humanRuledCount: number;
   pendingEscalations: number;
+  newCount: number;
   pipelineEnabled: boolean;
   pipelineLoopAlive: boolean;
   pipelineStopping: boolean;
@@ -84,6 +88,8 @@ function SystemTelemetryRail({
   showIssueHelp: boolean;
   onToggleIssueHelp: () => void;
   onOpenSettings: () => void;
+  onReviewEscalations: () => void;
+  onReviewNew: () => void;
 }) {
   const hasEscalations = pendingEscalations > 0;
   const primaryLabel = hasEscalations ? 'Escalations' : 'Open / in-progress';
@@ -132,12 +138,24 @@ function SystemTelemetryRail({
           <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">
             {primaryLabel}
           </p>
-          <p
-            className={`mt-phi-1 font-mono text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-none tracking-[-0.04em] tabular-nums ${hasEscalations ? 'text-escalation' : 'text-oxford'}`}
-            aria-live="polite"
-          >
-            {primaryValue.toLocaleString()}
-          </p>
+          {hasEscalations ? (
+            <button
+              type="button"
+              onClick={onReviewEscalations}
+              title="Review escalations"
+              className="mt-phi-1 block font-mono text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-none tracking-[-0.04em] tabular-nums text-escalation transition-opacity hover:opacity-80 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-escalation/40"
+              aria-label={`Review ${primaryValue} escalations`}
+            >
+              {primaryValue.toLocaleString()}
+            </button>
+          ) : (
+            <p
+              className="mt-phi-1 font-mono text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-none tracking-[-0.04em] tabular-nums text-oxford"
+              aria-live="polite"
+            >
+              {primaryValue.toLocaleString()}
+            </p>
+          )}
         </div>
         <span
           className={`inline-flex shrink-0 items-center gap-phi-2 pb-px font-mono text-[11px] uppercase tracking-[0.10em] ${statusTone}`}
@@ -179,6 +197,22 @@ function SystemTelemetryRail({
         <span className="mx-phi-2 text-oxford/20" aria-hidden>·</span>
         <span className="font-semibold text-oxford">{humanRuledCount.toLocaleString()}</span> ruled
       </p>
+
+      {/* Fresh intake — new arrivals to triage (replaces the in-queue strip) */}
+      {newCount > 0 ? (
+        <button
+          type="button"
+          onClick={onReviewNew}
+          className="group flex items-center gap-phi-2 border-t border-oxford/[0.075] pt-phi-3 text-left btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+          aria-label={`Triage ${newCount} new ${newCount === 1 ? 'company' : 'companies'}`}
+        >
+          <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe" aria-hidden />
+          <span className="font-mono text-[11px] tracking-[0.04em] tabular-nums text-oxford/55 transition-colors group-hover:text-oxford">
+            <span className="font-semibold text-oxford">{newCount.toLocaleString()}</span> new · triage
+          </span>
+          <span className="ml-auto font-mono text-[11px] text-oxford/30 transition-colors group-hover:text-oxford/60" aria-hidden>→</span>
+        </button>
+      ) : null}
     </article>
   );
 }
@@ -910,6 +944,7 @@ export default function MainLayout({
                     agentDecidedCount={agentDecidedCount}
                     humanRuledCount={humanRuledCount}
                     pendingEscalations={pendingEscalations}
+                    newCount={startups.filter((s) => s.is_new_to_user).length}
                     pipelineEnabled={pipelineEnabled}
                     pipelineLoopAlive={pipelineLoopAlive}
                     pipelineStopping={pipelineStopping}
@@ -918,6 +953,14 @@ export default function MainLayout({
                     showIssueHelp={showPipelineIssueHelp}
                     onToggleIssueHelp={() => setShowPipelineIssueHelp((open) => !open)}
                     onOpenSettings={() => navigate(SETTINGS_PATH)}
+                    onReviewEscalations={() => {
+                      setRightPanel(null);
+                      navigate('/v1?queue=escalated');
+                    }}
+                    onReviewNew={() => {
+                      setRightPanel(null);
+                      navigate('/v1?queue=new');
+                    }}
                   />
                 </section>
 

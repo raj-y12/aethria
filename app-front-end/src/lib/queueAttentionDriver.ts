@@ -120,14 +120,21 @@ export const CONVICTION_TIER_CLASS: Record<
   high: { ambient: 'text-oxford/88 font-semibold', prominent: 'text-oxford font-semibold' },
 };
 
-/** Interruptive badges — escalation / human-ruling only (not stale, evidence, conviction, etc.). */
-const ESCALATION_ATTENTION_BADGE_KEYS: ReadonlySet<QueueAttentionDriverKey> = new Set([
+/** Attention-worthy drivers that earn a badge — the "why look here" signal.
+ *  Calm states (ready / awaiting_review / on_monitor / high_conviction / decided) do not. */
+const ATTENTION_BADGE_KEYS: ReadonlySet<QueueAttentionDriverKey> = new Set([
   'needs_ruling',
   'reviewer_split',
+  'stale',
+  'missing_evidence',
+  'mandate_conflict',
+  'weak_conviction',
+  'execution_risk',
+  'defensibility_concern',
 ]);
 
 export function shouldRenderAttentionBadge(driver: QueueAttentionDriver): boolean {
-  return ESCALATION_ATTENTION_BADGE_KEYS.has(driver.key);
+  return ATTENTION_BADGE_KEYS.has(driver.key);
 }
 
 export function shouldRenderAttentionQuietText(driver: QueueAttentionDriver): boolean {

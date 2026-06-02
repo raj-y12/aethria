@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { usePrefersReducedMotion } from '../../hooks';
 import type { VerdictBadgeConfig } from '../../lib/fundConfiguration';
 import QueueVerdictLine from './QueueVerdictLine';
+import QueueAttentionBadge from './QueueAttentionBadge';
+import { shouldRenderAttentionBadge } from '../../lib/queueAttentionDriver';
 import {
   buildRowAriaLabel,
   formatRowDate,
@@ -41,7 +43,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
     sortKeyValue,
   } = model;
 
-  const { isStale, isEscalated, isDecided, ageDays } = queueContext;
+  const { isEscalated, isDecided, ageDays } = queueContext;
   const isEscalationState =
     isEscalated || decisionVariant === 'escalation' || attentionDriver.key === 'needs_ruling';
 
@@ -63,12 +65,13 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
   const ambientPadding =
     rowIndex % 2 === 0 ? queueRowPadding.ambient : queueRowPadding.ambientAlt;
   const selectedPadding = queueRowPadding.selected;
-  const showReviewerSplitMeta =
-    attentionDriver.key === 'reviewer_split' && !isEscalationState;
-  const showStaleMeta = isStale && ageDays != null && !isDecided;
+  // One dominant attention badge per row (stale / limited evidence / mandate
+  // conflict / risk / reviewer split). Escalation/needs-ruling is already carried
+  // by the burgundy spine + verdict line, so it's excluded here.
+  const showAttentionBadge =
+    !isDecided && shouldRenderAttentionBadge(attentionDriver) && attentionDriver.key !== 'needs_ruling';
   const showDateMeta = isSelected && Boolean(sortKeyValue);
-  const hasMetaRow =
-    Boolean(sectorStage) || showStaleMeta || showReviewerSplitMeta || showDateMeta;
+  const hasMetaRow = Boolean(sectorStage) || showDateMeta || showAttentionBadge;
 
   const metaSep = (needsSep: boolean) =>
     needsSep ? (
@@ -176,28 +179,10 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
                 </span>
               </>
             ) : null}
-            {showStaleMeta ? (
+            {showAttentionBadge ? (
               <>
                 {metaSep(Boolean(sectorStage || showDateMeta))}
-                <span
-                  className={`font-mono tracking-[0.06em] ${
-                    isSelected ? 'text-[10px] text-brass' : 'text-[9px] text-brass/90'
-                  }`}
-                >
-                  Stale · {ageDays}d
-                </span>
-              </>
-            ) : null}
-            {showReviewerSplitMeta ? (
-              <>
-                {metaSep(Boolean(sectorStage || showDateMeta || showStaleMeta))}
-                <span
-                  className={`font-mono normal-case tracking-[0.04em] ${
-                    isSelected ? 'text-[10px] text-escalation' : 'text-[9px] text-escalation/75'
-                  }`}
-                >
-                  Reviewer split
-                </span>
+                <QueueAttentionBadge driver={attentionDriver} ctx={{ ageDays }} prominent={isSelected} />
               </>
             ) : null}
           </motion.div>
