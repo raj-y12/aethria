@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { usePrefersReducedMotion } from '../hooks';
 import GrainOverlay from './GrainOverlay';
+import AuthInstitutionalFooter from './AuthInstitutionalFooter';
 import CountUp from './CountUp';
 import { fetchActivitySummaryWithToken, type ActivitySummary } from '../api/activity';
 import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from '../lib/loginEntryTransition';
@@ -262,18 +263,7 @@ export default function LoginPage() {
             >
               System Report
             </motion.p>
-          ) : (
-            <motion.p
-              key="eyebrow-access"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
-              transition={{ duration: 0.7, ease: EASE, delay: 0.15 }}
-              className="type-meta uppercase tracking-[0.22em] text-oxford/30 mb-phi-3"
-            >
-              Confidential · Institutional Access
-            </motion.p>
-          )}
+          ) : null}
         </AnimatePresence>
 
         {/* Heading */}
@@ -563,18 +553,7 @@ export default function LoginPage() {
         transition={{ duration: entering ? entryTransition.contentExitMs / 1000 : 1, delay: entering ? 0 : 1 }}
         className="fixed bottom-0 left-0 z-20 w-full p-phi-6 flex justify-center pointer-events-none"
       >
-        <p
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: '11px',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'rgba(var(--color-oxford-rgb), 0.55)',
-            margin: 0,
-          }}
-        >
-          Secure Session · Institutional Access
-        </p>
+        <AuthInstitutionalFooter />
       </motion.footer>
       </div>
     </div>

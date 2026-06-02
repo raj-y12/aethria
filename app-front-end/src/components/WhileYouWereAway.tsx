@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import GrainOverlay from './GrainOverlay';
+import AuthInstitutionalFooter from './AuthInstitutionalFooter';
 import CountUp from './CountUp';
 import type { ActivitySummary } from '../api/activity';
 import { usePrefersReducedMotion } from '../hooks';
@@ -183,18 +184,7 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
         transition={{ duration: reduceMotion ? 0 : 1, ease: EASE, delay: reduceMotion ? 0 : 1 }}
         className="fixed bottom-0 left-0 z-[10000] w-full p-phi-6 flex justify-center pointer-events-none"
       >
-        <p
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: '11px',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'rgba(var(--color-oxford-rgb), 0.55)',
-            margin: 0,
-          }}
-        >
-          Secure Session · Institutional Access
-        </p>
+        <AuthInstitutionalFooter />
       </motion.footer>
     </motion.div>
   );

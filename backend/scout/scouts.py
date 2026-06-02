@@ -23,6 +23,12 @@ NEGATIVE CONSTRAINTS — DO NOT discover any of the following (they cannot reach
 - Businesses whose addressable market cannot plausibly exceed $100M at scale
 If you cannot identify a VC-backable opportunity meeting all positive criteria, return nothing."""
 
+_REFERENCE_RULES_BLOCK = """
+REFERENCES — strict (sources must be about THIS specific company):
+- Cite ONLY pages that name or are about the company itself: its official website, a news/press article that names it, its Crunchbase / PitchBook / LinkedIn company page, regulatory filings, or its product/docs pages.
+- NEVER cite generic startup or VC advice: fundraising guides, "how to raise a seed round", investor/accelerator blogs, library/playbook/journal/how-to articles, listicles, or market explainers. These do NOT prove the company exists and will be discarded.
+- Prefer fewer, company-specific references over padding. If you cannot find a source about the company, return no references rather than generic content."""
+
 
 def _region_label_for(tenant_user_id: str) -> str:
     r = get_scout_region(tenant_user_id)
@@ -74,6 +80,7 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
             self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
             + _SCOUT_QUANT_TRACTION_GUIDANCE
             + _NEGATIVE_CONSTRAINTS_BLOCK
+            + _REFERENCE_RULES_BLOCK
         )
         super().__init__(
             scout_type="market_driven",
@@ -120,6 +127,7 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
             self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
             + _SCOUT_QUANT_TRACTION_GUIDANCE
             + _NEGATIVE_CONSTRAINTS_BLOCK
+            + _REFERENCE_RULES_BLOCK
         )
         super().__init__(
             scout_type="builder_technical",
@@ -166,6 +174,7 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
             self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
             + _SCOUT_QUANT_TRACTION_GUIDANCE
             + _NEGATIVE_CONSTRAINTS_BLOCK
+            + _REFERENCE_RULES_BLOCK
         )
         super().__init__(
             scout_type="pain_point",
@@ -212,6 +221,7 @@ Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references 
             self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
             + _SCOUT_QUANT_TRACTION_GUIDANCE
             + _NEGATIVE_CONSTRAINTS_BLOCK
+            + _REFERENCE_RULES_BLOCK
         )
         super().__init__(
             scout_type="contrarian",
