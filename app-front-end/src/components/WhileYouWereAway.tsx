@@ -98,16 +98,15 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
           Agents continued working. Here is what happened.
         </motion.p>
 
-        {/* Stats */}
+        {/* Stats — fixed 4-column row; never wrap (wide counts used to force stack) */}
         <div
           style={{
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            justifyContent: 'center',
-            gap: 'clamp(48px, 8vw, 120px)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+            alignItems: 'start',
+            gap: '8px clamp(12px, 2.5vw, 28px)',
+            width: '100%',
             marginBottom: '64px',
-            flexWrap: 'wrap',
           }}
         >
           {stats.map((stat, i) => (
@@ -121,27 +120,31 @@ export default function WhileYouWereAway({ summary, onDismiss }: Props) {
                 transition: { duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : (stats.length - 1 - i) * 0.06, ease: EASE },
               }}
               transition={{ duration: reduceMotion ? 0 : 0.45, ease: EASE, delay: reduceMotion ? 0 : 0.22 + i * 0.07 }}
-              style={{ textAlign: 'center' }}
+              style={{ minWidth: 0, textAlign: 'center' }}
             >
               <div
                 style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 'clamp(52px, 10vw, 96px)',
-                  fontWeight: 400,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'clamp(26px, 3.2vw, 40px)',
+                  fontWeight: 500,
                   lineHeight: 1,
                   color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
-                  letterSpacing: '-0.03em',
+                  letterSpacing: '-0.02em',
+                  fontVariantNumeric: 'tabular-nums',
                 }}
               >
                 <CountUp to={stat.value} delay={reduceMotion ? 0 : 0.22 + i * 0.07} reduceMotion={reduceMotion} />
               </div>
               <div
                 style={{
-                  fontFamily: "var(--font-sans)",
-                  fontSize: '13px',
-                  color: 'rgba(var(--color-oxford-rgb), 0.6)',
-                  marginTop: '6px',
-                  letterSpacing: '0.01em',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '10px',
+                  lineHeight: 1.35,
+                  color: 'rgba(var(--color-oxford-rgb), 0.55)',
+                  marginTop: '8px',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  textWrap: 'balance',
                 }}
               >
                 {stat.label}

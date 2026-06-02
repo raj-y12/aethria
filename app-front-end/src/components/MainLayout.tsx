@@ -337,7 +337,10 @@ export default function MainLayout({
 
   const handleLookupSubmit = useCallback(async () => {
     const value = lookupInput.trim();
-    if (!value || lookupBusy || (pendingLookup != null && !pendingLookup.autoOpened)) return;
+    // Allow starting a new lookup even while one is tracked ("Look up another"):
+    // the prior keeps running server-side and lands in the queue. Only block
+    // while a submit is mid-flight.
+    if (!value || lookupBusy) return;
     const requestSeq = lookupRequestSeqRef.current + 1;
     lookupRequestSeqRef.current = requestSeq;
     setLookupBusy(true);
@@ -674,12 +677,12 @@ export default function MainLayout({
     setCommandBarOpen(false); // close the takeover so the memo is visible
   }, [pendingLookupMatch, markStartupAcknowledged]);
 
-  // Closing the takeover with a finished-but-unopened lookup clears it so the
-  // next lookup isn't blocked by the in-flight guard.
+  // Closing keeps the tracked lookup intact so reopening returns to its live
+  // state (progress or result). It clears only when the analyst opens its memo
+  // or dismisses the ready toast (both set autoOpened).
   const handleCloseDispatch = useCallback(() => {
     setCommandBarOpen(false);
-    setPendingLookup((prev) => (prev && !prev.autoOpened && pendingLookupMatch ? null : prev));
-  }, [pendingLookupMatch]);
+  }, []);
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-paper">
@@ -690,7 +693,7 @@ export default function MainLayout({
         setInput={setLookupInput}
         onSubmit={() => void handleLookupSubmit()}
         onCancel={handleLookupCancel}
-        isBusy={lookupWorking}
+        isBusy={lookupBusy}
         message={lookupMessage}
         onClearMessage={() => setLookupMessage(null)}
         lookupPhase={lookupPhaseLabel}
