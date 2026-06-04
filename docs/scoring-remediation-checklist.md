@@ -34,7 +34,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 | Phase 1 — Stop the bleeding (highest severity, lowest effort) | ✅ 2 / 2 (P1.2 re-sequenced → Phase 3) |
 | Phase 2 — Canonical score (Workstream B) | ✅ 3 / 4 (P2.4 split: surface→Phase 4, orphan-removal deferred) |
 | Phase 3 — Meaning fix (Layers 1–3) | ◑ abstain framework + ALL-dimension rollout + off-vocab done (P1.2+P3.2); P3.1 anchored-criteria implemented for team (prompt QUALITY needs model); per-component anchor rollout pending |
-| Phase 4 — Presentation vocabulary (Workstream C) | ◑ P4.2 done + P4.1 drift-guard added; P4.3 conviction-scale (product decision), P4.4 confidence, P4.5 methodology pending |
+| Phase 4 — Presentation vocabulary (Workstream C) | ◑ P4.2 + P4.3 done, P4.1 drift-guard added; P4.4 confidence, P4.5 methodology pending |
 | Phase 5 — Calibration hardening (Layers 4–5) | 0 / 3 |
 | Phase 6 — Comparability completeness (Workstream A) | 0 / 3 |
 | Phase 7 — Outcome validity (Layer 6) | 0 / 2 |
@@ -276,7 +276,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     register; mapping those to `QUALITY_LABELS` is deferred (compact-row layout risk).
   - Depends on: P1.1
 
-- [ ] **P4.3 — One conviction scale end-to-end (audit B3).**
+- [✅] **P4.3 — One conviction scale end-to-end (audit B3).**
   Grid and memo use the same scale; kill the `78/10` interpolation hazard.
   - Files: `QueueVerdictLine`, `InvestmentMemoContent.tsx:911`.
   - **Validation gate:** the same startup shows the same conviction value/format in
