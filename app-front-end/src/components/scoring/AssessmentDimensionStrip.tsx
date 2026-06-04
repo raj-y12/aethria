@@ -49,9 +49,18 @@ export default function AssessmentDimensionStrip({
           const dimension = scoring[dim.key];
           const presDim = presentation?.dimensions?.find((d) => d.id === dim.key);
           const selected = activeKey === dim.key;
-          const scoreText = presDim ? presDim.score.toFixed(1) : dimension.score.toFixed(1);
-          const lowConfidence = !presDim && isLowConfidence(dimension.confidence);
-          const narrative = dimensionBriefTake(dimension, presDim);
+          // An unscored dimension has no evidence — show "Not scored", never the
+          // numeric placeholder (audit C2 / Layer 3).
+          const unscored = !presDim && dimension.unscored === true;
+          const scoreText = unscored
+            ? 'Not scored'
+            : presDim
+              ? presDim.score.toFixed(1)
+              : dimension.score.toFixed(1);
+          const lowConfidence = !presDim && !unscored && isLowConfidence(dimension.confidence);
+          const narrative = unscored
+            ? 'No supporting evidence — excluded from the overall.'
+            : dimensionBriefTake(dimension, presDim);
           return (
             <li key={dim.key}>
               <button
@@ -66,8 +75,14 @@ export default function AssessmentDimensionStrip({
                 <span className="memoScoreBriefRowTop">
                   <span className="memoScoreBriefName">{dim.label}</span>
                   <span
-                    className={`memoScoreBriefScore${lowConfidence ? ' memoScoreBriefScore--lowConfidence' : ''}`}
-                    title={lowConfidence ? 'Low evidence confidence' : undefined}
+                    className={`memoScoreBriefScore${lowConfidence ? ' memoScoreBriefScore--lowConfidence' : ''}${unscored ? ' memoScoreBriefScore--unscored' : ''}`}
+                    title={
+                      unscored
+                        ? 'No supporting evidence for this dimension'
+                        : lowConfidence
+                          ? 'Low evidence confidence'
+                          : undefined
+                    }
                   >
                     {scoreText}
                   </span>

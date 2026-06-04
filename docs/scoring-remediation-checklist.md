@@ -33,7 +33,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 | Phase 0 — Guardrails | ✅ 2 / 2 |
 | Phase 1 — Stop the bleeding (highest severity, lowest effort) | ✅ 2 / 2 (P1.2 re-sequenced → Phase 3) |
 | Phase 2 — Canonical score (Workstream B) | ✅ 3 / 4 (P2.4 split: surface→Phase 4, orphan-removal deferred) |
-| Phase 3 — Meaning fix (Layers 1–3) | 0 / 4 |
+| Phase 3 — Meaning fix (Layers 1–3) | ◑ core abstain framework + Market done (P1.2+P3.2); per-dim rollout, off-vocab, P3.1 criteria pending (P3.1 needs model) |
 | Phase 4 — Presentation vocabulary (Workstream C) | 0 / 5 |
 | Phase 5 — Calibration hardening (Layers 4–5) | 0 / 3 |
 | Phase 6 — Comparability completeness (Workstream A) | 0 / 3 |
@@ -92,8 +92,8 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     "Promising"); `tsc --noEmit` clean; eslint clean.
   - Depends on: P0.1
 
-- [⛔] **P1.2 — Abstain instead of `DEFAULT_SCORE = 5.0` (audit C2 + Layer 3).**
-  **RE-SEQUENCED → bundled with P3.2.** A standalone abstain fix is *unsafe*: the
+- [✅] **P1.2 — Abstain instead of `DEFAULT_SCORE = 5.0` (audit C2 + Layer 3).**
+  **DONE (bundled with P3.2 — see Phase 3).** A standalone abstain fix was *unsafe*: the
   extraction layer fabricates neutral labels (`urgency="important"`,
   `timing="neutral"`, `competition="moderate"`) for no-evidence components, so they
   pass `_has_concrete_evidence`. Excluding only the truly-missing components and
@@ -175,24 +175,42 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 
 > Move judgment from the model into evidence + rules. Roll out **per dimension**.
 
-- [ ] **P3.1 — Behaviorally-anchored criteria for ONE dimension as the pattern (Layer 1).**
-  Start with Team/Execution or Technical. Replace adjective labels with
-  evidence-bound conditions.
-  - Files: `backend/config/scoring_config.py` (rubric block),
-    `resources/config/evaluation_rubric/v1.json`.
-  - **Validation gate:** the chosen dimension's labels are each defined by checkable
-    conditions; a reviewer can point at the evidence that fired the score; golden
-    tests updated and reviewed.
-  - Depends on: P0.1
+- [✅] **P1.2 + P3.2 (abstain framework + Market) — the core comparability fix.**
+  The deterministic abstain framework is implemented and the Market dimension migrated:
+  - **Extraction** (`extraction_layer.py`) no longer fabricates neutral labels
+    (`urgency="important"`, `timing="neutral"`, `competition="moderate"`) when the
+    source text is empty — it emits a missing signal instead.
+  - **Aggregation** (`aggregation_layer.py`) excludes non-evidenced components and
+    renormalizes over the evidenced ones; a dimension with **zero** evidence is flagged
+    `unscored` (numeric placeholder kept so backend consumers don't crash, but the flag
+    is the source of truth).
+  - **Engine overall** excludes `unscored` dimensions, so a no-data dimension can no
+    longer inflate or drag the headline.
+  - **Frontend** renders `unscored` dimensions as "Not scored" (muted), never the
+    placeholder number (`AssessmentDimensionStrip`, `ScoringDimension.unscored` type).
+  - **Validation gate:** ✅ `all_missing` Market is now `unscored` and excluded
+    (overall 3.96→3.35); the C2 headline bug is fixed — a no-evidence Market no longer
+    outscores a verified-small one (golden `test_FIXED_unknown_market_is_unscored...`);
+    154 backend tests pass with **zero ripple** into other suites; frontend tsc+eslint
+    clean. Snapshot tool surfaces `unscored`.
+  - **Model-dependent caveat:** this changes *deterministic* keyword-extraction
+    fabrication only. The LLM-`structured_signals` path and prompt quality (real Layer
+    1/2) still need model-in-the-loop evaluation.
 
-- [ ] **P3.2 — Extraction emits facts + citations for that dimension (Layer 2).**
-  LLM returns atomic cited facts; a deterministic rule maps facts → label → score.
-  - Files: `backend/services/scoring/extraction_layer.py`,
-    `backend/services/scoring/normalization_layer.py`.
-  - **Validation gate:** the dimension's score is derived in code from extracted
-    facts (not an LLM-chosen label); the same facts always yield the same score;
-    citations are present.
-  - Depends on: P3.1
+- [ ] **P3.1 — Behaviorally-anchored criteria for ONE dimension (Layer 1).** *(needs model eval)*
+  Replace adjective labels with evidence-bound conditions. Deferred: changes LLM-facing
+  prompts whose quality needs a real model to validate.
+  - Files: `backend/config/scoring_config.py` (rubric block), `evaluation_rubric/v1.json`.
+
+- [~] **P3.2 — Remaining dimensions + off-vocabulary (continues the above).**
+  Framework done (✅ above). Follow-ups:
+  - Extend abstain to Execution/Product/Technical/Defensibility extractors (they use
+    per-dimension heuristics, not the simple `else "label"` pattern Market had — each
+    needs its own no-evidence → missing treatment).
+  - Off-vocabulary labels still map to 5.0 and are treated as evidence (see
+    `test_KNOWN_ISSUE_off_vocabulary_label_defaults_to_five_C2`); make an unrecognized
+    label `unscored`.
+  - Files: `backend/services/scoring/extraction_layer.py`, `normalization_layer.py`.
 
 - [ ] **P3.3 — Roll the pattern across remaining fact-derivable components.**
   Apply P3.1–P3.2 to the ~70% that is fact-derivable (tam, traction, team, retention,

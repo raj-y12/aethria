@@ -249,11 +249,16 @@ class DeterministicScoringEngine:
             details = aggregated.get(dim)
             if details is None:
                 continue
+            dim_score = details.get("score")
+            # Unscored dimensions (no evidence) are excluded from the overall so a
+            # no-data dimension never drags the headline toward a neutral placeholder.
+            if dim_score is None or details.get("unscored"):
+                continue
             weight = float(self.dimension_weights.get(dim, 0.0))
-            weighted_sum += float(details.get("score", DEFAULT_SCORE)) * weight
+            weighted_sum += float(dim_score) * weight
             weight_total += weight
         if weight_total <= 0:
-            return DEFAULT_SCORE
+            return None
         return round(weighted_sum / weight_total, 2)
 
     def _compute_overall_confidence(self, aggregated: Dict[str, Dict[str, Any]]) -> float:

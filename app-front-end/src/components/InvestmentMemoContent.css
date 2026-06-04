@@ -1616,6 +1616,15 @@
   text-decoration: underline dotted rgba(var(--color-oxford-rgb), 0.3);
   text-underline-offset: 3px;
 }
+/* Unscored dimension: no evidence — render as muted text, not a number (audit C2). */
+.memoScoreBriefScore--unscored {
+  font-family: var(--memo-font-ui);
+  font-variant-numeric: normal;
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.40);
+}
 
 .memoDimensionDetailPanel {
   margin-top: 10px;
@@ -1835,6 +1844,15 @@
   color: rgba(var(--color-oxford-rgb), 0.42);
   text-decoration: underline dotted rgba(var(--color-oxford-rgb), 0.3);
   text-underline-offset: 3px;
+}
+/* Unscored dimension: no evidence — render as muted text, not a number (audit C2). */
+.memoScoreBriefScore--unscored {
+  font-family: var(--memo-font-ui);
+  font-variant-numeric: normal;
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.40);
 }
 
 .memoDimensionDetailPanel {

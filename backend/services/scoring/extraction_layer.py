@@ -430,8 +430,14 @@ def _extract_market_signals(scout_output: Dict[str, Any], reviewer_output: Dict[
         else "No quantified growth rate found. Market growth trajectory unverified."
     )
 
+    # Do NOT fabricate a neutral label when the source text is empty — emit a missing
+    # signal instead so aggregation can abstain rather than score a no-evidence
+    # component as a mid value (audit C2 + Layer 3). label=None routes through
+    # _signal -> _missing_signal.
     why_now_lower = why_now.lower()
-    urgency_label = "high" if "urgent" in why_now_lower else "important"
+    urgency_label = (
+        "high" if "urgent" in why_now_lower else ("important" if why_now.strip() else None)
+    )
     urgency_reasoning = (
         f"High urgency indicated: {why_now[:120].strip()}."
         if "urgent" in why_now_lower and why_now.strip()
@@ -440,7 +446,9 @@ def _extract_market_signals(scout_output: Dict[str, Any], reviewer_output: Dict[
         else "No urgency signal in problem framing. Buyer urgency unvalidated."
     )
 
-    timing_label = "favorable" if "tailwind" in why_now_lower else "neutral"
+    timing_label = (
+        "favorable" if "tailwind" in why_now_lower else ("neutral" if why_now.strip() else None)
+    )
     timing_reasoning = (
         f"Favorable timing signal: {why_now[:120].strip()}."
         if "tailwind" in why_now_lower and why_now.strip()
@@ -450,7 +458,9 @@ def _extract_market_signals(scout_output: Dict[str, Any], reviewer_output: Dict[
     )
 
     comp_lower = competition_text.lower()
-    comp_label = "crowded" if "crowded" in comp_lower else "moderate"
+    comp_label = (
+        "crowded" if "crowded" in comp_lower else ("moderate" if competition_text.strip() else None)
+    )
     competition_analysis = _join_lines(reviewer_output.get("competition_analysis"))
     comp_reasoning = (
         f"Competitive landscape: {competition_analysis[:150].strip()}."

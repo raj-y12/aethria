@@ -110,6 +110,7 @@ def snapshot_one(engine, scout, review):
             d: {
                 "score": _round(result[d]["score"]),
                 "confidence": _round(result[d].get("confidence")),
+                "unscored": bool(result[d].get("unscored")),
             }
             for d in DIMENSIONS
         },
