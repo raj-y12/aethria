@@ -30,7 +30,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 
 | Phase | Done / Total |
 |---|---|
-| Phase 0 — Guardrails | 0 / 2 |
+| Phase 0 — Guardrails | ✅ 2 / 2 |
 | Phase 1 — Stop the bleeding (highest severity, lowest effort) | 0 / 3 |
 | Phase 2 — Canonical score (Workstream B) | 0 / 4 |
 | Phase 3 — Meaning fix (Layers 1–3) | 0 / 4 |
@@ -45,19 +45,31 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 
 ## Phase 0 — Guardrails (do first; protects every later change)
 
-- [ ] **P0.1 — Snapshot current scoring behaviour as golden tests.**
-  Capture a handful of representative `(scout, reviewer) → score/verdict/memo`
-  fixtures so later refactors are diffable.
-  - Files: `backend/tests/` (new fixtures), `app-front-end` snapshot of memo render.
-  - **Validation gate:** golden tests run green on `main` and fail loudly if a
-    score/band/verdict changes unexpectedly.
+- [✅] **P0.1 — Snapshot current scoring behaviour as golden tests.**
+  Characterization tests pin the EXACT current deterministic scores for representative
+  fixtures (the existing suite only checked shape/bounds). Includes `KNOWN_ISSUE`
+  locks that capture current buggy behavior (C2 missing→5.0, off-vocab→5.0, unknown
+  outscores known-small) so remediation tasks must consciously flip them.
+  - Files: `backend/tests/test_scoring_golden_snapshot.py` (new).
+  - **Validation gate:** ✅ `pytest tests/test_scoring_golden_snapshot.py` → 18 passed;
+    existing scoring suite still green (23 passed); a drifted score fails loudly with a
+    pointer to update GOLDEN.
   - Depends on: —
 
-- [ ] **P0.2 — Single comparison harness for memo before/after.**
-  A way to render the same startup's memo pre- and post-change side by side.
-  - Files: small script under `app-front-end` or `backend`.
-  - **Validation gate:** produces a stable before/after for one known startup id.
+- [✅] **P0.2 — Single comparison harness for before/after.**
+  Dependency-light snapshot tool (no LLM/Supabase) renders deterministic scores for the
+  same fixtures as stable, sorted JSON for diffing; `--payload` scores an arbitrary
+  `{scout, review}` file.
+  - Files: `backend/scripts/scoring_snapshot.py` (new).
+  - **Validation gate:** ✅ two consecutive runs produce an empty `diff`;
+    `--payload` mode scores a single company. Usage:
+    `python scripts/scoring_snapshot.py > before.json` → change → `> after.json` → diff.
   - Depends on: —
+
+  > Note: P0.1/P0.2 cover the **deterministic scoring layer** (the pure, highest-risk
+  > surface for the upcoming changes). A frontend memo-render snapshot is deferred to
+  > when Phase 4 (presentation) work begins, since that's the first phase that touches
+  > the memo UI.
 
 ---
 
