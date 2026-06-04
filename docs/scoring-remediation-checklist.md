@@ -159,11 +159,14 @@ Work one task at a time, tick it only when its **Validation gate** passes.
   uses it for grey-zone decisions (A5 referred to *memo UI* only). Action split:
   - `confidence_adjusted_score`: **surface** in the memo → folded into Phase 4 (it is a
     live, meaningful conviction signal; deleting would break partner grey-zone logic).
-  - `weighted_defensibility_score`: the only genuinely orphaned signal (computed +
-    plumbed to the frontend payload, never consumed; frontend has zero references).
-    **Deferred** to a focused removal touching `reviewer/engine.py`, `api.py`,
-    `models.py`, `utils/adapters.py` — gated on a full reviewer-engine test run to
-    keep the wire-contract change safe.
+  - `weighted_defensibility_score`: the float *output* field is unconsumed (frontend
+    has zero refs; partner never reads it), BUT it is **not** a pure dead field — at
+    `reviewer/engine.py:271` the same `weighted_def` computation (skeptical reviewer
+    counted 1.5×) actively **sets the published `defensibility_score`**. So removing
+    it changes defensibility scores; it is a behavior change, not a cleanup.
+    **Deferred** to a focused, test-gated change that decides whether the 1.5×-skeptical
+    weighting of defensibility should remain (touches `reviewer/engine.py`, `api.py`,
+    `models.py`, `utils/adapters.py`).
   - Depends on: P2.1; coordinate with Phase 4.
 
 ---
