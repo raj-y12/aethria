@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ScoringDimensionKey, ScoringPresentation, StructuredScoring } from '../../types/startup';
-import { normalizeConfidence } from './ConfidenceIndicator';
+import { getEvidenceConfidenceLabel, isLowEvidence } from './ConfidenceIndicator';
 import DimensionCard from './DimensionCard';
 import { dimensionBriefTake } from '../../lib/scoringRationale';
 
@@ -19,11 +19,8 @@ interface AssessmentDimensionStripProps {
 
 // The displayed score must never change with confidence — a low-confidence 7.5
 // previously rendered as "8", reading as a different, lower score (audit B5).
-// Confidence is now signalled separately (class + tooltip), not by mutating the digit.
-function isLowConfidence(confidence: number | null | undefined): boolean {
-  const normalized = normalizeConfidence(confidence);
-  return normalized != null && normalized < 0.4;
-}
+// Confidence is signalled separately (class + tooltip), using the SAME low-evidence
+// threshold and vocabulary as the rest of the app (isLowEvidence / evidence label).
 
 export default function AssessmentDimensionStrip({
   dimensions,
@@ -57,7 +54,7 @@ export default function AssessmentDimensionStrip({
             : presDim
               ? presDim.score.toFixed(1)
               : dimension.score.toFixed(1);
-          const lowConfidence = !presDim && !unscored && isLowConfidence(dimension.confidence);
+          const lowConfidence = !presDim && !unscored && isLowEvidence(dimension.confidence);
           const narrative = unscored
             ? 'No supporting evidence — excluded from the overall.'
             : dimensionBriefTake(dimension, presDim);
@@ -80,7 +77,7 @@ export default function AssessmentDimensionStrip({
                       unscored
                         ? 'No supporting evidence for this dimension'
                         : lowConfidence
-                          ? 'Low evidence confidence'
+                          ? `${getEvidenceConfidenceLabel(dimension.confidence)} evidence`
                           : undefined
                     }
                   >

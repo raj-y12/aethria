@@ -31,19 +31,26 @@ export function getEvidenceConfidenceTooltip(confidence: number | null | undefin
   return 'Limited evidence was available. Key data points remain unverified.';
 }
 
+/**
+ * Single source of truth for "is this evidence weak enough to flag?" — below the
+ * 'Strong' band (i.e. the Limited or Moderate tiers). Replaces ad-hoc per-component
+ * thresholds so the low-confidence cue is consistent with the Limited/Moderate/Strong/
+ * Extensive vocabulary used everywhere (audit B5 — one confidence treatment).
+ */
+export function isLowEvidence(confidence: number | null | undefined): boolean {
+  const normalized = normalizeConfidence(confidence);
+  return normalized != null && normalized < 0.5;
+}
+
 function getConfidenceTone(confidence: number | null | undefined): {
   label: string;
   width: string;
 } {
   const normalized = normalizeConfidence(confidence);
-  if (normalized == null) {
-    return { label: 'Limited', width: '0%' };
-  }
-  const width = `${normalized * 100}%`;
-  if (normalized >= 0.75) return { label: 'Extensive', width };
-  if (normalized >= 0.50) return { label: 'Strong', width };
-  if (normalized >= 0.25) return { label: 'Moderate', width };
-  return { label: 'Limited', width };
+  return {
+    label: getEvidenceConfidenceLabel(confidence),
+    width: normalized == null ? '0%' : `${normalized * 100}%`,
+  };
 }
 
 export default function ConfidenceIndicator({ confidence }: ConfidenceIndicatorProps) {

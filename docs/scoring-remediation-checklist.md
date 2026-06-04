@@ -34,7 +34,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 | Phase 1 — Stop the bleeding (highest severity, lowest effort) | ✅ 2 / 2 (P1.2 re-sequenced → Phase 3) |
 | Phase 2 — Canonical score (Workstream B) | ✅ 3 / 4 (P2.4 split: surface→Phase 4, orphan-removal deferred) |
 | Phase 3 — Meaning fix (Layers 1–3) | ◑ abstain framework + ALL-dimension rollout + off-vocab done (P1.2+P3.2); P3.1 anchored-criteria implemented for team (prompt QUALITY needs model); per-component anchor rollout pending |
-| Phase 4 — Presentation vocabulary (Workstream C) | ◑ P4.2 + P4.3 done, P4.1 drift-guard added; P4.4 confidence, P4.5 methodology pending |
+| Phase 4 — Presentation vocabulary (Workstream C) | ◑ P4.2/P4.3/P4.4 done, P4.1 drift-guard + P4.5 methodology block added; full payload-derived bands + sanitizeReasoning relax pending |
 | Phase 5 — Calibration hardening (Layers 4–5) | 0 / 3 |
 | Phase 6 — Comparability completeness (Workstream A) | 0 / 3 |
 | Phase 7 — Outcome validity (Layer 6) | 0 / 2 |
@@ -283,7 +283,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     grid and memo; no `/10` is ever applied to a 0–100 field.
   - Depends on: P2.2
 
-- [ ] **P4.4 — One confidence treatment (audit B5).**
+- [✅] **P4.4 — One confidence treatment (audit B5).**
   Collapse the three confidence representations into one consistent model;
   conviction and confidence are clearly separate axes.
   - Files: `reviewScoring.ts:21-25`, `ConfidenceIndicator.tsx`, memo components.
@@ -291,7 +291,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     competes with the overall.
   - Depends on: P1.3
 
-- [ ] **P4.5 — Expose methodology, stop censoring it (audit B6/A6).**
+- [◑] **P4.5 — Expose methodology (audit B6/A6).**
   Render the evidence trail (Layers 1–2) and rubric version in a deliberate
   "How this was scored" block; keep stripping only genuine debug strings.
   - Files: `reviewScoring.ts:180-212` (`sanitizeReasoning`), memo components.
