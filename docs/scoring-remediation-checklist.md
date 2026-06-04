@@ -34,7 +34,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 | Phase 1 — Stop the bleeding (highest severity, lowest effort) | ✅ 2 / 2 (P1.2 re-sequenced → Phase 3) |
 | Phase 2 — Canonical score (Workstream B) | ✅ 3 / 4 (P2.4 split: surface→Phase 4, orphan-removal deferred) |
 | Phase 3 — Meaning fix (Layers 1–3) | ◑ abstain framework + ALL-dimension rollout + off-vocab done (P1.2+P3.2); P3.1 anchored-criteria implemented for team (prompt QUALITY needs model); per-component anchor rollout pending |
-| Phase 4 — Presentation vocabulary (Workstream C) | ◑ 1 / 5 (P4.2 done; P4.3 conviction-scale + P4.1 derive-bands are product-visible; P4.5 needs Phase 3 trail) |
+| Phase 4 — Presentation vocabulary (Workstream C) | ◑ P4.2 done + P4.1 drift-guard added; P4.3 conviction-scale (product decision), P4.4 confidence, P4.5 methodology pending |
 | Phase 5 — Calibration hardening (Layers 4–5) | 0 / 3 |
 | Phase 6 — Comparability completeness (Workstream A) | 0 / 3 |
 | Phase 7 — Outcome validity (Layer 6) | 0 / 2 |
@@ -255,12 +255,13 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 
 > One scale, one set of words per axis, methodology visible.
 
-- [ ] **P4.1 — One banded scale, rubric-derived, version-stamped.**
-  Frontend imports/derives bands from the policy payload; memo shows the rubric
-  version it was scored under.
-  - Files: `semantics.ts`, memo components, `evaluation_rubric/v1.json`.
-  - **Validation gate:** changing the rubric changes the memo bands with no frontend
-    edit; memo displays `scored under rubric vX`.
+- [◑] **P4.1 — One banded scale, rubric-derived, version-stamped.**
+  Structural guard added: a pytest parity test reads the frontend `SCORE_BANDS` and the
+  canonical rubric and fails CI on any drift (so the B1 fix can't silently regress).
+  - Files: `backend/tests/test_frontend_band_parity.py` (new).
+  - **Validation gate:** ✅ parity test passes; an intentional mismatch fails loudly.
+  - **Remaining:** the fuller version derives bands from the policy *payload* at runtime
+    (no hand-mirror) and stamps the rubric version on the memo — a wire+UI change.
   - Depends on: P1.1
 
 - [✅] **P4.2 — Distinct words per axis (audit B2).**
