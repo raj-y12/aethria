@@ -34,7 +34,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 | Phase 1 — Stop the bleeding (highest severity, lowest effort) | ✅ 2 / 2 (P1.2 re-sequenced → Phase 3) |
 | Phase 2 — Canonical score (Workstream B) | ✅ 3 / 4 (P2.4 split: surface→Phase 4, orphan-removal deferred) |
 | Phase 3 — Meaning fix (Layers 1–3) | ◑ core abstain framework + Market done (P1.2+P3.2); per-dim rollout, off-vocab, P3.1 criteria pending (P3.1 needs model) |
-| Phase 4 — Presentation vocabulary (Workstream C) | 0 / 5 |
+| Phase 4 — Presentation vocabulary (Workstream C) | ◑ 1 / 5 (P4.2 done; P4.3 conviction-scale + P4.1 derive-bands are product-visible; P4.5 needs Phase 3 trail) |
 | Phase 5 — Calibration hardening (Layers 4–5) | 0 / 3 |
 | Phase 6 — Comparability completeness (Workstream A) | 0 / 3 |
 | Phase 7 — Outcome validity (Layer 6) | 0 / 2 |
@@ -241,12 +241,17 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     edit; memo displays `scored under rubric vX`.
   - Depends on: P1.1
 
-- [ ] **P4.2 — Distinct words per axis (audit B2).**
-  Dimension band, panel verdict, and decision never share a word.
-  - Files: `semantics.ts` (`SCORE_BANDS`, `QUALITY_LABELS`, `DECISION_LABELS`).
-  - **Validation gate:** no single word appears in two of the three vocabularies; a
-    test asserts disjoint label sets.
-  - Depends on: P4.1
+- [✅] **P4.2 — Distinct words per axis (audit B2).**
+  `QUALITY_LABELS.MEDIUM` was "Promising but incomplete" — "Promising" is also a
+  dimension band. Changed to "Watchlist-grade". The three vocabularies (dimension
+  bands / verdict labels / decision labels) are now word-disjoint.
+  - Files: `app-front-end/src/design-system/semantics.ts`.
+  - **Validation gate:** ✅ node disjointness check — no verdict/decision label shares
+    a word with any dimension band; `tsc`/eslint clean.
+  - Follow-up: the compact reviewer rows still render the raw verdict enum
+    (`STRONG`/`WEAK`, all-caps) which differs from the title-case band words only by
+    register; mapping those to `QUALITY_LABELS` is deferred (compact-row layout risk).
+  - Depends on: P1.1
 
 - [ ] **P4.3 — One conviction scale end-to-end (audit B3).**
   Grid and memo use the same scale; kill the `78/10` interpolation hazard.

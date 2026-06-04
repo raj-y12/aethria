@@ -33,10 +33,17 @@ export function getScoreBand(score: number): { label: string; meaning: string } 
   return { label: SCORE_BANDS[3].label, meaning: SCORE_BANDS[3].meaning };
 }
 
-/** Quality assessment from Reviewer (STRONG/MEDIUM/WEAK). */
+/**
+ * Quality assessment from Reviewer (STRONG/MEDIUM/WEAK).
+ *
+ * These labels MUST stay word-disjoint from SCORE_BANDS (the dimension-band words
+ * Weak/Concerning/Promising/Strong) so no single word means two different things on
+ * the page (audit B2). MEDIUM was "Promising but incomplete" — "Promising" is also a
+ * dimension band, so an analyst couldn't tell which axis "Promising" referred to.
+ */
 export const QUALITY_LABELS: Record<string, string> = {
   STRONG: 'Investment-grade',
-  MEDIUM: 'Promising but incomplete',
+  MEDIUM: 'Watchlist-grade',
   WEAK: 'Early and unproven',
 };
 
