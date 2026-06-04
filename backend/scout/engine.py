@@ -90,6 +90,14 @@ class ScoutEngine:
         for s in self.scouts:
             s.set_fund_thesis(thesis)
 
+    def close(self) -> None:
+        """Release each scout's OpenAI client and worker thread (called at cycle end)."""
+        for s in self.scouts:
+            try:
+                s.close()
+            except Exception as exc:  # pragma: no cover - defensive
+                self.logger.debug("Scout close failed: %s", exc)
+
     def _sync_thesis_to_scouts(self) -> None:
         for s in self.scouts:
             s.set_fund_thesis(self.active_thesis)

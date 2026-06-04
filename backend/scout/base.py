@@ -107,6 +107,17 @@ class Scout(ABC):
         """Active fund mandate from Supabase; discovery must align when set."""
         self._fund_thesis_ctx = thesis_ctx
 
+    def close(self) -> None:
+        """Release the OpenAI client (httpx pool) and worker thread.
+
+        Scouts are rebuilt every pipeline cycle; without this the connection
+        pool and executor thread leak across cycles -> RSS growth -> OOM.
+        """
+        from utils.resource_cleanup import close_openai_client, shutdown_executor
+
+        shutdown_executor(getattr(self, "executor", None))
+        close_openai_client(getattr(self, "client", None))
+
     def _fund_thesis_user_block(self) -> str:
         ctx = getattr(self, "_fund_thesis_ctx", None)
         if not ctx:

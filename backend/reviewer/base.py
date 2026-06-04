@@ -339,6 +339,17 @@ class Reviewer(ABC):
         """Runtime mandate from Supabase active thesis; None clears."""
         self._fund_thesis_ctx = thesis_ctx
 
+    def close(self) -> None:
+        """Release the OpenAI client (httpx pool) and worker thread.
+
+        Reviewers are rebuilt every pipeline cycle; without this the connection
+        pool and executor thread leak across cycles -> RSS growth -> OOM.
+        """
+        from utils.resource_cleanup import close_openai_client, shutdown_executor
+
+        shutdown_executor(getattr(self, "executor", None))
+        close_openai_client(getattr(self, "client", None))
+
     def _get_agent_name(self) -> str:
         """Map reviewer_type to agent name for prompt library lookup."""
         mapping = {

@@ -222,6 +222,13 @@ class PartnerDecisionEngine:
             "generic_rationale_replaced": 0,
         }
 
+    def close(self) -> None:
+        """Release the OpenAI client (httpx pool); rebuilt every pipeline cycle."""
+        from utils.resource_cleanup import close_openai_client
+
+        close_openai_client(getattr(self, "client", None))
+        self.client = None
+
     def _verdict_label(self, verdict: str) -> str:
         """Human-readable quality label for verdict. Uses quality_labels from rules."""
         labels = self._rules.get("quality_labels", {})

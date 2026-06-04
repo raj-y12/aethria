@@ -92,6 +92,44 @@ def test_startups_endpoint_uses_bounded_projection(monkeypatch):
     assert captured == {"limit": api.DEFAULT_STARTUPS_LIST_LIMIT, "offset": 0}
 
 
+def test_resource_cleanup_helpers_are_defensive():
+    from concurrent.futures import ThreadPoolExecutor
+
+    from utils.resource_cleanup import close_openai_client, shutdown_executor
+
+    # None and missing-method inputs must not raise.
+    close_openai_client(None)
+    shutdown_executor(None)
+    close_openai_client(object())
+
+    ex = ThreadPoolExecutor(max_workers=1)
+    ex.submit(lambda: None).result()
+    shutdown_executor(ex)
+    assert ex._shutdown is True
+
+    closed = {"value": False}
+
+    class FakeClient:
+        def close(self):
+            closed["value"] = True
+
+    close_openai_client(FakeClient())
+    assert closed["value"] is True
+
+
+def test_scout_engine_close_releases_clients_and_threads():
+    """Engines are rebuilt every cycle; close() must release httpx pools + threads."""
+    from scout.engine import ScoutEngine
+
+    engine = ScoutEngine(api_key="sk-test", tenant_user_id="user-1")
+    executors = [s.executor for s in engine.scouts]
+    assert executors and all(not e._shutdown for e in executors)
+
+    engine.close()
+
+    assert all(e._shutdown for e in executors)
+
+
 @pytest.mark.asyncio
 async def test_portfolio_execution_uses_bounded_decision_query():
     from portfolio.engine import PortfolioEngine

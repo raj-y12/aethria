@@ -78,6 +78,13 @@ class PartnerEngine:
         self.running = False
         self.last_cycle_escalations: int = 0
     
+    def close(self) -> None:
+        """Release the decision engine's OpenAI client (called at cycle end)."""
+        try:
+            self.decision_engine.close()
+        except Exception as exc:  # pragma: no cover - defensive
+            self.logger.debug("Partner decision engine close failed: %s", exc)
+
     def _build_entry(self, startup) -> Optional[Dict[str, Any]]:
         """Build an entry dict from a startup object (scout + review fields only)."""
         if startup.review_info is None:

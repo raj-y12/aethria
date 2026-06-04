@@ -82,28 +82,31 @@ class MetaAgent:
             )
         else:
             mutator = PromptMutator(signal, cycle_number, self.user_id)
-            mutation_targets = mutator.decide()
+            try:
+                mutation_targets = mutator.decide()
 
-            reweighter = ScoutReweighter(signal, cycle_number, self.user_id)
-            weight_updates = reweighter.decide()
+                reweighter = ScoutReweighter(signal, cycle_number, self.user_id)
+                weight_updates = reweighter.decide()
 
-            calibrator = ThresholdCalibrator(signal, cycle_number, self.user_id)
-            calibrations = calibrator.decide()
+                calibrator = ThresholdCalibrator(signal, cycle_number, self.user_id)
+                calibrations = calibrator.decide()
 
-            if mutation_targets:
-                mutations = mutator.apply(mutation_targets, self.scout_engine, self.reviewer_engine)
-            else:
-                self._no_action_reasons.append("No prompt mutations needed")
+                if mutation_targets:
+                    mutations = mutator.apply(mutation_targets, self.scout_engine, self.reviewer_engine)
+                else:
+                    self._no_action_reasons.append("No prompt mutations needed")
 
-            if weight_updates:
-                reweighter.apply(weight_updates)
-            else:
-                self._no_action_reasons.append("Scout weights stable")
+                if weight_updates:
+                    reweighter.apply(weight_updates)
+                else:
+                    self._no_action_reasons.append("Scout weights stable")
 
-            if calibrations:
-                calibrator.apply(calibrations)
-            else:
-                self._no_action_reasons.append("No calibration changes needed")
+                if calibrations:
+                    calibrator.apply(calibrations)
+                else:
+                    self._no_action_reasons.append("No calibration changes needed")
+            finally:
+                mutator.close()
 
         now = datetime.now()
         report = {

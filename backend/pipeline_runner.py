@@ -120,6 +120,24 @@ def _build_pipeline_engines(
     )
 
 
+def _close_pipeline_engines(*engines: object) -> None:
+    """Tear down per-cycle LLM clients / thread pools so they don't accumulate.
+
+    Engines are rebuilt every cycle; their OpenAI (httpx) clients and worker
+    threads must be released explicitly or RSS grows until the instance OOMs.
+    """
+    for engine in engines:
+        if engine is None:
+            continue
+        close = getattr(engine, "close", None)
+        if not callable(close):
+            continue
+        try:
+            close()
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("Engine close failed (%s): %s", type(engine).__name__, exc)
+
+
 def _safe_stage_count(storage: SupabaseStartupsStorage, method_name: str, user_id: str) -> Optional[int]:
     """Best-effort counter for stage logging; never raise."""
     try:
@@ -419,6 +437,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
         logger.exception("[%s] Pipeline cycle error: %s", user_id[:12], e)
         raise
     finally:
+        _close_pipeline_engines(scout_engine, reviewer_engine, partner_engine)
         gc.collect()
 
 
@@ -618,6 +637,7 @@ async def _run_on_demand_lookup_inner(
         )
         return None
     finally:
+        _close_pipeline_engines(scout_engine, reviewer_engine, partner_engine)
         gc.collect()
 
 
@@ -706,38 +726,41 @@ async def reprocess_startups_missing_fund_thesis(
     skipped = 0
     failed = 0
 
-    for sid in ids:
-        st = storage.get_startup(sid)
-        if st is None:
-            failed += 1
-            continue
-        if st.review_info is None:
-            skipped += 1
-            continue
-        vid = getattr(st.review_info, "fund_thesis_version_id", None)
-        if vid is not None and str(vid).strip():
-            skipped += 1
-            continue
+    try:
+        for sid in ids:
+            st = storage.get_startup(sid)
+            if st is None:
+                failed += 1
+                continue
+            if st.review_info is None:
+                skipped += 1
+                continue
+            vid = getattr(st.review_info, "fund_thesis_version_id", None)
+            if vid is not None and str(vid).strip():
+                skipped += 1
+                continue
 
-        prid = str(uuid4())
-        try:
-            ok_rev = await reviewer_engine.run_startup(
-                sid,
-                ignore_confidence_threshold=True,
-                pipeline_run_id=prid,
-                force_rerun=True,
-            )
-            if not ok_rev:
+            prid = str(uuid4())
+            try:
+                ok_rev = await reviewer_engine.run_startup(
+                    sid,
+                    ignore_confidence_threshold=True,
+                    pipeline_run_id=prid,
+                    force_rerun=True,
+                )
+                if not ok_rev:
+                    failed += 1
+                    continue
+                ok_p = await partner_engine.run_startup(sid, pipeline_run_id=prid, force_rerun=True)
+                if not ok_p:
+                    failed += 1
+                    continue
+                processed += 1
+            except Exception:
+                logger.exception("[%s] ThesisBackfill failed for startup %s", uid[:12], sid)
                 failed += 1
-                continue
-            ok_p = await partner_engine.run_startup(sid, pipeline_run_id=prid, force_rerun=True)
-            if not ok_p:
-                failed += 1
-                continue
-            processed += 1
-        except Exception:
-            logger.exception("[%s] ThesisBackfill failed for startup %s", uid[:12], sid)
-            failed += 1
+    finally:
+        _close_pipeline_engines(reviewer_engine, partner_engine)
 
     logger.info(
         "[ThesisBackfill] user_id=%s processed=%s skipped=%s failed=%s",

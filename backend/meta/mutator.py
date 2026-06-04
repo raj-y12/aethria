@@ -169,6 +169,14 @@ class PromptMutator:
             self._client = OpenAI(api_key=self.api_key)
         return self._client
 
+    def close(self) -> None:
+        """Release the OpenAI client and worker threads; rebuilt every meta cycle."""
+        from utils.resource_cleanup import close_openai_client, shutdown_executor
+
+        shutdown_executor(getattr(self, "_executor", None))
+        close_openai_client(getattr(self, "_client", None))
+        self._client = None
+
     def decide(self) -> List[Dict[str, Any]]:
         """Determine which prompts need mutation. Returns list of mutation targets."""
         targets = []

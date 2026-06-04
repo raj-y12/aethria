@@ -139,6 +139,14 @@ class ReviewerEngine:
         self.reviewer.set_fund_thesis(t)
         self.skeptical_reviewer.set_fund_thesis(t)
         self.opportunist_reviewer.set_fund_thesis(t)
+
+    def close(self) -> None:
+        """Release each reviewer's OpenAI client and worker thread (called at cycle end)."""
+        for r in (self.reviewer, self.skeptical_reviewer, self.opportunist_reviewer):
+            try:
+                r.close()
+            except Exception as exc:  # pragma: no cover - defensive
+                self.logger.debug("Reviewer close failed: %s", exc)
     
     def _compute_consensus(self, results: list) -> dict:
         """
