@@ -246,30 +246,14 @@ class ReviewerEngine:
 
     def _blend_numeric_scores_into_primary(self, primary: dict, all_results: list) -> None:
         """Deterministic dimension scores: integer mean across reviewers.
-        Defensibility uses 1.5x weight for SkepticalReviewer (Weighted Skepticism).
+        Defensibility uses the same plain mean as the other dimensions — it is a
+        risk/moat modifier, not part of the overall (see the decision log in
+        docs/scoring-remediation-checklist.md). The former 1.5x-skeptical weighting and
+        the orphaned weighted_defensibility_score field were removed.
         Also computes confidence_adjusted_score = S_bar × (1 − reviewer_delta/10).
         """
-        core_dims = ["market_score", "product_score", "technical_score", "execution_score"]
-        for d in core_dims:
+        for d in ["market_score", "product_score", "technical_score", "execution_score", "defensibility_score"]:
             primary[d] = self._mean_round_score([r.get(d) for r in all_results])
-
-        # Weighted Skepticism: SkepticalReviewer defensibility counts 1.5×
-        defs_weighted = []
-        for r in all_results:
-            ds = r.get("defensibility_score")
-            if ds is None:
-                continue
-            try:
-                weight = 1.5 if r.get("reviewer_type") == "SkepticalReviewer" else 1.0
-                defs_weighted.append((float(ds), weight))
-            except (TypeError, ValueError):
-                pass
-        if defs_weighted:
-            weighted_sum = sum(v * w for v, w in defs_weighted)
-            total_weight = sum(w for _, w in defs_weighted)
-            weighted_def = weighted_sum / total_weight
-            primary["defensibility_score"] = int(round(weighted_def))
-            primary["weighted_defensibility_score"] = round(weighted_def, 3)
 
         self._recompute_derived_from_primary(primary, all_results)
 

@@ -1210,7 +1210,6 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
             "thesis_deviation_points": review_enriched.get("thesis_deviation_points") or None,
             "thesis_alignment_confidence": review_enriched.get("thesis_alignment_confidence"),
             "fund_thesis_alignment_score": review_enriched.get("fund_thesis_alignment_score"),
-            "weighted_defensibility_score": review_enriched.get("weighted_defensibility_score"),
             "confidence_adjusted_score": review_enriched.get("confidence_adjusted_score"),
             "structured_scoring": review_enriched.get("structured_scoring"),
             "scoring_presentation": _build_scoring_presentation(

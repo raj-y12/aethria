@@ -32,7 +32,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 |---|---|
 | Phase 0 — Guardrails | ✅ 2 / 2 |
 | Phase 1 — Stop the bleeding (highest severity, lowest effort) | ✅ 2 / 2 (P1.2 re-sequenced → Phase 3) |
-| Phase 2 — Canonical score (Workstream B) | ✅ 3 / 4 (P2.4 split: surface→Phase 4, orphan-removal deferred) |
+| Phase 2 — Canonical score (Workstream B) | ✅ 4 / 4 (P2.4: weighted_defensibility removed; confidence_adjusted_score kept—live in partner) |
 | Phase 3 — Meaning fix (Layers 1–3) | ◑ abstain framework + ALL-dimension rollout + off-vocab done (P1.2+P3.2); P3.1 anchored-criteria implemented for team (prompt QUALITY needs model); per-component anchor rollout pending |
 | Phase 4 — Presentation vocabulary (Workstream C) | ◑ P4.2/P4.3/P4.4 done, P4.1 drift-guard + P4.5 methodology block added; full payload-derived bands + sanitizeReasoning relax pending |
 | Phase 5 — Calibration hardening (Layers 4–5) | 0 / 3 |
@@ -154,7 +154,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     `AssessmentDimensionStrip` is folded into the Phase 4 presentation pass.
   - Depends on: P2.2
 
-- [~] **P2.4 — Surface or delete dead signals (audit A5 — corrected).**
+- [✅] **P2.4 — Surface or delete dead signals (audit A5 — corrected).**
   **Correction:** `confidence_adjusted_score` is NOT dead — `partner/decision.py:654`
   uses it for grey-zone decisions (A5 referred to *memo UI* only). Action split:
   - `confidence_adjusted_score`: **surface** in the memo → folded into Phase 4 (it is a
