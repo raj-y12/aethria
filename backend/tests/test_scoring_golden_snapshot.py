@@ -95,21 +95,27 @@ FIXTURES = {
 }
 
 # Captured from the current engine (DEBUG_SCORING off). Update consciously.
+#
+# overall_score updated by P2.1 (defensibility excluded from the canonical overall;
+# overall is now the 4-dim mean of market/product/technical/execution, identical to
+# utils.scoring.compute_overall_score). Dimension scores are unchanged. The previous
+# 5-dim-equal-weight overalls (e.g. strong_saas 6.28) were dragged down by
+# defensibility's systematic low default (~2.35).
 GOLDEN = {
     "strong_saas": {
-        "overall_score": 6.28,
+        "overall_score": 7.26,
         "dims": {"market": 7.88, "product": 8.25, "technical": 6.15, "execution": 6.75, "defensibility": 2.35},
     },
     "weak_thin": {
-        "overall_score": 4.02,
+        "overall_score": 4.43,
         "dims": {"market": 5.48, "product": 5.60, "technical": 2.80, "execution": 3.85, "defensibility": 2.35},
     },
     "all_missing": {
-        "overall_score": 3.64,
+        "overall_score": 3.96,
         "dims": {"market": 5.78, "product": 3.85, "technical": 2.80, "execution": 3.40, "defensibility": 2.35},
     },
     "structured_signals": {
-        "overall_score": 3.92,
+        "overall_score": 4.31,
         "dims": {"market": 6.30, "product": 3.85, "technical": 2.80, "execution": 4.30, "defensibility": 2.35},
     },
 }
@@ -133,6 +139,18 @@ def test_engine_dimension_scores_golden(name):
         assert result[dim]["score"] == pytest.approx(expected, abs=ABS), (
             f"{name}.{dim}: dimension score drifted from golden snapshot."
         )
+
+
+@pytest.mark.parametrize("name", list(FIXTURES))
+def test_overall_is_four_dimension_mean_excluding_defensibility(name):
+    """Canonical-score invariant (P2.1/P2.3): the overall is the mean of the four
+    core driver dimensions and excludes defensibility. The displayed overall must be
+    reproducible from the displayed dimensions (audit B4)."""
+    scout, review = FIXTURES[name]
+    result = DeterministicScoringEngine().score(scout, review)
+    core = [result[d]["score"] for d in ("market", "product", "technical", "execution")]
+    expected = sum(core) / len(core)
+    assert result["overall_score"] == pytest.approx(expected, abs=ABS)
 
 
 # --- Pure normalizer anchor table -------------------------------------------------

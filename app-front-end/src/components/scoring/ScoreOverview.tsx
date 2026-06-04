@@ -25,6 +25,10 @@ export default function ScoreOverview({ scoring, presentation }: ScoreOverviewPr
   return (
     <div className="memoScoreOverview">
       <p className="memoScoreOverviewLine" title={evidenceTooltip}>{line}</p>
+      <p className="memoScoreOverviewNote" role="note">
+        Overall = mean of Market, Product, Technical, Execution. Defensibility is a
+        separate moat signal and is not averaged in.
+      </p>
       {consistencyNote && (
         <p className="memoScoreOverviewNote" role="note">{consistencyNote}</p>
       )}

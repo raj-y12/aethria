@@ -7,7 +7,13 @@ import os
 import re
 from typing import Any, Dict
 
-from config.scoring_config import DEBUG_SCORING, DEFAULT_SCORE, DIMENSION_WEIGHTS, OVERALL_DIMENSION_WEIGHTS
+from config.scoring_config import (
+    DEBUG_SCORING,
+    DEFAULT_SCORE,
+    DIMENSION_WEIGHTS,
+    OVERALL_DIMENSION_WEIGHTS,
+    OVERALL_SCORE_DIMENSIONS,
+)
 from services.scoring.aggregation_layer import aggregate_all_dimensions
 from services.scoring.extraction_layer import extract_structured_signals
 from services.scoring.policy_compiler import compile_policy_from_fund_config
@@ -232,9 +238,17 @@ class DeterministicScoringEngine:
         return normalized
 
     def _compute_overall_score(self, aggregated: Dict[str, Dict[str, Any]]) -> float:
+        # Only the core driver dimensions contribute to the overall; defensibility is
+        # a separate risk/moat modifier (OVERALL_SCORE_DIMENSIONS). This makes the
+        # engine's overall identical to utils.scoring.compute_overall_score, which the
+        # partner decision already uses (resolves A3/A4). Per-dimension fund weights
+        # among the four still apply.
         weighted_sum = 0.0
         weight_total = 0.0
-        for dim, details in aggregated.items():
+        for dim in OVERALL_SCORE_DIMENSIONS:
+            details = aggregated.get(dim)
+            if details is None:
+                continue
             weight = float(self.dimension_weights.get(dim, 0.0))
             weighted_sum += float(details.get("score", DEFAULT_SCORE)) * weight
             weight_total += weight
@@ -245,7 +259,10 @@ class DeterministicScoringEngine:
     def _compute_overall_confidence(self, aggregated: Dict[str, Dict[str, Any]]) -> float:
         weighted_sum = 0.0
         weight_total = 0.0
-        for dim, details in aggregated.items():
+        for dim in OVERALL_SCORE_DIMENSIONS:
+            details = aggregated.get(dim)
+            if details is None:
+                continue
             weight = float(self.dimension_weights.get(dim, 0.0))
             weighted_sum += float(details.get("confidence", 0.0)) * weight
             weight_total += weight

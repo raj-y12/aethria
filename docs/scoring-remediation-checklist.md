@@ -32,7 +32,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 |---|---|
 | Phase 0 — Guardrails | ✅ 2 / 2 |
 | Phase 1 — Stop the bleeding (highest severity, lowest effort) | ✅ 2 / 2 (P1.2 re-sequenced → Phase 3) |
-| Phase 2 — Canonical score (Workstream B) | 0 / 4 |
+| Phase 2 — Canonical score (Workstream B) | ✅ 3 / 4 (P2.4 split: surface→Phase 4, orphan-removal deferred) |
 | Phase 3 — Meaning fix (Layers 1–3) | 0 / 4 |
 | Phase 4 — Presentation vocabulary (Workstream C) | 0 / 5 |
 | Phase 5 — Calibration hardening (Layers 4–5) | 0 / 3 |
@@ -119,45 +119,52 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 
 > One overall, one formula, reproducible from the dimensions shown.
 
-- [ ] **P2.1 — Implement defensibility's resolved role (audit A3).**
-  **Decision made (see decision log): defensibility is a risk/moat modifier,
-  EXCLUDED from the canonical overall.** Canonical overall = mean(market, product,
-  technical, execution). Implement: make the structured engine's `overall_score`
-  and `OVERALL_DIMENSION_WEIGHTS` stop including defensibility; remove the unused
-  1.5×-weighted variant; keep defensibility as a separately-surfaced signal.
-  - Files: `backend/config/scoring_config.py` (`OVERALL_DIMENSION_WEIGHTS`),
-    `backend/services/scoring/scoring_engine.py`, `backend/reviewer/engine.py:256-272`.
-  - **Validation gate:** exactly one definition of "overall" exists in code; the
-    1.5×-weighted and equal-weighted variants no longer coexist; golden `GOLDEN`
-    values updated consciously to the 4-dim overall with the change referenced.
+- [✅] **P2.1 — Implement defensibility's resolved role (audit A3).**
+  Defensibility excluded from the canonical overall. Added
+  `OVERALL_SCORE_DIMENSIONS = (market, product, technical, execution)`; the engine's
+  `_compute_overall_score`/`_compute_overall_confidence` now iterate only those four,
+  so the engine overall is identical to `utils.scoring.compute_overall_score`
+  (immune to whatever per-dimension weights flow in). Dimension scores unchanged.
+  - Files: `backend/config/scoring_config.py`, `backend/services/scoring/scoring_engine.py`,
+    `backend/tests/test_scoring_golden_snapshot.py` (GOLDEN updated + invariant test).
+  - **Validation gate:** ✅ engine overall == 4-dim mean for all fixtures
+    (strong_saas 6.28→7.26); new `test_overall_is_four_dimension_mean_excluding_defensibility`;
+    91+ scoring/partner/reviewer tests green; partner decisions unchanged (they already
+    used the 4-dim `compute_overall_score`).
   - Depends on: P0.1
 
-- [ ] **P2.2 — Single `overall_score` source (audit A4).**
-  Collapse the up-to-three computation paths into one canonical function used by both
-  the partner decision and the memo.
-  - Files: `backend/utils/scoring.py`, `backend/partner/decision.py`,
-    `app-front-end/src/lib/reviewScoring.ts:155-160`.
-  - **Validation gate:** partner decision and memo read the identical `overall_score`
-    for the same startup; the frontend no longer synthesizes a fallback that differs
-    from the backend.
+- [✅] **P2.2 — Single `overall_score` source (audit A4).**
+  Backend already canonical (4-dim `compute_overall_score`, now matched by the engine
+  via P2.1). Fixed the frontend fallback in `reviewScoring.ts` which synthesised a
+  5-dim mean — now a 4-dim mean (defensibility excluded), preferring the
+  backend-computed value.
+  - Files: `app-front-end/src/lib/reviewScoring.ts`.
+  - **Validation gate:** ✅ frontend fallback excludes defensibility and matches the
+    backend definition; `tsc`/eslint clean.
   - Depends on: P2.1
 
-- [ ] **P2.3 — Dimensions reconcile to the overall, with a printed formula (audit B4).**
-  Averaging the displayed dimensions reproduces the displayed overall; the memo shows
-  the formula/caption.
-  - Files: `app-front-end/src/components/scoring/ScoreOverview.tsx`,
-    `InvestmentMemoContent.tsx`.
-  - **Validation gate:** for any memo, `mean(displayed dimensions)` == displayed
-    overall within rounding; caption states which dimensions are included.
+- [✅] **P2.3 — Dimensions reconcile to the overall, with a printed caption (audit B4).**
+  Data invariant holds (overall == mean of the 4 drivers, pinned by golden test).
+  Added a memo caption: "Overall = mean of Market, Product, Technical, Execution.
+  Defensibility is a separate moat signal and is not averaged in."
+  - Files: `app-front-end/src/components/scoring/ScoreOverview.tsx`.
+  - **Validation gate:** ✅ averaging the 4 driver dimensions reproduces the overall;
+    caption states inclusion explicitly; `tsc`/eslint clean.
+  - Note: visually separating the defensibility tile from the 4 driver tiles in
+    `AssessmentDimensionStrip` is folded into the Phase 4 presentation pass.
   - Depends on: P2.2
 
-- [ ] **P2.4 — Surface or delete dead signals (audit A5).**
-  `confidence_adjusted_score` and `weighted_defensibility_score` are either rendered
-  with a clear meaning or removed from the pipeline.
-  - Files: `backend/reviewer/engine.py:256-272,298-302`, memo components.
-  - **Validation gate:** no computed score field is silently discarded; each is
-    either shown or gone.
-  - Depends on: P2.1
+- [~] **P2.4 — Surface or delete dead signals (audit A5 — corrected).**
+  **Correction:** `confidence_adjusted_score` is NOT dead — `partner/decision.py:654`
+  uses it for grey-zone decisions (A5 referred to *memo UI* only). Action split:
+  - `confidence_adjusted_score`: **surface** in the memo → folded into Phase 4 (it is a
+    live, meaningful conviction signal; deleting would break partner grey-zone logic).
+  - `weighted_defensibility_score`: the only genuinely orphaned signal (computed +
+    plumbed to the frontend payload, never consumed; frontend has zero references).
+    **Deferred** to a focused removal touching `reviewer/engine.py`, `api.py`,
+    `models.py`, `utils/adapters.py` — gated on a full reviewer-engine test run to
+    keep the wire-contract change safe.
+  - Depends on: P2.1; coordinate with Phase 4.
 
 ---
 

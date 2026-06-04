@@ -151,13 +151,17 @@ export function normalizeStructuredScoring(review: Review | null | undefined): S
   if (!market || !product || !technical || !execution || !defensibility) {
     return null;
   }
-  const flatScores = [market.score, product.score, technical.score, execution.score, defensibility.score];
+  // Canonical overall = mean of the four core driver dimensions; defensibility is a
+  // risk/moat modifier and is excluded (matches backend compute_overall_score and the
+  // structured engine — see docs/scoring-remediation-checklist.md decision log). Prefer
+  // the backend-computed value; only synthesise a 4-dim mean as a last resort.
+  const coreScores = [market.score, product.score, technical.score, execution.score];
   const overallCandidate =
     typeof review.overall_score === 'number'
       ? review.overall_score
       : typeof review.aggregate_score === 'number'
         ? review.aggregate_score
-        : flatScores.reduce((sum, s) => sum + s, 0) / flatScores.length;
+        : coreScores.reduce((sum, s) => sum + s, 0) / coreScores.length;
   return {
     market,
     product,
