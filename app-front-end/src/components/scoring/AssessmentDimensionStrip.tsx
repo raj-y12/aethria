@@ -17,10 +17,12 @@ interface AssessmentDimensionStripProps {
   contentKey: string;
 }
 
-function dimensionScoreLabel(score: number, confidence: number | null | undefined): string {
+// The displayed score must never change with confidence — a low-confidence 7.5
+// previously rendered as "8", reading as a different, lower score (audit B5).
+// Confidence is now signalled separately (class + tooltip), not by mutating the digit.
+function isLowConfidence(confidence: number | null | undefined): boolean {
   const normalized = normalizeConfidence(confidence);
-  const lowConfidence = normalized != null && normalized < 0.4;
-  return lowConfidence ? String(Math.round(score)) : score.toFixed(1);
+  return normalized != null && normalized < 0.4;
 }
 
 export default function AssessmentDimensionStrip({
@@ -47,9 +49,8 @@ export default function AssessmentDimensionStrip({
           const dimension = scoring[dim.key];
           const presDim = presentation?.dimensions?.find((d) => d.id === dim.key);
           const selected = activeKey === dim.key;
-          const scoreText = presDim
-            ? presDim.score.toFixed(1)
-            : dimensionScoreLabel(dimension.score, dimension.confidence);
+          const scoreText = presDim ? presDim.score.toFixed(1) : dimension.score.toFixed(1);
+          const lowConfidence = !presDim && isLowConfidence(dimension.confidence);
           const narrative = dimensionBriefTake(dimension, presDim);
           return (
             <li key={dim.key}>
@@ -64,7 +65,12 @@ export default function AssessmentDimensionStrip({
               >
                 <span className="memoScoreBriefRowTop">
                   <span className="memoScoreBriefName">{dim.label}</span>
-                  <span className="memoScoreBriefScore">{scoreText}</span>
+                  <span
+                    className={`memoScoreBriefScore${lowConfidence ? ' memoScoreBriefScore--lowConfidence' : ''}`}
+                    title={lowConfidence ? 'Low evidence confidence' : undefined}
+                  >
+                    {scoreText}
+                  </span>
                 </span>
                 <span className="memoScoreBriefNarrative">{narrative}</span>
               </button>

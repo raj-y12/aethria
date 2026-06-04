@@ -31,7 +31,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 | Phase | Done / Total |
 |---|---|
 | Phase 0 — Guardrails | ✅ 2 / 2 |
-| Phase 1 — Stop the bleeding (highest severity, lowest effort) | 0 / 3 |
+| Phase 1 — Stop the bleeding (highest severity, lowest effort) | ✅ 2 / 2 (P1.2 re-sequenced → Phase 3) |
 | Phase 2 — Canonical score (Workstream B) | 0 / 4 |
 | Phase 3 — Meaning fix (Layers 1–3) | 0 / 4 |
 | Phase 4 — Presentation vocabulary (Workstream C) | 0 / 5 |
@@ -77,36 +77,40 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 
 > Highest severity, smallest changes. These remove active wrong/confusing output.
 
-- [ ] **P1.1 — Fix the band mismatch (audit B1).** 🔴 highest severity
-  Frontend `SCORE_BANDS` must derive from / match the versioned rubric, not a
-  hand-copied duplicate.
-  - Files: `app-front-end/src/design-system/semantics.ts`,
-    `resources/config/evaluation_rubric/v1.json`.
-  - Decision needed: **which banding is canonical** — the 4-band rubric
-    (Weak/Concerning/Promising/Strong) or the 5-band UI
-    (…/Below Threshold/Promising/Strong/Exceptional)? Pick one, in the rubric.
-  - **Validation gate:** a `7` renders with the **same** label in a memo as the
-    rubric assigns; an automated test asserts band parity between
-    `evaluation_rubric` and the frontend for scores 1–10; the false
-    "Aligned with canonical bands" comment is now true.
+- [✅] **P1.1 — Fix the band mismatch (audit B1).** 🔴 highest severity
+  Frontend `SCORE_BANDS` now mirrors the versioned rubric exactly (4-band:
+  Weak 1–3 / Concerning 4–5 / Promising 6–7 / Strong 8–10); `getScoreBand`
+  thresholds and the (previously false) "aligned" comment corrected.
+  - **Decision (resolved):** canonical banding = the rubric's 4-band scale in
+    `evaluation_rubric/v1.json` (versioned policy is the source of truth per
+    CLAUDE.md). The richer 5-band UI scale was dropped to match the bands the
+    reviewer actually scores against. Structural enforcement (derive from payload,
+    no hand-mirror) is deferred to P4.1.
+  - Files: `app-front-end/src/design-system/semantics.ts`.
+  - **Validation gate:** ✅ node parity check — for every integer score 1–10 the
+    frontend label equals the rubric label (previously `7`→"Strong" vs rubric
+    "Promising"); `tsc --noEmit` clean; eslint clean.
   - Depends on: P0.1
 
-- [ ] **P1.2 — Abstain instead of `DEFAULT_SCORE = 5.0` (audit C2 + Layer 3).**
-  Missing / off-vocabulary input → `unscored`, never a silent `5.0`.
-  - Files: `backend/services/scoring/normalization_layer.py`,
-    `backend/config/scoring_config.py`, aggregation in
-    `backend/services/scoring/scoring_engine.py`.
-  - **Validation gate:** a fixture with no TAM yields `unscored` (not 5.0) on Market;
-    an unknown differentiation label yields `unscored` (not 5.0); a verified small TAM
-    still scores below a no-data TAM (the perverse ordering is gone).
-  - Depends on: P0.1
+- [⛔] **P1.2 — Abstain instead of `DEFAULT_SCORE = 5.0` (audit C2 + Layer 3).**
+  **RE-SEQUENCED → bundled with P3.2.** A standalone abstain fix is *unsafe*: the
+  extraction layer fabricates neutral labels (`urgency="important"`,
+  `timing="neutral"`, `competition="moderate"`) for no-evidence components, so they
+  pass `_has_concrete_evidence`. Excluding only the truly-missing components and
+  renormalizing weights makes an all-missing company's Market score go **up** (5.78 →
+  6.55), the opposite of the intent. Abstain only works once extraction emits facts /
+  `unscored` instead of fabricated labels (P3.2). Verified empirically 2026-06-04.
+  - Depends on: P3.2 (extraction emits facts, not fabricated labels)
 
-- [ ] **P1.3 — Stop truncating the digit on low confidence (audit B5).**
-  `7.5` must not render as `7` when confidence < 0.4; low confidence is shown via the
-  confidence element, not by changing the number.
-  - Files: `app-front-end/src/components/scoring/AssessmentDimensionStrip.tsx:20-24`.
-  - **Validation gate:** a low-confidence 7.5 renders as `7.5` with a confidence
-    marker; no path silently rounds a displayed dimension score.
+- [✅] **P1.3 — Stop truncating the digit on low confidence (audit B5).**
+  Removed the `Math.round(score)` low-confidence path; the digit is always
+  `toFixed(1)`. Low confidence is now signalled by a non-destructive cue
+  (`memoScoreBriefScore--lowConfidence`: dimmed + dotted underline + tooltip),
+  never by changing the number.
+  - Files: `app-front-end/src/components/scoring/AssessmentDimensionStrip.tsx`,
+    `app-front-end/src/components/InvestmentMemoContent.css`.
+  - **Validation gate:** ✅ a low-confidence 7.5 renders as `7.5` (no rounding path
+    remains); `tsc --noEmit` clean; eslint clean.
   - Depends on: —
 
 ---
@@ -115,13 +119,17 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 
 > One overall, one formula, reproducible from the dimensions shown.
 
-- [ ] **P2.1 — Decide defensibility's role (audit A3).**
-  Is defensibility a **scored driver** (in the overall) or a **risk modifier**
-  (outside it)? Decide once; record the decision in the rubric/partner rules.
-  - Files: `resources/config/evaluation_rubric/v1.json`,
-    `backend/config/scoring_config.py`, decision note in this file.
+- [ ] **P2.1 — Implement defensibility's resolved role (audit A3).**
+  **Decision made (see decision log): defensibility is a risk/moat modifier,
+  EXCLUDED from the canonical overall.** Canonical overall = mean(market, product,
+  technical, execution). Implement: make the structured engine's `overall_score`
+  and `OVERALL_DIMENSION_WEIGHTS` stop including defensibility; remove the unused
+  1.5×-weighted variant; keep defensibility as a separately-surfaced signal.
+  - Files: `backend/config/scoring_config.py` (`OVERALL_DIMENSION_WEIGHTS`),
+    `backend/services/scoring/scoring_engine.py`, `backend/reviewer/engine.py:256-272`.
   - **Validation gate:** exactly one definition of "overall" exists in code; the
-    1.5×-weighted and equal-weighted variants no longer coexist.
+    1.5×-weighted and equal-weighted variants no longer coexist; golden `GOLDEN`
+    values updated consciously to the 4-dim overall with the change referenced.
   - Depends on: P0.1
 
 - [ ] **P2.2 — Single `overall_score` source (audit A4).**
@@ -316,16 +324,15 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 
 | Date | Decision | Made by | Notes |
 |---|---|---|---|
-| — | Canonical banding (4-band rubric vs 5-band UI) — **OPEN** | — | P1.1 blocker |
-| — | Defensibility: driver vs risk modifier — **OPEN** | — | P2.1 blocker |
-| — | Stage handling: relative anchors vs labelled cohorts — **OPEN** | — | P6.1 |
+| 2026-06-04 | **Canonical banding = rubric 4-band** (Weak/Concerning/Promising/Strong). Frontend mirrors it; structural derive-from-payload deferred to P4.1. | Claude (delegated) | Versioned policy is SSOT per CLAUDE.md. Unblocked P1.1 (done). |
+| 2026-06-04 | **Defensibility = risk/moat modifier, EXCLUDED from canonical overall.** Canonical overall = mean(market, product, technical, execution). | Claude (delegated) | Matches the existing partner decision (4-dim `compute_overall_score`), so INVEST/PASS thresholds stay stable; avoids defensibility's systematic low default (~2.35) tanking every overall; resolves A3 three-way conflict. Memo shows 4 driver tiles (which average to the overall) + defensibility as a separate labelled moat signal (B4). |
+| 2026-06-04 | **Stage handling = labelled cohorts** (keep absolute anchors; capture + display the stage cohort; judge maturity-dependent criteria within cohort). | Claude (delegated) | Stage-relative anchors would break the absolute scale that makes cross-company comparison possible. Implement in Phase 6. |
+| 2026-06-04 | **P1.2 re-sequenced to bundle with P3.2.** | Claude (delegated) | Standalone abstain backfires due to extraction fabricating neutral labels (5.78→6.55). See P1.2 row. |
 
 ---
 
-## Open decisions that block work (resolve early)
+## Open decisions that block work
 
-1. **Banding (P1.1):** which scale is canonical? Everything in Phase 4 depends on it.
-2. **Defensibility role (P2.1):** in or out of the overall? Blocks the canonical score.
-3. **Stage model (P6.1):** cohort-labelled scores vs stage-relative anchors?
-
-These three are the architectural forks — pick them before writing Phase 2+ code.
+All three original architectural forks are now **RESOLVED** (see decision log,
+2026-06-04): banding = rubric 4-band; defensibility = risk modifier (out of overall);
+stage = labelled cohorts. No open blockers remain; remaining work is execution.

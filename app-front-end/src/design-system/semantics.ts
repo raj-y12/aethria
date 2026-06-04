@@ -6,22 +6,31 @@
 
 import type { Review } from '../types/startup';
 
-/** Score band: human-readable meaning of a 1–10 score. Aligned with canonical bands. */
+/**
+ * Score band: human-readable meaning of a 1–10 score.
+ *
+ * These MUST mirror the canonical rubric `score_bands` in
+ * `resources/config/evaluation_rubric/v1.json` (v1.1) — the same bands the
+ * reviewer scores against. They were previously divergent (a `7` rendered as
+ * "Strong" here while the rubric calls it "Promising"), which inverted the
+ * verdict at the boundary where INVEST decisions are made (audit B1).
+ *
+ * NOTE: this is a hand-maintained mirror. P4.1 in the remediation plan replaces
+ * it with bands derived from the policy payload so divergence becomes impossible.
+ */
 export const SCORE_BANDS = [
-  { range: [1, 2] as [number, number], label: 'Structurally Weak', meaning: 'Fundamental structural concerns. Not investable without significant change.' },
-  { range: [3, 4] as [number, number], label: 'Below Threshold', meaning: 'Potential business but unlikely venture-scale outcome at current state.' },
-  { range: [5, 6] as [number, number], label: 'Promising', meaning: 'Promising opportunity with incomplete validation. Requires further diligence.' },
-  { range: [7, 8] as [number, number], label: 'Strong', meaning: 'Strong venture-scale opportunity supported by evidence.' },
-  { range: [9, 10] as [number, number], label: 'Exceptional', meaning: 'Exceptional opportunity with multiple reinforcing signals.' },
+  { range: [1, 3] as [number, number], label: 'Weak', meaning: 'High risk, failing, or structurally broken.' },
+  { range: [4, 5] as [number, number], label: 'Concerning', meaning: 'Unproven, material execution or validation gaps.' },
+  { range: [6, 7] as [number, number], label: 'Promising', meaning: 'Reasonable thesis, requires validation.' },
+  { range: [8, 10] as [number, number], label: 'Strong', meaning: 'Investment-grade, clear upside with managed risk.' },
 ] as const;
 
 export function getScoreBand(score: number): { label: string; meaning: string } {
   if (!Number.isFinite(score) || score < 1 || score > 10) return { label: '—', meaning: '' };
-  if (score < 3) return { label: SCORE_BANDS[0].label, meaning: SCORE_BANDS[0].meaning };
-  if (score < 5) return { label: SCORE_BANDS[1].label, meaning: SCORE_BANDS[1].meaning };
-  if (score < 7) return { label: SCORE_BANDS[2].label, meaning: SCORE_BANDS[2].meaning };
-  if (score < 9) return { label: SCORE_BANDS[3].label, meaning: SCORE_BANDS[3].meaning };
-  return { label: SCORE_BANDS[4].label, meaning: SCORE_BANDS[4].meaning };
+  if (score < 4) return { label: SCORE_BANDS[0].label, meaning: SCORE_BANDS[0].meaning };
+  if (score < 6) return { label: SCORE_BANDS[1].label, meaning: SCORE_BANDS[1].meaning };
+  if (score < 8) return { label: SCORE_BANDS[2].label, meaning: SCORE_BANDS[2].meaning };
+  return { label: SCORE_BANDS[3].label, meaning: SCORE_BANDS[3].meaning };
 }
 
 /** Quality assessment from Reviewer (STRONG/MEDIUM/WEAK). */

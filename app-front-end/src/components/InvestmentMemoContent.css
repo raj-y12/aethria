@@ -1610,6 +1610,12 @@
   font-variant-numeric: tabular-nums;
   color: rgba(var(--color-oxford-rgb), 0.68);
 }
+/* Low evidence confidence: signal uncertainty WITHOUT changing the digit (audit B5). */
+.memoScoreBriefScore--lowConfidence {
+  color: rgba(var(--color-oxford-rgb), 0.42);
+  text-decoration: underline dotted rgba(var(--color-oxford-rgb), 0.3);
+  text-underline-offset: 3px;
+}
 
 .memoDimensionDetailPanel {
   margin-top: 10px;
@@ -1823,6 +1829,12 @@
   font-size: var(--memo-size-ui);
   font-variant-numeric: tabular-nums;
   color: rgba(var(--color-oxford-rgb), 0.68);
+}
+/* Low evidence confidence: signal uncertainty WITHOUT changing the digit (audit B5). */
+.memoScoreBriefScore--lowConfidence {
+  color: rgba(var(--color-oxford-rgb), 0.42);
+  text-decoration: underline dotted rgba(var(--color-oxford-rgb), 0.3);
+  text-underline-offset: 3px;
 }
 
 .memoDimensionDetailPanel {
