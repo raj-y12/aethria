@@ -13,7 +13,7 @@
  */
 import type { Startup } from '../types/startup';
 import type { QueueAnnotationVariant } from '../design-system/verdictBadgeTokens';
-import { formatConfidencePercent, normalizeConfidence } from '../components/scoring/ConfidenceIndicator';
+import { normalizeConfidence } from '../components/scoring/ConfidenceIndicator';
 import { extractAdverseRegister, type AdverseRegisterItem } from './adverseRegister';
 import { getDealAgeDays, isDealDecided, type RulingDecision } from './dealState';
 import { computeConfiguredScore, isStartupStaleByConfig, type FundConfiguration } from './fundConfiguration';
@@ -73,9 +73,11 @@ export function startupNeedsRuling(startup: Startup): boolean {
 /** Conviction % for queue display — list-safe fallback chain. */
 export function getQueueConvictionPct(ctx: QueueRowContext): number | null {
   const { startup, configuredScore } = ctx;
-  const partnerConf = normalizeConfidence(startup.partner?.confidence);
-  if (partnerConf != null) return Math.round(partnerConf * 100);
-
+  // Conviction == the canonical overall SCORE (quality), consistent with the memo.
+  // It is deliberately NOT partner.confidence: confidence (how sure the decision is)
+  // is a separate axis and was previously conflated under the same "conviction" label
+  // (audit B3). Returned on a 0–100 internal scale (score×10) for the tier thresholds;
+  // display formats it back to x/10.
   const agg = startup.review?.overall_score ?? startup.review?.aggregate_score;
   if (typeof agg === 'number' && Number.isFinite(agg)) {
     return Math.round(agg <= 10 ? agg * 10 : agg);
@@ -89,9 +91,15 @@ export function getQueueConvictionPct(ctx: QueueRowContext): number | null {
   return null;
 }
 
-export function formatQueueConviction(ctx: QueueRowContext): string {
+/** Conviction on the canonical 0–10 scale (x.x), matching the memo. */
+export function getQueueConvictionScore(ctx: QueueRowContext): number | null {
   const pct = getQueueConvictionPct(ctx);
-  return pct == null ? '—' : formatConfidencePercent(pct / 100);
+  return pct == null ? null : pct / 10;
+}
+
+export function formatQueueConviction(ctx: QueueRowContext): string {
+  const score = getQueueConvictionScore(ctx);
+  return score == null ? '—' : `${score.toFixed(1)}/10`;
 }
 
 export type ConvictionTier = 'low' | 'mid' | 'high' | 'none';
@@ -333,7 +341,7 @@ export function resolveQueueAttentionDriver(ctx: QueueRowContext): QueueAttentio
       detail:
         startup.partner?.decision_rationale?.trim() ||
         cleanQueueReason(startup.queue_reason) ||
-        `System conviction at ${convictionPct}% with ${recommendation} recommendation.`,
+        `System conviction at ${(convictionPct / 10).toFixed(1)}/10 with ${recommendation} recommendation.`,
       tone: 'watch',
     };
   }

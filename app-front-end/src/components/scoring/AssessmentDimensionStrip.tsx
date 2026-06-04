@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ScoringDimensionKey, ScoringPresentation, StructuredScoring } from '../../types/startup';
-import { normalizeConfidence } from './ConfidenceIndicator';
+import { getEvidenceConfidenceLabel, isLowEvidence } from './ConfidenceIndicator';
 import DimensionCard from './DimensionCard';
 import { dimensionBriefTake } from '../../lib/scoringRationale';
 
@@ -17,11 +17,10 @@ interface AssessmentDimensionStripProps {
   contentKey: string;
 }
 
-function dimensionScoreLabel(score: number, confidence: number | null | undefined): string {
-  const normalized = normalizeConfidence(confidence);
-  const lowConfidence = normalized != null && normalized < 0.4;
-  return lowConfidence ? String(Math.round(score)) : score.toFixed(1);
-}
+// The displayed score must never change with confidence — a low-confidence 7.5
+// previously rendered as "8", reading as a different, lower score (audit B5).
+// Confidence is signalled separately (class + tooltip), using the SAME low-evidence
+// threshold and vocabulary as the rest of the app (isLowEvidence / evidence label).
 
 export default function AssessmentDimensionStrip({
   dimensions,
@@ -47,10 +46,18 @@ export default function AssessmentDimensionStrip({
           const dimension = scoring[dim.key];
           const presDim = presentation?.dimensions?.find((d) => d.id === dim.key);
           const selected = activeKey === dim.key;
-          const scoreText = presDim
-            ? presDim.score.toFixed(1)
-            : dimensionScoreLabel(dimension.score, dimension.confidence);
-          const narrative = dimensionBriefTake(dimension, presDim);
+          // An unscored dimension has no evidence — show "Not scored", never the
+          // numeric placeholder (audit C2 / Layer 3).
+          const unscored = !presDim && dimension.unscored === true;
+          const scoreText = unscored
+            ? 'Not scored'
+            : presDim
+              ? presDim.score.toFixed(1)
+              : dimension.score.toFixed(1);
+          const lowConfidence = !presDim && !unscored && isLowEvidence(dimension.confidence);
+          const narrative = unscored
+            ? 'No supporting evidence — excluded from the overall.'
+            : dimensionBriefTake(dimension, presDim);
           return (
             <li key={dim.key}>
               <button
@@ -64,7 +71,18 @@ export default function AssessmentDimensionStrip({
               >
                 <span className="memoScoreBriefRowTop">
                   <span className="memoScoreBriefName">{dim.label}</span>
-                  <span className="memoScoreBriefScore">{scoreText}</span>
+                  <span
+                    className={`memoScoreBriefScore${lowConfidence ? ' memoScoreBriefScore--lowConfidence' : ''}${unscored ? ' memoScoreBriefScore--unscored' : ''}`}
+                    title={
+                      unscored
+                        ? 'No supporting evidence for this dimension'
+                        : lowConfidence
+                          ? `${getEvidenceConfidenceLabel(dimension.confidence)} evidence`
+                          : undefined
+                    }
+                  >
+                    {scoreText}
+                  </span>
                 </span>
                 <span className="memoScoreBriefNarrative">{narrative}</span>
               </button>

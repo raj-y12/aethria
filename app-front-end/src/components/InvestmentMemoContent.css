@@ -1558,6 +1558,30 @@
   line-height: 1.5;
   color: rgba(var(--color-oxford-rgb), 0.52);
 }
+/* "How this was scored" methodology disclosure (audit B6). */
+.memoScoreMethod {
+  margin: 8px 0 0;
+  max-width: 40rem;
+}
+.memoScoreMethodSummary {
+  cursor: pointer;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  color: rgba(var(--color-oxford-rgb), 0.52);
+  list-style: none;
+}
+.memoScoreMethodSummary::-webkit-details-marker { display: none; }
+.memoScoreMethodSummary::before { content: "▸ "; opacity: 0.5; }
+.memoScoreMethod[open] .memoScoreMethodSummary::before { content: "▾ "; }
+.memoScoreMethodBody {
+  margin-top: 6px;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: rgba(var(--color-oxford-rgb), 0.52);
+}
+.memoScoreMethodBody p { margin: 0 0 6px; }
+.memoScoreMethodBody p:last-child { margin-bottom: 0; }
 
 .memoAssessmentDimensionStrip {
   margin-top: clamp(14px, 2vw, 20px);
@@ -1609,6 +1633,21 @@
   font-size: var(--memo-size-ui);
   font-variant-numeric: tabular-nums;
   color: rgba(var(--color-oxford-rgb), 0.68);
+}
+/* Low evidence confidence: signal uncertainty WITHOUT changing the digit (audit B5). */
+.memoScoreBriefScore--lowConfidence {
+  color: rgba(var(--color-oxford-rgb), 0.42);
+  text-decoration: underline dotted rgba(var(--color-oxford-rgb), 0.3);
+  text-underline-offset: 3px;
+}
+/* Unscored dimension: no evidence — render as muted text, not a number (audit C2). */
+.memoScoreBriefScore--unscored {
+  font-family: var(--memo-font-ui);
+  font-variant-numeric: normal;
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.40);
 }
 
 .memoDimensionDetailPanel {
@@ -1760,6 +1799,30 @@
   line-height: 1.5;
   color: rgba(var(--color-oxford-rgb), 0.52);
 }
+/* "How this was scored" methodology disclosure (audit B6). */
+.memoScoreMethod {
+  margin: 8px 0 0;
+  max-width: 40rem;
+}
+.memoScoreMethodSummary {
+  cursor: pointer;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  color: rgba(var(--color-oxford-rgb), 0.52);
+  list-style: none;
+}
+.memoScoreMethodSummary::-webkit-details-marker { display: none; }
+.memoScoreMethodSummary::before { content: "▸ "; opacity: 0.5; }
+.memoScoreMethod[open] .memoScoreMethodSummary::before { content: "▾ "; }
+.memoScoreMethodBody {
+  margin-top: 6px;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: rgba(var(--color-oxford-rgb), 0.52);
+}
+.memoScoreMethodBody p { margin: 0 0 6px; }
+.memoScoreMethodBody p:last-child { margin-bottom: 0; }
 
 .memoAssessmentDimensionStrip {
   margin-top: clamp(14px, 2vw, 20px);
@@ -1823,6 +1886,21 @@
   font-size: var(--memo-size-ui);
   font-variant-numeric: tabular-nums;
   color: rgba(var(--color-oxford-rgb), 0.68);
+}
+/* Low evidence confidence: signal uncertainty WITHOUT changing the digit (audit B5). */
+.memoScoreBriefScore--lowConfidence {
+  color: rgba(var(--color-oxford-rgb), 0.42);
+  text-decoration: underline dotted rgba(var(--color-oxford-rgb), 0.3);
+  text-underline-offset: 3px;
+}
+/* Unscored dimension: no evidence — render as muted text, not a number (audit C2). */
+.memoScoreBriefScore--unscored {
+  font-family: var(--memo-font-ui);
+  font-variant-numeric: normal;
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.40);
 }
 
 .memoDimensionDetailPanel {

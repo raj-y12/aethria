@@ -62,11 +62,13 @@ export default function QueueVerdictLine({
 }) {
   const recommendation = getVisibleRecommendation(ctx.startup);
   const convictionPct = getQueueConvictionPct(ctx);
+  // Conviction on the canonical x/10 scale, consistent with the memo (audit B3). The
+  // bare 0–100 integer previously read like a percentage and used a different metric.
+  const convictionLabel = convictionPct != null ? (convictionPct / 10).toFixed(1) : null;
   const badgeVariant = queueDecisionBadgeVariant(decisionVariant, recommendation);
 
-  // Conviction is a single bold integer — a clean right-anchor number, no "%".
   const convictionEl =
-    convictionPct != null ? (
+    convictionLabel != null ? (
       <>
         <span className={prominent ? 'text-oxford/30' : 'text-oxford/24'} aria-hidden>
           ·
@@ -76,7 +78,7 @@ export default function QueueVerdictLine({
             prominent ? 'text-[12px] font-semibold text-oxford/75' : 'text-[11px] font-medium text-oxford/55'
           }`}
         >
-          {convictionPct}
+          {convictionLabel}
         </span>
       </>
     ) : null;
@@ -85,7 +87,7 @@ export default function QueueVerdictLine({
     return (
       <div
         className="inline-flex flex-wrap items-center justify-end gap-x-phi-2 gap-y-0"
-        aria-label={`${recommendation}${convictionPct != null ? `, ${convictionPct} conviction` : ''}`}
+        aria-label={`${recommendation}${convictionLabel != null ? `, ${convictionLabel}/10 conviction` : ''}`}
       >
         <DecisionBadge
           variant={recommendation}

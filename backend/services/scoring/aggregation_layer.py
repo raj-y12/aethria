@@ -56,21 +56,37 @@ def aggregate_dimension(
 ) -> Dict[str, Any]:
     weights = weight_config.get(dimension, {})
     if not normalized_components:
-        return {"score": DEFAULT_SCORE, "confidence": 0.0, "components": {}}
+        # No data at all → unscored. A numeric placeholder is kept (so downstream
+        # consumers that format a score never crash) but `unscored` is the source of
+        # truth: it excludes the dimension from the overall and drives a "Not scored"
+        # display rather than a misleading mid value (audit C2 + Layer 3).
+        return {"score": DEFAULT_SCORE, "confidence": 0.0, "components": {}, "unscored": True}
+    # Only components with concrete evidence contribute to the score. Missing /
+    # fabricated-placeholder components are EXCLUDED and the weights renormalized over
+    # the evidenced ones — a no-evidence component must never be scored as a neutral
+    # 5.0 and dragged into the average. If nothing is evidenced, the dimension is
+    # unscored.
     weighted_sum = 0.0
     weight_total = 0.0
     for name, component in normalized_components.items():
+        if not _has_concrete_evidence(component):
+            continue
         weight = float(weights.get(name, 0.0))
         weighted_sum += _to_float(component.get("score")) * weight
         weight_total += weight
     if weight_total <= 0:
-        score = DEFAULT_SCORE
-    else:
-        score = weighted_sum / weight_total
+        return {
+            "score": DEFAULT_SCORE,
+            "confidence": compute_confidence(normalized_components),
+            "components": normalized_components,
+            "unscored": True,
+        }
+    score = weighted_sum / weight_total
     return {
         "score": round(max(0.0, min(10.0, score)), 2),
         "confidence": compute_confidence(normalized_components),
         "components": normalized_components,
+        "unscored": False,
     }
 
 

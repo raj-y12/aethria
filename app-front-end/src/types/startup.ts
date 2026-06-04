@@ -101,6 +101,9 @@ export interface ScoringCriterion {
 
 export interface ScoringDimension {
   score: number;
+  /** True when the dimension has no supporting evidence: `score` is a placeholder and
+   *  the dimension is excluded from the overall. Render as "Not scored", not a number. */
+  unscored?: boolean | null;
   confidence?: number | null;
   components: Record<string, ScoringComponent>;
   criteria?: Record<string, ScoringCriterion>;

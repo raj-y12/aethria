@@ -7,11 +7,18 @@ import os
 import re
 from typing import Any, Dict
 
-from config.scoring_config import DEBUG_SCORING, DEFAULT_SCORE, DIMENSION_WEIGHTS, OVERALL_DIMENSION_WEIGHTS
+from config.scoring_config import (
+    DEBUG_SCORING,
+    DEFAULT_SCORE,
+    DIMENSION_WEIGHTS,
+    OVERALL_DIMENSION_WEIGHTS,
+    OVERALL_SCORE_DIMENSIONS,
+)
 from services.scoring.aggregation_layer import aggregate_all_dimensions
 from services.scoring.extraction_layer import extract_structured_signals
 from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.scoring.normalization_layer import (
+    is_unrecognized,
     normalize_architecture,
     normalize_barriers,
     normalize_brand,
@@ -173,6 +180,19 @@ class DeterministicScoringEngine:
             "value": None,
         }
 
+    @classmethod
+    def _unrecognized_component(cls, signal: Dict[str, Any], value: Any) -> Dict[str, Any]:
+        """A label outside the recognized vocabulary is treated as no-evidence: a
+        placeholder score is kept (no NaN leaks to consumers) but value/label are
+        cleared so aggregation excludes it (audit C2 / off-vocabulary)."""
+        return {
+            "score": float(DEFAULT_SCORE),
+            "confidence": 0.2,
+            "reasoning": f"Label '{value}' is outside the recognized vocabulary; treated as no evidence.",
+            "value": None,
+            "unrecognized_label": True,
+        }
+
     @staticmethod
     def _normalized_signal(signal: Dict[str, Any], normalizer) -> Dict[str, Any]:
         value = signal.get("label") if signal.get("label") is not None else signal.get("value")
@@ -180,6 +200,8 @@ class DeterministicScoringEngine:
             return DeterministicScoringEngine._neutral_component(signal)
         confidence = signal.get("confidence", 0.5)
         score = normalizer(value)
+        if is_unrecognized(score):
+            return DeterministicScoringEngine._unrecognized_component(signal, value)
         score, confidence, reasoning_suffix = DeterministicScoringEngine._check_label_score_contradiction(
             value, score, confidence
         )
@@ -210,6 +232,8 @@ class DeterministicScoringEngine:
             return DeterministicScoringEngine._neutral_component(signal)
         confidence = signal.get("confidence", 0.5)
         score = normalizer(value)
+        if is_unrecognized(score):
+            return DeterministicScoringEngine._unrecognized_component(signal, value)
         score, confidence, reasoning_suffix = DeterministicScoringEngine._check_label_score_contradiction(
             value, score, confidence
         )
@@ -232,20 +256,36 @@ class DeterministicScoringEngine:
         return normalized
 
     def _compute_overall_score(self, aggregated: Dict[str, Dict[str, Any]]) -> float:
+        # Only the core driver dimensions contribute to the overall; defensibility is
+        # a separate risk/moat modifier (OVERALL_SCORE_DIMENSIONS). This makes the
+        # engine's overall identical to utils.scoring.compute_overall_score, which the
+        # partner decision already uses (resolves A3/A4). Per-dimension fund weights
+        # among the four still apply.
         weighted_sum = 0.0
         weight_total = 0.0
-        for dim, details in aggregated.items():
+        for dim in OVERALL_SCORE_DIMENSIONS:
+            details = aggregated.get(dim)
+            if details is None:
+                continue
+            dim_score = details.get("score")
+            # Unscored dimensions (no evidence) are excluded from the overall so a
+            # no-data dimension never drags the headline toward a neutral placeholder.
+            if dim_score is None or details.get("unscored"):
+                continue
             weight = float(self.dimension_weights.get(dim, 0.0))
-            weighted_sum += float(details.get("score", DEFAULT_SCORE)) * weight
+            weighted_sum += float(dim_score) * weight
             weight_total += weight
         if weight_total <= 0:
-            return DEFAULT_SCORE
+            return None
         return round(weighted_sum / weight_total, 2)
 
     def _compute_overall_confidence(self, aggregated: Dict[str, Dict[str, Any]]) -> float:
         weighted_sum = 0.0
         weight_total = 0.0
-        for dim, details in aggregated.items():
+        for dim in OVERALL_SCORE_DIMENSIONS:
+            details = aggregated.get(dim)
+            if details is None:
+                continue
             weight = float(self.dimension_weights.get(dim, 0.0))
             weighted_sum += float(details.get("confidence", 0.0)) * weight
             weight_total += weight

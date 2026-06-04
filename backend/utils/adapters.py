@@ -139,7 +139,6 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
         thesis_deviation_points=enriched.get("thesis_deviation_points") or None,
         thesis_alignment_confidence=enriched.get("thesis_alignment_confidence"),
         fund_thesis_alignment_score=enriched.get("fund_thesis_alignment_score"),
-        weighted_defensibility_score=enriched.get("weighted_defensibility_score"),
         confidence_adjusted_score=enriched.get("confidence_adjusted_score"),
         structured_scoring=enriched.get("structured_scoring"),
         structured_signals=enriched.get("structured_signals"),

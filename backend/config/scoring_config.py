@@ -54,6 +54,14 @@ OVERALL_DIMENSION_WEIGHTS: Dict[str, float] = {
     "defensibility": 0.20,
 }
 
+# Dimensions that contribute to the canonical overall score. Defensibility is a
+# risk/moat MODIFIER, not a driver, so it is intentionally excluded here (see the
+# decision log in docs/scoring-remediation-checklist.md). This keeps the engine's
+# overall identical to utils.scoring.compute_overall_score (the 4-dim mean already
+# used by the partner decision), resolving the A3/A4 divergence. Defensibility is
+# still scored and surfaced separately as a moat signal.
+OVERALL_SCORE_DIMENSIONS = ("market", "product", "technical", "execution")
+
 THRESHOLDS = {
     "tam_usd": {
         "xl": 10_000_000_000,
