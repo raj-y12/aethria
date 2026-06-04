@@ -81,12 +81,15 @@ def test_policy_criteria_are_included_with_legacy_components():
     assert isinstance(criterion["missing_data_applied"], bool)
 
 
-def test_missing_data_defaults_mid_scores():
+def test_no_data_company_is_unscored_not_mid_scored():
+    """A company with no evidence at all is now fully unscored (every dimension flagged
+    `unscored`, overall is None) instead of being assigned neutral mid scores — see the
+    P3.2 abstain work in docs/scoring-remediation-checklist.md."""
     engine = DeterministicScoringEngine()
     result = engine.score({}, {})
-    assert 0.0 <= result["market"]["score"] <= 10.0
-    assert result["market"]["confidence"] >= 0.0
-    assert 0.0 <= result["overall_score"] <= 10.0
+    for dim in ("market", "product", "technical", "execution", "defensibility"):
+        assert result[dim]["unscored"] is True
+    assert result["overall_score"] is None
 
 
 def test_full_pipeline_all_dimension_scores_present():

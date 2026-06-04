@@ -147,6 +147,8 @@ def extract_growth_velocity(scout_output: Dict[str, Any], reviewer_output: Dict[
         return _signal(label="moderate", confidence=0.6, reasoning="Moderate growth: steady or moderate growth language without quantification.")
     if any(k in lower for k in ("slow growth", "early adoption")):
         return _signal(label="slow", confidence=0.58, reasoning="Early-stage growth: slow growth or early adoption phase.")
+    if not lower.strip():
+        return _missing_signal("No growth velocity evidence. Growth rate and trajectory unquantified.")
     return _signal(label="flat", confidence=0.45, reasoning="No growth velocity evidence. Growth rate and trajectory unquantified.")
 
 
@@ -165,6 +167,8 @@ def classify_gtm_effectiveness(scout_output: Dict[str, Any], reviewer_output: Di
         return _signal(label="repeatable", confidence=0.7, reasoning="Repeatable GTM: proven or scalable acquisition channel identified.")
     if any(k in lower for k in ("partnership", "outbound", "paid", "community")):
         return _signal(label="some_channels", confidence=0.62, reasoning="GTM channels present: partnerships, outbound, paid, or community-led growth mentioned.")
+    if not lower.strip():
+        return _missing_signal("No GTM strategy articulated. Customer acquisition approach undefined.")
     return _signal(label="unclear", confidence=0.48, reasoning="No GTM strategy articulated. Customer acquisition approach undefined.")
 
 
@@ -217,7 +221,7 @@ def extract_team_execution(scout_output: Dict[str, Any], reviewer_output: Dict[s
     if any(k in lower for k in ("decent", "capable", "solid")):
         return _signal(label="decent", confidence=0.62, reasoning="Adequate team: capable or solid descriptors without standout credentials.")
     if "[missing" in lower or not lower.strip():
-        return _signal(label="weak", confidence=0.52, reasoning="Team data missing. Founder backgrounds and execution history unavailable.")
+        return _missing_signal("Team data missing. Founder backgrounds and execution history unavailable.")
     return _signal(label="decent", confidence=0.55, reasoning="Limited team evidence. Defaulting to adequate based on sparse signal.")
 
 
@@ -233,6 +237,8 @@ def extract_operational_velocity(scout_output: Dict[str, Any], reviewer_output: 
         return _signal(label="fast", confidence=0.66, reasoning="Fast execution: rapid iteration or quick shipping pace referenced.")
     if any(k in lower for k in ("moderate", "steady")):
         return _signal(label="moderate", confidence=0.58, reasoning="Moderate pace: steady execution without urgency indicators.")
+    if not lower.strip():
+        return _missing_signal("No operational velocity evidence. Shipping cadence and iteration speed unknown.")
     return _signal(label="slow", confidence=0.45, reasoning="No operational velocity evidence. Shipping cadence and iteration speed unknown.")
 
 
@@ -246,7 +252,7 @@ def classify_value_prop(scout_output: Dict[str, Any], reviewer_output: Dict[str,
         return _signal(label="clear", confidence=0.68, reasoning="Clear value proposition with concise positioning statement.")
     if one_line:
         return _signal(label="exceptional", confidence=0.6, reasoning="Highly focused value proposition with exceptionally concise positioning.")
-    return _signal(label="vague", confidence=0.45, reasoning="No value proposition text available. Product positioning is undefined.")
+    return _missing_signal("No value proposition text available. Product positioning is undefined.")
 
 
 def classify_pain_alignment(scout_output: Dict[str, Any], reviewer_output: Dict[str, Any]) -> Dict[str, Any]:
@@ -257,6 +263,8 @@ def classify_pain_alignment(scout_output: Dict[str, Any], reviewer_output: Dict[
         return _signal(label="strong", confidence=0.66, reasoning="Strong pain signal: manual processes, inefficiency, or explicit pain language present.")
     if any(k in problem for k in ("nice to have", "optional")):
         return _signal(label="weak", confidence=0.62, reasoning="Low-priority problem: language suggests nice-to-have rather than must-have.")
+    if not problem.strip():
+        return _missing_signal("No problem statement available. Pain severity and buyer priority are unknown.")
     return _signal(label="moderate", confidence=0.55, reasoning="Moderate pain: problem is real but urgency and budget priority are unvalidated.")
 
 
@@ -269,6 +277,8 @@ def classify_differentiation(scout_output: Dict[str, Any], reviewer_output: Dict
         return _signal(label="clear", confidence=0.65, reasoning="Clear differentiation from competitors with identifiable advantages.")
     if any(k in lower for k in ("slightly better", "incremental")):
         return _signal(label="slight", confidence=0.58, reasoning="Incremental differentiation only. Advantage is marginal over alternatives.")
+    if not lower.strip():
+        return _missing_signal("No differentiation evidence. Competitive advantage is unclear.")
     return _signal(label="none", confidence=0.5, reasoning="No differentiation evidence. Competitive advantage is unclear.")
 
 
@@ -280,6 +290,8 @@ def classify_ux(scout_output: Dict[str, Any], reviewer_output: Dict[str, Any]) -
         return _signal(label="smooth", confidence=0.66, reasoning="Smooth UX: intuitive or frictionless user experience referenced.")
     if any(k in text for k in ("usable", "adequate")):
         return _signal(label="usable", confidence=0.6, reasoning="Functional UX: product is usable but lacks standout experience qualities.")
+    if not text.strip():
+        return _missing_signal("No UX evidence. User experience quality is unknown.")
     return _signal(label="clunky", confidence=0.48, reasoning="No positive UX evidence. User experience quality unvalidated.")
 
 
@@ -308,6 +320,8 @@ def classify_complexity(scout_output: Dict[str, Any], reviewer_output: Dict[str,
         return _signal(label="complex", confidence=0.66, reasoning="Complex systems: distributed architecture, real-time processing, or multi-tenant infrastructure.", rule="keyword match: distributed/real-time/multi-tenant")
     if any(k in solution for k in ("workflow", "automation", "dashboard")):
         return _signal(label="moderate", confidence=0.58, reasoning="Moderate complexity: workflow automation or dashboard-level product.", rule="keyword match: workflow/automation/dashboard")
+    if not solution.strip():
+        return _missing_signal("No solution description available. Technical complexity is unknown.")
     return _signal(label="simple", confidence=0.5, reasoning="Simple implementation profile. No deep-tech or complex systems indicators.", rule="fallback: no complexity markers detected")
 
 
@@ -319,6 +333,8 @@ def classify_engineering_quality(scout_output: Dict[str, Any], reviewer_output: 
         return _signal(label="strong", confidence=0.66, reasoning="Strong engineering: good architecture or well-engineered system described.")
     if any(k in text for k in ("decent", "adequate")):
         return _signal(label="decent", confidence=0.58, reasoning="Adequate engineering: functional but not standout technical implementation.")
+    if not text.strip():
+        return _missing_signal("No engineering quality evidence. Technical execution unvalidated.")
     return _signal(label="weak", confidence=0.48, reasoning="No engineering quality evidence. Technical execution unvalidated.")
 
 
@@ -330,6 +346,8 @@ def classify_scalability(scout_output: Dict[str, Any], reviewer_output: Dict[str
         return _signal(label="high", confidence=0.66, reasoning="High scalability: elastic or highly scalable architecture confirmed.")
     if any(k in text for k in ("can scale", "moderate scale")):
         return _signal(label="medium", confidence=0.58, reasoning="Medium scalability: architecture can scale but limits not stress-tested.")
+    if not text.strip():
+        return _missing_signal("No scalability evidence. Architecture capacity and scaling strategy undocumented.")
     return _signal(label="low", confidence=0.5, reasoning="Low scalability evidence. Architecture capacity and scaling strategy undocumented.")
 
 
@@ -341,6 +359,8 @@ def classify_data_advantage(scout_output: Dict[str, Any], reviewer_output: Dict[
         return _signal(label="growing", confidence=0.64, reasoning="Growing data advantage: data flywheel or compounding dataset dynamics present.")
     if any(k in text for k in ("some data", "limited data")):
         return _signal(label="limited", confidence=0.56, reasoning="Limited data edge: some data assets but no clear moat or exclusivity.")
+    if not text.strip():
+        return _missing_signal("No data advantage evidence. Proprietary data assets and data moat unknown.")
     return _signal(label="none", confidence=0.48, reasoning="No data advantage evidence. Proprietary data assets and data moat absent.")
 
 
@@ -352,6 +372,8 @@ def classify_architecture(scout_output: Dict[str, Any], reviewer_output: Dict[st
         return _signal(label="mature", confidence=0.66, reasoning="Mature architecture: modular design with established patterns.")
     if any(k in text for k in ("early architecture", "initial architecture")):
         return _signal(label="early", confidence=0.58, reasoning="Early architecture: initial system design, not yet battle-tested.")
+    if not text.strip():
+        return _missing_signal("No architecture evidence. System design maturity is unknown.")
     return _signal(label="prototype", confidence=0.5, reasoning="Prototype-stage architecture. System design maturity unvalidated.")
 
 
@@ -363,6 +385,8 @@ def classify_network_effects(scout_output: Dict[str, Any], reviewer_output: Dict
         return _signal(label="moderate", confidence=0.62, reasoning="Moderate network effects: community or two-sided marketplace dynamics present.")
     if any(k in text for k in ("weak network", "limited network")):
         return _signal(label="weak", confidence=0.56, reasoning="Weak network effects: limited network dynamics acknowledged.")
+    if not text.strip():
+        return _missing_signal("No network effects evidence. Whether value compounds with user growth is unknown.")
     return _signal(label="none", confidence=0.5, reasoning="No network effects evidence. Value does not compound with user growth.")
 
 
@@ -374,6 +398,8 @@ def classify_switching_costs(scout_output: Dict[str, Any], reviewer_output: Dict
         return _signal(label="high", confidence=0.66, reasoning="High switching costs: deep workflow integration or significant migration burden.")
     if any(k in text for k in ("some switching cost", "moderate lock-in")):
         return _signal(label="medium", confidence=0.58, reasoning="Moderate switching costs: some lock-in but migration is feasible for motivated buyers.")
+    if not text.strip():
+        return _missing_signal("No switching-cost evidence. Lock-in and migration friction are unknown.")
     return _signal(label="low", confidence=0.5, reasoning="Low switching costs. Customers can migrate to alternatives with minimal friction.")
 
 
@@ -385,6 +411,8 @@ def classify_proprietary_data(scout_output: Dict[str, Any], reviewer_output: Dic
         return _signal(label="strong", confidence=0.66, reasoning="Strong proprietary data: exclusive or proprietary data assets that competitors cannot replicate.")
     if any(k in text for k in ("some proprietary", "limited proprietary")):
         return _signal(label="some", confidence=0.58, reasoning="Some proprietary data: limited exclusive data that provides partial advantage.")
+    if not text.strip():
+        return _missing_signal("No proprietary-data evidence. Data exclusivity is unknown.")
     return _signal(label="none", confidence=0.5, reasoning="No proprietary data evidence. Data assets are replicable or publicly available.")
 
 
@@ -396,6 +424,8 @@ def classify_barriers(scout_output: Dict[str, Any], reviewer_output: Dict[str, A
         return _signal(label="hard", confidence=0.66, reasoning="Strong barriers: significant replication difficulty or meaningful entry barriers.")
     if any(k in text for k in ("some barrier", "moderate barrier")):
         return _signal(label="some", confidence=0.58, reasoning="Moderate barriers: some protection but determined competitors could enter.")
+    if not text.strip():
+        return _missing_signal("No barrier-to-entry evidence. Replication difficulty is unknown.")
     return _signal(label="easy", confidence=0.5, reasoning="Low barriers to entry. Market is accessible to well-resourced competitors.")
 
 
@@ -407,6 +437,8 @@ def classify_brand(scout_output: Dict[str, Any], reviewer_output: Dict[str, Any]
         return _signal(label="recognized", confidence=0.66, reasoning="Recognized brand: established trust and awareness in target market.")
     if any(k in text for k in ("emerging brand", "early brand")):
         return _signal(label="emerging", confidence=0.58, reasoning="Emerging brand: early brand building with initial market awareness.")
+    if not text.strip():
+        return _missing_signal("No brand-strength evidence. Market awareness and brand equity are unknown.")
     return _signal(label="unknown", confidence=0.5, reasoning="No brand strength evidence. Market awareness and brand equity unestablished.")
 
 

@@ -99,29 +99,34 @@ FIXTURES = {
 # History:
 # - P2.1: defensibility excluded from the overall (now the 4-dim mean of the drivers,
 #   identical to utils.scoring.compute_overall_score).
-# - P3.2 (market): extraction no longer fabricates neutral labels when the source text
-#   is empty; aggregation renormalizes over evidenced components and flags a fully
-#   no-evidence dimension `unscored` (excluded from the overall). Effects: all_missing
-#   Market is now unscored (placeholder 5.0 but excluded → overall 3.96→3.35);
-#   weak_thin Market 5.48→5.1 (fabricated urgency/timing dropped; tam+competition kept).
-#   Dimensions other than Market still use their own heuristics (follow-up).
+# - P3.2: extraction no longer fabricates labels when a component's source text is
+#   empty; aggregation renormalizes over evidenced components and flags a fully
+#   no-evidence dimension `unscored` (placeholder score kept, excluded from the
+#   overall). Rolled out across ALL dimensions. Effects:
+#     * all_missing → every dimension unscored, overall = None (a no-data company is
+#       honestly unscored, not a fabricated mid score).
+#     * weak_thin → scores rose (4.34→4.69) because fabricated LOW labels that used to
+#       drag the score are now excluded (the old system under-scored sparse companies).
+#     * structured_signals → product/technical/defensibility unscored (the fixture only
+#       supplied market + execution signals).
+#     * strong_saas → unchanged (every dimension has evidence).
 GOLDEN = {
     "strong_saas": {
         "overall_score": 7.26,
         "dims": {"market": 7.88, "product": 8.25, "technical": 6.15, "execution": 6.75, "defensibility": 2.35},
     },
     "weak_thin": {
-        "overall_score": 4.34,
-        "dims": {"market": 5.10, "product": 5.60, "technical": 2.80, "execution": 3.85, "defensibility": 2.35},
+        "overall_score": 4.69,
+        "dims": {"market": 5.10, "product": 5.90, "technical": 3.90, "execution": 3.85, "defensibility": 4.40},
     },
     "all_missing": {
-        "overall_score": 3.35,
-        # market is a placeholder 5.0 but unscored=True (excluded from the overall).
-        "dims": {"market": 5.00, "product": 3.85, "technical": 2.80, "execution": 3.40, "defensibility": 2.35},
+        # Every dimension is a placeholder 5.0 but unscored=True; overall is None.
+        "overall_score": None,
+        "dims": {"market": 5.00, "product": 5.00, "technical": 5.00, "execution": 5.00, "defensibility": 5.00},
     },
     "structured_signals": {
-        "overall_score": 4.31,
-        "dims": {"market": 6.30, "product": 3.85, "technical": 2.80, "execution": 4.30, "defensibility": 2.35},
+        "overall_score": 5.95,
+        "dims": {"market": 6.30, "product": 5.00, "technical": 5.00, "execution": 5.60, "defensibility": 5.00},
     },
 }
 
@@ -129,8 +134,8 @@ GOLDEN = {
 UNSCORED_DIMS = {
     "strong_saas": set(),
     "weak_thin": set(),
-    "all_missing": {"market"},
-    "structured_signals": set(),
+    "all_missing": {"market", "product", "technical", "execution", "defensibility"},
+    "structured_signals": {"product", "technical", "defensibility"},
 }
 
 
@@ -138,10 +143,14 @@ UNSCORED_DIMS = {
 def test_engine_overall_score_golden(name):
     scout, review = FIXTURES[name]
     result = DeterministicScoringEngine().score(scout, review)
-    assert result["overall_score"] == pytest.approx(GOLDEN[name]["overall_score"], abs=ABS), (
-        f"{name}: overall_score drifted from golden snapshot. "
-        f"If intentional, update GOLDEN and reference the remediation task."
-    )
+    expected = GOLDEN[name]["overall_score"]
+    if expected is None:
+        assert result["overall_score"] is None, f"{name}: expected unscored overall (None)"
+    else:
+        assert result["overall_score"] == pytest.approx(expected, abs=ABS), (
+            f"{name}: overall_score drifted from golden snapshot. "
+            f"If intentional, update GOLDEN and reference the remediation task."
+        )
 
 
 @pytest.mark.parametrize("name", list(FIXTURES))
@@ -167,8 +176,12 @@ def test_overall_is_mean_of_evidenced_core_dimensions(name):
         for d in ("market", "product", "technical", "execution")
         if not result[d].get("unscored")
     ]
-    expected = sum(core) / len(core)
-    assert result["overall_score"] == pytest.approx(expected, abs=ABS)
+    if not core:
+        # Every core driver is unscored → the overall is undefined (None).
+        assert result["overall_score"] is None
+    else:
+        expected = sum(core) / len(core)
+        assert result["overall_score"] == pytest.approx(expected, abs=ABS)
 
 
 @pytest.mark.parametrize("name", list(FIXTURES))

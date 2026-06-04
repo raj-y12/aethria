@@ -33,7 +33,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 | Phase 0 — Guardrails | ✅ 2 / 2 |
 | Phase 1 — Stop the bleeding (highest severity, lowest effort) | ✅ 2 / 2 (P1.2 re-sequenced → Phase 3) |
 | Phase 2 — Canonical score (Workstream B) | ✅ 3 / 4 (P2.4 split: surface→Phase 4, orphan-removal deferred) |
-| Phase 3 — Meaning fix (Layers 1–3) | ◑ core abstain framework + Market done (P1.2+P3.2); per-dim rollout, off-vocab, P3.1 criteria pending (P3.1 needs model) |
+| Phase 3 — Meaning fix (Layers 1–3) | ◑ abstain framework + ALL-dimension rollout done (P1.2+P3.2); off-vocab + P3.1 anchored-criteria pending (P3.1 needs model) |
 | Phase 4 — Presentation vocabulary (Workstream C) | ◑ 1 / 5 (P4.2 done; P4.3 conviction-scale + P4.1 derive-bands are product-visible; P4.5 needs Phase 3 trail) |
 | Phase 5 — Calibration hardening (Layers 4–5) | 0 / 3 |
 | Phase 6 — Comparability completeness (Workstream A) | 0 / 3 |
@@ -202,15 +202,23 @@ Work one task at a time, tick it only when its **Validation gate** passes.
   prompts whose quality needs a real model to validate.
   - Files: `backend/config/scoring_config.py` (rubric block), `evaluation_rubric/v1.json`.
 
-- [~] **P3.2 — Remaining dimensions + off-vocabulary (continues the above).**
-  Framework done (✅ above). Follow-ups:
-  - Extend abstain to Execution/Product/Technical/Defensibility extractors (they use
-    per-dimension heuristics, not the simple `else "label"` pattern Market had — each
-    needs its own no-evidence → missing treatment).
-  - Off-vocabulary labels still map to 5.0 and are treated as evidence (see
-    `test_KNOWN_ISSUE_off_vocabulary_label_defaults_to_five_C2`); make an unrecognized
-    label `unscored`.
-  - Files: `backend/services/scoring/extraction_layer.py`, `normalization_layer.py`.
+- [✅] **P3.2 — Abstain rolled out across ALL dimensions.**
+  Every component extractor now abstains (emits a missing signal) when its source text
+  is empty, instead of fabricating a low/neutral label. So a dimension with no evidence
+  is flagged `unscored` and excluded from the overall, across Market/Execution/Product/
+  Technical/Defensibility.
+  - Files: `backend/services/scoring/extraction_layer.py` (~18 extractors).
+  - **Validation gate:** ✅ `all_missing` → every dimension unscored, overall `None`
+    (a no-data company is honestly unscored, not a fabricated mid score);
+    `structured_signals` → product/technical/defensibility unscored; `strong_saas`
+    unchanged. Revealed the old system **under-scored** sparse companies by fabricating
+    low labels (weak_thin 4.34→4.69). 151 backend tests pass; frontend renders
+    "Not scored" for the realistic partial-data case.
+  - **Remaining follow-up:** off-vocabulary labels still map to 5.0 and are treated as
+    evidence (`test_KNOWN_ISSUE_off_vocabulary_label_defaults_to_five_C2`); and the
+    abstain fires on *empty source text* — extending it to "evidence-present-but-
+    keyword-miss" (vs the current substantive low reads) would benefit from real-payload
+    / model evaluation.
 
 - [ ] **P3.3 — Roll the pattern across remaining fact-derivable components.**
   Apply P3.1–P3.2 to the ~70% that is fact-derivable (tam, traction, team, retention,
