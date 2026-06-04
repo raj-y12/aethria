@@ -293,6 +293,76 @@ class SupabaseStartupsStorage:
         self.logger.error("Supabase upsert failed after legacy column retries for %s", row.get("startup_id"))
         raise RuntimeError("Supabase upsert failed after legacy column retries")
 
+    def _update_startup_columns(self, startup_id: str, columns: dict) -> None:
+        """Targeted UPDATE of specific columns on one row.
+
+        Unlike upsert_startup_dict (which rewrites the entire row, including large
+        unchanged JSONB such as review_info), this writes only the columns that
+        actually changed. Postgres keeps the existing TOAST pointers for columns
+        not in the SET list, avoiding rewriting/​re-indexing big blobs on every
+        stage handoff. Mirrors upsert_startup_dict's legacy-column fallback so it
+        degrades gracefully on not-yet-migrated schemas.
+        """
+        # Keep None values (e.g. clearing unresolved_at); only strip identity/immutable keys.
+        payload = {
+            k: v
+            for k, v in columns.items()
+            if k not in ("user_id", "startup_id", "created_at")
+        }
+        if not payload:
+            return
+        warned: set[str] = set()
+        for _ in range(4):
+            if not payload:
+                return
+            try:
+                (
+                    self._client.table(TABLE)
+                    .update(payload)
+                    .eq("user_id", self._user_id)
+                    .eq("startup_id", startup_id)
+                    .execute()
+                )
+                return
+            except Exception as e:
+                if _is_missing_agent_trace_error(e) and "agent_trace" in payload:
+                    payload.pop("agent_trace", None)
+                    if "agent_trace" not in warned:
+                        warned.add("agent_trace")
+                        self.logger.warning(
+                            "Supabase agent_trace column missing; retrying update without trace. "
+                            "Apply the startup_agent_trace migration to persist handoff traces."
+                        )
+                    continue
+                if _is_missing_unresolved_at_error(e) and "unresolved_at" in payload:
+                    payload.pop("unresolved_at", None)
+                    if "unresolved_at" not in warned:
+                        warned.add("unresolved_at")
+                        self.logger.warning(
+                            "Supabase unresolved_at column missing; retrying update without unresolved state. "
+                            "Apply migration 20260512000001_unresolved_state.sql."
+                        )
+                    continue
+                if _is_missing_queue_awareness_error(e) and any(c in payload for c in _QUEUE_AWARENESS_COLUMNS):
+                    for column in _QUEUE_AWARENESS_COLUMNS:
+                        payload.pop(column, None)
+                    if "queue_awareness" not in warned:
+                        warned.add("queue_awareness")
+                        self.logger.warning(
+                            "Supabase queue awareness columns missing; retrying update without queue state. "
+                            "Apply migration 20260521000002_startup_queue_awareness.sql."
+                        )
+                    continue
+                self.logger.error("Supabase column update failed for %s: %s", startup_id, e)
+                raise
+        self.logger.error("Supabase column update failed after legacy column retries for %s", startup_id)
+        raise RuntimeError("Supabase column update failed after legacy column retries")
+
+    def _changed_row_columns(self, st: Startup, keys: Tuple[str, ...]) -> dict:
+        """Project a Startup into the subset of row columns named in keys."""
+        row = _dict_to_row(st.to_dict(), self._user_id)
+        return {k: row[k] for k in keys if k in row}
+
     def update_startup_partial(self, startup_id: str, patch: dict) -> bool:
         """Read-merge-write one row; patch keys are top-level startup fields (shallow merge for JSON blobs)."""
         st = self.get_startup(startup_id)
@@ -305,10 +375,15 @@ class SupabaseStartupsStorage:
         except Exception as e:
             self.logger.error("Invalid startup after patch %s: %s", startup_id, e)
             return False
+        changed_keys = set(patch.keys())
         if "queue_reason" not in patch and "priority_reason" not in patch:
             merged.queue_reason, merged.priority_reason = _queue_reasons_for_startup(merged)
+            changed_keys.update(("queue_reason", "priority_reason"))
         merged.update_timestamp()
-        self.upsert_startup_dict(merged.to_dict())
+        changed_keys.add("updated_at")
+        # Targeted write: only the patched columns (+ recomputed queue + updated_at),
+        # so unrelated heavy JSONB (e.g. review_info) is not rewritten.
+        self._update_startup_columns(startup_id, self._changed_row_columns(merged, tuple(changed_keys)))
         return True
 
     def get_list_projection_rows(
@@ -587,7 +662,14 @@ class SupabaseStartupsStorage:
         st.queue_reason, st.priority_reason = _queue_reasons_for_startup(st)
         st.update_timestamp()
         try:
-            self.upsert_startup_dict(st.to_dict())
+            # Only review-stage columns change; leave partner_info/financials/etc. untouched.
+            self._update_startup_columns(
+                startup_id,
+                self._changed_row_columns(
+                    st,
+                    ("scout_info", "review_info", "agent_trace", "queue_reason", "priority_reason", "updated_at"),
+                ),
+            )
         except Exception as e:
             if pr:
                 upsert_pipeline_state(
@@ -651,11 +733,14 @@ class SupabaseStartupsStorage:
         )
         st.unresolved_at = partner_info.partnered_at if partner_info.human_review_required else None
         st.queue_reason, st.priority_reason = _queue_reasons_for_startup(st)
+        cols = ["partner_info", "agent_trace", "unresolved_at", "queue_reason", "priority_reason", "updated_at"]
         if investment_memo_markdown is not None:
             st.investment_memo_markdown = investment_memo_markdown
+            cols.append("investment_memo_markdown")
         st.update_timestamp()
         try:
-            self.upsert_startup_dict(st.to_dict())
+            # Only partner-stage columns change; review_info (large) is not rewritten.
+            self._update_startup_columns(startup_id, self._changed_row_columns(st, tuple(cols)))
         except Exception as e:
             if pr:
                 upsert_pipeline_state(
@@ -685,7 +770,7 @@ class SupabaseStartupsStorage:
             return False
         st.financials = financials
         st.update_timestamp()
-        self.upsert_startup_dict(st.to_dict())
+        self._update_startup_columns(startup_id, self._changed_row_columns(st, ("financials", "updated_at")))
         self.logger.info("Updated financials for startup %s", startup_id)
         return True
 
