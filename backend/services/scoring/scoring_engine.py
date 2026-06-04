@@ -18,6 +18,7 @@ from services.scoring.aggregation_layer import aggregate_all_dimensions
 from services.scoring.extraction_layer import extract_structured_signals
 from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.scoring.normalization_layer import (
+    is_unrecognized,
     normalize_architecture,
     normalize_barriers,
     normalize_brand,
@@ -179,6 +180,19 @@ class DeterministicScoringEngine:
             "value": None,
         }
 
+    @classmethod
+    def _unrecognized_component(cls, signal: Dict[str, Any], value: Any) -> Dict[str, Any]:
+        """A label outside the recognized vocabulary is treated as no-evidence: a
+        placeholder score is kept (no NaN leaks to consumers) but value/label are
+        cleared so aggregation excludes it (audit C2 / off-vocabulary)."""
+        return {
+            "score": float(DEFAULT_SCORE),
+            "confidence": 0.2,
+            "reasoning": f"Label '{value}' is outside the recognized vocabulary; treated as no evidence.",
+            "value": None,
+            "unrecognized_label": True,
+        }
+
     @staticmethod
     def _normalized_signal(signal: Dict[str, Any], normalizer) -> Dict[str, Any]:
         value = signal.get("label") if signal.get("label") is not None else signal.get("value")
@@ -186,6 +200,8 @@ class DeterministicScoringEngine:
             return DeterministicScoringEngine._neutral_component(signal)
         confidence = signal.get("confidence", 0.5)
         score = normalizer(value)
+        if is_unrecognized(score):
+            return DeterministicScoringEngine._unrecognized_component(signal, value)
         score, confidence, reasoning_suffix = DeterministicScoringEngine._check_label_score_contradiction(
             value, score, confidence
         )
@@ -216,6 +232,8 @@ class DeterministicScoringEngine:
             return DeterministicScoringEngine._neutral_component(signal)
         confidence = signal.get("confidence", 0.5)
         score = normalizer(value)
+        if is_unrecognized(score):
+            return DeterministicScoringEngine._unrecognized_component(signal, value)
         score, confidence, reasoning_suffix = DeterministicScoringEngine._check_label_score_contradiction(
             value, score, confidence
         )

@@ -108,6 +108,17 @@ _LABEL_SYNONYMS: dict[str, str] = {
 }
 
 
+# Sentinel returned when a label is outside the recognized vocabulary for a component.
+# NaN is used so it propagates as "not a real score"; the scoring engine detects it and
+# treats the component as no-evidence (excluded from aggregation) rather than silently
+# scoring an unrecognized label as a neutral 5.0 (audit C2 / off-vocabulary).
+UNRECOGNIZED_LABEL = float("nan")
+
+
+def is_unrecognized(score: float) -> bool:
+    return score != score  # NaN is the only value not equal to itself
+
+
 def _map_label(value: Any, mapping: dict[str, float]) -> float:
     if value is None:
         return DEFAULT_SCORE
@@ -119,7 +130,7 @@ def _map_label(value: Any, mapping: dict[str, float]) -> float:
     resolved = _LABEL_SYNONYMS.get(key)
     if resolved and resolved in mapping:
         return _clamp(mapping[resolved])
-    return _clamp(mapping.get(key, DEFAULT_SCORE))
+    return UNRECOGNIZED_LABEL
 
 
 def normalize_urgency(label: Any) -> float:

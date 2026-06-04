@@ -228,14 +228,23 @@ def test_normalizer_missing_default_is_superseded_by_aggregation_abstain_C2():
     assert NL.normalize_network_effects(None) == 5.0
 
 
-def test_KNOWN_ISSUE_off_vocabulary_label_defaults_to_five_C2():
-    """Audit §5 — STILL OPEN: a label outside the controlled vocabulary silently maps
-    to 5.0. Unlike the missing case (fixed by P3.2), an off-vocab label IS concrete
-    evidence, so aggregation includes it at 5.0. Remaining P3.2 follow-up: treat an
-    unrecognized label as unscored rather than a neutral 5.0.
+def test_FIXED_off_vocabulary_label_is_unrecognized_not_five_C2():
+    """Audit §5, now FIXED: a label outside the controlled vocabulary used to silently
+    map to a neutral 5.0 and count as evidence. The normalizer now returns the
+    `UNRECOGNIZED_LABEL` sentinel, and the engine excludes such a component from
+    aggregation (treated as no-evidence) instead of scoring it 5.0.
     """
-    assert NL.normalize_team_execution("promising") == 5.0  # valid: weak/decent/credible_team/strong/elite
-    assert NL.normalize_differentiation("promising") == 5.0  # valid: none/slight/clear/strong
+    assert NL.is_unrecognized(NL.normalize_team_execution("promising"))  # valid: weak/decent/credible_team/strong/elite
+    assert NL.is_unrecognized(NL.normalize_differentiation("promising"))  # valid: none/slight/clear/strong
+    # a recognized label still scores normally
+    assert NL.normalize_team_execution("elite") == 10.0
+
+    # end to end: an off-vocab label is excluded, not scored 5.0
+    scout = {"one_line": "AI copilot", "solution": "model automation", "problem": "manual work"}
+    review = {"structured_signals": {"product": {"differentiation": {"label": "promising", "confidence": 0.9}}}}
+    comp = DeterministicScoringEngine().score(scout, review)["product"]["components"]["differentiation"]
+    assert comp.get("unrecognized_label") is True
+    assert comp.get("value") is None and comp.get("label") is None
 
 
 def test_FIXED_unknown_market_is_unscored_not_outscoring_known_small_C2():

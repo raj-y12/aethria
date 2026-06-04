@@ -214,11 +214,16 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     unchanged. Revealed the old system **under-scored** sparse companies by fabricating
     low labels (weak_thin 4.34→4.69). 151 backend tests pass; frontend renders
     "Not scored" for the realistic partial-data case.
-  - **Remaining follow-up:** off-vocabulary labels still map to 5.0 and are treated as
-    evidence (`test_KNOWN_ISSUE_off_vocabulary_label_defaults_to_five_C2`); and the
-    abstain fires on *empty source text* — extending it to "evidence-present-but-
-    keyword-miss" (vs the current substantive low reads) would benefit from real-payload
-    / model evaluation.
+  - ✅ **Off-vocabulary labels now abstain too.** `_map_label` returns an
+    `UNRECOGNIZED_LABEL` sentinel (NaN) for a label outside a component's vocabulary;
+    the engine converts it to a no-evidence component (placeholder score, value/label
+    cleared) so aggregation excludes it instead of scoring a silent 5.0. No NaN leaks to
+    consumers. (`test_FIXED_off_vocabulary_label_is_unrecognized_not_five_C2`.) The
+    realistic trigger — the *LLM* emitting an off-vocab label in `structured_signals` —
+    is what you'd confirm with a model; the deterministic exclusion is proven here.
+  - **Remaining follow-up:** the abstain fires on *empty source text*; extending it to
+    "evidence-present-but-keyword-miss" (vs the current substantive low reads) needs
+    real-payload / model evaluation.
 
 - [ ] **P3.3 — Roll the pattern across remaining fact-derivable components.**
   Apply P3.1–P3.2 to the ~70% that is fact-derivable (tam, traction, team, retention,
