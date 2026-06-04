@@ -33,7 +33,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 | Phase 0 — Guardrails | ✅ 2 / 2 |
 | Phase 1 — Stop the bleeding (highest severity, lowest effort) | ✅ 2 / 2 (P1.2 re-sequenced → Phase 3) |
 | Phase 2 — Canonical score (Workstream B) | ✅ 3 / 4 (P2.4 split: surface→Phase 4, orphan-removal deferred) |
-| Phase 3 — Meaning fix (Layers 1–3) | ◑ abstain framework + ALL-dimension rollout done (P1.2+P3.2); off-vocab + P3.1 anchored-criteria pending (P3.1 needs model) |
+| Phase 3 — Meaning fix (Layers 1–3) | ◑ abstain framework + ALL-dimension rollout + off-vocab done (P1.2+P3.2); P3.1 anchored-criteria implemented for team (prompt QUALITY needs model); per-component anchor rollout pending |
 | Phase 4 — Presentation vocabulary (Workstream C) | ◑ 1 / 5 (P4.2 done; P4.3 conviction-scale + P4.1 derive-bands are product-visible; P4.5 needs Phase 3 trail) |
 | Phase 5 — Calibration hardening (Layers 4–5) | 0 / 3 |
 | Phase 6 — Comparability completeness (Workstream A) | 0 / 3 |
@@ -197,10 +197,19 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     fabrication only. The LLM-`structured_signals` path and prompt quality (real Layer
     1/2) still need model-in-the-loop evaluation.
 
-- [ ] **P3.1 — Behaviorally-anchored criteria for ONE dimension (Layer 1).** *(needs model eval)*
-  Replace adjective labels with evidence-bound conditions. Deferred: changes LLM-facing
-  prompts whose quality needs a real model to validate.
-  - Files: `backend/config/scoring_config.py` (rubric block), `evaluation_rubric/v1.json`.
+- [◑] **P3.1 — Behaviorally-anchored criteria for ONE dimension (Layer 1).**
+  Implemented as the worked pattern for `execution.team_execution`: the reviewer prompt
+  now defines each label (`weak/decent/credible_team/strong/elite`) by **checkable
+  evidence conditions** (e.g. elite = a founder with a prior venture-backed exit), tells
+  the model to cite the evidence it used, and to **omit the signal when there's no
+  evidence** (reinforces abstain). The anchor vocabulary matches the deterministic
+  normalizer exactly (guard test).
+  - Files: `backend/reviewer/base.py` (`_evidence_anchors_block`),
+    `backend/tests/test_scoring_golden_snapshot.py` (parity guard).
+  - **Validation gate:** ✅ prompt assembles; anchor labels == normalizer vocabulary;
+    128 reviewer/scoring tests pass. ⏳ **prompt QUALITY** (does the model produce better
+    team labels?) needs a model — validate by running the branch locally with a key.
+  - **Follow-up:** roll the same evidence-anchored structure out to the other components.
 
 - [✅] **P3.2 — Abstain rolled out across ALL dimensions.**
   Every component extractor now abstains (emits a missing signal) when its source text

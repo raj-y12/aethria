@@ -168,6 +168,27 @@ DETERMINISTIC SCORING (enabled in deployment):
 """
 
 
+def _evidence_anchors_block() -> str:
+    """Behaviorally-anchored criteria for the Execution/team_execution signal (P3.1).
+
+    Defines the controlled vocabulary AND the checkable evidence that justifies each
+    label, so the label is a function of cited evidence rather than a holistic vibe.
+    The labels here match the deterministic normalizer vocabulary exactly
+    (weak/decent/credible_team/strong/elite). This is the worked pattern; other
+    components will follow the same structure.
+    """
+    return """
+EVIDENCE-ANCHORED LABELS — execution.team_execution (choose the label whose condition the cited evidence meets; pick the HIGHEST satisfied):
+- elite: at least one founder with a prior venture-backed exit, OR senior leadership (VP+ / C-level) at a category-leading company.
+- strong: experienced operators with directly relevant domain expertise (≈5+ years at relevant companies).
+- credible_team: founder/executive backgrounds or notable institutional affiliations referenced (e.g. ex-FAANG, relevant prior roles).
+- decent: capable team with relevant background but first-time founders or no standout credentials.
+- weak: no demonstrable relevant background in the evidence.
+- If there is NO team evidence at all, omit team_execution (or set it null) — do NOT guess a label. Unscored is better than fabricated.
+Put the specific evidence you relied on in the signal's "evidence" field. Apply this same evidence-first discipline to the other signals.
+"""
+
+
 def _build_system_prompt(reviewer_rules: Dict[str, Any], rubric: Dict[str, Any]) -> str:
     """Build system prompt from versioned reviewer rules and evaluation rubric (policy_resolver)."""
     red_flags_block = ""
@@ -206,6 +227,7 @@ NARRATIVE AND SCORING:
 - overall_summary must be a concise narrative synthesis for the investment committee. Do NOT list or repeat numeric scores in overall_summary (scores are captured in the scores table and score_reasoning). Write 2-4 sentences summarizing strengths, concerns, and fit; no "X/10" or score phrases in this field.
 - Extract structured_signals as strict JSON evidence with confidences; deterministic scoring runs downstream and sets final scores.
 {_deterministic_scoring_contract_block()}
+{_evidence_anchors_block()}
 - Use bullet points for positives and risks where appropriate. Provide 2-5 bullets per analysis list when content allows.
 - Never emit placeholder strings like [MISSING]. When information is absent, leave list fields empty and rely on confidence + structured_signals null values.
 - Do NOT invent data; only summarize what the Scout memo states and what optional supplemental web snippets in the user message support (when present).

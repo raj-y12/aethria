@@ -228,6 +228,20 @@ def test_normalizer_missing_default_is_superseded_by_aggregation_abstain_C2():
     assert NL.normalize_network_effects(None) == 5.0
 
 
+def test_p31_team_evidence_anchors_match_normalizer_vocabulary():
+    """P3.1: the behaviorally-anchored labels offered to the reviewer for
+    execution.team_execution must be exactly the labels the deterministic normalizer
+    recognizes — otherwise the LLM would be told to use labels that then abstain."""
+    from reviewer.base import _evidence_anchors_block
+
+    block = _evidence_anchors_block()
+    for label in ("weak", "decent", "credible_team", "strong", "elite"):
+        assert label in block, f"anchor block missing label {label}"
+        assert not NL.is_unrecognized(NL.normalize_team_execution(label)), (
+            f"anchor label {label} is not a recognized normalizer label"
+        )
+
+
 def test_FIXED_off_vocabulary_label_is_unrecognized_not_five_C2():
     """Audit §5, now FIXED: a label outside the controlled vocabulary used to silently
     map to a neutral 5.0 and count as evidence. The normalizer now returns the
