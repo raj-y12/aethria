@@ -68,7 +68,55 @@ def _partner_rules_json_for_prompt(rules: Dict[str, Any]) -> str:
     raw2 = json.dumps(slim, ensure_ascii=False, indent=2)
     if len(raw2) <= _MAX_RULES_JSON_CHARS:
         return raw2 + "\n/* note: long keyword lists from full partner_rules were omitted */\n"
-    return raw2[: _MAX_RULES_JSON_CHARS] + "\n/* truncated */\n"
+    return _json_within_budget(slim, _MAX_RULES_JSON_CHARS)
+
+
+def _json_within_budget(obj: Any, max_chars: int) -> str:
+    """Serialize obj to JSON that fits within max_chars and is ALWAYS valid JSON.
+
+    Char-boundary truncation (``json.dumps(obj)[:n] + "...(truncated)"``) can emit
+    malformed JSON into an LLM prompt — a brace/quote gets cut mid-structure and the
+    model sees broken syntax. Instead we shrink the *structure* (dropping the largest
+    keys / trailing list elements) and leave an explicit elision marker, so the
+    emitted text always parses. Size is best-effort; validity is guaranteed.
+    """
+    raw = json.dumps(obj, ensure_ascii=False)
+    if len(raw) <= max_chars:
+        return raw
+    if isinstance(obj, dict):
+        kept = dict(obj)
+        # Drop the largest-serialized values first until the marked dict fits.
+        for key in sorted(
+            obj.keys(),
+            key=lambda k: len(json.dumps(obj[k], ensure_ascii=False)),
+            reverse=True,
+        ):
+            marked = {**kept, "_elided_keys": True}
+            if len(json.dumps(marked, ensure_ascii=False)) <= max_chars:
+                return json.dumps(marked, ensure_ascii=False)
+            kept.pop(key, None)
+        return json.dumps({"_elided_keys": True}, ensure_ascii=False)
+    if isinstance(obj, list):
+        kept_list = list(obj)
+        while kept_list:
+            candidate = kept_list + [f"...(+{len(obj) - len(kept_list)} elided)"]
+            cand_json = json.dumps(candidate, ensure_ascii=False)
+            if len(cand_json) <= max_chars:
+                return cand_json
+            kept_list.pop()
+        return json.dumps([f"...({len(obj)} items elided)"], ensure_ascii=False)
+    # Scalars / unsupported: emit a valid JSON string rather than a sliced value.
+    return json.dumps("[elided: exceeds prompt budget]", ensure_ascii=False)
+
+
+def _merge_risks(
+    primary: Optional[List[str]],
+    secondary: Optional[List[str]],
+    limit: int = 5,
+) -> List[str]:
+    """Combine two risk lists, preserving order, de-duplicating, capped at ``limit``."""
+    combined = list(primary or []) + list(secondary or [])
+    return list(dict.fromkeys(combined))[:limit]
 
 
 def _parse_llm_json_object(content: str) -> Optional[Dict[str, Any]]:
@@ -693,9 +741,7 @@ class PartnerDecisionEngine:
             self._build_narrative_from_inputs(scout_output, review_output)
         )
         # Merged risks: key_risks + assumption_risks, deduplicated, max 5
-        merged_risks: List[str] = list(dict.fromkeys(
-            (key_risks or []) + assumption_risks
-        ))[:5]
+        merged_risks: List[str] = _merge_risks(key_risks, assumption_risks)
 
         scout_confidence = scout_output.get("confidence", 0.5)
         if scout_confidence < 0.5:
@@ -1444,9 +1490,7 @@ class PartnerDecisionEngine:
             n_t, n_w, n_s, n_m, n_p, n_tr = self._build_narrative_from_inputs(
                 scout_output, review_output
             )
-            f_risks: List[str] = list(dict.fromkeys(
-                (review_output.get("key_risks") or []) + assumption_risks
-            ))[:5]
+            f_risks: List[str] = _merge_risks(review_output.get("key_risks"), assumption_risks)
             result = self._create_decision(
                 recommendation=final_recommendation,
                 conviction=1,
@@ -1534,14 +1578,10 @@ class PartnerDecisionEngine:
             dc = build_deal_context_v1(scout_output, review_output, fund_thesis)
             digest_prefix = format_deal_context_digest_prompt_line(dc) + "\n\n"
 
-        sr_json = json.dumps(score_reasoning, ensure_ascii=False)
-        if len(sr_json) > 3500:
-            sr_json = sr_json[:3500] + "...(truncated)"
+        sr_json = _json_within_budget(score_reasoning, 3500)
         structured_scoring = review_output.get("structured_scoring") or {}
         policy_version_id = structured_scoring.get("policy_version_id") if isinstance(structured_scoring, dict) else None
-        scoring_json = json.dumps(structured_scoring, ensure_ascii=False)
-        if len(scoring_json) > 4500:
-            scoring_json = scoring_json[:4500] + "...(truncated)"
+        scoring_json = _json_within_budget(structured_scoring, 4500)
 
         ds = review_output.get("defensibility_score")
         ds_disp = ds if ds is not None else "N/A"
@@ -1550,13 +1590,9 @@ class PartnerDecisionEngine:
         est_disp = str(est_raw).strip() if est_raw is not None and str(est_raw).strip() else "N/A"
         refs_raw = scout_output.get("references") or []
         refs_list = [r for r in refs_raw if isinstance(r, str) and r.strip()][:12]
-        refs_json = json.dumps(refs_list, ensure_ascii=False)
-        if len(refs_json) > 2400:
-            refs_json = refs_json[:2400] + "...(truncated)"
+        refs_json = _json_within_budget(refs_list, 2400)
         prov_raw = scout_output.get("field_provenance")
-        prov_json = json.dumps(prov_raw, ensure_ascii=False) if isinstance(prov_raw, dict) else "{}"
-        if len(prov_json) > 800:
-            prov_json = prov_json[:800] + "...(truncated)"
+        prov_json = _json_within_budget(prov_raw if isinstance(prov_raw, dict) else {}, 800)
 
         user_prompt = f"""{digest_prefix}{thesis_section}STARTUP
 display_name: {scout_output.get('name', 'Unknown')}
@@ -1566,7 +1602,7 @@ one_line: {scout_output.get('one_line', 'N/A')}
 primary_thesis: {scout_output.get('primary_thesis', 'N/A')}
 why_now: {scout_output.get('why_now', 'N/A')}
 estimated_tam: {est_disp}
-references (truncated JSON array): {refs_json}
+references (JSON array, may be elided): {refs_json}
 field_provenance (JSON — source tags for enriched scout fields): {prov_json}
 
 REVIEWER OUTPUT
@@ -1578,7 +1614,7 @@ execution_score: {review_output.get('execution_score', 0)}/10
 defensibility_score: {ds_disp}/10
 score_reasoning (full JSON): {sr_json}
 policy_version_id: {policy_version_id or 'N/A'}
-structured_scoring_with_policy_criteria (truncated JSON): {scoring_json}
+structured_scoring_with_policy_criteria (JSON, may be elided): {scoring_json}
 
 THESIS ALIGNMENT (from review)
 thesis_alignment_score: {review_output.get('thesis_alignment_score')}
@@ -1797,7 +1833,7 @@ No markdown. No extra fields. Strictly under 350 words total information density
         risks_raw = llm_result.get("risks")
         llm_risks: List[str] = (
             [str(r) for r in risks_raw if isinstance(r, str)] if isinstance(risks_raw, list) else []
-        ) or list(dict.fromkeys((review_output.get("key_risks") or []) + assumption_risks))[:5]
+        ) or _merge_risks(review_output.get("key_risks"), assumption_risks)
 
         next_act = self._normalize_next_action(
             str(llm_result.get("next_action") or "")
