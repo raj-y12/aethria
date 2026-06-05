@@ -25,6 +25,7 @@ Your additional lens:
         model: str = "gpt-5-nano",
         tenant_user_id: str = "",
         use_resource_fund_thesis_fallback: bool = True,
+        structured_scoring_enabled: bool = False,
     ):
         self.reviewer_type = "skeptical"
         super().__init__(
@@ -32,5 +33,6 @@ Your additional lens:
             model=model,
             tenant_user_id=tenant_user_id,
             use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
+            structured_scoring_enabled=structured_scoring_enabled,
         )
         self.SYSTEM_PROMPT = self.SYSTEM_PROMPT + self.SKEPTICAL_ADDENDUM

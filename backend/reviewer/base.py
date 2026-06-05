@@ -312,14 +312,18 @@ class Reviewer(ABC):
         model: str = "gpt-5-nano",
         tenant_user_id: str = "",
         use_resource_fund_thesis_fallback: bool = True,
+        structured_scoring_enabled: bool = False,
     ):
         """
         Initialize a Reviewer.
-        
+
         Args:
             api_key: OpenAI API key
             model: OpenAI model to use (default: gpt-5-nano)
             tenant_user_id: Clerk user id for loading promoted prompts from Supabase
+            structured_scoring_enabled: When True, the engine derives final numeric
+                scores and score_reasoning deterministically from structured_signals,
+                so the LLM is told to omit those fields (they would be overwritten).
         """
         self.client = OpenAI(api_key=api_key)
         self.logger = logging.getLogger("reviewer")
@@ -328,6 +332,7 @@ class Reviewer(ABC):
         self._last_token_usage = 0
         self._tenant_user_id = (tenant_user_id or "").strip()
         self._use_resource_fund_thesis_fallback = bool(use_resource_fund_thesis_fallback)
+        self._structured_scoring_enabled = bool(structured_scoring_enabled)
         reviewer_rules, rubric = _load_reviewer_resources()
         self.SYSTEM_PROMPT = _build_system_prompt(reviewer_rules, rubric)
         self.reviewer_type = getattr(self, 'reviewer_type', 'default')
@@ -512,6 +517,22 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                         f"{json.dumps([round(float(x), 6) for x in emb[:24]])}\n"
                     )
             
+            # When structured scoring is enabled, the engine overwrites the LLM's
+            # numeric scores and score_reasoning with deterministic values derived
+            # from structured_signals. Omit them from the requested schema so the
+            # model doesn't spend output tokens on fields that get discarded.
+            omit_llm_scores = getattr(self, "_structured_scoring_enabled", False)
+            scores_schema_block = "" if omit_llm_scores else (
+                '  "market_score": int,        // 1-10\n'
+                '  "product_score": int,       // 1-10\n'
+                '  "technical_score": int,     // 1-10\n'
+                '  "execution_score": int,     // 1-10 (emphasize team)\n'
+                '  "defensibility_score": int, // 1-10 (moats, network effects, etc.)\n'
+            )
+            score_reasoning_schema_line = "" if omit_llm_scores else (
+                '  "score_reasoning": {"market_score": "string", "product_score": "string", ...},'
+                '  // Optional: concise reasoning per dimension for memo table\n'
+            )
             json_schema = '''{
   "structured_signals": { // required: extraction-only evidence used by deterministic scorer
     "market": {
@@ -550,12 +571,7 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
       "brand": {"label": "emerging", "confidence": 0.6, "reasoning": "...", "evidence": "..."}
     }
   },
-  "market_score": int,        // 1-10
-  "product_score": int,       // 1-10
-  "technical_score": int,     // 1-10
-  "execution_score": int,     // 1-10 (emphasize team)
-  "defensibility_score": int, // 1-10 (moats, network effects, etc.)
-  "overall_summary": "string",  // Narrative synthesis for IC; do NOT list scores (e.g. no "Market 7/10: ..."); scores go in score_reasoning
+''' + scores_schema_block + '''  "overall_summary": "string",  // Narrative synthesis for IC; do NOT list scores (e.g. no "Market 7/10: ..."); scores go in score_reasoning
   "key_risks": ["string", "..."],
   "verdict": "STRONG" | "MEDIUM" | "WEAK",
   "diligence_red_flags": ["string", "..."],  // Use only labels from versioned reviewer_rules policy
@@ -565,8 +581,7 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
   "business_model_analysis": ["string", "..."], // Optional: monetization, pricing, growth plan, unit economics; [] if absent
   "investment_thesis": ["string", "..."],    // Optional: bullet points why to invest + core assumptions
   "risk_mitigation": ["string", "..."],     // Optional: actionable strategies for each diligence_red_flags item
-  "score_reasoning": {"market_score": "string", "product_score": "string", ...},  // Optional: concise reasoning per dimension for memo table
-  "market_reasoning": ["string", "..."],      // 2-4 bullets
+''' + score_reasoning_schema_line + '''  "market_reasoning": ["string", "..."],      // 2-4 bullets
   "market_weaknesses": ["string", "..."],     // 1-3 bullets
   "market_confidence": "low" | "medium" | "high",
   "product_reasoning": ["string", "..."],     // 2-4 bullets
@@ -598,19 +613,34 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 else "Use only information provided in the Scout memo or defined in resources; do not hallucinate missing data."
             )
 
+            if omit_llm_scores:
+                score_directive = (
+                    "CRITICAL: do NOT output any numeric *_score fields or score_reasoning — "
+                    "those are derived deterministically downstream from structured_signals. "
+                    "Your sole scoring responsibility is to extract COMPLETE structured_signals with confidence values. "
+                )
+                score_reasoning_directive = ""
+            else:
+                score_directive = (
+                    "CRITICAL: treat all numeric score fields as provisional placeholders only. "
+                    "Do not invent final scoring. Your primary responsibility is to extract structured_signals with confidence values. "
+                )
+                score_reasoning_directive = (
+                    "Optionally include score_reasoning with one short sentence per dimension (e.g. market_score, product_score, technical_score, execution_score, defensibility_score) for the memo scores table.\n\n"
+                )
+
             user_content = (
                 f"Evaluate this startup idea discovered by a Scout:\n\n{scout_text}{supplement_block}{resource_thesis_block}{thesis_block}\n\n"
                 "Review Scout hypotheses when provided: evaluate assumptions and flag critical unknowns in assumption_feedback. "
                 f"{grounding_clause} "
-                "CRITICAL: treat all numeric score fields as provisional placeholders only. "
-                "Do not invent final scoring. Your primary responsibility is to extract structured_signals with confidence values. "
+                f"{score_directive}"
                 "structured_signals must be COMPLETE: include all 5 dimensions and all 25 components (no empty objects). "
                 "For each component provide either label or value, plus reasoning and evidence grounded in the provided startup text. "
                 "If evidence is unavailable, set value to null with confidence <= 0.2 and explain what is missing in reasoning. "
-                "In overall_summary, write a concise narrative synthesis only; do not list or repeat numeric scores (scores are in score_reasoning). "
-                "Emphasize team in execution_score; if team/founder data is missing, say so plainly and leave team_analysis as an empty list. "
+                "In overall_summary, write a concise narrative synthesis only; do not list or repeat numeric scores. "
+                "Emphasize team execution; if team/founder data is missing, say so plainly and leave team_analysis as an empty list. "
                 "Populate team_analysis, competition_analysis, business_model_analysis, investment_thesis, and risk_mitigation when you can; use empty lists when info is absent. "
-                "Optionally include score_reasoning with one short sentence per dimension (e.g. market_score, product_score, technical_score, execution_score, defensibility_score) for the memo scores table.\n\n"
+                f"{score_reasoning_directive}"
                 "For each dimension, include 2-4 reasoning bullets, 1-3 weaknesses bullets, and confidence as one of low/medium/high. "
                 "Include improvement_to_9 as actionable bullets and set score_source to reflect multi-reviewer aggregation.\n\n"
                 f"Output ONLY valid JSON matching this exact schema:\n\n{json_schema}\n\n"
@@ -648,6 +678,13 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 self.scout_output, data["structured_signals"]
             )
             data = _normalize_structured_signals_contract(data)
+            # When scores were intentionally omitted from the prompt, inject neutral
+            # placeholders so validate_reviewer_output passes. The engine overwrites
+            # these with deterministic scores from structured_signals immediately after.
+            if omit_llm_scores:
+                for sf in ("market_score", "product_score", "technical_score", "execution_score"):
+                    if not isinstance(data.get(sf), int):
+                        data[sf] = 5
             if "defensibility_score" not in data:
                 data["defensibility_score"] = None
             if "diligence_red_flags" not in data:
