@@ -506,12 +506,18 @@ class SupabaseStartupsStorage:
             out.append(raw)
         return out
 
-    def add_startup(self, scout_info: ScoutInfo, *, pipeline_run_id: Optional[str] = None) -> str:
+    def add_startup(
+        self,
+        scout_info: ScoutInfo,
+        *,
+        pipeline_run_id: Optional[str] = None,
+        financials: Optional[Financials] = None,
+    ) -> str:
         pr = (pipeline_run_id or "").strip() or None
         startup = Startup(
             startup_id=scout_info.startup_id,
             scout_info=scout_info,
-            financials=Financials(),
+            financials=financials or Financials(),
         )
         startup.agent_trace = merge_stage_trace(
             startup.agent_trace,
@@ -1130,10 +1136,13 @@ class SupabaseStartupsStorage:
     def add_discovery(
         self, scout_output: dict, *, pipeline_run_id: Optional[str] = None
     ) -> str:
-        from utils.adapters import scout_output_to_scout_info
+        from utils.adapters import scout_output_to_scout_info, financials_from_scout_output
 
         scout_info = scout_output_to_scout_info(scout_output)
-        return self.add_startup(scout_info, pipeline_run_id=pipeline_run_id)
+        financials = financials_from_scout_output(scout_output)
+        return self.add_startup(
+            scout_info, pipeline_run_id=pipeline_run_id, financials=financials
+        )
 
     def get_unreviewed_entries(self, limit: Optional[int] = None) -> List[dict]:
         return [s.to_dict() for s in self.get_unreviewed(limit=limit)]

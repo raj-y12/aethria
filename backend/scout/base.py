@@ -19,6 +19,7 @@ import certifi
 from openai import OpenAI
 
 from scout.schema import ScoutOutput, validate_scout_output, generate_id
+from utils.financials_grounding import ground_financials
 from tenant_context import require_user_id
 from security.prompt_safety import isolate_untrusted_text, prompt_safety_instruction
 from utils.reference_verify import (
@@ -351,6 +352,11 @@ class Scout(ABC):
             normalized_site = site if site.lower().startswith(("http://", "https://")) else f"https://{site}"
             refs.append(f"{out.get('name') or 'Company'} official website - {normalized_site}")
         out["references"] = refs
+
+        # financials is an optional object of grounded proposals; keep only a dict so the
+        # grounding gate has a stable shape (it drops anything unverifiable anyway).
+        fin = out.get("financials")
+        out["financials"] = fin if isinstance(fin, dict) else {}
         return out
 
     def _postprocess_scout_dict(
@@ -401,11 +407,16 @@ class Scout(ABC):
         # "Aethria" against the fund "Aethria" nukes aethria.com vs aethria.co.
         # Company-token relevance + URL probes still validate the references.
         anchor = None if for_lookup else self._reference_anchor_hostname(out, explicit_website=explicit_website)
-        return finalize_scout_references(
+        final = finalize_scout_references(
             out,
             anchor_hostname=anchor,
             company_name=str(out.get("name") or ""),
         )
+        if isinstance(final, dict):
+            # Independently verify every proposed financial figure against the retrieved,
+            # allowlisted sources; anything unprovable is dropped and marked missing.
+            final["financials_grounded"] = ground_financials(out, source_pack)
+        return final
 
     def _scout_validates(self, data: Dict[str, Any]) -> bool:
         try:
@@ -818,6 +829,12 @@ class Scout(ABC):
                             '  \"biggest_unknown\": \"string (single largest risk or uncertainty)\",\\n'
                             '  \"funding_stage\": \"Pre-Seed\" | \"Seed\" | \"Series A\" | \"Series B\" | \"Series C+\" | \"Unknown\" | null,\\n'
                             '  \"est_tam\": \"string\" | null,\\n'
+                            '  \"financials\": {  // OPTIONAL, GROUNDED ONLY. Fill a sub-field ONLY if a retrieved source explicitly states the figure; otherwise null. NEVER estimate or infer.\\n'
+                            '    \"funding_history\": {\"value\": \"e.g. $5M Series A (2024)\", \"quote\": \"exact sentence copied verbatim from the cited source\", \"source_url\": \"that source URL\"} | null,\\n'
+                            '    \"valuation_est\": {\"value\": \"e.g. $20M post-money\", \"quote\": \"verbatim source sentence\", \"source_url\": \"that source URL\"} | null,\\n'
+                            '    \"traction_metrics\": {\"value\": \"e.g. $2M ARR, 50 customers\", \"quote\": \"verbatim source sentence\", \"source_url\": \"that source URL\"} | null,\\n'
+                            '    \"ip_status\": {\"value\": \"e.g. 2 patents granted\", \"quote\": \"verbatim source sentence\", \"source_url\": \"that source URL\"} | null\\n'
+                            '  },\\n'
                             '  \"references\": [\"string\", ...] // REQUIRED: 1-8 sources that PROVE the company exists\\n'
                             "}\n\n"
                             "CRITICAL - references must PROVE the company exists: company website URL, funding/news article, Crunchbase, LinkedIn, or press release. "
@@ -827,6 +844,8 @@ class Scout(ABC):
                             "If you cannot find a suitable VC-scale startup with verifiable sources, return nothing. "
                             "Do NOT invent company names or make up sources. Use null for funding_stage/est_tam if unknown; prefer est_tam when sources give market size. "
                             "If sources mention customers, pilots, or revenue, state it concretely in problem/solution/why_now (no fabricated metrics). "
+                            "financials: fill a sub-field ONLY when a retrieved source explicitly states the exact figure — copy the figure into value, the source's exact sentence into quote, and that source's URL into source_url. "
+                            "If a figure is not present verbatim in your sources, use null. Never estimate, round, or infer funding, valuation, revenue, or IP numbers; unverifiable financials MUST be null. "
                             "You MUST include every top-level key from the schema (name through references); never return a partial JSON object with only id/scout_type/references. "
                             "Output only the JSON object, no text before or after."
                         ),

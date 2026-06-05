@@ -54,6 +54,7 @@ function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | null): St
     scout: partial.scout ?? base.scout,
     review: partial.review ?? base.review,
     partner: partial.partner ?? base.partner,
+    financials: partial.financials ?? base.financials,
   };
 }
 
@@ -393,6 +394,17 @@ function buildInvestmentCase(startup: Startup, exclude: string): string[] {
     if (points.length >= 5) break;
   }
   return points;
+}
+
+/** A fact is shown only when it carries real signal — empty, [MISSING], and
+ *  non-answers ("unknown"/"n/a"/"tbd") collapse to null so the memo never renders
+ *  a hollow "Stage: Unknown" row. Honest absence beats filler. */
+function cleanFactValue(value: unknown): string | null {
+  const s = String(value ?? '').trim();
+  if (!s) return null;
+  if (/^\[?\s*missing/i.test(s)) return null;
+  if (['unknown', 'n/a', 'na', 'tbd', 'none', '—', '-'].includes(s.toLowerCase())) return null;
+  return s;
 }
 
 function buildSnapshotRows(startup: Startup, blocker: string): Array<{ label: string; text: string }> {
@@ -784,6 +796,51 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     () => (displayStartup ? buildSnapshotRows(displayStartup, coverBlocker) : []),
     [displayStartup, coverBlocker]
   );
+  // Decision confidence — surfaced on the verdict so the recommendation is honest
+  // about how sure it is, not just what it concludes.
+  const partnerConfidencePct =
+    typeof displayStartup?.partner?.confidence === 'number'
+      ? Math.round(Math.max(0, Math.min(1, displayStartup.partner.confidence)) * 100)
+      : null;
+  const convictionLine = useMemo(() => {
+    const parts: string[] = [];
+    if (displayStartup?.review?.overall_score != null) {
+      parts.push(`${displayStartup.review.overall_score}/10 conviction`);
+    } else if (thesisAlignmentBrief) {
+      parts.push(thesisAlignmentBrief);
+    }
+    if (partnerConfidencePct != null) parts.push(`${partnerConfidencePct}% partner confidence`);
+    return parts.length ? parts.join('   ·   ') : 'Conviction forming';
+  }, [displayStartup?.review?.overall_score, thesisAlignmentBrief, partnerConfidencePct]);
+  // The single question the deal hinges on (AethriaView synthesis) — previously unused.
+  const focalQuestion = cleanFactValue(displayStartup?.review?.aethria_view?.focal_question);
+  // Vitals: the quantitative facts. Stage/TAM come from the scout; funding, valuation,
+  // traction, and IP come from the backend Financials grounding gate — every value there
+  // is verified against a cited source, so anything present is safe to show verbatim.
+  const fin = displayStartup?.financials;
+  const vitalsStrip = useMemo(
+    () =>
+      [
+        { label: 'Stage', value: cleanFactValue(displayStartup?.scout?.funding_stage) },
+        { label: 'Market (TAM)', value: cleanFactValue(displayStartup?.scout?.est_tam) },
+        { label: 'Valuation', value: cleanFactValue(fin?.valuation_est) },
+      ].filter((v): v is { label: string; value: string } => !!v.value),
+    [displayStartup?.scout?.funding_stage, displayStartup?.scout?.est_tam, fin?.valuation_est]
+  );
+  const fundingLine = cleanFactValue(fin?.funding_history);
+  // Prefer the source-verified traction metric; fall back to the partner's narrative signal.
+  const tractionLine =
+    cleanFactValue(fin?.traction_metrics) ?? cleanFactValue(displayStartup?.partner?.traction_signals);
+  const ipLine = cleanFactValue(fin?.ip_status);
+  const modelLine = useMemo(() => {
+    for (const item of displayStartup?.review?.business_model_analysis ?? []) {
+      const cleaned = cleanFactValue(item);
+      if (cleaned) return clipText(cleaned, 160);
+    }
+    return null;
+  }, [displayStartup?.review?.business_model_analysis]);
+  const hasVitals =
+    vitalsStrip.length > 0 || !!fundingLine || !!tractionLine || !!ipLine || !!modelLine;
   const memoKillers = useMemo(
     () => buildKillers(adverseRegister, riskFactors.risks),
     [adverseRegister, riskFactors.risks]
@@ -924,11 +981,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 )}
                 <div className="memoCoverRulingSupport">
                   <p className="memoCoverRulingConviction">
-                    {displayStartup.review?.overall_score != null
-                      ? renderWithMonoNumbers(`${displayStartup.review.overall_score}/10 conviction`)
-                      : thesisAlignmentBrief
-                        ? renderWithMonoNumbers(thesisAlignmentBrief)
-                        : 'Conviction forming'}
+                    {renderWithMonoNumbers(convictionLine)}
                   </p>
                   {reviewerConsensus.verdict ? (
                     <p className="memoCoverRulingConsensus">
@@ -947,6 +1000,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   </p>
                 ) : null}
               </div>
+
+              {focalQuestion ? (
+                <p className="memoCoverFocalQuestion mt-3 type-note text-oxford/72">
+                  <span className="type-label uppercase tracking-[0.07em] text-oxford/45 mr-2">Decides it</span>
+                  <span className="italic">{renderWithMonoNumbers(focalQuestion)}</span>
+                </p>
+              ) : null}
 
               {!embedded && (coverBlocker || coverAction) ? (
                 <dl className="memoCoverBrief">
@@ -967,17 +1027,61 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             </header>
 
             {/* ── Company snapshot ── */}
-            {snapshotRows.length > 0 && (
+            {(snapshotRows.length > 0 || hasVitals) && (
               <section className="memoDocSection memoSnapshotSection" aria-labelledby="memo-snapshot">
                 <h2 className="memoDocSectionHead" id="memo-snapshot">Snapshot</h2>
-                <dl className="memoSnapshot">
-                  {snapshotRows.map((row) => (
-                    <div key={row.label} className="memoSnapshotRow">
-                      <dt className="memoSnapshotLabel">{row.label}</dt>
-                      <dd className="memoSnapshotText">{renderWithMonoNumbers(row.text)}</dd>
-                    </div>
-                  ))}
-                </dl>
+                {hasVitals && (
+                  <div className={`memoVitals${snapshotRows.length > 0 ? ' mb-4 border-b border-oxford/8 pb-4' : ''}`}>
+                    {vitalsStrip.length > 0 && (
+                      <dl className="flex flex-wrap gap-x-8 gap-y-1.5">
+                        {vitalsStrip.map((v) => (
+                          <div key={v.label} className="flex items-baseline gap-2">
+                            <dt className="type-label uppercase tracking-[0.06em] text-oxford/45">{v.label}</dt>
+                            <dd className="type-data text-oxford/82 tabular-nums">{renderWithMonoNumbers(v.value)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                    {(fundingLine || tractionLine || ipLine || modelLine) && (
+                      <div className={`${vitalsStrip.length > 0 ? 'mt-2.5 ' : ''}space-y-1.5`}>
+                        {fundingLine && (
+                          <p className="type-note leading-snug text-oxford/75">
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Funding</span>
+                            {renderWithMonoNumbers(fundingLine)}
+                          </p>
+                        )}
+                        {tractionLine && (
+                          <p className="type-note leading-snug text-oxford/75">
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Traction</span>
+                            {renderWithMonoNumbers(tractionLine)}
+                          </p>
+                        )}
+                        {modelLine && (
+                          <p className="type-note leading-snug text-oxford/70">
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Model</span>
+                            {renderWithMonoNumbers(modelLine)}
+                          </p>
+                        )}
+                        {ipLine && (
+                          <p className="type-note leading-snug text-oxford/70">
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">IP</span>
+                            {renderWithMonoNumbers(ipLine)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {snapshotRows.length > 0 && (
+                  <dl className="memoSnapshot">
+                    {snapshotRows.map((row) => (
+                      <div key={row.label} className="memoSnapshotRow">
+                        <dt className="memoSnapshotLabel">{row.label}</dt>
+                        <dd className="memoSnapshotText">{renderWithMonoNumbers(row.text)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
               </section>
             )}
 
