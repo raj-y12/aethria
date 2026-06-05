@@ -54,6 +54,7 @@ function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | null): St
     scout: partial.scout ?? base.scout,
     review: partial.review ?? base.review,
     partner: partial.partner ?? base.partner,
+    financials: partial.financials ?? base.financials,
   };
 }
 
@@ -813,18 +814,24 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   }, [displayStartup?.review?.overall_score, thesisAlignmentBrief, partnerConfidencePct]);
   // The single question the deal hinges on (AethriaView synthesis) — previously unused.
   const focalQuestion = cleanFactValue(displayStartup?.review?.aethria_view?.focal_question);
-  // Vitals: the quantitative facts the pipeline actually populates (sector lives in the
-  // header). Funding history / valuation aren't extracted yet, so they're intentionally absent
-  // rather than rendered as a permanently-empty block.
+  // Vitals: the quantitative facts. Stage/TAM come from the scout; funding, valuation,
+  // traction, and IP come from the backend Financials grounding gate — every value there
+  // is verified against a cited source, so anything present is safe to show verbatim.
+  const fin = displayStartup?.financials;
   const vitalsStrip = useMemo(
     () =>
       [
         { label: 'Stage', value: cleanFactValue(displayStartup?.scout?.funding_stage) },
         { label: 'Market (TAM)', value: cleanFactValue(displayStartup?.scout?.est_tam) },
+        { label: 'Valuation', value: cleanFactValue(fin?.valuation_est) },
       ].filter((v): v is { label: string; value: string } => !!v.value),
-    [displayStartup?.scout?.funding_stage, displayStartup?.scout?.est_tam]
+    [displayStartup?.scout?.funding_stage, displayStartup?.scout?.est_tam, fin?.valuation_est]
   );
-  const tractionLine = cleanFactValue(displayStartup?.partner?.traction_signals);
+  const fundingLine = cleanFactValue(fin?.funding_history);
+  // Prefer the source-verified traction metric; fall back to the partner's narrative signal.
+  const tractionLine =
+    cleanFactValue(fin?.traction_metrics) ?? cleanFactValue(displayStartup?.partner?.traction_signals);
+  const ipLine = cleanFactValue(fin?.ip_status);
   const modelLine = useMemo(() => {
     for (const item of displayStartup?.review?.business_model_analysis ?? []) {
       const cleaned = cleanFactValue(item);
@@ -832,7 +839,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     }
     return null;
   }, [displayStartup?.review?.business_model_analysis]);
-  const hasVitals = vitalsStrip.length > 0 || !!tractionLine || !!modelLine;
+  const hasVitals =
+    vitalsStrip.length > 0 || !!fundingLine || !!tractionLine || !!ipLine || !!modelLine;
   const memoKillers = useMemo(
     () => buildKillers(adverseRegister, riskFactors.risks),
     [adverseRegister, riskFactors.risks]
@@ -1034,17 +1042,33 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         ))}
                       </dl>
                     )}
-                    {tractionLine && (
-                      <p className={`${vitalsStrip.length > 0 ? 'mt-2.5' : ''} type-note leading-snug text-oxford/75`}>
-                        <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Traction</span>
-                        {renderWithMonoNumbers(tractionLine)}
-                      </p>
-                    )}
-                    {modelLine && (
-                      <p className="mt-1.5 type-note leading-snug text-oxford/70">
-                        <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Model</span>
-                        {renderWithMonoNumbers(modelLine)}
-                      </p>
+                    {(fundingLine || tractionLine || ipLine || modelLine) && (
+                      <div className={`${vitalsStrip.length > 0 ? 'mt-2.5 ' : ''}space-y-1.5`}>
+                        {fundingLine && (
+                          <p className="type-note leading-snug text-oxford/75">
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Funding</span>
+                            {renderWithMonoNumbers(fundingLine)}
+                          </p>
+                        )}
+                        {tractionLine && (
+                          <p className="type-note leading-snug text-oxford/75">
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Traction</span>
+                            {renderWithMonoNumbers(tractionLine)}
+                          </p>
+                        )}
+                        {modelLine && (
+                          <p className="type-note leading-snug text-oxford/70">
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Model</span>
+                            {renderWithMonoNumbers(modelLine)}
+                          </p>
+                        )}
+                        {ipLine && (
+                          <p className="type-note leading-snug text-oxford/70">
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">IP</span>
+                            {renderWithMonoNumbers(ipLine)}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

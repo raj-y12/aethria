@@ -12,6 +12,28 @@ from models import ScoutInfo, ReviewInfo, PartnerInfo, PartnerSnapshot, Financia
 from utils.scoring import enrich_scores
 
 
+def financials_from_scout_output(scout_output: Dict[str, Any]) -> Financials:
+    """Build Financials from the scout's grounding-verified financial values.
+
+    Reads `financials_grounded` (produced by utils.financials_grounding.ground_financials),
+    which contains only values that passed the deterministic source-citation gate, plus the
+    revenue_/funding_/valuation_missing flags. When absent (e.g. ungrounded path), returns an
+    empty Financials — never a guessed value.
+    """
+    grounded = scout_output.get("financials_grounded")
+    if not isinstance(grounded, dict):
+        return Financials()
+    return Financials(
+        traction_metrics=grounded.get("traction_metrics"),
+        funding_history=grounded.get("funding_history"),
+        valuation_est=grounded.get("valuation_est"),
+        ip_status=grounded.get("ip_status"),
+        revenue_missing=bool(grounded.get("revenue_missing", False)),
+        funding_missing=bool(grounded.get("funding_missing", False)),
+        valuation_missing=bool(grounded.get("valuation_missing", False)),
+    )
+
+
 def _parse_timestamp(value: Any) -> Optional[datetime]:
     """Parse timestamp from dict input (ISO string or datetime). Returns None if missing or invalid."""
     if value is None:

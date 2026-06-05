@@ -1131,6 +1131,7 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
         "timestamps": timestamps,
         "human_resolution": raw.get("human_resolution"),
         "conviction_state": raw.get("conviction_state"),
+        "financials": raw.get("financials") if isinstance(raw.get("financials"), dict) else None,
         "agent_trace": raw.get("agent_trace"),
         "unresolved_at": _to_iso(raw.get("unresolved_at")),
         "is_new_to_user": raw.get("acknowledged_at") is None and not _startup_has_human_ruling(raw),
@@ -1243,6 +1244,7 @@ def _memo_partial_payload(startup: Startup) -> Dict[str, Any]:
         "scout": fe["scout"],
         "review": fe.get("review"),
         "partner": fe.get("partner"),
+        "financials": fe.get("financials"),
         "agent_trace": fe.get("agent_trace"),
     }
 

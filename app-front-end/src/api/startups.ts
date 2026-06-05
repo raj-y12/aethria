@@ -41,6 +41,7 @@ export type MemoPartialPayload = {
   scout: Startup['scout'];
   review: Startup['review'] | null;
   partner: Startup['partner'] | null;
+  financials?: Startup['financials'];
   agent_trace?: Startup['agent_trace'];
 };
 
@@ -61,6 +62,7 @@ function parseMemoPartial(data: unknown): MemoPartialPayload | null {
     scout: scout as Startup['scout'],
     review: (o.review as Startup['review'] | null) ?? null,
     partner: (o.partner as Startup['partner'] | null) ?? null,
+    financials: (o.financials as Startup['financials']) ?? null,
     agent_trace: (o.agent_trace as Startup['agent_trace']) ?? null,
   };
 }

@@ -346,11 +346,25 @@ export interface ConvictionState {
   escalation_events?: Array<Record<string, unknown>>;
 }
 
+/** Grounded financial facts. Every value is verified against a cited source by the
+ *  backend grounding gate before it is stored — unverifiable figures are null and the
+ *  matching *_missing flag is set. Never an estimate. */
+export interface Financials {
+  traction_metrics?: string | null;
+  funding_history?: string | null;
+  valuation_est?: string | null;
+  ip_status?: string | null;
+  revenue_missing?: boolean;
+  funding_missing?: boolean;
+  valuation_missing?: boolean;
+}
+
 export interface Startup {
   id: string;
   scout: Scout;
   review?: Review | null;
   partner?: Partner | null;
+  financials?: Financials | null;
   /** Structured backend audit trail for Scout -> Reviewer -> Partner handoffs. */
   agent_trace?: Record<string, unknown> | null;
   timestamps?: Timestamps;
