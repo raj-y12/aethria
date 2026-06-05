@@ -15,8 +15,7 @@ import { DECISION_LABELS } from '../design-system/semantics';
 import { UI_DETAIL_EMPTY_HINT } from '../design-system/ui-text';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
-import ScoreOverview from './scoring/ScoreOverview';
-import AssessmentDimensionStrip from './scoring/AssessmentDimensionStrip';
+import AssessmentScorecard from './scoring/AssessmentScorecard';
 import MemoRulingSection from './memo/MemoRulingSection';
 import MemoPrecedentStrip from './memo/MemoPrecedentStrip';
 import MemoPortfolioContext from './memo/MemoPortfolioContext';
@@ -505,7 +504,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const config = fundConfiguration ?? createDefaultFundConfiguration();
   const reduceMotion = usePrefersReducedMotion();
   const wrapperCls = embedded ? 'memoPanel memoPanel--embedded' : 'memoPanel';
-  const [selectedReviewerIdx, setSelectedReviewerIdx] = useState(0);
   const [risksReviewed, setRisksReviewed] = useState(false);
   const [rulingDecision, setRulingDecision] = useState<RulingDecision | null>(null);
   const [rulingNotes, setRulingNotes] = useState('');
@@ -680,7 +678,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   );
 
   useEffect(() => {
-    setSelectedReviewerIdx(0);
     setRisksReviewed(false);
     setRulingDecision(null);
     setRulingNotes('');
@@ -1020,7 +1017,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </section>
             )}
 
-            {/* ── Scoring ── */}
+            {/* ── Assessment ── */}
             {(() => {
               const isMissing = (s: string) => /^\[MISSING/i.test(String(s ?? '').trim());
               const teamItems = (displayStartup.review?.team_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
@@ -1035,7 +1032,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 { label: 'Business Model', items: bizItems },
               ].filter((section) => section.items.length > 0);
               const hasThesis = reviewHasThesisAlignment(displayStartup.review);
-              if (!showScores && assessmentReadouts.length === 0 && improvements.length === 0 && !hasThesis) {
+              const hasScorecard = showScores && !!structuredScoring;
+              const hasPanel = reviewerConsensusRows.length > 0;
+              const hasDeepDive = improvements.length > 0 || assessmentReadouts.length > 0 || hasThesis;
+              if (!hasScorecard && !hasPanel && !hasDeepDive) {
                 return null;
               }
               const r = displayStartup.review;
@@ -1051,31 +1051,55 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               ].filter(Boolean).join('   ·   ');
               const fitPoints = (r?.thesis_fit_points ?? []).filter((s) => String(s ?? '').trim());
               const gapPoints = (r?.thesis_deviation_points ?? []).filter((s) => String(s ?? '').trim());
+              const deepDiveSummary = [
+                hasThesis && ten != null ? `${ten.toFixed(0)}/10 fit` : hasThesis ? 'thesis' : null,
+                improvements.length || assessmentReadouts.length ? 'analyst reads' : null,
+              ].filter(Boolean).join(' · ') || undefined;
               return (
                 <section className="memoDocSection memoScoringSection" aria-labelledby="memo-scoring">
-                  <h2 className="memoDocSectionHead" id="memo-scoring">Scoring</h2>
-                  {showScores && (
+                  <h2 className="memoDocSectionHead" id="memo-scoring">Assessment</h2>
+                  {hasScorecard ? (
                     <div className="memoDocScoreScope">
-                      {structuredScoring && (
-                        <>
-                          <ScoreOverview scoring={structuredScoring} presentation={scoringPresentation} />
-                          <AssessmentDimensionStrip
-                            dimensions={SCORING_DIMENSIONS}
-                            scoring={structuredScoring}
-                            presentation={scoringPresentation}
-                            contentKey={contentKey}
-                          />
-                        </>
-                      )}
+                      <AssessmentScorecard
+                        dimensions={SCORING_DIMENSIONS}
+                        scoring={structuredScoring}
+                        presentation={scoringPresentation}
+                        reviewerRows={reviewerConsensusRows}
+                        reviewerConsensus={reviewerConsensus}
+                        renderNumbers={renderWithMonoNumbers}
+                        reduceMotion={reduceMotion}
+                      />
                     </div>
-                  )}
-                  {(improvements.length > 0 || assessmentReadouts.length > 0) && (
+                  ) : hasPanel ? (
+                    <div className="memoConsensusHead">
+                      <p className="memoConsensusVerdict">
+                        {reviewerConsensus.split ? 'Split' : 'Aligned'}
+                        {reviewerConsensus.verdict ? (
+                          <span className="memoConsensusVerdictTag">{` · ${reviewerConsensus.verdict}`}</span>
+                        ) : null}
+                      </p>
+                      <ul className="memoConsensusList">
+                        {reviewerConsensusRows.map((row) => (
+                          <li key={row.key} className="memoConsensusRow">
+                            <span className="memoConsensusName">{row.name}</span>
+                            <span className="memoConsensusScore">
+                              {row.score != null ? renderWithMonoNumbers(row.score.toFixed(1)) : '—'}
+                            </span>
+                            <span className="memoConsensusTake">
+                              {renderWithMonoNumbers(row.take || row.verdict || '—')}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {hasDeepDive && (
                     <div className="memoDiscGroup memoScoringMore">
                       <MemoDisclosureSection
-                        id={`${contentKey}-scoring-reads`}
-                        title="Analyst reads"
-                        summary={`${improvements.length + assessmentReadouts.length} note${improvements.length + assessmentReadouts.length === 1 ? '' : 's'}`}
-                        initialOpen={false}
+                        id={`${contentKey}-assessment-deepdive`}
+                        title="Deep dive"
+                        summary={deepDiveSummary}
+                        initialOpen={!config.memo.deepDiveCollapsed}
                       >
                         {improvements.length > 0 && (
                           <div className="memoDocSubsection">
@@ -1103,140 +1127,36 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                             </ul>
                           </div>
                         ))}
-                      </MemoDisclosureSection>
-                    </div>
-                  )}
-                  {hasThesis && (
-                    <div className="memoDiscGroup">
-                      <MemoDisclosureSection
-                        id={`${contentKey}-thesis-alignment`}
-                        title="Thesis alignment"
-                        summary={ten != null ? `${ten.toFixed(0)}/10` : fund != null ? (fund ? 'Aligned' : 'Misaligned') : undefined}
-                        initialOpen={!config.memo.deepDiveCollapsed}
-                      >
-                        {statLine && <p className="memoEvStatLine">{renderWithMonoNumbers(statLine)}</p>}
-                        {fitPoints.length > 0 && (
+                        {hasThesis && (
                           <div className="memoDocSubsection">
-                            <p className="memoDocSubhead">Fits</p>
-                            <ul className="memoList">
-                              {fitPoints.map((item, i) => (
-                                <li key={i} className="memoListItem">
-                                  <span className="memoBullet" aria-hidden>·</span>
-                                  <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {gapPoints.length > 0 && (
-                          <div className="memoDocSubsection">
-                            <p className="memoDocSubhead">Gaps</p>
-                            <ul className="memoList">
-                              {gapPoints.map((item, i) => (
-                                <li key={i} className="memoListItem">
-                                  <span className="memoBullet" aria-hidden>·</span>
-                                  <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                                </li>
-                              ))}
-                            </ul>
+                            <p className="memoDocSubhead">Thesis alignment</p>
+                            {statLine && <p className="memoEvStatLine">{renderWithMonoNumbers(statLine)}</p>}
+                            {fitPoints.length > 0 && (
+                              <ul className="memoList">
+                                {fitPoints.map((item, i) => (
+                                  <li key={`fit-${i}`} className="memoListItem">
+                                    <span className="memoBullet" aria-hidden>+</span>
+                                    <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {gapPoints.length > 0 && (
+                              <ul className="memoList">
+                                {gapPoints.map((item, i) => (
+                                  <li key={`gap-${i}`} className="memoListItem">
+                                    <span className="memoBullet" aria-hidden>·</span>
+                                    <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                           </div>
                         )}
                       </MemoDisclosureSection>
                     </div>
                   )}
                 </section>
-              );
-            })()}
-
-            {/* ── Reviewer consensus ── */}
-            {reviewerConsensusRows.length > 0 && (
-              <section className="memoDocSection memoConsensusSection" aria-labelledby="memo-consensus">
-                <h2 className="memoDocSectionHead" id="memo-consensus">Reviewer Consensus</h2>
-                <div className="memoConsensusHead">
-                  <p className="memoConsensusVerdict">
-                    {reviewerConsensus.split ? 'Split' : 'Aligned'}
-                    {reviewerConsensus.verdict ? (
-                      <span className="memoConsensusVerdictTag">{` · ${reviewerConsensus.verdict}`}</span>
-                    ) : null}
-                  </p>
-                  {reviewerConsensus.min != null && reviewerConsensus.max != null ? (
-                    <p className="memoConsensusSpread">
-                      {renderWithMonoNumbers(
-                        reviewerConsensus.min === reviewerConsensus.max
-                          ? `${reviewerConsensus.min.toFixed(1)}/10 across the panel`
-                          : `${reviewerConsensus.min.toFixed(1)}–${reviewerConsensus.max.toFixed(1)}/10 spread`
-                      )}
-                    </p>
-                  ) : null}
-                </div>
-                <ul className="memoConsensusList">
-                  {reviewerConsensusRows.map((row) => (
-                    <li key={row.key} className="memoConsensusRow">
-                      <span className="memoConsensusName">{row.name}</span>
-                      <span className="memoConsensusScore">
-                        {row.score != null ? renderWithMonoNumbers(row.score.toFixed(1)) : '—'}
-                      </span>
-                      <span className="memoConsensusTake">
-                        {renderWithMonoNumbers(row.take || row.verdict || '—')}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {/* ── Reviewer detail ── */}
-            {config.memo.style !== 'concise' && (displayStartup.review?.reviews?.length ?? 0) > 0 && (() => {
-              const reviews = displayStartup.review!.reviews!;
-              const isContested = displayStartup.review?.reviewer_disagreement === true;
-              const selected = reviews[selectedReviewerIdx] ?? reviews[0];
-              return (
-                <div className="memoDiscGroup">
-                  <MemoDisclosureSection
-                    id={`${contentKey}-reviewer-panel`}
-                    title="Reviewer detail"
-                    summary={isContested ? 'Where conviction diverges' : `${reviews.length} internal reads`}
-                    initialOpen={isContested || !config.memo.deepDiveCollapsed}
-                  >
-                    {isContested && (
-                      <p className="memoDocProse">
-                        The reviewer read is not unanimous. The useful signal is the shape of disagreement: which part of the case is carrying conviction, and which part is still soft.
-                      </p>
-                    )}
-                    <div className="memoDocReviewerTable" role="group" aria-label="Reviewer conviction and disagreement">
-                      {reviews.map((rv, idx) => {
-                        const isSelected = idx === selectedReviewerIdx;
-                        const scoreRow = `M ${rv.market_score} · P ${rv.product_score} · T ${rv.technical_score} · E ${rv.execution_score} · D ${rv.defensibility_score}`;
-                        return (
-                          <button
-                            key={rv.reviewer_type}
-                            type="button"
-                            className="memoDocReviewerRow"
-                            aria-pressed={isSelected}
-                            onClick={() => setSelectedReviewerIdx(idx)}
-                          >
-                            <span className="memoDocReviewerRowLabel">
-                              {REVIEWER_LABELS[rv.reviewer_type] ?? rv.reviewer_type}
-                            </span>
-                            <span className="memoDocReviewerRowVerdict">{rv.verdict}</span>
-                            <span className="memoDocReviewerRowScores">{renderWithMonoNumbers(scoreRow)}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {selected?.overall_summary && (
-                      <motion.div
-                        key={`${contentKey}:reviewer:${selectedReviewerIdx}`}
-                        className="memoDocReviewerDetail"
-                        initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={transitionOrReduced(reduceMotion, { duration: 0.18, ease: [0.16, 1, 0.3, 1] })}
-                      >
-                        <p className="memoDocReviewerDetailText">{renderWithMonoNumbers(selected.overall_summary)}</p>
-                      </motion.div>
-                    )}
-                  </MemoDisclosureSection>
-                </div>
               );
             })()}
 
