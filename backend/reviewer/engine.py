@@ -93,18 +93,21 @@ class ReviewerEngine:
             model=model,
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
+            structured_scoring_enabled=self.use_structured_scoring,
         )
         self.skeptical_reviewer = SkepticalReviewer(
             api_key,
             model=model,
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
+            structured_scoring_enabled=self.use_structured_scoring,
         )
         self.opportunist_reviewer = OpportunistReviewer(
             api_key,
             model=model,
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
+            structured_scoring_enabled=self.use_structured_scoring,
         )
         
         self.running = False
@@ -316,6 +319,83 @@ class ReviewerEngine:
             if isinstance(sig, dict) and sig:
                 return dict(sig)
         return None
+
+    @staticmethod
+    def _build_single_reviews(successful_results: List[Dict[str, Any]]) -> List[Any]:
+        """Build per-persona SingleReview snapshots for storage.
+
+        Only the primary persona's snapshot retains the heavy structured_signals /
+        structured_scoring blobs (~4KB each). Those are the only copies anything reads:
+        the deterministic scorer, partner engine, and memo all consume the primary
+        signals, which are also mirrored onto ReviewInfo's top-level fields. The
+        non-primary copies were persisted but never read — dropping them roughly
+        halves review_info size with no loss of information used downstream.
+
+        Primary = DefaultReviewer when present, else the first successful result
+        (mirrors _pick_primary_structured_signals and the primary review_output).
+        """
+        from models import SingleReview
+
+        _valid_reviewer_types = ("DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer")
+        has_default = any(r.get("reviewer_type") == "DefaultReviewer" for r in successful_results)
+        primary_type = "DefaultReviewer" if has_default else (
+            successful_results[0].get("reviewer_type") if successful_results else None
+        )
+
+        single_reviews: List[Any] = []
+        primary_kept = False
+        for r in successful_results:
+            reviewer_label = r.get("reviewer_type", "DefaultReviewer")
+            if reviewer_label not in _valid_reviewer_types:
+                reviewer_label = "DefaultReviewer"
+            # Keep structured payloads only on the first snapshot matching the primary.
+            keep_structured = (not primary_kept) and (r.get("reviewer_type") == primary_type)
+            if keep_structured:
+                primary_kept = True
+            single_reviews.append(SingleReview(
+                reviewer_type=reviewer_label,
+                market_score=r.get("market_score", 5),
+                product_score=r.get("product_score", 5),
+                technical_score=r.get("technical_score", 5),
+                execution_score=r.get("execution_score", 5),
+                defensibility_score=r.get("defensibility_score"),
+                overall_summary=r.get("overall_summary", ""),
+                key_risks=r.get("key_risks", []),
+                verdict=r.get("verdict", "MEDIUM"),
+                diligence_red_flags=r.get("diligence_red_flags", []),
+                assumption_feedback=r.get("assumption_feedback", []),
+                team_analysis=r.get("team_analysis") or None,
+                competition_analysis=r.get("competition_analysis") or None,
+                business_model_analysis=r.get("business_model_analysis") or None,
+                investment_thesis=r.get("investment_thesis") or None,
+                risk_mitigation=r.get("risk_mitigation") or None,
+                score_reasoning=r.get("score_reasoning") or None,
+                score_source=r.get("score_source"),
+                improvement_to_9=r.get("improvement_to_9") or None,
+                market_reasoning=r.get("market_reasoning") or None,
+                market_weaknesses=r.get("market_weaknesses") or None,
+                market_confidence=r.get("market_confidence"),
+                product_reasoning=r.get("product_reasoning") or None,
+                product_weaknesses=r.get("product_weaknesses") or None,
+                product_confidence=r.get("product_confidence"),
+                technical_reasoning=r.get("technical_reasoning") or None,
+                technical_weaknesses=r.get("technical_weaknesses") or None,
+                technical_confidence=r.get("technical_confidence"),
+                execution_reasoning=r.get("execution_reasoning") or None,
+                execution_weaknesses=r.get("execution_weaknesses") or None,
+                execution_confidence=r.get("execution_confidence"),
+                defensibility_reasoning=r.get("defensibility_reasoning") or None,
+                defensibility_weaknesses=r.get("defensibility_weaknesses") or None,
+                defensibility_confidence=r.get("defensibility_confidence"),
+                prompt_version=r.get("prompt_version"),
+                structured_scoring=r.get("structured_scoring") if keep_structured else None,
+                structured_signals=(
+                    dict(r["structured_signals"])
+                    if keep_structured and isinstance(r.get("structured_signals"), dict)
+                    else None
+                ),
+            ))
+        return single_reviews
 
     def _apply_structured_scoring(self, scout_output: dict, reviewer_output: dict) -> dict:
         """Replace LLM-assigned numeric scores with deterministic weighted scores."""
@@ -674,58 +754,10 @@ class ReviewerEngine:
                     resolution_notes=resolution_notes,
                 ).model_dump(mode="json")
 
-                # Build SingleReview list for storage
-                from models import SingleReview
-                single_reviews = []
-                _valid_reviewer_types = ("DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer")
-                for r in successful_results:
-                    reviewer_label = r.get("reviewer_type", "DefaultReviewer")
-                    if reviewer_label not in _valid_reviewer_types:
-                        reviewer_label = "DefaultReviewer"
-                    single_reviews.append(SingleReview(
-                        reviewer_type=reviewer_label,
-                        market_score=r.get("market_score", 5),
-                        product_score=r.get("product_score", 5),
-                        technical_score=r.get("technical_score", 5),
-                        execution_score=r.get("execution_score", 5),
-                        defensibility_score=r.get("defensibility_score"),
-                        overall_summary=r.get("overall_summary", ""),
-                        key_risks=r.get("key_risks", []),
-                        verdict=r.get("verdict", "MEDIUM"),
-                        diligence_red_flags=r.get("diligence_red_flags", []),
-                        assumption_feedback=r.get("assumption_feedback", []),
-                        team_analysis=r.get("team_analysis") or None,
-                        competition_analysis=r.get("competition_analysis") or None,
-                        business_model_analysis=r.get("business_model_analysis") or None,
-                        investment_thesis=r.get("investment_thesis") or None,
-                        risk_mitigation=r.get("risk_mitigation") or None,
-                        score_reasoning=r.get("score_reasoning") or None,
-                        score_source=r.get("score_source"),
-                        improvement_to_9=r.get("improvement_to_9") or None,
-                        market_reasoning=r.get("market_reasoning") or None,
-                        market_weaknesses=r.get("market_weaknesses") or None,
-                        market_confidence=r.get("market_confidence"),
-                        product_reasoning=r.get("product_reasoning") or None,
-                        product_weaknesses=r.get("product_weaknesses") or None,
-                        product_confidence=r.get("product_confidence"),
-                        technical_reasoning=r.get("technical_reasoning") or None,
-                        technical_weaknesses=r.get("technical_weaknesses") or None,
-                        technical_confidence=r.get("technical_confidence"),
-                        execution_reasoning=r.get("execution_reasoning") or None,
-                        execution_weaknesses=r.get("execution_weaknesses") or None,
-                        execution_confidence=r.get("execution_confidence"),
-                        defensibility_reasoning=r.get("defensibility_reasoning") or None,
-                        defensibility_weaknesses=r.get("defensibility_weaknesses") or None,
-                        defensibility_confidence=r.get("defensibility_confidence"),
-                        prompt_version=r.get("prompt_version"),
-                        structured_scoring=r.get("structured_scoring"),
-                        structured_signals=(
-                            dict(r["structured_signals"])
-                            if isinstance(r.get("structured_signals"), dict)
-                            else None
-                        ),
-                    ))
-                
+                # Build SingleReview list for storage (heavy structured blobs kept
+                # only on the primary persona; see _build_single_reviews).
+                single_reviews = self._build_single_reviews(successful_results)
+
                 # Convert to ReviewInfo and save (primary fields from default reviewer)
                 from utils.adapters import reviewer_output_to_review_info
                 review_info = reviewer_output_to_review_info(review_output)
@@ -928,57 +960,8 @@ class ReviewerEngine:
                 resolution_notes=resolution_notes,
             ).model_dump(mode="json")
 
-            from models import SingleReview
             from utils.adapters import reviewer_output_to_review_info
-            single_reviews = []
-            _valid_reviewer_types = ("DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer")
-            for r in successful_results:
-                reviewer_label = r.get("reviewer_type", "DefaultReviewer")
-                if reviewer_label not in _valid_reviewer_types:
-                    reviewer_label = "DefaultReviewer"
-                single_reviews.append(SingleReview(
-                    reviewer_type=reviewer_label,
-                    market_score=r.get("market_score", 5),
-                    product_score=r.get("product_score", 5),
-                    technical_score=r.get("technical_score", 5),
-                    execution_score=r.get("execution_score", 5),
-                    defensibility_score=r.get("defensibility_score"),
-                    overall_summary=r.get("overall_summary", ""),
-                    key_risks=r.get("key_risks", []),
-                    verdict=r.get("verdict", "MEDIUM"),
-                    diligence_red_flags=r.get("diligence_red_flags", []),
-                    assumption_feedback=r.get("assumption_feedback", []),
-                    team_analysis=r.get("team_analysis") or None,
-                    competition_analysis=r.get("competition_analysis") or None,
-                    business_model_analysis=r.get("business_model_analysis") or None,
-                    investment_thesis=r.get("investment_thesis") or None,
-                    risk_mitigation=r.get("risk_mitigation") or None,
-                    score_reasoning=r.get("score_reasoning") or None,
-                    score_source=r.get("score_source"),
-                    improvement_to_9=r.get("improvement_to_9") or None,
-                    market_reasoning=r.get("market_reasoning") or None,
-                    market_weaknesses=r.get("market_weaknesses") or None,
-                    market_confidence=r.get("market_confidence"),
-                    product_reasoning=r.get("product_reasoning") or None,
-                    product_weaknesses=r.get("product_weaknesses") or None,
-                    product_confidence=r.get("product_confidence"),
-                    technical_reasoning=r.get("technical_reasoning") or None,
-                    technical_weaknesses=r.get("technical_weaknesses") or None,
-                    technical_confidence=r.get("technical_confidence"),
-                    execution_reasoning=r.get("execution_reasoning") or None,
-                    execution_weaknesses=r.get("execution_weaknesses") or None,
-                    execution_confidence=r.get("execution_confidence"),
-                    defensibility_reasoning=r.get("defensibility_reasoning") or None,
-                    defensibility_weaknesses=r.get("defensibility_weaknesses") or None,
-                    defensibility_confidence=r.get("defensibility_confidence"),
-                    prompt_version=r.get("prompt_version"),
-                    structured_scoring=r.get("structured_scoring"),
-                    structured_signals=(
-                        dict(r["structured_signals"])
-                        if isinstance(r.get("structured_signals"), dict)
-                        else None
-                    ),
-                ))
+            single_reviews = self._build_single_reviews(successful_results)
 
             review_info = reviewer_output_to_review_info(review_output)
             review_info.reviewer_agent_id = self.agent_id

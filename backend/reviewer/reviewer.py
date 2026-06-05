@@ -18,6 +18,7 @@ class DefaultReviewer(Reviewer):
         model: str = "gpt-5-nano",
         tenant_user_id: str = "",
         use_resource_fund_thesis_fallback: bool = True,
+        structured_scoring_enabled: bool = False,
     ):
         self.reviewer_type = "default"
         super().__init__(
@@ -25,6 +26,7 @@ class DefaultReviewer(Reviewer):
             model=model,
             tenant_user_id=tenant_user_id,
             use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
+            structured_scoring_enabled=structured_scoring_enabled,
         )
 
     async def review(self, scout_output: dict) -> Optional[ReviewerOutput]:
