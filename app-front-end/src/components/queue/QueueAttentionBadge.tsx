@@ -1,4 +1,4 @@
-import { QUEUE_ANNOTATION_CLASS } from '../../design-system/verdictBadgeTokens';
+import { QUEUE_ANNOTATION_CLASS, VERDICT_CHIP_CLASS } from '../../design-system/verdictBadgeTokens';
 import {
   attentionBadgeVariant,
   attentionDriverBadgeLabel,
@@ -9,7 +9,7 @@ import {
 export default function QueueAttentionBadge({
   driver,
   ctx,
-  prominent = false,
+  prominent: _prominent = false,
 }: {
   driver: QueueAttentionDriver;
   ctx?: Pick<QueueRowContext, 'ageDays'>;
@@ -21,9 +21,7 @@ export default function QueueAttentionBadge({
   const variant = attentionBadgeVariant(driver);
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none font-mono font-medium uppercase ${
-        prominent ? 'py-[3px] px-phi-2 text-[10px] tracking-[0.13em]' : 'py-[2px] px-phi-2 text-[9px] tracking-[0.12em]'
-      } ${QUEUE_ANNOTATION_CLASS[variant]}`}
+      className={`${VERDICT_CHIP_CLASS} min-w-0 ${QUEUE_ANNOTATION_CLASS[variant]}`}
       aria-label={label}
     >
       {label}

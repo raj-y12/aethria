@@ -119,6 +119,7 @@ _agent_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _agent_worker_task: Optional[asyncio.Task] = None
 _lookup_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _lookup_worker_task: Optional[asyncio.Task] = None
+_cancelled_lookup_ids: set[str] = set()
 _logger_agents = logging.getLogger("api.agents")
 _logger_visible = logging.getLogger("uvicorn.error")
 _LOOKUP_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{8,128}$")
@@ -139,6 +140,21 @@ _LOOKUP_COMMAND_ONLY_PHRASES = {
     "check out",
     "research",
 }
+
+
+def _lookup_cancel_key(user_id: str, lookup_id: str) -> str:
+    return f"{user_id.strip()}:{lookup_id.strip()}"
+
+
+def _is_lookup_cancelled(user_id: str, lookup_id: Optional[str]) -> bool:
+    lid = (lookup_id or "").strip()
+    return bool(user_id.strip() and lid and _lookup_cancel_key(user_id, lid) in _cancelled_lookup_ids)
+
+
+def _mark_lookup_cancelled(user_id: str, lookup_id: str) -> None:
+    if len(_cancelled_lookup_ids) >= _CANCELLED_LOOKUP_MAX:
+        _cancelled_lookup_ids.clear()
+    _cancelled_lookup_ids.add(_lookup_cancel_key(user_id, lookup_id))
 
 # Per-user persistent agent loops: user_id -> asyncio.Task
 # Protected by _loops_lock to prevent duplicate tasks per user.
@@ -169,6 +185,7 @@ _ADMIN_OVERVIEW_POLICY = RateLimitPolicy("admin_overview_minute", limit=30, wind
 
 _AGENT_TRIGGER_LOCK_TTL_SECONDS = int(os.getenv("AGENT_TRIGGER_LOCK_TTL_SECONDS", "900"))
 _LOOKUP_LOCK_TTL_SECONDS = int(os.getenv("LOOKUP_LOCK_TTL_SECONDS", "900"))
+_CANCELLED_LOOKUP_MAX = int(os.getenv("CANCELLED_LOOKUP_MAX", "1000"))
 _META_TRIGGER_LOCK_TTL_SECONDS = int(os.getenv("META_TRIGGER_LOCK_TTL_SECONDS", "900"))
 DEFAULT_STARTUPS_LIST_LIMIT = max(1, min(int(os.getenv("STARTUPS_LIST_DEFAULT_LIMIT", "250")), 500))
 MAX_STARTUPS_LIST_LIMIT = max(
@@ -233,14 +250,23 @@ async def _lookup_worker() -> None:
         try:
             job = await _lookup_queue.get()
             user_id = str(job.get("user_id") or "").strip()
+            lookup_id = str(job.get("lookup_id") or "").strip() or None
             try:
+                if _is_lookup_cancelled(user_id, lookup_id):
+                    _logger_agents.info(
+                        "On-demand lookup skipped after cancellation for user %s lookup_id=%s",
+                        user_id[:12] if user_id else "?",
+                        lookup_id,
+                    )
+                    continue
                 await run_on_demand_lookup(
                     user_id,
                     str(job.get("company_name") or ""),
                     website=str(job.get("website") or "").strip() or None,
                     lookup_query=str(job.get("lookup_query") or "").strip() or None,
                     lookup_input_type=str(job.get("lookup_input_type") or "").strip() or None,
-                    lookup_id=str(job.get("lookup_id") or "").strip() or None,
+                    lookup_id=lookup_id,
+                    is_cancelled=lambda user_id=user_id, lookup_id=lookup_id: _is_lookup_cancelled(user_id, lookup_id),
                 )
             except Exception as e:
                 _logger_agents.exception(
@@ -3027,6 +3053,32 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
             "lookup_input_type": parsed.get("lookup_input_type"),
             "mode": "on_demand_lookup",
         },
+    )
+
+
+@app.post("/api/startups/lookup/cancel")
+async def cancel_lookup(request: Request, body: Dict[str, Any]):
+    """Cancel queued/running on-demand lookups for this user.
+
+    Running lookups stop cooperatively at stage boundaries; the frontend can clear
+    its dispatch state immediately after this returns.
+    """
+    user_id = require_authenticated_user(request)
+    raw_ids = body.get("lookup_ids")
+    if raw_ids is None and body.get("lookup_id") is not None:
+        raw_ids = [body.get("lookup_id")]
+    if not isinstance(raw_ids, list) or not raw_ids:
+        raise HTTPException(status_code=422, detail="lookup_ids is required")
+
+    cancelled: List[str] = []
+    for raw in raw_ids[:16]:
+        lookup_id = _coerce_lookup_id(raw)
+        _mark_lookup_cancelled(user_id, lookup_id)
+        cancelled.append(lookup_id)
+
+    return JSONResponse(
+        status_code=202,
+        content={"status": "cancelled", "cancelled": cancelled},
     )
 
 

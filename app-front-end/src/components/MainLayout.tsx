@@ -31,7 +31,13 @@ import { productInteraction } from '../design-system/productSystem';
 import type { Startup } from '../types/startup';
 import type { SystemData } from '../hooks/useSystemData';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from './InvestmentMemoContent';
-import { acknowledgeStartup, queueOnDemandLookup, fetchStartupDetail, fetchLookupJobStatus } from '../api/startups';
+import {
+  acknowledgeStartup,
+  cancelOnDemandLookups,
+  queueOnDemandLookup,
+  fetchStartupDetail,
+  fetchLookupJobStatus,
+} from '../api/startups';
 import {
   fetchAgentsStatus,
   fetchLoopStatus,
@@ -417,11 +423,22 @@ export default function MainLayout({
   }, [lookupInput, lookupBusy, pendingLookup]);
 
   const handleLookupCancel = useCallback(() => {
+    const lookupIds = [
+      pendingLookup?.lookupId,
+      ...backgroundLookups.map((lookup) => lookup.lookupId),
+    ].filter((id): id is string => Boolean(id?.trim()));
     lookupRequestSeqRef.current += 1;
     setLookupBusy(false);
     setPendingLookup(null);
+    setBackgroundLookups([]);
     setLookupMessage(null);
-  }, []);
+    setLookupInput('');
+    setCommandBarOpen(false);
+    if (dispatchStorageKey && typeof window !== 'undefined') {
+      window.localStorage.removeItem(dispatchStorageKey);
+    }
+    void cancelOnDemandLookups(lookupIds);
+  }, [backgroundLookups, dispatchStorageKey, pendingLookup]);
 
   useEffect(() => {
     if (!dispatchStorageKey || hydratedDispatchStorageKey === dispatchStorageKey) return;

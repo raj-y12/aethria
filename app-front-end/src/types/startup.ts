@@ -28,6 +28,8 @@ export interface Scout {
   lookup_website?: string;
   /** Hash of the system prompt used by the Scout when this record was created. */
   prompt_version?: string;
+  /** Per-field provenance tags from scout/reviewer enrichment. */
+  field_provenance?: Record<string, string>;
 }
 
 export interface SingleReview {
@@ -85,6 +87,9 @@ export interface ScoringComponent {
   evidence?: string | null;
   rule?: string | null;
   confidence?: number | null;
+  /** True for judgment components with no objective anchor (P3.4): a qualitative 8 is
+   *  not the same as an evidence-backed 8. Set by the backend scoring engine. */
+  qualitative?: boolean | null;
 }
 
 export interface ScoringCriterion {
@@ -115,6 +120,15 @@ export interface ScoringDimension {
   score_label?: string | null;
 }
 
+export interface ScoreDispersion {
+  /** Population standard deviation of the evidenced driver scores. */
+  std: number;
+  min: number;
+  max: number;
+  /** max − min, the most legible spread for a memo reader. */
+  range: number;
+}
+
 export interface StructuredScoring {
   policy_version_id?: string | null;
   policy_hash?: string | null;
@@ -125,6 +139,14 @@ export interface StructuredScoring {
   defensibility: ScoringDimension;
   overall_score: number;
   overall_confidence?: number | null;
+  /** Spread of the evidenced driver scores — distinguishes a flat 7 from a lopsided
+   * [9,9,3,9] the headline average hides. Null when fewer than two drivers are scored. */
+  overall_dispersion?: ScoreDispersion | null;
+  /** Stage cohort the maturity-dependent criteria should be read against (P6.1). */
+  stage_cohort?: string | null;
+  stage_cohort_label?: string | null;
+  /** Sector-relative TAM benchmark the Market score was graded on (P6.3). */
+  sector_tam_benchmark?: string | null;
 }
 
 export interface PresentationComponent {

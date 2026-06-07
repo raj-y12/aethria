@@ -293,6 +293,42 @@ class SupabaseStartupsStorage:
         self.logger.error("Supabase upsert failed after legacy column retries for %s", row.get("startup_id"))
         raise RuntimeError("Supabase upsert failed after legacy column retries")
 
+    def record_scoring_trail(self, startup_id: str, trace: dict) -> bool:
+        """Append a per-decision scoring trail row (P7.1).
+
+        Stores the full deterministic scoring trace (facts/labels/component scores) plus
+        denormalized columns for cheap calibration queries. Append-only — never updates.
+        Returns True on insert, False on any failure (a trail-write must NEVER break the
+        review pipeline). Safe no-op if the `scoring_trails` table is absent.
+        """
+        if not isinstance(trace, dict) or not startup_id:
+            return False
+        row = {
+            "user_id": self._user_id,
+            "startup_id": str(startup_id),
+            "rubric_version": trace.get("rubric_version"),
+            "policy_version_id": trace.get("policy_version_id"),
+            "policy_hash": trace.get("policy_hash"),
+            "overall_score": trace.get("overall_score"),
+            "overall_confidence": trace.get("overall_confidence"),
+            "stage_cohort": trace.get("stage_cohort"),
+            "sector_tam_benchmark": trace.get("sector_tam_benchmark"),
+            "trail": trace,
+        }
+        try:
+            self._execute_with_retry(
+                lambda: self._client.table("scoring_trails").insert(row).execute()
+            )
+            return True
+        except Exception as e:
+            self.logger.warning(
+                "Supabase scoring_trails insert failed for %s: %s. "
+                "Apply migration 20260604000002_scoring_trail.sql if the table is missing.",
+                startup_id,
+                e,
+            )
+            return False
+
     def _update_startup_columns(self, startup_id: str, columns: dict) -> None:
         """Targeted UPDATE of specific columns on one row.
 

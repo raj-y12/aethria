@@ -110,14 +110,26 @@ FIXTURES = {
 #     * structured_signals → product/technical/defensibility unscored (the fixture only
 #       supplied market + execution signals).
 #     * strong_saas → unchanged (every dimension has evidence).
+# - Criterion-evidence fix: _aggregate_policy_criteria used to recompute each dimension's
+#   score from its policy criteria while folding in NO-evidence components at their neutral
+#   5.0 placeholder — silently reintroducing the leak aggregate_dimension already excludes.
+#   Missing components (and fully-missing criteria) are now excluded and weights
+#   renormalized over evidenced signals, so a partially-evidenced dimension reads from real
+#   evidence only. Effects:
+#     * weak_thin → drivers move toward their evidenced signals (technical 3.90→2.56,
+#       execution 3.85→3.36 as weak evidence is no longer cushioned by 5.0 placeholders;
+#       market 5.10→5.20, product 5.90→6.29); overall 4.69→4.35.
+#     * structured_signals → evidenced dimensions rise off the 5.0 floor (market 6.30→7.60,
+#       execution 5.60→6.33); overall 5.95→6.96. Unscored dims unchanged.
+#     * strong_saas / all_missing → unchanged.
 GOLDEN = {
     "strong_saas": {
         "overall_score": 7.26,
         "dims": {"market": 7.88, "product": 8.25, "technical": 6.15, "execution": 6.75, "defensibility": 2.35},
     },
     "weak_thin": {
-        "overall_score": 4.69,
-        "dims": {"market": 5.10, "product": 5.90, "technical": 3.90, "execution": 3.85, "defensibility": 4.40},
+        "overall_score": 4.35,
+        "dims": {"market": 5.20, "product": 6.29, "technical": 2.56, "execution": 3.36, "defensibility": 2.00},
     },
     "all_missing": {
         # Every dimension is a placeholder 5.0 but unscored=True; overall is None.
@@ -125,8 +137,8 @@ GOLDEN = {
         "dims": {"market": 5.00, "product": 5.00, "technical": 5.00, "execution": 5.00, "defensibility": 5.00},
     },
     "structured_signals": {
-        "overall_score": 5.95,
-        "dims": {"market": 6.30, "product": 5.00, "technical": 5.00, "execution": 5.60, "defensibility": 5.00},
+        "overall_score": 6.96,
+        "dims": {"market": 7.60, "product": 5.00, "technical": 5.00, "execution": 6.33, "defensibility": 5.00},
     },
 }
 
@@ -242,6 +254,106 @@ def test_p31_team_evidence_anchors_match_normalizer_vocabulary():
         )
 
 
+def test_p33_evidence_anchors_match_normalizer_vocabulary():
+    """P3.3: every label offered to the reviewer in the component evidence-anchor catalog
+    must be a label the matching deterministic normalizer recognizes — otherwise the LLM
+    would be told to use labels that then abstain. Guards the rolled-out anchors the same
+    way P3.1 guarded team_execution."""
+    from reviewer.base import COMPONENT_EVIDENCE_ANCHORS, QUALITATIVE_COMPONENTS, VALUE_COMPONENTS
+
+    normalizers = {
+        "execution.team_execution": NL.normalize_team_execution,
+        "execution.traction": NL.normalize_traction,
+        "execution.gtm_effectiveness": NL.normalize_gtm,
+        "market.competition": NL.normalize_competition,
+        "product.pain_alignment": NL.normalize_pain_alignment,
+        "technical.complexity": NL.normalize_complexity,
+        "technical.scalability": NL.normalize_scalability,
+        "technical.data_advantage": NL.normalize_data_advantage,
+        "defensibility.network_effects": NL.normalize_network_effects,
+        "defensibility.switching_costs": NL.normalize_switching_costs,
+        "defensibility.proprietary_data": NL.normalize_proprietary_data,
+        "defensibility.barriers": NL.normalize_barriers,
+    }
+    # catalog must only contain components we can validate
+    assert set(COMPONENT_EVIDENCE_ANCHORS) == set(normalizers)
+    for comp_key, anchors in COMPONENT_EVIDENCE_ANCHORS.items():
+        fn = normalizers[comp_key]
+        for label, _cond in anchors:
+            assert not NL.is_unrecognized(fn(label)), (
+                f"{comp_key} anchor label {label!r} is not a recognized normalizer label"
+            )
+    # classification is a clean partition over the 25 components (no overlap)
+    classified = set(COMPONENT_EVIDENCE_ANCHORS) | set(QUALITATIVE_COMPONENTS) | set(VALUE_COMPONENTS)
+    assert len(classified) == len(COMPONENT_EVIDENCE_ANCHORS) + len(QUALITATIVE_COMPONENTS) + len(VALUE_COMPONENTS)
+    assert len(classified) == 25, "all 25 components must be classified exactly once"
+
+
+def test_p34_qualitative_components_are_flagged_in_engine_output():
+    """P3.4 (data side): components with no objective anchor are stamped qualitative=True
+    so the memo can tell a qualitative 8 from an evidence-backed 8. Fact-derived and
+    value components must NOT carry the flag."""
+    from config.scoring_config import (
+        FACT_DERIVED_COMPONENTS,
+        QUALITATIVE_COMPONENTS,
+        VALUE_COMPONENTS,
+    )
+
+    out = DeterministicScoringEngine().score(*FIXTURES["strong_saas"])
+
+    def comp(key):
+        dim, _, name = key.partition(".")
+        return out.get(dim, {}).get("components", {}).get(name)
+
+    for key in QUALITATIVE_COMPONENTS:
+        c = comp(key)
+        assert isinstance(c, dict), f"{key} missing from engine output"
+        assert c.get("qualitative") is True, f"{key} should be flagged qualitative"
+    for key in list(FACT_DERIVED_COMPONENTS) + list(VALUE_COMPONENTS):
+        c = comp(key)
+        assert isinstance(c, dict), f"{key} missing from engine output"
+        assert "qualitative" not in c, f"{key} must not be flagged qualitative"
+
+
+def test_p63_identical_tam_scores_by_sector_benchmark():
+    """P6.3: the same TAM must yield sector-appropriate Market.tam scores. $1B is a
+    'small' market for fintech (capital-heavy) but mid-band for dev-tools."""
+    engine = DeterministicScoringEngine()
+    base_review = {"competition_analysis": ["Some competitors."]}
+
+    fintech = engine.score(
+        {"name": "F", "sector": "Fintech payments", "est_tam": "$1B", "one_line": "x", "solution": "y", "problem": "z"},
+        base_review,
+    )
+    devtools = engine.score(
+        {"name": "D", "sector": "Developer infrastructure", "est_tam": "$1B", "one_line": "x", "solution": "y", "problem": "z"},
+        base_review,
+    )
+    fin_tam = fintech["market"]["components"]["tam"]["score"]
+    dev_tam = devtools["market"]["components"]["tam"]["score"]
+    assert dev_tam > fin_tam, "an identical $1B TAM must score higher in dev-tools than fintech"
+    assert "Fintech" in fintech["sector_tam_benchmark"]
+    assert "Dev-tools" in devtools["sector_tam_benchmark"]
+
+
+def test_p61_stage_cohort_is_captured_and_labelled():
+    """P6.1: the engine surfaces the stage cohort (display only; scores stay absolute)."""
+    engine = DeterministicScoringEngine()
+    base = {"name": "S", "sector": "SaaS", "one_line": "x", "solution": "y", "problem": "z"}
+
+    seed = engine.score({**base, "funding_stage": "Seed"}, {})
+    assert seed["stage_cohort"] == "seed" and seed["stage_cohort_label"] == "Seed"
+
+    late = engine.score({**base, "funding_stage": "Series B"}, {})
+    assert late["stage_cohort"] == "series_b_plus" and late["stage_cohort_label"] == "Series B+"
+
+    unknown = engine.score(base, {})
+    assert unknown["stage_cohort"] == "unknown"
+
+    # cohort must NOT change the absolute scores (decision log: absolute anchors)
+    assert seed["market"]["score"] == late["market"]["score"]
+
+
 def test_FIXED_off_vocabulary_label_is_unrecognized_not_five_C2():
     """Audit §5, now FIXED: a label outside the controlled vocabulary used to silently
     map to a neutral 5.0 and count as evidence. The normalizer now returns the
@@ -257,6 +369,29 @@ def test_FIXED_off_vocabulary_label_is_unrecognized_not_five_C2():
     scout = {"one_line": "AI copilot", "solution": "model automation", "problem": "manual work"}
     review = {"structured_signals": {"product": {"differentiation": {"label": "promising", "confidence": 0.9}}}}
     comp = DeterministicScoringEngine().score(scout, review)["product"]["components"]["differentiation"]
+    assert comp.get("unrecognized_label") is True
+    assert comp.get("value") is None and comp.get("label") is None
+
+
+def test_FIXED_stage_word_does_not_set_traction_score_P62():
+    """Audit P6.2, now FIXED: funding/lifecycle stage words ("seed", "pre_revenue",
+    "growth") used to be synonyms that hard-mapped into traction labels
+    (seed→early_adoption, growth→scaling), so a stage word silently set the traction
+    score. They are no longer synonyms — a stage word now abstains (UNRECOGNIZED_LABEL),
+    so traction is driven only by actual traction evidence.
+    """
+    for stage_word in ("seed", "pre_revenue", "pre-revenue", "growth"):
+        assert NL.is_unrecognized(NL.normalize_traction(stage_word)), (
+            f"stage word {stage_word!r} must not map to a traction label"
+        )
+    # genuine traction labels still score normally
+    assert NL.normalize_traction("scaling") == 8.0
+    assert NL.normalize_traction("early_adoption") == 5.0
+
+    # end to end: a stage word in structured_signals traction is excluded, not scored
+    scout = {"one_line": "AI copilot", "solution": "model automation", "problem": "manual work"}
+    review = {"structured_signals": {"execution": {"traction": {"label": "seed", "confidence": 0.9}}}}
+    comp = DeterministicScoringEngine().score(scout, review)["execution"]["components"]["traction"]
     assert comp.get("unrecognized_label") is True
     assert comp.get("value") is None and comp.get("label") is None
 

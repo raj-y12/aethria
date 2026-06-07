@@ -25,9 +25,13 @@ def test_scoring_output_shape_snapshot():
         "defensibility",
         "overall_score",
         "overall_confidence",
+        "overall_dispersion",
         "raw_signals",
         "policy_version_id",
         "policy_hash",
+        "stage_cohort",
+        "stage_cohort_label",
+        "sector_tam_benchmark",
     }
     assert 0.0 <= result["market"]["score"] <= 10.0
     assert "components" in result["market"]
@@ -90,6 +94,41 @@ def test_no_data_company_is_unscored_not_mid_scored():
     for dim in ("market", "product", "technical", "execution", "defensibility"):
         assert result[dim]["unscored"] is True
     assert result["overall_score"] is None
+
+
+def test_overall_dispersion_flags_lopsided_profiles():
+    """The overall is a mean, so a flat profile and a lopsided one can share a headline.
+    `overall_dispersion` exposes the spread of the evidenced drivers so the memo can show
+    a uniform 7 differs from [9,9,3,9]. Undefined (None) with fewer than two scored drivers."""
+    engine = DeterministicScoringEngine()
+
+    # No evidence → no drivers scored → dispersion undefined.
+    assert engine.score({}, {})["overall_dispersion"] is None
+
+    # A lopsided profile reports a wider range/std than a flat one with the same mean.
+    flat = engine._compute_overall_dispersion(
+        {d: {"score": 7.0, "unscored": False} for d in ("market", "product", "technical", "execution")}
+    )
+    lopsided = engine._compute_overall_dispersion(
+        {
+            "market": {"score": 9.0, "unscored": False},
+            "product": {"score": 9.0, "unscored": False},
+            "technical": {"score": 3.0, "unscored": False},
+            "execution": {"score": 9.0, "unscored": False},
+        }
+    )
+    assert flat["std"] == 0.0 and flat["range"] == 0.0
+    assert lopsided["range"] == 6.0 and lopsided["std"] > flat["std"]
+
+    # A single evidenced driver → spread undefined.
+    assert engine._compute_overall_dispersion(
+        {
+            "market": {"score": 8.0, "unscored": False},
+            "product": {"score": 5.0, "unscored": True},
+            "technical": {"score": 5.0, "unscored": True},
+            "execution": {"score": 5.0, "unscored": True},
+        }
+    ) is None
 
 
 def test_full_pipeline_all_dimension_scores_present():

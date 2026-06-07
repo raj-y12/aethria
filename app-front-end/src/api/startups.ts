@@ -154,3 +154,18 @@ export async function queueOnDemandLookup(
     lookupInputType: typeof data?.lookup_input_type === 'string' ? data.lookup_input_type : undefined,
   };
 }
+
+export async function cancelOnDemandLookups(lookupIds: string[]): Promise<void> {
+  const ids = Array.from(
+    new Set(lookupIds.map((id) => id.trim()).filter(Boolean))
+  );
+  if (ids.length === 0) return;
+  await authedFetch(`${API_BASE}/api/startups/lookup/cancel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ lookup_ids: ids }),
+  }).catch(() => undefined);
+}

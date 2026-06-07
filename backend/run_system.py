@@ -123,7 +123,7 @@ async def run_system(user_id: Optional[str]):
     scout_interval = int(os.getenv("SCOUT_INTERVAL_SECONDS", "300"))
     reviewer_interval = int(os.getenv("REVIEWER_INTERVAL_SECONDS", "60"))
     partner_interval = int(os.getenv("PARTNER_INTERVAL_SECONDS", "30"))
-    model = os.getenv("SCOUT_MODEL", "gpt-5-nano")  # gpt-5-nano doesn't exist, using gpt-5-nano
+    model = os.getenv("SCOUT_MODEL", "gpt-5-nano")
     reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-5-nano")
     use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
     

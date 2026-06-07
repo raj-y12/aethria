@@ -23,6 +23,7 @@ export interface AgentsStatus {
   supabase_configured: boolean;
   openai_configured: boolean;
   agents_will_run: boolean;
+  mandate_published?: boolean;
   thesis_ready?: boolean;
   active_thesis_version_id?: string | null;
   thesis_error?: string | null;

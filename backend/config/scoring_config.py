@@ -46,6 +46,12 @@ DIMENSION_WEIGHTS: Dict[str, Dict[str, float]] = {
     },
 }
 
+# Per-dimension POLICY / display weights (all five dimensions). Consumed by
+# policy_compiler when compiling a fund's policy and as a fallback when a fund has not
+# set explicit scoringWeights. NOTE: this is NOT the weighting used to compute the
+# headline overall score — that is OVERALL_DRIVER_WEIGHTS below. Defensibility appears
+# here because the policy carries a weight for every scored dimension, but it does not
+# drive the overall (see OVERALL_SCORE_DIMENSIONS).
 OVERALL_DIMENSION_WEIGHTS: Dict[str, float] = {
     "market": 0.20,
     "execution": 0.20,
@@ -62,6 +68,64 @@ OVERALL_DIMENSION_WEIGHTS: Dict[str, float] = {
 # still scored and surfaced separately as a moat signal.
 OVERALL_SCORE_DIMENSIONS = ("market", "product", "technical", "execution")
 
+# Weighting the engine actually applies to the overall score. Defined over the driver
+# dimensions ONLY and summing to 1.0, so each weight reads as its true contribution
+# (0.25 = 25% of the headline). Previously the engine reused OVERALL_DIMENSION_WEIGHTS
+# (0.20 each incl. a dead 0.20 for the excluded defensibility) and silently renormalized
+# the four drivers to 0.25 — numerically identical, but the config lied about the actual
+# weights. Keep these four in sync with OVERALL_SCORE_DIMENSIONS.
+OVERALL_DRIVER_WEIGHTS: Dict[str, float] = {
+    "market": 0.25,
+    "product": 0.25,
+    "technical": 0.25,
+    "execution": 0.25,
+}
+
+# ── Component evidence classification (P3.3 / P3.4) — single source of truth ──────
+#
+# Every one of the 25 components is classified exactly once. This drives two things:
+#   1. the reviewer prompt's evidence-anchored vs qualitative framing (reviewer/base.py)
+#   2. the `qualitative` flag the scoring engine stamps on each component, so the memo
+#      can distinguish an evidence-backed 8 from a qualitative 8 (audit P3.4).
+# Keys are "<dimension>.<component>".
+#
+# - FACT_DERIVED: a label chosen against checkable evidence conditions (anchored).
+# - VALUE: scored from a numeric figure by threshold (tam, growth, retention, velocity).
+# - QUALITATIVE: judgment call with no objective anchor.
+FACT_DERIVED_COMPONENTS: tuple[str, ...] = (
+    "execution.team_execution",
+    "execution.traction",
+    "execution.gtm_effectiveness",
+    "market.competition",
+    "product.pain_alignment",
+    "technical.complexity",
+    "technical.scalability",
+    "technical.data_advantage",
+    "defensibility.network_effects",
+    "defensibility.switching_costs",
+    "defensibility.proprietary_data",
+    "defensibility.barriers",
+)
+
+VALUE_COMPONENTS: tuple[str, ...] = (
+    "market.tam",
+    "market.growth_rate",
+    "execution.growth_velocity",
+    "product.retention",
+)
+
+QUALITATIVE_COMPONENTS: tuple[str, ...] = (
+    "market.urgency",
+    "market.timing",
+    "execution.operational_velocity",
+    "product.value_prop",
+    "product.differentiation",
+    "product.ux",
+    "technical.engineering_quality",
+    "technical.architecture",
+    "defensibility.brand",
+)
+
 THRESHOLDS = {
     "tam_usd": {
         "xl": 10_000_000_000,
@@ -71,6 +135,71 @@ THRESHOLDS = {
     },
     "growth_pct": {"hyper": 40.0, "strong": 25.0, "healthy": 12.0, "slow": 5.0},
 }
+
+# ── Sector-relative TAM benchmarks (P6.3) ─────────────────────────────────────────
+#
+# An identical TAM is not equally impressive across sectors — $1B is a large market for
+# vertical dev-tools but small for fintech. Each sector keyword group overrides the
+# default `tam_usd` thresholds; `resolve_tam_thresholds(sector)` picks the first group
+# whose keyword appears in the sector string, else the default. The absolute 1–10 scale
+# is preserved (decision log: absolute anchors, sector-calibrated bands), and the chosen
+# benchmark is surfaced on the memo so the comparison is transparent.
+SECTOR_TAM_THRESHOLDS: Dict[str, Dict[str, Any]] = {
+    "fintech": {
+        "keywords": ("fintech", "financial", "payments", "banking", "insurance", "insurtech"),
+        "label": "Fintech (capital-heavy; large markets expected)",
+        "thresholds": {"xl": 20_000_000_000, "large": 5_000_000_000, "mid": 1_500_000_000, "small": 500_000_000},
+    },
+    "ai_health": {
+        "keywords": ("healthcare", "health", "biotech", "bio", "medical", "pharma", "ai", "ml", "artificial intelligence"),
+        "label": "AI / Healthcare (large TAM, long horizon)",
+        "thresholds": {"xl": 15_000_000_000, "large": 4_000_000_000, "mid": 1_000_000_000, "small": 300_000_000},
+    },
+    "devtools": {
+        "keywords": ("developer", "devtools", "dev tools", "infrastructure", "open source", "api", "database", "observability"),
+        "label": "Dev-tools / Infra (smaller but high-margin TAM)",
+        "thresholds": {"xl": 5_000_000_000, "large": 1_500_000_000, "mid": 500_000_000, "small": 150_000_000},
+    },
+}
+
+_DEFAULT_TAM_BENCHMARK = {"label": "General (default benchmark)", "thresholds": THRESHOLDS["tam_usd"]}
+
+
+def resolve_tam_benchmark(sector: Any) -> Dict[str, Any]:
+    """Return {'label', 'thresholds'} for a sector string (P6.3). Falls back to the
+    general default when the sector is empty or matches no keyword group."""
+    text = str(sector or "").strip().lower()
+    if text:
+        for group in SECTOR_TAM_THRESHOLDS.values():
+            if any(kw in text for kw in group["keywords"]):
+                return {"label": group["label"], "thresholds": group["thresholds"]}
+    return dict(_DEFAULT_TAM_BENCHMARK)
+
+
+# ── Stage cohorts (P6.1) ──────────────────────────────────────────────────────────
+#
+# Scores stay absolute, but the memo states the stage cohort so maturity-dependent
+# criteria are read in context ("Execution 7 — strong for Seed"). `resolve_stage_cohort`
+# maps a free-text scout funding_stage to a canonical cohort + display label.
+STAGE_COHORTS: Dict[str, Dict[str, Any]] = {
+    "pre_seed": {"label": "Pre-seed", "keywords": ("pre-seed", "pre seed", "preseed", "idea", "prototype")},
+    "seed": {"label": "Seed", "keywords": ("seed", "angel")},
+    "series_a": {"label": "Series A", "keywords": ("series a", "series-a", "a round")},
+    "series_b_plus": {"label": "Series B+", "keywords": ("series b", "series c", "series d", "growth", "late stage", "pre-ipo")},
+}
+
+
+def resolve_stage_cohort(funding_stage: Any) -> Dict[str, str]:
+    """Map a free-text funding stage to a canonical cohort (P6.1). Unknown → 'unknown'."""
+    text = str(funding_stage or "").strip().lower()
+    if text:
+        # Check the most specific cohorts first so "series b" doesn't match "seed"-style
+        # substrings; iteration order here is pre_seed→seed→series_a→series_b_plus, and
+        # "seed" only matches the seed group (no "series" overlap).
+        for cohort, meta in STAGE_COHORTS.items():
+            if any(kw in text for kw in meta["keywords"]):
+                return {"cohort": cohort, "label": meta["label"]}
+    return {"cohort": "unknown", "label": "Stage unknown"}
 
 # ─── Canonical Framework (Aethria-owned, not user-editable) ───────────────────
 

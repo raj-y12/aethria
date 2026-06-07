@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type {
   ScoringDimensionKey,
   ScoringPresentation,
@@ -10,7 +11,6 @@ import {
   buildComponentDrivers,
   cleanReasoningList,
   dimensionBriefTake,
-  takeFirst,
 } from '../../lib/scoringRationale';
 import Popover from '../ui/Popover';
 
@@ -70,15 +70,29 @@ export default function AssessmentScorecard({
   renderNumbers = identity,
   reduceMotion = false,
 }: AssessmentScorecardProps) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggle = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   const overallScore = presentation?.overall_score ?? scoring.overall_score;
   const overallBand = presentation?.overall_band ?? getScoreBand(scoring.overall_score).label;
   const evidenceLabel =
     presentation?.confidence_label ?? getEvidenceConfidenceLabel(scoring.overall_confidence);
-  const headlineParts = [
-    `${overallScore.toFixed(1)} / 10`,
-    overallBand,
-    evidenceLabel ? `${evidenceLabel} evidence` : null,
-  ].filter(Boolean) as string[];
+
+  // Driver-score dispersion (audit): the overall is a mean, so a flat 7 and a lopsided
+  // [9,9,3,9] share a headline. Surface the spread so a reader sees the profile is uneven.
+  const dispersion = scoring.overall_dispersion;
+  const dispersionLine =
+    dispersion && dispersion.range >= 2.5
+      ? `Uneven profile — drivers span ${dispersion.min.toFixed(1)}–${dispersion.max.toFixed(1)}/10`
+      : dispersion
+        ? `Balanced profile — drivers within ${dispersion.range.toFixed(1)} pts`
+        : null;
 
   const { min, max, spread, split, verdict } = reviewerConsensus;
   const spreadLine =
@@ -88,16 +102,142 @@ export default function AssessmentScorecard({
         : `${min.toFixed(1)}–${max.toFixed(1)}/10 spread`
       : null;
 
+  // Defensibility is a moat SIGNAL, not a driver — it is excluded from the overall mean
+  // (OVERALL_SCORE_DIMENSIONS). Render it apart from the four drivers so the layout never
+  // implies it feeds the headline score. Split by key, not array position.
+  const driverDims = dimensions.filter((d) => d.key !== 'defensibility');
+  const moatDims = dimensions.filter((d) => d.key === 'defensibility');
+
+  const renderRow = (dim: ScorecardDimensionDef) => {
+    const dimension = scoring[dim.key];
+    if (!dimension) return null;
+    const presDim = presentation?.dimensions?.find((d) => d.id === dim.key);
+    const unscored = !presDim && dimension.unscored === true;
+    const scoreText = unscored
+      ? 'Not scored'
+      : presDim
+        ? presDim.score.toFixed(1)
+        : dimension.score.toFixed(1);
+    const lowConfidence = !presDim && !unscored && isLowEvidence(dimension.confidence);
+    const take = unscored
+      ? 'No supporting evidence — excluded from the overall.'
+      : dimensionBriefTake(dimension, presDim);
+
+    const allDrivers = buildComponentDrivers(dimension.components ?? {});
+    // Separate what the score rests on from what's still unknown, so an analyst can see
+    // "this 5.8 is 1 real signal + 4 gaps" at a glance rather than a flat undifferentiated list.
+    const evidence = allDrivers.filter((d) => d.status !== 'missing');
+    const gaps = allDrivers.filter((d) => d.status === 'missing');
+    const reasoning = allDrivers.length === 0 ? cleanReasoningList(dimension.reasoning) : [];
+    const weaknesses = cleanReasoningList(dimension.weaknesses);
+    const isOpen = expanded.has(dim.key);
+    const hasDetail =
+      evidence.length > 0 || gaps.length > 0 || reasoning.length > 0 || weaknesses.length > 0 || lowConfidence || unscored;
+
+    const renderDriver = (d: (typeof allDrivers)[number]) => (
+      <li key={d.id} className="memoScoreDriverItem">
+        <span className="memoScoreDriverHead">
+          <span className="memoScoreDriverName">{d.label}</span>
+          {d.tag && <span className="memoScoreDriverTag">{d.tag}</span>}
+        </span>
+        {d.text && <span className="memoScoreDriverText">{renderNumbers(d.text)}</span>}
+      </li>
+    );
+
+    return (
+      <li key={dim.key}>
+        <button
+          type="button"
+          onClick={() => hasDetail && toggle(dim.key)}
+          aria-expanded={isOpen}
+          disabled={!hasDetail}
+          className="memoScoreRow"
+        >
+          <span className="memoScoreName">{dim.label}</span>
+          <span className={unscored || lowConfidence ? 'memoScoreVal memoScoreVal--muted' : 'memoScoreVal'}>
+            {renderNumbers(scoreText)}
+          </span>
+          <span className="memoScoreTake">
+            {renderNumbers(take)}
+            {lowConfidence && <span className="memoScoreTakeFlag">low evidence</span>}
+          </span>
+          {hasDetail && (
+            <span aria-hidden className={isOpen ? 'memoScoreChevron memoScoreChevron--open' : 'memoScoreChevron'}>
+              ›
+            </span>
+          )}
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isOpen && hasDetail && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: 'easeOut' }}
+              style={{ overflow: 'hidden' }}
+            >
+              <div className="memoScoreDetail">
+                {evidence.length > 0 && (
+                  <div>
+                    {gaps.length > 0 && <p className="memoScoreGroupLabel">Evidence</p>}
+                    <ul className="memoScoreDriverList">{evidence.map(renderDriver)}</ul>
+                  </div>
+                )}
+                {gaps.length > 0 && (
+                  <div>
+                    <p className="memoScoreGroupLabel">Needs diligence</p>
+                    <ul className="memoScoreDriverList">{gaps.map(renderDriver)}</ul>
+                  </div>
+                )}
+                {reasoning.length > 0 && (
+                  <ul className="memoScoreReasonList">
+                    {reasoning.map((text, i) => (
+                      <li key={i} className="memoScoreReason">{renderNumbers(text)}</li>
+                    ))}
+                  </ul>
+                )}
+                {weaknesses.length > 0 && (
+                  <div>
+                    <p className="memoScoreGroupLabel">Watch</p>
+                    <ul className="memoScoreReasonList">
+                      {weaknesses.map((text, i) => (
+                        <li key={i} className="memoScoreReason">{renderNumbers(text)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {(lowConfidence || unscored) && (
+                  <p className="memoScoreEvidenceNote">
+                    {unscored
+                      ? 'No supporting evidence for this dimension.'
+                      : `${getEvidenceConfidenceLabel(dimension.confidence)} evidence — score may shift with diligence.`}
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </li>
+    );
+  };
+
   return (
     <div className="memoAssessmentCard">
-      {/* Headline */}
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="type-data text-oxford/88">{renderNumbers(headlineParts.join('   ·   '))}</p>
+      {/* Headline — overall score reads as a figure, band + evidence as a quiet tag. */}
+      <div className="memoScoreHead">
+        <p className="memoScoreHeadline">
+          <span className="memoScoreHeadlineValue">{renderNumbers(overallScore.toFixed(1))}</span>
+          <span className="memoScoreHeadlineMax">/ 10</span>
+          <span className="memoScoreHeadlineTag">
+            {[overallBand, evidenceLabel ? `${evidenceLabel} evidence` : null].filter(Boolean).join('  ·  ')}
+          </span>
+        </p>
         <Popover
           reduceMotion={reduceMotion}
           align="end"
           label="How this was scored"
-          triggerClassName="type-meta uppercase tracking-[0.08em] text-oxford/45 hover:text-oxford/70"
+          triggerClassName="memoScoreMethod"
           content={
             <div className="space-y-1.5">
               <p className="type-meta uppercase tracking-[0.08em] text-oxford/55">How this was scored</p>
@@ -110,114 +250,48 @@ export default function AssessmentScorecard({
           How scored
         </Popover>
       </div>
+      {dispersionLine && <p className="memoScoreSub">{renderNumbers(dispersionLine)}</p>}
 
-      {/* Dimension scorecard — all visible, rationale on hover */}
-      <ul className="mt-3 divide-y divide-oxford/8 border-y border-oxford/8">
-        {dimensions.map((dim) => {
-          const dimension = scoring[dim.key];
-          if (!dimension) return null;
-          const presDim = presentation?.dimensions?.find((d) => d.id === dim.key);
-          const unscored = !presDim && dimension.unscored === true;
-          const scoreText = unscored
-            ? 'Not scored'
-            : presDim
-              ? presDim.score.toFixed(1)
-              : dimension.score.toFixed(1);
-          const lowConfidence = !presDim && !unscored && isLowEvidence(dimension.confidence);
-          const take = unscored
-            ? 'No supporting evidence — excluded from the overall.'
-            : dimensionBriefTake(dimension, presDim);
+      {/* Driver dimensions — these four make up the overall. Click a row to expand. */}
+      <ul className="memoScoreList">{driverDims.map(renderRow)}</ul>
 
-          const drivers = takeFirst(buildComponentDrivers(dimension.components ?? {}), 3).shown;
-          const reasoning = drivers.length === 0 ? takeFirst(cleanReasoningList(dimension.reasoning), 3).shown : [];
-          const weaknesses = takeFirst(cleanReasoningList(dimension.weaknesses), 2).shown;
-
-          return (
-            <li key={dim.key}>
-              <Popover
-                reduceMotion={reduceMotion}
-                className="w-full"
-                triggerClassName="memoScorecardRow group flex w-full items-baseline gap-3 py-2.5 text-left"
-                content={
-                  <div className="space-y-2">
-                    <p className="type-meta uppercase tracking-[0.08em] text-oxford/55">
-                      {dim.label} · {renderNumbers(unscored ? 'Not scored' : `${scoreText} / 10`)}
-                    </p>
-                    {drivers.length > 0 && (
-                      <ul className="space-y-1.5">
-                        {drivers.map((d) => (
-                          <li key={d.id} className="type-note leading-relaxed text-oxford/75">
-                            <span className="text-oxford/55">{d.label}: </span>
-                            {renderNumbers(d.text || '—')}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {reasoning.length > 0 && (
-                      <ul className="space-y-1.5">
-                        {reasoning.map((text, i) => (
-                          <li key={i} className="type-note leading-relaxed text-oxford/75">{renderNumbers(text)}</li>
-                        ))}
-                      </ul>
-                    )}
-                    {weaknesses.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="type-meta uppercase tracking-[0.08em] text-oxford/45">Watch</p>
-                        {weaknesses.map((text, i) => (
-                          <p key={i} className="type-note leading-relaxed text-oxford/70">{renderNumbers(text)}</p>
-                        ))}
-                      </div>
-                    )}
-                    {(lowConfidence || unscored) && (
-                      <p className="type-meta text-oxford/50">
-                        {unscored
-                          ? 'No supporting evidence for this dimension.'
-                          : `${getEvidenceConfidenceLabel(dimension.confidence)} evidence — score may shift with diligence.`}
-                      </p>
-                    )}
-                  </div>
-                }
-              >
-                <span className="w-[7.5rem] shrink-0 type-label uppercase tracking-[0.06em] text-oxford/70">
-                  {dim.label}
-                </span>
-                <span
-                  className={[
-                    'w-12 shrink-0 type-data tabular-nums',
-                    unscored ? 'text-oxford/35' : lowConfidence ? 'text-oxford/45' : 'text-oxford/85',
-                  ].join(' ')}
-                >
-                  {renderNumbers(scoreText)}
-                </span>
-                <span className="flex-1 type-note leading-snug text-oxford/62 group-hover:text-oxford/80">
-                  {renderNumbers(take)}
-                  {lowConfidence && <span className="ml-1.5 type-meta text-oxford/45">· low evidence</span>}
-                </span>
-              </Popover>
-            </li>
-          );
-        })}
-      </ul>
-
-      {/* Reviewer panel — inlined, static */}
-      {reviewerRows.length > 0 && (
-        <div className="mt-4">
-          <p className="type-meta uppercase tracking-[0.08em] text-oxford/50">
-            The panel
-            <span className="text-oxford/72">{`   ·   ${split ? 'Split' : 'Aligned'}`}</span>
-            {verdict ? <span className="text-oxford/72">{`   ·   ${verdict}`}</span> : null}
-            {spreadLine ? <span className="text-oxford/55">{renderNumbers(`   ·   ${spreadLine}`)}</span> : null}
-            {spread != null && spread >= 2 ? <span className="text-oxford/45"> · conviction diverges</span> : null}
+      {/* Defensibility — a moat signal read alongside, not averaged into the overall. */}
+      {moatDims.length > 0 && (
+        <div className="memoScoreMoat">
+          <p className="memoScoreMoatLabel">
+            Moat signal{'  ·  '}<em>not averaged into overall</em>
           </p>
-          <ul className="mt-2 space-y-1.5">
+          <ul className="memoScoreList memoScoreList--moat">{moatDims.map(renderRow)}</ul>
+        </div>
+      )}
+
+      {/* Reviewer panel — same treatment as the prior Reviewer Consensus block. */}
+      {reviewerRows.length > 0 && (
+        <div className="memoScorePanel">
+          <div className="memoConsensusHead">
+            {/* Flag only the exception: a split panel is the signal worth surfacing; an
+                aligned panel is the expected case, so it gets a quiet label, not a verdict. */}
+            {split ? (
+              <p className="memoConsensusFlag">Reviewers split</p>
+            ) : (
+              <p className="memoConsensusLabel">Reviewer panel</p>
+            )}
+            {spreadLine ? (
+              <p className="memoConsensusSpread">
+                {renderNumbers(spreadLine)}
+                {verdict ? `  ·  ${verdict}` : ''}
+                {spread != null && spread >= 2 ? '  ·  conviction diverges' : ''}
+              </p>
+            ) : null}
+          </div>
+          <ul className="memoConsensusList">
             {reviewerRows.map((row) => (
-              <li key={row.key} className="flex items-baseline gap-3">
-                <span className="w-24 shrink-0 type-label uppercase tracking-[0.05em] text-oxford/68">{row.name}</span>
-                <span className="w-16 shrink-0 type-meta uppercase tracking-[0.06em] text-oxford/55">{row.verdict ?? '—'}</span>
-                <span className="w-10 shrink-0 type-data tabular-nums text-oxford/78">
+              <li key={row.key} className="memoConsensusRow">
+                <span className="memoConsensusName">{row.name}</span>
+                <span className="memoConsensusScore">
                   {row.score != null ? renderNumbers(row.score.toFixed(1)) : '—'}
                 </span>
-                <span className="flex-1 type-note leading-snug text-oxford/60">{renderNumbers(row.take || '—')}</span>
+                <span className="memoConsensusTake">{renderNumbers(row.take || row.verdict || '—')}</span>
               </li>
             ))}
           </ul>

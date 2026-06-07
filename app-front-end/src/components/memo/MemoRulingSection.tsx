@@ -47,7 +47,7 @@ export default function MemoRulingSection({
               onClick={() => onSelectDecision(decision)}
               aria-pressed={rulingDecision === decision}
               disabled={rulingSaving}
-              className="memoDecisionChoice"
+              className={`memoDecisionChoice memoDecisionChoice--${decision.toLowerCase()}`}
             >
               {label}
             </button>

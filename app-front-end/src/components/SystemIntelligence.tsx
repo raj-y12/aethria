@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import type {
   Startup, SignalItem, RejectionAnalytics, WatchlistAnalytics,
@@ -66,11 +66,43 @@ function formatDrift(drift: number | null | undefined): string {
 
 const REVIEWER_EVAL_AGENTS = new Set(['DefaultReviewer', 'SkepticalReviewer', 'OpportunistReviewer']);
 
+const TAB_CONTENT_CONTAINER_VARIANTS: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.05, delayChildren: 0.03 } },
+};
+
+const TAB_CONTENT_ITEM_VARIANTS: Variants = {
+  hidden: { opacity: 0, transform: 'translateY(8px)' },
+  visible: {
+    opacity: 1,
+    transform: 'translateY(0px)',
+    transition: { duration: 0.35, ease: tokens.motion.ease },
+  },
+};
+
+function AnimatedTabBlock({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const reduceMotion = usePrefersReducedMotion();
+  if (reduceMotion) {
+    return className ? <div className={className}>{children}</div> : <>{children}</>;
+  }
+  return (
+    <motion.div variants={TAB_CONTENT_ITEM_VARIANTS} className={className || undefined}>
+      {children}
+    </motion.div>
+  );
+}
+
 const FilterButton = ({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'text-oxford font-semibold' : 'text-oxford/40 hover:text-oxford/70'
+    className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'text-oxford font-semibold' : 'text-oxford/40 hover:text-oxford/70'
       }`}
   >
     {label}
@@ -142,13 +174,13 @@ function RowWrapper({
 function SignalsTab({ signals }: { signals: SignalItem[] }) {
   if (signals.length === 0) {
     return (
-      <div className="py-phi-6 px-phi-4 flex items-center justify-center">
+      <AnimatedTabBlock className="py-phi-6 px-phi-4 flex items-center justify-center">
         <EmptyState label="Signals" body="No high-priority events detected in the last cycle." />
-      </div>
+      </AnimatedTabBlock>
     );
   }
   return (
-    <div className="flex flex-col relative">
+    <AnimatedTabBlock className="flex flex-col relative">
       {signals.map((sig, i) => (
         <RowWrapper key={sig.id ?? i} index={i}>
           <span className="font-mono type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums pt-px">
@@ -192,7 +224,7 @@ function SignalsTab({ signals }: { signals: SignalItem[] }) {
           </div>
         </RowWrapper>
       ))}
-    </div>
+    </AnimatedTabBlock>
   );
 }
 
@@ -233,17 +265,17 @@ function DecisionsTab({
 
   if (decisions.length === 0) {
     return (
-      <div className="py-phi-6 px-phi-4 flex items-center justify-center">
+      <AnimatedTabBlock className="py-phi-6 px-phi-4 flex items-center justify-center">
         <EmptyState
           label="Human resolutions"
           body="No escalation resolutions yet. When you resolve a human review from the deal grid, the outcome and notes appear here. Partner verdicts stay on each deal row."
         />
-      </div>
+      </AnimatedTabBlock>
     );
   }
 
   return (
-    <div className="flex flex-col relative divide-y divide-oxford/[0.06]">
+    <AnimatedTabBlock className="flex flex-col relative divide-y divide-oxford/[0.06]">
       {decisions.map((item, i) => {
         const resolvedLabel = item.resolvedAt
           ? new Date(item.resolvedAt).toLocaleDateString('en-GB')
@@ -282,7 +314,7 @@ function DecisionsTab({
         </RowWrapper>
         );
       })}
-    </div>
+    </AnimatedTabBlock>
   );
 }
 
@@ -293,17 +325,17 @@ function CalibrationTab({ startups, fundConfiguration }: { startups: Startup[]; 
 
   if (!startups.length || !hasDecisions) {
     return (
-      <div className="py-phi-6 px-phi-4 flex items-center justify-center">
+      <AnimatedTabBlock className="py-phi-6 px-phi-4 flex items-center justify-center">
         <EmptyState
           label="Calibration"
           body="Calibration will emerge as decisions accumulate."
         />
-      </div>
+      </AnimatedTabBlock>
     );
   }
 
   return (
-    <div className="flex flex-col">
+    <>
       <TabSection title="Fund Intelligence" label="Derived">
         <div className="flex flex-wrap gap-phi-6">
           {snapshot.observations.map((item) => (
@@ -345,20 +377,37 @@ function CalibrationTab({ startups, fundConfiguration }: { startups: Startup[]; 
           </p>
         )}
       </TabSection>
-    </div>
+    </>
   );
 }
 
 /* ─── SECTION WRAPPER ─── */
 function TabSection({ title, label, children }: { title: string; label?: string; children: React.ReactNode }) {
+  const reduceMotion = usePrefersReducedMotion();
+  const header = (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
+      <h3 className="type-meta uppercase tracking-[0.12em] text-oxford/50">{title}</h3>
+      {label ? <span className="type-meta uppercase tracking-[0.12em] text-oxford/30">{label}</span> : null}
+    </div>
+  );
+
+  if (reduceMotion) {
+    return (
+      <section className="flex flex-col gap-phi-3 px-phi-4 pt-phi-5 pb-phi-5 first:pt-phi-3">
+        {header}
+        {children}
+      </section>
+    );
+  }
+
   return (
-    <section className="flex flex-col gap-phi-3 px-phi-4 pt-phi-5 pb-phi-5 first:pt-phi-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
-        <h3 className="type-meta uppercase tracking-[0.12em] text-oxford/50">{title}</h3>
-        {label ? <span className="type-meta uppercase tracking-[0.12em] text-oxford/30">{label}</span> : null}
-      </div>
+    <motion.section
+      variants={TAB_CONTENT_ITEM_VARIANTS}
+      className="flex flex-col gap-phi-3 px-phi-4 pt-phi-5 pb-phi-5 first:pt-phi-3"
+    >
+      {header}
       {children}
-    </section>
+    </motion.section>
   );
 }
 
@@ -373,7 +422,7 @@ function AnalyticsTab({ rejection, watchlist, concentration, systemHealth }: {
   const q = systemHealth?.queue_depths;
 
   return (
-    <div className="flex flex-col">
+    <>
       {systemHealth && (
         <TabSection title="Pipeline health" label="Live">
           <div className="flex flex-wrap gap-phi-6">
@@ -468,7 +517,7 @@ function AnalyticsTab({ rejection, watchlist, concentration, systemHealth }: {
           </div>
         )}
       </TabSection>
-    </div>
+    </>
   );
 }
 
@@ -501,25 +550,25 @@ function InstitutionalMandateTab({
 }) {
   if (error) {
     return (
-      <div className="py-phi-6 px-phi-4 flex items-center justify-center">
+      <AnimatedTabBlock className="py-phi-6 px-phi-4 flex items-center justify-center">
         <EmptyState label="Fund Thesis" body="Could not load thesis data. Check your API connection and try again." />
-      </div>
+      </AnimatedTabBlock>
     );
   }
 
   if (loading && !data) {
     return (
-      <div className="px-phi-4 py-phi-4">
+      <AnimatedTabBlock className="px-phi-4 py-phi-4">
         <p className="type-meta text-oxford/45 uppercase tracking-[0.12em]">Loading...</p>
-      </div>
+      </AnimatedTabBlock>
     );
   }
 
   if (!data || data.mode === 'missing' || (!data.parsed_json && data.thesis_ready === false)) {
     return (
-      <div className="py-phi-6 px-phi-4 flex items-center justify-center">
+      <AnimatedTabBlock className="py-phi-6 px-phi-4 flex items-center justify-center">
         <EmptyState label="Fund Thesis" body="No active thesis configured. Set up your investment mandate in Settings to enable thesis-aligned scouting." />
-      </div>
+      </AnimatedTabBlock>
     );
   }
 
@@ -531,7 +580,7 @@ function InstitutionalMandateTab({
   const mandateMode = data.thesis_mode === 'embedding' ? 'AI Enhanced' : 'Rule Based';
 
   return (
-    <div className="flex flex-col">
+    <>
       <TabSection title="Portfolio Mandate" label={`v${data.active_version_number ?? '01'}`}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-phi-5">
           <div className="flex flex-col gap-phi-5">
@@ -589,7 +638,7 @@ function InstitutionalMandateTab({
           </ul>
         </TabSection>
       )}
-    </div>
+    </>
   );
 }
 
@@ -657,8 +706,8 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
     !!insights?.latest && ((insights?.why?.length ?? 0) > 0 || whatChangedTotal > 0);
 
   return (
-    <div className="flex flex-col">
-      <div className="px-phi-4 pt-phi-4 pb-phi-5 border-b border-oxford/[0.06]">
+    <>
+      <AnimatedTabBlock className="px-phi-4 pt-phi-4 pb-phi-5 border-b border-oxford/[0.06]">
         <p className="type-body text-oxford/65 leading-relaxed max-w-2xl">
           This tab runs the scheduled correction cycle: it proposes updates to scouts, reviewers, and score thresholds.
           When you confirm <span className="text-oxford/80">Invest</span>, <span className="text-oxford/80">Pass</span>, or{' '}
@@ -667,7 +716,7 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
         {humanFbLine && (
           <p className="type-meta text-oxford/45 leading-relaxed max-w-2xl mt-phi-3">{humanFbLine}</p>
         )}
-      </div>
+      </AnimatedTabBlock>
       {showLatestInsight && insights?.latest && (
         <TabSection
           title="Latest insight"
@@ -764,6 +813,7 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
         </TabSection>
       )}
 
+      <AnimatedTabBlock>
       <details className="group border-b border-oxford/[0.06]">
         <summary className="cursor-pointer list-none px-phi-4 py-phi-4 type-meta uppercase tracking-[0.12em] text-oxford/45 hover:text-oxford/70 marker:content-none flex items-center justify-between gap-phi-3">
           <span>Advanced — prompt checks (optional)</span>
@@ -975,6 +1025,7 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
       </TabSection>
         </div>
       </details>
+      </AnimatedTabBlock>
 
       <TabSection title="Scout Allocation" label="Weights">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-phi-5 gap-y-phi-4">
@@ -1015,7 +1066,7 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
         )}
       </TabSection>
 
-      <div className="px-phi-4 py-phi-5 flex justify-end">
+      <AnimatedTabBlock className="px-phi-4 py-phi-5 flex justify-end">
         <button
           onClick={handleTrigger}
           disabled={triggering}
@@ -1023,8 +1074,8 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
         >
           {triggering ? 'Running...' : 'Run Correction Cycle'}
         </button>
-      </div>
-    </div>
+      </AnimatedTabBlock>
+    </>
   );
 }
 
@@ -1032,6 +1083,10 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
 export default function SystemIntelligence(props: SystemIntelligenceProps) {
   const [activeTab, setActiveTab] = useState<Tab>('signals');
   const reduceMotion = usePrefersReducedMotion();
+  const tabContentContainerVariants = useMemo(
+    (): Variants | undefined => (reduceMotion ? undefined : TAB_CONTENT_CONTAINER_VARIANTS),
+    [reduceMotion]
+  );
 
   return (
     <div className="w-full font-sans bg-surface-canvas selection:bg-oxford selection:text-paper min-h-full">
@@ -1058,10 +1113,11 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={transitionOrReduced(reduceMotion, { duration: 0.3, ease: 'circOut' })}
+          initial={reduceMotion ? false : 'hidden'}
+          animate="visible"
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, transform: 'translateY(-4px)' }}
+          transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: tokens.motion.ease })}
+          variants={tabContentContainerVariants}
         >
           {activeTab === 'signals' && <SignalsTab signals={props.signals} />}
           {activeTab === 'analytics' && (

@@ -108,6 +108,10 @@ export function normalizeStructuredScoring(review: Review | null | undefined): S
         defensibility,
         overall_score: candidate.overall_score,
         overall_confidence: candidate.overall_confidence,
+        overall_dispersion: candidate.overall_dispersion ?? null,
+        stage_cohort: candidate.stage_cohort ?? null,
+        stage_cohort_label: candidate.stage_cohort_label ?? null,
+        sector_tam_benchmark: candidate.sector_tam_benchmark ?? null,
       };
     }
   }
@@ -170,7 +174,20 @@ export function normalizeStructuredScoring(review: Review | null | undefined): S
     defensibility,
     overall_score: overallCandidate,
     overall_confidence: null,
+    overall_dispersion: computeDispersion([market.score, product.score, technical.score, execution.score]),
   };
+}
+
+/** Spread of the evidenced driver scores, mirroring the backend's overall_dispersion so
+ * the flat-2 branch (synthesised from flat review fields) still distinguishes a uniform
+ * profile from a lopsided one. Null when fewer than two drivers are present. */
+function computeDispersion(scores: number[]): StructuredScoring['overall_dispersion'] {
+  const valid = scores.filter((s) => typeof s === 'number' && Number.isFinite(s));
+  if (valid.length < 2) return null;
+  const mean = valid.reduce((sum, s) => sum + s, 0) / valid.length;
+  const std = Math.sqrt(valid.reduce((sum, s) => sum + (s - mean) ** 2, 0) / valid.length);
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  return { std: round2(std), min: round2(Math.min(...valid)), max: round2(Math.max(...valid)), range: round2(Math.max(...valid) - Math.min(...valid)) };
 }
 
 export function formatReviewOverallStructuredScore(review: Review | null | undefined): string {
@@ -181,14 +198,15 @@ export function formatReviewOverallStructuredScore(review: Review | null | undef
   return '—';
 }
 
+// P4.5: only GENUINE internal/debug identifiers are stripped — code symbols, module
+// names, and source-plumbing provenance that mean nothing to an analyst. Legitimate
+// methodology prose (weights, evidence status, rubric/aggregation language) is now SHOWN
+// so an analyst can answer "why is this a 7?" from the memo. Do NOT re-add prose-level
+// patterns like "Normalization"/"Aggregation"/"Weight 30%"/"Evidence: complete" here —
+// those are methodology, not debug strings (see scoring-remediation-checklist P4.5).
 const INTERNAL_REASONING_PATTERNS = [
-  /^Computed from\b/i,
   /\bfrom scout payload\b/i,
   /\bfrom scout narrative\b/i,
-  /\bfrom reviewer\b/i,
-  /\bGrowth inferred from\b/i,
-  /\bTAM from scout\b/i,
-  /\bextracted? from\b/i,
   /\bpolicy[_\s]?hash\b/i,
   /\bpolicy[_\s]?version\b/i,
   /\bsource_components?\b/i,
@@ -196,23 +214,11 @@ const INTERNAL_REASONING_PATTERNS = [
   /\b_extract_/i,
   /\bclassify_/i,
   /\braw extraction\b/i,
-  /\bMissing-data rule:/i,
-  /\bsignal pipeline\b/i,
   /\bscoring_engine\b/i,
   /\baggregation_layer\b/i,
   /\bnormalization_layer\b/i,
   /\bextraction_layer\b/i,
   /\bpolicy_compiler\b/i,
-  /\bWeight \d+%/i,
-  /\bEvidence partial\b/i,
-  /\bEvidence: missing\b/i,
-  /\bEvidence: complete\b/i,
-  /\bStructured scoring\b/i,
-  /\bNormalization\b/i,
-  /\bAggregation\b/i,
-  /\bRule engine\b/i,
-  /\bPolicy inputs\b/i,
-  /\bComponent weights\b/i,
 ];
 
 /**

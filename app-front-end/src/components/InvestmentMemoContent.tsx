@@ -58,14 +58,10 @@ function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | null): St
   };
 }
 
-const MEMO_GENERATING_DETAIL_AWAITING =
-  'Reviewers are scoring this company against your fund thesis. Memo sections appear as outputs land.';
-const MEMO_GENERATING_DETAIL_UNDECIDED =
-  'Analyst review is complete; the partner engine is determining Invest, Pass, or Monitor. This page updates as the memo fills in.';
-const MEMO_GENERATING_DETAIL_ESCALATION =
-  'Partner flagged human review. Sections still populate from the pipeline where available.';
-const MEMO_GENERATING_DETAIL_FORMATTING =
-  'Formatting and persisting the IC memo. This page updates automatically when the document is ready.';
+const MEMO_GENERATING_DETAIL_AWAITING = 'Reviewers scoring against your thesis.';
+const MEMO_GENERATING_DETAIL_UNDECIDED = 'Partner engine determining the call.';
+const MEMO_GENERATING_DETAIL_ESCALATION = 'Partner flagged this for human review.';
+const MEMO_GENERATING_DETAIL_FORMATTING = 'Finalising the memo.';
 
 function memoGeneratingDetailForVariant(variant: DecisionBadgeVariant): string {
   switch (variant) {
@@ -331,23 +327,30 @@ const REVIEWER_LABELS: Record<string, string> = {
   OpportunistReviewer: 'Opportunist',
 };
 
-const SENTENCE_BOUNDARY = /(?<=[.!?])\s+/;
-
 function collapseWhitespace(value: unknown): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
 }
 
-function clipText(value: unknown, maxLen: number): string {
-  const text = collapseWhitespace(value);
-  if (text.length <= maxLen) return text;
-  return `${text.slice(0, maxLen - 1).replace(/[\s,;:.]+$/, '')}…`;
+// Truncation is intentionally disabled across the memo — full text is shown everywhere,
+// nothing is cut mid-thought. Both helpers keep their signatures (so the many call sites
+// stay unchanged) but now just normalize whitespace and return the complete string.
+function clipText(value: unknown, _maxLen?: number): string {
+  return collapseWhitespace(value);
 }
 
-function firstSentence(value: unknown, maxLen = 180): string {
+// A short lede made of WHOLE sentences (never cut mid-thought, never an ellipsis). Used for
+// the cover standfirst so it stays a lede, not the full multi-paragraph thesis — the complete
+// text still appears in the body sections, so nothing is lost.
+function leadSentences(value: unknown, maxChars = 260): string {
   const text = collapseWhitespace(value);
   if (!text) return '';
-  const first = text.split(SENTENCE_BOUNDARY)[0]?.trim() || text;
-  return clipText(first, maxLen);
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  let out = sentences[0] ?? text;
+  for (let i = 1; i < sentences.length; i += 1) {
+    if (`${out} ${sentences[i]}`.length > maxChars) break;
+    out = `${out} ${sentences[i]}`;
+  }
+  return out;
 }
 
 function reviewerMeanScore(rv: SingleReview): number | null {
@@ -460,6 +463,36 @@ function buildKillers(adverse: AdverseRegisterItem[], fallbackRisks: string[]): 
     }
   }
   return killers;
+}
+
+/** A list that shows the first `cap` items and reveals the rest in place via "Show N more".
+ *  Used for long memo lists so the collapsed view stays tight without ever truncating content. */
+function ExpandableList<T>({
+  items,
+  cap = 4,
+  className = 'memoList',
+  as: Tag = 'ul',
+  renderItem,
+}: {
+  items: T[];
+  cap?: number;
+  className?: string;
+  as?: 'ul' | 'div';
+  renderItem: (item: T, index: number) => ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? items : items.slice(0, cap);
+  const rest = items.length - cap;
+  return (
+    <>
+      <Tag className={className}>{shown.map(renderItem)}</Tag>
+      {rest > 0 && (
+        <button type="button" className="memoShowMore" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? 'Show less' : `Show ${rest} more`}
+        </button>
+      )}
+    </>
+  );
 }
 
 function MemoDisclosureSection({
@@ -773,7 +806,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   );
   // ── Editorial derivations ──
   const coverStandfirst = displayStartup
-    ? firstSentence(
+    ? leadSentences(
         firstNonEmpty(
           displayStartup.partner?.thesis,
           displayStartup.review?.aethria_view?.headline,
@@ -781,7 +814,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           headerThesisLine,
           displayStartup.review?.overall_summary,
         ),
-        220,
+        260,
       )
     : '';
   const coverBlocker = displayStartup
@@ -805,7 +838,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const convictionLine = useMemo(() => {
     const parts: string[] = [];
     if (displayStartup?.review?.overall_score != null) {
-      parts.push(`${displayStartup.review.overall_score}/10 conviction`);
+      const sc = Number(displayStartup.review.overall_score);
+      const scText = Number.isFinite(sc) ? sc.toFixed(1) : String(displayStartup.review.overall_score);
+      parts.push(`${scText}/10 conviction`);
     } else if (thesisAlignmentBrief) {
       parts.push(thesisAlignmentBrief);
     }
@@ -853,7 +888,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         name: REVIEWER_LABELS[rv.reviewer_type] ?? rv.reviewer_type,
         score: reviewerMeanScore(rv),
         verdict: rv.verdict,
-        take: firstSentence(rv.overall_summary, 150),
+        // Lead sentence only — the reviewer's full read lives in Reviewer detail. Keeps the
+        // consensus panel compact instead of stacking a full paragraph per reviewer.
+        take: leadSentences(rv.overall_summary, 140),
       }))
       .filter((row) => row.score != null || row.take);
   }, [displayStartup?.review?.reviews]);
@@ -962,31 +999,22 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
               <div className="memoCoverRuling">
                 <p className="memoCoverRulingLabel">Recommendation</p>
-                {showCoverPipelineDetail ? (
-                  <motion.p
-                    className={`memoCoverRulingWord memoCoverRulingWord--${coverRulingVariantClass}`}
-                    animate={reduceMotion ? { opacity: 1 } : { opacity: [0.72, 1, 0.72] }}
-                    transition={
-                      reduceMotion
-                        ? { duration: 0 }
-                        : { duration: 2.4, repeat: Infinity, ease: [0.77, 0, 0.175, 1] }
-                    }
-                  >
-                    {renderWithMonoNumbers(coverRulingHeadline)}
-                  </motion.p>
-                ) : (
-                  <p className={`memoCoverRulingWord memoCoverRulingWord--${coverRulingVariantClass}`}>
-                    {renderWithMonoNumbers(coverRulingHeadline)}
-                  </p>
-                )}
+                {/* Static verdict — the colour carries the meaning. No perpetual animation
+                    (the old infinite opacity pulse caused jank); the pipeline "alive" state
+                    is now a single CSS-only dot on the status line below. */}
+                <p
+                  className={`memoCoverRulingWord memoCoverRulingWord--${coverRulingVariantClass}`}
+                  {...(showCoverPipelineDetail ? { 'aria-live': 'polite' as const } : {})}
+                >
+                  {renderWithMonoNumbers(coverRulingHeadline)}
+                </p>
                 <div className="memoCoverRulingSupport">
-                  <p className="memoCoverRulingConviction">
+                  <span className="memoCoverRulingConviction">
                     {renderWithMonoNumbers(convictionLine)}
-                  </p>
-                  {reviewerConsensus.verdict ? (
-                    <p className="memoCoverRulingConsensus">
-                      {reviewerConsensus.split ? 'Reviewers split' : 'Reviewers aligned'}
-                    </p>
+                  </span>
+                  {/* Only flag the exception. "Aligned" is the expected state — badging it is noise. */}
+                  {reviewerConsensus.split ? (
+                    <span className="memoCoverRulingConsensus">Reviewers split</span>
                   ) : null}
                 </div>
                 {coverStatusText ? (
@@ -1002,10 +1030,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </div>
 
               {focalQuestion ? (
-                <p className="memoCoverFocalQuestion mt-3 type-note text-oxford/72">
-                  <span className="type-label uppercase tracking-[0.07em] text-oxford/45 mr-2">Decides it</span>
-                  <span className="italic">{renderWithMonoNumbers(focalQuestion)}</span>
-                </p>
+                <div className="memoCoverDecider">
+                  <p className="memoCoverDeciderLabel">What decides it</p>
+                  <p className="memoCoverDeciderText">{renderWithMonoNumbers(focalQuestion)}</p>
+                </div>
               ) : null}
 
               {!embedded && (coverBlocker || coverAction) ? (
@@ -1045,25 +1073,25 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     {(fundingLine || tractionLine || ipLine || modelLine) && (
                       <div className={`${vitalsStrip.length > 0 ? 'mt-2.5 ' : ''}space-y-1.5`}>
                         {fundingLine && (
-                          <p className="type-note leading-snug text-oxford/75">
+                          <p className="type-body-sm leading-snug text-oxford/75">
                             <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Funding</span>
                             {renderWithMonoNumbers(fundingLine)}
                           </p>
                         )}
                         {tractionLine && (
-                          <p className="type-note leading-snug text-oxford/75">
+                          <p className="type-body-sm leading-snug text-oxford/75">
                             <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Traction</span>
                             {renderWithMonoNumbers(tractionLine)}
                           </p>
                         )}
                         {modelLine && (
-                          <p className="type-note leading-snug text-oxford/70">
+                          <p className="type-body-sm leading-snug text-oxford/70">
                             <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Model</span>
                             {renderWithMonoNumbers(modelLine)}
                           </p>
                         )}
                         {ipLine && (
-                          <p className="type-note leading-snug text-oxford/70">
+                          <p className="type-body-sm leading-snug text-oxford/70">
                             <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">IP</span>
                             {renderWithMonoNumbers(ipLine)}
                           </p>
@@ -1155,10 +1183,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               ].filter(Boolean).join('   ·   ');
               const fitPoints = (r?.thesis_fit_points ?? []).filter((s) => String(s ?? '').trim());
               const gapPoints = (r?.thesis_deviation_points ?? []).filter((s) => String(s ?? '').trim());
-              const deepDiveSummary = [
-                hasThesis && ten != null ? `${ten.toFixed(0)}/10 fit` : hasThesis ? 'thesis' : null,
-                improvements.length || assessmentReadouts.length ? 'analyst reads' : null,
-              ].filter(Boolean).join(' · ') || undefined;
               return (
                 <section className="memoDocSection memoScoringSection" aria-labelledby="memo-scoring">
                   <h2 className="memoDocSectionHead" id="memo-scoring">Assessment</h2>
@@ -1198,37 +1222,35 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </div>
                   ) : null}
                   {hasDeepDive && (
-                    <div className="memoDiscGroup memoScoringMore">
-                      <MemoDisclosureSection
-                        id={`${contentKey}-assessment-deepdive`}
-                        title="Deep dive"
-                        summary={deepDiveSummary}
-                        initialOpen={!config.memo.deepDiveCollapsed}
-                      >
+                    <div className="memoScoringMore">
                         {improvements.length > 0 && (
                           <div className="memoDocSubsection">
                             <p className="memoDocSubhead">Path to a 9</p>
-                            <ul className="memoList">
-                              {improvements.slice(0, 4).map((item, i) => (
+                            <ExpandableList
+                              items={improvements}
+                              cap={4}
+                              renderItem={(item, i) => (
                                 <li key={i} className="memoListItem">
                                   <span className="memoBullet" aria-hidden>·</span>
                                   <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
                                 </li>
-                              ))}
-                            </ul>
+                              )}
+                            />
                           </div>
                         )}
                         {assessmentReadouts.map((section) => (
                           <div key={section.label} className="memoDocSubsection">
                             <p className="memoDocSubhead">{section.label}</p>
-                            <ul className="memoList">
-                              {section.items.slice(0, 3).map((item, i) => (
+                            <ExpandableList
+                              items={section.items}
+                              cap={3}
+                              renderItem={(item, i) => (
                                 <li key={i} className="memoListItem">
                                   <span className="memoBullet" aria-hidden>·</span>
                                   <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
                                 </li>
-                              ))}
-                            </ul>
+                              )}
+                            />
                           </div>
                         ))}
                         {hasThesis && (
@@ -1257,7 +1279,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                             )}
                           </div>
                         )}
-                      </MemoDisclosureSection>
                     </div>
                   )}
                 </section>
@@ -1274,22 +1295,31 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   </p>
                 )}
                 {adverseRegister.length > 0 && (
-                  <div className="memoEvRiskList">
-                    {adverseRegister.map((item) => (
-                      <article key={item.id} className={`memoEvRisk memoEvRisk--${item.severity}`}>
-                        <p className="memoEvRiskHead">
+                  <ExpandableList
+                    items={adverseRegister}
+                    cap={4}
+                    as="div"
+                    className="memoEvRiskList"
+                    renderItem={(item) => {
+                      // The engine often sets whyItMatters == title; don't print the same line twice.
+                      const why = collapseWhitespace(item.whyItMatters);
+                      const showWhy = !!why && why.toLowerCase() !== collapseWhitespace(item.title).toLowerCase();
+                      return (
+                        <article key={item.id} className={`memoEvRisk memoEvRisk--${item.severity}`}>
                           <span className="memoEvRiskSeverity">{SEVERITY_LABEL[item.severity]}</span>
-                          <span className="memoEvRiskTitle">{renderWithMonoNumbers(item.title)}</span>
-                        </p>
-                        <p className="memoEvRiskWhy">{renderWithMonoNumbers(item.whyItMatters)}</p>
-                        {(item.basis || item.missingData || item.source) && (
-                          <p className="memoEvRiskMeta">
-                            {[item.basis, item.missingData ? 'Missing data' : null, item.source].filter(Boolean).join('  ·  ')}
-                          </p>
-                        )}
-                      </article>
-                    ))}
-                  </div>
+                          <div className="memoEvRiskBody">
+                            <p className="memoEvRiskTitle">{renderWithMonoNumbers(item.title)}</p>
+                            {showWhy && <p className="memoEvRiskWhy">{renderWithMonoNumbers(item.whyItMatters)}</p>}
+                            {(item.basis || item.missingData || item.source) && (
+                              <p className="memoEvRiskMeta">
+                                {[item.basis, item.missingData ? 'Missing data' : null, item.source].filter(Boolean).join('  ·  ')}
+                              </p>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    }}
+                  />
                 )}
                 {config.memo.includeMissingData && missingEvidenceItems.length > 0 && (
                   <div className="memoDocSubsection">
@@ -1379,7 +1409,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               >
                 {convictionHistory.length > 0 && (
                   <ol className="memoLedgerList">
-                    {[...convictionHistory].reverse().slice(0, 5).map((entry, index) => (
+                    {[...convictionHistory].reverse().map((entry, index) => (
                       <li key={`${entry.timestamp}-${index}`} className="memoLedgerItem">
                         <div className="memoLedgerMeta">
                           <span>{decisionLabel(entry.new_decision)}</span>

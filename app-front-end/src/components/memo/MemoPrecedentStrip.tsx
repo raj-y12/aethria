@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
+import { DECISION_BADGE_CLASS, VERDICT_CHIP_CLASS } from '../../design-system/verdictBadgeTokens';
 import type { PrecedentCandidate } from '../../lib/institutionalConviction';
 import type { RulingDecision } from '../../types/startup';
 
@@ -40,6 +41,12 @@ const MATCH_LABELS: Record<string, string> = {
   sector: 'Sector',
   stage: 'Stage',
   recommendation: 'Same recommendation',
+};
+
+const PRECEDENT_VERDICT_CLASS: Record<'invest' | 'pass' | 'monitor', string> = {
+  invest: DECISION_BADGE_CLASS.INVEST,
+  pass: DECISION_BADGE_CLASS.PASS,
+  monitor: DECISION_BADGE_CLASS.MONITOR,
 };
 
 type Props = {
@@ -93,7 +100,7 @@ export default function MemoPrecedentStrip({
               <li key={candidate.startupId} className="memoPrecedentCard">
                 <Link to={dealPath(candidate.startupId)} className="memoPrecedentCardLink">
                   <div className="memoPrecedentCardTop">
-                    <span className={`memoPrecedentVerdict memoPrecedentVerdict--${variant}`}>
+                    <span className={`${VERDICT_CHIP_CLASS} ${PRECEDENT_VERDICT_CLASS[variant]}`}>
                       {rulingLabel(candidate.decision)}
                     </span>
                     <span className="memoPrecedentName">{candidate.name}</span>

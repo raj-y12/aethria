@@ -1,9 +1,41 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import AgentDispatch from './AgentDispatch';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+/** Reverse-stagger anchor for exit — much shorter than enter so dismiss feels snappy. */
+const DISPATCH_EXIT_TAIL_DELAY = 0.1;
+const DISPATCH_EXIT_DURATION = 0.2;
+const DISPATCH_EXIT_STAGGER = 0.025;
+
+type DispatchExitCustom = { enterY: number; duration: number; enterDelay: number };
+
+function dispatchExitCustom(enterY: number, duration: number, enterDelay: number): DispatchExitCustom {
+  return { enterY, duration, enterDelay };
+}
+
+/** Propagates reverse-staggered exits to direct motion children. */
+const DISPATCH_EXIT_ORCHESTRATOR: Variants = {
+  exit: {
+    transition: {
+      staggerChildren: DISPATCH_EXIT_STAGGER,
+      staggerDirection: -1,
+    },
+  },
+};
+
+const DISPATCH_EXIT_PIECE: Variants = {
+  exit: ({ enterY, enterDelay }: DispatchExitCustom) => ({
+    opacity: 0,
+    y: enterY === 0 ? 10 : Math.abs(enterY),
+    transition: {
+      duration: DISPATCH_EXIT_DURATION,
+      ease: EASE,
+      delay: Math.max(0, DISPATCH_EXIT_TAIL_DELAY - enterDelay * 0.3),
+    },
+  }),
+};
 
 export interface LookupProgress {
   query: string;
@@ -178,7 +210,20 @@ export default function DispatchCommandBar({
           ref={containerRef}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit="exit"
+          variants={{
+            exit: {
+              opacity: 0,
+              transition: {
+                duration: 0.18,
+                ease: EASE,
+                delay: 0.14,
+                staggerChildren: DISPATCH_EXIT_STAGGER,
+                staggerDirection: -1,
+                when: 'afterChildren',
+              },
+            },
+          }}
           transition={{ duration: 0.4, ease: EASE }}
           className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-phi-6 bg-paper"
           role="dialog"
@@ -187,8 +232,10 @@ export default function DispatchCommandBar({
         >
           {showChips ? (
             <motion.div
-              initial={{ opacity: 0, transform: 'translateY(-6px)' }}
-              animate={{ opacity: 1, transform: 'translateY(0px)' }}
+              variants={DISPATCH_EXIT_PIECE}
+              custom={dispatchExitCustom(-6, 0.3, 0)}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, ease: EASE }}
               className="mb-phi-7 flex flex-wrap items-center justify-center gap-phi-2"
               aria-label="Tracked lookups"
@@ -225,18 +272,20 @@ export default function DispatchCommandBar({
             </motion.div>
           ) : null}
 
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={view}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transform: 'translateY(-8px)' }}
-              transition={{ duration: 0.26, ease: EASE }}
-              className="flex w-full flex-col items-center"
-            >
+          <motion.div
+            key={view}
+            variants={DISPATCH_EXIT_ORCHESTRATOR}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit="exit"
+            transition={{ duration: 0.26, ease: EASE }}
+            className="flex w-full flex-col items-center"
+          >
               <motion.p
-                initial={{ opacity: 0, transform: 'translateY(10px)' }}
-                animate={{ opacity: 1, transform: 'translateY(0px)' }}
+                variants={DISPATCH_EXIT_PIECE}
+                custom={dispatchExitCustom(10, 0.45, 0.05)}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45, ease: EASE, delay: 0.05 }}
                 className="type-meta uppercase tracking-[0.16em] text-oxford/40 mb-phi-3"
               >
@@ -244,8 +293,10 @@ export default function DispatchCommandBar({
               </motion.p>
 
               <motion.h1
-                initial={{ opacity: 0, transform: 'translateY(12px)' }}
-                animate={{ opacity: 1, transform: 'translateY(0px)' }}
+                variants={DISPATCH_EXIT_PIECE}
+                custom={dispatchExitCustom(12, 0.5, 0.1)}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
                 className={`type-display text-center text-[clamp(28px,4vw,52px)] font-medium text-oxford leading-[1.1] m-0 ${
                   view === 'result' ? 'max-w-none whitespace-nowrap' : 'max-w-[15ch]'
@@ -256,8 +307,10 @@ export default function DispatchCommandBar({
 
               {view === 'result' ? (
                 <motion.div
-                  initial={{ opacity: 0, transform: 'translateY(10px)' }}
-                  animate={{ opacity: 1, transform: 'translateY(0px)' }}
+                  variants={DISPATCH_EXIT_PIECE}
+                  custom={dispatchExitCustom(10, 0.45, 0.16)}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45, ease: EASE, delay: 0.16 }}
                   className="mt-phi-6 flex w-full max-w-lg flex-col items-center gap-phi-4"
                 >
@@ -266,8 +319,10 @@ export default function DispatchCommandBar({
                 </motion.div>
               ) : view === 'progress' ? (
                 <motion.div
-                  initial={{ opacity: 0, transform: 'translateY(10px)' }}
-                  animate={{ opacity: 1, transform: 'translateY(0px)' }}
+                  variants={DISPATCH_EXIT_PIECE}
+                  custom={dispatchExitCustom(10, 0.45, 0.16)}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45, ease: EASE, delay: 0.16 }}
                   className="mt-phi-3 flex flex-col items-center gap-phi-5"
                 >
@@ -282,11 +337,16 @@ export default function DispatchCommandBar({
                       {message}
                     </p>
                   ) : null}
-                  <QuietLink onClick={() => setCompose(true)}>+ Look up another</QuietLink>
+                  <div className="flex items-center justify-center gap-phi-4">
+                    <QuietLink onClick={() => setCompose(true)}>+ Look up another</QuietLink>
+                    {onCancel ? <QuietLink onClick={onCancel}>Cancel lookup</QuietLink> : null}
+                  </div>
                 </motion.div>
               ) : (
                 <>
                   <motion.p
+                    variants={DISPATCH_EXIT_PIECE}
+                    custom={dispatchExitCustom(0, 0.5, 0.18)}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.5, ease: EASE, delay: 0.18 }}
@@ -296,8 +356,10 @@ export default function DispatchCommandBar({
                   </motion.p>
 
                   <motion.div
-                    initial={{ opacity: 0, transform: 'translateY(10px)' }}
-                    animate={{ opacity: 1, transform: 'translateY(0px)' }}
+                    variants={DISPATCH_EXIT_PIECE}
+                    custom={dispatchExitCustom(10, 0.45, 0.25)}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.45, ease: EASE, delay: 0.25 }}
                     className="flex w-full max-w-md flex-col items-center gap-phi-4"
                   >
@@ -316,12 +378,13 @@ export default function DispatchCommandBar({
                   </motion.div>
                 </>
               )}
-            </motion.div>
-          </AnimatePresence>
+          </motion.div>
 
           <motion.button
-            initial={{ opacity: 0, transform: 'translateY(10px)' }}
-            animate={{ opacity: 1, transform: 'translateY(0px)' }}
+            variants={DISPATCH_EXIT_PIECE}
+            custom={dispatchExitCustom(10, 0.45, 0.32)}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: EASE, delay: 0.32 }}
             type="button"
             onClick={onClose}

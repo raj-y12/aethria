@@ -523,9 +523,10 @@
     transform: scale(0.97);
     opacity: 0.88;
   }
-  /** Opt out of :active scale from .btn-interaction (framer-motion + tactile press stacking looks odd here). */
+  /** Opt out of :active press feedback from .btn-interaction (nav tabs, queue chrome). */
   .btn-interaction--no-press:active:not(:disabled) {
     transform: none;
+    opacity: 1;
   }
   .btn-interaction:disabled {
     opacity: 0.7;

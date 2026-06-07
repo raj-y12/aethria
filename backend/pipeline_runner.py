@@ -10,7 +10,7 @@ import resource
 import time
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 from uuid import uuid4
 
 try:
@@ -51,6 +51,9 @@ from fund_thesis import (
 logger = logging.getLogger("pipeline_runner")
 _visible_logger = logging.getLogger("uvicorn.error")
 
+DEFAULT_SCOUT_MODEL = "gpt-5-nano"
+DEFAULT_REVIEWER_MODEL = "gpt-5-nano"
+
 
 @dataclass
 class _PipelineEngines:
@@ -72,8 +75,8 @@ def _build_pipeline_engines(
     cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
     cost_controller = CostController(user_id=user_id) if cost_budget_enabled else None
     deal_memory = DealMemory(user_id=user_id)
-    model = os.getenv("SCOUT_MODEL", "gpt-4o-mini")
-    reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-4o-mini")
+    model = os.getenv("SCOUT_MODEL", DEFAULT_SCOUT_MODEL)
+    reviewer_model = os.getenv("REVIEWER_MODEL", DEFAULT_REVIEWER_MODEL)
     use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
     reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
 
@@ -448,6 +451,7 @@ async def run_on_demand_lookup(
     lookup_query: Optional[str] = None,
     lookup_input_type: Optional[str] = None,
     lookup_id: Optional[str] = None,
+    is_cancelled: Optional[Callable[[], bool]] = None,
 ) -> Optional[str]:
     """
     Run scout -> reviewer -> partner for one explicit company name.
@@ -469,6 +473,7 @@ async def run_on_demand_lookup(
             lookup_query=lookup_query,
             lookup_input_type=lookup_input_type,
             lookup_id=lookup_id,
+            is_cancelled=is_cancelled,
         )
 
 
@@ -480,6 +485,7 @@ async def _run_on_demand_lookup_inner(
     lookup_query: Optional[str] = None,
     lookup_input_type: Optional[str] = None,
     lookup_id: Optional[str] = None,
+    is_cancelled: Optional[Callable[[], bool]] = None,
 ) -> Optional[str]:
     tenant = TenantContext(user_id=user_id)
     logger.info(
@@ -487,6 +493,16 @@ async def _run_on_demand_lookup_inner(
         tenant.user_id[:24],
     )
     lid = (lookup_id or "").strip() or None
+
+    def cancelled() -> bool:
+        try:
+            return bool(is_cancelled and is_cancelled())
+        except Exception:
+            return False
+
+    if cancelled():
+        logger.info("[%s] Lookup cancelled before start: %s", user_id[:12], lid or company)
+        return None
 
     use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
     if not use_supabase:
@@ -570,6 +586,9 @@ async def _run_on_demand_lookup_inner(
             lookup_run_id,
             _rss_mb(),
         )
+        if cancelled():
+            logger.info("[%s] Lookup cancelled before scout: %s", user_id[:12], lid or company)
+            return None
         startup_id = await scout_engine.run_named_lookup(
             company_name=company,
             scout_type="market_driven",
@@ -587,10 +606,16 @@ async def _run_on_demand_lookup_inner(
                 f'Scout could not complete lookup for "{company}". Try a different name or website.',
             )
             return None
+        if cancelled():
+            logger.info("[%s] Lookup cancelled after scout: %s (%s)", user_id[:12], company, startup_id)
+            return startup_id
         # Supabase can be briefly stale right after insert; retry reviewer handoff once or twice.
         reviewed = False
         review_attempts = 3
         for attempt in range(1, review_attempts + 1):
+            if cancelled():
+                logger.info("[%s] Lookup cancelled before review: %s (%s)", user_id[:12], company, startup_id)
+                return startup_id
             reviewed = await reviewer_engine.run_startup(
                 startup_id,
                 ignore_confidence_threshold=True,
@@ -606,9 +631,15 @@ async def _run_on_demand_lookup_inner(
             # Do not mark lookup as failed when scout persisted a startup successfully.
             # This is a partial completion state; UI should keep polling/matching rows.
             return startup_id
+        if cancelled():
+            logger.info("[%s] Lookup cancelled after review: %s (%s)", user_id[:12], company, startup_id)
+            return startup_id
         decided = False
         partner_attempts = 2
         for attempt in range(1, partner_attempts + 1):
+            if cancelled():
+                logger.info("[%s] Lookup cancelled before partner: %s (%s)", user_id[:12], company, startup_id)
+                return startup_id
             decided = await partner_engine.run_startup(
                 startup_id,
                 pipeline_run_id=lookup_run_id,
@@ -694,7 +725,7 @@ async def reprocess_startups_missing_fund_thesis(
     cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
     cost_controller = CostController(user_id=uid) if cost_budget_enabled else None
     deal_memory = DealMemory(user_id=uid)
-    reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-4o-mini")
+    reviewer_model = os.getenv("REVIEWER_MODEL", DEFAULT_REVIEWER_MODEL)
     use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
     reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
 

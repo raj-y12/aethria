@@ -1,26 +1,22 @@
 import type { CSSProperties } from 'react';
 import type { ReviewerQualityBand } from '../design-system/semantics';
-import { REVIEWER_BADGE_CLASS } from '../design-system/verdictBadgeTokens';
-import { badgeTextColorForBackground, type VerdictBadgeConfig } from '../lib/fundConfiguration';
+import { REVIEWER_BADGE_CLASS, VERDICT_CHIP_CLASS } from '../design-system/verdictBadgeTokens';
+import type { VerdictBadgeConfig } from '../lib/fundConfiguration';
 
 /**
- * Reviewer quality badge.
- * All bands are full-fill chips for immediate visual separation.
+ * Reviewer quality badge — same chip dimensions as decision / precedent verdicts.
  */
-function badgeStyle(band: ReviewerQualityBand, badges?: VerdictBadgeConfig[]): CSSProperties | undefined {
+function badgeBackground(band: ReviewerQualityBand, badges?: VerdictBadgeConfig[]): CSSProperties | undefined {
   const backgroundColor = badges?.find((badge) => badge.id === band)?.backgroundColor;
   if (!backgroundColor) return undefined;
-  return {
-    backgroundColor,
-    color: badgeTextColorForBackground(backgroundColor),
-  };
+  return { backgroundColor };
 }
 
 export default function VerdictBandBadge({ band, badges }: { band: ReviewerQualityBand; badges?: VerdictBadgeConfig[] }) {
-  const style = badgeStyle(band, badges);
+  const style = badgeBackground(band, badges);
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none type-meta tracking-badge uppercase py-phi-1 px-phi-2 ${REVIEWER_BADGE_CLASS[band]}`}
+      className={`${VERDICT_CHIP_CLASS} ${REVIEWER_BADGE_CLASS[band]}`}
       style={style}
       aria-label={band}
     >

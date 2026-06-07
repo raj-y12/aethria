@@ -76,7 +76,7 @@ function SpineNavButton({
       type="button"
       onClick={onClick}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`group type-label-tab w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
+      className={`group type-label-tab w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
         active ? `${textActive} ${bgActive}` : `${textIdle} ${bgHover}`
       } ${compact ? 'min-h-[32px] px-phi-4 py-phi-1' : 'min-h-[44px] px-2 py-1'}`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}

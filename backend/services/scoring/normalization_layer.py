@@ -29,7 +29,10 @@ def _parse_float(value: Any) -> Optional[float]:
         return None
 
 
-def normalize_tam(value: Any) -> float:
+def normalize_tam(value: Any, thresholds: Optional[dict] = None) -> float:
+    """Score a TAM string 1–10. `thresholds` overrides the default `tam_usd` bands so the
+    same TAM is judged against sector-relative benchmarks (P6.3); when omitted, the
+    general default is used (back-compatible)."""
     if value is None:
         return DEFAULT_SCORE
     text = str(value).strip().lower()
@@ -48,7 +51,7 @@ def normalize_tam(value: Any) -> float:
     elif any(token in text for token in ("k", "thousand")):
         multiplier = 1_000
     usd = number * multiplier
-    t = THRESHOLDS["tam_usd"]
+    t = thresholds or THRESHOLDS["tam_usd"]
     if usd >= t["xl"]:
         return 10.0
     if usd >= t["large"]:
@@ -101,10 +104,12 @@ _LABEL_SYNONYMS: dict[str, str] = {
     "unmatched": "extreme",
     "proven": "credible_team",
     "experienced": "credible_team",
-    "pre_revenue": "early_adoption",
-    "pre-revenue": "early_adoption",
-    "seed": "early_adoption",
-    "growth": "scaling",
+    # NOTE (audit P6.2): stage words ("seed", "pre_revenue", "growth") are deliberately
+    # NOT synonyms for traction labels. Funding/lifecycle stage is not traction evidence —
+    # mapping "seed"→early_adoption or "growth"→scaling let a stage word silently set the
+    # traction score. With these removed, an off-vocabulary stage word now abstains
+    # (UNRECOGNIZED_LABEL → excluded from aggregation) so traction is driven only by
+    # actual traction evidence. Stage is captured/displayed separately (Phase 6 cohorts).
 }
 
 

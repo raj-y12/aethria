@@ -397,6 +397,20 @@ class ReviewerEngine:
             ))
         return single_reviews
 
+    def _persist_scoring_trail(self, startup_id: str, trace: Any) -> None:
+        """Best-effort append of the primary scoring trail (P7.1). Never raises into the
+        review loop; silently skips when scoring is off, the trace is absent, or the
+        storage backend doesn't support trail writes (e.g. local file dev storage)."""
+        if not self.use_structured_scoring or not isinstance(trace, dict):
+            return
+        recorder = getattr(self.storage, "record_scoring_trail", None)
+        if not callable(recorder):
+            return
+        try:
+            recorder(startup_id, trace)
+        except Exception as exc:  # pragma: no cover - defensive
+            self.logger.debug("scoring trail persist failed for %s: %s", startup_id, exc)
+
     def _apply_structured_scoring(self, scout_output: dict, reviewer_output: dict) -> dict:
         """Replace LLM-assigned numeric scores with deterministic weighted scores."""
         if not self.structured_scoring_engine:
@@ -729,6 +743,9 @@ class ReviewerEngine:
                     review_output.get("verdict"),
                     review_output.get("derived_verdict"),
                 )
+                # P7.1: persist the primary scoring trail once per startup (append-only).
+                # Best-effort — a trail-write failure must never break the review.
+                self._persist_scoring_trail(entry_id, review_output.get("structured_scoring"))
                 if self.active_thesis and self.active_thesis.get("version_id"):
                     review_output["fund_thesis_version_id"] = self.active_thesis["version_id"]
                 self._apply_rule_based_thesis_alignment(review_output, scout_output)

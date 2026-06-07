@@ -1,16 +1,42 @@
 import { getScoreBand } from '../design-system/semantics';
 import type { PresentationDimension, ScoringComponent, ScoringCriterion, ScoringDimension } from '../types/startup';
-import { sanitizeReasoning } from './reviewScoring';
+import { assessEvidenceStatus, sanitizeReasoning } from './reviewScoring';
+
+/** Human-readable name for each scoring component id. The row label must be the METRIC
+ *  (what is being assessed), never the assessed level — "moderate"/"prototype" as a row
+ *  label is unreadable. The assessed level is carried separately as `tag`. */
+const COMPONENT_LABELS: Record<string, string> = {
+  // market
+  tam: 'TAM', growth_rate: 'Growth rate', urgency: 'Urgency', timing: 'Timing', competition: 'Competition',
+  // execution
+  traction: 'Traction', growth_velocity: 'Growth velocity', gtm_effectiveness: 'Go-to-market',
+  team_execution: 'Team', operational_velocity: 'Operational velocity',
+  // product
+  value_prop: 'Value proposition', pain_alignment: 'Pain alignment', differentiation: 'Differentiation',
+  ux: 'UX', retention: 'Retention',
+  // technical
+  complexity: 'Complexity', engineering_quality: 'Engineering quality', scalability: 'Scalability',
+  data_advantage: 'Data advantage', architecture: 'Architecture',
+  // defensibility
+  network_effects: 'Network effects', switching_costs: 'Switching costs',
+  proprietary_data: 'Proprietary data', barriers: 'Barriers to entry', brand: 'Brand',
+};
+
+function componentLabel(id: string): string {
+  const known = COMPONENT_LABELS[id];
+  if (known) return known;
+  const words = id.replace(/_/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 function collapseWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
-export function clipScoringText(value: string, max = 96): string {
-  const text = collapseWhitespace(value);
-  if (text.length <= max) return text;
-  const cutoff = text.lastIndexOf(' ', max - 1);
-  return `${text.slice(0, cutoff > 32 ? cutoff : max - 1).trim()}…`;
+// Truncation is intentionally disabled — the memo shows full text everywhere (no "…").
+// Kept as a whitespace-normalizer with a compatible signature so call sites are unchanged.
+export function clipScoringText(value: string, _max = 96): string {
+  return collapseWhitespace(value);
 }
 
 export function takeFirst<T>(items: T[], limit: number): { shown: T[]; rest: number } {
@@ -42,27 +68,48 @@ export function dimensionBriefTake(
 
 export type ScoringDriverRow = {
   id: string;
+  /** The metric being assessed, e.g. "Competition" — human-readable, never a raw level. */
   label: string;
+  /** The assessed level, e.g. "moderate" — shown as a small tag. Null when missing/none. */
+  tag: string | null;
   score: number | null;
   text: string;
+  /** Evidence status drives the Evidence-vs-Needs-diligence split in the memo. */
+  status: 'complete' | 'partial' | 'missing';
   missing: boolean;
+  /** True for judgment components with no objective anchor (P3.4). */
+  qualitative?: boolean;
 };
 
 export function buildComponentDrivers(components: Record<string, ScoringComponent>): ScoringDriverRow[] {
+  const seenText = new Set<string>();
   return Object.entries(components)
     .map(([id, component]) => {
       const text = sanitizeReasoning(component.reasoning) ?? sanitizeReasoning(component.evidence);
-      const label = collapseWhitespace(String(component.label ?? id.replace(/_/g, ' ')));
-      const missing = !text && (component.score == null || component.score <= 0);
+      const status = assessEvidenceStatus(component);
+      const rawTag = collapseWhitespace(String(component.label ?? ''));
+      const tag = rawTag && !/^\[?\s*missing/i.test(rawTag) && status !== 'missing' ? rawTag : null;
       return {
         id,
-        label,
+        label: componentLabel(id),
+        tag,
         score: typeof component.score === 'number' ? component.score : null,
-        text: text ? clipScoringText(text, 100) : '',
-        missing,
+        text: text ? clipScoringText(text, 160) : '',
+        status,
+        missing: status === 'missing',
+        qualitative: component.qualitative === true,
       };
     })
     .filter((row) => row.text || row.score != null)
+    // Dedupe identical reasoning within a dimension (the engine sometimes repeats a
+    // "TAM not quantified" line across urgency/timing) — repetition reads as padding.
+    .filter((row) => {
+      const key = row.text.toLowerCase();
+      if (!key) return true;
+      if (seenText.has(key)) return false;
+      seenText.add(key);
+      return true;
+    })
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }
 
@@ -73,8 +120,10 @@ export function buildCriterionDrivers(criteria: Record<string, ScoringCriterion>
       return {
         id: `criterion-${index}`,
         label: collapseWhitespace(String(criterion.name ?? 'Criterion')),
+        tag: null,
         score: typeof criterion.score === 'number' ? criterion.score : null,
         text: text ? clipScoringText(text, 100) : '',
+        status: (text ? 'complete' : 'missing') as 'complete' | 'partial' | 'missing',
         missing: !text,
       };
     })

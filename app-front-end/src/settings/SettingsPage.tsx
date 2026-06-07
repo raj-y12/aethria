@@ -13,6 +13,7 @@ import {
   type FundThesisSummary,
 } from '../api/fundThesis';
 import { railEditorial } from '../design-system/railEditorial';
+import { DECISION_BADGE_CLASS, REVIEWER_BADGE_CLASS, VERDICT_CHIP_CLASS } from '../design-system/verdictBadgeTokens';
 import { useAgentsEnabled, useFundConfiguration, useMediaQuery } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
 import { applyDecisionThresholds, DEFAULT_DECISION_BOUNDARIES, validateDecisionThresholds } from '../lib/decisionThresholds';
@@ -22,7 +23,6 @@ import {
   DIMENSION_SCORE_BANDS,
   UNIVERSAL_SCORE_BANDS,
   DEFAULT_VERDICT_BADGES,
-  badgeTextColorForBackground,
   applyThesisVersionMetadata,
   buildFundConfigThesisPayload,
   clearFundConfiguration,
@@ -233,13 +233,14 @@ function TextField({
 }
 
 function BadgeSwatch({ label, backgroundColor }: { label: string; backgroundColor: string }) {
+  const semanticClass =
+    DECISION_BADGE_CLASS[label as keyof typeof DECISION_BADGE_CLASS] ??
+    REVIEWER_BADGE_CLASS[label as keyof typeof REVIEWER_BADGE_CLASS] ??
+    '';
   return (
     <span
-      className="inline-flex min-h-[26px] items-center justify-center rounded-none px-phi-2 type-meta tracking-badge uppercase"
-      style={{
-        backgroundColor,
-        color: badgeTextColorForBackground(backgroundColor),
-      }}
+      className={`${VERDICT_CHIP_CLASS} ${semanticClass}`}
+      style={{ backgroundColor }}
     >
       {label}
     </span>

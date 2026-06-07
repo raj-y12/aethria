@@ -33,11 +33,11 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 | Phase 0 — Guardrails | ✅ 2 / 2 |
 | Phase 1 — Stop the bleeding (highest severity, lowest effort) | ✅ 2 / 2 (P1.2 re-sequenced → Phase 3) |
 | Phase 2 — Canonical score (Workstream B) | ✅ 4 / 4 (P2.4: weighted_defensibility removed; confidence_adjusted_score kept—live in partner) |
-| Phase 3 — Meaning fix (Layers 1–3) | ◑ abstain framework + ALL-dimension rollout + off-vocab done (P1.2+P3.2); P3.1 anchored-criteria implemented for team (prompt QUALITY needs model); per-component anchor rollout pending |
-| Phase 4 — Presentation vocabulary (Workstream C) | ◑ P4.2/P4.3/P4.4 done, P4.1 drift-guard + P4.5 methodology block added; full payload-derived bands + sanitizeReasoning relax pending |
-| Phase 5 — Calibration hardening (Layers 4–5) | 0 / 3 |
-| Phase 6 — Comparability completeness (Workstream A) | 0 / 3 |
-| Phase 7 — Outcome validity (Layer 6) | 0 / 2 |
+| Phase 3 — Meaning fix (Layers 1–3) | ◑ P1.2+P3.2 ✅; P3.3 anchor rollout ✅; P3.4 qualitative flag (data + memo UI) ✅; P3.1 team-anchor ✅ — only prompt QUALITY (needs a model) outstanding |
+| Phase 4 — Presentation vocabulary (Workstream C) | ◑ P4.2/P4.3/P4.4 ✅; P4.5 ✅; P4.1 drift-guard + rubric version-stamp ✅ — only runtime payload-derived band *thresholds* pending |
+| Phase 5 — Calibration hardening (Layers 4–5) | ◑ 1 / 3 — P5.3 ✅; P5.1 (exemplars+cache) and P5.2 (label stability) both need a model |
+| Phase 6 — Comparability completeness (Workstream A) | ◑ P6.2 ✅; P6.1 cohorts ✅; P6.3 sector TAM benchmark ✅ (backend + memo render) — only sector-calibrating complexity/competition pending |
+| Phase 7 — Outcome validity (Layer 6) | ◑ P7.1 ✅ (migration applied to prod + storage-write + tests); P7.2 needs realized-outcome volume |
 
 > Update these counts whenever a row flips to `[✅]`.
 
@@ -234,19 +234,43 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     "evidence-present-but-keyword-miss" (vs the current substantive low reads) needs
     real-payload / model evaluation.
 
-- [ ] **P3.3 — Roll the pattern across remaining fact-derivable components.**
-  Apply P3.1–P3.2 to the ~70% that is fact-derivable (tam, traction, team, retention,
-  data advantage, …).
-  - **Validation gate:** each migrated component has criteria + fact-derived scoring;
-    a coverage note lists which components are now rules-based vs still qualitative.
+- [✅] **P3.3 — Roll the pattern across remaining fact-derivable components.**
+  The single-component (team_execution) anchor block is now a catalog-driven
+  `COMPONENT_EVIDENCE_ANCHORS` covering all 12 fact-derivable label components
+  (traction, team, gtm, competition, pain_alignment, complexity, scalability,
+  data_advantage, network_effects, switching_costs, proprietary_data, barriers) — each
+  with checkable evidence conditions, rendered compactly to respect prompt-cost limits.
+  Value components (tam/growth_rate/growth_velocity/retention) are threshold-scored and
+  flagged as "give a number"; qualitative components are flagged qualitative.
+  - Files: `backend/reviewer/base.py` (catalog + `_evidence_anchors_block`),
+    `backend/config/scoring_config.py` (classification SSOT),
+    `backend/tests/test_scoring_golden_snapshot.py` (`test_p33_evidence_anchors_match_normalizer_vocabulary`).
+  - **Coverage note (rules-based vs qualitative):** 12 fact-derived (anchored) + 4 value
+    (threshold) = 16 rules-based; 9 qualitative (`market.urgency`, `market.timing`,
+    `execution.operational_velocity`, `product.value_prop`, `product.differentiation`,
+    `product.ux`, `technical.engineering_quality`, `technical.architecture`,
+    `defensibility.brand`). Partition is exhaustive over the 25 components.
+  - **Validation gate:** ✅ every anchor label is a recognized normalizer label;
+    classification partitions all 25 components exactly once; prompt assembles; 270
+    backend tests pass. ⏳ prompt QUALITY (does the model produce better labels?) needs a
+    model — same caveat as P3.1.
   - Depends on: P3.2
 
-- [ ] **P3.4 — Mark qualitative dimensions as qualitative (Layer 5 partial).**
-  Technical/Defensibility components with no objective anchor are explicitly labelled
-  qualitative in the data and the UI.
-  - Files: scoring config, memo components.
-  - **Validation gate:** the memo visibly distinguishes an evidence-backed Market 8
-    from a qualitative Defensibility 8.
+- [✅] **P3.4 — Mark qualitative dimensions as qualitative (Layer 5 partial).**
+  Components with no objective anchor are classified `QUALITATIVE_COMPONENTS` (SSOT in
+  `scoring_config.py`); the scoring engine stamps `qualitative: True` on those components
+  in its output, and the reviewer prompt frames them honestly ("judgment; prefer null
+  over a guess"). The `qualitative` flag flows to the memo so an evidence-backed 8 is
+  distinguishable from a qualitative 8.
+  - Files: `backend/config/scoring_config.py`, `backend/services/scoring/scoring_engine.py`,
+    `backend/reviewer/base.py`, `backend/tests/test_scoring_golden_snapshot.py`
+    (`test_p34_qualitative_components_are_flagged_in_engine_output`).
+  - **Validation gate:** ✅ (data) qualitative components carry the flag, fact-derived /
+    value components do not; 275 backend tests pass. ✅ (UI) the flag is threaded through
+    `ScoringDriverRow` and rendered as a "qualitative" marker on driver rows in
+    `DimensionCard`; methodology copy explains it; tsc/eslint clean.
+  - Files (UI): `app-front-end/src/types/startup.ts`, `src/lib/scoringRationale.ts`,
+    `src/components/scoring/DimensionCard.tsx`, `src/components/InvestmentMemoContent.css`.
   - Depends on: P3.3
 
 ---
@@ -260,8 +284,12 @@ Work one task at a time, tick it only when its **Validation gate** passes.
   canonical rubric and fails CI on any drift (so the B1 fix can't silently regress).
   - Files: `backend/tests/test_frontend_band_parity.py` (new).
   - **Validation gate:** ✅ parity test passes; an intentional mismatch fails loudly.
-  - **Remaining:** the fuller version derives bands from the policy *payload* at runtime
-    (no hand-mirror) and stamps the rubric version on the memo — a wire+UI change.
+  - ✅ **Rubric version stamp added:** `ScoreOverview` now renders the rubric/policy
+    version (`policy_version_id` → `policy_hash` fallback) in the "How this was scored"
+    block; tsc/eslint clean.
+  - **Remaining:** derive the band *thresholds* from the policy payload at runtime (no
+    hand-mirror) — a deeper wire change; the drift-guard test keeps the hand-mirror safe
+    until then.
   - Depends on: P1.1
 
 - [✅] **P4.2 — Distinct words per axis (audit B2).**
@@ -291,13 +319,20 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     competes with the overall.
   - Depends on: P1.3
 
-- [◑] **P4.5 — Expose methodology (audit B6/A6).**
-  Render the evidence trail (Layers 1–2) and rubric version in a deliberate
-  "How this was scored" block; keep stripping only genuine debug strings.
-  - Files: `reviewScoring.ts:180-212` (`sanitizeReasoning`), memo components.
-  - **Validation gate:** an analyst can answer "why is this a 7?" from the memo
-    alone; legitimate weights/rubric text are shown while `normalize_`/`_extract_`/
-    `policy_hash` debug strings stay hidden.
+- [✅] **P4.5 — Expose methodology (audit B6/A6).**
+  `sanitizeReasoning`'s `INTERNAL_REASONING_PATTERNS` was over-aggressive — it stripped
+  legitimate methodology prose ("Normalization", "Aggregation", "Weight 30%",
+  "Evidence: complete", "Component weights", "Policy inputs", "Rule engine",
+  "Missing-data rule:", "extracted from"). Relaxed to strip ONLY genuine code/debug
+  identifiers (`normalize_`/`_extract_`/`classify_`/`policy_hash`/`policy_version`/
+  `source_components`/module names/scout-payload plumbing). Methodology weights and
+  rubric/aggregation language now render, so an analyst can answer "why a 7?".
+  - Files: `app-front-end/src/lib/reviewScoring.ts` (`INTERNAL_REASONING_PATTERNS`).
+  - **Validation gate:** ✅ legitimate weights/rubric/evidence-status text is shown;
+    `normalize_`/`_extract_`/`policy_hash` strings stay hidden; `tsc --noEmit` clean;
+    eslint clean.
+  - **Remaining:** the deliberate "How this was scored" block that renders the Layer 1–2
+    evidence trail + rubric version inline is folded with P4.1's version-stamp work.
   - Depends on: P3.2
 
 ---
@@ -319,49 +354,87 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     averaged into a precise number.
   - Depends on: P3.4
 
-- [ ] **P5.3 — Persona display honesty (audit A2).**
-  Present persona rows as qualitative lenses, not three independent authoritative
-  votes; show what actually drove the published number.
-  - Files: `InvestmentMemoContent.tsx` reviewer detail/consensus sections.
-  - **Validation gate:** the memo no longer implies three independent scorers produced
-    the headline; the published number's provenance is clear.
+- [✅] **P5.3 — Persona display honesty (audit A2).**
+  Added a provenance note at the top of the Reviewer-detail section: "Persona lenses, not
+  independent scorers. The published score is computed deterministically from extracted
+  evidence; these reads show how each lens weighs the same case." The persona rows remain
+  for the shape-of-disagreement signal, but no longer read as three authoritative votes
+  producing the headline.
+  - Files: `app-front-end/src/components/InvestmentMemoContent.tsx`,
+    `app-front-end/src/components/InvestmentMemoContent.css`.
+  - **Validation gate:** ✅ memo states the published number's provenance (deterministic,
+    not a 3-persona average); tsc/eslint clean.
   - Depends on: P2.2
 
 ---
 
 ## Phase 6 — Comparability completeness (Workstream A)
 
-- [ ] **P6.1 — Stage cohorts (audit C4).**
-  Score against a stated stage cohort; print it ("Execution 7 — strong *for Seed*").
-  - Files: scoring config, extraction (stage), memo components.
-  - **Validation gate:** the same evidence yields the cohort-appropriate framing; the
-    memo states the cohort; within-cohort comparability is preserved.
+- [◑] **P6.1 — Stage cohorts (audit C4).**
+  Backend done: `resolve_stage_cohort` maps the scout `funding_stage` to a canonical
+  cohort (pre_seed/seed/series_a/series_b_plus/unknown); the engine surfaces
+  `stage_cohort` + `stage_cohort_label` in its trace (now typed on `StructuredScoring`
+  and copied through `reviewScoring.ts`). Scores stay absolute (decision log) — the
+  cohort is display context only.
+  - Files: `backend/config/scoring_config.py`, `backend/services/scoring/scoring_engine.py`,
+    `app-front-end/src/types/startup.ts`, `app-front-end/src/lib/reviewScoring.ts`,
+    `backend/tests/test_scoring_golden_snapshot.py` (`test_p61_stage_cohort_is_captured_and_labelled`).
+  - **Validation gate:** ✅ cohort captured + labelled; same evidence in different cohorts
+    yields identical absolute scores (cohort is framing, not a multiplier); rendered in
+    the memo as an "Assessed as <cohort>-stage" context line (`ScoreOverview`); 275
+    backend pass; tsc/eslint clean.
   - Depends on: P3.3
 
-- [ ] **P6.2 — Remove stage-word contamination of traction (audit §5 coupling).**
-  `"seed"/"pre_revenue"/"growth"` must not hard-map into traction labels.
-  - Files: `normalization_layer.py:104-107`.
-  - **Validation gate:** a stage word in the payload no longer sets the traction
-    score; traction is driven by traction evidence only.
+- [✅] **P6.2 — Remove stage-word contamination of traction (audit §5 coupling).**
+  Removed the four stage-word synonyms (`seed`/`pre_revenue`/`pre-revenue`/`growth`)
+  from `_LABEL_SYNONYMS`; a stage word now abstains (`UNRECOGNIZED_LABEL` → excluded
+  from aggregation) instead of hard-mapping into traction (`seed→early_adoption`,
+  `growth→scaling`). Traction is driven only by traction evidence.
+  - Files: `normalization_layer.py` (synonyms block), `tests/test_scoring_golden_snapshot.py`
+    (`test_FIXED_stage_word_does_not_set_traction_score_P62`).
+  - **Validation gate:** ✅ stage words → `is_unrecognized`; genuine traction labels still
+    score; end-to-end a `traction:"seed"` structured signal is excluded (`unrecognized_label`),
+    not scored. 268 backend tests pass, zero ripple.
   - Depends on: P3.2
 
-- [ ] **P6.3 — Sector benchmarks (audit C5).**
-  Anchor TAM/complexity/competition to sector-relative references.
-  - Files: `config/scoring_config.py`, normalization.
-  - **Validation gate:** an identical TAM yields sector-appropriate Market scores; the
-    memo notes the sector benchmark used.
+- [◑] **P6.3 — Sector benchmarks (audit C5).**
+  TAM is now scored against sector-relative thresholds: `SECTOR_TAM_THRESHOLDS` +
+  `resolve_tam_benchmark(sector)` route `normalize_tam(value, thresholds)` so an
+  identical $1B TAM scores lower for fintech (capital-heavy) than dev-tools. The chosen
+  benchmark label rides on the trace (`sector_tam_benchmark`, typed + copied through).
+  Absolute scale preserved; default benchmark == prior behavior (zero ripple for
+  sector-less fixtures).
+  - Files: `backend/config/scoring_config.py`, `backend/services/scoring/normalization_layer.py`,
+    `backend/services/scoring/scoring_engine.py`, frontend types/lib,
+    `backend/tests/test_scoring_golden_snapshot.py` (`test_p63_identical_tam_scores_by_sector_benchmark`).
+  - **Validation gate:** ✅ same $1B TAM → dev-tools Market.tam > fintech Market.tam;
+    benchmark label emitted and rendered in the memo ("Market graded vs <benchmark>",
+    `ScoreOverview`); 275 backend pass; tsc/eslint clean. **Remaining:** extend sector
+    calibration to complexity/competition (TAM done).
   - Depends on: P3.3
 
 ---
 
 ## Phase 7 — Outcome validity (Layer 6, long horizon)
 
-- [ ] **P7.1 — Persist the structured evidence + score trail per decision.**
-  Store facts, labels, scores, rubric version for every memo so future calibration is
-  possible.
-  - Files: storage layer, `supabase/migrations/` (new migration).
-  - **Validation gate:** every scored startup has a retrievable, versioned scoring
-    trail.
+- [✅] **P7.1 — Persist the structured evidence + score trail per decision.**
+  **Append-only** `public.scoring_trails` table (facts/labels/component scores in `trail`
+  jsonb + rubric/policy version, overall, stage cohort, sector benchmark), indexed for
+  the per-startup read and the P7.2 calibration scan, RLS-locked to the service role.
+  Separate table (not a JSONB column on the churny `startups` row) preserves history and
+  avoids re-adding the write amplification a prior migration removed.
+  `SupabaseStartupsStorage.record_scoring_trail` inserts the trace; the reviewer engine
+  calls it once per startup after the primary review is finalized (best-effort — a
+  trail-write failure can never break a review; no-op on file-storage dev backends).
+  - Files: `supabase/migrations/20260604000002_scoring_trail.sql`,
+    `backend/supabase_storage.py` (`record_scoring_trail`),
+    `backend/reviewer/engine.py` (`_persist_scoring_trail` + call site),
+    `backend/tests/test_scoring_trail_write.py` (new).
+  - **Validation gate:** ✅ migration **APPLIED to aethria-prod** (`scoring_trails` exists,
+    RLS-locked, indexed — advisor only flags `rls_enabled_no_policy` INFO, the DB-wide
+    convention for this service-role-only schema); insert writes the denormalized columns
+    + full trace; DB error returns False without raising; 275 backend tests pass. Live
+    rows populate on the next pipeline review run.
   - Depends on: P3.2
 
 - [ ] **P7.2 — Outcome → anchor recalibration loop.**

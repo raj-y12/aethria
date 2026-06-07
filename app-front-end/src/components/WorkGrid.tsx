@@ -22,6 +22,7 @@ import {
   createDefaultFundConfiguration,
   type FundConfiguration,
 } from '../lib/fundConfiguration';
+import { productInteraction } from '../design-system/productSystem';
 import { QUEUE_ROW_LAYOUT_TRANSITION } from './queue/queueRowMotion';
 import {
   buildQueueRowContext,
@@ -188,6 +189,30 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     [reduceMotion]
   );
 
+  const emptyStateContainerVariants = useMemo((): Variants | undefined =>
+    reduceMotion
+      ? undefined
+      : {
+          hidden: {},
+          visible: { transition: { staggerChildren: 0.05, delayChildren: 0.03 } },
+        },
+    [reduceMotion]
+  );
+
+  const emptyStateItemVariants = useMemo((): Variants | undefined =>
+    reduceMotion
+      ? undefined
+      : {
+          hidden: { opacity: 0, transform: 'translateY(8px)' },
+          visible: {
+            opacity: 1,
+            transform: 'translateY(0px)',
+            transition: { duration: 0.35, ease: tokens.motion.ease },
+          },
+        },
+    [reduceMotion]
+  );
+
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const stableIndex = useMemo(() => {
@@ -309,85 +334,107 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
       />
 
       <LayoutGroup id="decision-queue">
-      <motion.div
-        key={`${queueView}-${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
-        className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1"
-        initial={reduceMotion ? false : 'hidden'}
-        animate="visible"
-        variants={listContainerVariants}
-      >
         {orderedModels.length === 0 ? (
-          <div className="min-h-[16rem] px-phi-4 py-phi-5">
-            <div className="max-w-[32rem]">
-              <p className="type-label-tab text-oxford/35">Queue view</p>
-              <p className="mt-phi-3 type-body-emphasis text-oxford">No deals match this view.</p>
-              <p className="mt-phi-2 type-body text-oxford/55">
-                Adjust filters or return to priority. Stale work is classified after {config.thresholds.staleAfterHours}{' '}
-                hours.
-              </p>
-              {(hasActiveFilters || (queueView !== 'PRIORITY' && queueView !== 'ALL')) && (
-                <div className="mt-phi-4 flex flex-wrap items-center gap-x-phi-4">
-                  {hasActiveFilters && (
-                    <button
-                      type="button"
-                      onClick={resetFilters}
-                      className="type-meta min-h-[44px] text-oxford/60 hover:text-oxford transition-colors"
-                    >
-                      Reset filters
-                    </button>
-                  )}
-                  {queueView !== 'PRIORITY' && queueView !== 'ALL' && (
-                    <button
-                      type="button"
-                      onClick={() => setQueueView('PRIORITY')}
-                      className="type-meta min-h-[44px] text-oxford/60 hover:text-oxford transition-colors"
-                    >
-                      Priority view
-                    </button>
-                  )}
-                  {queueView !== 'ALL' && queueView !== 'PRIORITY' && (
-                    <button
-                      type="button"
-                      onClick={() => setQueueView('ALL')}
-                      className="type-meta min-h-[44px] text-oxford/60 hover:text-oxford transition-colors"
-                    >
-                      All deals
-                    </button>
-                  )}
-                </div>
-              )}
+          <div className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1">
+            <div className="min-h-[16rem] px-phi-4 py-phi-5">
+              <motion.div
+                key={`${queueView}-${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
+                className="max-w-[32rem]"
+                initial={reduceMotion ? false : 'hidden'}
+                animate="visible"
+                variants={emptyStateContainerVariants}
+              >
+                <motion.p className="type-label-tab text-oxford/35" variants={emptyStateItemVariants}>
+                  Queue view
+                </motion.p>
+                <motion.p
+                  className="mt-phi-3 type-body-emphasis text-oxford"
+                  variants={emptyStateItemVariants}
+                >
+                  No deals match this view.
+                </motion.p>
+                <motion.p className="mt-phi-2 type-body text-oxford/55" variants={emptyStateItemVariants}>
+                  Clear filters or switch to a broader queue view. Stale work is classified after{' '}
+                  {config.thresholds.staleAfterHours} hours.
+                </motion.p>
+                {(hasActiveFilters || (queueView !== 'PRIORITY' && queueView !== 'ALL')) && (
+                  <motion.div
+                    className="mt-phi-4 flex flex-wrap items-center gap-x-phi-4 gap-y-phi-1"
+                    role="group"
+                    aria-label="Queue empty-state actions"
+                    variants={emptyStateItemVariants}
+                  >
+                    {hasActiveFilters && (
+                      <button
+                        type="button"
+                        onClick={resetFilters}
+                        className={`${productInteraction.action} btn-interaction btn-interaction--no-press uppercase tracking-[0.12em] text-oxford`}
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                    {queueView !== 'PRIORITY' && queueView !== 'ALL' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setQueueView('PRIORITY')}
+                          aria-label="Switch to priority queue view"
+                          className={`${productInteraction.action} btn-interaction btn-interaction--no-press uppercase tracking-[0.12em] text-oxford font-semibold`}
+                        >
+                          Show priority queue
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQueueView('ALL')}
+                          aria-label="Switch to all deals view"
+                          className={`${productInteraction.action} btn-interaction btn-interaction--no-press uppercase tracking-[0.12em] text-oxford/55`}
+                        >
+                          Show all deals
+                        </button>
+                      </>
+                    )}
+                  </motion.div>
+                )}
+              </motion.div>
             </div>
           </div>
         ) : (
-          orderedModels.map((model, idx) => {
-            const isSelected = selectedId === model.startup.id;
-            const keyDown = (e: React.KeyboardEvent) => handleRowKeyDown(e, model, idx);
+          <motion.div
+            key={`${queueView}-${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
+            className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1"
+            initial={reduceMotion ? false : 'hidden'}
+            animate="visible"
+            variants={listContainerVariants}
+          >
+            {orderedModels.map((model, idx) => {
+              const isSelected = selectedId === model.startup.id;
+              const keyDown = (e: React.KeyboardEvent) => handleRowKeyDown(e, model, idx);
 
-            return (
-              <motion.div
-                key={model.startup.id}
-                layout={!reduceMotion}
-                transition={reduceMotion ? undefined : QUEUE_ROW_LAYOUT_TRANSITION}
-                variants={rowVariants}
-                className="min-w-0"
-              >
-                <DocketCaseRow
-                  ref={(el) => {
-                    if (el) rowRefs.current.set(model.startup.id, el);
-                    else rowRefs.current.delete(model.startup.id);
-                  }}
-                  model={model}
-                  isSelected={isSelected}
-                  rowIndex={idx}
-                  onClick={() => onStartupClick(model.startup)}
-                  onKeyDown={keyDown}
-                  badges={config.verdictBadges}
-                />
-              </motion.div>
-            );
-          })
+              return (
+                <motion.div
+                  key={model.startup.id}
+                  layout={!reduceMotion}
+                  transition={reduceMotion ? undefined : QUEUE_ROW_LAYOUT_TRANSITION}
+                  variants={rowVariants}
+                  className="min-w-0"
+                >
+                  <DocketCaseRow
+                    ref={(el) => {
+                      if (el) rowRefs.current.set(model.startup.id, el);
+                      else rowRefs.current.delete(model.startup.id);
+                    }}
+                    model={model}
+                    isSelected={isSelected}
+                    rowIndex={idx}
+                    onClick={() => onStartupClick(model.startup)}
+                    onKeyDown={keyDown}
+                    badges={config.verdictBadges}
+                  />
+                </motion.div>
+              );
+            })}
+          </motion.div>
         )}
-      </motion.div>
       </LayoutGroup>
     </div>
   );

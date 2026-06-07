@@ -11,8 +11,11 @@ from config.scoring_config import (
     DEBUG_SCORING,
     DEFAULT_SCORE,
     DIMENSION_WEIGHTS,
-    OVERALL_DIMENSION_WEIGHTS,
+    OVERALL_DRIVER_WEIGHTS,
     OVERALL_SCORE_DIMENSIONS,
+    QUALITATIVE_COMPONENTS,
+    resolve_stage_cohort,
+    resolve_tam_benchmark,
 )
 from services.scoring.aggregation_layer import aggregate_all_dimensions
 from services.scoring.extraction_layer import extract_structured_signals
@@ -59,13 +62,17 @@ class DeterministicScoringEngine:
         policy: Dict[str, Any] | None = None,
     ):
         self.weights = weights or DIMENSION_WEIGHTS
-        self.dimension_weights = dimension_weights or OVERALL_DIMENSION_WEIGHTS
+        self.dimension_weights = dimension_weights or OVERALL_DRIVER_WEIGHTS
         self.policy = policy or compile_policy_from_fund_config({})
         self.debug = os.getenv("DEBUG_SCORING", str(DEBUG_SCORING)).lower() in ("1", "true", "yes")
 
-    def _normalize_market(self, signals: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    def _normalize_market(
+        self, signals: Dict[str, Dict[str, Any]], tam_thresholds: Dict[str, Any] | None = None
+    ) -> Dict[str, Dict[str, Any]]:
         return {
-            "tam": self._normalized_signal(signals.get("tam", {}), normalize_tam),
+            "tam": self._normalized_signal(
+                signals.get("tam", {}), lambda v: normalize_tam(v, tam_thresholds)
+            ),
             "growth_rate": self._normalized_signal(signals.get("growth_rate", {}), normalize_growth),
             "urgency": self._normalized_signal(signals.get("urgency", {}), lambda v: normalize_urgency(v)),
             "timing": self._normalized_signal(signals.get("timing", {}), lambda v: normalize_timing(v)),
@@ -279,6 +286,30 @@ class DeterministicScoringEngine:
             return None
         return round(weighted_sum / weight_total, 2)
 
+    def _compute_overall_dispersion(self, aggregated: Dict[str, Dict[str, Any]]) -> Dict[str, Any] | None:
+        """Spread of the evidenced driver scores (audit: a blended 7 from flat 7s and one
+        from [9,9,3,9] are very different bets). Returns the standard deviation plus the
+        min/max range across the *evidenced* core drivers, so the memo can flag a lopsided
+        profile the headline average hides. None when fewer than two drivers are scored
+        (spread is undefined for a single point)."""
+        scores = [
+            float(details["score"])
+            for dim in OVERALL_SCORE_DIMENSIONS
+            if (details := aggregated.get(dim)) is not None
+            and details.get("score") is not None
+            and not details.get("unscored")
+        ]
+        if len(scores) < 2:
+            return None
+        mean = sum(scores) / len(scores)
+        std = (sum((s - mean) ** 2 for s in scores) / len(scores)) ** 0.5
+        return {
+            "std": round(std, 2),
+            "min": round(min(scores), 2),
+            "max": round(max(scores), 2),
+            "range": round(max(scores) - min(scores), 2),
+        }
+
     def _compute_overall_confidence(self, aggregated: Dict[str, Dict[str, Any]]) -> float:
         weighted_sum = 0.0
         weight_total = 0.0
@@ -331,15 +362,19 @@ class DeterministicScoringEngine:
             present = 0
             for name in source_components:
                 component = components.get(name) or {}
-                component_weight = float(self.weights.get(dimension, {}).get(name, 1.0))
-                weighted_sum += float(component.get("score", DEFAULT_SCORE)) * component_weight
-                weight_total += component_weight
                 try:
                     confidences.append(max(0.0, min(1.0, float(component.get("confidence", 0.0)))))
                 except (TypeError, ValueError):
                     confidences.append(0.0)
+                # Only components with concrete evidence contribute to the criterion score.
+                # A missing component must NOT be folded in at its neutral 5.0 placeholder —
+                # that reintroduces the very leak aggregate_dimension excludes (audit C2 /
+                # Layer 3). Weights are renormalized over the evidenced components.
                 if self._component_has_evidence(component):
                     present += 1
+                    component_weight = float(self.weights.get(dimension, {}).get(name, 1.0))
+                    weighted_sum += float(component.get("score", DEFAULT_SCORE)) * component_weight
+                    weight_total += component_weight
             score = weighted_sum / weight_total if weight_total > 0 else DEFAULT_SCORE
             completeness = present / len(source_components) if source_components else 0.0
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
@@ -399,6 +434,11 @@ class DeterministicScoringEngine:
         criterion_weight_total = 0.0
         criterion_conf_weighted_sum = 0.0
         for criterion in out_criteria.values():
+            # A criterion with no evidenced components carries only a placeholder score;
+            # excluding it keeps the dimension score evidence-only and consistent with
+            # aggregate_dimension (a no-evidence criterion never drags the dimension toward 5.0).
+            if criterion.get("evidence_status") == "missing":
+                continue
             weight = float(criterion.get("weight", 0.0))
             criterion_weighted_sum += float(criterion.get("score", DEFAULT_SCORE)) * weight
             criterion_conf_weighted_sum += float(criterion.get("confidence", 0.0)) * weight
@@ -415,8 +455,13 @@ class DeterministicScoringEngine:
 
     def score(self, scout_output: Dict[str, Any], reviewer_output: Dict[str, Any]) -> Dict[str, Any]:
         extracted = extract_structured_signals(scout_output, reviewer_output)
+        # Sector-relative TAM benchmark (P6.3) and stage cohort (P6.1). Scores stay on the
+        # absolute 1–10 scale; only the TAM band thresholds shift by sector, and the
+        # cohort is surfaced so maturity-dependent criteria read in context.
+        tam_benchmark = resolve_tam_benchmark(scout_output.get("sector"))
+        stage_cohort = resolve_stage_cohort(scout_output.get("funding_stage"))
         normalized = {
-            "market": self._normalize_market(extracted.get("market", {})),
+            "market": self._normalize_market(extracted.get("market", {}), tam_benchmark["thresholds"]),
             "execution": self._normalize_execution(extracted.get("execution", {})),
             "product": self._normalize_product(extracted.get("product", {})),
             "technical": self._normalize_technical(extracted.get("technical", {})),
@@ -435,10 +480,29 @@ class DeterministicScoringEngine:
             "defensibility": aggregated.get("defensibility", {"score": DEFAULT_SCORE, "confidence": 0.0, "components": {}}),
             "overall_score": self._compute_overall_score(aggregated),
             "overall_confidence": self._compute_overall_confidence(aggregated),
+            "overall_dispersion": self._compute_overall_dispersion(aggregated),
             "raw_signals": extracted,
             "policy_version_id": self.policy.get("policy_version_id"),
             "policy_hash": self.policy.get("policy_hash"),
+            # Comparability context for the memo (P6.1 / P6.3): the cohort the maturity
+            # criteria should be read against, and the sector TAM benchmark the Market
+            # score was graded on.
+            "stage_cohort": stage_cohort["cohort"],
+            "stage_cohort_label": stage_cohort["label"],
+            "sector_tam_benchmark": tam_benchmark["label"],
         }
+        # Stamp the qualitative flag (P3.4) so the memo can distinguish a qualitative 8
+        # (judgment, no objective anchor) from an evidence-backed 8. Classification is the
+        # SSOT in config.scoring_config; value/fact-derived components are left unflagged.
+        for comp_key in QUALITATIVE_COMPONENTS:
+            dim, _, comp_name = comp_key.partition(".")
+            dim_details = output.get(dim)
+            if not isinstance(dim_details, dict):
+                continue
+            comps = dim_details.get("components")
+            if isinstance(comps, dict) and isinstance(comps.get(comp_name), dict):
+                comps[comp_name]["qualitative"] = True
+
         missing_components: Dict[str, list[str]] = {}
         for dim, details in output.items():
             if not isinstance(details, dict):

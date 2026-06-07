@@ -85,6 +85,27 @@ def test_duplicate_lookup_id_is_coalesced_without_second_enqueue(monkeypatch):
     assert len(queue.items) == 1
 
 
+def test_cancel_lookup_marks_lookup_cancelled(monkeypatch):
+    import api
+    from security.rate_limiter import InMemorySecurityStore
+
+    monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
+    monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
+    monkeypatch.setattr(api, "_cancelled_lookup_ids", set())
+
+    client = TestClient(api.app)
+    response = client.post(
+        "/api/startups/lookup/cancel",
+        json={"lookup_ids": ["lookup-cancel-1", "lookup-cancel-2"]},
+        headers=_auth_headers(),
+    )
+
+    assert response.status_code == 202
+    assert response.json()["cancelled"] == ["lookup-cancel-1", "lookup-cancel-2"]
+    assert api._is_lookup_cancelled("user_a", "lookup-cancel-1") is True
+    assert api._is_lookup_cancelled("user_b", "lookup-cancel-1") is False
+
+
 def test_manual_agent_trigger_when_ops_off_is_coalesced_without_second_enqueue(monkeypatch):
     import api
     from security.rate_limiter import InMemorySecurityStore

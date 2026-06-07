@@ -12,12 +12,13 @@
   --memo-font-ui: var(--font-sans, "Figtree Variable", system-ui, -apple-system, sans-serif);
   --memo-font-mono: var(--font-mono, "Space Mono", ui-monospace, monospace);
   --memo-font-display: var(--font-display, "Playfair Display", Georgia, "Times New Roman", serif);
-  --memo-size-body:      0.8125rem;
-  --memo-size-secondary: 0.75rem;
-  --memo-size-ui:        0.75rem;
-  --memo-size-label:     0.6875rem;
-  --memo-size-micro:     0.625rem;
-  --memo-leading-body:   1.55;
+  /* Tuned for ~1440px (MacBook Air): restrained, spacious — readable without feeling big. */
+  --memo-size-body:      0.875rem;   /* 14px — prose, lists, reasoning */
+  --memo-size-secondary: 0.8125rem;  /* 13px — secondary prose, takes */
+  --memo-size-ui:        0.8125rem;  /* 13px — meta lines, instrument text */
+  --memo-size-label:     0.6875rem;  /* 11px — mono section heads / labels */
+  --memo-size-micro:     0.625rem;   /* 10px — tags & chips ONLY, never body content */
+  --memo-leading-body:   1.6;
   --memo-ink-strong:     rgba(var(--color-oxford-rgb), 0.88);
   --memo-ink:            rgba(var(--color-oxford-rgb), 0.70);
   --memo-ink-muted:      rgba(var(--color-oxford-rgb), 0.52);
@@ -36,6 +37,10 @@
   width: 60%;
   min-width: 0;
   flex: 0 0 60%;
+  /* The memo lives in a resizable split pane, so it must respond to ITS OWN width, not the
+     viewport. Make it a query container; cqw units + @container rules below size to the panel. */
+  container-type: inline-size;
+  container-name: memoPanel;
   background: var(--color-paper);
   min-height: 0;
   height: 100%;
@@ -826,9 +831,6 @@
 }
 .memoDisclosureMeta {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
   letter-spacing: 0.06em;
@@ -857,21 +859,31 @@
   color: rgba(var(--color-oxford-rgb), 0.48);
   transition: color 140ms ease, border-color 140ms ease, opacity 140ms ease;
 }
+/* Outline button in the house language (btn-aethria): sharp corners, mono uppercase, accent
+   border to mark it as the risk gate. Fills on hover, scale-on-press. A real button, not a label. */
 .memoRiskAckButton {
-  min-height: 42px;
   justify-self: start;
-  padding: 0;
-  border-color: transparent;
+  height: 36px;
+  padding: 0 22px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 38%, transparent);
+  border-radius: 0;
   background: transparent;
-  color: color-mix(in srgb, var(--color-accent) 74%, rgba(var(--color-oxford-rgb), 0.92));
-  text-align: left;
+  color: color-mix(in srgb, var(--color-accent) 80%, var(--color-oxford));
+  transition:
+    background-color 150ms var(--motion-ease),
+    color 150ms var(--motion-ease),
+    transform 120ms var(--motion-ease);
 }
-.memoRiskAckButton:hover,
-.memoDecisionChoice:hover {
+.memoDecisionChoice:hover:not([aria-pressed="true"]):not(:disabled) {
   color: var(--color-oxford);
+  border-color: rgba(var(--color-oxford-rgb), 0.45);
 }
 .memoRiskAckButton:hover {
-  color: color-mix(in srgb, var(--color-accent) 86%, rgba(var(--color-oxford-rgb), 0.92));
+  background: color-mix(in srgb, var(--color-accent) 86%, var(--color-oxford));
+  color: var(--color-paper);
+}
+.memoRiskAckButton:active {
+  transform: scale(0.97);
 }
 .memoRiskAckButton:focus,
 .memoRulingSubmit:focus,
@@ -938,20 +950,36 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
+/* Segmented ruling selector in the house language: sharp outline buttons, mono uppercase,
+   scale-on-press. The SELECTED option fills with its verdict colour (Invest green / Monitor
+   amber / Pass oxblood) — same ramp as the cover recommendation — so the choice reads at a glance. */
 .memoDecisionChoice {
-  min-height: 46px;
+  height: 40px;
+  min-height: 0;
   padding: 0 10px;
   text-align: center;
   justify-content: center;
-  border-color: transparent;
-  background: rgba(var(--color-oxford-rgb), 0.035);
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.22);
+  border-radius: 0;
+  background: transparent;
+  color: rgba(var(--color-oxford-rgb), 0.55);
+  transition:
+    background-color 150ms var(--motion-ease),
+    border-color 150ms var(--motion-ease),
+    color 150ms var(--motion-ease),
+    transform 120ms var(--motion-ease);
+}
+.memoDecisionChoice:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .memoDecisionChoice[aria-pressed="true"] {
-  color: var(--color-oxford);
+  color: var(--color-paper);
   border-color: transparent;
-  background: rgba(var(--color-oxford-rgb), 0.075);
   font-weight: 600;
 }
+.memoDecisionChoice--yes[aria-pressed="true"] { background: #17442d; }
+.memoDecisionChoice--maybe[aria-pressed="true"] { background: #5f4716; }
+.memoDecisionChoice--no[aria-pressed="true"] { background: #5e2621; }
 .memoDecisionChoice:disabled,
 .memoRulingSubmit:disabled,
 .memoRiskAckButton:disabled,
@@ -1033,16 +1061,30 @@
 .memoRulingSubmitRow--locked .memoRulingHint {
   order: 1;
 }
+/* Same shape/feel as the "Enter Aethria" solid button (.btn-aethria-solid): sharp corners,
+   36px height, generous 0 40px padding, opacity hover, and scale-on-press feedback. Colours
+   stay the commit button's own oxford fill / inverse text. */
 .memoRulingSubmit {
-  min-height: 44px;
-  padding: 0 20px;
+  height: 36px;
+  min-height: 0;
+  padding: 0 40px;
   border-color: transparent;
+  border-radius: 0;
   background: var(--color-oxford);
   color: var(--text-inverse);
+  transition:
+    background-color 150ms var(--motion-ease),
+    opacity 150ms var(--motion-ease),
+    transform 120ms var(--motion-ease);
 }
 .memoRulingSubmit:hover:not(:disabled) {
-  background: rgba(var(--color-oxford-rgb), 0.88);
+  background: rgba(var(--color-oxford-rgb), 0.85);
   color: var(--color-paper);
+  opacity: 0.9;
+}
+.memoRulingSubmit:active:not(:disabled) {
+  transform: scale(0.97);
+  opacity: 0.88;
 }
 .memoRulingHint,
 .memoRulingError {
@@ -1210,38 +1252,50 @@
 .memoCoverRulingWord {
   margin: 0;
   font-family: var(--memo-font-ui);
-  font-size: clamp(2.5rem, 6vw, 4rem);
+  /* cqw = % of the panel width, so the verdict never stays huge in a narrow pane. */
+  font-size: clamp(2rem, 7.5cqw, 3.5rem);
   font-weight: 700;
-  line-height: 0.92;
-  letter-spacing: -0.035em;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
   text-transform: uppercase;
   color: var(--color-oxford);
   font-feature-settings: "kern" 1, "liga" 1;
 }
-.memoCoverRulingWord--pass {
-  color: color-mix(in srgb, var(--color-accent) 86%, var(--color-oxford));
-}
+/* The verdict colour carries the call — deep print-ink tones on the cream cover, matching
+   the WorkGrid / badge semantic ramp (verdictBadgeTokens). Previously only PASS was tinted. */
+.memoCoverRulingWord--invest { color: #17442d; }
+.memoCoverRulingWord--pass { color: #5e2621; }
+.memoCoverRulingWord--monitor { color: #5f4716; }
+.memoCoverRulingWord--escalation { color: color-mix(in srgb, var(--color-accent) 88%, var(--color-oxford)); }
+.memoCoverRulingWord--awaiting,
+.memoCoverRulingWord--undecided,
+.memoCoverRulingWord--pending { color: var(--memo-ink-faint); }
 .memoCoverRulingSupport {
-  margin: 12px 0 0;
+  margin: 16px 0 0;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 22px;
 }
 .memoCoverRulingConviction {
-  margin: 0;
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-ui);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--memo-ink-muted);
   font-variant-numeric: tabular-nums;
 }
+/* Only rendered when reviewers are SPLIT — the exception worth flagging. Accent pill so it
+   reads as a caution, not a neutral stat (aligned panels show nothing here). */
 .memoCoverRulingConsensus {
-  margin: 0;
   font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-label);
-  letter-spacing: 0.08em;
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--memo-ink-faint);
+  color: color-mix(in srgb, var(--color-accent) 85%, var(--color-oxford));
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 38%, transparent);
+  border-radius: 999px;
+  transform: translateY(-1px);
 }
 .memoCoverStatus {
   margin: 12px 0 0;
@@ -1263,6 +1317,47 @@
   color: var(--memo-ink-muted);
   max-width: 38rem;
 }
+/* Pending / awaiting verdicts pulse to signal the pipeline is still working — a calm,
+   compositor-only opacity animation (no JS re-renders, no jank). The verdict word itself
+   carries the cue, so no separate dot is needed. Decided verdicts stay perfectly static. */
+@keyframes memoCoverRulingPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+.memoCoverRulingWord--pending,
+.memoCoverRulingWord--awaiting,
+.memoCoverRulingWord--undecided {
+  animation: memoCoverRulingPulse 2.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .memoCoverRulingWord--pending,
+  .memoCoverRulingWord--awaiting,
+  .memoCoverRulingWord--undecided { animation: none; }
+}
+/* "What decides it" — the crux question, set as an accent-bordered callout so it reads as
+   the single thing the deal hinges on, not a footnote under the verdict. */
+.memoCoverDecider {
+  margin-top: clamp(18px, 2.4vw, 26px);
+  padding-left: 16px;
+  border-left: 2px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+.memoCoverDeciderLabel {
+  margin: 0 0 5px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoCoverDeciderText {
+  margin: 0;
+  max-width: 42rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.55;
+  color: var(--memo-ink);
+}
+
 .memoCoverBrief {
   margin: clamp(22px, 3vw, 30px) 0 0;
   display: flex;
@@ -1411,7 +1506,6 @@
 }
 .memoKillerStatement {
   margin: 0;
-  max-width: 38rem;
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-body);
   line-height: 1.5;
@@ -1426,9 +1520,9 @@
 .memoConsensusHead {
   display: flex;
   align-items: baseline;
-  gap: 8px 18px;
+  gap: 6px 16px;
   flex-wrap: wrap;
-  margin-bottom: clamp(16px, 2vw, 22px);
+  margin-bottom: clamp(12px, 1.6vw, 16px);
 }
 .memoConsensusVerdict {
   margin: 0;
@@ -1446,6 +1540,24 @@
   text-transform: uppercase;
   font-weight: 400;
   color: var(--memo-ink-faint);
+}
+/* Aligned (normal) → quiet label. Split (exception) → accent flag. Flag the exception, not the rule. */
+.memoConsensusLabel {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoConsensusFlag {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--color-accent) 85%, var(--color-oxford));
 }
 .memoConsensusSpread {
   margin: 0;
@@ -1466,7 +1578,7 @@
   grid-template-columns: 6.5rem 3rem minmax(0, 1fr);
   gap: 0 clamp(14px, 2vw, 22px);
   align-items: baseline;
-  padding: 14px 0;
+  padding: 11px 0;
   border-bottom: 1px solid var(--memo-rule);
 }
 .memoConsensusName {
@@ -1488,6 +1600,260 @@
   font-size: var(--memo-size-secondary);
   line-height: 1.5;
   color: var(--memo-ink);
+}
+
+/* ── Assessment scorecard — driver dimensions + moat signal, expandable rows ── */
+.memoScoreHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+}
+.memoScoreHeadline {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.memoScoreHeadlineValue {
+  font-family: var(--memo-font-ui);
+  font-size: clamp(1.6rem, 5cqw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  color: var(--color-oxford);
+  font-variant-numeric: tabular-nums;
+}
+.memoScoreHeadlineMax {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  letter-spacing: 0.02em;
+  color: var(--memo-ink-faint);
+}
+.memoScoreHeadlineTag {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--memo-ink-muted);
+}
+.memoScoreMethod {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+  transition: color 120ms ease;
+}
+.memoScoreMethod:hover { color: var(--memo-ink-muted); }
+.memoScoreSub {
+  margin: 8px 0 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  letter-spacing: 0.03em;
+  color: var(--memo-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.memoScoreList {
+  list-style: none;
+  margin: clamp(18px, 2.4vw, 26px) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--memo-rule);
+}
+.memoScoreList--moat { margin-top: 8px; }
+.memoScoreRow {
+  display: grid;
+  grid-template-columns: 7rem 3rem minmax(0, 1fr) 1.25rem;
+  gap: 0 clamp(14px, 2vw, 22px);
+  align-items: baseline;
+  width: 100%;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--memo-rule);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.memoScoreRow:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-oxford) 3%, transparent);
+}
+.memoScoreRow:disabled { cursor: default; }
+.memoScoreName {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--memo-ink-muted);
+}
+.memoScoreVal {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-body);
+  font-weight: 700;
+  color: var(--color-oxford);
+  font-variant-numeric: tabular-nums;
+}
+.memoScoreVal--muted { color: var(--memo-ink-faint); font-weight: 400; }
+.memoScoreTake {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: var(--memo-ink);
+}
+.memoScoreTakeFlag {
+  margin-left: 8px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoScoreChevron {
+  justify-self: end;
+  align-self: center;
+  font-family: var(--memo-font-ui);
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--memo-ink-faint);
+  transition: transform 200ms ease, color 200ms ease;
+}
+.memoScoreRow:hover .memoScoreChevron { color: var(--memo-ink-muted); }
+.memoScoreChevron--open { transform: rotate(90deg); }
+.memoScoreDetail {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 1.8vw, 18px);
+  padding: 6px 0 18px;
+}
+.memoScoreDriverList,
+.memoScoreReasonList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.memoScoreReason {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.55;
+  color: var(--memo-ink);
+}
+/* Definition-list rhythm: metric name in a quiet left column, reasoning fills the width. */
+.memoScoreDriverItem {
+  display: grid;
+  grid-template-columns: minmax(7rem, 8.5rem) minmax(0, 1fr);
+  gap: 2px clamp(16px, 2vw, 24px);
+  align-items: baseline;
+}
+.memoScoreDriverHead {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding-top: 0.1em;
+}
+.memoScoreDriverName {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--memo-ink-muted);
+}
+.memoScoreDriverTag {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.02em;
+  color: var(--memo-ink-faint);
+  padding: 1px 6px;
+  border: 1px solid var(--memo-rule);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.memoScoreDriverText {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: var(--memo-ink);
+}
+.memoScoreGroupLabel {
+  margin: 0 0 9px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+
+@media (max-width: 640px) {
+  .memoScoreDriverItem { grid-template-columns: 1fr; gap: 4px; }
+  .memoScoreDriverHead { flex-direction: row; align-items: baseline; gap: 8px; padding-top: 0; }
+}
+.memoScoreEvidenceNote {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-ui);
+  letter-spacing: 0.02em;
+  color: var(--memo-ink-muted);
+}
+.memoScoreMoat { margin-top: clamp(24px, 3.2vw, 34px); }
+.memoScoreMoatLabel {
+  margin: 0 0 2px;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoScoreMoatLabel em { font-style: normal; color: var(--memo-ink-muted); }
+.memoScorePanel { margin-top: clamp(32px, 4.2vw, 48px); }
+
+/* "Show N more" / "Show less" toggle for capped lists (never truncates — reveals in place). */
+.memoShowMore {
+  margin-top: 10px;
+  padding: 0;
+  background: none;
+  border: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--memo-ink-muted);
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.memoShowMore:hover { color: var(--color-oxford); }
+
+@media (max-width: 640px) {
+  .memoScoreRow { grid-template-columns: 5rem 2.5rem minmax(0, 1fr) 1rem; }
+  .memoScoreDetail { padding-left: 0; }
+}
+
+/* ── Panel-width responsiveness (container queries) ──────────────────────────────────────
+   These measure the memo PANEL itself, so multi-column rows reflow when the pane is dragged
+   narrow on a wide screen — the viewport @media blocks elsewhere can't see that. */
+@container memoPanel (max-width: 620px) {
+  .memoScoreRow { grid-template-columns: 4.25rem 2.25rem minmax(0, 1fr) 0.9rem; gap: 0 12px; }
+  .memoScoreDetail { padding-left: 0; }
+  .memoScoreDriverItem { grid-template-columns: 1fr; gap: 4px; }
+  .memoScoreDriverHead { flex-direction: row; align-items: baseline; gap: 8px; padding-top: 0; }
+  .memoConsensusRow { grid-template-columns: 4rem 2.5rem minmax(0, 1fr); }
+  .memoCoverBriefItem,
+  .memoSnapshotRow { grid-template-columns: 1fr; gap: 4px; }
+  .memoEvRisk { grid-template-columns: 4rem minmax(0, 1fr); gap: 0 14px; }
+}
+@container memoPanel (max-width: 440px) {
+  .memoDecisionChoices { grid-template-columns: 1fr; }
+  .memoEvRisk { grid-template-columns: 1fr; gap: 3px; }
+  .memoScoreRow { grid-template-columns: 1fr auto; gap: 2px 10px; }
+  .memoScoreName { grid-row: 1; grid-column: 1; }
+  .memoScoreVal { grid-row: 1; grid-column: 2; }
+  .memoScoreTake { grid-row: 2; grid-column: 1 / -1; }
+  .memoScoreChevron { display: none; }
 }
 
 /* Evidence pack — the depth the brief is freed from carrying */
@@ -1535,8 +1901,10 @@
 .memoScoringSection .memoDocScoreScope {
   padding-top: 0;
 }
-.memoScoringMore.memoDiscGroup {
-  margin-top: clamp(16px, 2.2vw, 22px);
+.memoScoringMore {
+  margin-top: clamp(20px, 2.6vw, 28px);
+  padding-top: clamp(18px, 2.4vw, 24px);
+  border-top: 1px solid var(--memo-rule);
 }
 .memoScoreOverview {
   max-width: 42rem;
@@ -1776,8 +2144,10 @@
 .memoScoringSection .memoDocScoreScope {
   padding-top: 0;
 }
-.memoScoringMore.memoDiscGroup {
-  margin-top: clamp(16px, 2.2vw, 22px);
+.memoScoringMore {
+  margin-top: clamp(20px, 2.6vw, 28px);
+  padding-top: clamp(18px, 2.4vw, 24px);
+  border-top: 1px solid var(--memo-rule);
 }
 .memoScoreOverview {
   max-width: 42rem;
@@ -2084,47 +2454,52 @@
   color: rgba(var(--color-oxford-rgb), 0.62);
 }
 
-/* Risk register — single column, decisive items */
+/* Risk register — aligned severity column on the left, statement + meta on the right, so the
+   eye scans severity down one rail (matches the snapshot / scorecard rhythm). */
 .memoEvRiskList {
   display: flex;
   flex-direction: column;
 }
 .memoEvRisk {
-  padding: clamp(15px, 1.9vw, 19px) 0;
+  display: grid;
+  grid-template-columns: minmax(4.25rem, 5rem) minmax(0, 1fr);
+  gap: 0 clamp(16px, 2vw, 24px);
+  align-items: baseline;
+  padding: clamp(14px, 1.8vw, 18px) 0;
   border-top: 1px solid var(--memo-rule);
 }
 .memoEvRisk:first-child {
   border-top: none;
   padding-top: 0;
 }
-.memoEvRiskHead {
-  margin: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 6px 13px;
-  flex-wrap: wrap;
+.memoEvRisk:last-child {
+  border-bottom: none;
 }
 .memoEvRiskSeverity {
-  flex: none;
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.40);
+  color: rgba(var(--color-oxford-rgb), 0.34);
 }
+/* High severity is the exception to flag — accent it; material risks stay quiet. */
 .memoEvRisk--high .memoEvRiskSeverity {
   color: var(--color-accent);
+  font-weight: 700;
+}
+.memoEvRiskBody {
+  min-width: 0;
 }
 .memoEvRiskTitle {
+  margin: 0;
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-body);
   font-weight: 600;
-  line-height: 1.42;
+  line-height: 1.45;
   color: var(--memo-ink-strong);
 }
 .memoEvRiskWhy {
-  margin: 7px 0 0;
-  max-width: 42rem;
+  margin: 6px 0 0;
   font-family: var(--memo-font-ui);
   font-size: var(--memo-size-secondary);
   line-height: 1.6;
@@ -2133,9 +2508,10 @@
 .memoEvRiskMeta {
   margin: 8px 0 0;
   font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-label);
-  letter-spacing: 0.05em;
-  color: rgba(var(--color-oxford-rgb), 0.38);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.36);
 }
 
 /* Sources — quiet supporting line under each reference */
@@ -2543,7 +2919,7 @@
   color: var(--memo-ink-strong);
   font-variant-numeric: tabular-nums;
 }
-.memoDocScorePanelBand { color: var(--memo-ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memoDocScorePanelBand { color: var(--memo-ink-muted); }
 .memoDocScorePanelMeta {
   font-family: var(--memo-font-mono);
   display: inline-flex;
@@ -2588,9 +2964,6 @@
   text-transform: uppercase;
   color: rgba(var(--color-oxford-rgb), 0.30);
   transition: color 150ms ease;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   max-width: 100%;
 }
 .memoDocScoreVal {
@@ -3126,9 +3499,6 @@
   font-size: var(--memo-size-label);
   letter-spacing: 0.04em;
   color: rgba(var(--color-oxford-rgb), 0.30);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   transition: color 150ms ease;
 }
 .memoDocReviewerRow[aria-pressed="true"] .memoDocReviewerRowScores { color: rgba(var(--color-oxford-rgb), 0.60); }
@@ -3241,9 +3611,6 @@
   font-variant-numeric: tabular-nums;
   color: var(--memo-ink-faint);
   margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .memoPipelinePlus {
   flex-shrink: 0;
@@ -3383,9 +3750,6 @@
 
 .memoPrecedentSummary {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-label);
   letter-spacing: 0.06em;
@@ -3452,35 +3816,6 @@
   align-items: center;
 }
 
-.memoPrecedentVerdict {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 4.25rem;
-  padding: 4px 8px;
-  font-family: var(--memo-font-mono);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  line-height: 1;
-}
-
-.memoPrecedentVerdict--invest {
-  background: #bfe3cc;
-  color: #17442d;
-}
-
-.memoPrecedentVerdict--pass {
-  background: #eabfb7;
-  color: #5e2621;
-}
-
-.memoPrecedentVerdict--monitor {
-  background: #e5d39f;
-  color: #5f4716;
-}
-
 .memoPrecedentName {
   font-family: var(--memo-font-ui);
   font-size: clamp(0.9375rem, 1.1vw, 1rem);
@@ -3504,10 +3839,6 @@
   font-size: var(--memo-size-ui);
   line-height: 1.5;
   color: var(--memo-ink-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .memoPrecedentTags {
@@ -3694,21 +4025,14 @@
   padding-top: clamp(22px, 3vw, 34px);
 }
 
-.memoDocSection {
-  margin-top: clamp(42px, 5vw, 68px);
-  padding-top: clamp(18px, 2.4vw, 28px);
-  border-top: 1px solid var(--memo-rule);
-}
-
+/* One spacing rhythm for every section: identical top margin + one divider rule + identical
+   padding. Previously Snapshot/Why-Now/Killers/Consensus had a larger margin than Assessment/
+   Risks, which read as uneven gaps. Single source of truth now. */
+.memoDocSection,
 .memoDocSection + .memoDocSection {
-  margin-top: clamp(42px, 5vw, 68px);
-}
-
-.memoSnapshotSection,
-.memoCaseSection,
-.memoKillerSection,
-.memoConsensusSection {
-  margin-top: clamp(46px, 5.6vw, 76px);
+  margin-top: clamp(40px, 5vw, 64px);
+  padding-top: clamp(20px, 2.6vw, 30px);
+  border-top: 1px solid var(--memo-rule);
 }
 
 .memoDocSectionHead {
@@ -3716,28 +4040,43 @@
   color: rgba(var(--color-oxford-rgb), 0.70);
 }
 
+/* Row-lists draw a divider under every row. Drop the trailing one so a list's bottom edge
+   never stacks against the next section's top border (the doubled hairline). */
+.memoKillerList .memoKiller:last-child,
+.memoConsensusList .memoConsensusRow:last-child {
+  border-bottom: none;
+}
+
+/* Prose-style blocks keep a reading measure; row-lists (killers, risks, scorecard,
+   reviewer panel) span the memo column so dividers and grids align edge-to-edge. */
 .memoSnapshot,
-.memoCaseList,
+.memoCaseList {
+  max-width: 66ch;
+}
+
 .memoKillerList,
 .memoConsensusList,
 .memoEvRiskList,
+.memoScoringMore,
+.memoScorePanel,
+.memoAssessmentCard,
 .memoList,
-.memoReplayList {
-  max-width: 66ch;
+.memoRulingPanel,
+.memoRulingTextarea,
+.memoDecisionChoices,
+.memoRulingSubmitRow {
+  width: 100%;
+  max-width: 100%;
 }
 
 .memoSnapshotText,
 .memoCasePoint,
-.memoKillerStatement,
-.memoConsensusTake,
-.memoEvRiskWhy,
 .memoDocProse,
 .memoDocDD,
 .memoDocReviewerDetailText,
 .memoReplayDetail,
 .memoLedgerText,
-.memoLedgerEmpty,
-.memoListItem > span:not(.memoBullet) {
+.memoLedgerEmpty {
   max-width: 66ch;
   text-align: left;
   text-wrap: pretty;
@@ -3785,25 +4124,27 @@
 }
 
 .memoDiscGroup {
-  margin-top: clamp(44px, 5.4vw, 72px);
+  margin-top: clamp(28px, 3.4vw, 44px);
   max-width: 66ch;
+}
+/* A group whose disclosures all fail their render conditions would otherwise leave a
+   phantom divider + the full top margin. Collapse it entirely. */
+.memoDiscGroup:empty {
+  display: none;
+  margin: 0;
+  border: 0;
 }
 
 .memoDiscGroup .memoDisclosureToggle {
-  padding-block: clamp(18px, 2.4vw, 26px);
+  padding-block: clamp(13px, 1.6vw, 18px);
 }
 
 .memoDiscGroup .memoDisclosureBody {
-  padding-bottom: clamp(24px, 3.2vw, 38px);
+  padding-bottom: clamp(20px, 2.6vw, 30px);
 }
 
 .memoDisclosureMeta {
   color: rgba(var(--color-oxford-rgb), 0.42);
-}
-
-.memoRulingPanel,
-.memoRulingTextarea {
-  max-width: 66ch;
 }
 
 .memoPanel--embedded .memoDocSection {
@@ -3876,4 +4217,42 @@
   .memoConsensusRow {
     gap: 8px 14px;
   }
+}
+
+/* ── Scoring remediation additions (P3.4 / P4.1 / P6.1 / P6.3) ─────────────────── */
+/* Rubric version stamp (P4.1) inside the methodology disclosure. */
+.memoScoreMethodVersion {
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+/* Comparability context line: stage cohort + sector benchmark (P6.1 / P6.3). */
+.memoScoreOverviewContext {
+  margin: 6px 0 0;
+  max-width: 40rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: rgba(var(--color-oxford-rgb), 0.52);
+}
+/* Persona-provenance note (P5.3): lenses, not independent scorers. */
+.memoDocReviewerProvenance {
+  margin: 0 0 8px;
+  max-width: 42rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: rgba(var(--color-oxford-rgb), 0.5);
+}
+/* Qualitative-component marker (P3.4): judgment, no objective anchor. */
+.memoScoreCompactDriverQual {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 0.7em;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.55);
+  background: rgba(var(--color-oxford-rgb), 0.07);
+  vertical-align: middle;
 }

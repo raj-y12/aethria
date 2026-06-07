@@ -22,6 +22,58 @@ from utils.reviewer_structured_signals_clamp import clamp_structured_signals_evi
 
 logger = logging.getLogger(__name__)
 MISSING_TOKEN_RE = re.compile(r"^\s*\[?\s*missing(?::[^\]]*)?\]?\s*$", re.IGNORECASE)
+DEFAULT_MAX_COMPLETION_TOKENS = 8192
+
+
+def _as_plain_obj(value: Any) -> Any:
+    if isinstance(value, dict):
+        return value
+    if hasattr(value, "model_dump"):
+        try:
+            return value.model_dump()
+        except Exception:
+            pass
+    if hasattr(value, "__dict__"):
+        return vars(value)
+    return value
+
+
+def _get_nested(value: Any, *keys: str) -> Any:
+    cur = value
+    for key in keys:
+        cur = _as_plain_obj(cur)
+        if isinstance(cur, dict):
+            cur = cur.get(key)
+        else:
+            return None
+    return cur
+
+
+def _chat_completion_content(response: Any) -> tuple[Optional[str], Dict[str, Any]]:
+    choices = _get_nested(response, "choices") or []
+    first_choice = choices[0] if isinstance(choices, list) and choices else None
+    content = _get_nested(first_choice, "message", "content")
+    if isinstance(content, str) and content.strip():
+        return content, {}
+
+    usage = _get_nested(response, "usage") or {}
+    diagnostic = {
+        "finish_reason": _get_nested(first_choice, "finish_reason"),
+        "total_tokens": _get_nested(usage, "total_tokens"),
+        "completion_tokens": _get_nested(usage, "completion_tokens"),
+        "reasoning_tokens": _get_nested(usage, "completion_tokens_details", "reasoning_tokens"),
+    }
+    return None, diagnostic
+
+
+def _reviewer_max_completion_tokens() -> int:
+    raw = os.getenv("REVIEWER_MAX_COMPLETION_TOKENS", "").strip()
+    if raw:
+        try:
+            return max(1024, int(raw))
+        except ValueError:
+            logger.warning("Invalid REVIEWER_MAX_COMPLETION_TOKENS=%r; using default", raw)
+    return DEFAULT_MAX_COMPLETION_TOKENS
 
 
 def _is_missing_token(value: Any) -> bool:
@@ -168,25 +220,132 @@ DETERMINISTIC SCORING (enabled in deployment):
 """
 
 
-def _evidence_anchors_block() -> str:
-    """Behaviorally-anchored criteria for the Execution/team_execution signal (P3.1).
+# ── Component evidence-anchoring catalog (P3.1 → P3.3/P3.4) ──────────────────────
+#
+# Each fact-derivable component lists its controlled-vocabulary labels paired with a
+# CHECKABLE evidence condition, so the label is a function of cited evidence rather
+# than a holistic vibe. Labels MUST match the deterministic normalizer vocabulary
+# exactly (guarded by test_p33_evidence_anchors_match_normalizer_vocabulary). Pick the
+# HIGHEST label whose condition the cited evidence meets; omit the signal when no
+# evidence supports any label (abstain — reinforces P3.2).
+#
+# `value` components (tam, growth_rate, growth_velocity, retention) take a number, not a
+# label, so they are scored by threshold and are not enumerated here. Components in
+# QUALITATIVE_COMPONENTS have no objective anchor (judgment calls); they are flagged
+# qualitative in the prompt and the data (P3.4) so a qualitative 8 is not read as an
+# evidence-backed 8.
+COMPONENT_EVIDENCE_ANCHORS: Dict[str, tuple[tuple[str, str], ...]] = {
+    "execution.team_execution": (
+        ("elite", "a founder with a prior venture-backed exit, OR VP+/C-level at a category-leading company"),
+        ("strong", "experienced operators with directly relevant domain expertise (~5+ yrs at relevant companies)"),
+        ("credible_team", "founder/executive backgrounds or notable affiliations referenced (e.g. ex-FAANG, relevant prior roles)"),
+        ("decent", "capable team with relevant background but first-time founders / no standout credentials"),
+        ("weak", "no demonstrable relevant background in the evidence"),
+    ),
+    "execution.traction": (
+        ("strong_scale", "$100M+ revenue or marquee enterprise contracts cited"),
+        ("scaling", "Series B+ or rapid multi-market expansion evidenced"),
+        ("early_revenue", "ARR/MRR or paying customers cited"),
+        ("early_adoption", "named customers, deployments, or production usage cited"),
+        ("mvp", "product in MVP/pilot/beta, no revenue yet"),
+        ("pre-product", "idea or prototype stage, no users"),
+    ),
+    "execution.gtm_effectiveness": (
+        ("strong_edge", "repeatable sales motion with efficient CAC or a proven distribution advantage"),
+        ("repeatable", "a proven or clearly scalable acquisition channel identified"),
+        ("some_channels", "channels named (partnerships, outbound, paid, community) but not yet proven repeatable"),
+        ("unclear", "no acquisition approach articulated"),
+    ),
+    "market.competition": (
+        ("fragmented", "many small players, no dominant incumbent — room to consolidate"),
+        ("moderate", "a handful of competitors, no winner yet"),
+        ("crowded", "many funded competitors targeting the same buyer"),
+        ("intense", "several well-capitalized incumbents actively competing"),
+        ("winner_take_all", "a dominant incumbent already controls the category"),
+    ),
+    "product.pain_alignment": (
+        ("critical", "compliance/regulatory, large cost, or explicit urgency makes this must-have"),
+        ("strong", "manual workarounds, inefficiency, or explicit pain language evidenced"),
+        ("moderate", "real problem but urgency/budget priority unvalidated"),
+        ("weak", "language suggests nice-to-have rather than must-have"),
+    ),
+    "technical.complexity": (
+        ("deeptech", "AI/ML model training, robotics, biotech, or compiler-level engineering required"),
+        ("complex", "distributed systems, real-time, or multi-tenant infrastructure"),
+        ("moderate", "workflow automation or dashboard-level product"),
+        ("simple", "thin layer over existing tools, easily replicated"),
+    ),
+    "technical.scalability": (
+        ("extreme", "planet-scale / millions of RPS capacity demonstrated"),
+        ("high", "elastic, horizontally scalable architecture confirmed"),
+        ("medium", "can scale but limits not yet stress-tested"),
+        ("low", "single-tenant or known scaling bottlenecks"),
+    ),
+    "technical.data_advantage": (
+        ("strong", "proprietary dataset, exclusive access, or a clear data moat"),
+        ("growing", "a data flywheel or compounding dataset dynamic"),
+        ("limited", "some data assets but no exclusivity"),
+        ("none", "no proprietary data; relies on public/replicable data"),
+    ),
+    "defensibility.network_effects": (
+        ("strong", "flywheel dynamics or a liquidity network explicitly identified"),
+        ("moderate", "community or two-sided marketplace dynamics present"),
+        ("weak", "limited network dynamics acknowledged"),
+        ("none", "value does not compound with user growth"),
+    ),
+    "defensibility.switching_costs": (
+        ("very_high", "mission-critical lock-in; displacement extremely hard"),
+        ("high", "deep workflow integration or significant migration burden"),
+        ("medium", "some lock-in but migration feasible for motivated buyers"),
+        ("low", "customers can migrate with minimal friction"),
+    ),
+    "defensibility.proprietary_data": (
+        ("dominant", "exclusive rights or a dominant dataset competitors cannot match"),
+        ("strong", "exclusive/proprietary data assets competitors cannot replicate"),
+        ("some", "limited exclusive data giving partial advantage"),
+        ("none", "data assets are replicable or publicly available"),
+    ),
+    "defensibility.barriers": (
+        ("very_hard", "regulatory moat, capital intensity, or extremely hard-to-replicate tech"),
+        ("hard", "significant replication difficulty or meaningful entry barriers"),
+        ("some", "some protection but determined competitors could enter"),
+        ("easy", "market is accessible to well-resourced competitors"),
+    ),
+}
 
-    Defines the controlled vocabulary AND the checkable evidence that justifies each
-    label, so the label is a function of cited evidence rather than a holistic vibe.
-    The labels here match the deterministic normalizer vocabulary exactly
-    (weak/decent/credible_team/strong/elite). This is the worked pattern; other
-    components will follow the same structure.
+# Component classification (qualitative vs value vs fact-derived) is the single source
+# of truth in config.scoring_config — imported here so the prompt framing and the
+# engine's `qualitative` flag (P3.4) never drift. The anchor PROSE lives above; the
+# CLASSIFICATION lives in config.
+from config.scoring_config import QUALITATIVE_COMPONENTS, VALUE_COMPONENTS  # noqa: E402
+
+
+def _evidence_anchors_block() -> str:
+    """Behaviorally-anchored criteria across fact-derivable components (P3.1 → P3.3),
+    plus an explicit qualitative-component note (P3.4).
+
+    Renders compactly (one component per line) to respect prompt-cost limits while
+    moving judgment from the model into checkable evidence conditions. Labels match the
+    deterministic normalizer vocabulary exactly.
     """
-    return """
-EVIDENCE-ANCHORED LABELS — execution.team_execution (choose the label whose condition the cited evidence meets; pick the HIGHEST satisfied):
-- elite: at least one founder with a prior venture-backed exit, OR senior leadership (VP+ / C-level) at a category-leading company.
-- strong: experienced operators with directly relevant domain expertise (≈5+ years at relevant companies).
-- credible_team: founder/executive backgrounds or notable institutional affiliations referenced (e.g. ex-FAANG, relevant prior roles).
-- decent: capable team with relevant background but first-time founders or no standout credentials.
-- weak: no demonstrable relevant background in the evidence.
-- If there is NO team evidence at all, omit team_execution (or set it null) — do NOT guess a label. Unscored is better than fabricated.
-Put the specific evidence you relied on in the signal's "evidence" field. Apply this same evidence-first discipline to the other signals.
-"""
+    lines = [
+        "\nEVIDENCE-ANCHORED LABELS — for each signal pick the HIGHEST label whose condition the CITED evidence meets;",
+        "omit the signal (null) when NO evidence supports any label (unscored beats fabricated). Put the evidence you used in \"evidence\".",
+    ]
+    for comp_key, anchors in COMPONENT_EVIDENCE_ANCHORS.items():
+        rendered = "; ".join(f"{label}={cond}" for label, cond in anchors)
+        lines.append(f"- {comp_key}: {rendered}")
+    lines.append(
+        "VALUE SIGNALS (give a number, not a label): "
+        + ", ".join(VALUE_COMPONENTS)
+        + " — cite the figure and source; leave null if unknown."
+    )
+    lines.append(
+        "QUALITATIVE SIGNALS (no objective anchor — judgment; mark honestly, prefer null over a guess): "
+        + ", ".join(QUALITATIVE_COMPONENTS)
+        + "."
+    )
+    return "\n".join(lines) + "\n"
 
 
 def _build_system_prompt(reviewer_rules: Dict[str, Any], rubric: Dict[str, Any]) -> str:
@@ -655,7 +814,7 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     {"role": "user", "content": user_content},
                 ],
                 response_format={"type": "json_object"},
-                max_completion_tokens=8192,
+                max_completion_tokens=_reviewer_max_completion_tokens(),
             )
             
             if hasattr(response, 'usage') and response.usage:
@@ -663,9 +822,17 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
             else:
                 self._last_token_usage = 0
 
-            content = response.choices[0].message.content
+            content, diagnostic = _chat_completion_content(response)
             if not content:
-                self.logger.error("Empty response from LLM")
+                self.logger.error(
+                    "Empty response from LLM: model=%s finish_reason=%s total_tokens=%s "
+                    "completion_tokens=%s reasoning_tokens=%s",
+                    self.model,
+                    diagnostic.get("finish_reason"),
+                    diagnostic.get("total_tokens"),
+                    diagnostic.get("completion_tokens"),
+                    diagnostic.get("reasoning_tokens"),
+                )
                 return None
             
             # Parse JSON

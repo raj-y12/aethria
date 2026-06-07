@@ -7,17 +7,20 @@ from pipeline_runner import run_on_demand_lookup
 
 class _FakeScoutEngine:
     active_thesis = "unset"
+    calls = 0
 
     def __init__(self, *args, **kwargs):
         type(self).active_thesis = kwargs.get("active_thesis", "missing")
 
     async def run_named_lookup(self, **kwargs):
+        type(self).calls += 1
         return "startup-1"
 
 
 class _FakeReviewerEngine:
     active_thesis = "unset"
     use_resource_fund_thesis_fallback = "unset"
+    calls = 0
 
     def __init__(self, *args, **kwargs):
         type(self).active_thesis = kwargs.get("active_thesis", "missing")
@@ -27,12 +30,14 @@ class _FakeReviewerEngine:
         )
 
     async def run_startup(self, *args, **kwargs):
+        type(self).calls += 1
         return True
 
 
 class _FakePartnerEngine:
     fund_thesis = "unset"
     use_resource_fund_thesis_fallback = "unset"
+    calls = 0
 
     def __init__(self, *args, **kwargs):
         type(self).fund_thesis = kwargs.get("fund_thesis", "missing")
@@ -42,6 +47,7 @@ class _FakePartnerEngine:
         )
 
     async def run_startup(self, *args, **kwargs):
+        type(self).calls += 1
         return True
 
 
@@ -55,6 +61,9 @@ class _FakeThesis:
 
 
 def _wire_common_engines(monkeypatch):
+    _FakeScoutEngine.calls = 0
+    _FakeReviewerEngine.calls = 0
+    _FakePartnerEngine.calls = 0
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr("pipeline_runner.get_service_client", lambda: SimpleNamespace())
@@ -104,3 +113,40 @@ async def test_on_demand_lookup_runs_thesis_blind_when_no_mandate(monkeypatch):
     assert _FakeScoutEngine.active_thesis is None
     assert _FakeReviewerEngine.active_thesis is None
     assert _FakePartnerEngine.fund_thesis is None
+
+
+@pytest.mark.asyncio
+async def test_on_demand_lookup_cancelled_before_scout_does_not_start(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+
+    startup_id = await run_on_demand_lookup(
+        "user_123",
+        "Perplexity AI",
+        lookup_id="lookup-123",
+        is_cancelled=lambda: True,
+    )
+
+    assert startup_id is None
+    assert _FakeScoutEngine.calls == 0
+    assert _FakeReviewerEngine.calls == 0
+    assert _FakePartnerEngine.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_on_demand_lookup_cancelled_after_scout_stops_before_review(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+    checks = iter([False, False, True])
+
+    startup_id = await run_on_demand_lookup(
+        "user_123",
+        "Perplexity AI",
+        lookup_id="lookup-123",
+        is_cancelled=lambda: next(checks, True),
+    )
+
+    assert startup_id == "startup-1"
+    assert _FakeScoutEngine.calls == 1
+    assert _FakeReviewerEngine.calls == 0
+    assert _FakePartnerEngine.calls == 0
