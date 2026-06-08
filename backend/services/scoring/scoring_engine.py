@@ -527,10 +527,4 @@ class DeterministicScoringEngine:
             logger.info("scoring_trace normalized=%s", normalized)
             logger.info("scoring_trace aggregated=%s", output)
             logger.info("scoring_trace missing_components=%s", missing_components)
-            print("SCORING_TRACE_INPUT_SCOUT", scout_output)
-            print("SCORING_TRACE_INPUT_REVIEWER", reviewer_output)
-            print("SCORING_TRACE_RAW", extracted)
-            print("SCORING_TRACE_NORMALIZED", normalized)
-            print("SCORING_TRACE_OUTPUT", output)
-            print("SCORING_TRACE_MISSING_COMPONENTS", missing_components)
         return output

@@ -98,7 +98,7 @@ def tavily_search(query: str, max_results: int = 10, timeout: float | None = Non
             for item in results
             if isinstance(item, dict) and str(item.get("url") or "").strip()
         ]
-        logger.info("DEBUG tavily depth=%s raw=%s raw_urls=%s", depth, raw_flag, raw_urls)
+        logger.debug("tavily depth=%s raw=%s raw_urls=%s", depth, raw_flag, raw_urls)
         out: List[Dict[str, str]] = []
         for item in results:
             if not isinstance(item, dict):
