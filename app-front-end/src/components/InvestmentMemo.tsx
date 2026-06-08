@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import type { Startup } from '../types/startup';
+import type { SignalItem, Startup } from '../types/startup';
 import type { FundConfiguration } from '../lib/fundConfiguration';
 import { tokens } from '../design-system/tokens';
 import { chrome } from '../design-system/chrome';
@@ -13,14 +13,16 @@ interface InvestmentMemoProps {
   startup: Startup | null;
   onClose: () => void;
   onMemoPipelineReady?: () => void;
+  onDecisionResolved?: (startup: Startup) => void;
   fundConfiguration?: FundConfiguration;
   peerStartups?: Startup[];
+  portfolioSignals?: SignalItem[];
 }
 
 /**
  * Full-screen modal wrapper for the investment memo. Used on small viewports.
  */
-export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady, fundConfiguration, peerStartups }: InvestmentMemoProps) {
+export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady, onDecisionResolved, fundConfiguration, peerStartups, portfolioSignals }: InvestmentMemoProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion = usePrefersReducedMotion();
   useFocusTrap(true, containerRef);
@@ -78,8 +80,10 @@ export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady, 
           startup={startup}
           onClose={onClose}
           onMemoPipelineReady={onMemoPipelineReady}
+          onDecisionResolved={onDecisionResolved}
           fundConfiguration={fundConfiguration}
           peerStartups={peerStartups}
+          portfolioSignals={portfolioSignals}
         />
       </div>
     </motion.div>

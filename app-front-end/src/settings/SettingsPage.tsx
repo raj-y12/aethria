@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import MobileHeader from '../components/MobileHeader';
 import LoadingAnimation from '../components/LoadingAnimation';
 import AgentLogoutModal from '../components/AgentLogoutModal';
+import { SpineNavButton } from '../components/SystemBar';
 import { fetchSettings, patchSettings, previewPolicy, publishPolicy, type Settings } from '../api/settings';
 import { fetchAgentsStatus, toggleAgents, type AgentsStatus } from '../api/agents';
 import {
@@ -29,7 +30,7 @@ import {
   getWeightImpactText,
   mapFundConfigToSettings,
   thesisVersionLabel,
-  normalizeWeights,
+  rebalanceWeights,
   validateScoreBands,
   validateWeights,
   type CoreDimensionKey,
@@ -81,14 +82,6 @@ const solidBtnCls =
   'type-label-section inline-flex min-h-[36px] items-center justify-center rounded-none bg-oxford px-phi-4 text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
 
 const RAIL_CLAMP_PAD = { paddingTop: 'clamp(5px, 0.6vw, 8px)', paddingBottom: 'clamp(5px, 0.6vw, 8px)' } as const;
-
-function settingsRailNavCls(active: boolean): string {
-  return `group type-label-tab flex w-full min-h-[32px] items-center justify-start px-phi-4 py-phi-1 cursor-pointer btn-interaction transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-    active
-      ? 'text-oxford bg-surface-selected'
-      : 'text-oxford/50 hover:text-oxford/80 hover:bg-oxford/[0.04]'
-  }`;
-}
 
 function WorkspaceExitButton({ className = 'w-full' }: { className?: string }) {
   return (
@@ -144,29 +137,34 @@ function SettingsSidebarFooter({
   onReset: () => void;
 }) {
   const statusDetail = unsaved
-    ? 'Changes not synced'
+    ? 'Changes not yet saved'
     : lastSavedAt
-      ? formatSettingsSavedAt(lastSavedAt)
+      ? `Saved · ${formatSettingsSavedAt(lastSavedAt)}`
       : 'Save to persist fund configuration';
 
   return (
     <div
       className="min-w-0 shrink-0 border-t border-oxford/[0.075]"
       style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}
-      aria-label="Save draft"
+      aria-label="Draft status"
     >
-      <div className="flex items-start gap-phi-2" aria-live="polite">
+      {/* Eyebrow + live status — mirrors the workspace rail's Mandate card header. */}
+      <div className="flex items-center justify-between gap-phi-2">
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">Draft</span>
         <span
-          className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-none ${unsaved ? 'bg-escalation/70 signal-dot-breathe' : 'bg-oxford/30'}`}
-          aria-hidden
-        />
-        <div className="min-w-0">
-          <p className={railEditorial.meta}>Draft status</p>
-          <p className={`mt-phi-1 type-body-sm leading-snug ${unsaved ? 'text-oxford' : 'text-oxford/50'}`}>
-            {unsaved ? 'Unsaved changes' : statusDetail}
-          </p>
-        </div>
+          className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] transition-colors ${unsaved ? 'text-escalation/80' : 'text-oxford/45'}`}
+          aria-live="polite"
+        >
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-none signal-dot-breathe transition-colors ${unsaved ? 'bg-escalation/70' : 'bg-oxford'}`}
+            aria-hidden
+          />
+          {unsaved ? 'Unsaved' : 'Synced'}
+        </span>
       </div>
+      <p className={`mt-phi-2 truncate type-body-sm leading-snug transition-colors ${unsaved ? 'text-oxford' : 'text-oxford/50'}`}>
+        {statusDetail}
+      </p>
       <div className="mt-phi-4 flex flex-col gap-phi-2">
         <button
           type="button"
@@ -744,7 +742,7 @@ export default function SettingsPage() {
                 className="paper-dot-grid flex h-full min-h-0 flex-col justify-between overflow-hidden px-phi-4"
                 style={RAIL_CLAMP_PAD}
               >
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                   <div className="min-w-0 shrink-0">
                     <Link
                       to="/v1"
@@ -760,24 +758,24 @@ export default function SettingsPage() {
                   <div className="aethria-rail-nav-bleed mt-phi-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                     <p className={`${railEditorial.label} shrink-0 px-phi-4`}>Fund configuration</p>
                     <nav
-                      className="mt-phi-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto [scrollbar-gutter:stable]"
+                      className="mt-phi-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto"
                       aria-label="Settings sections"
                     >
-                    {sections.map((section) => (
-                      <a
+                    {sections.map((section, index) => (
+                      <SpineNavButton
                         key={section.id}
-                        href={`#${section.id}`}
-                        onClick={(event) => {
-                          event.preventDefault();
+                        label={section.label}
+                        active={activeSection === section.id}
+                        ariaPressed={activeSection === section.id}
+                        shortcut={String(index + 1)}
+                        compact
+                        surface="paper"
+                        onClick={() => {
                           setActiveSection(section.id);
                           const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${section.id}`);
                           target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         }}
-                        className={settingsRailNavCls(activeSection === section.id)}
-                        aria-current={activeSection === section.id ? 'true' : undefined}
-                      >
-                        {section.short}
-                      </a>
+                      />
                     ))}
                     </nav>
                   </div>
@@ -883,14 +881,12 @@ export default function SettingsPage() {
 
                 <SettingsSection id="weights" title="Scoring Weights" kicker="Weights match the five reviewer dimensions used by deterministic backend scoring. Traction and timing remain sub-signals inside Execution and Market.">
                   <div className="flex flex-col gap-phi-4">
-                    <div className="flex flex-wrap items-center justify-between gap-phi-4 border-b border-oxford/[0.06] pb-phi-4">
-                      <p className={`font-mono text-[1.6rem] tabular-nums ${weightValidation.valid ? 'text-oxford' : 'text-escalation/75'}`}>{weightValidation.total}%</p>
-                      <div className="flex items-center gap-phi-4">
-                        {!weightValidation.valid && <p className="type-meta text-escalation/70">Adjust by {weightValidation.delta}%</p>}
-                        <button type="button" onClick={() => updateDraft((current) => ({ ...current, scoringWeights: normalizeWeights(current.scoringWeights) }))} className={actionBtnCls}>
-                          Normalize to 100
-                        </button>
+                    <div className="flex flex-wrap items-baseline justify-between gap-phi-4 border-b border-oxford/[0.06] pb-phi-4">
+                      <div className="flex items-baseline gap-phi-3">
+                        <p className={`font-mono text-[1.6rem] tabular-nums ${weightValidation.valid ? 'text-oxford' : 'text-escalation/75'}`}>{weightValidation.total}%</p>
+                        <p className="type-meta text-oxford/40">Total weight</p>
                       </div>
+                      <p className="type-meta text-oxford/40">Adjust one — the rest rebalance to 100</p>
                     </div>
                     {draft.scoringWeights.map((item) => (
                       <div key={item.key} className="grid gap-phi-3 border-b border-oxford/[0.055] py-phi-4 md:grid-cols-[minmax(150px,22%)_minmax(0,1fr)_92px] md:items-start">
@@ -906,7 +902,7 @@ export default function SettingsPage() {
                           value={item.weight}
                           onChange={(event) => updateDraft((current) => ({
                             ...current,
-                            scoringWeights: current.scoringWeights.map((weight) => weight.key === item.key ? { ...weight, weight: Number(event.target.value) || 0 } : weight),
+                            scoringWeights: rebalanceWeights(current.scoringWeights, item.key, Number(event.target.value)),
                           }))}
                           className={`${inputCls} text-right font-mono tabular-nums`}
                           aria-label={`${item.label} weight`}

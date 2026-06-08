@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import AgentDispatch from './AgentDispatch';
+import { useFocusTrap } from '../hooks';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 /** Reverse-stagger anchor for exit — much shorter than enter so dismiss feels snappy. */
@@ -147,6 +148,10 @@ export default function DispatchCommandBar({
   onFocusChip,
 }: DispatchCommandBarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // aria-modal dialog → keep Tab focus inside the takeover (matches the memo modal
+  // and judgements panel). The compose view's own autofocus effect runs after and
+  // moves focus to the input.
+  useFocusTrap(open, containerRef);
   // Local override: "Look up another" shows the compose view even while a prior
   // lookup is still tracked. Reset whenever the takeover closes.
   const [compose, setCompose] = useState(false);

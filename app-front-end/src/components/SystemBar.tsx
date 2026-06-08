@@ -40,7 +40,7 @@ function SpineRule() {
   );
 }
 
-function SpineNavButton({
+export function SpineNavButton({
   label,
   active,
   onClick,

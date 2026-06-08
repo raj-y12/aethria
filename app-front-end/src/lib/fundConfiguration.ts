@@ -541,6 +541,48 @@ export function validateWeights(weights: ScoringWeight[]): WeightValidation {
   return { total, valid: Math.abs(total - 100) < 0.1, delta: Math.round((100 - total) * 10) / 10 };
 }
 
+/**
+ * Set one weight and proportionally rebalance the others so the set always sums to
+ * exactly 100. This powers the "auto-adjusting" feel: nudge one dimension and the
+ * rest absorb the difference (equal split when the others are all zero). Integer
+ * rounding drift is corrected against the largest fractional parts so totals are exact.
+ */
+export function rebalanceWeights(
+  weights: ScoringWeight[],
+  changedKey: ScoringDimensionKey,
+  rawValue: number,
+): ScoringWeight[] {
+  const next = Math.min(100, Math.max(0, Math.round(Number(rawValue) || 0)));
+  const others = weights.filter((w) => w.key !== changedKey);
+  if (others.length === 0) return weights.map((w) => ({ ...w, weight: next }));
+
+  const remaining = 100 - next;
+  const othersTotal = others.reduce((sum, w) => sum + Math.max(0, w.weight), 0);
+  const exact = others.map((w) =>
+    othersTotal > 0 ? (Math.max(0, w.weight) / othersTotal) * remaining : remaining / others.length,
+  );
+  const rounded = exact.map((value) => Math.max(0, Math.round(value)));
+
+  // Correct rounding drift by ±1 against the largest fractional parts (descending
+  // for a deficit, ascending for a surplus) so the others fill `remaining` exactly.
+  let drift = remaining - rounded.reduce((sum, r) => sum + r, 0);
+  const fractionOrder = exact
+    .map((value, index) => ({ index, frac: value - Math.floor(value) }))
+    .sort((a, b) => (drift > 0 ? b.frac - a.frac : a.frac - b.frac));
+  for (let i = 0; drift !== 0 && i < fractionOrder.length * 200; i += 1) {
+    const idx = fractionOrder[i % fractionOrder.length].index;
+    const step = drift > 0 ? 1 : -1;
+    if (rounded[idx] + step < 0) continue;
+    rounded[idx] += step;
+    drift -= step;
+  }
+
+  const byKey = new Map(others.map((w, i) => [w.key, rounded[i]]));
+  return weights.map((w) =>
+    w.key === changedKey ? { ...w, weight: next } : { ...w, weight: byKey.get(w.key) ?? w.weight },
+  );
+}
+
 export function normalizeWeights(weights: ScoringWeight[]): ScoringWeight[] {
   const total = weights.reduce((sum, item) => sum + Number(item.weight || 0), 0);
   if (total <= 0) return DEFAULT_SCORING_WEIGHTS;

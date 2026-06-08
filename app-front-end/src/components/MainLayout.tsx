@@ -322,6 +322,10 @@ export default function MainLayout({
   const judgementsAsOverlay = rightPanel === 'feed' && !isDesktop;
   /** System replaces the work grid (left column); never an overlay. */
   const anyOverlayOpen = verdictOrMemoOpen || judgementsAsOverlay;
+  // Scroll lock must also cover the full-screen dispatch takeover, otherwise the
+  // page behind it scrolls (iOS scroll-bleed). Kept as a single locked flag so the
+  // dispatch → memo handoff never unmounts/remounts the (non-ref-counted) hook.
+  const scrollLocked = anyOverlayOpen || commandBarOpen;
   const useModal = selectedStartup && !isDesktop;
 
   const markStartupAcknowledged = useCallback((startup: Startup) => {
@@ -558,7 +562,7 @@ export default function MainLayout({
     else if (rightPanel === 'system') setRightPanel(null);
   }, [memoOpen, rightPanel, handleCloseMemo, handleCloseJudgements]);
 
-  useScrollLock(anyOverlayOpen);
+  useScrollLock(scrollLocked);
   useEscapeKey(handleEscape, anyOverlayOpen);
   useRestoreFocus(verdictOrMemoOpen, restoreRefVerdictMemo, !judgementsAsOverlay);
   useRestoreFocus(judgementsAsOverlay, { current: null }, !verdictOrMemoOpen);
@@ -1454,8 +1458,10 @@ export default function MainLayout({
             startup={memoStartup}
             onClose={handleCloseMemo}
             onMemoPipelineReady={handleMemoPipelineReady}
+            onDecisionResolved={handleDecisionResolved}
             fundConfiguration={fundConfiguration}
             peerStartups={startups}
+            portfolioSignals={signals}
           />
         )}
       </AnimatePresence>
