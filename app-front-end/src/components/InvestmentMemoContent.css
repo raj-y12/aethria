@@ -3707,8 +3707,9 @@
 .memoPrecedent {
   margin: clamp(14px, 1.8vw, 20px) 0 0;
   padding: 12px 0 0;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.1);
-  max-width: 36rem;
+  /* Full memo width + the standard hairline, so the "Prior rulings" divider lines up
+     with every other section instead of stopping short under a heavier rule. */
+  border-top: 1px solid var(--memo-rule);
 }
 
 .memoCover .memoPrecedent + .memoPortfolioContext {
