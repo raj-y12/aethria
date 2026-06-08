@@ -755,7 +755,6 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--memo-rule);
 }
 .memoLedgerItem {
   padding: 14px 0;
@@ -4023,7 +4022,9 @@
 
 .memoCoverStandfirst {
   max-width: 38rem;
-  font-size: clamp(1.0625rem, 1.45vw, 1.25rem);
+  /* Fixed lede size — sits just above the 14px body, never balloons on a wide
+     MacBook/external display the way a vw-scaled size did. */
+  font-size: 1rem;
   line-height: 1.55;
   color: rgba(var(--color-oxford-rgb), 0.78);
 }
@@ -4051,7 +4052,8 @@
 /* Row-lists draw a divider under every row. Drop the trailing one so a list's bottom edge
    never stacks against the next section's top border (the doubled hairline). */
 .memoKillerList .memoKiller:last-child,
-.memoConsensusList .memoConsensusRow:last-child {
+.memoConsensusList .memoConsensusRow:last-child,
+.memoLedgerList .memoLedgerItem:last-child {
   border-bottom: none;
 }
 
@@ -4133,7 +4135,8 @@
 
 .memoDiscGroup {
   margin-top: clamp(28px, 3.4vw, 44px);
-  max-width: 66ch;
+  /* Span the full memo width so the disclosure dividers line up with every other
+     section. The prose inside keeps its own 66ch measure for readability. */
 }
 /* A group whose disclosures all fail their render conditions would otherwise leave a
    phantom divider + the full top margin. Collapse it entirely. */
