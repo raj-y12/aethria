@@ -312,7 +312,7 @@ export default function DispatchCommandBar({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45, ease: EASE, delay: 0.16 }}
-                  className="mt-phi-6 flex w-full max-w-lg flex-col items-center gap-phi-4"
+                  className="mt-phi-6 flex w-full max-w-xl flex-col items-center gap-phi-4"
                 >
                   {result}
                   <QuietLink onClick={() => setCompose(true)}>+ Look up another</QuietLink>

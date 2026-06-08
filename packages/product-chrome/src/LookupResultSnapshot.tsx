@@ -24,13 +24,17 @@ export default function LookupResultSnapshot({
   openMemoLabel = 'Open full memo',
   variant = 'snapshot',
   compact = false,
+  size = 'default',
   intelligenceKicker = 'Aethria intelligence · autonomous output',
   judgmentLabel = 'Investment judgment',
   dimensionsLabel = 'Dimension scores',
   className,
 }: LookupResultSnapshotProps) {
   const isMemo = variant === 'memo';
-  const pad = compact ? 'p-3' : isMemo ? 'p-5 sm:p-7 md:p-9' : 'px-4 py-4 sm:p-5';
+  // Larger snapshot for the dispatch takeover: enlarge company name, summary, scores
+  // and padding while leaving the small mono tag/labels and verdict chip unchanged.
+  const lg = !isMemo && size === 'lg';
+  const pad = compact ? 'p-3' : isMemo ? 'p-5 sm:p-7 md:p-9' : lg ? 'p-6 sm:p-7' : 'px-4 py-4 sm:p-5';
   const verdictSize = compact
     ? 'font-sans text-[18px] font-semibold leading-tight text-oxford'
     : isMemo
@@ -90,7 +94,7 @@ export default function LookupResultSnapshot({
           <h3
             className={cx(
               'pc-font-sans font-semibold leading-tight tracking-tight text-oxford',
-              compact ? 'text-base' : 'text-xl sm:text-2xl',
+              compact ? 'text-base' : lg ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl',
             )}
           >
             {companyName}
@@ -114,8 +118,8 @@ export default function LookupResultSnapshot({
         <p
           className={cx(
             'font-sans leading-[1.6] text-oxford/58',
-            isMemo ? 'mt-3 text-[15px] font-normal' : 'mt-1.5',
-            !isMemo && (compact ? 'text-[13px]' : 'text-[15px]'),
+            isMemo ? 'mt-3 text-[15px] font-normal' : lg ? 'mt-2.5' : 'mt-1.5',
+            !isMemo && (compact ? 'text-[13px]' : lg ? 'text-base sm:text-[17px]' : 'text-[15px]'),
           )}
         >
           {summary}
@@ -155,7 +159,12 @@ export default function LookupResultSnapshot({
                 {dimensions.map((d) => (
                   <div key={d.key} className="flex min-w-0 flex-col items-center gap-0.5 text-center">
                     <span className="font-mono text-[10px] text-oxford/35">{d.label}</span>
-                    <span className="font-mono text-[11px] font-bold text-oxford/70 sm:text-sm">
+                    <span
+                      className={cx(
+                        'font-mono font-bold text-oxford/70',
+                        lg ? 'text-base sm:text-lg' : 'text-[11px] sm:text-sm',
+                      )}
+                    >
                       {formatScore(d.score)}
                     </span>
                   </div>

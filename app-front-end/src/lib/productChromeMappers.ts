@@ -166,8 +166,9 @@ export function buildLookupSnapshotProps(
     summary,
     dimensions,
     thesisLine: thesisBits.length > 0 ? thesisBits.join(' · ') : undefined,
-    // Fuller layout for the dispatch result card: larger company name and a readable
-    // summary line (the "what we found" overview) rather than the tight rail strip.
+    // Fuller, enlarged layout for the dispatch result takeover: bigger company name,
+    // summary and dimension scores (same tags/styling), never the tight rail strip.
     compact: false,
+    size: 'lg',
   };
 }

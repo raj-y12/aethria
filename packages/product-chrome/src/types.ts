@@ -43,6 +43,9 @@ export type LookupResultSnapshotProps = {
   /** Compact strip for app rail; memo = marketing sample IC excerpt */
   variant?: LookupResultVariant;
   compact?: boolean;
+  /** 'lg' enlarges the snapshot (company name, summary, dimension scores, padding)
+   * while keeping the same tags/labels — used for the dispatch result takeover. */
+  size?: 'default' | 'lg';
   intelligenceKicker?: string;
   judgmentLabel?: string;
   dimensionsLabel?: string;

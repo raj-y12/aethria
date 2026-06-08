@@ -834,7 +834,7 @@ export default function MainLayout({
         onFocusChip={focusLookup}
         result={
           pendingLookupMatch?.partner?.recommendation && lookupSnapshotProps ? (
-            <LookupResultSnapshot {...lookupSnapshotProps} onOpenMemo={handleOpenLookupMemo} />
+            <LookupResultSnapshot {...lookupSnapshotProps} onOpenMemo={handleOpenLookupMemo} className="w-full" />
           ) : null
         }
       />
