@@ -7,7 +7,8 @@ import { tokens } from '../design-system/tokens';
 import { usePrefersReducedMotion } from '../hooks';
 import EmptyState from './EmptyState';
 import DecisionQueueHeader, {
-  type DecisionFilter,
+  type FlagFilter,
+  type OutcomeFilter,
   type QueueView,
   type ReviewFilter,
   type SortFilter,
@@ -41,6 +42,13 @@ interface WorkGridProps {
 }
 
 const EMPTY_WATCHLIST_IDS = new Set<string>();
+
+function toggleInSet<T>(prev: Set<T>, value: T): Set<T> {
+  const next = new Set(prev);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
+}
 
 function sortKey(s: Startup): string {
   return s.timestamps?.partnered_at ?? s.timestamps?.reviewed_at ?? s.timestamps?.discovered_at ?? '';
@@ -87,23 +95,34 @@ function buildDocketRow(
   };
 }
 
-function rowMatchesDecisionFilter(row: DocketRowModel, filter: DecisionFilter): boolean {
-  if (filter === 'ALL') return true;
-  const visibleRecommendation = getVisibleRecommendation(row.startup);
-  const { queueContext, decisionVariant } = row;
-  const onMonitorList = queueContext.onMonitorList;
-  if (filter === 'WATCHLIST') return onMonitorList || visibleRecommendation === 'MONITOR';
-  if (filter === 'NEEDS_RULING') return queueContext.needsRuling;
-  if (filter === 'STALE') return queueContext.isStale;
-  if (filter === 'ADVERSE') return !queueContext.isDecided && row.hasHighAdverse;
-  if (filter === 'ESCALATION') {
-    return !queueContext.isDecided && (queueContext.isEscalated || decisionVariant === 'escalation');
+// Multi-select matchers — selected chips within a group are OR'd. An empty set
+// means the group imposes no constraint.
+function rowMatchesOutcomeFilters(row: DocketRowModel, filters: Set<OutcomeFilter>): boolean {
+  if (filters.size === 0) return true;
+  const rec = getVisibleRecommendation(row.startup);
+  for (const f of filters) {
+    if (f === 'YES' && rec === 'INVEST') return true;
+    if (f === 'NO' && rec === 'PASS') return true;
+    if (f === 'MAYBE' && rec === 'MONITOR') return true;
+    if (f === 'DECIDED' && row.queueContext.isDecided) return true;
   }
-  if (filter === 'DECIDED') return queueContext.isDecided;
-  if (filter === 'AWAITING_REVIEW') return !row.startup.review && !queueContext.isDecided;
-  if (filter === 'YES') return visibleRecommendation === 'INVEST';
-  if (filter === 'NO') return visibleRecommendation === 'PASS';
-  if (filter === 'MAYBE') return visibleRecommendation === 'MONITOR';
+  return false;
+}
+
+function rowMatchesFlagFilters(row: DocketRowModel, filters: Set<FlagFilter>): boolean {
+  if (filters.size === 0) return true;
+  for (const f of filters) {
+    if (f === 'ADVERSE' && !row.queueContext.isDecided && row.hasHighAdverse) return true;
+  }
+  return false;
+}
+
+function rowMatchesReviewFilters(row: DocketRowModel, filters: Set<ReviewFilter>): boolean {
+  if (filters.size === 0) return true;
+  for (const f of filters) {
+    if (f === 'UNREVIEWED' && row.startup.review == null) return true;
+    if (f !== 'UNREVIEWED' && row.reviewBand === f) return true;
+  }
   return false;
 }
 
@@ -146,22 +165,46 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     params.delete('queue');
     setSearchParams(params, { replace: true });
   }, [searchParams, setSearchParams]);
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('ALL');
-  const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>('ALL');
-  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('ALL');
+  const [sourceFilters, setSourceFilters] = useState<Set<SourceFilter>>(() => new Set());
+  const [outcomeFilters, setOutcomeFilters] = useState<Set<OutcomeFilter>>(() => new Set());
+  const [flagFilters, setFlagFilters] = useState<Set<FlagFilter>>(() => new Set());
+  const [reviewFilters, setReviewFilters] = useState<Set<ReviewFilter>>(() => new Set());
   const [sortFilter, setSortFilter] = useState<SortFilter>('QUEUE_PRIORITY');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  // In the NEW view, a clicked row is acknowledged and would normally drop out
+  // immediately (is_new_to_user flips false). Pin it so it stays visible until
+  // the analyst clicks off it (closes the memo or selects another row).
+  const [pinnedNewId, setPinnedNewId] = useState<string | null>(null);
   const reduceMotion = usePrefersReducedMotion();
   const hasActiveFilters =
-    sourceFilter !== 'ALL' ||
-    decisionFilter !== 'ALL' ||
-    reviewFilter !== 'ALL' ||
+    sourceFilters.size > 0 ||
+    outcomeFilters.size > 0 ||
+    flagFilters.size > 0 ||
+    reviewFilters.size > 0 ||
     sortFilter !== 'QUEUE_PRIORITY';
 
+  const toggleSource = useCallback(
+    (f: SourceFilter) => setSourceFilters((prev) => toggleInSet(prev, f)),
+    []
+  );
+  const toggleOutcome = useCallback(
+    (f: OutcomeFilter) => setOutcomeFilters((prev) => toggleInSet(prev, f)),
+    []
+  );
+  const toggleFlag = useCallback(
+    (f: FlagFilter) => setFlagFilters((prev) => toggleInSet(prev, f)),
+    []
+  );
+  const toggleReview = useCallback(
+    (f: ReviewFilter) => setReviewFilters((prev) => toggleInSet(prev, f)),
+    []
+  );
+
   const resetFilters = useCallback(() => {
-    setSourceFilter('ALL');
-    setDecisionFilter('ALL');
-    setReviewFilter('ALL');
+    setSourceFilters(new Set());
+    setOutcomeFilters(new Set());
+    setFlagFilters(new Set());
+    setReviewFilters(new Set());
     setSortFilter('QUEUE_PRIORITY');
   }, []);
 
@@ -239,14 +282,13 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
 
   const orderedModels = useMemo(() => {
     const filtered = allModels.filter((row) => {
-      if (!rowMatchesQueueView(row, queueView)) return false;
-      if (sourceFilter === 'LOOKUP' && row.sourceBadge !== 'LOOKUP') return false;
-      if (sourceFilter === 'SCOUT' && row.sourceBadge !== 'SCOUT') return false;
-      if (!rowMatchesDecisionFilter(row, decisionFilter)) return false;
-      if (reviewFilter === 'UNREVIEWED' && row.startup.review != null) return false;
-      if (reviewFilter !== 'ALL' && reviewFilter !== 'UNREVIEWED' && row.reviewBand !== reviewFilter) {
-        return false;
-      }
+      const pinnedInNew =
+        queueView === 'NEW' && pinnedNewId != null && row.startup.id === pinnedNewId;
+      if (!pinnedInNew && !rowMatchesQueueView(row, queueView)) return false;
+      if (sourceFilters.size > 0 && !sourceFilters.has(row.sourceBadge)) return false;
+      if (!rowMatchesOutcomeFilters(row, outcomeFilters)) return false;
+      if (!rowMatchesFlagFilters(row, flagFilters)) return false;
+      if (!rowMatchesReviewFilters(row, reviewFilters)) return false;
       return true;
     });
     const sorted = [...filtered];
@@ -280,13 +322,27 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
       }
     }
     return sorted;
-  }, [allModels, queueView, sourceFilter, decisionFilter, reviewFilter, sortFilter]);
+  }, [allModels, queueView, sourceFilters, outcomeFilters, flagFilters, reviewFilters, sortFilter, pinnedNewId]);
+
+  // Drop the pin once the selection moves off the pinned row (memo closed or
+  // a different row selected), letting the acknowledged row leave the NEW view.
+  useEffect(() => {
+    if (pinnedNewId && selectedId !== pinnedNewId) setPinnedNewId(null);
+  }, [selectedId, pinnedNewId]);
+
+  const handleRowSelect = useCallback(
+    (startup: Startup) => {
+      if (queueView === 'NEW') setPinnedNewId(startup.id);
+      onStartupClick(startup);
+    },
+    [queueView, onStartupClick]
+  );
 
   const handleRowKeyDown = useCallback(
     (e: React.KeyboardEvent, model: DocketRowModel, idx: number) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        onStartupClick(model.startup);
+        handleRowSelect(model.startup);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         const next = orderedModels[idx + 1];
@@ -297,7 +353,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         if (prev) rowRefs.current.get(prev.startup.id)?.focus();
       }
     },
-    [onStartupClick, orderedModels]
+    [handleRowSelect, orderedModels]
   );
 
   if (startups.length === 0) {
@@ -320,12 +376,14 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         viewCounts={viewCounts}
         sortFilter={sortFilter}
         onSortFilterChange={setSortFilter}
-        sourceFilter={sourceFilter}
-        onSourceFilterChange={setSourceFilter}
-        decisionFilter={decisionFilter}
-        onDecisionFilterChange={setDecisionFilter}
-        reviewFilter={reviewFilter}
-        onReviewFilterChange={setReviewFilter}
+        sourceFilters={sourceFilters}
+        onToggleSource={toggleSource}
+        outcomeFilters={outcomeFilters}
+        onToggleOutcome={toggleOutcome}
+        flagFilters={flagFilters}
+        onToggleFlag={toggleFlag}
+        reviewFilters={reviewFilters}
+        onToggleReview={toggleReview}
         showAdvancedFilters={showAdvancedFilters}
         onToggleAdvancedFilters={() => setShowAdvancedFilters((v) => !v)}
         hasActiveFilters={hasActiveFilters}
@@ -338,7 +396,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
           <div className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1">
             <div className="min-h-[16rem] px-phi-4 py-phi-5">
               <motion.div
-                key={`${queueView}-${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
+                key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
                 className="max-w-[32rem]"
                 initial={reduceMotion ? false : 'hidden'}
                 animate="visible"
@@ -400,7 +458,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
           </div>
         ) : (
           <motion.div
-            key={`${queueView}-${sourceFilter}-${decisionFilter}-${reviewFilter}-${sortFilter}`}
+            key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
             className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1"
             initial={reduceMotion ? false : 'hidden'}
             animate="visible"
@@ -426,7 +484,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                     model={model}
                     isSelected={isSelected}
                     rowIndex={idx}
-                    onClick={() => onStartupClick(model.startup)}
+                    onClick={() => handleRowSelect(model.startup)}
                     onKeyDown={keyDown}
                     badges={config.verdictBadges}
                   />

@@ -279,7 +279,12 @@ export default function AgentDispatch({
             className={`${productInteraction.action} w-4 shrink-0 select-none text-center`}
             aria-expanded={isExpanded}
           >
-            {isExpanded ? '−' : '+'}
+            <span
+              aria-hidden
+              className={`inline-block leading-none transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+            >
+              ›
+            </span>
             <span className="sr-only">{isExpanded ? 'Close dispatch panel' : 'Open dispatch panel'}</span>
           </button>
         </div>

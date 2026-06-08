@@ -821,9 +821,11 @@
   outline: 2px solid rgba(var(--color-oxford-rgb), 0.22);
   outline-offset: 2px;
 }
-.memoDisclosureToggle:hover .memoDisclosureTitle,
-.memoDisclosureToggle:hover .memoDisclosurePlus {
+.memoDisclosureToggle:hover .memoDisclosureTitle {
   color: rgba(var(--color-oxford-rgb), 0.72);
+}
+.memoDisclosureToggle:hover .memoScoreChevron {
+  color: var(--memo-ink-muted);
 }
 .memoDisclosureTitle {
   font-family: var(--memo-font-mono);
@@ -841,11 +843,8 @@
   color: rgba(var(--color-oxford-rgb), 0.34);
 }
 .memoDisclosurePlus {
-  font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-ui);
-  color: rgba(var(--color-oxford-rgb), 0.38);
-  line-height: 1;
-  transition: color 140ms ease;
+  justify-self: end;
+  align-self: center;
 }
 .memoDisclosureBody {
   padding-top: 4px;
@@ -1296,18 +1295,16 @@
   color: var(--memo-ink-muted);
   font-variant-numeric: tabular-nums;
 }
-/* Only rendered when reviewers are SPLIT — the exception worth flagging. Accent pill so it
-   reads as a caution, not a neutral stat (aligned panels show nothing here). */
+/* Only rendered when reviewers are SPLIT — the exception worth flagging. Set as plain accent
+   text (no pill, no border, no rounded corners), matching the .memoConsensusFlag treatment in
+   the scorecard: it reads as a caution by colour and weight alone. Aligned panels show nothing. */
 .memoCoverRulingConsensus {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-micro);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+  font-weight: 700;
   color: color-mix(in srgb, var(--color-accent) 85%, var(--color-oxford));
-  padding: 2px 8px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 38%, transparent);
-  border-radius: 999px;
-  transform: translateY(-1px);
 }
 .memoCoverStatus {
   margin: 12px 0 0;
@@ -1676,6 +1673,10 @@
   border-top: 1px solid var(--memo-rule);
 }
 .memoScoreList--moat { margin-top: 8px; }
+/* Divider sits on the row block, not the header button — so an expanded row's
+   detail (Evidence / Needs diligence) stays inside its own dimension, with one
+   clean rule closing the block before the next dimension begins. */
+.memoScoreList > li { border-bottom: 1px solid var(--memo-rule); }
 .memoScoreRow {
   display: grid;
   grid-template-columns: 7rem 3rem minmax(0, 1fr) 1.25rem;
@@ -1684,7 +1685,6 @@
   width: 100%;
   padding: 14px 0;
   border: 0;
-  border-bottom: 1px solid var(--memo-rule);
   background: none;
   text-align: left;
   cursor: pointer;
@@ -1737,8 +1737,8 @@
 .memoScoreDetail {
   display: flex;
   flex-direction: column;
-  gap: clamp(14px, 1.8vw, 18px);
-  padding: 6px 0 18px;
+  gap: clamp(18px, 2.2vw, 24px);
+  padding: 2px 0 18px;
 }
 .memoScoreDriverList,
 .memoScoreReasonList {
@@ -1747,58 +1747,62 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 13px;
 }
 .memoScoreReason {
   font-family: var(--memo-font-ui);
-  font-size: var(--memo-size-secondary);
-  line-height: 1.55;
+  font-size: var(--memo-size-body);
+  line-height: 1.6;
   color: var(--memo-ink);
 }
 /* Definition-list rhythm: metric name in a quiet left column, reasoning fills the width. */
 .memoScoreDriverItem {
   display: grid;
-  grid-template-columns: minmax(7rem, 8.5rem) minmax(0, 1fr);
-  gap: 2px clamp(16px, 2vw, 24px);
+  grid-template-columns: minmax(5.5rem, 7rem) minmax(0, 1fr);
+  gap: 4px clamp(20px, 2.6vw, 32px);
   align-items: baseline;
 }
 .memoScoreDriverHead {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  padding-top: 0.1em;
+  gap: 6px;
+  padding-top: 0.15em;
 }
 .memoScoreDriverName {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-micro);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.13em;
+  line-height: 1.4;
   text-transform: uppercase;
   color: var(--memo-ink-muted);
 }
+/* Quiet tinted chip — evidence-strength qualifier, not a bordered button. */
 .memoScoreDriverTag {
+  align-self: flex-start;
   font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-micro);
-  letter-spacing: 0.02em;
-  color: var(--memo-ink-faint);
-  padding: 1px 6px;
-  border: 1px solid var(--memo-rule);
-  border-radius: 3px;
+  font-size: 0.5625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--memo-ink-muted);
+  background: color-mix(in srgb, var(--color-oxford) 6%, transparent);
+  padding: 2px 7px;
+  border-radius: 2px;
   white-space: nowrap;
 }
 .memoScoreDriverText {
   font-family: var(--memo-font-ui);
-  font-size: var(--memo-size-secondary);
-  line-height: 1.5;
+  font-size: var(--memo-size-body);
+  line-height: 1.6;
   color: var(--memo-ink);
 }
 .memoScoreGroupLabel {
-  margin: 0 0 9px;
+  margin: 0 0 11px;
   font-family: var(--memo-font-mono);
-  font-size: var(--memo-size-micro);
-  letter-spacing: 0.1em;
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--memo-ink-faint);
+  color: var(--memo-ink-muted);
 }
 
 @media (max-width: 640px) {
@@ -3770,11 +3774,15 @@
 }
 
 .memoPrecedentPlus {
+  display: inline-block;
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-ui);
   color: rgba(var(--color-oxford-rgb), 0.38);
   line-height: 1;
-  transition: color 140ms ease;
+  transition: color 140ms ease, transform 200ms ease;
+}
+.memoPrecedentPlus--open {
+  transform: rotate(90deg);
 }
 
 .memoPrecedentBody {

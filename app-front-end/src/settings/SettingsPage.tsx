@@ -334,7 +334,7 @@ function ChipGroup({
               type="button"
               aria-pressed={active}
               onClick={() => toggle(option)}
-              className={`type-meta min-h-[38px] rounded-none px-phi-3 transition-colors ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] text-oxford/58 hover:bg-oxford/[0.075]'}`}
+              className={`type-meta inline-flex min-h-[36px] items-center justify-center rounded-none px-[40px] transition-colors ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] text-oxford/58 hover:bg-oxford/[0.075]'}`}
             >
               {option}
             </button>

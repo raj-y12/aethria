@@ -19,38 +19,42 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
   const toast = (
     <AnimatePresence>
       {name ? (
+        // Fixed, full-width centering rail. Centering lives here (flex justify-center)
+        // so it can't be clobbered by framer-motion writing `transform` for the y slide.
         <motion.div
           key="lookup-ready"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 16 }}
           transition={{ duration: 0.28, ease: EASE }}
-          className="fixed bottom-phi-5 left-1/2 z-[9998] flex -translate-x-1/2 items-center gap-phi-4 border border-oxford/15 bg-paper px-phi-4 py-phi-3 shadow-[0_18px_44px_-18px_rgba(0,20,51,0.35)]"
+          className="pointer-events-none fixed inset-x-0 bottom-phi-5 z-[9998] flex justify-center px-phi-4"
           role="status"
           aria-live="polite"
         >
-          <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe" aria-hidden />
-          <span className="min-w-0">
-            <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">
-              Lookup ready{recommendation ? ` · ${recommendation}` : ''}
+          <div className="pointer-events-auto flex max-w-[min(92vw,30rem)] items-center gap-phi-4 border border-oxford/15 bg-paper/95 px-phi-5 py-phi-3 shadow-[0_18px_44px_-18px_rgba(0,20,51,0.35)] backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">
+                Lookup ready{recommendation ? ` · ${recommendation}` : ''}
+              </span>
+              <span className="block truncate type-body-sm font-medium text-oxford">{name}</span>
             </span>
-            <span className="block truncate type-body-sm font-medium text-oxford">{name}</span>
-          </span>
-          <button
-            type="button"
-            onClick={onOpen}
-            className="shrink-0 type-meta uppercase tracking-[0.12em] bg-oxford px-phi-3 py-phi-2 text-paper transition-opacity hover:opacity-90 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
-          >
-            Open memo
-          </button>
-          <button
-            type="button"
-            onClick={onDismiss}
-            aria-label="Dismiss"
-            className="shrink-0 type-meta text-oxford/30 hover:text-oxford/60 bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
-          >
-            ×
-          </button>
+            <button
+              type="button"
+              onClick={onOpen}
+              className="inline-flex h-[34px] shrink-0 items-center justify-center bg-oxford px-phi-4 font-mono text-[10px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
+            >
+              Open memo
+            </button>
+            <button
+              type="button"
+              onClick={onDismiss}
+              aria-label="Dismiss"
+              className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-base leading-none text-oxford/30 transition-colors hover:text-oxford/60 btn-interaction"
+            >
+              ×
+            </button>
+          </div>
         </motion.div>
       ) : null}
     </AnimatePresence>

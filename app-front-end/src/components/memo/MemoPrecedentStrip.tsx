@@ -80,8 +80,8 @@ export default function MemoPrecedentStrip({
           Prior rulings
         </span>
         <span className="memoPrecedentSummary">{summary}</span>
-        <span className="memoPrecedentPlus" aria-hidden>
-          {open ? '−' : '+'}
+        <span className={open ? 'memoPrecedentPlus memoPrecedentPlus--open' : 'memoPrecedentPlus'} aria-hidden>
+          ›
         </span>
       </button>
 

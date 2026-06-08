@@ -5,22 +5,15 @@ import type { FundConfiguration } from '../../lib/fundConfiguration';
 
 export type QueueView = 'ALL' | 'PRIORITY' | 'NEW' | 'STALE' | 'ESCALATED';
 
-export type SourceFilter = 'ALL' | 'SCOUT' | 'LOOKUP';
+// Multi-select filter groups. An empty set means "no constraint" (show all).
+// Within a group the selected chips are OR'd; across groups they are AND'd.
+export type SourceFilter = 'SCOUT' | 'LOOKUP';
 
-export type DecisionFilter =
-  | 'ALL'
-  | 'NEEDS_RULING'
-  | 'STALE'
-  | 'ADVERSE'
-  | 'YES'
-  | 'NO'
-  | 'MAYBE'
-  | 'ESCALATION'
-  | 'WATCHLIST'
-  | 'DECIDED'
-  | 'AWAITING_REVIEW';
+export type OutcomeFilter = 'YES' | 'NO' | 'MAYBE' | 'DECIDED';
 
-export type ReviewFilter = 'ALL' | 'STRONG' | 'MEDIUM' | 'WEAK' | 'UNREVIEWED';
+export type FlagFilter = 'ADVERSE';
+
+export type ReviewFilter = 'STRONG' | 'MEDIUM' | 'WEAK' | 'UNREVIEWED';
 
 export type SortFilter = 'QUEUE_PRIORITY' | 'NEWEST' | 'OLDEST' | 'UNRESOLVED_OLDEST';
 
@@ -40,26 +33,26 @@ const SORT_OPTIONS: { value: SortFilter; label: string; title: string }[] = [
 ];
 
 const SOURCE_FILTER_CHIPS: { key: SourceFilter; label: string }[] = [
-  { key: 'ALL', label: 'ALL' },
   { key: 'SCOUT', label: 'SCOUT' },
   { key: 'LOOKUP', label: 'LOOKUP' },
 ];
 
-const ATTENTION_FILTER_CHIPS: { key: DecisionFilter; label: string }[] = [
-  { key: 'ALL', label: 'ANY ATTENTION' },
-  { key: 'NEEDS_RULING', label: 'NEEDS RULING' },
-  { key: 'STALE', label: 'STALE' },
-  { key: 'ADVERSE', label: 'ADVERSE' },
-  { key: 'ESCALATION', label: 'ESCALATION' },
-  { key: 'AWAITING_REVIEW', label: 'AWAITING REVIEW' },
-  { key: 'WATCHLIST', label: 'ON MONITOR' },
-];
-
-const RULING_FILTER_CHIPS: { key: DecisionFilter; label: string }[] = [
+const OUTCOME_FILTER_CHIPS: { key: OutcomeFilter; label: string }[] = [
   { key: 'YES', label: 'INVEST' },
   { key: 'MAYBE', label: 'MONITOR' },
   { key: 'NO', label: 'PASS' },
   { key: 'DECIDED', label: 'ANY DECIDED' },
+];
+
+const FLAG_FILTER_CHIPS: { key: FlagFilter; label: string }[] = [
+  { key: 'ADVERSE', label: 'ADVERSE' },
+];
+
+const REVIEW_FILTER_CHIPS: { key: ReviewFilter; label: string }[] = [
+  { key: 'STRONG', label: 'STRONG' },
+  { key: 'MEDIUM', label: 'MEDIUM' },
+  { key: 'WEAK', label: 'WEAK' },
+  { key: 'UNREVIEWED', label: 'UNREVIEWED' },
 ];
 
 function AdvancedChip({
@@ -76,7 +69,7 @@ function AdvancedChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`type-meta min-h-[36px] whitespace-nowrap px-phi-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+      className={`type-meta text-[10px] min-h-[36px] whitespace-nowrap px-[40px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
         active ? 'bg-oxford text-paper' : 'bg-oxford/[0.035] hover:bg-oxford/[0.065] text-oxford/58'
       }`}
     >
@@ -145,12 +138,14 @@ export interface DecisionQueueHeaderProps {
   viewCounts: Record<QueueView, number>;
   sortFilter: SortFilter;
   onSortFilterChange: (sort: SortFilter) => void;
-  sourceFilter: SourceFilter;
-  onSourceFilterChange: (filter: SourceFilter) => void;
-  decisionFilter: DecisionFilter;
-  onDecisionFilterChange: (filter: DecisionFilter) => void;
-  reviewFilter: ReviewFilter;
-  onReviewFilterChange: (filter: ReviewFilter) => void;
+  sourceFilters: Set<SourceFilter>;
+  onToggleSource: (filter: SourceFilter) => void;
+  outcomeFilters: Set<OutcomeFilter>;
+  onToggleOutcome: (filter: OutcomeFilter) => void;
+  flagFilters: Set<FlagFilter>;
+  onToggleFlag: (filter: FlagFilter) => void;
+  reviewFilters: Set<ReviewFilter>;
+  onToggleReview: (filter: ReviewFilter) => void;
   showAdvancedFilters: boolean;
   onToggleAdvancedFilters: () => void;
   hasActiveFilters: boolean;
@@ -165,12 +160,14 @@ export default function DecisionQueueHeader({
   viewCounts,
   sortFilter,
   onSortFilterChange,
-  sourceFilter,
-  onSourceFilterChange,
-  decisionFilter,
-  onDecisionFilterChange,
-  reviewFilter,
-  onReviewFilterChange,
+  sourceFilters,
+  onToggleSource,
+  outcomeFilters,
+  onToggleOutcome,
+  flagFilters,
+  onToggleFlag,
+  reviewFilters,
+  onToggleReview,
   showAdvancedFilters,
   onToggleAdvancedFilters,
   hasActiveFilters,
@@ -230,11 +227,16 @@ export default function DecisionQueueHeader({
               onClick={onToggleAdvancedFilters}
               aria-expanded={showAdvancedFilters}
               aria-label={showAdvancedFilters ? 'Hide filters' : 'More filters'}
-              className={`inline-flex h-9 w-9 shrink-0 items-center justify-center font-mono text-[17px] leading-none transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-                showAdvancedFilters || hasActiveFilters ? 'text-oxford' : 'text-oxford/40 hover:text-oxford/70'
+              className={`group inline-flex h-9 w-9 shrink-0 items-center justify-center leading-none transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+                showAdvancedFilters || hasActiveFilters ? 'text-oxford' : 'text-oxford/34 hover:text-oxford/55'
               }`}
             >
-              <span aria-hidden>{showAdvancedFilters ? '−' : '+'}</span>
+              <span
+                aria-hidden
+                className={`inline-block font-sans text-[1.05rem] leading-none transition-[transform,color] duration-200 ease-out ${showAdvancedFilters ? 'rotate-90' : ''}`}
+              >
+                ›
+              </span>
             </button>
           </div>
         </div>
@@ -243,52 +245,39 @@ export default function DecisionQueueHeader({
       <AnimatePresence>
         {showAdvancedFilters && (
           <motion.div
-            initial={reduceMotion ? false : { opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -8 }}
-            transition={{ duration: reduceMotion ? 0 : 0.18, ease: tokens.motion.ease }}
+            initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.22, ease: tokens.motion.ease }}
             role="region"
             aria-label="Advanced queue filters"
-            className="mt-phi-2 border-t border-oxford/[0.06] pt-phi-2"
+            className="overflow-hidden"
           >
+            <div className="mt-phi-2 border-t border-oxford/[0.06] pt-phi-2">
             <div role="group" aria-label="Deal source" className="mb-phi-3 flex min-w-0 flex-col gap-phi-1">
               <p className={productText.mutedLabel}>Source</p>
               <div className="flex flex-wrap gap-phi-2">
                 {SOURCE_FILTER_CHIPS.map(({ key, label }) => (
                   <AdvancedChip
                     key={key}
-                    active={sourceFilter === key}
+                    active={sourceFilters.has(key)}
                     label={label}
-                    onClick={() => onSourceFilterChange(key)}
+                    onClick={() => onToggleSource(key)}
                   />
                 ))}
               </div>
             </div>
 
             <div className="grid min-w-0 gap-x-phi-6 gap-y-phi-2 md:grid-cols-3">
-              <div role="group" aria-label="Attention and queue state" className="flex min-w-0 flex-col gap-phi-1">
-                <p className={productText.mutedLabel}>Attention</p>
-                <div className="flex flex-wrap gap-phi-2">
-                  {ATTENTION_FILTER_CHIPS.filter((item) => item.key !== 'ALL').map(({ key, label }) => (
-                    <AdvancedChip
-                      key={key}
-                      active={decisionFilter === key}
-                      label={label}
-                      onClick={() => onDecisionFilterChange(decisionFilter === key ? 'ALL' : key)}
-                    />
-                  ))}
-                </div>
-              </div>
-
               <div role="group" aria-label="Partner ruling and outcome" className="flex min-w-0 flex-col gap-phi-1">
                 <p className={productText.mutedLabel}>Outcome</p>
                 <div className="flex flex-wrap gap-phi-2">
-                  {RULING_FILTER_CHIPS.map(({ key, label }) => (
+                  {OUTCOME_FILTER_CHIPS.map(({ key, label }) => (
                     <AdvancedChip
                       key={key}
-                      active={decisionFilter === key}
+                      active={outcomeFilters.has(key)}
                       label={label}
-                      onClick={() => onDecisionFilterChange(decisionFilter === key ? 'ALL' : key)}
+                      onClick={() => onToggleOutcome(key)}
                     />
                   ))}
                 </div>
@@ -297,12 +286,26 @@ export default function DecisionQueueHeader({
               <div role="group" aria-label="Reviewer signal strength" className="flex min-w-0 flex-col gap-phi-1">
                 <p className={productText.mutedLabel}>Review</p>
                 <div className="flex flex-wrap gap-phi-2">
-                  {(['STRONG', 'MEDIUM', 'WEAK', 'UNREVIEWED'] as const).map((r) => (
+                  {REVIEW_FILTER_CHIPS.map(({ key, label }) => (
                     <AdvancedChip
-                      key={r}
-                      active={reviewFilter === r}
-                      label={r}
-                      onClick={() => onReviewFilterChange(reviewFilter === r ? 'ALL' : r)}
+                      key={key}
+                      active={reviewFilters.has(key)}
+                      label={label}
+                      onClick={() => onToggleReview(key)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div role="group" aria-label="Risk flags" className="flex min-w-0 flex-col gap-phi-1">
+                <p className={productText.mutedLabel}>Flags</p>
+                <div className="flex flex-wrap gap-phi-2">
+                  {FLAG_FILTER_CHIPS.map(({ key, label }) => (
+                    <AdvancedChip
+                      key={key}
+                      active={flagFilters.has(key)}
+                      label={label}
+                      onClick={() => onToggleFlag(key)}
                     />
                   ))}
                 </div>
@@ -318,6 +321,7 @@ export default function DecisionQueueHeader({
                 Reset
               </button>
             )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

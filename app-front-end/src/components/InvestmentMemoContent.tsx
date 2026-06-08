@@ -523,7 +523,12 @@ function MemoDisclosureSection({
       >
         <span className="memoDisclosureTitle" id={`${id}-title`}>{title}</span>
         <span className="memoDisclosureMeta">{summary}</span>
-        <span className="memoDisclosurePlus" aria-hidden>{open ? '−' : '+'}</span>
+        <span
+          aria-hidden
+          className={open ? 'memoScoreChevron memoDisclosurePlus memoScoreChevron--open' : 'memoScoreChevron memoDisclosurePlus'}
+        >
+          ›
+        </span>
       </button>
       <div id={`${id}-body`} className={open ? 'memoDisclosureBody' : 'hidden'}>
         {children}
@@ -1175,11 +1180,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               const fund = r?.thesis_matches_fund;
               const confRaw = r?.thesis_alignment_confidence;
               const confPct = confRaw != null ? `${(confRaw * 100).toFixed(0)}%` : null;
-              const statLine = [
-                ten != null ? `${ten.toFixed(0)}/10 alignment` : null,
+              const thesisHeadlineTag = [
                 fund != null ? (fund ? 'Mandate aligned' : 'Mandate misaligned') : null,
                 confPct != null ? `${confPct} confidence` : null,
-              ].filter(Boolean).join('   ·   ');
+              ].filter(Boolean).join('  ·  ');
               const fitPoints = (r?.thesis_fit_points ?? []).filter((s) => String(s ?? '').trim());
               const gapPoints = (r?.thesis_deviation_points ?? []).filter((s) => String(s ?? '').trim());
               return (
@@ -1254,8 +1258,20 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         ))}
                         {hasThesis && (
                           <div className="memoDocSubsection">
-                            <p className="memoDocSubhead">Thesis alignment</p>
-                            {statLine && <p className="memoEvStatLine">{renderWithMonoNumbers(statLine)}</p>}
+                            <h3 className="memoDocSectionHead">Thesis alignment</h3>
+                            {(ten != null || thesisHeadlineTag) && (
+                              <p className="memoScoreHeadline">
+                                {ten != null && (
+                                  <>
+                                    <span className="memoScoreHeadlineValue">{renderWithMonoNumbers(ten.toFixed(0))}</span>
+                                    <span className="memoScoreHeadlineMax">/ 10</span>
+                                  </>
+                                )}
+                                {thesisHeadlineTag && (
+                                  <span className="memoScoreHeadlineTag">{renderWithMonoNumbers(thesisHeadlineTag)}</span>
+                                )}
+                              </p>
+                            )}
                             {fitPoints.length > 0 && (
                               <ul className="memoList">
                                 {fitPoints.map((item, i) => (
