@@ -978,10 +978,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 {headerMeta ? <p className="memoMeta">{renderWithMonoNumbers(headerMeta)}</p> : null}
               </div>
 
-              {coverStandfirst ? (
-                <p className="memoCoverStandfirst">{renderWithMonoNumbers(coverStandfirst)}</p>
-              ) : null}
-
               {readOnly ? (
                 <p className="memoShareBanner" role="status">
                   Read-only view — share this link with a co-GP. Rulings and edits are disabled.
@@ -1008,6 +1004,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 >
                   {renderWithMonoNumbers(coverRulingHeadline)}
                 </p>
+                {coverStandfirst ? (
+                  <p className="memoCoverStandfirst">{renderWithMonoNumbers(coverStandfirst)}</p>
+                ) : null}
                 <div className="memoCoverRulingSupport">
                   <span className="memoCoverRulingConviction">
                     {renderWithMonoNumbers(convictionLine)}
