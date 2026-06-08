@@ -951,8 +951,8 @@
   gap: 14px;
 }
 /* Segmented ruling selector in the house language: sharp outline buttons, mono uppercase,
-   scale-on-press. The SELECTED option fills with its verdict colour (Invest green / Monitor
-   amber / Pass oxblood) — same ramp as the cover recommendation — so the choice reads at a glance. */
+   scale-on-press. The SELECTED option fills with plain print-ink — no verdict colour, matching
+   the neutral cover recommendation — so the selection reads from fill alone, not hue. */
 .memoDecisionChoice {
   height: 40px;
   min-height: 0;
@@ -977,9 +977,9 @@
   border-color: transparent;
   font-weight: 600;
 }
-.memoDecisionChoice--yes[aria-pressed="true"] { background: #17442d; }
-.memoDecisionChoice--maybe[aria-pressed="true"] { background: #5f4716; }
-.memoDecisionChoice--no[aria-pressed="true"] { background: #5e2621; }
+.memoDecisionChoice--yes[aria-pressed="true"],
+.memoDecisionChoice--maybe[aria-pressed="true"],
+.memoDecisionChoice--no[aria-pressed="true"] { background: var(--color-oxford); }
 .memoDecisionChoice:disabled,
 .memoRulingSubmit:disabled,
 .memoRiskAckButton:disabled,
@@ -1261,12 +1261,13 @@
   color: var(--color-oxford);
   font-feature-settings: "kern" 1, "liga" 1;
 }
-/* The verdict colour carries the call — deep print-ink tones on the cream cover, matching
-   the WorkGrid / badge semantic ramp (verdictBadgeTokens). Previously only PASS was tinted. */
-.memoCoverRulingWord--invest { color: #17442d; }
-.memoCoverRulingWord--pass { color: #5e2621; }
-.memoCoverRulingWord--monitor { color: #5f4716; }
-.memoCoverRulingWord--escalation { color: color-mix(in srgb, var(--color-accent) 88%, var(--color-oxford)); }
+/* The verdict is set in plain print-ink — no semantic tint. The word itself (INVEST /
+   PASS / MONITOR) carries the call; colour-coding it added visual noise the memo reads
+   cleaner without. Pending-state verdicts stay faint to read as "still working". */
+.memoCoverRulingWord--invest,
+.memoCoverRulingWord--pass,
+.memoCoverRulingWord--monitor,
+.memoCoverRulingWord--escalation { color: var(--color-oxford); }
 .memoCoverRulingWord--awaiting,
 .memoCoverRulingWord--undecided,
 .memoCoverRulingWord--pending { color: var(--memo-ink-faint); }

@@ -999,9 +999,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
               <div className="memoCoverRuling">
                 <p className="memoCoverRulingLabel">Recommendation</p>
-                {/* Static verdict — the colour carries the meaning. No perpetual animation
-                    (the old infinite opacity pulse caused jank); the pipeline "alive" state
-                    is now a single CSS-only dot on the status line below. */}
+                {/* Static verdict set in plain ink — the word itself carries the call, no
+                    colour-coding. Pending states stay faint (and pulse) to read as "still
+                    working"; decided verdicts are perfectly static. */}
                 <p
                   className={`memoCoverRulingWord memoCoverRulingWord--${coverRulingVariantClass}`}
                   {...(showCoverPipelineDetail ? { 'aria-live': 'polite' as const } : {})}
