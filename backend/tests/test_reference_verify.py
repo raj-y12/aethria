@@ -266,6 +266,66 @@ def test_filter_references_by_url_probe_drops_hard_dead_link(monkeypatch):
     assert out["references"] == []
 
 
+def test_filter_references_by_url_probe_lenient_keeps_hard_dead_link(monkeypatch):
+    # On-demand lookups are user-intentional: a dead probe (or a dark retrieval
+    # provider) must not delete the citation and drop the requested company.
+    from utils.reference_verify import filter_references_by_url_probe
+
+    monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
+    monkeypatch.setattr(
+        "utils.reference_verify.probe_url_status",
+        lambda url, timeout=4.0: "unreachable",
+    )
+    output = {
+        "references": [
+            "TinyPay official site - https://tinypay.example/",
+        ],
+    }
+    out = filter_references_by_url_probe(output, lenient=True)
+    assert out["references"] == ["TinyPay official site - https://tinypay.example/"]
+
+
+def test_finalize_lenient_lookup_restores_refs_when_all_pruned(monkeypatch):
+    # When every reference fails the live probe, a lenient (lookup) finalize keeps the
+    # model's URL-bearing citations as a fallback so the company is not dropped to zero.
+    from utils.reference_verify import finalize_scout_references
+
+    monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
+    monkeypatch.setattr(
+        "utils.reference_verify.probe_url_status",
+        lambda url, timeout=4.0: "unreachable",
+    )
+    output = {
+        "name": "TinyPay",
+        "references": [
+            "TinyPay official site - https://tinypay.example/",
+            "TinyPay raised seed - https://news.example/tinypay",
+        ],
+    }
+    finalize_scout_references(output, company_name="TinyPay", lenient=True)
+    assert output["references"]  # not dropped to empty
+    assert all("http" in r for r in output["references"])
+
+
+def test_finalize_strict_still_drops_when_all_pruned(monkeypatch):
+    # Default (autonomous pipeline) behavior is unchanged: no fallback, refs are dropped.
+    from utils.reference_verify import finalize_scout_references
+
+    monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
+    monkeypatch.setattr(
+        "utils.reference_verify.probe_url_status",
+        lambda url, timeout=4.0: "unreachable",
+    )
+    output = {
+        "name": "TinyPay",
+        "references": [
+            "TinyPay official site - https://tinypay.example/",
+        ],
+    }
+    finalize_scout_references(output, company_name="TinyPay")
+    assert output["references"] == []
+
+
 def test_filter_references_to_allowlist_keeps_only_allowed_urls():
     from utils.reference_verify import filter_references_to_allowlist
 

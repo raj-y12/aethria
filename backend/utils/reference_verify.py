@@ -267,7 +267,9 @@ def reference_string_verified(ref: str, timeout: float = 4.0) -> bool:
     return False
 
 
-def filter_references_by_url_probe(output: Dict[str, Any], timeout: float = 4.0) -> Dict[str, Any]:
+def filter_references_by_url_probe(
+    output: Dict[str, Any], timeout: float = 4.0, *, lenient: bool = False
+) -> Dict[str, Any]:
     if skip_reference_url_verify():
         return output
     refs = output.get("references")
@@ -293,7 +295,11 @@ def filter_references_by_url_probe(output: Dict[str, Any], timeout: float = 4.0)
                 break
             if status == "unreachable":
                 hard_negative = True
-        if soft_accept or not hard_negative:
+        # Lenient mode is for user-intentional on-demand lookups: the analyst explicitly
+        # asked for this company, so a dead/unreachable probe (or a dark retrieval provider
+        # that left us with only the model's own citations) must not delete the reference
+        # and drop the company entirely. Keep it; verification is best-effort here.
+        if lenient or soft_accept or not hard_negative:
             kept.append(s)
         else:
             logger.warning("reference_verify: dropped hard-dead reference: %s", s[:120])
@@ -501,14 +507,25 @@ def finalize_scout_references(
     anchor_hostname: Optional[str] = None,
     company_name: Optional[str] = None,
     probe_timeout: float = 4.0,
+    lenient: bool = False,
 ) -> Dict[str, Any]:
     """
     Apply anchor conflict filtering (wrong TLD for same slug), then URL probes.
     Mutates output['references'].
+
+    lenient=True is for user-intentional on-demand lookups: filtering still runs to
+    prefer good citations, but the company is never dropped solely because external
+    URL probes failed (e.g. retrieval provider down). If every reference would be
+    pruned, the model's original URL-bearing citations are restored as a fallback.
     """
     refs = output.get("references")
     if not isinstance(refs, list):
         return output
+    original_url_refs = [
+        str(r).strip()
+        for r in refs
+        if isinstance(r, str) and str(r).strip() and extract_http_urls(str(r))
+    ]
     cleaned = filter_references_anchor_conflicts(refs, anchor_hostname)
     cleaned = filter_references_by_company_relevance(
         cleaned,
@@ -516,8 +533,16 @@ def finalize_scout_references(
         anchor_hostname=anchor_hostname,
     )
     output["references"] = cleaned
-    output = filter_references_by_url_probe(output, timeout=probe_timeout)
+    output = filter_references_by_url_probe(output, timeout=probe_timeout, lenient=lenient)
     final_refs = output.get("references")
+    if lenient and (not isinstance(final_refs, list) or not final_refs) and original_url_refs:
+        logger.warning(
+            "reference_verify: lookup fallback — all references were pruned; keeping %d "
+            "unverified citation(s) so the requested company is not dropped",
+            len(original_url_refs),
+        )
+        output["references"] = original_url_refs[:8]
+        final_refs = output["references"]
     if isinstance(final_refs, list):
         output["source_evidence"] = build_source_evidence(
             [str(r) for r in final_refs if isinstance(r, str)],

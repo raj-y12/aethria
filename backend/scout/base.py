@@ -411,6 +411,9 @@ class Scout(ABC):
             out,
             anchor_hostname=anchor,
             company_name=str(out.get("name") or ""),
+            # On-demand lookups are user-intentional: prefer verified citations but never
+            # drop the company purely because external URL probes failed or retrieval was dark.
+            lenient=for_lookup,
         )
         if isinstance(final, dict):
             # Independently verify every proposed financial figure against the retrieved,
