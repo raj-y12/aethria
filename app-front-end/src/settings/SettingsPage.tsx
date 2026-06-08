@@ -751,9 +751,6 @@ export default function SettingsPage() {
                     >
                       Aethria
                     </Link>
-                    <div className="mt-phi-3">
-                      <WorkspaceExitButton />
-                    </div>
                   </div>
                   <div className="aethria-rail-nav-bleed mt-phi-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                     <p className={`${railEditorial.label} shrink-0 px-phi-4`}>Fund configuration</p>
@@ -813,7 +810,17 @@ export default function SettingsPage() {
             <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]">
               <div className="min-w-0 px-phi-5 py-phi-6 lg:px-phi-7">
                 <header className="mb-phi-7 max-w-[54rem]">
-                  <p className="type-label-section text-oxford/45">{draft.versionLabel}</p>
+                  <div className="hidden items-center justify-between gap-phi-3 lg:flex">
+                    <p className="type-label-section text-oxford/45">{draft.versionLabel}</p>
+                    <Link
+                      to="/v1"
+                      className="type-meta inline-flex items-center gap-phi-1 text-oxford/45 transition-colors hover:text-oxford btn-interaction"
+                      aria-label="Return to conviction workspace"
+                    >
+                      <span aria-hidden="true">←</span> Workspace
+                    </Link>
+                  </div>
+                  <p className="type-label-section text-oxford/45 lg:hidden">{draft.versionLabel}</p>
                   <h1 className="mt-phi-3 font-display text-[2.2rem] font-medium leading-[0.98] tracking-0 text-oxford sm:text-[3rem]">
                     How this fund thinks
                   </h1>
@@ -909,6 +916,29 @@ export default function SettingsPage() {
                         />
                       </div>
                     ))}
+
+                    <div className="mt-phi-2 border-t border-oxford/[0.08] pt-phi-4">
+                      <div className="flex flex-wrap items-baseline justify-between gap-phi-3">
+                        <div>
+                          <p className={labelCls}>Active policy</p>
+                          <p className="mt-phi-1 type-body-sm text-oxford/60">{draft.activePolicyVersionId ?? 'No published policy'}</p>
+                        </div>
+                        <p className={`type-meta ${policyUnpublished ? 'text-escalation/70' : 'text-oxford/40'}`}>
+                          {policyUnpublished ? 'Unpublished changes — preview differs from published policy' : 'Published policy is up to date'}
+                        </p>
+                      </div>
+                      <div className="mt-phi-4 flex flex-wrap items-center gap-phi-3">
+                        <button type="button" onClick={handlePreviewPolicy} disabled={policyBusy} className={actionBtnCls}>
+                          {policyBusy ? 'Working...' : 'Preview policy'}
+                        </button>
+                        <button type="button" onClick={handlePublishPolicy} disabled={policyBusy} className={solidBtnCls}>
+                          {policyBusy ? 'Publishing...' : 'Publish version'}
+                        </button>
+                        {draft.lastPublishedAt && (
+                          <p className="type-meta text-oxford/38">Last published {new Date(draft.lastPublishedAt).toLocaleString()}</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </SettingsSection>
 
@@ -993,14 +1023,21 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     <div className="border-y border-oxford/[0.06]">
-                      <ToggleRow id="risk-ack" checked={draft.risk.requireAcknowledgement} onChange={(value) => updateRisk('requireAcknowledgement', value)} label="Require risk acknowledgement before ruling" hint="When enabled, high-risk pending deals require a reviewed-risk interaction before Commit ruling." />
-                      <ToggleRow id="risk-high-only" checked={draft.risk.onlyGateHighSeverity} onChange={(value) => updateRisk('onlyGateHighSeverity', value)} label="Only gate high severity risks" hint="Power users can leave medium adverse items visible without slowing the ruling action." />
+                      <ToggleRow id="risk-ack" checked={draft.risk.requireAcknowledgement} onChange={(value) => updateRisk('requireAcknowledgement', value)} label="Require acknowledgement before ruling" hint="High-risk pending deals need a reviewed-risk step before Commit." />
+                      <ToggleRow id="risk-high-only" checked={draft.risk.onlyGateHighSeverity} onChange={(value) => updateRisk('onlyGateHighSeverity', value)} label="Only gate high severity risks" hint="Leaves medium adverse items visible without slowing the ruling." />
                     </div>
-                    <div className="grid gap-phi-5 md:grid-cols-2">
-                      <TextField id="founder-penalty" label="Missing founder/team data penalty" type="number" value={draft.risk.missingFounderPenalty} onChange={(value) => updateRisk('missingFounderPenalty', Number(value))} min={0} max={100} disabled hint="Saved for policy display only; backend reviewers do not apply this penalty." />
-                      <TextField id="traction-penalty" label="Missing traction data penalty" type="number" value={draft.risk.missingTractionPenalty} onChange={(value) => updateRisk('missingTractionPenalty', Number(value))} min={0} max={100} disabled hint="Saved for policy display only; backend reviewers do not apply this penalty." />
-                      <TextField id="contradiction-penalty" label="Contradiction penalty" type="number" value={draft.risk.contradictionPenalty} onChange={(value) => updateRisk('contradictionPenalty', Number(value))} min={0} max={100} disabled hint="Saved for policy display only; backend reviewers do not apply this penalty." />
-                      <TextField id="weak-source-penalty" label="Weak-source penalty" type="number" value={draft.risk.weakSourcePenalty} onChange={(value) => updateRisk('weakSourcePenalty', Number(value))} min={0} max={100} disabled hint="Saved for policy display only; backend reviewers do not apply this penalty." />
+                    <div className="border-b border-oxford/[0.06] pb-phi-5">
+                      <div className="flex items-center justify-between gap-phi-3">
+                        <p className={labelCls}>Penalty weights</p>
+                        <span className="inline-flex items-center border border-oxford/[0.12] px-phi-2 py-px font-mono text-[0.625rem] uppercase tracking-wide text-oxford/45">Display only</span>
+                      </div>
+                      <div className="mt-phi-4 grid gap-phi-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <TextField id="founder-penalty" label="Founder data" type="number" value={draft.risk.missingFounderPenalty} onChange={(value) => updateRisk('missingFounderPenalty', Number(value))} min={0} max={100} disabled />
+                        <TextField id="traction-penalty" label="Traction data" type="number" value={draft.risk.missingTractionPenalty} onChange={(value) => updateRisk('missingTractionPenalty', Number(value))} min={0} max={100} disabled />
+                        <TextField id="contradiction-penalty" label="Contradiction" type="number" value={draft.risk.contradictionPenalty} onChange={(value) => updateRisk('contradictionPenalty', Number(value))} min={0} max={100} disabled />
+                        <TextField id="weak-source-penalty" label="Weak source" type="number" value={draft.risk.weakSourcePenalty} onChange={(value) => updateRisk('weakSourcePenalty', Number(value))} min={0} max={100} disabled />
+                      </div>
+                      <p className={`mt-phi-3 ${metaCls}`}>Saved for policy display only (0–100). Backend reviewers do not apply these penalties.</p>
                     </div>
                   </div>
                 </SettingsSection>
@@ -1034,36 +1071,8 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="rubric" title="Evaluation Framework" kicker="Aethria's institutional scoring framework. Dimensions are fixed to ensure score consistency across all evaluations. Publish policy versions to activate weight changes.">
+                <SettingsSection id="rubric" title="Evaluation Framework" kicker="Aethria's institutional scoring framework. Dimensions are fixed to ensure score consistency across all evaluations — this is read-only reference. Adjust and publish weights in Scoring Weights.">
                   <div className="flex flex-col gap-phi-5">
-                    <div className="border-y border-oxford/[0.06] py-phi-4">
-                      <div className="grid gap-phi-3 md:grid-cols-3">
-                        <div>
-                          <p className={labelCls}>Active policy</p>
-                          <p className="mt-phi-1 type-body-sm text-oxford/60">{draft.activePolicyVersionId ?? 'No published policy'}</p>
-                        </div>
-                        <div>
-                          <p className={labelCls}>Published hash</p>
-                          <p className="mt-phi-1 type-body-sm text-oxford/60">{draft.publishedPolicyHash ?? 'n/a'}</p>
-                        </div>
-                        <div>
-                          <p className={labelCls}>Draft state</p>
-                          <p className="mt-phi-1 type-body-sm text-oxford/60">{policyUnpublished ? 'Preview differs from published policy' : 'No unpublished policy preview'}</p>
-                        </div>
-                      </div>
-                      <div className="mt-phi-4 flex flex-wrap items-center gap-phi-3">
-                        <button type="button" onClick={handlePreviewPolicy} disabled={policyBusy} className={actionBtnCls}>
-                          {policyBusy ? 'Working...' : 'Preview policy'}
-                        </button>
-                        <button type="button" onClick={handlePublishPolicy} disabled={policyBusy} className={solidBtnCls}>
-                          {policyBusy ? 'Publishing...' : 'Publish version'}
-                        </button>
-                        {draft.lastPublishedAt && (
-                          <p className="type-meta text-oxford/38">Last published {new Date(draft.lastPublishedAt).toLocaleString()}</p>
-                        )}
-                      </div>
-                    </div>
-
                     <div className="border-b border-oxford/[0.06] pb-phi-4">
                       <p className="type-body-sm leading-relaxed text-oxford/52">
                         Every startup is evaluated across five institutional dimensions. Score definitions are fixed to ensure a 7 in Market always means the same thing regardless of fund configuration. You can adjust dimension weights to reflect your fund's investment priorities.

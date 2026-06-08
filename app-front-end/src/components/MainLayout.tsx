@@ -1016,7 +1016,7 @@ export default function MainLayout({
                 <button
                   type="button"
                   onClick={() => navigate(SETTINGS_PATH)}
-                  className="group flex w-full min-w-0 flex-col gap-phi-2 border border-oxford/[0.08] px-phi-4 py-phi-3 text-left transition-colors hover:border-oxford/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                  className="group flex w-full min-w-0 flex-col gap-phi-2 border border-oxford/[0.08] px-phi-5 py-phi-3 text-left transition-colors hover:border-oxford/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
                   style={{ marginTop: 'clamp(5px, 0.6vw, 8px)' }}
                   title={mandateSummaryLine || desktopMandateLine || undefined}
                   aria-label={hasThesis ? `Active mandate: ${fundName || 'configured'} — open settings` : 'No active thesis — open settings'}
