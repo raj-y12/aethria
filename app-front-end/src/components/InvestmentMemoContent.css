@@ -1211,8 +1211,8 @@
 
 /* ===================================================================
    Editorial briefing — a partner-review note, not a dashboard.
-   Strong vertical rhythm, a serif standfirst for typographic contrast,
-   mono labels for structure, generous negative space.
+   Strong vertical rhythm, a clean sans standfirst that reads as plain
+   prose, mono labels for structure, generous negative space.
    =================================================================== */
 
 /* Executive cover */
@@ -1228,7 +1228,7 @@
 .memoCoverStandfirst {
   margin: clamp(12px, 1.6vw, 16px) 0 0;
   max-width: 34rem;
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-ui);
   font-size: clamp(1rem, 1.35vw, 1.125rem);
   line-height: 1.5;
   letter-spacing: 0;
@@ -1271,6 +1271,13 @@
 .memoCoverRulingWord--awaiting,
 .memoCoverRulingWord--undecided,
 .memoCoverRulingWord--pending { color: var(--memo-ink-faint); }
+/* Editorial full stop on a settled call — "MONITOR." reads as a verdict, not a tag.
+   Only decided verdicts get it; pending/awaiting states stay open-ended. */
+.memoCoverRulingWord--invest::after,
+.memoCoverRulingWord--pass::after,
+.memoCoverRulingWord--monitor::after {
+  content: '.';
+}
 .memoCoverRulingSupport {
   margin: 16px 0 0;
   display: flex;
@@ -4018,7 +4025,7 @@
   max-width: 38rem;
   font-size: clamp(1.0625rem, 1.45vw, 1.25rem);
   line-height: 1.55;
-  color: rgba(var(--color-oxford-rgb), 0.68);
+  color: rgba(var(--color-oxford-rgb), 0.78);
 }
 
 .memoCoverRuling {
