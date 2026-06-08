@@ -15,6 +15,7 @@ import logging
 import os
 import ssl
 from typing import Any, Dict, List
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import certifi
@@ -83,7 +84,13 @@ def tavily_search(query: str, max_results: int = 10, timeout: float | None = Non
     req = Request(
         "https://api.tavily.com/search",
         data=payload,
-        headers={"Content-Type": "application/json"},
+        # Tavily's current standard is Bearer auth; the legacy `api_key` in the body is
+        # kept too for backward compatibility. Sending the header avoids silent auth
+        # failures (and therefore empty retrieval) if the legacy body method is rejected.
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
         method="POST",
     )
     ssl_ctx = ssl.create_default_context(cafile=certifi.where())
@@ -111,6 +118,16 @@ def tavily_search(query: str, max_results: int = 10, timeout: float | None = Non
             if normalized:
                 out.append(normalized)
         return out
+    except HTTPError as e:
+        # Surface the status + Tavily's error detail (e.g. invalid api key, usage limit
+        # exceeded) so a dark-retrieval outage is diagnosable from logs instead of silent.
+        detail = ""
+        try:
+            detail = e.read().decode("utf-8", errors="replace")[:300]
+        except Exception:
+            pass
+        logger.warning("Tavily search failed: HTTP %s %s", getattr(e, "code", "?"), detail)
+        return []
     except Exception as e:
         logger.warning("Tavily search failed: %s", e)
         return []
