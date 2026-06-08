@@ -253,6 +253,11 @@
   margin-top: clamp(20px, 2.6vw, 28px);
   padding-top: clamp(16px, 2vw, 22px);
 }
+/* The verdict shrinks with the panel (cqw); keep the lede proportional in the
+   narrow column so it doesn't read large next to a smaller verdict word. */
+.memoPanel--embedded .memoCoverStandfirst {
+  font-size: 0.9375rem;
+}
 .memoPanel--embedded .memoCoverRulingSupport {
   gap: 5px;
 }
