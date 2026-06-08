@@ -219,6 +219,10 @@ const INTERNAL_REASONING_PATTERNS = [
   /\bnormalization_layer\b/i,
   /\bextraction_layer\b/i,
   /\bpolicy_compiler\b/i,
+  // Defense-in-depth: never render the engine's internal off-vocabulary diagnostic, even
+  // from older cached scores. The backend now emits a clean diligence message instead.
+  /\boutside the recognized vocabulary\b/i,
+  /\btreated as no evidence\b/i,
 ];
 
 /**

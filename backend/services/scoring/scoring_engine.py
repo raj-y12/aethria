@@ -21,6 +21,7 @@ from services.scoring.aggregation_layer import aggregate_all_dimensions
 from services.scoring.extraction_layer import extract_structured_signals
 from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.scoring.normalization_layer import (
+    is_no_information,
     is_unrecognized,
     normalize_architecture,
     normalize_barriers,
@@ -189,13 +190,24 @@ class DeterministicScoringEngine:
 
     @classmethod
     def _unrecognized_component(cls, signal: Dict[str, Any], value: Any) -> Dict[str, Any]:
-        """A label outside the recognized vocabulary is treated as no-evidence: a
-        placeholder score is kept (no NaN leaks to consumers) but value/label are
-        cleared so aggregation excludes it (audit C2 / off-vocabulary)."""
+        """A label the deterministic vocabulary does not recognize is treated as
+        no-evidence: a placeholder score is kept (no NaN leaks to consumers) but
+        value/label are cleared so aggregation excludes it (audit C2 / off-vocabulary).
+
+        The user-facing `reasoning` is a clean diligence message — never internal
+        vocabulary diagnostics, which must not surface in a memo. The off-vocabulary label
+        is logged at WARNING so genuine vocabulary gaps can be closed from telemetry rather
+        than by a user noticing a broken-looking memo line."""
+        logger.warning(
+            "scoring off_vocabulary_label=%r excluded as no-evidence (component reasoning=%r)",
+            value,
+            signal.get("reasoning"),
+        )
+        base_reasoning = str(signal.get("reasoning") or "").strip()
         return {
             "score": float(DEFAULT_SCORE),
             "confidence": 0.2,
-            "reasoning": f"Label '{value}' is outside the recognized vocabulary; treated as no evidence.",
+            "reasoning": base_reasoning or "Evidence not available. Diligence required to establish baseline.",
             "value": None,
             "unrecognized_label": True,
         }
@@ -208,6 +220,10 @@ class DeterministicScoringEngine:
         confidence = signal.get("confidence", 0.5)
         score = normalizer(value)
         if is_unrecognized(score):
+            # An honest "unknown"/"n/a" is no evidence, not a vocabulary error — surface a
+            # clean diligence note. A genuinely off-vocabulary label is logged + excluded.
+            if is_no_information(value):
+                return DeterministicScoringEngine._neutral_component(signal)
             return DeterministicScoringEngine._unrecognized_component(signal, value)
         score, confidence, reasoning_suffix = DeterministicScoringEngine._check_label_score_contradiction(
             value, score, confidence
@@ -240,6 +256,10 @@ class DeterministicScoringEngine:
         confidence = signal.get("confidence", 0.5)
         score = normalizer(value)
         if is_unrecognized(score):
+            # An honest "unknown"/"n/a" is no evidence, not a vocabulary error — surface a
+            # clean diligence note. A genuinely off-vocabulary label is logged + excluded.
+            if is_no_information(value):
+                return DeterministicScoringEngine._neutral_component(signal)
             return DeterministicScoringEngine._unrecognized_component(signal, value)
         score, confidence, reasoning_suffix = DeterministicScoringEngine._check_label_score_contradiction(
             value, score, confidence

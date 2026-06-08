@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import statistics
 from typing import Any, Optional
 
 from config.scoring_config import DEFAULT_SCORE, THRESHOLDS
@@ -10,6 +11,24 @@ from config.scoring_config import DEFAULT_SCORE, THRESHOLDS
 
 def _clamp(score: float) -> float:
     return max(0.0, min(10.0, float(score)))
+
+
+_SEPARATOR_RE = re.compile(r"[\s\-_]+")
+
+
+def _canonical_key(value: Any) -> str:
+    """Lowercase, trim, and collapse separator variants (hyphen, underscore, whitespace)
+    to a single space so 'pre_product', 'pre-product', and 'pre product' all resolve to
+    the same key. Separator style is never semantically meaningful for our controlled
+    labels, and upstream LLM/extraction output uses the three forms interchangeably —
+    matching on a canonical form removes a whole class of spurious off-vocabulary misses.
+    """
+    if value is None:
+        return ""
+    text = str(value).strip().lower()
+    if not text:
+        return ""
+    return _SEPARATOR_RE.sub(" ", text).strip()
 
 
 def _parse_float(value: Any) -> Optional[float]:
@@ -113,6 +132,42 @@ _LABEL_SYNONYMS: dict[str, str] = {
 }
 
 
+# Canonicalized synonym table (built once). Keys/values are normalized through
+# `_canonical_key` so separator variants in either the synonym entry or the incoming
+# label resolve identically.
+_LABEL_SYNONYMS_CANON: dict[str, str] = {
+    _canonical_key(k): _canonical_key(v) for k, v in _LABEL_SYNONYMS.items()
+}
+
+
+# Generic mid-tier gradation words. When a component's controlled vocabulary does not
+# enumerate an explicit middle term (e.g. differentiation = none/slight/clear/strong has
+# no "moderate"), one of these still carries an unambiguous meaning — "the middle of this
+# scale" — so it resolves to the median of the vocabulary's scores rather than abstaining.
+# This is what makes a natural label like "moderate"/"medium" score instead of dropping
+# to no-evidence, without hand-maintaining a middle synonym in every vocabulary.
+_GRADATION_MIDDLE_TOKENS = frozenset(
+    {"moderate", "medium", "mid", "average", "intermediate", "middling", "middle", "fair"}
+)
+
+
+# Labels that explicitly convey "no information available" rather than a graded
+# assessment. When a component's own vocabulary does NOT define one of these (some do —
+# e.g. brand/competition use "unknown" as a real tier, which takes precedence), the label
+# is an honest abstention, not an off-vocabulary error. The scoring engine routes these
+# to a clean no-evidence component (with a diligence message) instead of flagging a
+# vocabulary miss, so an honest "unknown" never reads as a system error in the memo.
+_NO_INFORMATION_TOKENS = frozenset(
+    {
+        "unknown", "unclear", "unspecified", "undetermined", "indeterminate", "unsure",
+        "na", "n/a", "n.a.", "n a", "tbd", "to be determined", "not available",
+        "not specified", "not provided", "not applicable", "none provided",
+        "not disclosed", "undisclosed", "no data", "no information", "no info",
+        "insufficient data", "not assessed", "cannot assess", "not evaluated", "none given",
+    }
+)
+
+
 # Sentinel returned when a label is outside the recognized vocabulary for a component.
 # NaN is used so it propagates as "not a real score"; the scoring engine detects it and
 # treats the component as no-evidence (excluded from aggregation) rather than silently
@@ -124,17 +179,33 @@ def is_unrecognized(score: float) -> bool:
     return score != score  # NaN is the only value not equal to itself
 
 
+def is_no_information(value: Any) -> bool:
+    """True when a label explicitly means 'no information available' (e.g. 'unknown',
+    'n/a', 'tbd', 'not disclosed') rather than a graded assessment. The engine uses this
+    to route an honest abstention to a clean no-evidence component instead of treating it
+    as an off-vocabulary error."""
+    key = _canonical_key(value)
+    return bool(key) and key in _NO_INFORMATION_TOKENS
+
+
 def _map_label(value: Any, mapping: dict[str, float]) -> float:
     if value is None:
         return DEFAULT_SCORE
-    key = str(value).strip().lower()
+    key = _canonical_key(value)
     if not key:
         return DEFAULT_SCORE
-    if key in mapping:
-        return _clamp(mapping[key])
-    resolved = _LABEL_SYNONYMS.get(key)
-    if resolved and resolved in mapping:
-        return _clamp(mapping[resolved])
+    # Match against a canonicalized view of the vocabulary so 'pre_product' resolves to
+    # the 'pre-product' tier, 'very_high' to 'very high', etc.
+    canon_map = {_canonical_key(k): v for k, v in mapping.items()}
+    if key in canon_map:
+        return _clamp(canon_map[key])
+    resolved = _LABEL_SYNONYMS_CANON.get(key)
+    if resolved and resolved in canon_map:
+        return _clamp(canon_map[resolved])
+    # A generic mid-tier word the specific vocabulary does not enumerate still resolves to
+    # the middle of that vocabulary's range rather than abstaining (see note above).
+    if key in _GRADATION_MIDDLE_TOKENS and canon_map:
+        return _clamp(statistics.median(canon_map.values()))
     return UNRECOGNIZED_LABEL
 
 
