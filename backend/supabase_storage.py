@@ -39,7 +39,7 @@ _QUEUE_AWARENESS_COLUMNS = (
 )
 
 _LIST_SELECT = (
-    "startup_id, display_name, list_one_line, list_sector, list_scout_type, list_origin_type, "
+    "startup_id, display_name, list_one_line, list_sector, list_location, list_scout_type, list_origin_type, "
     "list_lookup_id, list_lookup_query, list_lookup_website, list_confidence, list_score, list_verdict, "
     "list_consensus_verdict, list_reviewer_disagreement, list_reviewed_at, list_partnered_at, "
     "short_summary, partner_decision, partner_human_review_required, partner_info, human_resolution, "
@@ -47,7 +47,7 @@ _LIST_SELECT = (
     "queue_reason, priority_reason, created_at, updated_at"
 )
 _LIST_SELECT_LEGACY_NO_UNRESOLVED = (
-    "startup_id, display_name, list_one_line, list_sector, list_scout_type, list_origin_type, "
+    "startup_id, display_name, list_one_line, list_sector, list_location, list_scout_type, list_origin_type, "
     "list_lookup_id, list_lookup_query, list_lookup_website, list_confidence, list_score, list_verdict, "
     "list_consensus_verdict, list_reviewer_disagreement, list_reviewed_at, list_partnered_at, "
     "short_summary, partner_decision, partner_human_review_required, partner_info, human_resolution, "

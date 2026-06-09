@@ -6,6 +6,11 @@ import '@fontsource/instrument-sans/400.css';
 import '@fontsource/instrument-sans/500.css';
 import '@fontsource/instrument-sans/600.css';
 import '@fontsource/instrument-sans/700.css';
+import '@fontsource/playfair-display/400.css';
+import '@fontsource/playfair-display/500.css';
+import '@fontsource/playfair-display/600.css';
+import '@fontsource/space-mono/400.css';
+import '@fontsource/space-mono/700.css';
 import 'lenis/dist/lenis.css';
 import './index.css';
 import '@aethria/product-chrome';
@@ -16,6 +21,9 @@ const lenis = new Lenis({
   lerp: 0.08,
   smoothWheel: true,
 });
+
+// Expose for in-page nav anchors (header) to drive smooth scroll.
+(window as unknown as { __lenis?: Lenis }).__lenis = lenis;
 
 function raf(time: number) {
   lenis.raf(time);

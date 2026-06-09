@@ -42,6 +42,9 @@ export default {
         },
         /** Escalation / human-attention only — matches tokens.color.accent. */
         escalation: '#7D2B3A',
+        /** Wordmark dot — verdigris; not for status semantics. */
+        'brand-mark': '#3d6b5e',
+        'brand-mark-inverse': '#7aab9a',
         /** Decorative — aligned with web-front-end. */
         gold: '#a88a5e',
         'gold-soft': 'rgba(168, 138, 94, 0.35)',

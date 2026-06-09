@@ -420,6 +420,9 @@ def _format_scout_context_extras(scout_output: Dict[str, Any]) -> str:
     fs = scout_output.get("funding_stage")
     if fs:
         lines.append(f"Funding stage (scout): {fs}")
+    loc = scout_output.get("location")
+    if loc:
+        lines.append(f"Location (scout): {loc}")
     et = scout_output.get("est_tam")
     if et:
         lines.append(f"Est. TAM (scout): {et}")

@@ -138,18 +138,29 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
               isSelected ? 'gap-phi-3 sm:gap-phi-4' : 'gap-phi-1 sm:gap-phi-3'
             }`}
           >
-            <motion.h2
-              layout={!reduceMotion}
-              className={`min-w-0 flex-1 break-words font-sans transition-[color,font-weight] ${
-                isSelected
-                  ? 'font-semibold text-oxford text-[length:var(--case-title-size)] leading-[var(--case-title-leading)] tracking-[var(--case-title-tracking)]'
-                  : 'text-[clamp(15px,1.4vw,20px)] font-normal leading-[1.08] tracking-[-0.02em] text-oxford/52'
-              }`}
-              style={{ transitionDuration: `${selectTransition.duration}s`, transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' }}
-              transition={selectTransition}
-            >
-              {startup.scout.name}
-            </motion.h2>
+            <div className="min-w-0 flex-1">
+              {startup.scout.location?.trim() ? (
+                <p
+                  className={`type-meta uppercase tracking-[0.12em] ${
+                    isSelected ? 'mb-1.5 text-oxford/45' : 'mb-1 text-oxford/30'
+                  }`}
+                >
+                  {startup.scout.location.trim()}
+                </p>
+              ) : null}
+              <motion.h2
+                layout={!reduceMotion}
+                className={`min-w-0 break-words font-sans transition-[color,font-weight] ${
+                  isSelected
+                    ? 'font-semibold text-oxford text-[length:var(--case-title-size)] leading-[var(--case-title-leading)] tracking-[var(--case-title-tracking)]'
+                    : 'text-[clamp(15px,1.4vw,20px)] font-normal leading-[1.08] tracking-[-0.02em] text-oxford/52'
+                }`}
+                style={{ transitionDuration: `${selectTransition.duration}s`, transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' }}
+                transition={selectTransition}
+              >
+                {startup.scout.name}
+              </motion.h2>
+            </div>
             <motion.div layout={!reduceMotion} className="shrink-0 sm:text-right sm:pt-px" transition={layoutTransition}>
               <QueueVerdictLine
                 ctx={queueContext}
@@ -167,7 +178,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
             transition={selectTransition}
           >
             {sectorStage ? (
-              <p className={`type-meta tracking-[0.06em] ${isSelected ? 'text-oxford/42' : 'text-oxford/30'}`}>
+              <p className={`type-meta uppercase tracking-[0.06em] ${isSelected ? 'text-oxford/42' : 'text-oxford/30'}`}>
                 {sectorStage}
               </p>
             ) : null}

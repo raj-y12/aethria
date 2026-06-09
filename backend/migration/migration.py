@@ -81,6 +81,7 @@ def migrate_old_to_new(old_file: str, new_file: str) -> None:
                 scout_type=scout_data.get("scout_type", "market_driven"),
                 confidence_score=float(scout_data.get("confidence", 0.5)),
                 funding_stage=scout_data.get("funding_stage"),
+                location=scout_data.get("location"),
                 est_tam=scout_data.get("est_tam"),
                 discovered_at=discovered_at,
             )

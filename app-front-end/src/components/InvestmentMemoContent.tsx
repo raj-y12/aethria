@@ -672,6 +672,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   );
   const showEscalationBadge = !!(displayStartup?.partner?.human_review_required && decisionBadgeVariant);
   const showLookupBadge = !!(displayStartup && isLookupStartup(displayStartup));
+  const headerLocation = displayStartup?.scout.location?.trim() || '';
   const headerMeta = [sectorCategory.trim(), showLookupBadge ? 'LOOKUP' : ''].filter(Boolean).join(' · ');
   const headerThesisLine = displayStartup ? memoHeaderThesisLine(displayStartup) : '';
   const reasoningParagraphs = useMemo(
@@ -861,11 +862,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const vitalsStrip = useMemo(
     () =>
       [
+        { label: 'Location', value: cleanFactValue(displayStartup?.scout?.location) },
         { label: 'Stage', value: cleanFactValue(displayStartup?.scout?.funding_stage) },
         { label: 'Market (TAM)', value: cleanFactValue(displayStartup?.scout?.est_tam) },
         { label: 'Valuation', value: cleanFactValue(fin?.valuation_est) },
       ].filter((v): v is { label: string; value: string } => !!v.value),
-    [displayStartup?.scout?.funding_stage, displayStartup?.scout?.est_tam, fin?.valuation_est]
+    [displayStartup?.scout?.location, displayStartup?.scout?.funding_stage, displayStartup?.scout?.est_tam, fin?.valuation_est]
   );
   const fundingLine = cleanFactValue(fin?.funding_history);
   // Prefer the source-verified traction metric; fall back to the partner's narrative signal.
@@ -977,6 +979,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             <header className="memoCover">
               {!embedded ? <p className="memoKicker">Investment Memo</p> : null}
               <div className="memoCoverTitleRow">
+                {headerLocation ? (
+                  <p className="memoMeta memoCoverLocation">{renderWithMonoNumbers(headerLocation)}</p>
+                ) : null}
                 <h1 className="type-title font-semibold text-oxford-ink-emphasis m-0" id="memo-title">
                   {companyName || '—'}
                 </h1>

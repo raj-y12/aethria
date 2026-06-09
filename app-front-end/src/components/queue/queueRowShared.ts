@@ -37,6 +37,7 @@ export function buildRowAriaLabel(model: DocketRowModel, isSelected: boolean): s
   const rec = queueContext.startup.partner?.recommendation ?? '';
   const parts = [
     startup.scout.name,
+    startup.scout.location?.trim(),
     model.sectorStage || 'Unknown sector',
     attentionDriver.label,
     rec ? `Recommendation ${rec}` : '',

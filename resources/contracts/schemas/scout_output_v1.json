@@ -30,6 +30,11 @@
       "enum": ["Pre-Seed", "Seed", "Series A", "Series B", "Series C+", "Unknown", null]
     },
     "est_tam": { "type": ["string", "null"], "maxLength": 256 },
+    "location": {
+      "type": ["string", "null"],
+      "maxLength": 128,
+      "description": "HQ or primary operating city when known from sources, e.g. Paris, FR"
+    },
     "references": {
       "description": "Required. References that PROVE the company exists: company website URL, news article, Crunchbase, LinkedIn, press release. 'General domain knowledge' is rejected.",
       "type": "array",

@@ -115,15 +115,28 @@ function ProgressSteps({ progress }: { progress: LookupProgress }) {
   );
 }
 
-function QuietLink({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+type DispatchFooterAction = { label: string; onClick: () => void };
+
+function DispatchFooterBar({ actions }: { actions: DispatchFooterAction[] }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/35 transition-colors hover:text-oxford/60 btn-interaction"
-    >
-      {children}
-    </button>
+    <div className="mt-phi-7 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 border-b border-oxford/10 pb-0.5">
+      {actions.map((action, index) => (
+        <span key={action.label} className="inline-flex items-center">
+          {index > 0 ? (
+            <span className="type-meta px-1 text-oxford/20" aria-hidden>
+              ·
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={action.onClick}
+            className="type-meta uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction cursor-pointer"
+          >
+            {action.label}
+          </button>
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -201,8 +214,23 @@ export default function DispatchCommandBar({
       : view === 'progress'
         ? progress!.name || progress!.query
         : 'Look up a company';
-  const bottomLabel =
-    view === 'result' ? 'Close · Esc' : view === 'progress' ? 'Continue in background →' : 'Cancel · Esc';
+  const footerActions: DispatchFooterAction[] =
+    view === 'result'
+      ? [
+          { label: 'Back', onClick: () => setCompose(true) },
+          { label: 'Exit', onClick: onClose },
+        ]
+      : view === 'progress'
+        ? [
+            { label: 'Back', onClick: () => setCompose(true) },
+            { label: 'Exit', onClick: onClose },
+            ...(onCancel ? [{ label: 'Cancel', onClick: onCancel }] : []),
+          ]
+        : [
+            ...(chips.length >= 1 ? [{ label: 'Back', onClick: () => setCompose(false) }] : []),
+            { label: 'Exit', onClick: onClose },
+            ...(onCancel ? [{ label: 'Cancel', onClick: onCancel }] : []),
+          ];
   // Show the stack when there's more than one, or in compose (so you keep context
   // of the lookup you're stepping away from).
   const showChips = chips.length >= 2 || (view === 'compose' && chips.length >= 1);
@@ -317,10 +345,9 @@ export default function DispatchCommandBar({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45, ease: EASE, delay: 0.16 }}
-                  className="mt-phi-6 flex w-full max-w-xl flex-col items-center gap-phi-4"
+                  className="mt-phi-6 flex w-full max-w-xl flex-col items-center"
                 >
                   {result}
-                  <QuietLink onClick={() => setCompose(true)}>+ Look up another</QuietLink>
                 </motion.div>
               ) : view === 'progress' ? (
                 <motion.div
@@ -342,10 +369,6 @@ export default function DispatchCommandBar({
                       {message}
                     </p>
                   ) : null}
-                  <div className="flex items-center justify-center gap-phi-4">
-                    <QuietLink onClick={() => setCompose(true)}>+ Look up another</QuietLink>
-                    {onCancel ? <QuietLink onClick={onCancel}>Cancel lookup</QuietLink> : null}
-                  </div>
                 </motion.div>
               ) : (
                 <>
@@ -385,18 +408,15 @@ export default function DispatchCommandBar({
               )}
           </motion.div>
 
-          <motion.button
+          <motion.div
             variants={DISPATCH_EXIT_PIECE}
             custom={dispatchExitCustom(10, 0.45, 0.32)}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: EASE, delay: 0.32 }}
-            type="button"
-            onClick={onClose}
-            className="mt-phi-7 type-meta uppercase tracking-[0.12em] text-oxford/30 hover:text-oxford/50 btn-interaction cursor-pointer transition-colors border-b border-oxford/10 pb-0.5"
           >
-            {bottomLabel}
-          </motion.button>
+            <DispatchFooterBar actions={footerActions} />
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

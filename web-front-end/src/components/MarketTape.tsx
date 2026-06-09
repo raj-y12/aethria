@@ -5,14 +5,11 @@ import { SCROLL_EASE } from '../motionTokens';
  * Hero ticker — Space Mono 9px, Oxford @ 40% on paper. Seamless linear marquee.
  */
 const SEGMENTS = [
-  'VERSIONED',
-  'ESCALATIONS HUMAN-IN-LOOP',
-  'AUDIT TRAIL IMMUTABLE',
-  'SECTOR MAP LIVE',
-  'COMMITTEE-READY OUTPUT',
-  'PIPELINE NOMINAL',
-  'MULTI-AGENT REVIEW',
-  'MEMOS VERSIONED',
+  'SOURCE TRAIL RETAINED',
+  'REVIEWER DISAGREEMENT VISIBLE',
+  'MANDATE FIT RECORDED',
+  'POLICY-BACKED RECOMMENDATION',
+  'INVESTMENT RECORD PREPARED',
 ];
 
 const LINE = SEGMENTS.join(' · ');
@@ -21,7 +18,7 @@ export default function MarketTape() {
   const reduce = useReducedMotion();
   return (
     <motion.div
-      className="market-tape market-tape-shell section-divider-top border-b border-solid border-[var(--section-divider)] overflow-hidden bg-[var(--color-paper)]"
+      className="market-tape market-tape-shell overflow-hidden bg-[var(--color-paper)]"
       aria-hidden
       initial={reduce ? false : { opacity: 0, y: 10 }}
       whileInView={reduce ? undefined : { opacity: 1, y: 0 }}

@@ -357,6 +357,10 @@ class Scout(ABC):
         # grounding gate has a stable shape (it drops anything unverifiable anyway).
         fin = out.get("financials")
         out["financials"] = fin if isinstance(fin, dict) else {}
+
+        loc = self._coerce_text(out.get("location"))
+        out["location"] = loc if loc else None
+
         return out
 
     def _postprocess_scout_dict(
@@ -640,7 +644,8 @@ class Scout(ABC):
             "Every required Scout field must be present with correct types: "
             "name, one_line, sector, problem, solution, target_users, why_now, confidence (0-1 number), "
             "primary_thesis, key_assumptions (array of 2-4 strings), biggest_unknown, references (1-8 strings). "
-            "Optional: funding_stage, est_tam (may be null — prefer order-of-magnitude est_tam when sources allow). "
+            "Optional: funding_stage, est_tam (may be null — prefer order-of-magnitude est_tam when sources allow), "
+            "location (City, Country code when HQ/primary city is known, e.g. \"Paris, FR\"; null if unknown). "
             "When sources cite traction (customers, pilots, ARR/MRR), reflect it in problem/solution/why_now text. "
             "`name` must be a real operating company's brand or legal name—not a hypothetical venture, not a market theme. "
             "Never return a partial object. Do not use markdown."
@@ -813,7 +818,7 @@ class Scout(ABC):
                             "not a hypothetical idea, not a product category or market theme, and not a mega-cap incumbent like Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, or their cloud brands. "
                             "`name` must be that company's actual brand or legal name as used in the wild (not a generic label like \"AI compliance tooling\"). "
                             "Use retrieved snippets aggressively: when sources mention TAM/market size/CAGR, funding round/investors/valuation, customers/pilots/ARR/MRR/users, or founders/executives, "
-                            "you MUST weave those facts into problem, solution, why_now, and primary_thesis, and set `est_tam` / `funding_stage` when supported (approximate TAM as a string is fine). "
+                            "you MUST weave those facts into problem, solution, why_now, and primary_thesis, and set `est_tam` / `funding_stage` / `location` when supported (approximate TAM as a string is fine; location as \"City, CC\" e.g. \"Berlin, DE\"). "
                             "Output ONLY valid JSON matching the ScoutOutput schema "
                             "(resources/contracts/schemas/scout_output_v1.json). Exact shape:\n\n"
                             "{\n"
@@ -832,6 +837,7 @@ class Scout(ABC):
                             '  \"biggest_unknown\": \"string (single largest risk or uncertainty)\",\\n'
                             '  \"funding_stage\": \"Pre-Seed\" | \"Seed\" | \"Series A\" | \"Series B\" | \"Series C+\" | \"Unknown\" | null,\\n'
                             '  \"est_tam\": \"string\" | null,\\n'
+                            '  \"location\": \"string\" | null,  // HQ or primary city, e.g. \"Paris, FR\"\\n'
                             '  \"financials\": {  // OPTIONAL, GROUNDED ONLY. Fill a sub-field ONLY if a retrieved source explicitly states the figure; otherwise null. NEVER estimate or infer.\\n'
                             '    \"funding_history\": {\"value\": \"e.g. $5M Series A (2024)\", \"quote\": \"exact sentence copied verbatim from the cited source\", \"source_url\": \"that source URL\"} | null,\\n'
                             '    \"valuation_est\": {\"value\": \"e.g. $20M post-money\", \"quote\": \"verbatim source sentence\", \"source_url\": \"that source URL\"} | null,\\n'
@@ -845,7 +851,7 @@ class Scout(ABC):
                             "Do NOT use \"General domain knowledge\" or \"no specific external sources\"—those are rejected. "
                             "Avoid giant public companies and hyperscalers (Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, etc.). "
                             "If you cannot find a suitable VC-scale startup with verifiable sources, return nothing. "
-                            "Do NOT invent company names or make up sources. Use null for funding_stage/est_tam if unknown; prefer est_tam when sources give market size. "
+                            "Do NOT invent company names or make up sources. Use null for funding_stage/est_tam/location if unknown; prefer est_tam when sources give market size. "
                             "If sources mention customers, pilots, or revenue, state it concretely in problem/solution/why_now (no fabricated metrics). "
                             "financials: fill a sub-field ONLY when a retrieved source explicitly states the exact figure — copy the figure into value, the source's exact sentence into quote, and that source's URL into source_url. "
                             "If a figure is not present verbatim in your sources, use null. Never estimate, round, or infer funding, valuation, revenue, or IP numbers; unverifiable financials MUST be null. "
@@ -980,6 +986,7 @@ class Scout(ABC):
                 '  "biggest_unknown": "string",\n'
                 '  "funding_stage": "Pre-Seed" | "Seed" | "Series A" | "Series B" | "Series C+" | "Unknown" | null,\n'
                 '  "est_tam": "string" | null,\n'
+                '  "location": "string" | null,\n'
                 '  "references": ["string", ...]\n'
                 "}\n\n"
                 "CRITICAL: references must contain verifiable sources proving this company exists. "
