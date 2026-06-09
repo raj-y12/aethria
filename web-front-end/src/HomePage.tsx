@@ -1,4 +1,4 @@
-import type { MouseEvent } from 'react';
+import { Fragment, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import GrainOverlay from './components/GrainOverlay';
@@ -60,15 +60,6 @@ export default function HomePage() {
         hidden: { opacity: 0 },
         visible: { opacity: 1, transition: { duration: 0.45, delay: 0.6, ease: SCROLL_EASE } },
       };
-
-  const stripVariants: Variants = {
-    hidden: {},
-    visible: { transition: { staggerChildren: reduce ? 0 : 0.07, delayChildren: reduce ? 0 : 0.2 } },
-  };
-  const tileVariants: Variants = {
-    hidden: reduce ? { opacity: 1 } : { opacity: 0, y: 14 },
-    visible: { opacity: 1, y: 0, transition: { duration: reduce ? 0 : 0.5, ease: SCROLL_EASE } },
-  };
 
   const heroViewport = { once: true as const, amount: 0.3 };
 
@@ -173,31 +164,44 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Full-bleed stage strip — Balderton's headshot-row beat, in Oxford */}
+          {/* Pipeline ribbon — Scout → Review → Decide → Portfolio (a flow, not boxes) */}
           <motion.div
-            className="grid grid-cols-2 gap-px border-t border-solid border-[var(--section-divider)] bg-[rgba(244,235,230,0.14)] md:grid-cols-4"
-            variants={stripVariants}
-            initial={reduce ? false : 'hidden'}
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.2 }}
+            className="w-full border-t border-solid border-[var(--section-divider)] bg-[var(--color-oxford)]"
+            initial={reduce ? false : { opacity: 0 }}
+            whileInView={reduce ? undefined : { opacity: 1 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: reduce ? 0 : 0.5, ease: SCROLL_EASE }}
           >
-            {HERO_STAGES.map((s) => (
-              <motion.div
-                key={s.label}
-                variants={tileVariants}
-                className="relative flex min-h-[124px] flex-col justify-between bg-[var(--color-oxford)] p-6 md:min-h-[156px] md:p-7"
-              >
-                <span className="font-mono text-[11px] tracking-[0.12em] text-[var(--text-inverse-muted)]">{s.n}</span>
-                <div>
-                  <p className="font-display text-[21px] leading-none text-[var(--color-paper)] md:text-[25px]">
-                    {s.label}
-                  </p>
-                  <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--text-inverse-muted)]">
-                    {s.note}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
+            <div className="page-margin-x py-9 md:py-12">
+              <div className="flex flex-col gap-7 md:flex-row md:items-center md:gap-0">
+                {HERO_STAGES.map((s, i) => (
+                  <Fragment key={s.label}>
+                    <div className="flex items-baseline gap-4 md:flex-col md:items-start md:gap-2.5">
+                      <span className="font-mono text-[11px] tracking-[0.2em] text-[var(--color-heritage-gold)]">
+                        {s.n}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-display text-[22px] font-medium leading-none text-[var(--color-paper)] md:text-[28px]">
+                          {s.label}
+                        </p>
+                        <p className="mt-2 hidden font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--text-inverse-muted)] md:block">
+                          {s.note}
+                        </p>
+                      </div>
+                      <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--text-inverse-muted)] md:hidden">
+                        {s.note}
+                      </span>
+                    </div>
+                    {i < HERO_STAGES.length - 1 ? (
+                      <div className="hidden flex-1 items-center px-6 md:flex" aria-hidden>
+                        <span className="h-px flex-1 bg-[rgba(244,235,230,0.16)]" />
+                        <span className="pl-3 text-[14px] leading-none text-[var(--text-inverse-muted)]">→</span>
+                      </div>
+                    ) : null}
+                  </Fragment>
+                ))}
+              </div>
+            </div>
           </motion.div>
 
           <div className="relative z-10 w-full shrink-0 border-t border-solid border-[var(--section-divider)]">
