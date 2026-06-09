@@ -12,8 +12,11 @@
   --color-paper: #f4f1ea;
   --color-ivory: #f4f1ea;
   --color-charcoal: #26313f;
-  --color-accent: #8f4a32;
-  --color-accent-soft: rgba(143, 74, 50, 0.24);
+  /* Brand accent — warmed terracotta. Marketing's "third colour" (Balderton-style).
+     NOTE: distinct from `escalation` (#8f4a32), which stays reserved for errors. */
+  --color-accent: #a8503a;
+  --color-accent-strong: #95442f;
+  --color-accent-soft: rgba(168, 80, 58, 0.22);
   --color-heritage-gold: #a88a5e;
   --color-heritage-gold-soft: rgba(168, 138, 94, 0.35);
   --color-brass: #8a704d;
@@ -168,6 +171,81 @@ hr.doc-section-separator::before {
 .section-numeral--on-dark {
   font-size: 10px;
   color: var(--text-inverse-muted);
+}
+
+/* ───────────────────────────────────────────────────────────────
+   Accent system — one warmed terracotta, fixed jobs:
+   eyebrow labels · key-word underline · card corner dot · arrow links.
+   Repeating these five jobs across every section is what reads as
+   "designed system" rather than assembled pages.
+   ─────────────────────────────────────────────────────────────── */
+
+/* 1 — Eyebrow / category label (leads a section or a card) */
+.accent-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.accent-eyebrow::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  background: var(--color-accent);
+  transform: rotate(45deg); /* diamond — echoes the document section diamonds */
+}
+
+.accent-eyebrow--bare::before {
+  display: none;
+}
+
+/* 2 — Underline a key word/phrase inside a serif headline */
+.accent-underline {
+  background-image: linear-gradient(var(--color-accent), var(--color-accent));
+  background-repeat: no-repeat;
+  background-position: 0 94%;
+  background-size: 100% 2px;
+  padding-bottom: 0.04em;
+}
+
+/* 3 — Card corner dot (Balderton tiles) */
+.accent-corner-dot {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+/* 4 — Arrow link */
+.accent-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  transition: gap 0.25s ease, opacity 0.2s ease;
+}
+
+.accent-link:hover {
+  gap: 0.7rem;
+  opacity: 0.82;
+}
+
+/* Wordmark accent period (the "Aethria." dot, à la "Balderton.") */
+.wordmark-dot {
+  color: var(--color-accent);
 }
 
 /* Institutional tape (homepage) */

@@ -18,6 +18,8 @@ export default {
         charcoal: '#26313f',
         graphite: '#001433',
         escalation: '#8f4a32',
+        accent: '#a8503a',
+        'accent-strong': '#95442f',
         gold: '#a88a5e',
         'gold-soft': 'rgba(168, 138, 94, 0.35)',
       },

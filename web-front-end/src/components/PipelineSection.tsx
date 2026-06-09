@@ -58,7 +58,7 @@ export default function PipelineSection() {
         <motion.div className="page-margin-x pt-14 md:pt-20 pb-8 md:pb-10">
           <ScrollReveal y={12} amount={0.2}>
             <p className="section-numeral mb-6" aria-hidden="true">
-              III
+              IV
             </p>
             <h2
               id="pipeline-heading"
