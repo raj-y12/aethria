@@ -36,10 +36,10 @@ export default function BeliefSection() {
           </p>
           <h2
             id="belief-heading"
-            className="text-[clamp(2rem,5vw,3.1rem)] font-normal leading-[1.1] tracking-[-0.02em] text-[var(--color-oxford)]"
+            className="editorial-display text-[clamp(2.2rem,5.5vw,3.6rem)] text-[var(--color-oxford)]"
           >
             Conviction you can{' '}
-            <span className="accent-underline italic font-normal">defend</span> in the room.
+            <span className="accent-underline">defend</span> in the room.
           </h2>
           <p className="mx-auto mt-6 max-w-[54ch] font-sans text-[16px] leading-[1.7] text-[var(--text-secondary)]">
             Aethria doesn’t hand you a score and a shrug. Every name arrives sourced, reviewed against your

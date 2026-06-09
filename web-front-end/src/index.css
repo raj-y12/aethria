@@ -9,8 +9,11 @@
 /* Design tokens (match app-front-end behaviour; note single-colon :root) */
 :root {
   --color-oxford: #001433;
-  --color-paper: #f4f1ea;
-  --color-ivory: #f4f1ea;
+  /* Warm paper — shifted toward a faint blush so the marketing site reads warmer
+     and more editorial (Balderton-adjacent) while staying institutional. */
+  --color-paper: #f4ebe6;
+  --color-ivory: #f4ebe6;
+  --color-blush: #efe1da;
   --color-charcoal: #26313f;
   /* Brand accent — warmed terracotta. Marketing's "third colour" (Balderton-style).
      NOTE: distinct from `escalation` (#8f4a32), which stays reserved for errors. */
@@ -84,10 +87,26 @@
 
 /* Marketing — paper dot grid (#F4F1EA texture, 28px, Oxford @ 3.5%) */
 .paper-dot-grid {
-  background-color: #f4f1ea;
+  background-color: var(--color-paper);
   background-image: radial-gradient(rgba(0, 20, 51, 0.055) 1px, transparent 1px);
   background-size: 28px 28px;
   background-repeat: repeat;
+}
+
+/* Deeper blush ground for alternating editorial sections (Balderton rhythm) */
+.blush-dot-grid {
+  background-color: var(--color-blush);
+  background-image: radial-gradient(rgba(0, 20, 51, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-repeat: repeat;
+}
+
+/* Oversized editorial display headline (hero / section openers) */
+.editorial-display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 0.92;
 }
 
 /* Full-width section rule + centered 4×4 diamond (Lazard break) */

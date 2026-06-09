@@ -55,18 +55,18 @@ export default function PipelineSection() {
         className="paper-dot-grid w-full border-b border-solid border-[var(--section-divider)]"
         style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-charcoal)' }}
       >
-        <motion.div className="page-margin-x pt-14 md:pt-20 pb-8 md:pb-10">
-          <ScrollReveal y={12} amount={0.2}>
+        <motion.div className="page-margin-x pt-16 md:pt-24 pb-8 md:pb-12">
+          <ScrollReveal y={12} amount={0.2} className="mx-auto max-w-[760px] text-center">
             <p className="section-numeral mb-6" aria-hidden="true">
               IV
             </p>
             <h2
               id="pipeline-heading"
-              className="text-[clamp(1.75rem,5.5vw,2.25rem)] font-normal leading-[1.15] tracking-[-0.02em] text-[#001433] md:text-[36px] md:tracking-normal"
+              className="editorial-display text-[clamp(2rem,5.5vw,3.25rem)] text-[var(--color-oxford)]"
             >
-              The pipeline
+              The <span className="accent-underline">pipeline</span>
             </h2>
-            <p className="mt-4 max-w-xl font-sans text-[15px] leading-[1.7] text-[rgba(0,27,71,0.65)]">
+            <p className="mx-auto mt-5 max-w-[52ch] font-sans text-[16px] leading-[1.7] text-[rgba(0,20,51,0.66)]">
               From signal to position. Four locked phases. No hand-offs lost in email.
             </p>
           </ScrollReveal>

@@ -76,9 +76,9 @@ export default function FieldNotes() {
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <h2
               id="notes-heading"
-              className="max-w-xl text-[clamp(1.9rem,5vw,2.5rem)] font-normal leading-[1.12] tracking-[-0.02em] text-[var(--color-oxford)]"
+              className="editorial-display max-w-xl text-[clamp(2rem,5vw,3rem)] text-[var(--color-oxford)]"
             >
-              How we think about the work
+              How we think about the <span className="accent-underline">work</span>
             </h2>
             <Link to="/request-access" className="accent-link" data-cursor-expand>
               <span>All field notes</span>
