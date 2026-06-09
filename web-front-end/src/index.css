@@ -12,11 +12,13 @@
   --color-paper: #f4f1ea;
   --color-ivory: #f4f1ea;
   --color-charcoal: #26313f;
-  /* Brand accent — warmed terracotta. Marketing's "third colour" (Balderton-style).
-     NOTE: distinct from `escalation` (#8f4a32), which stays reserved for errors. */
-  --color-accent: #a8503a;
-  --color-accent-strong: #95442f;
-  --color-accent-soft: rgba(168, 80, 58, 0.22);
+  /* Brand accent — verdigris (patina green). Marketing punctuation only.
+     NOTE: distinct from app escalation (#7d2b3a). */
+  --color-accent: #3d6b5e;
+  --color-accent-strong: #2f574c;
+  --color-accent-soft: rgba(61, 107, 94, 0.22);
+  --color-brand-mark: #3d6b5e;
+  --color-brand-mark-inverse: #7aab9a;
   --color-heritage-gold: #a88a5e;
   --color-heritage-gold-soft: rgba(168, 138, 94, 0.35);
   --color-brass: #8a704d;
@@ -74,9 +76,9 @@
   padding-right: var(--page-margin-x);
 }
 
-/* Sticky-header offset for in-page nav anchors */
+/* Sticky-header offset for in-page nav anchors — matches .inst-site-header height */
 section[id] {
-  scroll-margin-top: 80px;
+  scroll-margin-top: 88px;
 }
 
 /* iPhone: horizontal padding respects notch/safe area in landscape */
@@ -186,9 +188,77 @@ hr.doc-section-separator::before {
   color: var(--text-inverse-muted);
 }
 
+/* Site header — generous vertical rhythm; compacts slightly on scroll */
+.inst-site-header {
+  --site-header-py: 20px;
+  --site-header-nav-gap: 2.25rem;
+}
+
+.inst-site-header--compact {
+  --site-header-py: 14px;
+}
+
+.inst-site-header-inner {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding-top: var(--site-header-py);
+  padding-bottom: var(--site-header-py);
+}
+
+.inst-site-header-nav {
+  display: none;
+  align-items: center;
+  gap: var(--site-header-nav-gap);
+}
+
+@media (min-width: 768px) {
+  .inst-site-header-nav {
+    display: flex;
+  }
+}
+
+.inst-site-header-nav a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding-inline: 4px;
+}
+
+.inst-site-header-wordmark {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  font-family: var(--font-wordmark);
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: normal;
+  color: var(--text-primary);
+  transition: opacity 0.2s ease;
+}
+
+.inst-site-header-wordmark:hover {
+  opacity: 0.8;
+}
+
+@media (min-width: 640px) {
+  .inst-site-header-wordmark {
+    font-size: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inst-site-header-inner {
+    transition: none;
+  }
+}
+
 /* ───────────────────────────────────────────────────────────────
-   Accent system — one warmed terracotta, fixed jobs:
-   eyebrow labels · key-word underline · card corner dot · arrow links.
+   Accent system — verdigris, fixed jobs:
+   wordmark dot · key-word underline · card corner dot · arrow link hover.
    Repeating these five jobs across every section is what reads as
    "designed system" rather than assembled pages.
    ─────────────────────────────────────────────────────────────── */
@@ -206,9 +276,30 @@ hr.doc-section-separator::before {
   color: var(--label-muted);
 }
 
+/* Verdigris punctuation dot — the brand spark that precedes every section eyebrow. */
+.accent-eyebrow::before {
+  content: '';
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+/* Eyebrow on dark (oxford) sections — light text, lighter verdigris dot. */
+.accent-eyebrow--inverse {
+  color: var(--text-inverse-muted);
+}
+.accent-eyebrow--inverse::before {
+  background: var(--color-brand-mark-inverse);
+}
+
 /* legacy modifier — kept as a no-op so existing markup doesn't break */
 .accent-eyebrow--bare {
   color: var(--label-muted);
+}
+.accent-eyebrow--bare::before {
+  display: none;
 }
 
 /* 2 — Underline a key word/phrase inside a serif headline */
@@ -244,14 +335,269 @@ hr.doc-section-separator::before {
   transition: gap 0.25s ease, color 0.2s ease;
 }
 
+/* Arrow sits in verdigris at rest; the whole link greens up on hover. */
+.accent-link > span[aria-hidden] {
+  color: var(--color-accent);
+  transition: color 0.2s ease;
+}
+
 .accent-link:hover {
   gap: 0.7rem;
+  color: var(--color-accent);
+}
+
+.home-hero-section {
+  isolation: isolate;
+}
+
+.hero-result-stage {
+  position: relative;
+  z-index: 1;
+  padding: clamp(1rem, 3vw, 2.5rem) 0 clamp(1.5rem, 3vw, 3rem);
+}
+
+.hero-result-stage::before {
+  content: '';
+  position: absolute;
+  right: calc(var(--page-margin-x) * -1);
+  top: 0;
+  bottom: 10%;
+  width: min(44vw, 420px);
+  background: rgba(0, 20, 51, 0.055);
+  pointer-events: none;
+}
+
+.hero-result-stage > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-result-snapshot {
+  background: rgba(244, 241, 234, 0.9) !important;
+}
+
+/* CTA — expand-arrow on hover (padding/size set per instance) */
+.cta-button-arrow {
+  display: inline-block;
+  width: 0.5rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: width 250ms ease;
+}
+
+.group:hover .cta-button-arrow {
+  width: 1.5rem;
+}
+
+.case-proof-ticker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--section-divider);
+}
+
+.case-proof-ticker-item {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.85rem var(--page-margin-x);
+  background: rgba(244, 241, 234, 0.78);
+  color: var(--text-secondary);
+}
+
+.case-proof-ticker-item span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   color: var(--color-oxford);
+}
+
+.case-proof-ticker-item span:not(:first-child) {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--label-muted);
+}
+
+.intelligence-proof-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.72fr);
+  gap: clamp(1.25rem, 3vw, 2.5rem);
+  align-items: stretch;
+}
+
+.intelligence-proof-grid > * {
+  min-width: 0;
+}
+
+.pipeline-phase-grid {
+  gap: 0.5px;
+  background-color: rgba(0, 20, 51, 0.06);
+}
+
+.intelligence-metrics-panel {
+  padding: clamp(1.25rem, 2.4vw, 2rem);
+}
+
+.intelligence-metric-row {
+  display: grid;
+  grid-template-columns: minmax(52px, 0.28fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  padding: 1.15rem 0;
+  border-top: 1px solid var(--section-divider);
+}
+
+.intelligence-metric-row:last-child {
+  border-bottom: 1px solid var(--section-divider);
+}
+
+.routing-ledger {
+  padding: clamp(1.25rem, 2.4vw, 2rem);
+}
+
+.routing-ledger-row {
+  display: grid;
+  grid-template-columns: minmax(82px, 0.34fr) minmax(0, 1fr);
+  gap: 1.2rem;
+  padding: 1.1rem 0;
+  border-top: 1px solid var(--section-divider);
+}
+
+.routing-ledger-row:last-child {
+  border-bottom: 1px solid var(--section-divider);
+}
+
+.routing-ledger-step {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label-muted);
+  tab-size: 2;
+}
+
+.routing-ledger strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.45;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-oxford);
+}
+
+.routing-ledger span span {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.home-metrics-row {
+  gap: clamp(1.5rem, 4vw, 4rem);
+}
+
+.home-metrics-row > * + *::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: clamp(56px, 8vw, 96px);
+  height: 1px;
+  background: var(--section-divider);
+}
+
+.home-proof-grid article {
+  border-color: rgba(0, 20, 51, 0.07);
+  background: rgba(244, 241, 234, 0.72);
+}
+
+.home-proof-grid article:hover {
+  border-color: rgba(0, 20, 51, 0.2);
+}
+
+.review-split-row {
+  border-top: 1px solid rgba(0, 20, 51, 0.08);
+}
+
+.principle-panel > * {
+  border-top: 1px solid rgba(0, 20, 51, 0.08);
+}
+
+.record-index-row {
+  border-top: 1px solid rgba(0, 20, 51, 0.08);
+}
+
+.record-index-row:last-child {
+  border-bottom: 1px solid rgba(0, 20, 51, 0.08);
+}
+
+@media (max-width: 900px) {
+  .intelligence-proof-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .case-proof-ticker {
+    grid-template-columns: 1fr;
+  }
+
+  .case-proof-ticker-item {
+    padding-inline: var(--page-margin-x);
+  }
+
+  .hero-result-stage {
+    padding: 0 0 2rem;
+  }
+
+  .hero-result-stage::before {
+    right: calc(var(--page-margin-x) * -1);
+    left: 22%;
+    width: auto;
+    top: 1.5rem;
+    bottom: 1rem;
+  }
 }
 
 /* Wordmark accent period (the "Aethria." dot, à la "Balderton.") */
 .wordmark-dot {
   color: var(--color-accent);
+}
+
+.wordmark-dot--inverse {
+  color: var(--color-brand-mark-inverse);
+}
+
+/* Tactile press feedback on CTAs and interactive tiles */
+.btn-interaction {
+  transition:
+    color 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-interaction:active:not(:disabled) {
+  transform: scale(0.97);
+  opacity: 0.88;
+}
+@media (hover: none) {
+  .btn-interaction:hover:not(:active) {
+    transform: none;
+  }
 }
 
 /* Institutional tape (homepage) */
@@ -494,6 +840,77 @@ hr.doc-section-separator::before {
 
 .form-input-aethria.form-input-aethria-error {
   border-bottom-color: rgba(0, 20, 51, 0.4) !important;
+}
+
+/* Minimal email / newsletter fields — static hairline + animated accent underline (left-to-right) */
+.input-underline-field {
+  position: relative;
+}
+
+.input-underline-field::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--section-divider);
+  pointer-events: none;
+}
+
+.input-underline-field::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background-color: var(--color-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.input-underline-field:focus-within::after {
+  transform: scaleX(1);
+}
+
+.input-underline {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0 0 12px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--color-oxford);
+  outline: none;
+  border-radius: 0;
+}
+
+.input-underline::placeholder {
+  color: var(--text-subtle);
+}
+
+.input-underline:focus,
+.input-underline:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .input-underline {
+    font-size: 16px;
+    min-height: 44px;
+    padding-bottom: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input-underline-field::after {
+    transition: none;
+  }
 }
 
 /* Homepage: monolith slides in from the left */

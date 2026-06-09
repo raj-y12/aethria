@@ -13,6 +13,7 @@ export interface Scout {
   key_assumptions?: string[];
   biggest_unknown?: string;
   funding_stage?: string;
+  location?: string;
   est_tam?: string;
   references?: string[];
   source_evidence?: Array<{

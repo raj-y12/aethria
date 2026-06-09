@@ -19,7 +19,7 @@ export default function MobileHeader({ onMenuToggle }: MobileHeaderProps) {
         className="font-wordmark text-[20px] font-medium leading-[1.4] text-white hover:opacity-90 btn-interaction"
         aria-label="Aethria"
       >
-        Aethria
+        Aethria<span className="wordmark-dot wordmark-dot--inverse">.</span>
       </Link>
       <button
         type="button"

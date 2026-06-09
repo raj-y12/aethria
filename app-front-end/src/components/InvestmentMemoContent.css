@@ -1222,11 +1222,13 @@
 .memoCover .memoKicker { margin-bottom: 14px; }
 .memoCoverTitleRow {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px 20px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   width: 100%;
+}
+.memoCoverLocation {
+  margin: 0;
 }
 .memoCoverStandfirst {
   margin: clamp(12px, 1.6vw, 16px) 0 0;

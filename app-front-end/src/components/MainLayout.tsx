@@ -964,7 +964,7 @@ export default function MainLayout({
                 <div className="min-w-0">
                   <div className="flex items-center justify-between gap-phi-3">
                     <p className={railEditorial.wordmark}>
-                      Aethria
+                      Aethria<span className="wordmark-dot">.</span>
                     </p>
                   </div>
 

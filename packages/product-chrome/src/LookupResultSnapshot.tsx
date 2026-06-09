@@ -58,7 +58,7 @@ export default function LookupResultSnapshot({
         <LookupCommandBar
           label="MEMO"
           trailing="close"
-          className="border-0 border-b border-solid border-oxford/10 bg-oxford/[0.025]"
+          className="border-0 bg-paper"
         />
       ) : null}
 

@@ -12,7 +12,12 @@ type ScrollRevealProps = {
   style?: CSSProperties;
 } & Omit<HTMLMotionProps<'div'>, 'children' | 'initial' | 'animate' | 'style'>;
 
-/** Fade + slight rise when the block enters the viewport. Respects reduced motion. */
+/**
+ * Scroll animation wrapper.
+ *
+ * Content stays visible by default; motion is an enhancement only. This avoids blank sections in
+ * full-page captures, background tabs, and any browser state where IntersectionObserver is delayed.
+ */
 export function ScrollReveal({
   children,
   className,
@@ -28,7 +33,7 @@ export function ScrollReveal({
     <motion.div
       className={className}
       style={style}
-      initial={reduce ? false : { opacity: 0, y }}
+      initial={false}
       whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once, amount, margin: '0px 0px -6% 0px' }}
       transition={scrollRevealTransition(reduce ? 0 : 0.55, reduce ? 0 : delay)}

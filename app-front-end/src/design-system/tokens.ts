@@ -69,6 +69,9 @@ export const tokens = {
     mist: '#f2f4f8',
     /** Escalation-only: use only for escalation dots, pulse, escalation counts, critical alerts requiring human attention. */
     accent: '#7D2B3A',
+    /** Wordmark punctuation dot — verdigris; never use for status or alerts. */
+    brandMark: '#3d6b5e',
+    brandMarkInverse: '#7aab9a',
     /** Decorative warm metal — hairlines, non-semantic highlights. Never use for alerts or status. */
     heritageGold: '#a88a5e',
     heritageGoldSoft: 'rgba(168, 138, 94, 0.35)',

@@ -16,18 +16,18 @@ export const DEMO_MANDATE_PAPER: MandateCardProps = {
   live: true,
 };
 
-export const DEMO_LOOKUP_QUERY = 'Meridian Systems';
+export const DEMO_LOOKUP_QUERY = 'European infrastructure co.';
 
 export const DEMO_LOOKUP_RESULT: LookupResultSnapshotProps = {
-  companyName: 'Meridian Systems',
+  companyName: 'European infrastructure co.',
   queryLabel: DEMO_LOOKUP_QUERY,
-  metaLine: 'B2B Infrastructure · Series A',
+  metaLine: 'B2B Infrastructure · Series A · London',
   verdict: 'INVEST',
   verdictColor: '#bfe3cc',
   verdictTextColor: '#17442d',
   summary:
-    'Thesis-aligned · High conviction · Pending unit economics review',
-  thesisLine: 'Benchmarked against your active mandate',
+    'Source trail retained · Reviewer disagreement surfaced · Mandate fit recorded',
+  thesisLine: 'Investment record prepared for review',
   dimensions: [
     { key: 'market', label: 'MKT', score: 9 },
     { key: 'execution', label: 'EXEC', score: 8 },
@@ -37,15 +37,15 @@ export const DEMO_LOOKUP_RESULT: LookupResultSnapshotProps = {
   ],
 };
 
-/** Marketing homepage — full memo excerpt (DashboardPreview). */
+/** Marketing homepage — full memo excerpt variant. */
 export const DEMO_LOOKUP_MEMO_SAMPLE: LookupResultSnapshotProps = {
   variant: 'memo',
-  companyName: 'Meridian Systems',
-  metaLine: 'B2B Infrastructure · Series A',
+  companyName: 'European infrastructure co.',
+  metaLine: 'B2B Infrastructure · Series A · London',
   verdict: 'MONITOR.',
   summary:
-    'Clear market timing, credible founding team, and defensible infrastructure play. Conviction is high pending final diligence on unit economics.',
-  thesisLine: 'Benchmarked against your active mandate',
+    'Clear market timing, credible founding team, and defensible infrastructure play. Reviewer disagreement remains visible beside the partner recommendation.',
+  thesisLine: 'Policy-backed recommendation',
   dimensions: [
     { key: 'market', label: 'MARKET', score: 9 },
     { key: 'execution', label: 'EXECUTION', score: 8 },

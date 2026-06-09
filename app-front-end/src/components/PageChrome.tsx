@@ -28,7 +28,9 @@ export default function PageChrome({ title, kicker, children }: PageChromeProps)
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
       <GrainOverlay opacity={0.028} />
       <header className="flex flex-none items-center gap-phi-5 border-b border-oxford/[0.08] px-phi-5 py-phi-3">
-        <p className={railEditorial.wordmark}>Aethria</p>
+        <p className={railEditorial.wordmark}>
+          Aethria<span className="wordmark-dot">.</span>
+        </p>
         <nav aria-label="Primary" className="flex items-center gap-phi-4">
           {NAV.map((item) => {
             const active =

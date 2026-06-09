@@ -159,6 +159,7 @@ class ScoutInfo(BaseModel):
     key_assumptions: Optional[List[str]] = None
     biggest_unknown: Optional[str] = None
     funding_stage: Optional[Literal["Pre-Seed", "Seed", "Series A", "Series B", "Series C", "Series C+", "Unknown"]] = None
+    location: Optional[str] = None  # HQ or primary operating city, e.g. "Paris, FR"
     est_tam: Optional[str] = None  # Total Addressable Market estimate
     # Optional provenance for enriched fields (e.g. est_tam, funding_stage, references): scout | reviewer_extraction | gap_retrieval | reviewer_text_infer
     field_provenance: Optional[Dict[str, str]] = None

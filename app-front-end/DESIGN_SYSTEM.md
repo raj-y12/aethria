@@ -29,6 +29,8 @@ Institutional, editorial UI. Modelled after a private equity firm's internal dea
 | `heritage-gold` | `#a88a5e` | Heritage decorative accent — section rules, diamonds |
 | `gold-soft` | `rgba(168,138,94,0.35)` | Gold tint surfaces |
 | `escalation` | `#8F4A32` | **Human-attention alerts only** — escalation dots, counts, critical intervention states |
+| `brand-mark` | `#3d6b5e` | **Wordmark punctuation dot only** — shared with marketing; never for status |
+| `brand-mark-inverse` | `#7aab9a` | Wordmark dot on oxford/dark chrome |
 | `hairline` | `rgba(0,27,71,0.06)` | Default 1px borders (structural frames) |
 | `hairline-strong` | `rgba(0,27,71,0.12)` | Emphasized dividers |
 | `field-border` | `rgba(0,27,71,0.15)` | Input / select borders |
@@ -54,6 +56,7 @@ Use Tailwind's opacity modifier: `text-oxford/100`, `text-oxford/80`, etc.
 ### Cross-app semantic contract (mandatory)
 
 - `escalation` is always `#8F4A32` and is never used as a decorative accent.
+- `brand-mark` (verdigris) is for the wordmark dot only — never for alerts, badges, or links.
 - `heritage-gold` is decorative only and never used for critical status semantics.
 - In code, avoid introducing new raw hex values in class strings when a semantic token exists.
 

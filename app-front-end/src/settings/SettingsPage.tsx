@@ -749,7 +749,7 @@ export default function SettingsPage() {
                       className={`${railEditorial.wordmark} inline-block hover:opacity-80 transition-opacity btn-interaction`}
                       aria-label="Aethria — return to workspace"
                     >
-                      Aethria
+                      Aethria<span className="wordmark-dot">.</span>
                     </Link>
                   </div>
                   <div className="aethria-rail-nav-bleed mt-phi-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

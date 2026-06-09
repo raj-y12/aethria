@@ -20,6 +20,9 @@
   --color-heritage-gold: #a88a5e;
   --color-heritage-gold-soft: rgba(168, 138, 94, 0.35);
   --color-accent-soft: rgba(125, 43, 58, 0.24);
+  /** Brand mark — verdigris wordmark dot only (marketing parity). Not escalation. */
+  --color-brand-mark: #3d6b5e;
+  --color-brand-mark-inverse: #7aab9a;
   --color-brass: #8a704d;
   --color-brass-line: rgba(168, 138, 94, 0.55);
   /* Escalation-only: use only for escalation dots, pulse, counts, critical human-attention alerts. */
@@ -645,10 +648,18 @@
     border-color var(--motion-micro) var(--motion-ease),
     color var(--motion-micro) var(--motion-ease);
 }
-.conviction-chip:hover {
-  border-color: rgba(168, 138, 94, 0.45);
-  color: rgba(var(--color-oxford-rgb), 0.78);
-}
+  .conviction-chip:hover {
+    border-color: rgba(168, 138, 94, 0.45);
+    color: rgba(var(--color-oxford-rgb), 0.78);
+  }
+
+  /** Wordmark punctuation — verdigris dot (marketing parity). */
+  .wordmark-dot {
+    color: var(--color-brand-mark);
+  }
+  .wordmark-dot--inverse {
+    color: var(--color-brand-mark-inverse);
+  }
 
 /* Underline draw-in from left (used on active labels/headings) */
 @keyframes underline-draw {

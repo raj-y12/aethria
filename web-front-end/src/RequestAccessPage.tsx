@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import GrainOverlay from './components/GrainOverlay';
 import DeskClock from './components/DeskClock';
 
@@ -30,6 +30,8 @@ function usePrefersReducedMotion() {
 
 export default function RequestAccessPage() {
   const reduce = usePrefersReducedMotion();
+  const [searchParams] = useSearchParams();
+  const prefilledEmail = searchParams.get('email')?.trim() ?? '';
   const [submitted, setSubmitted] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -37,7 +39,7 @@ export default function RequestAccessPage() {
   const [validationError, setValidationError] = useState(false);
   const [position, setPosition] = useState<number | null>(null);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(prefilledEmail);
   const [role, setRole] = useState('');
   const [firm, setFirm] = useState('');
   const [linkedin, setLinkedin] = useState('');
@@ -48,7 +50,14 @@ export default function RequestAccessPage() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (reduce) { setMounted(true); return; }
+    if (prefilledEmail) setEmail(prefilledEmail);
+  }, [prefilledEmail]);
+
+  useEffect(() => {
+    if (reduce) {
+      setMounted(true);
+      return;
+    }
     // Double-rAF: ensures the browser paints opacity:0 before the transition fires
     let r2: number;
     const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => setMounted(true)); });
@@ -129,16 +138,16 @@ export default function RequestAccessPage() {
 
       {/* Header */}
       <header
-        className="sticky top-0 z-[100] w-full shrink-0 border-b border-[var(--section-divider)] bg-[var(--surface-base)]"
+        className="sticky top-0 z-[100] w-full shrink-0 border-b border-[var(--section-divider)] bg-[rgba(244,241,234,0.92)] backdrop-blur-md"
         style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
       >
-        <div className="page-margin-x grid min-h-[52px] grid-cols-[1fr_1fr] items-center gap-2 sm:gap-4 md:grid-cols-[1fr_auto_1fr]">
+        <div className="page-margin-x grid min-h-[44px] grid-cols-[1fr_1fr] items-center gap-2 py-5 sm:gap-4 md:grid-cols-[1fr_auto_1fr] md:py-[18px]">
           <nav aria-label="Site navigation">
             <Link
               to="/"
               className="font-wordmark inline-flex min-h-[44px] items-center text-[15px] font-medium leading-none tracking-normal text-[var(--text-primary)] transition-opacity hover:opacity-75 sm:text-[16px]"
             >
-              Aethria
+              Aethria<span className="wordmark-dot">.</span>
             </Link>
           </nav>
           <p className="hidden justify-self-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)] md:block">

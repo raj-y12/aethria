@@ -31,11 +31,12 @@ def _scout_info(**overrides):
 
 
 def test_build_scout_output_payload_includes_tam_stage_references_scout_type():
-    startup = Startup(startup_id="wire-1", scout_info=_scout_info())
+    startup = Startup(startup_id="wire-1", scout_info=_scout_info(location="London, UK"))
     payload = ReviewerEngine._build_scout_output_payload(startup)
     assert payload["id"] == "wire-1"
     assert payload["est_tam"] == "$14B"
     assert payload["funding_stage"] == "Seed"
+    assert payload["location"] == "London, UK"
     assert payload["scout_type"] == "market_driven"
     assert len(payload["references"]) == 2
     assert payload["problem"].startswith("Manual compliance")

@@ -83,15 +83,12 @@ export default function SystemAccessPage({
       <div className="relative z-10 flex flex-col items-center">
         <h1 className={`font-wordmark text-[clamp(2rem,5vw,3rem)] font-medium normal-case leading-none tracking-normal text-[var(--text-inverse)] ${reduce ? '' : 'system-access-hero'}`}>
           {hero === 'Aethria' ? (
-            <span className="relative inline-block">
-              A
-              <span
-                className={`absolute bottom-[-0.08em] left-0 block h-[2px] w-full bg-[var(--text-inverse)] opacity-70 ${reduce ? '' : 'system-access-hero-underline'}`}
-                aria-hidden
-              />
-            </span>
-          ) : null}
-          {hero === 'Aethria' ? 'ethria' : hero}
+            <>
+              Aethria<span className="wordmark-dot--inverse">.</span>
+            </>
+          ) : (
+            hero
+          )}
         </h1>
 
         <p className={`mt-5 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--text-inverse-muted)] ${reduce ? '' : 'system-access-status'}`}>

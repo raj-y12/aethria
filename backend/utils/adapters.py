@@ -79,6 +79,7 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
         key_assumptions=scout_output.get("key_assumptions"),
         biggest_unknown=scout_output.get("biggest_unknown"),
         funding_stage=scout_output.get("funding_stage"),
+        location=(str(scout_output.get("location") or "").strip() or None),
         est_tam=scout_output.get("est_tam"),
         field_provenance=scout_output.get("field_provenance") if isinstance(scout_output.get("field_provenance"), dict) else None,
         references=scout_output.get("references") or None,
