@@ -22,7 +22,9 @@ export const DEMO_LOOKUP_RESULT: LookupResultSnapshotProps = {
   companyName: 'Meridian Systems',
   queryLabel: DEMO_LOOKUP_QUERY,
   metaLine: 'B2B Infrastructure · Series A',
-  verdict: 'STRONG.',
+  verdict: 'INVEST',
+  verdictColor: '#bfe3cc',
+  verdictTextColor: '#17442d',
   summary:
     'Thesis-aligned · High conviction · Pending unit economics review',
   thesisLine: 'Benchmarked against your active mandate',
