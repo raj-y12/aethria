@@ -64,7 +64,7 @@ export default function PipelineSection() {
               id="pipeline-heading"
               className="editorial-display text-[clamp(2rem,5.5vw,3.25rem)] text-[var(--color-oxford)]"
             >
-              The <span className="accent-underline">pipeline</span>
+              The pipeline
             </h2>
             <p className="mx-auto mt-5 max-w-[52ch] font-sans text-[16px] leading-[1.7] text-[rgba(0,20,51,0.66)]">
               From signal to position. Four locked phases. No hand-offs lost in email.

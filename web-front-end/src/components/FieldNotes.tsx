@@ -78,7 +78,7 @@ export default function FieldNotes() {
               id="notes-heading"
               className="editorial-display max-w-xl text-[clamp(2rem,5vw,3rem)] text-[var(--color-oxford)]"
             >
-              How we think about the <span className="accent-underline">work</span>
+              How we think about the work
             </h2>
             <Link to="/request-access" className="accent-link" data-cursor-expand>
               <span>All field notes</span>

@@ -97,7 +97,7 @@ export default function HomeStatsSection() {
               }`}
             >
               <MetricNumber metric={metric} />
-              <motion.div className="my-3 h-px w-8 bg-[var(--color-accent)]" aria-hidden />
+              <motion.div className="my-3 h-px w-full bg-[var(--section-divider)]" aria-hidden />
               <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)]">{metric.label}</p>
               <p className="mt-2 font-sans text-[14px] leading-[1.6] text-[var(--text-muted)]">{metric.note}</p>
             </motion.div>

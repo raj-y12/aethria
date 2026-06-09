@@ -9,12 +9,11 @@ export default {
     extend: {
       colors: {
         oxford: '#001433',
-        paper: '#f4ebe6',
-        paperDeep: '#efe1da',
-        blush: '#efe1da',
-        'paper-bright': '#faf3ee',
-        ivory: '#f4ebe6',
-        canvas: '#f4ebe6',
+        paper: '#f4f1ea',
+        paperDeep: '#e7e0d4',
+        'paper-bright': '#f8f5ee',
+        ivory: '#f4f1ea',
+        canvas: '#f4f1ea',
         mist: '#f2f4f8',
         charcoal: '#26313f',
         graphite: '#001433',

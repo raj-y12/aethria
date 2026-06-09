@@ -110,7 +110,7 @@ export default function HomePage() {
               viewport={heroViewport}
               transition={{ duration: reduce ? 0 : 0.85, delay: reduce ? 0 : 0.08, ease: SCROLL_EASE }}
             >
-              Judgment at <span className="text-[var(--color-accent)]">institutional</span> standard.
+              Judgment at <span className="accent-underline">institutional</span> standard.
             </motion.h1>
 
             <div className="mt-10 flex flex-col gap-8 md:mt-14 md:flex-row md:items-end md:justify-between">
@@ -135,7 +135,7 @@ export default function HomePage() {
                 <Link
                   to="/request-access"
                   data-cursor-expand
-                  className="group inline-flex min-h-[52px] w-full items-center justify-center rounded-none bg-[var(--color-accent)] px-8 py-4 font-mono text-[12px] uppercase tracking-[0.14em] text-[var(--color-paper)] transition-colors duration-[250ms] ease hover:bg-[var(--color-accent-strong)] sm:w-fit"
+                  className="group inline-flex min-h-[52px] w-full items-center justify-center rounded-none bg-[var(--surface-strong)] px-8 py-4 font-mono text-[12px] uppercase tracking-[0.14em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,20,51,0.9)] sm:w-fit"
                 >
                   <span>Request access</span>
                   <span
@@ -192,7 +192,8 @@ export default function HomePage() {
 
         {/* ───────────── Section V — intelligence map ───────────── */}
         <section
-          className="blush-dot-grid w-full border-b border-solid border-[var(--section-divider)]"
+          className="paper-dot-grid w-full border-b border-solid border-[var(--section-divider)]"
+          style={{ backgroundColor: 'var(--color-paper)' }}
           aria-labelledby="graph-section-heading"
         >
           <div className="page-margin-x py-16 md:py-24">
@@ -204,7 +205,7 @@ export default function HomePage() {
                 id="graph-section-heading"
                 className="editorial-display text-[clamp(2rem,5.5vw,3.25rem)] text-[var(--color-oxford)]"
               >
-                How <span className="accent-underline">intelligence</span> routes
+                How intelligence routes
               </h2>
               <p className="mx-auto mt-5 max-w-[54ch] font-sans text-[16px] leading-[1.7] text-[var(--text-secondary)]">
                 Scouts feed the reviewer. Partner logic and portfolio stay coupled. Meta-agent oversight on the dashed
@@ -244,14 +245,16 @@ export default function HomePage() {
               <p className="section-numeral mb-6 text-[rgba(244,235,230,0.22)]" aria-hidden="true">
                 VII
               </p>
-              <p className="accent-eyebrow mb-4">Configuration layer</p>
+              <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.14em] text-[rgba(244,241,234,0.42)]">
+                Configuration layer
+              </p>
               <h2
                 id="thesis-lookup-heading"
                 className="editorial-display text-[clamp(2rem,5vw,3rem)] text-[var(--color-paper)]"
               >
                 Define your mandate.
                 <br />
-                <span className="text-[var(--color-accent)]">The system obeys.</span>
+                <span className="italic font-normal opacity-80">The system obeys.</span>
               </h2>
               <p className="mt-6 max-w-[44ch] font-sans text-[15px] leading-[1.7] text-[rgba(244,235,230,0.62)]">
                 Upload or write your investment thesis. Every scout, reviewer, and partner decision is gated against that
@@ -265,7 +268,7 @@ export default function HomePage() {
           </ScrollReveal>
 
           <ScrollReveal
-            className="blush-dot-grid flex w-full shrink-0 flex-col justify-center self-stretch border-t border-solid border-[var(--section-divider)] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:border-l lg:border-t-0 lg:px-14 lg:py-24"
+            className="paper-dot-grid flex w-full shrink-0 flex-col justify-center self-stretch border-t border-solid border-[var(--section-divider)] py-14 px-[max(1.25rem,var(--safe-left))] pr-[max(1.25rem,var(--safe-right))] md:py-16 md:px-8 lg:w-1/2 lg:border-l lg:border-t-0 lg:px-14 lg:py-24"
             y={20}
             delay={0.08}
             amount={0.18}
@@ -275,7 +278,7 @@ export default function HomePage() {
               <h2 className="editorial-display text-[clamp(2rem,5vw,3rem)] text-[var(--color-oxford)]">
                 Interrogate any name.
                 <br />
-                <span className="text-[var(--color-accent)]">Instantly.</span>
+                <span className="italic font-normal opacity-70">Instantly.</span>
               </h2>
               <p className="mt-6 max-w-[44ch] font-sans text-[15px] leading-[1.7] text-[rgba(0,20,51,0.66)]">
                 On-demand lookup delivers a full investment memo on any company in seconds. No pipeline wait. Benchmarked
@@ -302,7 +305,7 @@ export default function HomePage() {
               <h2 className="editorial-display text-[clamp(2.4rem,6.5vw,4.5rem)] text-[var(--color-oxford)]">
                 Run the pipeline.
                 <br />
-                Keep the <span className="text-[var(--color-accent)]">conviction.</span>
+                Keep the <span className="italic">conviction.</span>
               </h2>
               <p className="mx-auto mt-6 max-w-[48ch] font-sans text-[16px] leading-[1.7] text-[var(--text-secondary)]">
                 Aethria discovers, scores, and recommends. You advance, pass, or hold — with the reasoning attached.
@@ -310,7 +313,7 @@ export default function HomePage() {
               <Link
                 to="/request-access"
                 data-cursor-expand
-                className="group mx-auto mt-10 inline-flex min-h-[52px] w-full items-center justify-center rounded-none bg-[var(--color-accent)] px-9 py-4 font-mono text-[12px] uppercase tracking-[0.14em] text-[var(--color-paper)] transition-colors duration-[250ms] ease hover:bg-[var(--color-accent-strong)] sm:w-fit"
+                className="group mx-auto mt-10 inline-flex min-h-[52px] w-full items-center justify-center rounded-none bg-[var(--surface-strong)] px-9 py-4 font-mono text-[12px] uppercase tracking-[0.14em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,20,51,0.9)] sm:w-fit"
               >
                 <span>Request access</span>
                 <span
@@ -325,7 +328,7 @@ export default function HomePage() {
         </section>
 
         <motion.footer
-          className="home-footer blush-dot-grid relative z-20 w-full shrink-0"
+          className="home-footer paper-dot-grid relative z-20 w-full shrink-0"
           initial={reduce ? false : { opacity: 0, y: 18 }}
           whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}

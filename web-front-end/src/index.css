@@ -9,11 +9,8 @@
 /* Design tokens (match app-front-end behaviour; note single-colon :root) */
 :root {
   --color-oxford: #001433;
-  /* Warm paper — shifted toward a faint blush so the marketing site reads warmer
-     and more editorial (Balderton-adjacent) while staying institutional. */
-  --color-paper: #f4ebe6;
-  --color-ivory: #f4ebe6;
-  --color-blush: #efe1da;
+  --color-paper: #f4f1ea;
+  --color-ivory: #f4f1ea;
   --color-charcoal: #26313f;
   /* Brand accent — warmed terracotta. Marketing's "third colour" (Balderton-style).
      NOTE: distinct from `escalation` (#8f4a32), which stays reserved for errors. */
@@ -89,14 +86,6 @@
 .paper-dot-grid {
   background-color: var(--color-paper);
   background-image: radial-gradient(rgba(0, 20, 51, 0.055) 1px, transparent 1px);
-  background-size: 28px 28px;
-  background-repeat: repeat;
-}
-
-/* Deeper blush ground for alternating editorial sections (Balderton rhythm) */
-.blush-dot-grid {
-  background-color: var(--color-blush);
-  background-image: radial-gradient(rgba(0, 20, 51, 0.05) 1px, transparent 1px);
   background-size: 28px 28px;
   background-repeat: repeat;
 }
@@ -199,29 +188,22 @@ hr.doc-section-separator::before {
    "designed system" rather than assembled pages.
    ─────────────────────────────────────────────────────────────── */
 
-/* 1 — Eyebrow / category label (leads a section or a card) */
+/* 1 — Eyebrow / category label (leads a section or a card).
+   Neutral muted ink — restraint reads more high-end than a coloured label. */
 .accent-eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.5rem;
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--color-accent);
+  color: var(--label-muted);
 }
 
-.accent-eyebrow::before {
-  content: '';
-  width: 5px;
-  height: 5px;
-  flex-shrink: 0;
-  background: var(--color-accent);
-  transform: rotate(45deg); /* diamond — echoes the document section diamonds */
-}
-
-.accent-eyebrow--bare::before {
-  display: none;
+/* legacy modifier — kept as a no-op so existing markup doesn't break */
+.accent-eyebrow--bare {
+  color: var(--label-muted);
 }
 
 /* 2 — Underline a key word/phrase inside a serif headline */
@@ -244,7 +226,7 @@ hr.doc-section-separator::before {
   background: var(--color-accent);
 }
 
-/* 4 — Arrow link */
+/* 4 — Arrow link — neutral ink, darkens on hover */
 .accent-link {
   display: inline-flex;
   align-items: center;
@@ -253,13 +235,13 @@ hr.doc-section-separator::before {
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--color-accent);
-  transition: gap 0.25s ease, opacity 0.2s ease;
+  color: var(--label-muted);
+  transition: gap 0.25s ease, color 0.2s ease;
 }
 
 .accent-link:hover {
   gap: 0.7rem;
-  opacity: 0.82;
+  color: var(--color-oxford);
 }
 
 /* Wordmark accent period (the "Aethria." dot, à la "Balderton.") */
