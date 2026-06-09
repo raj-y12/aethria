@@ -104,9 +104,9 @@ export default function LookupResultSnapshot({
         {verdictColor ? (
           <span
             className={cx(
-              'inline-block font-mono uppercase leading-none tracking-[0.12em]',
+              // Match the app-front-end decision chip (VERDICT_CHIP_CLASS) exactly.
+              'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none font-mono font-semibold uppercase leading-none min-w-[4.25rem] px-2 py-1 text-[9px] tracking-[0.1em]',
               showCompanyName && companyName ? 'mt-2' : '',
-              compact ? 'px-2 py-[5px] text-[12px]' : 'px-2.5 py-1.5 text-[13px]',
             )}
             style={{ backgroundColor: verdictColor, color: verdictTextColor ?? undefined }}
           >
