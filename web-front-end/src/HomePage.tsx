@@ -80,7 +80,7 @@ export default function HomePage() {
       <GrainOverlay opacity={0.028} variant="light" />
 
       <header
-        className="inst-site-header sticky top-0 z-[100] w-full shrink-0 border-b border-solid border-[var(--section-divider)] bg-[rgba(244,241,234,0.85)] backdrop-blur-md"
+        className="inst-site-header sticky top-0 z-[100] w-full shrink-0 bg-[rgba(244,241,234,0.85)] backdrop-blur-md"
         style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
       >
         <div className="page-margin-x flex min-h-[64px] items-center justify-between gap-6">
