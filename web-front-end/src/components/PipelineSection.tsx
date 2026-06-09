@@ -50,7 +50,7 @@ export default function PipelineSection() {
   };
 
   return (
-    <section className="w-full border-b border-solid border-[var(--section-divider)]" aria-labelledby="pipeline-heading">
+    <section id="pipeline" className="w-full border-b border-solid border-[var(--section-divider)]" aria-labelledby="pipeline-heading">
       <div
         className="paper-dot-grid w-full border-b border-solid border-[var(--section-divider)]"
         style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-charcoal)' }}

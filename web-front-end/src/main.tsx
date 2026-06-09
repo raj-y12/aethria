@@ -22,6 +22,9 @@ const lenis = new Lenis({
   smoothWheel: true,
 });
 
+// Expose for in-page nav anchors (header) to drive smooth scroll.
+(window as unknown as { __lenis?: Lenis }).__lenis = lenis;
+
 function raf(time: number) {
   lenis.raf(time);
   requestAnimationFrame(raf);

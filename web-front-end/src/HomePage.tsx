@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import GrainOverlay from './components/GrainOverlay';
@@ -7,9 +8,23 @@ import HomeStatsSection from './components/HomeStatsSection';
 import PipelineSection from './components/PipelineSection';
 import BeliefSection from './components/BeliefSection';
 import FieldNotes from './components/FieldNotes';
-import DeskClock from './components/DeskClock';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SCROLL_EASE } from './motionTokens';
+
+const NAV_LINKS = [
+  { label: 'Pipeline', href: '#pipeline' },
+  { label: 'Intelligence', href: '#intelligence' },
+  { label: 'Method', href: '#method' },
+];
+
+function scrollToAnchor(e: MouseEvent<HTMLAnchorElement>, href: string) {
+  const el = document.querySelector(href);
+  if (!el) return;
+  e.preventDefault();
+  const lenis = (window as unknown as { __lenis?: { scrollTo: (t: Element, o?: { offset?: number }) => void } }).__lenis;
+  if (lenis) lenis.scrollTo(el, { offset: -72 });
+  else el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 import {
   DEMO_LOOKUP_RESULT,
   DEMO_MANDATE_DARK,
@@ -65,23 +80,43 @@ export default function HomePage() {
       <GrainOverlay opacity={0.028} variant="light" />
 
       <header
-        className="inst-site-header sticky top-0 z-[100] w-full shrink-0 border-b border-solid border-[var(--section-divider)] bg-[var(--surface-base)]"
+        className="inst-site-header sticky top-0 z-[100] w-full shrink-0 border-b border-solid border-[var(--section-divider)] bg-[rgba(244,241,234,0.85)] backdrop-blur-md"
         style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
       >
-        <div className="page-margin-x grid min-h-[52px] grid-cols-[1fr_1fr] items-center gap-2 sm:gap-4 md:grid-cols-[1fr_auto_1fr]">
-          <nav aria-label="Site navigation">
-            <Link
-              data-cursor-expand
-              to="/home"
-              className="font-wordmark inline-flex min-h-[44px] items-center justify-self-start text-[17px] font-medium normal-case leading-none tracking-normal text-[var(--text-primary)] transition-opacity hover:opacity-80 sm:text-[18px]"
-            >
-              Aethria<span className="wordmark-dot">.</span>
-            </Link>
+        <div className="page-margin-x flex min-h-[64px] items-center justify-between gap-6">
+          <Link
+            data-cursor-expand
+            to="/home"
+            aria-label="Aethria — home"
+            className="font-wordmark inline-flex min-h-[44px] shrink-0 items-center text-[20px] font-medium normal-case leading-none tracking-normal text-[var(--text-primary)] transition-opacity hover:opacity-80 sm:text-[21px]"
+          >
+            Aethria<span className="wordmark-dot">.</span>
+          </Link>
+
+          <nav
+            aria-label="Section navigation"
+            className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-9 md:flex"
+          >
+            {NAV_LINKS.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={(e) => scrollToAnchor(e, item.href)}
+                data-cursor-expand
+                className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--label-muted)] transition-colors duration-200 hover:text-[var(--color-oxford)]"
+              >
+                {item.label}
+              </a>
+            ))}
           </nav>
-          <p className="hidden justify-self-center text-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)] md:block">
-            Deal flow operating system
-          </p>
-          <DeskClock className="min-w-0 justify-self-end text-right" />
+
+          <Link
+            to="/request-access"
+            data-cursor-expand
+            className="inline-flex min-h-[40px] shrink-0 items-center justify-center rounded-none border border-solid border-[rgba(0,20,51,0.28)] px-4 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-oxford)] transition-colors duration-200 hover:border-[var(--color-oxford)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] sm:px-5 sm:text-[11px]"
+          >
+            Request access
+          </Link>
         </div>
       </header>
 
@@ -192,6 +227,7 @@ export default function HomePage() {
 
         {/* ───────────── Section V — intelligence map ───────────── */}
         <section
+          id="intelligence"
           className="paper-dot-grid w-full border-b border-solid border-[var(--section-divider)]"
           style={{ backgroundColor: 'var(--color-paper)' }}
           aria-labelledby="graph-section-heading"

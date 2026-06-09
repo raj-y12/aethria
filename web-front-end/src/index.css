@@ -74,6 +74,11 @@
   padding-right: var(--page-margin-x);
 }
 
+/* Sticky-header offset for in-page nav anchors */
+section[id] {
+  scroll-margin-top: 80px;
+}
+
 /* iPhone: horizontal padding respects notch/safe area in landscape */
 @media (max-width: 768px) {
   .page-margin-x {
