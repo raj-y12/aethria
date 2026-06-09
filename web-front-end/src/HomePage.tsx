@@ -93,10 +93,7 @@ export default function HomePage() {
             Aethria<span className="wordmark-dot">.</span>
           </Link>
 
-          <nav
-            aria-label="Section navigation"
-            className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-9 md:flex"
-          >
+          <nav aria-label="Section navigation" className="hidden items-center gap-9 md:flex">
             {NAV_LINKS.map((item) => (
               <a
                 key={item.href}
@@ -109,14 +106,6 @@ export default function HomePage() {
               </a>
             ))}
           </nav>
-
-          <Link
-            to="/request-access"
-            data-cursor-expand
-            className="inline-flex min-h-[40px] shrink-0 items-center justify-center rounded-none border border-solid border-[rgba(0,20,51,0.28)] px-4 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-oxford)] transition-colors duration-200 hover:border-[var(--color-oxford)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] sm:px-5 sm:text-[11px]"
-          >
-            Request access
-          </Link>
         </div>
       </header>
 
@@ -170,7 +159,7 @@ export default function HomePage() {
                 <Link
                   to="/request-access"
                   data-cursor-expand
-                  className="group inline-flex min-h-[52px] w-full items-center justify-center rounded-none bg-[var(--surface-strong)] px-8 py-4 font-mono text-[12px] uppercase tracking-[0.14em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,20,51,0.9)] sm:w-fit"
+                  className="group inline-flex h-9 w-full items-center justify-center rounded-none bg-[var(--surface-strong)] px-[72px] font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,20,51,0.9)] sm:w-fit"
                 >
                   <span>Request access</span>
                   <span
@@ -349,7 +338,7 @@ export default function HomePage() {
               <Link
                 to="/request-access"
                 data-cursor-expand
-                className="group mx-auto mt-10 inline-flex min-h-[52px] w-full items-center justify-center rounded-none bg-[var(--surface-strong)] px-9 py-4 font-mono text-[12px] uppercase tracking-[0.14em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,20,51,0.9)] sm:w-fit"
+                className="group mx-auto mt-10 inline-flex h-9 w-full items-center justify-center rounded-none bg-[var(--surface-strong)] px-[72px] font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-inverse)] transition-colors duration-[250ms] ease hover:bg-[rgba(0,20,51,0.9)] sm:w-fit"
               >
                 <span>Request access</span>
                 <span
