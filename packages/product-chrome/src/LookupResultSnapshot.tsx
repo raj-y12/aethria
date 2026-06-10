@@ -20,6 +20,7 @@ export default function LookupResultSnapshot({
   summary,
   dimensions,
   thesisLine,
+  resolutionLine,
   onOpenMemo,
   openMemoLabel = 'Open full memo',
   variant = 'snapshot',
@@ -126,6 +127,11 @@ export default function LookupResultSnapshot({
         </p>
         {thesisLine ? (
           <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.08em] text-oxford/35">{thesisLine}</p>
+        ) : null}
+        {resolutionLine ? (
+          <p className="mt-2 border border-solid border-oxford/12 bg-oxford/[0.04] px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-oxford/55">
+            {resolutionLine}
+          </p>
         ) : null}
 
         {dimensions.length > 0 ? (

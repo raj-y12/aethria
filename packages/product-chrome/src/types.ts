@@ -38,6 +38,9 @@ export type LookupResultSnapshotProps = {
   summary: string;
   dimensions: LookupDimensionScore[];
   thesisLine?: string;
+  /** Company Resolver transparency: what evidence was found / what's missing
+   * (e.g. "Partial evidence — missing LinkedIn, founders"). Shown for non-FOUND lookups. */
+  resolutionLine?: string | null;
   onOpenMemo?: () => void;
   openMemoLabel?: string;
   /** Compact strip for app rail; memo = marketing sample IC excerpt */

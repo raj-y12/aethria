@@ -18,6 +18,9 @@ from html import unescape
 import certifi
 from openai import OpenAI
 
+from functools import partial
+
+from resolver.company_resolver import CompanyResolution
 from scout.schema import ScoutOutput, validate_scout_output, generate_id
 from utils.financials_grounding import ground_financials
 from tenant_context import require_user_id
@@ -592,6 +595,54 @@ class Scout(ABC):
         out["url_allowlist"] = allowlist_urls
         return out
 
+    def _merge_resolution_sources(
+        self,
+        source_pack: Dict[str, Any],
+        resolution: Optional[CompanyResolution],
+    ) -> Dict[str, Any]:
+        """Make Company Resolver evidence citable: merge it into the retrieval source pack
+        and allowlist, so the scout LLM can reference what the resolver already verified."""
+        if resolution is None or not resolution.evidence_sources:
+            return source_pack
+        sources = [s for s in list(source_pack.get("sources") or []) if isinstance(s, dict)]
+        existing = {str(s.get("url") or "").strip().lower().rstrip("/") for s in sources}
+        added = 0
+        for ev in resolution.evidence_sources:
+            url = (ev.url or "").strip()
+            if not url or url.lower().rstrip("/") in existing:
+                continue
+            sources.append(
+                {
+                    "title": ev.title or ev.supports or "Resolver evidence",
+                    "url": url,
+                    "snippet": ev.snippet or ev.supports or "",
+                }
+            )
+            existing.add(url.lower().rstrip("/"))
+            added += 1
+        for i, s in enumerate(sources):
+            s["source_id"] = f"S{i + 1}"
+        allowlist = {str(s.get("url") or "").strip() for s in sources}
+        allowlist.discard("")
+        out = dict(source_pack)
+        out["sources"] = sources
+        out["url_allowlist"] = allowlist
+        if added:
+            self.logger.info(
+                "company lookup: merged %d resolver evidence source(s) into source pack (total=%d)",
+                added,
+                len(sources),
+            )
+        return out
+
+    @staticmethod
+    def _attach_resolution(data: Dict[str, Any], resolution: Optional[CompanyResolution]) -> Dict[str, Any]:
+        if resolution is None:
+            return data
+        data["resolution_status"] = resolution.resolution_status
+        data["company_resolution"] = resolution.model_dump(mode="json")
+        return data
+
     @staticmethod
     def _lookup_anchor_tokens(company_name: str) -> list[str]:
         tokens: list[str] = []
@@ -894,9 +945,16 @@ class Scout(ABC):
             self.logger.error(f"LLM call failed: {e}")
             return None
     
-    def _call_llm_for_company_sync(self, company_name: str, website: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def _call_llm_for_company_sync(
+        self,
+        company_name: str,
+        website: Optional[str] = None,
+        resolution: Optional[CompanyResolution] = None,
+    ) -> Optional[Dict[str, Any]]:
         """
         Synchronous LLM call for a specific company name (runs in thread pool).
+        `resolution` is the Company Resolver outcome (stage 1); its evidence is merged
+        into the citable source pack and persisted on the payload.
         """
         company = (company_name or "").strip()
         if not company:
@@ -927,6 +985,9 @@ class Scout(ABC):
                     company_name=company,
                     website_hint=site or None,
                 )
+                # Resolver evidence is merged AFTER the anchor-host filter so identity
+                # evidence (LinkedIn/Crunchbase/news) stays citable even with a website hint.
+                source_pack = self._merge_resolution_sources(source_pack, resolution)
                 if fail_closed and not source_pack["sources"]:
                     self.logger.warning(
                         "grounded_citations: fail-closed company=%s no retrieval sources",
@@ -939,6 +1000,10 @@ class Scout(ABC):
                         company,
                         source_pack.get("provider"),
                     )
+            else:
+                # Even without grounded citations, resolver evidence should back the
+                # payload's references and financial grounding.
+                source_pack = self._merge_resolution_sources(source_pack, resolution)
 
             user_prompt = (
                 "Analyze the specific company named in the untrusted lookup block below. "
@@ -1036,18 +1101,39 @@ class Scout(ABC):
             )
             if finalized is None:
                 return None
+            finalized = self._attach_resolution(finalized, resolution)
             if not self._matches_lookup_identity(
                 str(finalized.get("name") or ""),
                 expected_company=company,
                 website_hint=site or None,
             ):
+                # Analyst-style behavior: a possible identity drift is flagged for human
+                # review, NOT silently dropped. The user asked for this company; show what
+                # was found and why it is uncertain.
                 self.logger.warning(
-                    "company lookup identity mismatch: expected=%s got=%s website_hint=%s",
+                    "company lookup identity mismatch (kept as NEEDS_REVIEW): expected=%s got=%s website_hint=%s",
                     company,
                     finalized.get("name"),
                     site or "",
                 )
-                return None
+                finalized["resolution_status"] = "NEEDS_REVIEW"
+                cr = finalized.get("company_resolution")
+                note = (
+                    f"Identity check: scout returned '{finalized.get('name')}' for lookup "
+                    f"'{company}' — confirm this is the intended company."
+                )
+                if isinstance(cr, dict):
+                    notes = list(cr.get("notes") or [])
+                    notes.append(note)
+                    cr["notes"] = notes
+                else:
+                    finalized["company_resolution"] = {
+                        "query": company,
+                        "canonical_name": str(finalized.get("name") or company),
+                        "resolution_status": "NEEDS_REVIEW",
+                        "confidence": float(finalized.get("confidence") or 0.0),
+                        "notes": [note],
+                    }
             return finalized
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse JSON from LLM (company lookup): {e}")
@@ -1070,16 +1156,26 @@ class Scout(ABC):
             self._call_llm_sync,
         )
 
-    async def discover_company(self, company_name: str, website: Optional[str] = None) -> Optional[ScoutOutput]:
+    async def discover_company(
+        self,
+        company_name: str,
+        website: Optional[str] = None,
+        resolution: Optional[CompanyResolution] = None,
+    ) -> Optional[ScoutOutput]:
         """
         Discover and validate one specific company by name.
+        `resolution` (Company Resolver outcome) seeds the evidence pack and is
+        persisted on the resulting payload for UI transparency.
         """
         loop = asyncio.get_event_loop()
         data = await loop.run_in_executor(
             self.executor,
-            self._call_llm_for_company_sync,
-            company_name,
-            website,
+            partial(
+                self._call_llm_for_company_sync,
+                company_name,
+                website,
+                resolution,
+            ),
         )
         if data is None:
             return None

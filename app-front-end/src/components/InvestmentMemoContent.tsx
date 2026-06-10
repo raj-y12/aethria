@@ -76,6 +76,23 @@ function memoGeneratingDetailForVariant(variant: DecisionBadgeVariant): string {
   }
 }
 
+const RESOLUTION_SECTION_LABELS: Record<string, string> = {
+  FOUND: 'Identity confirmed',
+  PARTIAL: 'Partial evidence',
+  LOW_CONFIDENCE: 'Low-confidence match',
+  NEEDS_REVIEW: 'Needs review',
+  NOT_FOUND: 'Not found',
+};
+
+const RESOLUTION_MISSING_FIELD_LABELS: Record<string, string> = {
+  website: 'website',
+  linkedin_url: 'LinkedIn company page',
+  funding_profile: 'funding profile (Crunchbase/Dealroom/YC)',
+  founder_names: 'founder names',
+  description: 'company description',
+  news_mentions: 'news mentions',
+};
+
 function memoSourceRows(startup: Startup) {
   const structured = startup.scout.source_evidence ?? [];
   if (structured.length > 0) {
@@ -691,6 +708,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     () => (displayStartup ? memoSourceRows(displayStartup) : []),
     [displayStartup]
   );
+  const companyResolution = displayStartup?.scout.company_resolution ?? null;
+  const resolutionStatus = (
+    displayStartup?.scout.resolution_status ??
+    companyResolution?.resolution_status ??
+    ''
+  )
+    .toString()
+    .toUpperCase();
   const highAdverseCount = adverseRegister.filter((item) => item.severity === 'high').length;
   const riskFactors = useMemo(
     () => uniqueRiskItems(displayStartup),
@@ -1480,6 +1505,120 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
             {/* ── Footer detail ── */}
             <div className="memoDiscGroup">
+            {/* ── Company resolution (lookup stage 1) ── */}
+            {(companyResolution || resolutionStatus) && (
+              <MemoDisclosureSection
+                id={`${contentKey}-resolution`}
+                title="Company resolution"
+                summary={RESOLUTION_SECTION_LABELS[resolutionStatus] ?? resolutionStatus ?? 'Resolved'}
+                initialOpen={resolutionStatus !== '' && resolutionStatus !== 'FOUND'}
+              >
+                <ul className="memoList">
+                  <li className="memoListItem">
+                    <span className="memoBullet">·</span>
+                    <span>
+                      Status: {RESOLUTION_SECTION_LABELS[resolutionStatus] ?? resolutionStatus ?? 'Unknown'}
+                      {typeof companyResolution?.confidence === 'number'
+                        ? ` (${Math.round(companyResolution.confidence * 100)}% identity confidence)`
+                        : ''}
+                    </span>
+                  </li>
+                  {companyResolution?.website ? (
+                    <li className="memoListItem">
+                      <span className="memoBullet">·</span>
+                      <span>
+                        Website:{' '}
+                        <a className="memoLink" href={companyResolution.website} target="_blank" rel="noreferrer">
+                          {companyResolution.website}
+                        </a>
+                      </span>
+                    </li>
+                  ) : null}
+                  {companyResolution?.linkedin_url ? (
+                    <li className="memoListItem">
+                      <span className="memoBullet">·</span>
+                      <span>
+                        LinkedIn:{' '}
+                        <a className="memoLink" href={companyResolution.linkedin_url} target="_blank" rel="noreferrer">
+                          {companyResolution.linkedin_url}
+                        </a>
+                      </span>
+                    </li>
+                  ) : null}
+                  {companyResolution?.crunchbase_url || companyResolution?.dealroom_url || companyResolution?.yc_url ? (
+                    <li className="memoListItem">
+                      <span className="memoBullet">·</span>
+                      <span>
+                        Funding profile:{' '}
+                        <a
+                          className="memoLink"
+                          href={companyResolution.crunchbase_url || companyResolution.dealroom_url || companyResolution.yc_url || undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {companyResolution.crunchbase_url || companyResolution.dealroom_url || companyResolution.yc_url}
+                        </a>
+                      </span>
+                    </li>
+                  ) : null}
+                  {(companyResolution?.founder_names?.length ?? 0) > 0 ? (
+                    <li className="memoListItem">
+                      <span className="memoBullet">·</span>
+                      <span>Founders: {companyResolution!.founder_names!.join(', ')}</span>
+                    </li>
+                  ) : null}
+                  {(companyResolution?.missing_fields?.length ?? 0) > 0 ? (
+                    <li className="memoListItem">
+                      <span className="memoBullet">·</span>
+                      <span>
+                        Missing evidence:{' '}
+                        {companyResolution!.missing_fields!
+                          .map((f) => RESOLUTION_MISSING_FIELD_LABELS[f] ?? f)
+                          .join(', ')}
+                      </span>
+                    </li>
+                  ) : null}
+                  {(companyResolution?.alternative_matches?.length ?? 0) > 0 ? (
+                    <li className="memoListItem">
+                      <span className="memoBullet">·</span>
+                      <span>
+                        Alternative matches:{' '}
+                        {companyResolution!.alternative_matches!
+                          .map((a) => a.website || a.name)
+                          .filter(Boolean)
+                          .join(', ')}
+                      </span>
+                    </li>
+                  ) : null}
+                  {(companyResolution?.notes ?? []).map((note, i) => (
+                    <li key={`note-${i}`} className="memoListItem">
+                      <span className="memoBullet">·</span>
+                      <span>{note}</span>
+                    </li>
+                  ))}
+                </ul>
+                {(companyResolution?.stage_log?.length ?? 0) > 0 ? (
+                  <ol className="memoReplayList">
+                    {companyResolution!.stage_log!.map((step, i) => (
+                      <li key={`res-step-${i}`} className="memoReplayItem">
+                        <p className="memoReplayKicker">
+                          <span>{step.stage}</span>
+                          <span className="memoReplayBadge">{step.decision || '—'}</span>
+                        </p>
+                        {step.queries && step.queries.length > 0 ? (
+                          <p className="memoReplayWhen">Queries: {step.queries.join(' · ')}</p>
+                        ) : null}
+                        <p className="memoReplayDetail">
+                          {step.reason || ''}
+                          {typeof step.sources_found === 'number' ? ` (${step.sources_found} sources)` : ''}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+              </MemoDisclosureSection>
+            )}
+
             {/* ── Sources ── */}
             {config.memo.includeEvidenceExcerpts && memoSources.length > 0 && (
               <MemoDisclosureSection

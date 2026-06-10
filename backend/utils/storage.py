@@ -427,6 +427,13 @@ class Storage:
             kept: List[dict] = []
             for item in data:
                 scout = (item or {}).get("scout_info") or {}
+                # On-demand lookups are never pruned: weak evidence is a visible
+                # PARTIAL/NEEDS_REVIEW state, not grounds for deletion.
+                if str(scout.get("origin_type") or "").strip().lower() == "on_demand_lookup" or (
+                    scout.get("company_resolution") or scout.get("resolution_status")
+                ):
+                    kept.append(item)
+                    continue
                 refs = scout.get("references")
                 if not refs or not isinstance(refs, list):
                     removed.append(item.get("startup_id") or "?")

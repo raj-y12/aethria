@@ -540,17 +540,27 @@ export default function MainLayout({
       );
       return;
     }
+    // Company Resolver transparency: weak identity evidence is announced, not hidden.
+    const resolutionStatus = (matched.scout.resolution_status ?? '').toString().toUpperCase();
+    const resolutionNote =
+      resolutionStatus === 'PARTIAL'
+        ? ' Evidence is partial — the memo lists what was found and what is missing.'
+        : resolutionStatus === 'LOW_CONFIDENCE'
+          ? ' Identity evidence is thin — kept and flagged for your review.'
+          : resolutionStatus === 'NEEDS_REVIEW'
+            ? ' Identity needs your confirmation — see alternatives in the memo.'
+            : '';
     const hasDecision = !!matched.partner?.recommendation;
     if (hasDecision) {
       setLookupMessage(
-        `Lookup complete: ${matched.scout.name} analyzed. Review the result and open the memo.`
+        `Lookup complete: ${matched.scout.name} analyzed.${resolutionNote} Review the result and open the memo.`
       );
     } else if (matched.review) {
       setLookupMessage(
-        `Found ${matched.scout.name}. Review is complete and the partner decision is now running...`
+        `Found ${matched.scout.name}.${resolutionNote} Review is complete and the partner decision is now running...`
       );
     } else {
-      setLookupMessage(`Found ${matched.scout.name}. Running analyst review and scoring...`);
+      setLookupMessage(`Found ${matched.scout.name}.${resolutionNote} Running analyst review and scoring...`);
     }
     // No silent auto-navigation: the takeover surfaces the result overview with an
     // "Open memo" action (handleOpenLookupMemo) so the user advances deliberately.

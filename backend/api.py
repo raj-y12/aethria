@@ -1151,6 +1151,10 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
             "lookup_query": scout.get("lookup_query"),
             "lookup_website": scout.get("lookup_website"),
             "lookup_id": scout.get("lookup_id"),
+            "resolution_status": scout.get("resolution_status"),
+            "company_resolution": scout.get("company_resolution")
+            if isinstance(scout.get("company_resolution"), dict)
+            else None,
             "field_provenance": scout.get("field_provenance")
             if isinstance(scout.get("field_provenance"), dict)
             else None,
@@ -1315,6 +1319,7 @@ def _list_projection_to_frontend(
             "lookup_id": row.get("list_lookup_id"),
             "lookup_query": row.get("list_lookup_query"),
             "lookup_website": row.get("list_lookup_website"),
+            "resolution_status": row.get("list_resolution_status"),
             "source_evidence": [],
         },
         "timestamps": timestamps,
@@ -1387,6 +1392,8 @@ def _thin_list_from_full_frontend(obj: Dict[str, Any]) -> Dict[str, Any]:
         "est_tam",
         "lookup_input_type",
         "prompt_version",
+        # Heavy resolver payload stays out of the list view; resolution_status remains.
+        "company_resolution",
     ):
         scout.pop(k, None)
     rev = obj.get("review") or {}

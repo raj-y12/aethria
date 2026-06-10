@@ -174,7 +174,33 @@ def build_scout_trace(
     if scout.get("origin_type") == "on_demand_lookup" and not active_thesis:
         flags.append("no_active_thesis_for_on_demand_lookup")
         warnings.append("On-demand lookup ran without active thesis gating.")
-    return {
+    missing_evidence: List[str] = []
+    resolution_summary: Optional[Dict[str, Any]] = None
+    resolution = scout.get("company_resolution")
+    resolution_status = scout.get("resolution_status")
+    if isinstance(resolution, dict) or resolution_status:
+        res = resolution if isinstance(resolution, dict) else {}
+        status = str(resolution_status or res.get("resolution_status") or "")
+        missing_evidence = [str(m) for m in (res.get("missing_fields") or [])]
+        if status and status != "FOUND":
+            flags.append(f"resolution_{status.lower()}")
+            warnings.append(
+                f"Company Resolver status {status}"
+                + (f"; missing: {', '.join(missing_evidence)}" if missing_evidence else "")
+                + "."
+            )
+        resolution_summary = {
+            "status": status or None,
+            "confidence": _float(res.get("confidence"), 0.0) if res else None,
+            "website": res.get("website"),
+            "linkedin_url": res.get("linkedin_url"),
+            "crunchbase_url": res.get("crunchbase_url"),
+            "queries_used": list(res.get("queries_used") or [])[:12],
+            "evidence_source_count": len(res.get("evidence_sources") or []),
+            "missing_fields": missing_evidence,
+            "alternative_match_count": len(res.get("alternative_matches") or []),
+        }
+    trace = {
         "stage": "scout",
         "status": "completed",
         "pipeline_run_id": pipeline_run_id,
@@ -192,10 +218,13 @@ def build_scout_trace(
             "quality_flags": flags,
             "blocking_issues": [],
             "warnings": warnings,
-            "missing_evidence": [],
+            "missing_evidence": missing_evidence,
             "conflicts": [],
         },
     }
+    if resolution_summary is not None:
+        trace["resolution"] = resolution_summary
+    return trace
 
 
 def build_review_trace(

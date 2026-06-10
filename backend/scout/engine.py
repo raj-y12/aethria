@@ -8,6 +8,13 @@ import os
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
+from functools import partial
+
+from resolver.company_resolver import (
+    CompanyResolution,
+    build_fallback_scout_payload,
+    resolve_company,
+)
 from scout.scouts import (
     MarketDrivenScout,
     BuilderTechnicalScout,
@@ -84,6 +91,10 @@ class ScoutEngine:
         )
         self.logger = logging.getLogger("scout.engine")
         self.running = False
+        # Outcome of the most recent run_named_lookup: resolver status, message, and
+        # debug detail. Lets pipeline_runner surface a transparent failure message
+        # (what was searched, what was missing) instead of a generic error.
+        self.last_lookup_outcome: Optional[Dict[str, Any]] = None
 
     def set_active_thesis(self, thesis: Optional[Dict[str, Any]]) -> None:
         self.active_thesis = thesis
@@ -283,12 +294,20 @@ class ScoutEngine:
         lookup_input_type: Optional[str] = None,
         lookup_id: Optional[str] = None,
         pipeline_run_id: Optional[str] = None,
+        resolution: Optional[CompanyResolution] = None,
     ) -> Optional[str]:
         """
-        Run a focused scout lookup for one specific company and persist it.
+        On-demand lookup, staged:
+          1. Resolve company identity (Company Resolver — deterministic, layered searches)
+          2. Scout/enrich the resolved company (LLM, seeded with resolver evidence)
+          3. Persist (review + scoring happen later and never delete the row)
+        Weak evidence is persisted as PARTIAL/LOW_CONFIDENCE/NEEDS_REVIEW; only a lookup
+        with genuinely no credible evidence anywhere returns None (status NOT_FOUND),
+        and even then last_lookup_outcome explains what was searched and missing.
         Returns startup_id on success, else None.
         """
         company = (company_name or "").strip()
+        self.last_lookup_outcome = None
         if not company:
             return None
         selected = next((s for s in self.scouts if s.scout_type == scout_type), None)
@@ -298,12 +317,93 @@ class ScoutEngine:
             return None
 
         self._sync_thesis_to_scouts()
-        result = await selected.discover_company(company, website=website)
+
+        # ── Stage 1: resolve company identity ────────────────────────────────
+        if resolution is None:
+            loop = asyncio.get_event_loop()
+            try:
+                resolution = await loop.run_in_executor(
+                    None,
+                    partial(
+                        resolve_company,
+                        company,
+                        user_id=self.tenant_user_id,
+                        website_hint=website,
+                    ),
+                )
+            except Exception as e:
+                self.logger.warning("Company resolver failed for %s: %s", company, e)
+                resolution = None
+        if resolution is not None:
+            self.logger.info(
+                "[lookup] resolver company=%s %s queries=%d",
+                company,
+                resolution.summary_line(),
+                len(resolution.queries_used),
+            )
+            if resolution.resolution_status == "NOT_FOUND":
+                searched = len(resolution.queries_used)
+                self.last_lookup_outcome = {
+                    "status": "NOT_FOUND",
+                    "message": (
+                        f'No credible evidence found for "{company}" across {searched} '
+                        "search queries (web, LinkedIn, Crunchbase, founders, funding). "
+                        "If the company exists, add its website to the lookup "
+                        f'(example: "{company} company-website.com").'
+                    ),
+                    "resolution": resolution.model_dump(mode="json"),
+                }
+                self.logger.warning(
+                    "[lookup] NOT_FOUND company=%s queries_used=%s",
+                    company,
+                    resolution.queries_used,
+                )
+                return None
+
+        # Resolver-discovered website only steers the scout when identity is solid;
+        # the user-provided hint always wins.
+        effective_website = (website or "").strip() or None
+        if (
+            not effective_website
+            and resolution is not None
+            and resolution.website
+            and resolution.resolution_status == "FOUND"
+        ):
+            effective_website = resolution.website
+
+        # ── Stage 2: enrich via scout LLM (seeded with resolver evidence) ────
+        result = await selected.discover_company(
+            company, website=effective_website, resolution=resolution
+        )
+        if result is None and resolution is not None:
+            # Demo-safe fallback: the resolver found real evidence but profile
+            # generation failed — persist a NEEDS_REVIEW row instead of vanishing.
+            result = build_fallback_scout_payload(
+                resolution, scout_type=selected.scout_type, company_name=company
+            )
+            if result is not None:
+                self.logger.warning(
+                    "[lookup] scout stage failed for %s; persisting resolver-evidence "
+                    "fallback row as NEEDS_REVIEW (%d sources)",
+                    company,
+                    len(resolution.evidence_sources),
+                )
         if result is None:
+            self.last_lookup_outcome = {
+                "status": "FAILED",
+                "message": (
+                    f'Lookup for "{company}" found no usable evidence and profile '
+                    "generation failed. Try adding the company website to disambiguate."
+                ),
+                "resolution": resolution.model_dump(mode="json") if resolution else None,
+            }
             return None
 
         try:
             payload = dict(result)
+            if resolution is not None and not payload.get("company_resolution"):
+                payload["resolution_status"] = resolution.resolution_status
+                payload["company_resolution"] = resolution.model_dump(mode="json")
             payload["prompt_version"] = hash_prompt(getattr(selected, "system_prompt", ""))
             payload["origin_type"] = "on_demand_lookup"
             payload["lookup_query"] = (lookup_query or company).strip()
@@ -334,9 +434,24 @@ class ScoutEngine:
                     )
             if self.storage:
                 self.storage.add_discovery(payload, pipeline_run_id=pr)
+            self.last_lookup_outcome = {
+                "status": payload.get("resolution_status") or "FOUND",
+                "startup_id": payload.get("id"),
+                "message": None,
+            }
+            self.logger.info(
+                "[lookup] persisted company=%s startup_id=%s resolution_status=%s",
+                company,
+                payload.get("id"),
+                payload.get("resolution_status") or "-",
+            )
             return payload.get("id")
         except Exception as e:
             self.logger.error("Failed named lookup persistence for %s: %s", company, e)
+            self.last_lookup_outcome = {
+                "status": "FAILED",
+                "message": f'Lookup for "{company}" could not be saved. Try again.',
+            }
             return None
     
     async def run_forever(self):
