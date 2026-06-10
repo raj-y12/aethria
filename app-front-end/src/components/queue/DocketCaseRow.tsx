@@ -144,12 +144,15 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
                   {startup.scout.location.trim()}
                 </p>
               ) : null}
+              {/* The queue stays compressed even when selected — the Decision
+                  Stage carries the subject at display scale. Selection reads
+                  through weight and full ink, not size. */}
               <motion.h2
                 layout={!reduceMotion}
                 className={`min-w-0 break-words font-sans transition-[color,font-weight] ${
                   isSelected
-                    ? 'font-semibold text-oxford text-[length:var(--case-title-size)] leading-[var(--case-title-leading)] tracking-[var(--case-title-tracking)]'
-                    : 'text-[clamp(15px,1.4vw,20px)] font-normal leading-[1.08] tracking-[-0.02em] text-oxford/52'
+                    ? 'text-[clamp(15px,1.3vw,18px)] font-semibold leading-[1.15] tracking-[-0.01em] text-oxford'
+                    : 'text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.15] tracking-[-0.01em] text-oxford/55'
                 }`}
                 style={{ transitionDuration: `${selectTransition.duration}s`, transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' }}
                 transition={selectTransition}

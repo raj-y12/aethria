@@ -39,6 +39,10 @@ interface WorkGridProps {
   selectedId?: string | null;
   watchlistIds?: Set<string>;
   fundConfiguration?: FundConfiguration;
+  /** The canvas always has an anchor: select the top-priority row when nothing is selected. */
+  autoSelectFirst?: boolean;
+  /** Auto-selection callback — unlike onStartupClick it must not acknowledge new rows. */
+  onAutoSelect?: (startup: Startup) => void;
 }
 
 const EMPTY_WATCHLIST_IDS = new Set<string>();
@@ -143,7 +147,15 @@ function priorityRank(row: DocketRowModel): number {
   return queueAttentionRank(row.startup);
 }
 
-const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConfiguration }: WorkGridProps): JSX.Element => {
+const WorkGrid = ({
+  startups,
+  onStartupClick,
+  selectedId,
+  watchlistIds,
+  fundConfiguration,
+  autoSelectFirst = false,
+  onAutoSelect,
+}: WorkGridProps): JSX.Element => {
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
   const config = fundConfiguration ?? createDefaultFundConfiguration();
   const [queueView, setQueueView] = useState<QueueView>('PRIORITY');
@@ -329,6 +341,16 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
   useEffect(() => {
     if (pinnedNewId && selectedId !== pinnedNewId) setPinnedNewId(null);
   }, [selectedId, pinnedNewId]);
+
+  // The decision stage always has a subject: when nothing is selected, the
+  // top of the current view takes the canvas (without acknowledging it).
+  // Deep links (?queue=…, ?open=…) win — wait until they have been consumed.
+  useEffect(() => {
+    if (!autoSelectFirst || selectedId != null) return;
+    if (searchParams.get('queue') != null || searchParams.get('open') != null) return;
+    const first = orderedModels[0]?.startup;
+    if (first) onAutoSelect?.(first);
+  }, [autoSelectFirst, selectedId, orderedModels, onAutoSelect, searchParams]);
 
   const handleRowSelect = useCallback(
     (startup: Startup) => {

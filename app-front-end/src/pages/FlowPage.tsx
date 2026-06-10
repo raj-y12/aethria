@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import WorkGrid from '../components/WorkGrid';
 import PanelShell from '../components/PanelShell';
-import LiveIntelligenceFeed from '../components/LiveIntelligenceFeed';
+import DecisionStage from '../components/DecisionStage';
+import EmptyState from '../components/EmptyState';
 import InvestmentMemo from '../components/InvestmentMemo';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from '../components/InvestmentMemoContent';
 import AgentDispatch from '../components/AgentDispatch';
@@ -29,12 +30,15 @@ import type { Startup } from '../types/startup';
 const PANEL_ACTION_CLASS = productInteraction.panelActionInline;
 
 /**
- * Flow — the judgment workspace. Queue on the left, the open memo on the
- * right. When no memo is open the right column rests on the system's live
- * judgment record: the instrument keeps reporting, the workspace is never blank.
+ * Flow — the judgment workspace: queue | active decision. The queue is
+ * compressed utility; the right column is the Decision Stage, where the
+ * active company dominates the canvas (huge conviction, the state of the
+ * call, the name at display scale) with the full memo flowing beneath it.
+ * The stage always has a subject — the top of the queue takes the canvas
+ * until the principal chooses otherwise.
  */
 export default function FlowPage({ data }: { data: SystemData }) {
-  const { startups, signals, metaReports, watchlistAnalytics } = data;
+  const { startups, signals, watchlistAnalytics } = data;
   const { inlineDispatch, setPageOverlayOpen } = useAppFrame();
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
@@ -103,8 +107,16 @@ export default function FlowPage({ data }: { data: SystemData }) {
 
   const handleCloseMemo = useCallback(() => setSelectedStartup(null), []);
 
-  useEscapeKey(handleCloseMemo, memoOpen);
+  // The stage holds its subject: a queued row replaces it, nothing closes it.
+  // Escape applies only to the mobile modal.
+  useEscapeKey(handleCloseMemo, memoOpen && !isDesktop);
   useRestoreFocus(memoOpen, restoreRef, true);
+
+  // Auto-selection (desktop): the top of the queue takes the canvas without
+  // being acknowledged — only a deliberate click marks a row as seen.
+  const handleAutoSelect = useCallback((startup: Startup) => {
+    setSelectedStartup(startup);
+  }, []);
 
   // Small viewports show the memo as a modal; the frame owns body scroll locking.
   const useModal = Boolean(selectedStartup && !isDesktop);
@@ -147,109 +159,70 @@ export default function FlowPage({ data }: { data: SystemData }) {
               selectedId={selectedStartup?.id ?? null}
               watchlistIds={watchlistIds}
               fundConfiguration={fundConfiguration}
+              autoSelectFirst={isDesktop}
+              onAutoSelect={handleAutoSelect}
             />
           </GhostTransition>
         </section>
 
-        {/* ── Memo / judgment record ────────────────────────────── */}
+        {/* ── Active decision ───────────────────────────────────── */}
         <aside
           className="hidden min-h-0 min-w-0 flex-col overflow-hidden bg-paper lg:flex"
           aria-live="polite"
-          aria-label={selectedStartup ? 'Memo' : 'Judgements'}
+          aria-label="Active decision"
         >
-          <AnimatePresence mode="wait" initial={false}>
-            {selectedStartup ? (
+          {selectedStartup ? (
+            <PanelShell
+              className="min-h-0 min-w-0 w-full flex-1 bg-paper"
+              title="Active decision"
+              headerClassName="!items-start !py-0 !pt-phi-2 !pb-phi-2 min-h-[46px]"
+              actions={
+                <button
+                  type="button"
+                  onClick={() => memoContentRef.current?.downloadPDF()}
+                  className={PANEL_ACTION_CLASS}
+                  aria-label="Download IC pack as PDF"
+                >
+                  IC pack (PDF)
+                </button>
+              }
+              contentClassName="memoShellContent memoShellContent--workspace bg-paper px-phi-4 py-phi-3 sm:px-phi-5 sm:py-phi-4"
+            >
+              {/* Enter-only when swapping deals: keyed motion.div remounts instantly;
+                  only the incoming decision fades in. */}
               <motion.div
-                key="flow-memo-shell"
-                initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+                key={memoStartup!.id}
+                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
                 transition={transitionOrReduced(reduceMotion, {
-                  duration: tokens.motion.duration.short,
+                  duration: tokens.motion.duration.micro,
                   ease: tokens.motion.ease,
                 })}
-                className="h-full"
+                className="h-full min-h-full bg-paper"
               >
-                <PanelShell
-                  className="min-h-0 min-w-0 w-full flex-1 bg-paper"
-                  title="Memo"
-                  headerClassName="!items-start !py-0 !pt-phi-2 !pb-phi-2 min-h-[46px]"
-                  actions={
-                    <div className="flex shrink-0 items-start gap-0" role="group" aria-label="Memo controls">
-                      <button
-                        type="button"
-                        onClick={() => memoContentRef.current?.downloadPDF()}
-                        className={PANEL_ACTION_CLASS}
-                        aria-label="Download IC pack as PDF"
-                      >
-                        IC pack (PDF)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCloseMemo}
-                        className={PANEL_ACTION_CLASS}
-                        aria-label="Close memo"
-                      >
-                        Close
-                      </button>
-                    </div>
+                <InvestmentMemoContent
+                  ref={memoContentRef}
+                  startup={memoStartup!}
+                  embedded
+                  coverOverride={
+                    <DecisionStage startup={memoStartup!} fundConfiguration={fundConfiguration} />
                   }
-                  contentClassName="memoShellContent memoShellContent--workspace bg-paper px-phi-4 py-phi-3 sm:px-phi-5 sm:py-phi-4"
-                >
-                  {/* Enter-only when swapping deals: keyed motion.div remounts instantly;
-                      only the incoming memo fades in. */}
-                  <motion.div
-                    key={memoStartup!.id}
-                    initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={transitionOrReduced(reduceMotion, {
-                      duration: tokens.motion.duration.micro,
-                      ease: tokens.motion.ease,
-                    })}
-                    className="h-full min-h-full bg-paper"
-                  >
-                    <InvestmentMemoContent
-                      ref={memoContentRef}
-                      startup={memoStartup!}
-                      embedded
-                      onMemoPipelineReady={handleMemoPipelineReady}
-                      onDecisionResolved={handleDecisionResolved}
-                      fundConfiguration={fundConfiguration}
-                      peerStartups={startups}
-                      portfolioSignals={signals}
-                    />
-                  </motion.div>
-                </PanelShell>
+                  onMemoPipelineReady={handleMemoPipelineReady}
+                  onDecisionResolved={handleDecisionResolved}
+                  fundConfiguration={fundConfiguration}
+                  peerStartups={startups}
+                  portfolioSignals={signals}
+                />
               </motion.div>
-            ) : (
-              <motion.div
-                key="flow-judgements-rest"
-                initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
-                transition={transitionOrReduced(reduceMotion, {
-                  duration: tokens.motion.duration.short,
-                  ease: tokens.motion.ease,
-                })}
-                className="h-full"
-              >
-                {/* Resting state: the system's judgment record. Selecting a
-                    matter from the queue replaces this with its memo. */}
-                <PanelShell
-                  className="min-h-0 flex-1 bg-paper"
-                  title="Judgements"
-                  contentOverflowHidden
-                  contentClassName="flex-1 min-h-0 overflow-hidden"
-                >
-                  <LiveIntelligenceFeed
-                    startups={startups}
-                    signals={signals}
-                    metaReports={metaReports}
-                  />
-                </PanelShell>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            </PanelShell>
+          ) : startups.length === 0 ? (
+            <div className="flex h-full items-center justify-center">
+              <EmptyState
+                label="Decision stage"
+                body="Scouts are filling the workspace against the active mandate. The first matter takes the stage as soon as it lands."
+              />
+            </div>
+          ) : null}
         </aside>
       </div>
 

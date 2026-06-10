@@ -85,13 +85,24 @@ principal must dismiss before reaching their desk.
 
 ## Flow
 
-Two columns beside the spine, split on the golden ratio: the queue (38.2%) and the open
-memo (61.8% — it is a document; it gets the measure).
+**Queue | active decision.** The queue (34%) is compressed utility — small type, dense
+rows, selection read through weight and full ink, never size. The right column (66%) is
+the **Decision Stage**: the active company owns the canvas with the one act the product
+exists for — make a judgment — given real gravity:
 
-The defining decision: **the workspace is never blank.** When no memo is open, the right
-column rests on the live judgment record (Judgements) — the instrument keeps reporting
-while the principal scans the queue. Empty states that instruct the user ("select a
-matter to open the memo") are replaced by states that *inform* them.
+- a huge conviction numeral (counts up on arrival) over a tiny `/100 conviction` scale
+- the state of the call in bold mono — `NEEDS YOUR RULING` in escalation ink is the
+  product's moment of tension
+- the company name at display scale, one standfirst line
+- the instruments: thesis-fit track, the reviewer **agreement map** (each reviewer's
+  mean as a tick on the 0–10 axis; split reads in escalation ink), partner confidence
+- "What decides it" — the focal question — then the full memo flowing beneath
+
+The stage always has a subject: the top of the current queue view takes the canvas
+automatically (without being acknowledged — only a deliberate click marks a row seen).
+There is no empty resting state and no Close: a different row replaces the subject.
+This is the layout's compression/release rhythm: dense list → silence → huge score →
+small metadata.
 
 Deep links: `/v1/flow?open=<id>` opens a memo (used by Today, Dispatch results,
 Portfolio, and Fund); `/v1/flow?queue=escalated|new` focuses a queue view (used by the

@@ -128,6 +128,8 @@ export interface InvestmentMemoContentProps {
   startup: Startup | null;
   onClose?: () => void;
   embedded?: boolean;
+  /** Replaces the executive cover (e.g. the Flow Decision Stage owns the opening). */
+  coverOverride?: ReactNode;
   /** Share link / co-GP view: memo readable, ruling controls hidden. */
   readOnly?: boolean;
   onMemoPipelineReady?: () => void;
@@ -559,6 +561,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     startup,
     onClose,
     embedded = false,
+    coverOverride,
     readOnly = false,
     onMemoPipelineReady,
     onDecisionResolved,
@@ -1000,7 +1003,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             transition={transitionOrReduced(reduceMotion, { duration: 0.24, ease: [0.23, 1, 0.32, 1] })}
           >
 
-            {/* ── Executive cover ── */}
+            {/* ── Executive cover (or the workspace's Decision Stage) ── */}
+            {coverOverride ?? (
             <header className="memoCover">
               {!embedded ? <p className="memoKicker">Investment Memo</p> : null}
               <div className="memoCoverTitleRow">
@@ -1087,6 +1091,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </dl>
               ) : null}
             </header>
+            )}
 
             {/* ── Company snapshot ── */}
             {(snapshotRows.length > 0 || hasVitals) && (

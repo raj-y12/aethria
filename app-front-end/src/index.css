@@ -98,12 +98,13 @@
   --type-data-size: 12px;
   --type-body-sm-leading: 1.48;
   --type-meta-leading: 1.45;
-  /* Queue row vertical padding — ambient compressed; selected stays immersive */
-  --queue-pad-ambient: 14px;
-  --queue-pad-ambient-alt: 15px;
+  /* Queue row vertical padding — ambient compressed; selected stays immersive.
+     The contrast between the two IS the rhythm: dense list, released stage. */
+  --queue-pad-ambient: 10px;
+  --queue-pad-ambient-alt: 11px;
   --queue-pad-interrupt: 16px;
-  --queue-pad-selected: 26px;
-  --queue-row-gap: var(--space-5);
+  --queue-pad-selected: 24px;
+  --queue-row-gap: var(--space-4);
   /* Selected queue title ↔ embedded memo company name */
   --case-title-size: clamp(25px, 2.45vw, 34px);
   --case-title-leading: 1.08;
@@ -145,7 +146,8 @@
   width: clamp(204px, 15vw, 248px);
 }
 
-/* Flow workspace — queue | memo split on the golden ratio (lg+).
+/* Flow workspace — queue | active decision (lg+). The queue is compressed
+ * utility; the Decision Stage owns the canvas.
  * display:grid comes from Tailwind `lg:grid` on the element (utilities load after this file;
  * a display:grid rule here would lose to `flex` otherwise). */
 @media screen and (min-width: 1024px) {
@@ -154,8 +156,8 @@
     gap: var(--layout-col-gap);
     min-height: 0;
     overflow: hidden;
-    /* 38.2% / 61.8% — queue | memo (1/φ² : 1/φ) */
-    grid-template-columns: minmax(0, 38.2fr) minmax(0, 61.8fr);
+    /* 34 / 66 — compressed queue, dominant stage */
+    grid-template-columns: minmax(0, 34fr) minmax(0, 66fr);
   }
 
   .aethria-flow-grid > * {
