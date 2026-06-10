@@ -7,11 +7,16 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LookupResultSnapshot } from '@aethria/product-chrome';
-import AppSpine, { SPINE_WORKSPACES, type SpineMandate, type SpineTelemetry } from './AppSpine';
+import AppSpine, {
+  SPINE_WORKSPACES,
+  isSpineRouteActive,
+  type SpineMandate,
+  type SpineTelemetry,
+} from './AppSpine';
 import MobileHeader from './MobileHeader';
 import AgentLogoutModal from './AgentLogoutModal';
 import DispatchCommandBar from './DispatchCommandBar';
@@ -75,6 +80,7 @@ interface AppFrameProps {
  */
 export default function AppFrame({ data, startupsError, children }: AppFrameProps) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const reduceMotion = usePrefersReducedMotion();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -107,6 +113,17 @@ export default function AppFrame({ data, startupsError, children }: AppFrameProp
   // Scroll lock has one owner: the frame. Covers the dispatch takeover and any
   // full-screen page overlay (mobile memo) without double-locking the body.
   useScrollLock(dispatch.commandBarOpen || pageOverlayOpen);
+
+  // Places have names — the browser tab is part of the instrument.
+  useEffect(() => {
+    const place = pathname.startsWith('/v1/settings')
+      ? 'Settings'
+      : SPINE_WORKSPACES.find((w) => isSpineRouteActive(w.href, pathname))?.label;
+    document.title = place ? `${place} — Aethria` : 'Aethria';
+    return () => {
+      document.title = 'Aethria';
+    };
+  }, [pathname]);
 
   // ⌘K opens Dispatch; 1/2/3 move between workspaces — from anywhere.
   useEffect(() => {

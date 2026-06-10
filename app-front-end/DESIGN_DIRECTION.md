@@ -126,7 +126,11 @@ These extend `DESIGN_SYSTEM.md` from tokens to layout judgment:
   on oxford chrome — both reserved for states requiring a human.
 - **Whitespace must create focus.** The golden-ratio splits and Fibonacci gaps are the
   grid; if removing an element does not lose information, remove it.
-- **Everything addressable.** Every place has a URL; every readout that implies an
-  action navigates to where the action happens.
+- **One selection language.** Vertical lists (spine nav, queue rows) mark the current
+  item with a 2px left bar; horizontal tabs (Fund facets) with a 1px underline. Never
+  both, never a filled pill.
+- **Everything addressable.** Every place has a URL and a named browser tab
+  ("Flow — Aethria"); every readout that implies an action navigates to where the
+  action happens.
 - **The instrument reports; the human rules.** Copy is declarative ("3 need ruling"),
   never promotional, never instructional unless the system is unconfigured.

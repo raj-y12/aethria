@@ -76,13 +76,20 @@ export function SpineNavButton({
       type="button"
       onClick={onClick}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`group type-label-tab w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
+      className={`group type-label-tab relative w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
         active ? `${textActive} ${bgActive}` : `${textIdle} ${bgHover}`
       } ${compact ? 'min-h-[32px] px-phi-4 py-phi-1' : 'min-h-[44px] px-2 py-1'}`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
       aria-pressed={ariaPressed}
       aria-current={active ? 'page' : undefined}
     >
+      {/* Selection spine — same language as the selected queue row's left bar. */}
+      {active ? (
+        <span
+          className={`absolute bottom-[5px] left-0 top-[5px] w-[2px] ${onPaper ? 'bg-oxford' : 'bg-white'}`}
+          aria-hidden
+        />
+      ) : null}
       <span className="inline-flex min-w-0 items-center gap-phi-2">
         {running ? (
           <span
