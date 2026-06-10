@@ -272,8 +272,8 @@ export default function SystemBar({
         <div className="flex flex-col gap-5 h-full min-h-0">
           {/* Wordmark */}
           <div className="shrink-0 px-3">
-            <p className="font-wordmark font-medium text-[16px] leading-none tracking-[0.01em] text-white/80">
-              Aethria
+            <p className="font-wordmark font-medium text-[16px] leading-none tracking-[0.01em] text-paper">
+              Aethria<span className="wordmark-dot wordmark-dot--inverse">.</span>
             </p>
           </div>
 

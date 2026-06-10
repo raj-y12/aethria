@@ -52,7 +52,7 @@ function signalWhen(sig: SignalItem): string {
  */
 export default function PortfolioPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
-  const openDeal = (id: string) => navigate(`/v1?open=${id}`);
+  const openDeal = (id: string) => navigate(`/v1/flow?open=${id}`);
 
   const track = useMemo(
     () => buildTrackRecord(data.startups, data.calibrationState, data.systemHealth?.calibration_warning ?? null),

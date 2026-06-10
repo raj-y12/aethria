@@ -35,7 +35,7 @@ export default function FundPage({ data }: { data: SystemData }) {
     data.settings?.fund_identity?.fund_name?.trim() ||
     (runtime?.active_version_number != null ? `Fund Thesis v${runtime.active_version_number}` : 'Fund');
 
-  const openDeal = (startup: Startup) => navigate(`/v1?open=${startup.id}`);
+  const openDeal = (startup: Startup) => navigate(`/v1/flow?open=${startup.id}`);
   const stats = runtime?.alignment_stats;
 
   return (

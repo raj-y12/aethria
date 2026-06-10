@@ -84,7 +84,7 @@ export default function AppFrame({ data, startupsError, children }: AppFrameProp
   const handleOpenMemo = useCallback(
     (startup: Startup) => {
       if (startup.is_new_to_user) acknowledge(startup);
-      navigate(`/v1?open=${startup.id}`);
+      navigate(`/v1/flow?open=${startup.id}`);
     },
     [acknowledge, navigate],
   );

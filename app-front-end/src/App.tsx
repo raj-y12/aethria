@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { setTokenGetter } from './api/auth';
 import { triggerAgents } from './api/agents';
 import AppFrame from './components/AppFrame';
+import TodayPage from './pages/TodayPage';
 import FlowPage from './pages/FlowPage';
 import PortfolioPage from './pages/PortfolioPage';
 import FundPage from './pages/FundPage';
@@ -29,6 +30,7 @@ function AppShell() {
   const isSettingsRoute = pathname.startsWith(SETTINGS_ROOT);
   const isFundRoute = pathname.startsWith(`${APP_ROOT}/fund`);
   const isPortfolioRoute = pathname.startsWith(`${APP_ROOT}/portfolio`);
+  const isFlowRoute = pathname.startsWith(`${APP_ROOT}/flow`) || pathname.startsWith(`${APP_ROOT}/deal`);
   const [arrivedFromLogin] = useState(() => sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY) === '1');
   const triggeredAgentsRef = useRef(false);
   const reduceMotion = usePrefersReducedMotion();
@@ -92,8 +94,10 @@ function AppShell() {
             <PortfolioPage data={systemData} />
           ) : isFundRoute ? (
             <FundPage data={systemData} />
-          ) : (
+          ) : isFlowRoute ? (
             <FlowPage data={systemData} />
+          ) : (
+            <TodayPage data={systemData} />
           )}
         </AppFrame>
       )}

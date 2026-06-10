@@ -60,7 +60,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
     [acknowledge],
   );
 
-  // Deep link from Dispatch / Portfolio / Fund: /v1?open=<id> opens the memo.
+  // Deep link from Today / Dispatch / Portfolio / Fund: /v1/flow?open=<id> opens the memo.
   useEffect(() => {
     const openId = searchParams.get('open');
     if (!openId || startups.length === 0) return;

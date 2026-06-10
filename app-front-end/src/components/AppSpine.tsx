@@ -34,14 +34,18 @@ interface AppSpineProps {
 }
 
 export const SPINE_WORKSPACES: Array<{ href: string; label: string; shortcut: string }> = [
-  { href: '/v1', label: 'Flow', shortcut: '1' },
-  { href: '/v1/portfolio', label: 'Portfolio', shortcut: '2' },
-  { href: '/v1/fund', label: 'Fund', shortcut: '3' },
+  { href: '/v1', label: 'Today', shortcut: '1' },
+  { href: '/v1/flow', label: 'Flow', shortcut: '2' },
+  { href: '/v1/portfolio', label: 'Portfolio', shortcut: '3' },
+  { href: '/v1/fund', label: 'Fund', shortcut: '4' },
 ];
 
 export function isSpineRouteActive(href: string, pathname: string): boolean {
   if (href === '/v1') {
-    return pathname === '/v1' || pathname === '/v1/' || pathname.startsWith('/v1/deal');
+    return pathname === '/v1' || pathname === '/v1/';
+  }
+  if (href === '/v1/flow') {
+    return pathname.startsWith('/v1/flow') || pathname.startsWith('/v1/deal');
   }
   return pathname.startsWith(href);
 }
@@ -101,7 +105,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
           <div className="flex items-baseline justify-between gap-phi-3 px-2">
             <Link
               to="/v1"
-              className="font-wordmark text-[clamp(19px,1.5vw,24px)] font-medium leading-tight text-white/92 btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+              className="font-wordmark text-[clamp(19px,1.5vw,24px)] font-medium leading-tight text-paper btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
             >
               Aethria<span className="wordmark-dot wordmark-dot--inverse">.</span>
             </Link>
@@ -147,7 +151,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                 {hasEscalations ? (
                   <button
                     type="button"
-                    onClick={() => navigate('/v1?queue=escalated')}
+                    onClick={() => navigate('/v1/flow?queue=escalated')}
                     title="Review escalations"
                     aria-label={`Review ${heroValue} items needing a ruling`}
                     className="mt-phi-1 block font-mono text-[clamp(1.6rem,2.4vw,2.25rem)] font-bold leading-none tracking-[-0.04em] tabular-nums text-escalation-bright transition-opacity hover:opacity-80 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
@@ -192,7 +196,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
             {telemetry.newCount > 0 ? (
               <button
                 type="button"
-                onClick={() => navigate('/v1?queue=new')}
+                onClick={() => navigate('/v1/flow?queue=new')}
                 aria-label={`Triage ${telemetry.newCount} new ${telemetry.newCount === 1 ? 'company' : 'companies'}`}
                 className="group mt-phi-3 flex w-full items-center gap-phi-2 border-t border-white/[0.07] pt-phi-3 text-left btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
               >

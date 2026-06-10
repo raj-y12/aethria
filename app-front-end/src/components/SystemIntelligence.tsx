@@ -102,17 +102,6 @@ function AnimatedTabBlock({
   );
 }
 
-const FilterButton = ({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`type-meta uppercase tracking-[0.12em] min-h-[36px] px-phi-3 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${active ? 'text-oxford font-semibold' : 'text-oxford/40 hover:text-oxford/70'
-      }`}
-  >
-    {label}
-  </button>
-);
-
 function TacticalBar({ pct, delay = 0 }: { pct: number; delay?: number }) {
   const reduceMotion = usePrefersReducedMotion();
   return (
@@ -1036,24 +1025,33 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
 
   return (
     <div className="w-full font-sans bg-surface-canvas selection:bg-oxford selection:text-paper min-h-full">
-      <div className="sticky top-0 z-20 bg-surface-canvas px-phi-4 py-phi-3">
-        <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-phi-3">
-            <div className="flex items-center gap-0">
-              {TABS.map((tab) => {
-                const isActive = activeTab === tab.key;
-                return (
-                  <FilterButton
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    active={isActive}
-                    label={tab.label}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </div>
+      {/* Facet nav — underlined section tabs, sticky while the page scrolls. */}
+      <div className="sticky top-0 z-20 bg-surface-canvas pt-phi-3">
+        <nav
+          role="tablist"
+          aria-label="Fund facets"
+          className="flex items-center gap-phi-5 overflow-x-auto border-b border-oxford/[0.08] no-scrollbar"
+        >
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTab(tab.key)}
+                className={`relative -mb-px shrink-0 border-b pb-phi-3 pt-phi-1 type-label-tab transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+                  isActive
+                    ? 'border-oxford text-oxford'
+                    : 'border-transparent text-oxford/40 hover:text-oxford/70'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
       <AnimatePresence mode="wait">

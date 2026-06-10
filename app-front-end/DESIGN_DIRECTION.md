@@ -20,12 +20,13 @@ purpose?"*
 
 ## The operating states
 
-An investor using Aethria is always in exactly one of five states. The architecture maps
+An investor using Aethria is always in exactly one of six states. The architecture maps
 one place to each state; nothing else earns top-level presence.
 
 | State | Place | Route |
 |---|---|---|
-| Judging — ruling on what the system surfaced | **Flow** | `/v1` |
+| Arriving — what happened, what needs me | **Today** | `/v1` |
+| Judging — ruling on what the system surfaced | **Flow** | `/v1/flow` |
 | Researching — pulling a specific company through the machine | **Dispatch** | ⌘K, from anywhere |
 | Monitoring conviction — the book, the watchlist, the signals against them | **Portfolio** | `/v1/portfolio` |
 | Steering the instrument — mandate, record, patterns, calibration, evolution | **Fund** | `/v1/fund` |
@@ -51,8 +52,8 @@ instrument, not a destination.
 The full-height oxford (navy) rail is the product's identity and is constant on every
 workspace. It carries exactly five things and nothing else:
 
-1. **Identity** — wordmark, clock.
-2. **The four places** — Flow, Portfolio, Fund (keys 1–3), Dispatch (⌘K).
+1. **Identity** — wordmark (always `paper` on oxford chrome, verdigris dot), clock.
+2. **The places** — Today, Flow, Portfolio, Fund (keys 1–4), Dispatch (⌘K).
 3. **Judgment pressure** — the one number that needs the human (escalations, in
    escalation tone) or the open count when nothing does; pipeline state as a single
    word (LIVE / IDLE / OFF / ISSUE).
@@ -61,6 +62,15 @@ workspace. It carries exactly five things and nothing else:
 
 If a candidate element for the spine is not one of these five, it belongs to a
 workspace.
+
+## Today
+
+The desk — the arrival surface and the home route. It states the situation in one line
+("3 matters require your ruling · 5 new arrivals"), then briefs: what requires
+judgment, what arrived, the latest judgments, the signals moving, the instrument's
+state. It is a **briefing, not a dashboard**: lists and readouts, no stat boxes, and
+every line is a doorway into the workspace where the work happens. If it cannot change
+what the principal does next, it does not appear here.
 
 ## Flow
 
@@ -72,9 +82,9 @@ column rests on the live judgment record (Judgements) — the instrument keeps r
 while the principal scans the queue. Empty states that instruct the user ("select a
 matter to open the memo") are replaced by states that *inform* them.
 
-Deep links: `/v1?open=<id>` opens a memo (used by Dispatch results, Portfolio, and
-Fund); `/v1?queue=escalated|new` focuses a queue view (used by the spine's pressure
-readouts).
+Deep links: `/v1/flow?open=<id>` opens a memo (used by Today, Dispatch results,
+Portfolio, and Fund); `/v1/flow?queue=escalated|new` focuses a queue view (used by the
+spine's pressure readouts). Legacy `/v1?open=…` links redirect into Flow.
 
 ## Dispatch
 
