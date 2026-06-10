@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import type {
-  Startup, SignalItem, RejectionAnalytics, WatchlistAnalytics,
+  Startup, RejectionAnalytics, WatchlistAnalytics,
   ConcentrationAnalytics, MetaCycleReport, MetaPromptState, MetaEvalSet, PromptEvaluateResult, ScoutWeights, CalibrationState,
   HumanFeedbackSummary, SystemHealthSnapshot, MetaInsightsPayload,
   CalibrationChangeSummary, WeightUpdateSummary, PromptMutationSummary,
@@ -17,21 +17,25 @@ import DecisionBadge, { DECISION_BADGE_LABEL, type DecisionBadgeVariant } from '
 import { buildFundIntelligenceSnapshot } from '../lib/institutionalConviction';
 import { createDefaultFundConfiguration, type FundConfiguration } from '../lib/fundConfiguration';
 
-type Tab = 'signals' | 'analytics' | 'decisions' | 'calibration' | 'thesis' | 'meta';
+/**
+ * The five facets of the instrument, ordered by how an investor reads it:
+ * what it hunts (Mandate), what the human ruled (Record), what its decisions
+ * show (Patterns), how tightly it is tuned (Calibration), how it rewrites
+ * itself (Evolution). Signals live in Portfolio, where they act on conviction.
+ */
+type Tab = 'analytics' | 'decisions' | 'calibration' | 'thesis' | 'meta';
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'signals', label: 'Signals' },
-  { key: 'analytics', label: 'Analytics' },
-  { key: 'decisions', label: 'Resolutions' },
+  { key: 'thesis', label: 'Mandate' },
+  { key: 'decisions', label: 'Record' },
+  { key: 'analytics', label: 'Patterns' },
   { key: 'calibration', label: 'Calibration' },
-  { key: 'thesis', label: 'Thesis' },
-  { key: 'meta', label: 'Meta' },
+  { key: 'meta', label: 'Evolution' },
 ];
 
 interface SystemIntelligenceProps {
   startups: Startup[];
   onStartupClick?: (startup: Startup) => void;
   selectedStartupId?: string | null;
-  signals: SignalItem[];
   rejectionAnalytics: RejectionAnalytics;
   watchlistAnalytics: WatchlistAnalytics;
   concentrationAnalytics: ConcentrationAnalytics;
@@ -167,64 +171,6 @@ function RowWrapper({
         {children}
       </div>
     </motion.div>
-  );
-}
-
-/* ─── SIGNALS ─── */
-function SignalsTab({ signals }: { signals: SignalItem[] }) {
-  if (signals.length === 0) {
-    return (
-      <AnimatedTabBlock className="py-phi-6 px-phi-4 flex items-center justify-center">
-        <EmptyState label="Signals" body="No high-priority events detected in the last cycle." />
-      </AnimatedTabBlock>
-    );
-  }
-  return (
-    <AnimatedTabBlock className="flex flex-col relative">
-      {signals.map((sig, i) => (
-        <RowWrapper key={sig.id ?? i} index={i}>
-          <span className="font-mono type-meta text-oxford/20 group-hover:text-oxford/40 transition-colors tabular-nums pt-px">
-            {(i + 1).toString().padStart(2, '0')}
-          </span>
-
-          <div className="flex min-w-0 flex-col gap-phi-2">
-            <p className="type-note text-oxford/70 leading-relaxed max-w-2xl">
-              <span className="type-meta text-oxford/40 tracking-[0.08em]">{sig.signal_type.replace(/_/g, ' ')}</span>
-              {sig.description ? (
-                <>
-                  <span className="type-meta text-oxford/25 mx-phi-2" aria-hidden>
-                    ·
-                  </span>
-                  {sig.description}
-                </>
-              ) : null}
-            </p>
-          </div>
-
-          <div className="min-w-0 lg:text-right">
-            <p className="type-meta text-oxford/38 leading-relaxed">
-              <span className="text-oxford/45">{sig.tracker_agent_id ?? sig.source ?? 'System'}</span>
-              <span className="text-oxford/20 mx-phi-2" aria-hidden>
-                ·
-              </span>
-              <span className="font-mono tabular-nums">
-                {sig.detected_at
-                  ? `${new Date(sig.detected_at).toLocaleDateString('en-GB')} ${new Date(sig.detected_at).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' })}`
-                  : '—'}
-              </span>
-              {sig.startup_id ? (
-                <>
-                  <span className="text-oxford/20 mx-phi-2" aria-hidden>
-                    ·
-                  </span>
-                  <span className="font-mono tracking-[0.04em]">{sig.startup_id.slice(0, 8)}</span>
-                </>
-              ) : null}
-            </p>
-          </div>
-        </RowWrapper>
-      ))}
-    </AnimatedTabBlock>
   );
 }
 
@@ -1081,7 +1027,7 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
 
 /* ─── MAIN COMPONENT ─── */
 export default function SystemIntelligence(props: SystemIntelligenceProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('signals');
+  const [activeTab, setActiveTab] = useState<Tab>('thesis');
   const reduceMotion = usePrefersReducedMotion();
   const tabContentContainerVariants = useMemo(
     (): Variants | undefined => (reduceMotion ? undefined : TAB_CONTENT_CONTAINER_VARIANTS),
@@ -1119,7 +1065,6 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
           transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: tokens.motion.ease })}
           variants={tabContentContainerVariants}
         >
-          {activeTab === 'signals' && <SignalsTab signals={props.signals} />}
           {activeTab === 'analytics' && (
             <AnalyticsTab
               rejection={props.rejectionAnalytics}

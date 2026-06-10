@@ -196,7 +196,7 @@ export default function SystemBar({
         className="hidden lg:flex flex-col h-auto w-full min-h-0 bg-transparent overflow-visible"
         aria-label="System"
       >
-        {/* Nav — workspace chrome only (wordmark + pipeline + clock live in MainLayout above) */}
+        {/* Nav — workspace chrome only (wordmark + pipeline + clock live in the host rail) */}
         {workspaceChrome ? (
           <div className="flex flex-col gap-0.5 w-full shrink-0">
               <SpineNavButton

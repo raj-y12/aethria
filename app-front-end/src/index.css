@@ -81,7 +81,7 @@
    * Spacing: Fibonacci sequence — each step × φ ≈ next value.
    * Tailwind classes: p-phi-1 … p-phi-9, gap-phi-4, mt-phi-6, etc.
    * Type: body 14px → title 23px (×φ) → hero 37px (×φ²). Line-height = φ.
-   * Workspace columns: sidebar ~22% : queue ~38% : memo ~40% (see .aethria-workspace-grid).
+   * Flow columns: queue 38.2% : memo 61.8% beside the fixed spine (see .aethria-flow-grid).
    * ─────────────────────────────────────────────────────────────────────── */
   --phi: 1.618034;
   --space-1: 3px;    /* micro: icon padding, divider gap */
@@ -140,23 +140,25 @@
   }
 }
 
-/* Three-column workspace — queue-led operational layout (lg+).
+/* The spine — full-height oxford rail, constant across workspaces. */
+.aethria-spine {
+  width: clamp(204px, 15vw, 248px);
+}
+
+/* Flow workspace — queue | memo split on the golden ratio (lg+).
  * display:grid comes from Tailwind `lg:grid` on the element (utilities load after this file;
  * a display:grid rule here would lose to `flex` otherwise). */
 @media screen and (min-width: 1024px) {
-  .aethria-workspace-grid {
+  .aethria-flow-grid {
     grid-template-rows: minmax(0, 1fr);
     gap: var(--layout-col-gap);
     min-height: 0;
     overflow: hidden;
-    /* 22% / 38% / 40% — sidebar | queue | memo */
-    grid-template-columns:
-      minmax(var(--layout-sidebar-min), 22fr)
-      minmax(0, 38fr)
-      minmax(0, 40fr);
+    /* 38.2% / 61.8% — queue | memo (1/φ² : 1/φ) */
+    grid-template-columns: minmax(0, 38.2fr) minmax(0, 61.8fr);
   }
 
-  .aethria-workspace-grid > * {
+  .aethria-flow-grid > * {
     min-width: 0;
   }
 

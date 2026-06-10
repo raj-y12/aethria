@@ -4,7 +4,10 @@ import { useAuth } from '@clerk/react-router';
 import { motion } from 'framer-motion';
 import { setTokenGetter } from './api/auth';
 import { triggerAgents } from './api/agents';
-import MainLayout from './components/MainLayout';
+import AppFrame from './components/AppFrame';
+import FlowPage from './pages/FlowPage';
+import PortfolioPage from './pages/PortfolioPage';
+import FundPage from './pages/FundPage';
 import GrainOverlay from './components/GrainOverlay';
 import LoadingAnimation from './components/LoadingAnimation';
 const SettingsPage = lazy(() => import('./settings/SettingsPage'));
@@ -24,13 +27,15 @@ const ADMIN_ROOT = '/admin';
 function AppShell() {
   const { pathname } = useLocation();
   const isSettingsRoute = pathname.startsWith(SETTINGS_ROOT);
-  const [isSystemPanelOpen, setIsSystemPanelOpen] = useState(false);
+  const isFundRoute = pathname.startsWith(`${APP_ROOT}/fund`);
+  const isPortfolioRoute = pathname.startsWith(`${APP_ROOT}/portfolio`);
   const [arrivedFromLogin] = useState(() => sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY) === '1');
   const triggeredAgentsRef = useRef(false);
   const reduceMotion = usePrefersReducedMotion();
   const entryTransition = getLoginEntryTransition(reduceMotion);
   const systemData = useSystemData({
-    systemPanelOpen: !isSettingsRoute && isSystemPanelOpen,
+    // The Fund workspace surfaces meta/analytics — refresh them when it opens.
+    systemPanelOpen: !isSettingsRoute && isFundRoute,
   });
   const agentsEnabled = useAgentsEnabled();
   const { summary, showSummary, loading, dismissSummary } = useActivitySummary();
@@ -46,11 +51,6 @@ function AppShell() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [agentsEnabled]);
-
-  useEffect(() => {
-    if (!isSettingsRoute) return;
-    setIsSystemPanelOpen(false);
-  }, [isSettingsRoute]);
 
   useEffect(() => {
     if (!agentsEnabled || isSettingsRoute || triggeredAgentsRef.current) return;
@@ -87,11 +87,15 @@ function AppShell() {
           <SettingsPage />
         </Suspense>
       ) : (
-        <MainLayout
-          data={systemData}
-          startupsError={systemData.startupsError}
-          onSystemPanelOpenChange={setIsSystemPanelOpen}
-        />
+        <AppFrame data={systemData} startupsError={systemData.startupsError}>
+          {isPortfolioRoute ? (
+            <PortfolioPage data={systemData} />
+          ) : isFundRoute ? (
+            <FundPage data={systemData} />
+          ) : (
+            <FlowPage data={systemData} />
+          )}
+        </AppFrame>
       )}
     </motion.div>
   );

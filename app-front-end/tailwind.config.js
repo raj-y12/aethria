@@ -42,6 +42,8 @@ export default {
         },
         /** Escalation / human-attention only — matches tokens.color.accent. */
         escalation: '#7D2B3A',
+        /** Escalation on dark (oxford) chrome — same hue, lifted for contrast. */
+        'escalation-bright': '#C97B6A',
         /** Wordmark dot — verdigris; not for status semantics. */
         'brand-mark': '#3d6b5e',
         'brand-mark-inverse': '#7aab9a',

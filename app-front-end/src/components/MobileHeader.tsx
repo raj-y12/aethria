@@ -2,7 +2,7 @@ import { Link } from 'react-router';
 
 /**
  * Canonical mobile top bar: one height, padding, wordmark, and menu trigger.
- * Used by MainLayout and SettingsPage so nav chrome is identical.
+ * Used by AppFrame and SettingsPage so nav chrome is identical.
  */
 interface MobileHeaderProps {
   onMenuToggle: () => void;

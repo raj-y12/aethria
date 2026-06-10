@@ -1,7 +1,7 @@
 const bodyMetrics = 'font-sans text-[12px] leading-[1.48]';
 
 export const railEditorial = {
-  /** Primary wordmark — both MainLayout and SettingsPage asides (Playfair Display). Title case in markup. */
+  /** Primary wordmark — paper-surface asides (SettingsPage). Title case in markup. */
   wordmark:
     'font-wordmark font-medium text-[clamp(20px,1.75vw,26px)] leading-tight tracking-normal text-oxford',
 
