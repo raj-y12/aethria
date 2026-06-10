@@ -126,9 +126,14 @@ These extend `DESIGN_SYSTEM.md` from tokens to layout judgment:
   on oxford chrome — both reserved for states requiring a human.
 - **Whitespace must create focus.** The golden-ratio splits and Fibonacci gaps are the
   grid; if removing an element does not lose information, remove it.
+- **Verdicts are typographic.** The word carries the call. One fill in the entire
+  system: INVEST, in oxford. MONITOR and PASS read through border and ink weight;
+  annotations (reviewer split, stale, limited evidence) are plain text marks, never
+  chips. Burgundy remains reserved for states requiring a human.
 - **One selection language.** Vertical lists (spine nav, queue rows) mark the current
   item with a 2px left bar; horizontal tabs (Fund facets) with a 1px underline. Never
-  both, never a filled pill.
+  both, never a filled pill. The left bar marks selection only — it is not an alarm
+  channel.
 - **Everything addressable.** Every place has a URL and a named browser tab
   ("Flow — Aethria"); every readout that implies an action navigates to where the
   action happens.

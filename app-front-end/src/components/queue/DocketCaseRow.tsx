@@ -44,20 +44,14 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
     sortKeyValue,
   } = model;
 
-  const { isEscalated, isDecided, ageDays } = queueContext;
-  const isEscalationState =
-    isEscalated || decisionVariant === 'escalation' || attentionDriver.key === 'needs_ruling';
+  const { isDecided, ageDays } = queueContext;
 
-  /** Coloured spine: selected row (oxford) or escalation (burgundy) only. */
-  const spineVisible = isSelected || isEscalationState;
-  const spineColor = !spineVisible
-    ? 'transparent'
-    : isEscalationState
-      ? isSelected
-        ? '#7D2B3A'
-        : 'rgba(125, 43, 58, 0.38)'
-      : '#001433';
-  const spineWidth = spineVisible ? (isSelected ? 3 : 2) : 0;
+  /* Left bar = selection only (the product-wide selection mark). Escalation is
+     carried by the burgundy "Needs ruling" verdict text — with most of a busy
+     queue escalated, per-row bars read as a wall of alarms, not a signal. */
+  const spineVisible = isSelected;
+  const spineColor = spineVisible ? '#001433' : 'transparent';
+  const spineWidth = spineVisible ? 3 : 0;
 
   const layoutTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_LAYOUT_TRANSITION;
   const selectTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_SELECT_TRANSITION;

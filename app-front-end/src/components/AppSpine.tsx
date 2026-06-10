@@ -102,16 +102,16 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
       >
         <div className="flex min-h-0 flex-col gap-phi-4">
           {/* ── Identity ─────────────────────────────────────────── */}
-          <div className="flex items-baseline justify-between gap-phi-3 px-2">
+          <div className="px-2">
             <Link
               to="/v1"
               className="font-wordmark text-[clamp(19px,1.5vw,24px)] font-medium leading-tight text-paper btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
             >
               Aethria<span className="wordmark-dot wordmark-dot--inverse">.</span>
             </Link>
-            <span className="font-mono text-[10px] tabular-nums tracking-[0.08em] text-white/35" aria-hidden>
+            <p className="mt-phi-2 font-mono text-[10px] tabular-nums tracking-[0.08em] text-white/35" aria-hidden>
               {timeShort} · {dateShort}
-            </span>
+            </p>
           </div>
 
           {/* ── Workspaces ───────────────────────────────────────── */}

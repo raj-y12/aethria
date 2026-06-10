@@ -1,4 +1,4 @@
-import { QUEUE_ANNOTATION_CLASS, VERDICT_CHIP_CLASS } from '../../design-system/verdictBadgeTokens';
+import { QUEUE_ANNOTATION_CLASS } from '../../design-system/verdictBadgeTokens';
 import {
   attentionBadgeVariant,
   attentionDriverBadgeLabel,
@@ -19,9 +19,10 @@ export default function QueueAttentionBadge({
   if (!label) return null;
 
   const variant = attentionBadgeVariant(driver);
+  // Plain text mark, not a filled chip — annotations stay quieter than the verdict.
   return (
     <span
-      className={`${VERDICT_CHIP_CLASS} min-w-0 ${QUEUE_ANNOTATION_CLASS[variant]}`}
+      className={`whitespace-nowrap font-mono text-[9px] font-semibold uppercase tracking-[0.1em] ${QUEUE_ANNOTATION_CLASS[variant]}`}
       aria-label={label}
     >
       {label}

@@ -194,7 +194,7 @@ export default function DecisionQueueHeader({
                 count={
                   key === 'ALL'
                     ? viewCounts.ALL
-                    : key === 'NEW'
+                    : key === 'NEW' && viewCounts.NEW > 0
                       ? viewCounts.NEW
                       : undefined
                 }

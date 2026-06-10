@@ -10,16 +10,15 @@ import {
   type FundThesisSummary,
 } from '../api/fundThesis';
 import { railEditorial } from '../design-system/railEditorial';
-import { DECISION_BADGE_CLASS, REVIEWER_BADGE_CLASS, VERDICT_CHIP_CLASS } from '../design-system/verdictBadgeTokens';
+import DecisionBadge from '../components/DecisionBadge';
 import { useFundConfiguration } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
-import { applyDecisionThresholds, DEFAULT_DECISION_BOUNDARIES, validateDecisionThresholds } from '../lib/decisionThresholds';
+import { validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
   CANONICAL_DIMENSIONS,
   CANONICAL_DIMENSION_KEYS,
   DIMENSION_SCORE_BANDS,
   UNIVERSAL_SCORE_BANDS,
-  DEFAULT_VERDICT_BADGES,
   applyThesisVersionMetadata,
   buildFundConfigThesisPayload,
   clearFundConfiguration,
@@ -55,7 +54,6 @@ const sections: Array<{ id: SectionId; label: string; short: string }> = [
   { id: 'mandate', label: 'Fund Mandate', short: 'Mandate' },
   { id: 'budget', label: 'Operations', short: 'Ops' },
   { id: 'weights', label: 'Scoring Weights', short: 'Weights' },
-  { id: 'bands', label: 'Verdict Badges', short: 'Badges' },
   { id: 'thresholds', label: 'Decision Thresholds', short: 'Thresholds' },
   { id: 'risk', label: 'Adverse / Risk', short: 'Risk' },
   { id: 'memo', label: 'Memo Output', short: 'Memo' },
@@ -154,7 +152,11 @@ function SettingsSidebarFooter({
           type="button"
           onClick={onSave}
           disabled={saving || !unsaved}
-          className="w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
+          className={
+            unsaved && !saving
+              ? 'w-full btn-aethria-solid'
+              : 'inline-flex h-[36px] w-full cursor-not-allowed items-center justify-center rounded-none border border-oxford/[0.15] bg-transparent font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/35'
+          }
         >
           {saving ? 'Saving…' : 'Save changes'}
         </button>
@@ -211,21 +213,6 @@ function TextField({
       />
       {hint && <p className={metaCls}>{hint}</p>}
     </div>
-  );
-}
-
-function BadgeSwatch({ label, backgroundColor }: { label: string; backgroundColor: string }) {
-  const semanticClass =
-    DECISION_BADGE_CLASS[label as keyof typeof DECISION_BADGE_CLASS] ??
-    REVIEWER_BADGE_CLASS[label as keyof typeof REVIEWER_BADGE_CLASS] ??
-    '';
-  return (
-    <span
-      className={`${VERDICT_CHIP_CLASS} ${semanticClass}`}
-      style={{ backgroundColor }}
-    >
-      {label}
-    </span>
   );
 }
 
@@ -318,7 +305,11 @@ function ChipGroup({
               type="button"
               aria-pressed={active}
               onClick={() => toggle(option)}
-              className={`type-meta inline-flex min-h-[36px] items-center justify-center rounded-none px-[40px] transition-colors ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] text-oxford/58 hover:bg-oxford/[0.075]'}`}
+              className={`type-meta inline-flex min-h-[30px] items-center justify-center rounded-none border px-phi-4 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+                active
+                  ? 'border-oxford bg-oxford/[0.04] font-semibold text-oxford'
+                  : 'border-oxford/[0.14] bg-transparent text-oxford/50 hover:border-oxford/35 hover:text-oxford/75'
+              }`}
             >
               {option}
             </button>
@@ -364,7 +355,7 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
             <p className="type-meta text-oxford/35">Mandate</p>
             <p className="mt-phi-2 type-body-emphasis text-oxford">{config.mandate.fundName || 'Unnamed fund'}</p>
             <p className="mt-phi-1 type-body-sm text-oxford/52">
-              {[...config.mandate.preferredStages, ...config.mandate.geographies].filter(Boolean).join(' / ') || 'No mandate scope set'}
+              {[...config.mandate.preferredStages, ...config.mandate.geographies].filter(Boolean).join(' · ') || 'No mandate scope set'}
             </p>
           </div>
           <div className="border-t border-oxford/[0.06] pt-phi-4">
@@ -372,10 +363,10 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
             <p className={`mt-phi-2 font-mono text-[1.65rem] tabular-nums ${weightTotal === 100 ? 'text-oxford' : 'text-escalation/75'}`}>{weightTotal}%</p>
           </div>
           <div className="border-t border-oxford/[0.06] pt-phi-4">
-            <p className="type-meta text-oxford/35">Verdict badges</p>
+            <p className="type-meta text-oxford/35">Verdict marks</p>
             <div className="mt-phi-3 flex flex-wrap gap-phi-2">
-              {config.verdictBadges.map((item) => (
-                <BadgeSwatch key={item.id} label={item.id} backgroundColor={item.backgroundColor} />
+              {(['INVEST', 'MONITOR', 'PASS'] as const).map((id) => (
+                <DecisionBadge key={id} variant={id} />
               ))}
             </div>
           </div>
@@ -402,7 +393,8 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
             <p className="type-meta text-oxford/35">Sample outcome</p>
             <p className="mt-phi-2 type-body-emphasis text-oxford">Verdict display settings</p>
             <p className="mt-phi-1 type-body-sm text-oxford/55">
-              Percentage bands shape configured score language in the app; badge colours shape the visible chips.
+              Percentage bands shape configured score language in the app. Verdict marks are
+              typographic — INVEST is the only filled chip.
             </p>
           </div>
         </div>
@@ -498,10 +490,6 @@ export default function SettingsPage() {
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
   const thresholdValidation = useMemo(() => validateDecisionThresholds(draft), [draft]);
-  const scoreBandByVerdict = useMemo(
-    () => new Map(draft.scoreBands.map((band) => [band.label.toUpperCase(), band])),
-    [draft.scoreBands]
-  );
   const unsaved = serializeConfig(draft) !== savedSnapshot || serializeOperations(settings) !== savedOperationsSnapshot;
   const policyUnpublished = !!policyPreviewHash && policyPreviewHash !== draft.publishedPolicyHash;
   const thesisPublishDisabledReason = agentsStatus == null
@@ -681,9 +669,9 @@ export default function SettingsPage() {
       <main className="flex min-h-0 flex-1 overflow-hidden bg-paper">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper lg:flex-row lg:gap-[var(--layout-col-gap)]">
-            <aside className="aethria-workspace-sidebar paper-dot-grid hidden h-full min-h-0 max-h-full w-[18rem] shrink-0 flex-col overflow-hidden lg:flex">
+            <aside className="aethria-workspace-sidebar hidden h-full min-h-0 max-h-full w-[18rem] shrink-0 flex-col overflow-hidden lg:flex">
               <div
-                className="paper-dot-grid flex h-full min-h-0 flex-col justify-between overflow-hidden px-phi-4"
+                className="flex h-full min-h-0 flex-col justify-between overflow-hidden px-phi-4"
                 style={RAIL_CLAMP_PAD}
               >
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -865,69 +853,13 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="bands" title="Verdict Badges" kicker="Badge colours for grid chips. Score ranges come from Decision Thresholds.">
-                  <div className="flex flex-col gap-phi-4">
-                    {!bandValidation.valid && (
-                      <div className="border border-escalation/25 bg-escalation/[0.035] px-phi-4 py-phi-3">
-                        {bandValidation.errors.map((error) => <p key={error} className="type-body-sm text-escalation/75">{error}</p>)}
-                      </div>
-                    )}
-                    <div className="border-b border-oxford/[0.055] pb-phi-4">
-                      <p className="type-body-sm leading-relaxed text-oxford/52">
-                        Colours apply to INVEST, MONITOR, and PASS chips. Percentage ranges sync from{' '}
-                        <a href="#thresholds" className="text-oxford/72 underline underline-offset-2 hover:text-oxford">Decision Thresholds</a>.
-                      </p>
-                    </div>
-                    <div className="border-b border-oxford/[0.055]">
-                      <div className="hidden border-b border-oxford/[0.055] pb-phi-2 sm:grid sm:grid-cols-[minmax(130px,1fr)_160px_180px] sm:gap-phi-4">
-                        <p className={labelCls}>Name</p>
-                        <p className={labelCls}>Colour</p>
-                        <p className={labelCls}>Percentages</p>
-                      </div>
-                      {draft.verdictBadges.map((badge) => (
-                        <div key={badge.id} className="grid gap-phi-3 border-b border-oxford/[0.055] py-phi-4 last:border-0 sm:grid-cols-[minmax(130px,1fr)_160px_180px] sm:items-center sm:gap-phi-4">
-                          <div>
-                            <p className="type-body-emphasis text-oxford">{badge.label}</p>
-                            <p className="mt-phi-1 type-meta text-oxford/38">{badge.id}</p>
-                          </div>
-                          <label htmlFor={`${badge.id}-colour`} className="flex min-w-0 cursor-pointer items-center gap-phi-2">
-                            <input
-                              id={`${badge.id}-colour`}
-                              type="color"
-                              value={badge.backgroundColor}
-                              onChange={(event) => updateDraft((current) => ({
-                                ...current,
-                                verdictBadges: current.verdictBadges.map((item) => item.id === badge.id ? { ...item, backgroundColor: event.target.value } : item),
-                              }))}
-                              className="h-8 w-8 shrink-0 cursor-pointer rounded-none border border-oxford/[0.10] bg-transparent p-0.5"
-                              aria-label={`${badge.label} badge colour`}
-                            />
-                            <BadgeSwatch label={badge.id} backgroundColor={badge.backgroundColor} />
-                          </label>
-                          {scoreBandByVerdict.get(badge.id) ? (
-                            <p className="font-mono text-sm tabular-nums text-oxford/55">
-                              {scoreBandByVerdict.get(badge.id)?.min}–{scoreBandByVerdict.get(badge.id)?.max}%
-                            </p>
-                          ) : (
-                            <p className="type-meta text-oxford/36">Reviewer badge</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-phi-4">
-                      <button
-                        type="button"
-                        onClick={() => updateDraft((current) => applyDecisionThresholds(current, DEFAULT_DECISION_BOUNDARIES))}
-                        className={actionBtnCls}
-                      >
-                        Restore default cutoffs
-                      </button>
-                      <button type="button" onClick={() => updateDraft((current) => ({ ...current, verdictBadges: DEFAULT_VERDICT_BADGES }))} className={actionBtnCls}>
-                        Restore default badge colours
-                      </button>
-                    </div>
+                {/* Verdict chips are typographic (one fill: INVEST) — the badge
+                    colour-picker section was retired with colour-coded chips. */}
+                {!bandValidation.valid && (
+                  <div className="mb-phi-5 border border-escalation/25 bg-escalation/[0.035] px-phi-4 py-phi-3">
+                    {bandValidation.errors.map((error) => <p key={error} className="type-body-sm text-escalation/75">{error}</p>)}
                   </div>
-                </SettingsSection>
+                )}
 
                 <SettingsSection id="thresholds" title="Decision Thresholds" kicker="Pass, Monitor, and Invest cutoffs — synced with Partner scoring and badge ranges.">
                   <DecisionThresholdsPanel draft={draft} updateDraft={updateDraft} updateThreshold={updateThreshold} />

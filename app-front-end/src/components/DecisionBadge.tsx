@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import { DECISION_LABELS } from '../design-system/semantics';
 import { DECISION_BADGE_CLASS, VERDICT_CHIP_CLASS } from '../design-system/verdictBadgeTokens';
 import type { DecisionBadgeVariant } from '../lib/decisionBadgeVariant';
@@ -8,7 +7,8 @@ export type { DecisionBadgeVariant };
 
 /**
  * Compact decision badge — same chip as memo precedent verdicts.
- * INVEST / PASS / MONITOR use semantic fill colors; pipeline states stay neutral.
+ * Monochrome by rule: INVEST is the system's only filled chip; everything
+ * else reads through ink and border weight (see verdictBadgeTokens).
  */
 export const DECISION_BADGE_LABEL: Record<DecisionBadgeVariant, string> = {
   INVEST: (DECISION_LABELS.INVEST ?? 'Invest').toUpperCase(),
@@ -19,24 +19,15 @@ export const DECISION_BADGE_LABEL: Record<DecisionBadgeVariant, string> = {
   escalation: 'ESCALATION',
 };
 
-function badgeBackground(
-  variant: DecisionBadgeVariant,
-  badges?: VerdictBadgeConfig[],
-): CSSProperties | undefined {
-  if (variant !== 'INVEST' && variant !== 'MONITOR' && variant !== 'PASS') return undefined;
-  const backgroundColor = badges?.find((badge) => badge.id === variant)?.backgroundColor;
-  if (!backgroundColor) return undefined;
-  return { backgroundColor };
-}
-
 export default function DecisionBadge({
   variant,
-  badges,
+  badges: _badges,
   label,
   prominent: _prominent = false,
   queue: _queue = false,
 }: {
   variant: DecisionBadgeVariant;
+  /** @deprecated Colour-coded chips were retired — verdicts are typographic. */
   badges?: VerdictBadgeConfig[];
   /** Optional override for badge copy (e.g. specific escalation driver). */
   label?: string;
@@ -46,14 +37,9 @@ export default function DecisionBadge({
   queue?: boolean;
 }) {
   const text = label ?? DECISION_BADGE_LABEL[variant];
-  const style = badgeBackground(variant, badges);
 
   return (
-    <span
-      className={`${VERDICT_CHIP_CLASS} ${DECISION_BADGE_CLASS[variant]}`}
-      style={style}
-      aria-label={text}
-    >
+    <span className={`${VERDICT_CHIP_CLASS} ${DECISION_BADGE_CLASS[variant]}`} aria-label={text}>
       {text}
     </span>
   );

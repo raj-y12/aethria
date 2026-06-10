@@ -42,7 +42,7 @@ export default function SignalEventRow({
   }
 
   return (
-    <div className={`flex flex-col gap-phi-2 py-phi-5 ${borderCls} ${className}`.trim()}>
+    <div className={`flex flex-col gap-phi-1 py-phi-4 ${borderCls} ${className}`.trim()}>
       <div className="flex items-baseline gap-phi-2 flex-wrap">
         <span className={tsCls}>{timestamp}</span>
         {label != null && label !== '' && (
