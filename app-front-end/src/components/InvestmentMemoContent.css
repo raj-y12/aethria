@@ -4045,6 +4045,19 @@
   color: rgba(var(--color-oxford-rgb), 0.78);
 }
 
+/* Cover company name — shares --case-title-* with the selected queue row so the
+   name reads at the same scale on both sides of the queue → memo handoff. */
+.memoCoverCompany {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-weight: 600;
+  font-size: var(--case-title-size, clamp(25px, 2.45vw, 34px));
+  line-height: var(--case-title-leading, 1.08);
+  letter-spacing: var(--case-title-tracking, -0.02em);
+  color: var(--color-oxford);
+  overflow-wrap: anywhere;
+}
+
 .memoCoverRuling {
   margin-top: clamp(30px, 4vw, 48px);
   padding-top: clamp(22px, 3vw, 34px);

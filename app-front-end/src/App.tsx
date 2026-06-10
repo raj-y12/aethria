@@ -13,10 +13,8 @@ import GrainOverlay from './components/GrainOverlay';
 import LoadingAnimation from './components/LoadingAnimation';
 const SettingsPage = lazy(() => import('./settings/SettingsPage'));
 const AdminDashboardPage = lazy(() => import('./admin/AdminDashboardPage'));
-import WhileYouWereAway from './components/WhileYouWereAway';
 import { useSystemData } from './hooks/useSystemData';
 import { useAgentsEnabled } from './hooks/useAgentsEnabled';
-import { useActivitySummary } from './hooks/useActivitySummary';
 import { usePrefersReducedMotion } from './hooks';
 import LoginPage from './components/LoginPage';
 import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from './lib/loginEntryTransition';
@@ -40,7 +38,12 @@ function AppShell() {
     systemPanelOpen: !isSettingsRoute && isFundRoute,
   });
   const agentsEnabled = useAgentsEnabled();
-  const { summary, showSummary, loading, dismissSummary } = useActivitySummary();
+
+  // The login-entry handoff key is consumed here (captured into state above);
+  // clearing it after mount keeps later AppShell remounts from re-animating.
+  useEffect(() => {
+    sessionStorage.removeItem(LOGIN_ENTRY_SESSION_KEY);
+  }, []);
 
   // Warn the user before closing the tab if agents are actively running.
   useEffect(() => {
@@ -62,14 +65,6 @@ function AppShell() {
     });
   }, [agentsEnabled, isSettingsRoute]);
 
-  if (loading && !arrivedFromLogin) {
-    return <LoadingAnimation />;
-  }
-
-  if (showSummary && summary) {
-    return <WhileYouWereAway summary={summary} onDismiss={dismissSummary} />;
-  }
-
   return (
     <motion.div
       className="min-h-[100dvh]"
@@ -84,23 +79,21 @@ function AppShell() {
       transition={{ duration: entryTransition.appRevealMs / 1000, ease: [0.16, 1, 0.3, 1] }}
     >
       <GrainOverlay opacity={0.028} />
-      {isSettingsRoute ? (
-        <Suspense fallback={<LoadingAnimation />}>
-          <SettingsPage />
-        </Suspense>
-      ) : (
-        <AppFrame data={systemData} startupsError={systemData.startupsError}>
-          {isPortfolioRoute ? (
-            <PortfolioPage data={systemData} />
-          ) : isFundRoute ? (
-            <FundPage data={systemData} />
-          ) : isFlowRoute ? (
-            <FlowPage data={systemData} />
-          ) : (
-            <TodayPage data={systemData} />
-          )}
-        </AppFrame>
-      )}
+      <AppFrame data={systemData} startupsError={systemData.startupsError}>
+        {isSettingsRoute ? (
+          <Suspense fallback={<LoadingAnimation />}>
+            <SettingsPage />
+          </Suspense>
+        ) : isPortfolioRoute ? (
+          <PortfolioPage data={systemData} />
+        ) : isFundRoute ? (
+          <FundPage data={systemData} />
+        ) : isFlowRoute ? (
+          <FlowPage data={systemData} />
+        ) : (
+          <TodayPage data={systemData} />
+        )}
+      </AppFrame>
     </motion.div>
   );
 }

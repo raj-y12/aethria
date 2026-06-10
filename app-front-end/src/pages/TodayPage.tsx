@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import DecisionBadge from '../components/DecisionBadge';
 import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 import { isDealHumanResolved, isDealUnresolved } from '../lib/dealState';
+import { useSinceAwaySummary } from '../hooks/useActivitySummary';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup, SignalItem } from '../types/startup';
 
@@ -91,6 +92,7 @@ export default function TodayPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { startups, signals, metaReports } = data;
+  const sinceAway = useSinceAwaySummary();
 
   // Legacy deep links (/v1?open=…, /v1?queue=…) now belong to Flow.
   useEffect(() => {
@@ -163,6 +165,24 @@ export default function TodayPage({ data }: { data: SystemData }) {
           <p className="type-label-section text-oxford/45">The desk</p>
           <h1 className="mt-phi-2 type-title font-medium text-oxford">{dateLine}</h1>
           <p className="mt-phi-2 type-body-sm text-oxford/55">{situation}</p>
+          {sinceAway ? (
+            <p className="mt-phi-3 font-mono text-[11px] tracking-[0.04em] tabular-nums text-oxford/45">
+              <span className="uppercase tracking-[0.1em] text-oxford/38">Since you were away</span>
+              <span className="mx-phi-2 text-oxford/20" aria-hidden>·</span>
+              <span className="font-semibold text-oxford/70">{sinceAway.found}</span> discovered
+              <span className="mx-phi-2 text-oxford/20" aria-hidden>·</span>
+              <span className="font-semibold text-oxford/70">{sinceAway.reviewed}</span> evaluated
+              <span className="mx-phi-2 text-oxford/20" aria-hidden>·</span>
+              <span className="font-semibold text-oxford/70">{sinceAway.agent_decided ?? sinceAway.decided}</span> decided
+              {sinceAway.escalations > 0 ? (
+                <>
+                  <span className="mx-phi-2 text-oxford/20" aria-hidden>·</span>
+                  <span className="font-semibold text-escalation">{sinceAway.escalations}</span>
+                  <span className="text-escalation/80"> escalated</span>
+                </>
+              ) : null}
+            </p>
+          ) : null}
         </header>
 
         <div className="grid grid-cols-1 gap-x-phi-7 gap-y-phi-6 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">

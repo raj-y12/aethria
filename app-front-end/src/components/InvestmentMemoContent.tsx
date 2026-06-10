@@ -1007,7 +1007,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 {headerLocation ? (
                   <p className="memoMeta memoCoverLocation">{renderWithMonoNumbers(headerLocation)}</p>
                 ) : null}
-                <h1 className="type-title font-semibold text-oxford-ink-emphasis m-0" id="memo-title">
+                <h1 className="memoCoverCompany" id="memo-title">
                   {companyName || '—'}
                 </h1>
                 {headerMeta ? <p className="memoMeta">{renderWithMonoNumbers(headerMeta)}</p> : null}

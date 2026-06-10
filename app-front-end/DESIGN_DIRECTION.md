@@ -32,6 +32,9 @@ one place to each state; nothing else earns top-level presence.
 | Steering the instrument — mandate, record, patterns, calibration, evolution | **Fund** | `/v1/fund` |
 | Configuring — thresholds, identity, operations | Settings | `/v1/settings` |
 
+Settings renders inside the same frame as the workspaces — the spine never leaves.
+There is exactly one full-screen surface in the product: the Dispatch takeover.
+
 What this replaced: a single mega-workspace whose modes (Workspace / Judgements /
 System) swapped panels in place, plus a six-tab "Intelligence" panel. **Intelligence is
 not a place** — it was a bucket of leftovers. Its surfaces were redistributed by what
@@ -71,6 +74,10 @@ judgment, what arrived, the latest judgments, the signals moving, the instrument
 state. It is a **briefing, not a dashboard**: lists and readouts, no stat boxes, and
 every line is a doorway into the workspace where the work happens. If it cannot change
 what the principal does next, it does not appear here.
+
+Today also absorbed the "While you were away" interstitial: what the agents did since
+the last visit is one quiet line in the briefing header, not a full-screen gate the
+principal must dismiss before reaching their desk.
 
 ## Flow
 

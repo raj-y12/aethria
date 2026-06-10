@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { useClerk } from '@clerk/react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import MobileHeader from '../components/MobileHeader';
 import LoadingAnimation from '../components/LoadingAnimation';
-import AgentLogoutModal from '../components/AgentLogoutModal';
 import { SpineNavButton } from '../components/SystemBar';
 import { fetchSettings, patchSettings, previewPolicy, publishPolicy, type Settings } from '../api/settings';
-import { fetchAgentsStatus, toggleAgents, type AgentsStatus } from '../api/agents';
+import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
 import {
   fetchFundThesisSummary,
   postFundThesisVersion,
@@ -15,7 +11,7 @@ import {
 } from '../api/fundThesis';
 import { railEditorial } from '../design-system/railEditorial';
 import { DECISION_BADGE_CLASS, REVIEWER_BADGE_CLASS, VERDICT_CHIP_CLASS } from '../design-system/verdictBadgeTokens';
-import { useAgentsEnabled, useFundConfiguration, useMediaQuery } from '../hooks';
+import { useFundConfiguration } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
 import { applyDecisionThresholds, DEFAULT_DECISION_BOUNDARIES, validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
@@ -82,18 +78,6 @@ const solidBtnCls =
   'type-label-section inline-flex min-h-[36px] items-center justify-center rounded-none bg-oxford px-phi-4 text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
 
 const RAIL_CLAMP_PAD = { paddingTop: 'clamp(5px, 0.6vw, 8px)', paddingBottom: 'clamp(5px, 0.6vw, 8px)' } as const;
-
-function WorkspaceExitButton({ className = 'w-full' }: { className?: string }) {
-  return (
-    <Link
-      to="/v1"
-      className={`btn-aethria-solid ${className}`}
-      aria-label="Return to conviction workspace"
-    >
-      Workspace
-    </Link>
-  );
-}
 
 function serializeConfig(config: FundConfiguration): string {
   const rest = { ...config } as Record<string, unknown>;
@@ -428,11 +412,7 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
 }
 
 export default function SettingsPage() {
-  const navigate = useNavigate();
-  const { signOut } = useClerk();
   const queryClient = useQueryClient();
-  const isDesktop = useMediaQuery('(min-width: 1024px)');
-  const agentsEnabled = useAgentsEnabled();
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -441,8 +421,6 @@ export default function SettingsPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [activeSection, setActiveSection] = useState<SectionId>('mandate');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [thesisBusy, setThesisBusy] = useState(false);
@@ -683,22 +661,11 @@ export default function SettingsPage() {
     }
   };
 
-  const doLogout = () => {
-    localStorage.removeItem('aethria_last_activity');
-    sessionStorage.removeItem('auth');
-    sessionStorage.removeItem('authUser');
-    signOut?.().then(() => navigate('/sign-in', { replace: true }));
-  };
-
-  const handleTurnOffAndLogout = async () => { await toggleAgents(false); doLogout(); };
-  const handleTurnOnAndLogout = async () => { await toggleAgents(true); doLogout(); };
-  const displayName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('authUser') : null;
-
   if (loading) return <LoadingAnimation />;
 
   if (!settings) {
     return (
-      <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
+      <div className="flex h-full flex-col overflow-hidden bg-paper">
         <main className="flex min-h-0 flex-1 items-center justify-center">
           <div>
             <p className={sectionLabelCls}>Settings unavailable</p>
@@ -709,32 +676,9 @@ export default function SettingsPage() {
     );
   }
 
-  const mobileMenu = mobileMenuOpen ? (
-    <section className="border-b border-hairline bg-oxford px-phi-4 py-phi-3" aria-label="Menu">
-      <div className="flex flex-col items-start gap-phi-3">
-        <Link to="/v1" className="type-label-section text-white/70" onClick={() => setMobileMenuOpen(false)}>Overview</Link>
-        {displayName && <span className="type-label-section text-white/55">{displayName}</span>}
-        <button type="button" onClick={() => setShowLogoutModal(true)} className="type-label-section text-white/55">Log out</button>
-      </div>
-    </section>
-  ) : null;
-
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper text-oxford">
-      {!isDesktop && (
-        <>
-          <MobileHeader onMenuToggle={() => setMobileMenuOpen((open) => !open)} />
-          {mobileMenu}
-        </>
-      )}
-
+    <div className="flex h-full flex-col overflow-hidden bg-paper text-oxford">
       <main className="flex min-h-0 flex-1 overflow-hidden bg-paper">
-        <div
-          className="w-4 shrink-0 self-stretch origin-top sm:w-7 md:w-10"
-          style={{ backgroundColor: 'var(--color-oxford)' }}
-          aria-hidden
-        />
-
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper lg:flex-row lg:gap-[var(--layout-col-gap)]">
             <aside className="aethria-workspace-sidebar paper-dot-grid hidden h-full min-h-0 max-h-full w-[18rem] shrink-0 flex-col overflow-hidden lg:flex">
@@ -743,28 +687,18 @@ export default function SettingsPage() {
                 style={RAIL_CLAMP_PAD}
               >
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                  <div className="min-w-0 shrink-0">
-                    <Link
-                      to="/v1"
-                      className={`${railEditorial.wordmark} inline-block hover:opacity-80 transition-opacity btn-interaction`}
-                      aria-label="Aethria — return to workspace"
-                    >
-                      Aethria<span className="wordmark-dot">.</span>
-                    </Link>
-                  </div>
-                  <div className="aethria-rail-nav-bleed mt-phi-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                  <div className="aethria-rail-nav-bleed flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                     <p className={`${railEditorial.label} shrink-0 px-phi-4`}>Fund configuration</p>
                     <nav
                       className="mt-phi-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto"
                       aria-label="Settings sections"
                     >
-                    {sections.map((section, index) => (
+                    {sections.map((section) => (
                       <SpineNavButton
                         key={section.id}
                         label={section.label}
                         active={activeSection === section.id}
                         ariaPressed={activeSection === section.id}
-                        shortcut={String(index + 1)}
                         compact
                         surface="paper"
                         onClick={() => {
@@ -791,7 +725,6 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between border-b border-oxford/[0.08] px-phi-5 py-phi-4 lg:hidden">
             <div className="flex min-w-0 flex-col gap-phi-2">
               <p className={sectionLabelCls}>Fund Configuration</p>
-              <WorkspaceExitButton className="w-fit" />
               {unsaved ? (
                 <p className="type-meta text-oxford/45">Unsaved changes</p>
               ) : null}
@@ -810,17 +743,7 @@ export default function SettingsPage() {
             <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]">
               <div className="min-w-0 px-phi-5 py-phi-6 lg:px-phi-7">
                 <header className="mb-phi-7 max-w-[54rem]">
-                  <div className="hidden items-center justify-between gap-phi-3 lg:flex">
-                    <p className="type-label-section text-oxford/45">{draft.versionLabel}</p>
-                    <Link
-                      to="/v1"
-                      className="type-meta inline-flex items-center gap-phi-1 text-oxford/45 transition-colors hover:text-oxford btn-interaction"
-                      aria-label="Return to conviction workspace"
-                    >
-                      <span aria-hidden="true">←</span> Workspace
-                    </Link>
-                  </div>
-                  <p className="type-label-section text-oxford/45 lg:hidden">{draft.versionLabel}</p>
+                  <p className="type-label-section text-oxford/45">{draft.versionLabel}</p>
                   <h1 className="mt-phi-3 font-display text-[2.2rem] font-medium leading-[0.98] tracking-0 text-oxford sm:text-[3rem]">
                     How this fund thinks
                   </h1>
@@ -1120,15 +1043,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </main>
-
-      <AgentLogoutModal
-        open={showLogoutModal}
-        agentsEnabled={agentsEnabled}
-        onCancel={() => setShowLogoutModal(false)}
-        onKeepRunning={() => { setShowLogoutModal(false); doLogout(); }}
-        onTurnOffAndLogout={handleTurnOffAndLogout}
-        onTurnOnAndLogout={handleTurnOnAndLogout}
-      />
     </div>
   );
 }

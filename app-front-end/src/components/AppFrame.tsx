@@ -13,8 +13,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LookupResultSnapshot } from '@aethria/product-chrome';
 import AppSpine, { SPINE_WORKSPACES, type SpineMandate, type SpineTelemetry } from './AppSpine';
 import MobileHeader from './MobileHeader';
+import AgentLogoutModal from './AgentLogoutModal';
 import DispatchCommandBar from './DispatchCommandBar';
 import LookupReadyToast from './LookupReadyToast';
+import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import { tokens } from '../design-system/tokens';
 import { transitionOrReduced } from '../design-system/motion';
 import {
@@ -77,6 +79,12 @@ export default function AppFrame({ data, startupsError, children }: AppFrameProp
   const reduceMotion = usePrefersReducedMotion();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pageOverlayOpen, setPageOverlayOpen] = useState(false);
+  // Mobile log out — desktop logs out from the spine's operator block.
+  const {
+    requestLogout: requestMobileLogout,
+    agentActionPending: mobileLogoutPending,
+    logoutModalProps: mobileLogoutModalProps,
+  } = useAgentLogoutFlow();
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
   const { startups, liveGate } = data;
 
@@ -314,10 +322,22 @@ export default function AppFrame({ data, startupsError, children }: AppFrameProp
                     >
                       Settings
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        requestMobileLogout();
+                      }}
+                      disabled={mobileLogoutPending}
+                      className="type-label-tab flex min-h-[44px] items-center border-t border-white/[0.07] px-1 text-white/60 hover:text-white disabled:opacity-50 btn-interaction"
+                    >
+                      {mobileLogoutPending ? 'Updating...' : 'Log out'}
+                    </button>
                   </div>
                 </motion.nav>
               )}
             </AnimatePresence>
+            <AgentLogoutModal {...mobileLogoutModalProps} />
           </>
         )}
 
