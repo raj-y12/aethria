@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { tokens } from '../../design-system/tokens';
-import { productInteraction, productText } from '../../design-system/productSystem';
+import { productInteraction, productPanel, productText } from '../../design-system/productSystem';
 import type { FundConfiguration } from '../../lib/fundConfiguration';
 
 export type QueueView = 'ALL' | 'PRIORITY' | 'NEW' | 'STALE' | 'ESCALATED';
@@ -175,7 +175,9 @@ export default function DecisionQueueHeader({
   reduceMotion,
 }: DecisionQueueHeaderProps) {
   return (
-    <header className="sticky top-0 z-20 bg-paper px-phi-3 py-phi-2 uppercase tracking-[0.06em]">
+    <header
+      className={`sticky top-0 z-20 ${productPanel.header} !px-phi-0`}
+    >
       <div className="flex min-w-0 flex-col gap-phi-2">
         <div className="min-w-0 flex flex-col gap-phi-1">
           <p className={productText.mutedLabel}>Decision queue</p>

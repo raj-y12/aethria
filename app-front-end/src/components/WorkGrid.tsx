@@ -415,8 +415,8 @@ const WorkGrid = ({
 
       <LayoutGroup id="decision-queue">
         {orderedModels.length === 0 ? (
-          <div className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1">
-            <div className="min-h-[16rem] px-phi-4 py-phi-5">
+          <div className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1 pb-phi-6">
+            <div className="min-h-[16rem] py-phi-5">
               <motion.div
                 key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
                 className="max-w-[32rem]"
@@ -481,7 +481,7 @@ const WorkGrid = ({
         ) : (
           <motion.div
             key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
-            className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1"
+            className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1 pb-phi-6"
             initial={reduceMotion ? false : 'hidden'}
             animate="visible"
             variants={listContainerVariants}

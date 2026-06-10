@@ -92,7 +92,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
         paddingTop: isSelected ? selectedPadding : ambientPadding,
         paddingBottom: isSelected ? selectedPadding : ambientPadding,
       }}
-      className={`group relative w-full min-w-0 cursor-pointer px-phi-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
+      className={`group relative w-full min-w-0 cursor-pointer px-phi-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
         isSelected ? 'bg-paperDeep/35' : ''
       }`}
     >

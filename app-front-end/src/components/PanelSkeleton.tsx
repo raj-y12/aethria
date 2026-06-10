@@ -19,7 +19,7 @@ function SkeletonBlock({ className = '' }: { className?: string }) {
 
 export function WorkGridSkeleton() {
   return (
-    <div className="w-full space-y-4 px-0 pt-3 pb-8 lg:pb-9">
+    <div className="w-full space-y-4 px-phi-0 pt-phi-3 pb-phi-8 lg:pb-phi-9">
       {[1, 2, 3, 4].map((i) => (
         <div key={i} className="flex gap-5 border border-hairline bg-paper p-5">
           <SkeletonBlock className="w-12 h-12 shrink-0 rounded-none" />

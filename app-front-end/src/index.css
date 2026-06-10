@@ -166,7 +166,7 @@
 
   .aethria-queue-surface {
     width: 100%;
-    max-width: var(--queue-content-measure);
+    max-width: 100%;
     min-width: 0;
   }
 
@@ -176,6 +176,11 @@
 
   .aethria-queue-list {
     gap: var(--queue-row-gap);
+  }
+
+  /* Flow memo column — horizontal inset comes from the column gutter in FlowPage. */
+  .memoShellContent--workspace {
+    padding-inline: 0;
   }
 }
 
@@ -192,11 +197,6 @@
 
   .aethria-workspace-sidebar > .paper-dot-grid .aethria-rail-nav-bleed {
     margin-inline: calc(-1 * var(--space-3));
-  }
-
-  .memoShellContent--workspace {
-    padding-left: var(--space-4);
-    padding-right: var(--space-4);
   }
 }
 

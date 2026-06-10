@@ -134,96 +134,101 @@ export default function FlowPage({ data }: { data: SystemData }) {
   }, [watchlistAnalytics]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col px-phi-4 pb-phi-4 pt-phi-3 lg:px-phi-5 lg:pb-phi-5 lg:pt-phi-4">
-      {/* Mobile dispatch — desktop research goes through ⌘K */}
-      <div className="flex-none pb-phi-4 lg:hidden">
-        <AgentDispatch
-          input={inlineDispatch.input}
-          setInput={inlineDispatch.setInput}
-          onSubmit={inlineDispatch.onSubmit}
-          onCancel={inlineDispatch.onCancel}
-          isBusy={inlineDispatch.isBusy}
-          message={inlineDispatch.message}
-          onClearMessage={inlineDispatch.onClearMessage}
-          lookupPhase={inlineDispatch.lookupPhase}
-        />
-      </div>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1180px] flex-col px-phi-5 pb-phi-8 pt-phi-5">
+        {/* Mobile dispatch — desktop research goes through ⌘K */}
+        <div className="flex-none pb-phi-4 lg:hidden">
+          <AgentDispatch
+            input={inlineDispatch.input}
+            setInput={inlineDispatch.setInput}
+            onSubmit={inlineDispatch.onSubmit}
+            onCancel={inlineDispatch.onCancel}
+            isBusy={inlineDispatch.isBusy}
+            message={inlineDispatch.message}
+            onClearMessage={inlineDispatch.onClearMessage}
+            lookupPhase={inlineDispatch.lookupPhase}
+          />
+        </div>
 
-      <div className="aethria-flow-grid flex min-h-0 flex-1 flex-col overflow-hidden lg:grid">
-        {/* ── Queue ─────────────────────────────────────────────── */}
-        <section className="min-h-0 overflow-y-auto overscroll-contain" aria-label="Decision queue">
-          <GhostTransition disableLift className="min-h-full w-full min-w-0">
-            <WorkGrid
-              startups={startups}
-              onStartupClick={handleStartupClick}
-              selectedId={selectedStartup?.id ?? null}
-              watchlistIds={watchlistIds}
-              fundConfiguration={fundConfiguration}
-              autoSelectFirst={isDesktop}
-              onAutoSelect={handleAutoSelect}
-            />
-          </GhostTransition>
-        </section>
-
-        {/* ── Active decision ───────────────────────────────────── */}
-        <aside
-          className="hidden min-h-0 min-w-0 flex-col overflow-hidden bg-paper lg:flex"
-          aria-live="polite"
-          aria-label="Active decision"
-        >
-          {selectedStartup ? (
-            <PanelShell
-              className="min-h-0 min-w-0 w-full flex-1 bg-paper"
-              title="Active decision"
-              headerClassName="!items-start !py-0 !pt-phi-2 !pb-phi-2 min-h-[46px]"
-              actions={
-                <button
-                  type="button"
-                  onClick={() => memoContentRef.current?.downloadPDF()}
-                  className={PANEL_ACTION_CLASS}
-                  aria-label="Download IC pack as PDF"
-                >
-                  IC pack (PDF)
-                </button>
-              }
-              contentClassName="memoShellContent memoShellContent--workspace bg-paper px-phi-4 py-phi-3 sm:px-phi-5 sm:py-phi-4"
-            >
-              {/* Enter-only when swapping deals: keyed motion.div remounts instantly;
-                  only the incoming decision fades in. */}
-              <motion.div
-                key={memoStartup!.id}
-                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={transitionOrReduced(reduceMotion, {
-                  duration: tokens.motion.duration.micro,
-                  ease: tokens.motion.ease,
-                })}
-                className="h-full min-h-full bg-paper"
-              >
-                <InvestmentMemoContent
-                  ref={memoContentRef}
-                  startup={memoStartup!}
-                  embedded
-                  coverOverride={
-                    <DecisionStage startup={memoStartup!} fundConfiguration={fundConfiguration} />
-                  }
-                  onMemoPipelineReady={handleMemoPipelineReady}
-                  onDecisionResolved={handleDecisionResolved}
-                  fundConfiguration={fundConfiguration}
-                  peerStartups={startups}
-                  portfolioSignals={signals}
-                />
-              </motion.div>
-            </PanelShell>
-          ) : startups.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <EmptyState
-                label="Decision stage"
-                body="Scouts are filling the workspace against the active mandate. The first matter takes the stage as soon as it lands."
+        <div className="aethria-flow-grid flex min-h-0 flex-1 flex-col overflow-hidden lg:grid">
+          {/* ── Queue ─────────────────────────────────────────────── */}
+          <section
+            className="min-h-0 overflow-y-auto overscroll-contain lg:border-r lg:border-oxford/[0.06] lg:pr-phi-4"
+            aria-label="Decision queue"
+          >
+            <GhostTransition disableLift className="min-h-full w-full min-w-0">
+              <WorkGrid
+                startups={startups}
+                onStartupClick={handleStartupClick}
+                selectedId={selectedStartup?.id ?? null}
+                watchlistIds={watchlistIds}
+                fundConfiguration={fundConfiguration}
+                autoSelectFirst={isDesktop}
+                onAutoSelect={handleAutoSelect}
               />
-            </div>
-          ) : null}
-        </aside>
+            </GhostTransition>
+          </section>
+
+          {/* ── Active decision ───────────────────────────────────── */}
+          <aside
+            className="hidden min-h-0 min-w-0 flex-col overflow-hidden bg-paper lg:flex lg:pl-phi-4"
+            aria-live="polite"
+            aria-label="Active decision"
+          >
+            {selectedStartup ? (
+              <PanelShell
+                className="min-h-0 min-w-0 w-full flex-1 bg-paper"
+                title="Active decision"
+                headerClassName="!items-start !px-phi-0 !py-phi-2 min-h-[44px]"
+                actions={
+                  <button
+                    type="button"
+                    onClick={() => memoContentRef.current?.downloadPDF()}
+                    className={PANEL_ACTION_CLASS}
+                    aria-label="Download IC pack as PDF"
+                  >
+                    IC pack (PDF)
+                  </button>
+                }
+                contentClassName="memoShellContent memoShellContent--workspace bg-paper px-phi-0 pt-phi-1 pb-phi-6"
+              >
+                {/* Enter-only when swapping deals: keyed motion.div remounts instantly;
+                    only the incoming decision fades in. */}
+                <motion.div
+                  key={memoStartup!.id}
+                  initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={transitionOrReduced(reduceMotion, {
+                    duration: tokens.motion.duration.micro,
+                    ease: tokens.motion.ease,
+                  })}
+                  className="h-full min-h-full bg-paper"
+                >
+                  <InvestmentMemoContent
+                    ref={memoContentRef}
+                    startup={memoStartup!}
+                    embedded
+                    coverOverride={
+                      <DecisionStage startup={memoStartup!} fundConfiguration={fundConfiguration} />
+                    }
+                    onMemoPipelineReady={handleMemoPipelineReady}
+                    onDecisionResolved={handleDecisionResolved}
+                    fundConfiguration={fundConfiguration}
+                    peerStartups={startups}
+                    portfolioSignals={signals}
+                  />
+                </motion.div>
+              </PanelShell>
+            ) : startups.length === 0 ? (
+              <div className="flex h-full items-center justify-center px-phi-0">
+                <EmptyState
+                  label="Decision stage"
+                  body="Scouts are filling the workspace against the active mandate. The first matter takes the stage as soon as it lands."
+                />
+              </div>
+            ) : null}
+          </aside>
+        </div>
       </div>
 
       {/* Memo modal on small viewports; on desktop the right column shows the memo. */}

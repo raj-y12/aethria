@@ -166,7 +166,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
   return (
     <motion.section
       aria-label="Active decision"
-      className="pb-phi-6"
+      className="pb-phi-5"
       initial={reduceMotion ? false : 'hidden'}
       animate="visible"
       variants={reduceMotion ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}

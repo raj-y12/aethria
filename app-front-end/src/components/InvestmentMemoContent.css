@@ -164,7 +164,7 @@
   font-variant-numeric: tabular-nums;
 }
 .memoPanel--embedded .memoBody {
-  max-width: 39rem;
+  max-width: 100%;
   width: 100%;
 }
 
