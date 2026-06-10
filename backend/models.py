@@ -173,6 +173,13 @@ class ScoutInfo(BaseModel):
     lookup_website: Optional[str] = None
     # Stable id for on-demand lookups: same value from POST /api/startups/lookup → scout row → UI pending match.
     lookup_id: Optional[str] = None
+    # Company Resolver outcome (stage 1 of on-demand lookups).
+    # resolution_status: FOUND | PARTIAL | LOW_CONFIDENCE | NEEDS_REVIEW | NOT_FOUND.
+    # Weak evidence is surfaced (PARTIAL/NEEDS_REVIEW) instead of dropping the company.
+    resolution_status: Optional[Literal["FOUND", "PARTIAL", "LOW_CONFIDENCE", "NEEDS_REVIEW", "NOT_FOUND"]] = None
+    # Full CompanyResolution payload (canonical name, website, linkedin/crunchbase URLs,
+    # founder names, confidence, alternatives, evidence sources, missing fields, stage log).
+    company_resolution: Optional[Dict[str, Any]] = None
     discovered_at: datetime = Field(default_factory=datetime.now)
     # Hash of the system prompt used by the Scout when this discovery was created.
     prompt_version: Optional[str] = None

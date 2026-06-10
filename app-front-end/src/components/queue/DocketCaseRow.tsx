@@ -8,6 +8,7 @@ import { shouldRenderAttentionBadge } from '../../lib/queueAttentionDriver';
 import {
   buildRowAriaLabel,
   formatRowDate,
+  resolutionBadgeLabel,
   type DocketRowModel,
 } from './queueRowShared';
 import {
@@ -71,7 +72,8 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
   const showAttentionBadge =
     !isDecided && shouldRenderAttentionBadge(attentionDriver) && attentionDriver.key !== 'needs_ruling';
   const showDateMeta = isSelected && Boolean(sortKeyValue);
-  const hasMetaRow = Boolean(sectorStage) || showDateMeta || showAttentionBadge;
+  const resolutionBadge = resolutionBadgeLabel(startup);
+  const hasMetaRow = Boolean(sectorStage) || showDateMeta || showAttentionBadge || Boolean(resolutionBadge);
 
   const metaSep = (needsSep: boolean) =>
     needsSep ? (
@@ -194,6 +196,19 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
               <>
                 {metaSep(Boolean(sectorStage || showDateMeta))}
                 <QueueAttentionBadge driver={attentionDriver} ctx={{ ageDays }} prominent={isSelected} />
+              </>
+            ) : null}
+            {resolutionBadge ? (
+              <>
+                {metaSep(Boolean(sectorStage || showDateMeta || showAttentionBadge))}
+                <span
+                  className={`type-meta uppercase tracking-[0.08em] ${
+                    isSelected ? 'text-oxford/55' : 'text-oxford/35'
+                  }`}
+                  title="Company Resolver: identity evidence is incomplete — open the memo to see what was found and what's missing."
+                >
+                  {resolutionBadge}
+                </span>
               </>
             ) : null}
           </motion.div>

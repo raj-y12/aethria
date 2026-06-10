@@ -89,6 +89,17 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
         lookup_query=scout_output.get("lookup_query"),
         lookup_website=scout_output.get("lookup_website"),
         lookup_id=scout_output.get("lookup_id"),
+        resolution_status=(
+            scout_output.get("resolution_status")
+            if scout_output.get("resolution_status")
+            in ("FOUND", "PARTIAL", "LOW_CONFIDENCE", "NEEDS_REVIEW", "NOT_FOUND")
+            else None
+        ),
+        company_resolution=(
+            scout_output.get("company_resolution")
+            if isinstance(scout_output.get("company_resolution"), dict)
+            else None
+        ),
         discovered_at=discovered,
         prompt_version=scout_output.get("prompt_version"),
     )

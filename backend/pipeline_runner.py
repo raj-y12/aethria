@@ -599,12 +599,19 @@ async def _run_on_demand_lookup_inner(
             pipeline_run_id=lookup_run_id,
         )
         if not startup_id:
-            logger.warning("[%s] On-demand lookup failed at scout stage: %s", user_id[:12], company)
-            _record_lookup_failure(
-                user_id,
-                lid,
-                f'Scout could not complete lookup for "{company}". Try a different name or website.',
+            # The resolver/scout records WHY it failed (status, queries used, missing
+            # evidence) so the UI can explain instead of looking like a random failure.
+            outcome = getattr(scout_engine, "last_lookup_outcome", None) or {}
+            message = (outcome.get("message") or "").strip() or (
+                f'Scout could not complete lookup for "{company}". Try a different name or website.'
             )
+            logger.warning(
+                "[%s] On-demand lookup failed at scout stage: %s status=%s",
+                user_id[:12],
+                company,
+                outcome.get("status") or "unknown",
+            )
+            _record_lookup_failure(user_id, lid, message)
             return None
         if cancelled():
             logger.info("[%s] Lookup cancelled after scout: %s (%s)", user_id[:12], company, startup_id)

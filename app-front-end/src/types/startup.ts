@@ -1,3 +1,54 @@
+/** Company Resolver (lookup stage 1) statuses — weak evidence is flagged, never dropped. */
+export type ResolutionStatus = 'FOUND' | 'PARTIAL' | 'LOW_CONFIDENCE' | 'NEEDS_REVIEW' | 'NOT_FOUND';
+
+export interface ResolutionEvidenceSource {
+  url: string;
+  title?: string;
+  snippet?: string;
+  source_type?: string;
+  match_score?: number;
+  supports?: string;
+}
+
+export interface ResolutionAlternativeMatch {
+  name: string;
+  website?: string | null;
+  reason?: string;
+  match_score?: number;
+}
+
+export interface ResolutionStageLog {
+  stage: string;
+  queries?: string[];
+  sources_found?: number;
+  confidence?: number | null;
+  decision?: string;
+  reason?: string;
+  missing?: string[];
+}
+
+/** Stage-1 lookup output: how the typed company name was resolved to a real entity. */
+export interface CompanyResolution {
+  query: string;
+  canonical_name: string;
+  website?: string | null;
+  linkedin_url?: string | null;
+  crunchbase_url?: string | null;
+  dealroom_url?: string | null;
+  yc_url?: string | null;
+  founder_names?: string[];
+  description?: string | null;
+  confidence?: number;
+  resolution_status?: ResolutionStatus | string;
+  alternative_matches?: ResolutionAlternativeMatch[];
+  evidence_sources?: ResolutionEvidenceSource[];
+  missing_fields?: string[];
+  queries_used?: string[];
+  stage_log?: ResolutionStageLog[];
+  notes?: string[];
+  retrieval_provider?: string | null;
+}
+
 export interface Scout {
   id: string;
   scout_type: string;
@@ -27,6 +78,10 @@ export interface Scout {
   lookup_id?: string;
   lookup_query?: string;
   lookup_website?: string;
+  /** Company Resolver status (FOUND | PARTIAL | LOW_CONFIDENCE | NEEDS_REVIEW | NOT_FOUND). */
+  resolution_status?: ResolutionStatus | string | null;
+  /** Full Company Resolver payload (detail view only; stripped from the list projection). */
+  company_resolution?: CompanyResolution | null;
   /** Hash of the system prompt used by the Scout when this record was created. */
   prompt_version?: string;
   /** Per-field provenance tags from scout/reviewer enrichment. */

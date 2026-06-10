@@ -20,6 +20,19 @@ export interface DocketRowModel {
   isNewToUser: boolean;
 }
 
+const RESOLUTION_BADGE_LABELS: Record<string, string> = {
+  PARTIAL: 'Partial evidence',
+  LOW_CONFIDENCE: 'Low confidence',
+  NEEDS_REVIEW: 'Needs review',
+};
+
+/** Company Resolver badge for lookup rows: weak identity evidence is flagged in the
+ * queue (instead of the row silently missing). Null when FOUND or not a lookup. */
+export function resolutionBadgeLabel(startup: Startup): string | null {
+  const status = (startup.scout.resolution_status ?? '').toString().toUpperCase();
+  return RESOLUTION_BADGE_LABELS[status] ?? null;
+}
+
 export function formatRowDate(value: string): string {
   if (!value) return '';
   return new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase();

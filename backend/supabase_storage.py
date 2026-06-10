@@ -40,7 +40,8 @@ _QUEUE_AWARENESS_COLUMNS = (
 
 _LIST_SELECT = (
     "startup_id, display_name, list_one_line, list_sector, list_location, list_scout_type, list_origin_type, "
-    "list_lookup_id, list_lookup_query, list_lookup_website, list_confidence, list_score, list_verdict, "
+    "list_lookup_id, list_lookup_query, list_lookup_website, list_resolution_status, list_confidence, "
+    "list_score, list_verdict, "
     "list_consensus_verdict, list_reviewer_disagreement, list_reviewed_at, list_partnered_at, "
     "short_summary, partner_decision, partner_human_review_required, partner_info, human_resolution, "
     "conviction_state, unresolved_at, first_seen_at, last_seen_by_user_at, acknowledged_at, "
@@ -175,6 +176,13 @@ def _is_missing_agent_trace_error(exc: Exception) -> bool:
 def _is_missing_queue_awareness_error(exc: Exception) -> bool:
     text = str(exc).lower()
     return any(column in text for column in _QUEUE_AWARENESS_COLUMNS) and (
+        "does not exist" in text or "schema cache" in text or "42703" in text
+    )
+
+
+def _is_missing_resolution_status_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "list_resolution_status" in text and (
         "does not exist" in text or "schema cache" in text or "42703" in text
     )
 
@@ -447,6 +455,28 @@ class SupabaseStartupsStorage:
                 )
             )
         except Exception as e:
+            if _is_missing_resolution_status_error(e):
+                # Resolution-status migration not applied yet; retry with the same
+                # projection minus that column so queue awareness is preserved.
+                self.logger.warning(
+                    "list_resolution_status column missing; apply the resolution status "
+                    "projection migration to badge lookup resolution states in the list."
+                )
+                try:
+                    no_resolution_select = _LIST_SELECT.replace("list_resolution_status, ", "")
+                    r = self._execute_with_retry(
+                        lambda: (
+                            self._client.table(TABLE)
+                            .select(no_resolution_select)
+                            .eq("user_id", self._user_id)
+                            .order("updated_at", desc=True)
+                            .range(off, off + lim - 1)
+                            .execute()
+                        )
+                    )
+                    return list((r.data or []) if hasattr(r, "data") else [])
+                except Exception as retry_e:
+                    e = retry_e
             if _is_missing_unresolved_at_error(e) or _is_missing_queue_awareness_error(e):
                 self.logger.warning(
                     "List projection queue column missing; using legacy projection. "
@@ -1130,6 +1160,12 @@ class SupabaseStartupsStorage:
         for row in rows:
             sid = row.get("startup_id") or "?"
             scout = row.get("scout_info") or {}
+            # User-intentional lookups are never pruned: weak evidence is a visible
+            # PARTIAL/NEEDS_REVIEW state in the UI, not grounds for deletion.
+            if str(scout.get("origin_type") or "").strip().lower() == "on_demand_lookup":
+                continue
+            if scout.get("company_resolution") or scout.get("resolution_status"):
+                continue
             refs = scout.get("references")
             if not refs or not isinstance(refs, list):
                 bad_ids.append(str(sid))

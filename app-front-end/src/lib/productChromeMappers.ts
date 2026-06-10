@@ -93,6 +93,40 @@ export function buildMandateCardProps(
   };
 }
 
+const RESOLUTION_STATUS_LABELS: Record<string, string> = {
+  FOUND: 'Identity confirmed',
+  PARTIAL: 'Partial evidence',
+  LOW_CONFIDENCE: 'Low-confidence match',
+  NEEDS_REVIEW: 'Needs review',
+  NOT_FOUND: 'Not found',
+};
+
+const RESOLUTION_MISSING_LABELS: Record<string, string> = {
+  website: 'website',
+  linkedin_url: 'LinkedIn',
+  funding_profile: 'funding profile',
+  founder_names: 'founders',
+  description: 'description',
+  news_mentions: 'news mentions',
+};
+
+/** Company Resolver transparency line — only shown when identity isn't fully confirmed,
+ * so a weak lookup explains itself instead of looking like a random failure. */
+export function buildResolutionLine(startup: Startup): string | undefined {
+  const status = (startup.scout.resolution_status ?? '').toString().toUpperCase();
+  if (!status || status === 'FOUND') return undefined;
+  const label = RESOLUTION_STATUS_LABELS[status] ?? status;
+  const resolution = startup.scout.company_resolution;
+  const missing = (resolution?.missing_fields ?? [])
+    .map((f) => RESOLUTION_MISSING_LABELS[f] ?? f)
+    .slice(0, 4);
+  const evidenceCount = resolution?.evidence_sources?.length ?? 0;
+  const bits = [label];
+  if (evidenceCount > 0) bits.push(`${evidenceCount} source${evidenceCount === 1 ? '' : 's'}`);
+  if (missing.length > 0) bits.push(`missing ${missing.join(', ')}`);
+  return bits.join(' · ');
+}
+
 export function buildLookupSnapshotProps(
   startup: Startup,
   queryLabel?: string,
@@ -166,6 +200,7 @@ export function buildLookupSnapshotProps(
     summary,
     dimensions,
     thesisLine: thesisBits.length > 0 ? thesisBits.join(' · ') : undefined,
+    resolutionLine: buildResolutionLine(startup),
     // Fuller, enlarged layout for the dispatch result takeover: bigger company name,
     // summary and dimension scores (same tags/styling), never the tight rail strip.
     compact: false,
