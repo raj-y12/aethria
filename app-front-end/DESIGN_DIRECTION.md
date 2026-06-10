@@ -32,8 +32,12 @@ one place to each state; nothing else earns top-level presence.
 | Steering the instrument — mandate, record, patterns, calibration, evolution | **Fund** | `/v1/fund` |
 | Configuring — thresholds, identity, operations | Settings | `/v1/settings` |
 
-Settings renders inside the same frame as the workspaces — the spine never leaves.
-There is exactly one full-screen surface in the product: the Dispatch takeover.
+Settings renders inside the same frame as the workspaces — the spine never leaves,
+and it is the product's **only rail**. A room may take over the spine's contextual
+regions (Settings projects its section nav and draft/save state into it, with a
+"← Today" exit); identity stays at the top and the operator at the bottom, always.
+Never a second sidebar beside the spine. There is exactly one full-screen surface
+in the product: the Dispatch takeover.
 
 What this replaced: a single mega-workspace whose modes (Workspace / Judgements /
 System) swapped panels in place, plus a six-tab "Intelligence" panel. **Intelligence is

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { SpineNavButton } from './SystemBar';
 import AgentLogoutModal from './AgentLogoutModal';
@@ -25,12 +25,23 @@ export interface SpineMandate {
   versionNumber: number | null;
 }
 
+/**
+ * A room (e.g. Settings) can take over the spine's contextual regions: its
+ * nav replaces the workspace nav, its footer replaces telemetry + mandate.
+ * Identity (top) and operator (bottom) never change — one rail, always.
+ */
+export interface SpineOverride {
+  nav: ReactNode;
+  footer?: ReactNode;
+}
+
 interface AppSpineProps {
   telemetry: SpineTelemetry;
   mandate: SpineMandate;
   /** True while a Dispatch lookup runs in the background. */
   dispatchActive: boolean;
   onDispatch: () => void;
+  override?: SpineOverride | null;
 }
 
 export const SPINE_WORKSPACES: Array<{ href: string; label: string; shortcut: string }> = [
@@ -68,7 +79,7 @@ const PIPELINE_TONE: Record<SpinePipelineState, { text: string; dot: string }> =
  * number that needs judgment, the active mandate, and the operator. Everything
  * else belongs to the workspace it serves.
  */
-export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatch }: AppSpineProps) {
+export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatch, override }: AppSpineProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const {
@@ -114,35 +125,46 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
             </p>
           </div>
 
-          {/* ── Workspaces ───────────────────────────────────────── */}
-          <nav className="flex flex-col gap-0.5" aria-label="Workspaces">
-            {SPINE_WORKSPACES.map((item) => (
+          {override ? (
+            /* ── Room nav (e.g. Settings sections) ──────────────── */
+            <nav className="flex min-h-0 flex-col gap-0.5 overflow-y-auto" aria-label="Section navigation">
+              {override.nav}
+            </nav>
+          ) : (
+            /* ── Workspaces ─────────────────────────────────────── */
+            <nav className="flex flex-col gap-0.5" aria-label="Workspaces">
+              {SPINE_WORKSPACES.map((item) => (
+                <SpineNavButton
+                  key={item.href}
+                  label={item.label}
+                  active={isSpineRouteActive(item.href, pathname)}
+                  ariaPressed={isSpineRouteActive(item.href, pathname)}
+                  onClick={() => navigate(item.href)}
+                  shortcut={item.shortcut}
+                  surface="oxford"
+                />
+              ))}
+              <div className="my-phi-2 px-2">
+                <SpineRule />
+              </div>
               <SpineNavButton
-                key={item.href}
-                label={item.label}
-                active={isSpineRouteActive(item.href, pathname)}
-                ariaPressed={isSpineRouteActive(item.href, pathname)}
-                onClick={() => navigate(item.href)}
-                shortcut={item.shortcut}
+                label="Dispatch"
+                active={false}
+                ariaPressed={false}
+                onClick={onDispatch}
+                shortcut="⌘K"
                 surface="oxford"
+                running={dispatchActive}
               />
-            ))}
-            <div className="my-phi-2 px-2">
-              <SpineRule />
-            </div>
-            <SpineNavButton
-              label="Dispatch"
-              active={false}
-              ariaPressed={false}
-              onClick={onDispatch}
-              shortcut="⌘K"
-              surface="oxford"
-              running={dispatchActive}
-            />
-          </nav>
+            </nav>
+          )}
         </div>
 
         <div className="flex min-h-0 flex-col gap-phi-4">
+          {override ? (
+            override.footer ?? null
+          ) : (
+            <>
           {/* ── Judgment pressure ────────────────────────────────── */}
           <section aria-label="Pipeline overview" className="px-2">
             <div className="flex items-end justify-between gap-phi-3">
@@ -249,6 +271,8 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                 : 'Configure to start the pipeline →'}
             </span>
           </button>
+            </>
+          )}
 
           {/* ── Operator ─────────────────────────────────────────── */}
           <section aria-label="Operator" className="min-w-0 border-t border-white/[0.07] px-2 pt-phi-3">

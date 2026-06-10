@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import LoadingAnimation from '../components/LoadingAnimation';
+import { useAppFrame } from '../components/AppFrame';
 import { SpineNavButton } from '../components/SystemBar';
 import { fetchSettings, patchSettings, previewPolicy, publishPolicy, type Settings } from '../api/settings';
 import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
@@ -9,7 +11,6 @@ import {
   postFundThesisVersion,
   type FundThesisSummary,
 } from '../api/fundThesis';
-import { railEditorial } from '../design-system/railEditorial';
 import DecisionBadge from '../components/DecisionBadge';
 import { useFundConfiguration } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
@@ -75,8 +76,6 @@ const actionBtnCls =
 const solidBtnCls =
   'type-label-section inline-flex min-h-[36px] items-center justify-center rounded-none bg-oxford px-phi-4 text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
 
-const RAIL_CLAMP_PAD = { paddingTop: 'clamp(5px, 0.6vw, 8px)', paddingBottom: 'clamp(5px, 0.6vw, 8px)' } as const;
-
 function serializeConfig(config: FundConfiguration): string {
   const rest = { ...config } as Record<string, unknown>;
   for (const key of ['lastSavedAt', 'version', 'versionLabel', 'activePolicyVersionId', 'draftPolicyHash', 'publishedPolicyHash', 'lastPublishedAt']) {
@@ -103,75 +102,6 @@ function formatSettingsSavedAt(iso: string): string {
     hour: 'numeric',
     minute: '2-digit',
   }).format(date);
-}
-
-function SettingsSidebarFooter({
-  unsaved,
-  lastSavedAt,
-  saving,
-  onSave,
-  onReset,
-}: {
-  unsaved: boolean;
-  lastSavedAt?: string | null;
-  saving: boolean;
-  onSave: () => void;
-  onReset: () => void;
-}) {
-  const statusDetail = unsaved
-    ? 'Changes not yet saved'
-    : lastSavedAt
-      ? `Saved · ${formatSettingsSavedAt(lastSavedAt)}`
-      : 'Save to persist fund configuration';
-
-  return (
-    <div
-      className="min-w-0 shrink-0 border-t border-oxford/[0.075]"
-      style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}
-      aria-label="Draft status"
-    >
-      {/* Eyebrow + live status — mirrors the workspace rail's Mandate card header. */}
-      <div className="flex items-center justify-between gap-phi-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">Draft</span>
-        <span
-          className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] transition-colors ${unsaved ? 'text-escalation/80' : 'text-oxford/45'}`}
-          aria-live="polite"
-        >
-          <span
-            className={`h-1.5 w-1.5 shrink-0 rounded-none signal-dot-breathe transition-colors ${unsaved ? 'bg-escalation/70' : 'bg-oxford'}`}
-            aria-hidden
-          />
-          {unsaved ? 'Unsaved' : 'Synced'}
-        </span>
-      </div>
-      <p className={`mt-phi-2 truncate type-body-sm leading-snug transition-colors ${unsaved ? 'text-oxford' : 'text-oxford/50'}`}>
-        {statusDetail}
-      </p>
-      <div className="mt-phi-4 flex flex-col gap-phi-2">
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={saving || !unsaved}
-          className={
-            unsaved && !saving
-              ? 'w-full btn-aethria-solid'
-              : 'inline-flex h-[36px] w-full cursor-not-allowed items-center justify-center rounded-none border border-oxford/[0.15] bg-transparent font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/35'
-          }
-        >
-          {saving ? 'Saving…' : 'Save changes'}
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          disabled={saving}
-          className={`${actionBtnCls} w-full justify-center`}
-          title="Restore local defaults; save to sync compatible fields to the backend"
-        >
-          Reset to defaults
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function TextField({
@@ -405,6 +335,8 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { setSpineOverride } = useAppFrame();
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -567,6 +499,100 @@ export default function SettingsPage() {
     setErrors([]);
   };
 
+  // ── The spine is the only rail: project section nav + draft state into it. ──
+  // Handlers are reached through a ref so the projection effect re-runs only
+  // when displayed values change, never on handler identity.
+  const spineActionsRef = useRef({ save: () => {}, reset: () => {} });
+  spineActionsRef.current = { save: () => void handleSave(), reset: handleReset };
+  const lastSavedAt = draft.lastSavedAt;
+
+  useEffect(() => {
+    const scrollToSection = (id: SectionId) => {
+      setActiveSection(id);
+      const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${id}`);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    const statusDetail = unsaved
+      ? 'Changes not yet saved'
+      : lastSavedAt
+        ? `Saved · ${formatSettingsSavedAt(lastSavedAt)}`
+        : 'Save to persist fund configuration';
+    setSpineOverride({
+      nav: (
+        <>
+          <SpineNavButton
+            label="← Today"
+            active={false}
+            ariaPressed={false}
+            surface="oxford"
+            onClick={() => navigate('/v1')}
+          />
+          <p className="px-2 pb-phi-1 pt-phi-4 font-mono text-[10px] uppercase tracking-[0.12em] text-white/38">
+            Configuration
+          </p>
+          {sections.map((section) => (
+            <SpineNavButton
+              key={section.id}
+              label={section.label}
+              active={activeSection === section.id}
+              ariaPressed={activeSection === section.id}
+              surface="oxford"
+              onClick={() => scrollToSection(section.id)}
+            />
+          ))}
+        </>
+      ),
+      footer: (
+        <section aria-label="Draft status" className="border-t border-white/[0.07] px-2 pt-phi-3">
+          <div className="flex items-center justify-between gap-phi-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/38">Draft</span>
+            <span
+              className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] ${
+                unsaved ? 'text-escalation-bright/90' : 'text-white/45'
+              }`}
+              aria-live="polite"
+            >
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-none ${unsaved ? 'bg-escalation-bright/80' : 'bg-white/55'}`}
+                aria-hidden
+              />
+              {unsaved ? 'Unsaved' : 'Synced'}
+            </span>
+          </div>
+          <p className={`mt-phi-2 truncate font-sans text-[12px] leading-snug ${unsaved ? 'text-white/85' : 'text-white/45'}`}>
+            {statusDetail}
+          </p>
+          <div className="mt-phi-3 flex flex-col gap-phi-2">
+            <button
+              type="button"
+              onClick={() => spineActionsRef.current.save()}
+              disabled={saving || !unsaved}
+              className={
+                unsaved && !saving
+                  ? 'inline-flex h-9 w-full items-center justify-center rounded-none bg-paper font-mono text-[11px] uppercase tracking-[0.12em] text-oxford transition-opacity hover:opacity-90 btn-interaction'
+                  : 'inline-flex h-9 w-full cursor-not-allowed items-center justify-center rounded-none border border-white/[0.18] bg-transparent font-mono text-[11px] uppercase tracking-[0.12em] text-white/35'
+              }
+            >
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+            <button
+              type="button"
+              onClick={() => spineActionsRef.current.reset()}
+              disabled={saving}
+              className="inline-flex min-h-[32px] w-full items-center justify-center font-mono text-[10px] uppercase tracking-[0.12em] text-white/40 transition-colors hover:text-white/80 disabled:opacity-50 btn-interaction"
+              title="Restore local defaults; save to sync compatible fields to the backend"
+            >
+              Reset to defaults
+            </button>
+          </div>
+        </section>
+      ),
+    });
+  }, [setSpineOverride, navigate, activeSection, unsaved, saving, lastSavedAt]);
+
+  // Leaving the room returns the spine to the workspaces.
+  useEffect(() => () => setSpineOverride(null), [setSpineOverride]);
+
   const handlePreviewPolicy = async () => {
     setPolicyBusy(true);
     setErrors([]);
@@ -668,47 +694,8 @@ export default function SettingsPage() {
     <div className="flex h-full flex-col overflow-hidden bg-paper text-oxford">
       <main className="flex min-h-0 flex-1 overflow-hidden bg-paper">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper lg:flex-row lg:gap-[var(--layout-col-gap)]">
-            <aside className="aethria-workspace-sidebar hidden h-full min-h-0 max-h-full w-[18rem] shrink-0 flex-col overflow-hidden lg:flex">
-              <div
-                className="flex h-full min-h-0 flex-col justify-between overflow-hidden px-phi-4"
-                style={RAIL_CLAMP_PAD}
-              >
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                  <div className="aethria-rail-nav-bleed flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                    <p className={`${railEditorial.label} shrink-0 px-phi-4`}>Fund configuration</p>
-                    <nav
-                      className="mt-phi-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto"
-                      aria-label="Settings sections"
-                    >
-                    {sections.map((section) => (
-                      <SpineNavButton
-                        key={section.id}
-                        label={section.label}
-                        active={activeSection === section.id}
-                        ariaPressed={activeSection === section.id}
-                        compact
-                        surface="paper"
-                        onClick={() => {
-                          setActiveSection(section.id);
-                          const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${section.id}`);
-                          target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }}
-                      />
-                    ))}
-                    </nav>
-                  </div>
-                </div>
-                <SettingsSidebarFooter
-                  unsaved={unsaved}
-                  lastSavedAt={draft.lastSavedAt}
-                  saving={saving}
-                  onSave={() => void handleSave()}
-                  onReset={handleReset}
-                />
-              </div>
-            </aside>
-
+          {/* Section nav + draft state live in the spine (setSpineOverride) — one rail. */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:h-full lg:min-h-0">
               <div className="flex items-center justify-between border-b border-oxford/[0.08] px-phi-5 py-phi-4 lg:hidden">
             <div className="flex min-w-0 flex-col gap-phi-2">

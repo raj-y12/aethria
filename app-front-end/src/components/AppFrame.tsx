@@ -15,6 +15,7 @@ import AppSpine, {
   SPINE_WORKSPACES,
   isSpineRouteActive,
   type SpineMandate,
+  type SpineOverride,
   type SpineTelemetry,
 } from './AppSpine';
 import MobileHeader from './MobileHeader';
@@ -57,6 +58,8 @@ interface AppFrameContextValue {
   inlineDispatch: InlineDispatchProps;
   /** Pages report full-screen overlays (e.g. the mobile memo) so body scroll locking stays single-owner. */
   setPageOverlayOpen: (open: boolean) => void;
+  /** A room can take over the spine's contextual regions (see SpineOverride). */
+  setSpineOverride: (override: SpineOverride | null) => void;
 }
 
 const AppFrameContext = createContext<AppFrameContextValue | null>(null);
@@ -85,6 +88,7 @@ export default function AppFrame({ data, startupsError, children }: AppFrameProp
   const reduceMotion = usePrefersReducedMotion();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pageOverlayOpen, setPageOverlayOpen] = useState(false);
+  const [spineOverride, setSpineOverride] = useState<SpineOverride | null>(null);
   // Mobile log out — desktop logs out from the spine's operator block.
   const {
     requestLogout: requestMobileLogout,
@@ -261,6 +265,7 @@ export default function AppFrame({ data, startupsError, children }: AppFrameProp
     dispatchActive: dispatch.lookupWorking,
     inlineDispatch,
     setPageOverlayOpen,
+    setSpineOverride,
   };
 
   return (
@@ -370,6 +375,7 @@ export default function AppFrame({ data, startupsError, children }: AppFrameProp
             mandate={mandate}
             dispatchActive={dispatch.lookupWorking}
             onDispatch={dispatch.openCommandBar}
+            override={spineOverride}
           />
           <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper">
             {children}
