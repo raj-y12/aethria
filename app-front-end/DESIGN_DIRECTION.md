@@ -32,12 +32,12 @@ one place to each state; nothing else earns top-level presence.
 | Steering the instrument — mandate, record, patterns, calibration, evolution | **Fund** | `/v1/fund` |
 | Configuring — thresholds, identity, operations | Settings | `/v1/settings` |
 
-Settings renders inside the same frame as the workspaces — the spine never leaves,
-and it is the product's **only rail**. A room may take over the spine's contextual
-regions (Settings projects its section nav and draft/save state into it, with a
-"← Today" exit); identity stays at the top and the operator at the bottom, always.
-Never a second sidebar beside the spine. There is exactly one full-screen surface
-in the product: the Dispatch takeover.
+Inside the working rooms (Flow, Portfolio, Fund, Settings) the spine is constant and
+is the product's **only rail**. A room may take over its contextual regions (Settings
+projects its section nav and draft/save state into it, with a "← Today" exit);
+identity stays at the top and the operator at the bottom, always. Never a second
+sidebar beside the spine. Two surfaces are deliberately chrome-free — the front door
+(Today) and the Dispatch takeover — both centered, both speaking in serif.
 
 What this replaced: a single mega-workspace whose modes (Workspace / Judgements /
 System) swapped panels in place, plus a six-tab "Intelligence" panel. **Intelligence is
@@ -70,18 +70,21 @@ workspace. It carries exactly five things and nothing else:
 If a candidate element for the spine is not one of these five, it belongs to a
 workspace.
 
-## Today
+## Today — the front door
 
-The desk — the arrival surface and the home route. It states the situation in one line
-("3 matters require your ruling · 5 new arrivals"), then briefs: what requires
-judgment, what arrived, the latest judgments, the signals moving, the instrument's
-state. It is a **briefing, not a dashboard**: lists and readouts, no stat boxes, and
-every line is a doorway into the workspace where the work happens. If it cannot change
-what the principal does next, it does not appear here.
+The home route is modelled on the Dispatch takeover, which is the product's voice:
+**no sidebar**, one centered column on dotted paper, staggered upward reveals. Top to
+bottom: the wordmark; the date as a tracked mono eyebrow; **the system speaking in
+Playfair** — one situation headline ("3 matters await your ruling." / "The desk is
+clear."); a quiet counts line (plus the since-away report); then **the four doors as
+control keys in the middle of the canvas** — Flow is the single solid oxford key (the
+product's one action is making judgments), Portfolio / Fund / Dispatch are quiet
+ghosts, each carrying its live reading. A Dispatch-style micro-action footer holds the
+operator, mandate, settings, and log out.
 
-Today also absorbed the "While you were away" interstitial: what the agents did since
-the last visit is one quiet line in the briefing header, not a full-screen gate the
-principal must dismiss before reaching their desk.
+The serif headline is the personality register: when Aethria addresses the principal
+(the front door, the Dispatch takeover, login), it speaks in Playfair. Inside the
+workspaces, the instrument is sans and mono.
 
 ## Flow
 
@@ -141,10 +144,10 @@ These extend `DESIGN_SYSTEM.md` from tokens to layout judgment:
   on oxford chrome — both reserved for states requiring a human.
 - **Whitespace must create focus.** The golden-ratio splits and Fibonacci gaps are the
   grid; if removing an element does not lose information, remove it.
-- **Verdicts are typographic.** The word carries the call. One fill in the entire
-  system: INVEST, in oxford. MONITOR and PASS read through border and ink weight;
-  annotations (reviewer split, stale, limited evidence) are plain text marks, never
-  chips. Burgundy remains reserved for states requiring a human.
+- **Verdict chips are the system's one colour accent.** Soft-fill pastel chips
+  (sage INVEST, butter MONITOR, clay PASS) make verdicts scannable at a glance —
+  they are the deliberate exception to monochrome, and the only one. No new hues
+  beyond this ramp; burgundy remains reserved for states requiring a human.
 - **One selection language.** Vertical lists (spine nav, queue rows) mark the current
   item with a 2px left bar; horizontal tabs (Fund facets) with a 1px underline. Never
   both, never a filled pill. The left bar marks selection only — it is not an alarm

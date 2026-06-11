@@ -1,344 +1,277 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import DecisionBadge from '../components/DecisionBadge';
-import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
-import { isDealHumanResolved, isDealUnresolved } from '../lib/dealState';
+import { motion } from 'framer-motion';
+import { useAppFrame } from '../components/AppFrame';
+import AgentLogoutModal from '../components/AgentLogoutModal';
+import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import { useSinceAwaySummary } from '../hooks/useActivitySummary';
+import { isDealUnresolved } from '../lib/dealState';
 import type { SystemData } from '../hooks/useSystemData';
-import type { Startup, SignalItem } from '../types/startup';
+import type { Startup } from '../types/startup';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const EASE = [0.16, 1, 0.3, 1] as const;
 
-function daysWaiting(s: Startup): number | null {
-  const since =
-    s.unresolved_at ??
-    s.timestamps?.unresolved_at ??
-    s.timestamps?.partnered_at ??
-    s.timestamps?.reviewed_at ??
-    s.timestamps?.discovered_at ??
-    null;
-  if (!since) return null;
-  const ms = Date.now() - new Date(since).getTime();
-  return Number.isFinite(ms) ? Math.max(0, Math.floor(ms / DAY_MS)) : null;
-}
-
-function judgedAt(s: Startup): string {
-  return (
-    s.human_resolution?.resolved_at ??
-    s.timestamps?.partnered_at ??
-    s.timestamps?.reviewed_at ??
-    ''
-  );
-}
-
-function signalWhen(sig: SignalItem): string {
-  if (!sig.detected_at) return '—';
-  return new Date(sig.detected_at).toLocaleDateString('en-GB');
-}
-
-function SectionHead({ title, action }: { title: string; action?: { label: string; href: string } }) {
-  return (
-    <div className="flex items-baseline justify-between gap-phi-4 border-t border-oxford/[0.075] pt-phi-4">
-      <h2 className="type-label-section text-oxford/72">{title}</h2>
-      {action ? (
-        <Link
-          to={action.href}
-          className="type-meta uppercase tracking-[0.1em] text-oxford/40 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-        >
-          {action.label}
-        </Link>
-      ) : null}
-    </div>
-  );
-}
-
-function QuietEmpty({ children }: { children: React.ReactNode }) {
-  return <p className="mt-phi-4 type-body-sm text-oxford/45">{children}</p>;
-}
-
-function DeskRow({
-  onClick,
-  primary,
-  secondary,
-  right,
+/** Dispatch-style staggered reveal — the takeover's motion language is the house voice. */
+function Reveal({
+  delay,
+  y = 10,
+  className,
+  children,
 }: {
+  delay: number;
+  y?: number;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE, delay }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function recOf(s: Startup): string | null {
+  const r = s.partner?.recommendation;
+  return typeof r === 'string' && r ? r.toUpperCase() : null;
+}
+
+/**
+ * A control key — one of the four doors. Flow is the single solid oxford key
+ * (the product's one action is making judgments); the rest are quiet ghosts.
+ */
+function HomeKey({
+  numeral,
+  label,
+  detail,
+  detailTone = 'default',
+  solid = false,
+  onClick,
+}: {
+  numeral: string;
+  label: string;
+  detail: string;
+  detailTone?: 'default' | 'escalation';
+  solid?: boolean;
   onClick: () => void;
-  primary: string;
-  secondary?: string;
-  right?: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between gap-phi-4 border-b border-oxford/[0.06] py-phi-3 text-left transition-colors hover:bg-registerTint btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+      className={`group flex min-h-[112px] flex-col items-center justify-center gap-phi-2 rounded-none border px-phi-4 py-phi-5 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 ${
+        solid
+          ? 'border-oxford bg-oxford text-paper hover:bg-oxford/[0.92]'
+          : 'border-oxford/[0.14] bg-transparent text-oxford hover:border-oxford/45 hover:bg-oxford/[0.03]'
+      }`}
     >
-      <span className="min-w-0">
-        <span className="block truncate type-body-emphasis text-oxford">{primary}</span>
-        {secondary ? <span className="block truncate type-meta text-oxford/45">{secondary}</span> : null}
+      <span
+        className={`font-mono text-[10px] tracking-[0.14em] ${solid ? 'text-paper/45' : 'text-oxford/30'}`}
+        aria-hidden
+      >
+        {numeral}
       </span>
-      {right ? <span className="flex shrink-0 items-center gap-phi-3">{right}</span> : null}
+      <span
+        className={`font-mono text-[12px] font-semibold uppercase tracking-[0.16em] ${
+          solid ? 'text-paper' : 'text-oxford/85'
+        }`}
+      >
+        {label}
+      </span>
+      <span
+        className={`font-mono text-[10px] tracking-[0.06em] tabular-nums ${
+          solid
+            ? detailTone === 'escalation'
+              ? 'text-escalation-bright'
+              : 'text-paper/55'
+            : detailTone === 'escalation'
+              ? 'text-escalation/85'
+              : 'text-oxford/40'
+        }`}
+      >
+        {detail}
+      </span>
     </button>
   );
 }
 
 /**
- * Today — the desk. The arrival surface: what requires judgment, what arrived,
- * what the instrument just ruled, and what is moving against the book. A
- * briefing, not a dashboard — every line is a doorway into the workspace
- * where the work happens.
+ * Today — the front door. Modelled on the Dispatch takeover (the house voice):
+ * no sidebar, one centered column, the system speaking in serif, and the four
+ * doors as control keys in the middle of the canvas.
  */
 export default function TodayPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { startups, signals, metaReports } = data;
+  const { openDispatch, dispatchActive } = useAppFrame();
   const sinceAway = useSinceAwaySummary();
+  const {
+    displayName,
+    agentActionPending,
+    requestLogout,
+    logoutModalProps,
+  } = useAgentLogoutFlow();
+  const { startups } = data;
 
-  // Legacy deep links (/v1?open=…, /v1?queue=…) now belong to Flow.
+  // Legacy deep links (/v1?open=…, /v1?queue=…) belong to Flow.
   useEffect(() => {
     if (searchParams.get('open') || searchParams.get('queue')) {
       navigate(`/v1/flow?${searchParams.toString()}`, { replace: true });
     }
   }, [searchParams, navigate]);
 
-  const openDeal = (id: string) => navigate(`/v1/flow?open=${id}`);
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
-  const requiresJudgment = useMemo(
-    () =>
-      startups
-        .filter((s) => isDealUnresolved(s) && s.partner?.human_review_required === true)
-        .sort((a, b) => (a.timestamps?.partnered_at ?? '').localeCompare(b.timestamps?.partnered_at ?? '')),
-    [startups],
-  );
+  // ── The situation ──────────────────────────────────────────────────────────
+  const needRuling = data.pendingEscalationCount ?? 0;
+  const newCount = useMemo(() => startups.filter((s) => s.is_new_to_user).length, [startups]);
+  const openCount = useMemo(() => startups.filter(isDealUnresolved).length, [startups]);
+  const convictionCount = useMemo(() => startups.filter((s) => recOf(s) === 'INVEST').length, [startups]);
+  const watchTotal = data.watchlistAnalytics.total;
+  const mandateVersion = data.fundThesisRuntime?.active_version_number ?? null;
+  const fundName = data.settings?.fund_identity?.fund_name?.trim() || '';
 
-  const newArrivals = useMemo(
-    () =>
-      startups
-        .filter((s) => s.is_new_to_user)
-        .sort((a, b) =>
-          (b.timestamps?.first_seen_at ?? b.timestamps?.discovered_at ?? '').localeCompare(
-            a.timestamps?.first_seen_at ?? a.timestamps?.discovered_at ?? '',
-          ),
-        ),
-    [startups],
-  );
+  const headline =
+    needRuling > 0
+      ? `${needRuling} ${needRuling === 1 ? 'matter awaits' : 'matters await'} your ruling.`
+      : newCount > 0
+        ? `${newCount} new ${newCount === 1 ? 'company' : 'companies'} since you left.`
+        : openCount > 0
+          ? 'The pipeline is working. Nothing needs you.'
+          : 'The desk is clear.';
 
-  const latestJudgments = useMemo(
-    () =>
-      startups
-        .filter((s) => Boolean(s.partner?.recommendation) || isDealHumanResolved(s))
-        .sort((a, b) => judgedAt(b).localeCompare(judgedAt(a)))
-        .slice(0, 6),
-    [startups],
-  );
-
-  const recentSignals = (signals ?? []).slice(0, 4);
-  const lastCycle = metaReports.length > 0 ? metaReports[0] : null;
-  const queueDepths = data.systemHealth?.queue_depths;
-  const startupNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const s of startups) if (s.scout?.name) map.set(s.id, s.scout.name);
-    return map;
-  }, [startups]);
-
-  const dateLine = new Date().toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
-
-  const situation = [
-    requiresJudgment.length > 0
-      ? `${requiresJudgment.length} ${requiresJudgment.length === 1 ? 'matter requires' : 'matters require'} your ruling`
-      : 'Nothing awaits your ruling',
-    newArrivals.length > 0 ? `${newArrivals.length} new ${newArrivals.length === 1 ? 'arrival' : 'arrivals'}` : null,
-    recentSignals.length > 0 ? `${signals.length} ${signals.length === 1 ? 'signal' : 'signals'} live` : null,
+  const subline = [
+    `${startups.length.toLocaleString()} in pipeline`,
+    `${openCount.toLocaleString()} open`,
+    convictionCount > 0 ? `${convictionCount.toLocaleString()} conviction` : null,
   ]
     .filter(Boolean)
     .join(' · ');
 
+  const eyebrow = `${now
+    .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+    .toUpperCase()} · ${now.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' })}`;
+
   return (
-    <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <div className="mx-auto w-full max-w-[1180px] px-phi-5 pb-phi-8 pt-phi-5">
-        {/* ── The situation, in one line of sight ── */}
-        <header className="pb-phi-6">
-          <p className="type-label-section text-oxford/45">The desk</p>
-          <h1 className="mt-phi-2 type-title font-medium text-oxford">{dateLine}</h1>
-          <p className="mt-phi-2 type-body-sm text-oxford/55">{situation}</p>
+    <div className="paper-dot-grid relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain">
+      <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7">
+        {/* ── The mark ── */}
+        <Reveal delay={0.02} y={-6}>
+          <p className="text-center font-wordmark text-[clamp(22px,2vw,28px)] font-medium leading-tight text-oxford">
+            Aethria<span className="wordmark-dot">.</span>
+          </p>
+        </Reveal>
+
+        {/* ── The situation, spoken ── */}
+        <Reveal delay={0.1} className="mt-phi-7">
+          <p className="text-center font-mono text-[11px] uppercase tracking-[0.16em] tabular-nums text-oxford/40">
+            {eyebrow}
+          </p>
+        </Reveal>
+
+        <Reveal delay={0.16} y={12} className="mt-phi-4">
+          <h1 className="type-display m-0 max-w-[18ch] text-center text-[clamp(30px,4.2vw,54px)] font-medium leading-[1.1] text-oxford">
+            {headline}
+          </h1>
+        </Reveal>
+
+        <Reveal delay={0.24} className="mt-phi-4">
+          <p className="text-center font-mono text-[11px] tracking-[0.06em] tabular-nums text-oxford/45">
+            {subline}
+          </p>
           {sinceAway ? (
-            <p className="mt-phi-3 font-mono text-[11px] tracking-[0.04em] tabular-nums text-oxford/45">
-              <span className="uppercase tracking-[0.1em] text-oxford/38">Since you were away</span>
-              <span className="mx-phi-2 text-oxford/20" aria-hidden>·</span>
-              <span className="font-semibold text-oxford/70">{sinceAway.found}</span> discovered
-              <span className="mx-phi-2 text-oxford/20" aria-hidden>·</span>
-              <span className="font-semibold text-oxford/70">{sinceAway.reviewed}</span> evaluated
-              <span className="mx-phi-2 text-oxford/20" aria-hidden>·</span>
-              <span className="font-semibold text-oxford/70">{sinceAway.agent_decided ?? sinceAway.decided}</span> decided
+            <p className="mt-phi-2 text-center font-mono text-[10px] tracking-[0.06em] tabular-nums text-oxford/35">
+              While you were away — {sinceAway.found} discovered · {sinceAway.reviewed} evaluated ·{' '}
+              {sinceAway.agent_decided ?? sinceAway.decided} decided
               {sinceAway.escalations > 0 ? (
-                <>
-                  <span className="mx-phi-2 text-oxford/20" aria-hidden>·</span>
-                  <span className="font-semibold text-escalation">{sinceAway.escalations}</span>
-                  <span className="text-escalation/80"> escalated</span>
-                </>
+                <span className="text-escalation/80"> · {sinceAway.escalations} escalated</span>
               ) : null}
             </p>
           ) : null}
-        </header>
+        </Reveal>
 
-        <div className="grid grid-cols-1 gap-x-phi-7 gap-y-phi-6 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
-          <div className="flex min-w-0 flex-col gap-phi-6">
-            {/* ── Requires judgment ── */}
-            <section aria-label="Requires judgment">
-              <SectionHead
-                title="Requires judgment"
-                action={
-                  requiresJudgment.length > 0
-                    ? { label: 'Open queue →', href: '/v1/flow?queue=escalated' }
-                    : undefined
-                }
-              />
-              {requiresJudgment.length === 0 ? (
-                <QuietEmpty>The instrument has nothing escalated. Rulings land here when the partner defers to you.</QuietEmpty>
-              ) : (
-                <ul className="mt-phi-2 flex flex-col">
-                  {requiresJudgment.slice(0, 6).map((s) => {
-                    const days = daysWaiting(s);
-                    return (
-                      <li key={s.id}>
-                        <DeskRow
-                          onClick={() => openDeal(s.id)}
-                          primary={s.scout.name}
-                          secondary={[s.scout.sector, s.scout.funding_stage].filter(Boolean).join(' · ') || undefined}
-                          right={
-                            <span
-                              className={`font-mono text-[11px] tabular-nums ${
-                                days != null && days >= 3 ? 'text-escalation' : 'text-oxford/45'
-                              }`}
-                            >
-                              {days != null ? `${days}d waiting` : '—'}
-                            </span>
-                          }
-                        />
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
-
-            {/* ── New arrivals ── */}
-            <section aria-label="New arrivals">
-              <SectionHead
-                title="New arrivals"
-                action={
-                  newArrivals.length > 0 ? { label: 'Triage →', href: '/v1/flow?queue=new' } : undefined
-                }
-              />
-              {newArrivals.length === 0 ? (
-                <QuietEmpty>No unseen companies. Scouts report against the active mandate each cycle.</QuietEmpty>
-              ) : (
-                <ul className="mt-phi-2 flex flex-col">
-                  {newArrivals.slice(0, 6).map((s) => (
-                    <li key={s.id}>
-                      <DeskRow
-                        onClick={() => openDeal(s.id)}
-                        primary={s.scout.name}
-                        secondary={[s.scout.sector, s.scout.funding_stage].filter(Boolean).join(' · ') || undefined}
-                        right={
-                          <span className="h-1.5 w-1.5 rounded-none bg-oxford signal-dot-breathe" aria-hidden />
-                        }
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+        {/* ── The doors ── */}
+        <Reveal delay={0.32} className="mt-phi-7 w-full max-w-[42rem]">
+          <div className="grid grid-cols-2 gap-phi-3 sm:grid-cols-4" role="navigation" aria-label="Workspaces">
+            <HomeKey
+              numeral="II"
+              label="Flow"
+              solid
+              detail={
+                needRuling > 0
+                  ? `${needRuling} need ruling`
+                  : newCount > 0
+                    ? `${newCount} new`
+                    : `${openCount} open`
+              }
+              detailTone={needRuling > 0 ? 'escalation' : 'default'}
+              onClick={() => navigate('/v1/flow')}
+            />
+            <HomeKey
+              numeral="III"
+              label="Portfolio"
+              detail={`${convictionCount} conviction · ${watchTotal} watch`}
+              onClick={() => navigate('/v1/portfolio')}
+            />
+            <HomeKey
+              numeral="IV"
+              label="Fund"
+              detail={mandateVersion != null ? `Mandate v${mandateVersion}` : 'No mandate'}
+              onClick={() => navigate('/v1/fund')}
+            />
+            <HomeKey
+              numeral="⌘K"
+              label="Dispatch"
+              detail={dispatchActive ? 'Lookup running' : 'Look up a company'}
+              onClick={openDispatch}
+            />
           </div>
+        </Reveal>
 
-          <div className="flex min-w-0 flex-col gap-phi-6">
-            {/* ── Latest judgments ── */}
-            <section aria-label="Latest judgments">
-              <SectionHead title="Latest judgments" action={{ label: 'Flow →', href: '/v1/flow' }} />
-              {latestJudgments.length === 0 ? (
-                <QuietEmpty>No verdicts yet. The record builds as the pipeline decides.</QuietEmpty>
-              ) : (
-                <ul className="mt-phi-2 flex flex-col">
-                  {latestJudgments.map((s) => (
-                    <li key={s.id}>
-                      <DeskRow
-                        onClick={() => openDeal(s.id)}
-                        primary={s.scout.name}
-                        secondary={
-                          judgedAt(s) ? new Date(judgedAt(s)).toLocaleDateString('en-GB') : undefined
-                        }
-                        right={<DecisionBadge variant={getDecisionBadgeVariant(s)} />}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            {/* ── Signals ── */}
-            <section aria-label="Signals">
-              <SectionHead title="Signals" action={{ label: 'Portfolio →', href: '/v1/portfolio' }} />
-              {recentSignals.length === 0 ? (
-                <QuietEmpty>No high-priority events detected.</QuietEmpty>
-              ) : (
-                <ul className="mt-phi-2 flex flex-col">
-                  {recentSignals.map((sig, i) => (
-                    <li key={sig.id ?? i} className="border-b border-oxford/[0.06] py-phi-3">
-                      <span className="flex items-baseline justify-between gap-phi-3">
-                        <span className="min-w-0 truncate type-meta uppercase tracking-[0.08em] text-oxford/55">
-                          {(sig.startup_id ? startupNameById.get(sig.startup_id) : null) ??
-                            sig.signal_type.replace(/_/g, ' ')}
-                        </span>
-                        <span className="shrink-0 font-mono text-[10px] tabular-nums text-oxford/35">
-                          {signalWhen(sig)}
-                        </span>
-                      </span>
-                      {sig.description ? (
-                        <span className="mt-phi-1 block type-body-sm leading-relaxed text-oxford/65">
-                          {sig.description}
-                        </span>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            {/* ── The instrument ── */}
-            <section aria-label="The instrument">
-              <SectionHead title="The instrument" action={{ label: 'Fund →', href: '/v1/fund' }} />
-              <dl className="mt-phi-2 flex flex-col">
-                <div className="flex items-baseline justify-between gap-phi-3 border-b border-oxford/[0.06] py-phi-2">
-                  <dt className="type-meta uppercase tracking-[0.1em] text-oxford/45">Awaiting review</dt>
-                  <dd className="font-mono text-[12px] tabular-nums text-oxford/70">{queueDepths?.unreviewed ?? '—'}</dd>
-                </div>
-                <div className="flex items-baseline justify-between gap-phi-3 border-b border-oxford/[0.06] py-phi-2">
-                  <dt className="type-meta uppercase tracking-[0.1em] text-oxford/45">Awaiting partner</dt>
-                  <dd className="font-mono text-[12px] tabular-nums text-oxford/70">{queueDepths?.undecided ?? '—'}</dd>
-                </div>
-                <div className="flex items-baseline justify-between gap-phi-3 border-b border-oxford/[0.06] py-phi-2">
-                  <dt className="type-meta uppercase tracking-[0.1em] text-oxford/45">Last correction cycle</dt>
-                  <dd className="font-mono text-[12px] tabular-nums text-oxford/70">
-                    {lastCycle ? new Date(lastCycle.ran_at).toLocaleDateString('en-GB') : 'Not yet run'}
-                  </dd>
-                </div>
-                <div className="flex items-baseline justify-between gap-phi-3 border-b border-oxford/[0.06] py-phi-2">
-                  <dt className="type-meta uppercase tracking-[0.1em] text-oxford/45">Mandate</dt>
-                  <dd className="font-mono text-[12px] tabular-nums text-oxford/70">
-                    {data.fundThesisRuntime?.active_version_number != null
-                      ? `v${data.fundThesisRuntime.active_version_number} active`
-                      : 'Not configured'}
-                  </dd>
-                </div>
-              </dl>
-            </section>
+        {/* ── The footer bar — Dispatch's micro-action language ── */}
+        <Reveal delay={0.42} className="mt-phi-8">
+          <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1 border-b border-oxford/10 pb-0.5">
+            <span className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/40">{displayName}</span>
+            {fundName || mandateVersion != null ? (
+              <>
+                <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
+                <Link
+                  to="/v1/fund"
+                  className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
+                >
+                  {fundName || `Mandate v${mandateVersion}`}
+                </Link>
+              </>
+            ) : null}
+            <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
+            <Link
+              to="/v1/settings"
+              className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
+            >
+              Settings
+            </Link>
+            <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
+            <button
+              type="button"
+              onClick={requestLogout}
+              disabled={agentActionPending}
+              className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 disabled:opacity-50 btn-interaction"
+            >
+              {agentActionPending ? 'Updating…' : 'Log out'}
+            </button>
           </div>
-        </div>
+        </Reveal>
       </div>
+
+      <AgentLogoutModal {...logoutModalProps} />
     </div>
   );
 }

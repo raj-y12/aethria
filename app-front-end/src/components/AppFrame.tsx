@@ -73,6 +73,11 @@ export function useAppFrame(): AppFrameContextValue {
 interface AppFrameProps {
   data: SystemData;
   startupsError?: string | null;
+  /**
+   * 'bare' drops the spine and mobile chrome — the front door (Today) is a
+   * centered Dispatch-style surface that carries its own navigation keys.
+   */
+  chrome?: 'full' | 'bare';
   children: ReactNode;
 }
 
@@ -81,9 +86,10 @@ interface AppFrameProps {
  * Dispatch command surface. Every workspace renders inside this frame so the
  * instrument's identity, telemetry, and ⌘K research are constant.
  */
-export default function AppFrame({ data, startupsError, children }: AppFrameProps) {
+export default function AppFrame({ data, startupsError, chrome = 'full', children }: AppFrameProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const bareChrome = chrome === 'bare';
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const reduceMotion = usePrefersReducedMotion();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -303,7 +309,7 @@ export default function AppFrame({ data, startupsError, children }: AppFrameProp
         />
 
         {/* Mobile / tablet top nav — desktop carries identity in the spine */}
-        {!isDesktop && (
+        {!isDesktop && !bareChrome && (
           <>
             <MobileHeader onMenuToggle={() => setMobileMenuOpen((open) => !open)} />
             <AnimatePresence>
@@ -370,13 +376,15 @@ export default function AppFrame({ data, startupsError, children }: AppFrameProp
         )}
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <AppSpine
-            telemetry={telemetry}
-            mandate={mandate}
-            dispatchActive={dispatch.lookupWorking}
-            onDispatch={dispatch.openCommandBar}
-            override={spineOverride}
-          />
+          {!bareChrome && (
+            <AppSpine
+              telemetry={telemetry}
+              mandate={mandate}
+              dispatchActive={dispatch.lookupWorking}
+              onDispatch={dispatch.openCommandBar}
+              override={spineOverride}
+            />
+          )}
           <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper">
             {children}
           </main>

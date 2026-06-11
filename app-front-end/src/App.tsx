@@ -79,7 +79,12 @@ function AppShell() {
       transition={{ duration: entryTransition.appRevealMs / 1000, ease: [0.16, 1, 0.3, 1] }}
     >
       <GrainOverlay opacity={0.028} />
-      <AppFrame data={systemData} startupsError={systemData.startupsError}>
+      <AppFrame
+        data={systemData}
+        startupsError={systemData.startupsError}
+        // The front door is a centered Dispatch-style surface with its own keys.
+        chrome={!isSettingsRoute && !isPortfolioRoute && !isFundRoute && !isFlowRoute ? 'bare' : 'full'}
+      >
         {isSettingsRoute ? (
           <Suspense fallback={<LoadingAnimation />}>
             <SettingsPage />
