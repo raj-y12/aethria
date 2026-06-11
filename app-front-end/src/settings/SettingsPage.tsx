@@ -319,14 +319,6 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
               {config.risk.requireAcknowledgement ? `${config.risk.sensitivity} sensitivity` : 'Acknowledgement disabled'}
             </p>
           </div>
-          <div className="border-t border-oxford/[0.06] pt-phi-4">
-            <p className="type-meta text-oxford/35">Sample outcome</p>
-            <p className="mt-phi-2 type-body-emphasis text-oxford">Verdict display settings</p>
-            <p className="mt-phi-1 type-body-sm text-oxford/55">
-              Percentage bands shape configured score language in the app. Verdict marks are
-              typographic — INVEST is the only filled chip.
-            </p>
-          </div>
         </div>
       </div>
     </aside>

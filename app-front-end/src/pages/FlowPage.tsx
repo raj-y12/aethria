@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import WorkGrid from '../components/WorkGrid';
 import PanelShell from '../components/PanelShell';
 import DecisionStage from '../components/DecisionStage';
-import EmptyState from '../components/EmptyState';
 import InvestmentMemo from '../components/InvestmentMemo';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from '../components/InvestmentMemoContent';
 import AgentDispatch from '../components/AgentDispatch';
@@ -39,7 +38,7 @@ const PANEL_ACTION_CLASS = productInteraction.panelActionInline;
  */
 export default function FlowPage({ data }: { data: SystemData }) {
   const { startups, signals, watchlistAnalytics } = data;
-  const { inlineDispatch, setPageOverlayOpen } = useAppFrame();
+  const { inlineDispatch, setPageOverlayOpen, openDispatch } = useAppFrame();
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const reduceMotion = usePrefersReducedMotion();
@@ -150,7 +149,27 @@ export default function FlowPage({ data }: { data: SystemData }) {
           />
         </div>
 
-        <div className="aethria-flow-grid flex min-h-0 flex-1 flex-col overflow-hidden lg:grid">
+        {startups.length === 0 ? (
+        /* Zero state — one statement in the house voice, not two duplicate panels. */
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center pb-phi-8 text-center">
+          <span className="block h-2 w-2 rounded-none bg-brand-mark" aria-hidden />
+          <h2 className="type-display mt-phi-5 text-[clamp(26px,3vw,40px)] leading-[1.1] text-oxford">
+            The pipeline is filling.
+          </h2>
+          <p className="mt-phi-3 max-w-[36ch] font-mono text-[11px] tracking-[0.06em] text-oxford/45">
+            Scouts are searching against the active mandate. The first matter takes the stage when it lands.
+          </p>
+          <button
+            type="button"
+            onClick={openDispatch}
+            className="mt-phi-6 inline-flex min-h-[40px] items-center gap-phi-2 rounded-none border border-oxford/[0.14] px-phi-5 font-mono text-[11px] uppercase tracking-[0.14em] text-oxford/70 transition-colors hover:border-oxford/45 hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
+          >
+            Dispatch a lookup
+            <span className="text-oxford/35" aria-hidden>⌘K</span>
+          </button>
+        </div>
+      ) : (
+      <div className="aethria-flow-grid flex min-h-0 flex-1 flex-col overflow-hidden lg:grid">
           {/* ── Queue ─────────────────────────────────────────────── */}
           <section
             className="min-h-0 overflow-y-auto overscroll-contain lg:border-r lg:border-oxford/[0.06] lg:pr-phi-4"
@@ -219,16 +238,10 @@ export default function FlowPage({ data }: { data: SystemData }) {
                   />
                 </motion.div>
               </PanelShell>
-            ) : startups.length === 0 ? (
-              <div className="flex h-full items-center justify-center px-phi-0">
-                <EmptyState
-                  label="Decision stage"
-                  body="Scouts are filling the workspace against the active mandate. The first matter takes the stage as soon as it lands."
-                />
-              </div>
             ) : null}
           </aside>
         </div>
+        )}
       </div>
 
       {/* Memo modal on small viewports; on desktop the right column shows the memo. */}

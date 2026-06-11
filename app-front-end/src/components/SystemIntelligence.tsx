@@ -947,15 +947,19 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
         {calibration.calibration_history.length === 0 ? (
           <p className="type-meta text-oxford/45 uppercase tracking-[0.18em]">No calibration history yet</p>
         ) : (
-          <div className="flex flex-col border border-oxford/[0.06] bg-oxford/[0.01]">
+          <div className="flex flex-col">
             {calibration.calibration_history.slice(-5).reverse().map((h, i) => (
-              <div key={i} className="grid grid-cols-[100px_1fr] gap-phi-4 border-b border-oxford/[0.06] last:border-0 p-phi-4 items-start">
-                <span className={`type-meta px-phi-2 py-phi-1 border ${h.direction === 'tightened' ? 'border-escalation/20 text-escalation/70' : 'border-oxford/[0.08] text-oxford/55'} text-center`}>
+              <div key={i} className="grid grid-cols-[110px_1fr] items-start gap-phi-4 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
+                <span
+                  className={`font-mono text-[9px] font-semibold uppercase tracking-[0.1em] ${
+                    h.direction === 'tightened' ? 'text-escalation/85' : 'text-oxford/55'
+                  }`}
+                >
                   {h.direction}
                 </span>
-                <div className="flex flex-col gap-phi-2">
-                  <span className="type-meta text-oxford/70 tracking-[0.06em]">{h.parameter.replace(/_/g, ' ')}</span>
-                  <p className="type-meta text-oxford/45 leading-relaxed font-mono">{h.reasoning}</p>
+                <div className="flex min-w-0 flex-col gap-phi-1">
+                  <span className="type-meta tracking-[0.06em] text-oxford/70">{h.parameter.replace(/_/g, ' ')}</span>
+                  <p className="type-meta leading-relaxed text-oxford/45">{h.reasoning}</p>
                 </div>
               </div>
             ))}

@@ -6,12 +6,9 @@
 import type { ReactNode } from 'react';
 import { productText } from '../design-system/productSystem';
 
+/** The brand's punctuation as the resting mark — a small verdigris square. */
 function DefaultMark() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" aria-hidden>
-      <circle cx="12" cy="12" r="9" />
-    </svg>
-  );
+  return <span className="block h-2 w-2 rounded-none bg-brand-mark" aria-hidden />;
 }
 
 interface EmptyStateProps {
@@ -23,9 +20,7 @@ interface EmptyStateProps {
 export default function EmptyState({ label, body, icon }: EmptyStateProps) {
   return (
     <div className="flex w-full flex-col items-start justify-center px-phi-6 py-phi-7 text-left sm:px-phi-7 empty-state-enter">
-      <div className="mb-phi-4 flex h-6 w-6 shrink-0 items-center justify-center text-oxford [&_svg]:h-full [&_svg]:w-full">
-        {icon ?? <DefaultMark />}
-      </div>
+      <div className="mb-phi-4 flex shrink-0 items-center">{icon ?? <DefaultMark />}</div>
       <p className={`${productText.mutedLabel} mb-phi-3 max-w-xs`}>{label}</p>
       <div className={`${productText.body} max-w-[28rem]`}>{body}</div>
     </div>
