@@ -166,7 +166,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
   return (
     <motion.section
       aria-label="Active decision"
-      className="pb-phi-5"
+      className="pt-phi-3 pb-phi-7"
       initial={reduceMotion ? false : 'hidden'}
       animate="visible"
       variants={reduceMotion ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
@@ -182,7 +182,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       ) : null}
 
       {/* Release: the number owns the canvas. */}
-      <motion.div variants={STAGE_ITEM} className="mt-phi-4 flex items-end gap-phi-4">
+      <motion.div variants={STAGE_ITEM} className="mt-phi-6 flex items-end gap-phi-4">
         <span
           className="font-mono font-bold leading-[0.85] tracking-[-0.05em] tabular-nums text-oxford"
           style={{ fontSize: 'clamp(72px, 9.5vw, 148px)' }}
@@ -200,7 +200,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       {/* The state of the call — the moment of tension. */}
       <motion.p
         variants={STAGE_ITEM}
-        className={`mt-phi-4 font-mono text-[13px] font-bold uppercase tracking-[0.18em] ${stateToneClass}`}
+        className={`mt-phi-5 font-mono text-[13px] font-bold uppercase tracking-[0.18em] ${stateToneClass}`}
       >
         {state.word}
       </motion.p>
@@ -209,7 +209,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
           result and the front door headline. */}
       <motion.h2
         variants={STAGE_ITEM}
-        className="type-display mt-phi-4 break-words leading-[1.05] text-oxford"
+        className="type-display mt-phi-5 break-words leading-[1.05] text-oxford"
         style={{ fontSize: 'clamp(30px, 3.4vw, 48px)' }}
       >
         {startup.scout.name}
@@ -228,7 +228,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       {hasInstruments ? (
         <motion.div
           variants={STAGE_ITEM}
-          className="mt-phi-6 grid grid-cols-1 gap-x-phi-6 gap-y-phi-4 border-t border-oxford/[0.08] pt-phi-4 sm:grid-cols-3"
+          className="mt-phi-7 grid grid-cols-1 gap-x-phi-6 gap-y-phi-4 border-t border-oxford/[0.08] pt-phi-5 sm:grid-cols-3"
         >
           {thesisTen != null ? (
             <Instrument label="Thesis fit" reading={`${thesisTen.toFixed(1)} /10`}>

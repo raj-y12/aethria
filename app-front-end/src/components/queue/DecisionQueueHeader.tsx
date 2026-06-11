@@ -179,12 +179,12 @@ export default function DecisionQueueHeader({
       className={`sticky top-0 z-20 ${productPanel.header} !px-phi-0`}
     >
       <div className="flex min-w-0 flex-col gap-phi-2">
-        <div className="min-w-0 flex flex-col gap-phi-1">
-          <p className={productText.mutedLabel}>Decision queue</p>
-          <p className="type-meta normal-case tracking-normal text-oxford/32">
-            {config.thresholds.staleAfterHours}h stale · {config.risk.sensitivity} risk
-          </p>
-        </div>
+        <p
+          className={productText.mutedLabel}
+          title={`${config.thresholds.staleAfterHours}h stale · ${config.risk.sensitivity} risk`}
+        >
+          Decision queue
+        </p>
 
         <div className="flex min-w-0 flex-wrap items-center gap-x-phi-3 gap-y-phi-1">
           <div className="flex items-center gap-0" role="group" aria-label="Queue views">

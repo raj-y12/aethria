@@ -135,12 +135,9 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
             }`}
           >
             <div className="min-w-0 flex-1">
-              {startup.scout.location?.trim() ? (
-                <p
-                  className={`type-meta uppercase tracking-[0.12em] ${
-                    isSelected ? 'mb-1.5 text-oxford/45' : 'mb-1 text-oxford/30'
-                  }`}
-                >
+              {/* Ambient rows are one line — context belongs to the selected row. */}
+              {isSelected && startup.scout.location?.trim() ? (
+                <p className="mb-1.5 type-meta uppercase tracking-[0.12em] text-oxford/45">
                   {startup.scout.location.trim()}
                 </p>
               ) : null}
@@ -169,46 +166,45 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
             </motion.div>
           </div>
 
-          <motion.div
-            layout={!reduceMotion}
-            className="flex min-w-0 flex-wrap items-center gap-x-phi-2 gap-y-phi-1"
-            initial={false}
-            animate={{ marginTop: isSelected ? 6 : hasMetaRow ? 3 : 2 }}
-            transition={selectTransition}
-          >
-            {sectorStage ? (
-              <p className={`type-meta uppercase tracking-[0.06em] ${isSelected ? 'text-oxford/42' : 'text-oxford/30'}`}>
-                {sectorStage}
-              </p>
-            ) : null}
-            {showDateMeta ? (
-              <>
-                {metaSep(Boolean(sectorStage))}
-                <span className={`type-meta tracking-[0.06em] ${isSelected ? 'text-oxford/42' : 'text-oxford/30'}`}>
-                  {formatRowDate(sortKeyValue)}
-                </span>
-              </>
-            ) : null}
-            {showAttentionBadge ? (
-              <>
-                {metaSep(Boolean(sectorStage || showDateMeta))}
-                <QueueAttentionBadge driver={attentionDriver} ctx={{ ageDays }} prominent={isSelected} />
-              </>
-            ) : null}
-            {resolutionBadge ? (
-              <>
-                {metaSep(Boolean(sectorStage || showDateMeta || showAttentionBadge))}
-                <span
-                  className={`type-meta uppercase tracking-[0.08em] ${
-                    isSelected ? 'text-oxford/55' : 'text-oxford/35'
-                  }`}
-                  title="Company Resolver: identity evidence is incomplete — open the memo to see what was found and what's missing."
-                >
-                  {resolutionBadge}
-                </span>
-              </>
-            ) : null}
-          </motion.div>
+          {/* Meta row — selected only; ambient rows stay a single line. */}
+          {isSelected && hasMetaRow ? (
+            <motion.div
+              layout={!reduceMotion}
+              className="mt-phi-2 flex min-w-0 flex-wrap items-center gap-x-phi-2 gap-y-phi-1"
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={selectTransition}
+            >
+              {sectorStage ? (
+                <p className="type-meta uppercase tracking-[0.06em] text-oxford/42">{sectorStage}</p>
+              ) : null}
+              {showDateMeta ? (
+                <>
+                  {metaSep(Boolean(sectorStage))}
+                  <span className="type-meta tracking-[0.06em] text-oxford/42">
+                    {formatRowDate(sortKeyValue)}
+                  </span>
+                </>
+              ) : null}
+              {showAttentionBadge ? (
+                <>
+                  {metaSep(Boolean(sectorStage || showDateMeta))}
+                  <QueueAttentionBadge driver={attentionDriver} ctx={{ ageDays }} prominent={isSelected} />
+                </>
+              ) : null}
+              {resolutionBadge ? (
+                <>
+                  {metaSep(Boolean(sectorStage || showDateMeta || showAttentionBadge))}
+                  <span
+                    className="type-meta uppercase tracking-[0.08em] text-oxford/55"
+                    title="Company Resolver: identity evidence is incomplete — open the memo to see what was found and what's missing."
+                  >
+                    {resolutionBadge}
+                  </span>
+                </>
+              ) : null}
+            </motion.div>
+          ) : null}
 
           <AnimatePresence initial={false} mode="popLayout">
             {/* Description lives only on the selected row — ambient rows stay calm. */}
