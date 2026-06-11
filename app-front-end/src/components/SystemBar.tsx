@@ -62,14 +62,14 @@ export function SpineNavButton({
 }) {
   const onPaper = surface === 'paper';
   const textActive = onPaper ? 'text-oxford' : 'text-white';
-  const textIdle = onPaper ? 'text-oxford/50 hover:text-oxford/80' : 'text-white/55 hover:text-white/88';
+  const textIdle = onPaper ? 'text-oxford/50 hover:text-oxford/80' : 'text-white/55 hover:text-white/[0.88]';
   const ring = onPaper ? 'focus-visible:ring-oxford/35' : 'focus-visible:ring-white/35';
   const bgActive = onPaper ? 'bg-surface-selected' : 'bg-white/[0.08]';
   const bgHover = onPaper ? 'hover:bg-oxford/[0.04]' : 'hover:bg-white/[0.05]';
   const shortcutActive = onPaper ? 'text-oxford/60' : 'text-white/75';
   const shortcutIdle = onPaper
     ? 'text-oxford/25 group-hover:text-oxford/45'
-    : 'text-white/30 group-hover:text-white/52';
+    : 'text-white/30 group-hover:text-white/[0.52]';
 
   return (
     <button

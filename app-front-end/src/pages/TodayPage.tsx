@@ -152,7 +152,7 @@ export default function TodayPage({ data }: { data: SystemData }) {
         </Reveal>
 
         <Reveal delay={0.16} y={12} className="mt-phi-4">
-          <h1 className="type-display m-0 max-w-[18ch] text-center text-[clamp(30px,4.2vw,54px)] font-medium leading-[1.1] text-oxford">
+          <h1 className="type-display m-0 max-w-[24ch] text-center text-[clamp(30px,4.2vw,54px)] font-medium leading-[1.1] text-oxford">
             {headline}
           </h1>
         </Reveal>

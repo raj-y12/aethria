@@ -49,7 +49,7 @@ function ThresholdBar({ boundaries }: { boundaries: DecisionThresholdBoundaries 
           Invest
         </div>
       </div>
-      <p className="mt-phi-2 font-mono text-[11px] tabular-nums text-oxford/42">
+      <p className="mt-phi-2 font-mono text-[11px] tabular-nums text-oxford/[0.42]">
         0–{passMax} · {boundaries.passMonitorBoundary}–{monitorMax} · {boundaries.monitorInvestBoundary}–100
       </p>
     </div>

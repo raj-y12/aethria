@@ -350,6 +350,12 @@ export function installMockApi() {
       });
     }
     if (url.includes('/api/fund-thesis/runtime')) return json(MOCK_SYSTEM_DATA.fundThesisRuntime);
+    if (/\/api\/fund-thesis\/?($|\?)/.test(url)) {
+      return json({
+        active_version_id: 'v3', active_version_number: 3,
+        parsed_json: { fund_name: "Aethria's Fund Thesis", sectors: ['B2B SaaS', 'AI', 'Climate'], stage_focus: ['Pre-seed', 'Seed'], geography: ['Europe', 'UK/Ireland'] },
+      });
+    }
     if (url.includes('/api/activity/summary')) {
       return json({ found: 12, reviewed: 8, decided: 5, agent_decided: 5, human_reviewed: 1, escalations: 2 });
     }

@@ -175,7 +175,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       {kicker ? (
         <motion.p
           variants={STAGE_ITEM}
-          className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/38"
+          className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/[0.38]"
         >
           {kicker}
         </motion.p>
@@ -190,7 +190,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
         >
           {score != null ? <CountUp to={score} delay={0.15} reduceMotion={reduceMotion} /> : '—'}
         </span>
-        <span className="pb-[6px] font-mono text-[10px] uppercase leading-[1.5] tracking-[0.12em] text-oxford/38">
+        <span className="pb-[6px] font-mono text-[10px] uppercase leading-[1.5] tracking-[0.12em] text-oxford/[0.38]">
           /100
           <br />
           conviction
@@ -268,7 +268,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       {/* What decides it — the single question the deal hinges on. */}
       {focalQuestion ? (
         <motion.div variants={STAGE_ITEM} className="mt-phi-5 border-l-2 border-oxford/25 pl-phi-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/38">What decides it</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/[0.38]">What decides it</p>
           <p className="mt-phi-1 max-w-[34rem] font-sans text-[14px] leading-[1.5] text-oxford/80">
             {focalQuestion}
           </p>

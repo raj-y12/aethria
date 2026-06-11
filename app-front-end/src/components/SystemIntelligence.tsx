@@ -57,17 +57,6 @@ function mandateTagList(value: unknown): string[] {
   return value.filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
 }
 
-function formatAlignmentPct(score: number | null | undefined): string {
-  if (score == null || Number.isNaN(score)) return '--';
-  return `${Math.round(score * 100)}%`;
-}
-
-function formatDrift(drift: number | null | undefined): string {
-  if (drift == null || Number.isNaN(drift)) return '--';
-  const rounded = Math.round(drift * 1000) / 1000;
-  return rounded > 0 ? `+${rounded.toFixed(2)}` : rounded.toFixed(2);
-}
-
 const REVIEWER_EVAL_AGENTS = new Set(['DefaultReviewer', 'SkepticalReviewer', 'OpportunistReviewer']);
 
 const TAB_CONTENT_CONTAINER_VARIANTS: Variants = {
@@ -291,7 +280,7 @@ function CalibrationTab({ startups, fundConfiguration }: { startups: Startup[]; 
           ].map(([label, value]) => (
             <div key={label} className="border-t border-oxford/[0.08] pt-phi-3">
               <span className="font-mono type-meta text-oxford/65 tabular-nums">{value}</span>
-              <span className="block mt-phi-1 type-meta uppercase tracking-[0.12em] text-oxford/38">{label}</span>
+              <span className="block mt-phi-1 type-meta uppercase tracking-[0.12em] text-oxford/[0.38]">{label}</span>
             </div>
           ))}
         </div>
@@ -301,7 +290,7 @@ function CalibrationTab({ startups, fundConfiguration }: { startups: Startup[]; 
           <ul className="flex flex-col">
             {snapshot.commonRiskThemes.map((item) => (
               <li key={item.theme} className="flex items-baseline justify-between gap-phi-4 border-t border-oxford/[0.06] py-phi-3 first:border-t-0">
-                <span className="type-note text-oxford/68">{item.theme}</span>
+                <span className="type-note text-oxford/[0.68]">{item.theme}</span>
                 <span className="font-mono type-meta text-oxford/45 tabular-nums">{item.count}</span>
               </li>
             ))}
@@ -463,7 +452,12 @@ function MandateTagGroup({ label, tags }: { label: string; tags: string[] }) {
       {tags.length > 0 ? (
         <div className="flex flex-wrap gap-phi-2 mt-phi-1">
           {tags.map((s) => (
-            <span key={s} className="type-meta bg-registerTint px-phi-2 py-phi-1 text-oxford/55">{s}</span>
+            <span
+              key={s}
+              className="inline-flex items-center rounded-none border border-oxford/[0.16] px-phi-3 py-phi-1 type-meta text-oxford/65"
+            >
+              {s}
+            </span>
           ))}
         </div>
       ) : (
@@ -510,50 +504,18 @@ function InstitutionalMandateTab({
   const pj = data.parsed_json ?? {};
   const sectors = mandateTagList(pj.sectors);
   const stages = mandateTagList(pj.stage_focus);
-  const reviewedCount = data.alignment_stats?.reviewed_with_thesis_count ?? 0;
-  const pctMatch = data.alignment_stats?.pct_matching_thesis;
   const mandateMode = data.thesis_mode === 'embedding' ? 'AI Enhanced' : 'Rule Based';
 
   return (
     <>
       <TabSection title="Portfolio Mandate" label={`v${data.active_version_number ?? '01'}`}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-phi-5">
-          <div className="flex flex-col gap-phi-5">
-            <MandateTagGroup label="Target Sectors" tags={sectors} />
-            <MandateTagGroup label="Stage Focus" tags={stages} />
-          </div>
-          <div className="flex flex-col gap-phi-3 p-phi-4 bg-registerTint">
-            <span className="type-meta text-oxford/30 uppercase tracking-[0.12em]">Agent Directive</span>
-            <p className="type-body text-oxford/60 leading-relaxed italic">
-              Scouts prioritize {sectors[0] || 'core sector'} at {stages[0] || 'target stage'}.
-              {' '}
-              <span className="text-oxford/80">{mandateMode}</span> mandate.
-            </p>
-          </div>
+        <div className="grid grid-cols-1 gap-phi-5 md:grid-cols-2">
+          <MandateTagGroup label="Target Sectors" tags={sectors} />
+          <MandateTagGroup label="Stage Focus" tags={stages} />
         </div>
-      </TabSection>
-
-      <TabSection title="Alignment" label={reviewedCount > 0 ? `${reviewedCount} reviewed` : undefined}>
-        <div className="grid grid-cols-3 gap-phi-4">
-          <div className="bg-registerTint px-phi-3 py-phi-3">
-            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">
-              {pctMatch != null ? `${pctMatch}%` : '--'}
-            </span>
-            <span className="type-meta text-oxford/50">Mandate match</span>
-          </div>
-          <div className="bg-registerTint px-phi-3 py-phi-3">
-            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">
-              {formatAlignmentPct(data.alignment_stats?.avg_alignment_score)}
-            </span>
-            <span className="type-meta text-oxford/50">Mean alignment</span>
-          </div>
-          <div className="bg-registerTint px-phi-3 py-phi-3">
-            <span className="block font-mono font-semibold text-2xl text-oxford tabular-nums">
-              {formatDrift(data.alignment_stats?.drift_vs_previous)}
-            </span>
-            <span className="type-meta text-oxford/50">Drift</span>
-          </div>
-        </div>
+        <p className="mt-phi-4 type-meta text-oxford/40">
+          {mandateMode} mandate · scouts prioritise {sectors[0] || 'core sector'} at {stages[0] || 'target stage'}.
+        </p>
       </TabSection>
 
       {(data.version_timeline?.length ?? 0) > 0 && (

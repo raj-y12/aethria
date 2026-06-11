@@ -70,7 +70,7 @@ function AdvancedChip({
       onClick={onClick}
       aria-pressed={active}
       className={`type-meta text-[10px] min-h-[36px] whitespace-nowrap px-[40px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-        active ? 'bg-oxford text-paper' : 'bg-oxford/[0.035] hover:bg-oxford/[0.065] text-oxford/58'
+        active ? 'bg-oxford text-paper' : 'bg-oxford/[0.035] hover:bg-oxford/[0.065] text-oxford/[0.58]'
       }`}
     >
       {label}
@@ -118,7 +118,7 @@ function QueueTab({
                 : 'rounded-none bg-paper px-phi-1 text-oxford'
               : active
                 ? 'text-oxford/55'
-                : 'text-oxford/28'
+                : 'text-oxford/[0.28]'
           }`}
           initial={reduceMotion || !emphasize ? false : { scale: 0.92, opacity: 0.9 }}
           animate={reduceMotion || !emphasize ? undefined : { scale: [0.92, 1.08, 1], opacity: [0.9, 1, 1] }}
@@ -230,7 +230,7 @@ export default function DecisionQueueHeader({
               aria-expanded={showAdvancedFilters}
               aria-label={showAdvancedFilters ? 'Hide filters' : 'More filters'}
               className={`group inline-flex h-9 w-9 shrink-0 items-center justify-center leading-none transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-                showAdvancedFilters || hasActiveFilters ? 'text-oxford' : 'text-oxford/34 hover:text-oxford/55'
+                showAdvancedFilters || hasActiveFilters ? 'text-oxford' : 'text-oxford/[0.34] hover:text-oxford/55'
               }`}
             >
               <span

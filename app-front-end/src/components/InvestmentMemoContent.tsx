@@ -1122,7 +1122,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         {vitalsStrip.map((v) => (
                           <div key={v.label} className="flex items-baseline gap-2">
                             <dt className="type-label uppercase tracking-[0.06em] text-oxford/45">{v.label}</dt>
-                            <dd className="type-data text-oxford/82 tabular-nums">{renderWithMonoNumbers(v.value)}</dd>
+                            <dd className="type-data text-oxford/[0.82] tabular-nums">{renderWithMonoNumbers(v.value)}</dd>
                           </div>
                         ))}
                       </dl>

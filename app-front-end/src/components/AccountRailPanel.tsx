@@ -33,7 +33,7 @@ export default function AccountRailPanel({ settingsPath }: AccountRailPanelProps
             <Link to={settingsPath} className={RAIL_ACTION_CLASS}>
               Settings
             </Link>
-            <span className="font-mono text-[9px] text-oxford/22 px-phi-1" aria-hidden>
+            <span className="font-mono text-[9px] text-oxford/[0.22] px-phi-1" aria-hidden>
               ·
             </span>
             <button

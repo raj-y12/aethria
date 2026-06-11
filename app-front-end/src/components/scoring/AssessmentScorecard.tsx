@@ -242,7 +242,7 @@ export default function AssessmentScorecard({
             <div className="space-y-1.5">
               <p className="type-meta uppercase tracking-[0.08em] text-oxford/55">How this was scored</p>
               {METHOD_COPY.map((line, i) => (
-                <p key={i} className="type-note leading-relaxed text-oxford/72">{renderNumbers(line)}</p>
+                <p key={i} className="type-note leading-relaxed text-oxford/[0.72]">{renderNumbers(line)}</p>
               ))}
             </div>
           }

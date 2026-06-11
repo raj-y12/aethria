@@ -285,7 +285,7 @@ export default function DispatchCommandBar({
                   className={`inline-flex items-center gap-phi-2 border px-phi-3 py-phi-1 font-mono text-[10px] uppercase tracking-[0.1em] transition-colors btn-interaction ${
                     c.active
                       ? 'border-oxford/30 bg-oxford/[0.06] text-oxford'
-                      : 'border-oxford/12 text-oxford/45 hover:border-oxford/25 hover:text-oxford/70'
+                      : 'border-oxford/[0.12] text-oxford/45 hover:border-oxford/25 hover:text-oxford/70'
                   }`}
                 >
                   <span

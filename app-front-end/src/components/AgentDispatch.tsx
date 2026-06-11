@@ -49,15 +49,15 @@ function phaseState(lookupPhase: LookupPhase, phase: Phase) {
 function LookupPhaseLine({ lookupPhase, className = '' }: { lookupPhase: LookupPhase; className?: string }) {
   if (!lookupPhase) return null;
   return (
-    <p className={`type-meta text-oxford/28 ${className}`} aria-live="polite">
+    <p className={`type-meta text-oxford/[0.28] ${className}`} aria-live="polite">
       {PHASES.map((phase, i) => {
         const { isCurrentPhase, isPast } = phaseState(lookupPhase, phase);
         return (
           <span key={phase}>
-            {i > 0 ? <span className="text-oxford/18"> · </span> : null}
+            {i > 0 ? <span className="text-oxford/[0.18]"> · </span> : null}
             <span
               className={
-                isCurrentPhase ? 'text-oxford/55' : isPast ? 'text-oxford/36' : 'text-oxford/22'
+                isCurrentPhase ? 'text-oxford/55' : isPast ? 'text-oxford/[0.36]' : 'text-oxford/[0.22]'
               }
             >
               {phase}
@@ -102,8 +102,8 @@ function DispatchPanelBody({
   const [focused, setFocused] = useState(false);
 
   const inputCls = embedded
-    ? 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-medium font-sans text-[13px] leading-[1.5] text-oxford placeholder:text-oxford/28 outline-none disabled:cursor-not-allowed'
-    : 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/28 outline-none disabled:cursor-not-allowed';
+    ? 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-medium font-sans text-[13px] leading-[1.5] text-oxford placeholder:text-oxford/[0.28] outline-none disabled:cursor-not-allowed'
+    : 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/[0.28] outline-none disabled:cursor-not-allowed';
 
   const showStatusSlot = isBusy || !!lookupMessage;
   const statusSlotCls = embedded
@@ -135,14 +135,14 @@ function DispatchPanelBody({
       );
     }
     if (!isBusy) return null;
-    return <p className={embedded ? `${railEditorial.meta} text-oxford/32` : 'type-meta text-oxford/35'}>Dispatch active.</p>;
+    return <p className={embedded ? `${railEditorial.meta} text-oxford/[0.32]` : 'type-meta text-oxford/35'}>Dispatch active.</p>;
   })();
 
   return (
     <>
       <div
         className={`relative flex items-center gap-phi-3 border-b transition-colors duration-200 ${
-          focused ? 'border-oxford/45' : isActive ? 'border-oxford/22' : 'border-oxford/[0.12]'
+          focused ? 'border-oxford/45' : isActive ? 'border-oxford/[0.22]' : 'border-oxford/[0.12]'
         }`}
         aria-label="Pipeline dispatch"
       >
@@ -228,9 +228,9 @@ export default function AgentDispatch({
       {showCompactShell ? (
         <div className="flex min-w-0 items-center justify-between gap-phi-3 border border-oxford/[0.08] bg-paper px-phi-3 py-phi-3">
           <div className="min-w-0">
-            <p className={`${railEditorial.meta} text-oxford/68`}>{shellTone}</p>
+            <p className={`${railEditorial.meta} text-oxford/[0.68]`}>{shellTone}</p>
             <div className="mt-phi-1 flex min-w-0 items-start gap-phi-2">
-              <p className={`${railEditorial.meta} min-w-0 flex-1 ${hasStatus ? 'text-oxford/52' : 'text-oxford/32'}`}>
+              <p className={`${railEditorial.meta} min-w-0 flex-1 ${hasStatus ? 'text-oxford/[0.52]' : 'text-oxford/[0.32]'}`}>
                 <span className="block truncate">{shellBody}</span>
               </p>
               {onClearMessage && hasStatus ? (
@@ -294,13 +294,13 @@ export default function AgentDispatch({
         <div className="min-w-0">
           {isCompactEmbedded && !isRunning ? (
             <div className="mb-phi-2 flex items-center justify-between gap-phi-3">
-              <p className={`${railEditorial.meta} text-oxford/36`}>
+              <p className={`${railEditorial.meta} text-oxford/[0.36]`}>
                 {hasStatus ? 'Latest dispatch status.' : 'Ready for a targeted lookup.'}
               </p>
               <button
                 type="button"
                 onClick={() => setExpanded(false)}
-                className="type-meta text-oxford/28 hover:text-oxford/55 bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
+                className="type-meta text-oxford/[0.28] hover:text-oxford/55 bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
               >
                 Hide
               </button>

@@ -69,8 +69,8 @@ const inputCls =
 const selectCls =
   `${inputCls} cursor-pointer appearance-none bg-no-repeat bg-[length:10px] bg-[center_right_2px] pr-7`;
 const labelCls = 'type-label-section text-oxford/45';
-const sectionLabelCls = 'type-label-section text-oxford/72';
-const metaCls = 'type-meta text-oxford/42';
+const sectionLabelCls = 'type-label-section text-oxford/[0.72]';
+const metaCls = 'type-meta text-oxford/[0.42]';
 const actionBtnCls =
   'type-label-section inline-flex min-h-[36px] items-center rounded-none border-0 bg-transparent p-0 text-oxford/55 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
 const solidBtnCls =
@@ -169,7 +169,7 @@ function TextAreaField({
         rows={rows}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full resize-y rounded-none border border-oxford/[0.08] bg-oxford/[0.025] px-phi-3 py-phi-3 type-body-sm leading-relaxed text-oxford outline-none transition-colors placeholder:text-oxford/25 focus:border-oxford/28"
+        className="w-full resize-y rounded-none border border-oxford/[0.08] bg-oxford/[0.025] px-phi-3 py-phi-3 type-body-sm leading-relaxed text-oxford outline-none transition-colors placeholder:text-oxford/25 focus:border-oxford/[0.28]"
       />
       {hint && <p className={metaCls}>{hint}</p>}
     </div>
@@ -193,7 +193,7 @@ function ToggleRow({
     <div className="flex items-center justify-between gap-phi-5 border-b border-oxford/[0.055] py-phi-3 last:border-0">
       <div className="min-w-0">
         <label htmlFor={id} className="type-body-sm text-oxford">{label}</label>
-        {hint && <p className="mt-phi-1 type-meta leading-snug text-oxford/38">{hint}</p>}
+        {hint && <p className="mt-phi-1 type-meta leading-snug text-oxford/[0.38]">{hint}</p>}
       </div>
       <button
         id={id}
@@ -284,7 +284,7 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
           <div>
             <p className="type-meta text-oxford/35">Mandate</p>
             <p className="mt-phi-2 type-body-emphasis text-oxford">{config.mandate.fundName || 'Unnamed fund'}</p>
-            <p className="mt-phi-1 type-body-sm text-oxford/52">
+            <p className="mt-phi-1 type-body-sm text-oxford/[0.52]">
               {[...config.mandate.preferredStages, ...config.mandate.geographies].filter(Boolean).join(' · ') || 'No mandate scope set'}
             </p>
           </div>
@@ -304,11 +304,11 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
             <p className="type-meta text-oxford/35">Score cutoffs</p>
             <div className="mt-phi-3 flex flex-col gap-phi-2">
               {config.scoreBands.map((item) => (
-                <p key={item.id} className="type-meta text-oxford/52">
+                <p key={item.id} className="type-meta text-oxford/[0.52]">
                   <span className="font-mono tabular-nums">{item.min}–{item.max}</span> {item.label}
                 </p>
               ))}
-              <p className="type-meta text-oxford/38">
+              <p className="type-meta text-oxford/[0.38]">
                 Stale after {config.thresholds.staleAfterHours}h · confidence ≥ {config.thresholds.confidenceFloor}
               </p>
             </div>
@@ -527,7 +527,7 @@ export default function SettingsPage() {
             surface="oxford"
             onClick={() => navigate('/v1')}
           />
-          <p className="px-2 pb-phi-1 pt-phi-4 font-mono text-[10px] uppercase tracking-[0.12em] text-white/38">
+          <p className="px-2 pb-phi-1 pt-phi-4 font-mono text-[10px] uppercase tracking-[0.12em] text-white/[0.38]">
             Configuration
           </p>
           {sections.map((section) => (
@@ -545,7 +545,7 @@ export default function SettingsPage() {
       footer: (
         <section aria-label="Draft status" className="border-t border-white/[0.07] px-2 pt-phi-3">
           <div className="flex items-center justify-between gap-phi-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/38">Draft</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/[0.38]">Draft</span>
             <span
               className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] ${
                 unsaved ? 'text-escalation-bright/90' : 'text-white/45'
@@ -766,7 +766,7 @@ export default function SettingsPage() {
                       <button type="button" onClick={publishThesis} disabled={thesisBusy || thesisPublishDisabledReason != null} className={actionBtnCls}>
                         {thesisBusy ? 'Publishing...' : 'Publish fund thesis version'}
                       </button>
-                      <p className="type-meta text-oxford/38">
+                      <p className="type-meta text-oxford/[0.38]">
                         {thesisPublishDisabledReason ?? (thesisSummary ? `Active thesis v${thesisSummary.active_version_number}` : 'No active thesis loaded')}
                       </p>
                     </div>
@@ -835,7 +835,7 @@ export default function SettingsPage() {
                           {policyBusy ? 'Publishing...' : 'Publish version'}
                         </button>
                         {draft.lastPublishedAt && (
-                          <p className="type-meta text-oxford/38">Last published {new Date(draft.lastPublishedAt).toLocaleString()}</p>
+                          <p className="type-meta text-oxford/[0.38]">Last published {new Date(draft.lastPublishedAt).toLocaleString()}</p>
                         )}
                       </div>
                     </div>
@@ -918,7 +918,7 @@ export default function SettingsPage() {
                 <SettingsSection id="rubric" title="Evaluation Framework" kicker="Aethria's institutional scoring framework. Dimensions are fixed to ensure score consistency across all evaluations — this is read-only reference. Adjust and publish weights in Scoring Weights.">
                   <div className="flex flex-col gap-phi-5">
                     <div className="border-b border-oxford/[0.06] pb-phi-4">
-                      <p className="type-body-sm leading-relaxed text-oxford/52">
+                      <p className="type-body-sm leading-relaxed text-oxford/[0.52]">
                         Every startup is evaluated across five institutional dimensions. Score definitions are fixed to ensure a 7 in Market always means the same thing regardless of fund configuration. You can adjust dimension weights to reflect your fund's investment priorities.
                       </p>
                     </div>

@@ -66,9 +66,9 @@ function SpineRule() {
 }
 
 const PIPELINE_TONE: Record<SpinePipelineState, { text: string; dot: string }> = {
-  Live: { text: 'text-white/72', dot: 'bg-white signal-dot-breathe' },
+  Live: { text: 'text-white/[0.72]', dot: 'bg-white signal-dot-breathe' },
   Idle: { text: 'text-white/40', dot: 'bg-white/35' },
-  Off: { text: 'text-white/28', dot: 'bg-white/18' },
+  Off: { text: 'text-white/[0.28]', dot: 'bg-white/[0.18]' },
   Stopping: { text: 'text-white/50', dot: 'bg-white/40 pulse-soft' },
   Issue: { text: 'text-escalation-bright', dot: 'bg-escalation-bright escalation-dot-active' },
 };
@@ -165,70 +165,55 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
             override.footer ?? null
           ) : (
             <>
-          {/* ── Judgment pressure ────────────────────────────────── */}
-          <section aria-label="Pipeline overview" className="px-2">
-            <div className="flex items-end justify-between gap-phi-3">
-              <div className="min-w-0">
-                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/38">{heroLabel}</p>
-                {hasEscalations ? (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/v1/flow?queue=escalated')}
-                    title="Review escalations"
-                    aria-label={`Review ${heroValue} items needing a ruling`}
-                    className="mt-phi-1 block font-mono text-[clamp(1.6rem,2.4vw,2.25rem)] font-bold leading-none tracking-[-0.04em] tabular-nums text-escalation-bright transition-opacity hover:opacity-80 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
-                  >
-                    {heroValue.toLocaleString()}
-                  </button>
-                ) : (
-                  <p
-                    className="mt-phi-1 font-mono text-[clamp(1.6rem,2.4vw,2.25rem)] font-bold leading-none tracking-[-0.04em] tabular-nums text-white/92"
-                    aria-live="polite"
-                  >
-                    {heroValue.toLocaleString()}
-                  </p>
-                )}
-              </div>
+          {/* ── Telemetry: status row, one hero number, one counts line ── */}
+          <section aria-label="Pipeline telemetry" className="px-2">
+            <div className="flex items-center justify-between gap-phi-3 border-t border-white/[0.07] pt-phi-3">
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/[0.38]">Pipeline</span>
               <span
-                className={`inline-flex shrink-0 items-center gap-phi-2 pb-px font-mono text-[10px] uppercase tracking-[0.10em] ${pipelineTone.text}`}
-                title="Pipeline status"
+                className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] ${pipelineTone.text}`}
               >
                 <span className={`h-1.5 w-1.5 shrink-0 rounded-none ${pipelineTone.dot}`} aria-hidden />
                 {telemetry.pipelineState}
               </span>
             </div>
+            {telemetry.pipelineState === 'Issue' ? (
+              <Link
+                to="/v1/settings"
+                className="mt-phi-2 block font-mono text-[10px] uppercase tracking-[0.10em] text-escalation-bright/85 hover:text-escalation-bright btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+              >
+                Needs attention →
+              </Link>
+            ) : null}
 
-            <p className="mt-phi-3 border-t border-white/[0.07] pt-phi-3 font-mono text-[10px] tracking-[0.04em] tabular-nums text-white/40">
+            <div className="mt-phi-4">
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/[0.38]">{heroLabel}</p>
+              {hasEscalations ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/v1/flow?queue=escalated')}
+                  title="Review escalations"
+                  aria-label={`Review ${heroValue} items needing a ruling`}
+                  className="mt-phi-1 block font-mono text-[clamp(1.9rem,2.6vw,2.5rem)] font-bold leading-none tracking-[-0.04em] tabular-nums text-escalation-bright transition-opacity hover:opacity-80 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                >
+                  {heroValue.toLocaleString()}
+                </button>
+              ) : (
+                <p
+                  className="mt-phi-1 font-mono text-[clamp(1.9rem,2.6vw,2.5rem)] font-bold leading-none tracking-[-0.04em] tabular-nums text-white/[0.92]"
+                  aria-live="polite"
+                >
+                  {heroValue.toLocaleString()}
+                </p>
+              )}
+            </div>
+
+            <p className="mt-phi-3 font-mono text-[10px] tracking-[0.04em] tabular-nums text-white/40">
               <span className="font-semibold text-white/75">{telemetry.totalCount.toLocaleString()}</span> total
               <span className="mx-phi-2 text-white/20" aria-hidden>·</span>
               <span className="font-semibold text-white/75">{telemetry.agentDecidedCount.toLocaleString()}</span> rec
               <span className="mx-phi-2 text-white/20" aria-hidden>·</span>
               <span className="font-semibold text-white/75">{telemetry.humanRuledCount.toLocaleString()}</span> ruled
             </p>
-
-            {telemetry.pipelineState === 'Issue' ? (
-              <Link
-                to="/v1/settings"
-                className="mt-phi-3 block font-mono text-[10px] uppercase tracking-[0.10em] text-escalation-bright/85 hover:text-escalation-bright btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
-              >
-                Pipeline needs attention →
-              </Link>
-            ) : null}
-
-            {telemetry.newCount > 0 ? (
-              <button
-                type="button"
-                onClick={() => navigate('/v1/flow?queue=new')}
-                aria-label={`Triage ${telemetry.newCount} new ${telemetry.newCount === 1 ? 'company' : 'companies'}`}
-                className="group mt-phi-3 flex w-full items-center gap-phi-2 border-t border-white/[0.07] pt-phi-3 text-left btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
-              >
-                <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-white signal-dot-breathe" aria-hidden />
-                <span className="font-mono text-[10px] tracking-[0.04em] tabular-nums text-white/50 transition-colors group-hover:text-white/85">
-                  <span className="font-semibold text-white/80">{telemetry.newCount.toLocaleString()}</span> new · triage
-                </span>
-                <span className="ml-auto font-mono text-[10px] text-white/30 transition-colors group-hover:text-white/60" aria-hidden>→</span>
-              </button>
-            ) : null}
           </section>
 
           {/* ── Mandate ──────────────────────────────────────────── */}
@@ -244,7 +229,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
             className="group flex w-full min-w-0 flex-col gap-phi-2 border-t border-white/[0.07] px-2 pt-phi-3 text-left btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
           >
             <span className="flex items-center justify-between gap-phi-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/38">
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/[0.38]">
                 Mandate
                 {mandate.hasThesis && mandate.versionNumber != null ? ` · v${mandate.versionNumber}` : ''}
               </span>

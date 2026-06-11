@@ -30,7 +30,7 @@ function Readout({ label, value, tone }: { label: string; value: string; tone?: 
 function SectionHead({ title, detail }: { title: string; detail?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-phi-4 border-t border-oxford/[0.075] pt-phi-4">
-      <h2 className="type-label-section text-oxford/72">{title}</h2>
+      <h2 className="type-label-section text-oxford/[0.72]">{title}</h2>
       {detail ? <span className="type-meta tabular-nums text-oxford/35">{detail}</span> : null}
     </div>
   );

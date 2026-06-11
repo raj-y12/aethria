@@ -21,6 +21,12 @@ function pct(v: number | null | undefined): string {
   return `${Math.round(v <= 1 ? v * 100 : v)}%`;
 }
 
+function drift(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return '--';
+  const r = Math.round(v * 100) / 100;
+  return r > 0 ? `+${r.toFixed(2)}` : r.toFixed(2);
+}
+
 /**
  * Fund — the instrument itself. The mandate the system runs on, the record of
  * human judgment, the patterns in its decisions, its calibration, and how it
@@ -60,6 +66,7 @@ export default function FundPage({ data }: { data: SystemData }) {
             <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
               <HeaderReadout label="Mandate match" value={pct(stats?.pct_matching_thesis)} />
               <HeaderReadout label="Mean alignment" value={pct(stats?.avg_alignment_score)} />
+              <HeaderReadout label="Drift" value={drift(stats?.drift_vs_previous)} />
               <HeaderReadout
                 label="Reviewed"
                 value={(stats?.reviewed_with_thesis_count ?? 0).toLocaleString()}
