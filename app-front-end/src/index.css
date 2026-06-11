@@ -103,7 +103,7 @@
   --queue-pad-ambient: 10px;
   --queue-pad-ambient-alt: 11px;
   --queue-pad-interrupt: 16px;
-  --queue-pad-selected: 24px;
+  --queue-pad-selected: 14px;
   --queue-row-gap: var(--space-4);
   /* Selected queue title ↔ embedded memo company name */
   --case-title-size: clamp(25px, 2.45vw, 34px);

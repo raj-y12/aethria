@@ -429,11 +429,24 @@ function cleanFactValue(value: unknown): string | null {
   return s;
 }
 
-function buildSnapshotRows(startup: Startup, blocker: string): Array<{ label: string; text: string }> {
+function buildSnapshotRows(
+  startup: Startup,
+  blocker: string,
+  omitStandfirst = false,
+): Array<{ label: string; text: string }> {
+  const whatItDoes = firstNonEmpty(
+    startup.scout.solution,
+    startup.scout.one_line,
+    startup.partner?.snapshot?.one_liner,
+  );
+  // Under a Decision Stage cover the standfirst already says this — once is enough.
+  const standfirst = (startup.scout.one_line ?? '').toString().replace(/\s+/g, ' ').trim();
+  const dropWhatItDoes =
+    omitStandfirst && whatItDoes.replace(/\s+/g, ' ').trim() === standfirst && standfirst !== '';
   return [
     {
       label: 'What it does',
-      text: firstNonEmpty(startup.scout.solution, startup.scout.one_line, startup.partner?.snapshot?.one_liner),
+      text: dropWhatItDoes ? '' : whatItDoes,
     },
     {
       label: 'Who it serves',
@@ -860,8 +873,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [displayStartup, coverStandfirst]
   );
   const snapshotRows = useMemo(
-    () => (displayStartup ? buildSnapshotRows(displayStartup, coverBlocker) : []),
-    [displayStartup, coverBlocker]
+    () => (displayStartup ? buildSnapshotRows(displayStartup, coverBlocker, coverOverride != null) : []),
+    [displayStartup, coverBlocker, coverOverride]
   );
   // Decision confidence — surfaced on the verdict so the recommendation is honest
   // about how sure it is, not just what it concludes.
@@ -890,12 +903,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const vitalsStrip = useMemo(
     () =>
       [
-        { label: 'Location', value: cleanFactValue(displayStartup?.scout?.location) },
-        { label: 'Stage', value: cleanFactValue(displayStartup?.scout?.funding_stage) },
+        // Under a Decision Stage cover, the kicker already says location/stage.
+        ...(coverOverride == null
+          ? [
+              { label: 'Location', value: cleanFactValue(displayStartup?.scout?.location) },
+              { label: 'Stage', value: cleanFactValue(displayStartup?.scout?.funding_stage) },
+            ]
+          : []),
         { label: 'Market (TAM)', value: cleanFactValue(displayStartup?.scout?.est_tam) },
         { label: 'Valuation', value: cleanFactValue(fin?.valuation_est) },
       ].filter((v): v is { label: string; value: string } => !!v.value),
-    [displayStartup?.scout?.location, displayStartup?.scout?.funding_stage, displayStartup?.scout?.est_tam, fin?.valuation_est]
+    [coverOverride, displayStartup?.scout?.location, displayStartup?.scout?.funding_stage, displayStartup?.scout?.est_tam, fin?.valuation_est]
   );
   const fundingLine = cleanFactValue(fin?.funding_history);
   // Prefer the source-verified traction metric; fall back to the partner's narrative signal.
@@ -1202,7 +1220,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 { label: 'Competitive Landscape', items: compItems },
                 { label: 'Business Model', items: bizItems },
               ].filter((section) => section.items.length > 0);
-              const hasThesis = reviewHasThesisAlignment(displayStartup.review);
+              const thesisFitCount =
+                (displayStartup.review?.thesis_fit_points?.filter((x) => String(x ?? '').trim()).length ?? 0) +
+                (displayStartup.review?.thesis_deviation_points?.filter((x) => String(x ?? '').trim()).length ?? 0);
+              const hasThesis =
+                reviewHasThesisAlignment(displayStartup.review) &&
+                (coverOverride == null || thesisFitCount > 0);
               const hasScorecard = showScores && !!structuredScoring;
               const hasPanel = reviewerConsensusRows.length > 0;
               const hasDeepDive = improvements.length > 0 || assessmentReadouts.length > 0 || hasThesis;

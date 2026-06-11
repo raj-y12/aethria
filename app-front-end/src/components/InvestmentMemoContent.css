@@ -4296,3 +4296,13 @@
   background: rgba(var(--color-oxford-rgb), 0.07);
   vertical-align: middle;
 }
+
+/* Commit ruling — solid oxford only when armed; disabled is a quiet ghost,
+   not a gray slab (same rule as the Settings save key). */
+.memoRulingSubmit:disabled {
+  background: transparent;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.15);
+  color: rgba(var(--color-oxford-rgb), 0.35);
+  opacity: 1;
+  cursor: not-allowed;
+}

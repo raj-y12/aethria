@@ -210,7 +210,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       <motion.h2
         variants={STAGE_ITEM}
         className="type-display mt-phi-5 break-words leading-[1.05] text-oxford"
-        style={{ fontSize: 'clamp(30px, 3.4vw, 48px)' }}
+        style={{ fontSize: 'clamp(34px, 3.8vw, 56px)' }}
       >
         {startup.scout.name}
       </motion.h2>
@@ -218,7 +218,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       {standfirst ? (
         <motion.p
           variants={STAGE_ITEM}
-          className="mt-phi-4 max-w-[36rem] font-sans text-[15px] leading-[1.55] text-oxford/65"
+          className="mt-phi-4 max-w-[36rem] font-sans text-[16px] leading-[1.55] text-oxford/70"
         >
           {standfirst}
         </motion.p>
