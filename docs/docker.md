@@ -1,6 +1,6 @@
 # Docker — Backend API
 
-Run the FastAPI backend in Docker for local development or ad-hoc deployment. This does **not** replace the current Render deployment; see [deployment.md](deployment.md) for Vercel/Render roots.
+Run the FastAPI backend in Docker for local development or ad-hoc deployment. Production uses the same image on Railway; see [deployment.md](deployment.md) for Vercel/Railway roots.
 
 Frontends (`app-front-end`, `web-front-end`) are **not** containerized. Run them with Vite locally or use hosted Vercel builds.
 
@@ -95,21 +95,14 @@ The Dockerfile and compose file include a built-in healthcheck against this endp
 
 For authenticated deployment diagnostics, use `GET /api/agents/status` (requires Clerk JWT).
 
-## How this differs from Render
+## How this relates to Railway
 
-| | Render (current) | Docker (local) |
-|--|------------------|----------------|
-| Deploy root | `backend/` | Image: `/app/backend` |
-| Policy JSON | Full repo cloned; `resources/` on disk | Copied into image at `/app/resources` |
+| | Railway (production) | Docker (local) |
+|--|----------------------|----------------|
+| Build | `backend/Dockerfile` from repo root | Same |
+| Image layout | `/app/backend` + `/app/resources` | Same |
 | Start command | `uvicorn api:app --host 0.0.0.0 --port $PORT --workers 1` | Same |
-| Secrets | Render dashboard env | `--env-file .env` or compose `env_file` |
-| Frontends | Vercel | Not in this image |
+| Secrets | Railway Variables | `--env-file .env` or compose `env_file` |
+| Frontends | Vercel (separate) | Not in this image |
 
-Render configuration is unchanged by this Docker support.
-
-## Follow-up (not implemented)
-
-- CI/CD to build and push images
-- Render Docker deploy
-- Frontend containerization
-- Kubernetes
+Railway reads `railway.toml` at the repo root for health checks and watch paths.

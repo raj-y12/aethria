@@ -1,6 +1,6 @@
 # Environment Variables
 
-Do not commit secret values. Keep local values in `.env` files and configure production values in the relevant host.
+Do not commit secret values. Keep local values in `.env` files and configure production values in the relevant host (Railway for backend, Vercel for frontends).
 
 ## Backend
 
