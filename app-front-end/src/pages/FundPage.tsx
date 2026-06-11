@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router';
+import RoomHeader from '../components/RoomHeader';
 import SystemIntelligence from '../components/SystemIntelligence';
 import { useFundConfiguration } from '../hooks';
 import type { SystemData } from '../hooks/useSystemData';
@@ -41,29 +42,31 @@ export default function FundPage({ data }: { data: SystemData }) {
   return (
     <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <div className="mx-auto w-full max-w-[1180px] px-phi-5 pb-phi-8 pt-phi-5">
-        <header className="flex flex-wrap items-end justify-between gap-x-phi-7 gap-y-phi-5 border-b border-oxford/[0.075] pb-phi-6">
-          <div className="min-w-0">
-            <p className="type-label-section text-oxford/45">
-              The instrument
-              {runtime?.active_version_number != null ? ` · Mandate v${runtime.active_version_number}` : ''}
-            </p>
-            <h1 className="mt-phi-2 type-title font-medium text-oxford">{fundName}</h1>
+        <RoomHeader
+          className="border-b border-oxford/[0.075] pb-phi-6"
+          eyebrow={`The instrument${
+            runtime?.active_version_number != null ? ` · Mandate v${runtime.active_version_number}` : ''
+          }`}
+          title={fundName}
+          sub={
             <Link
               to="/v1/settings"
-              className="mt-phi-2 inline-block type-meta uppercase tracking-[0.1em] text-oxford/40 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+              className="inline-block type-meta uppercase tracking-[0.1em] text-oxford/40 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
             >
               Edit mandate →
             </Link>
-          </div>
-          <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
-            <HeaderReadout label="Mandate match" value={pct(stats?.pct_matching_thesis)} />
-            <HeaderReadout label="Mean alignment" value={pct(stats?.avg_alignment_score)} />
-            <HeaderReadout
-              label="Reviewed"
-              value={(stats?.reviewed_with_thesis_count ?? 0).toLocaleString()}
-            />
-          </div>
-        </header>
+          }
+          readouts={
+            <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
+              <HeaderReadout label="Mandate match" value={pct(stats?.pct_matching_thesis)} />
+              <HeaderReadout label="Mean alignment" value={pct(stats?.avg_alignment_score)} />
+              <HeaderReadout
+                label="Reviewed"
+                value={(stats?.reviewed_with_thesis_count ?? 0).toLocaleString()}
+              />
+            </div>
+          }
+        />
 
         <SystemIntelligence
           startups={data.startups}

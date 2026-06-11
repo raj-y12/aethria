@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
+import RoomHeader from '../components/RoomHeader';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup, SignalItem } from '../types/startup';
 import { isDealHumanResolved } from '../lib/dealState';
@@ -91,23 +92,24 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
     <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <div className="mx-auto w-full max-w-[1180px] px-phi-5 pb-phi-8 pt-phi-5">
         {/* ── Header: place + book composition in one line of sight ── */}
-        <header className="flex flex-wrap items-end justify-between gap-x-phi-7 gap-y-phi-5 pb-phi-6">
-          <div className="min-w-0">
-            <p className="type-label-section text-oxford/45">Conviction</p>
-            <h1 className="mt-phi-2 type-title font-medium text-oxford">Portfolio</h1>
-          </div>
-          <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
-            <Readout label="Conviction" value={track.investCount.toLocaleString()} />
-            <Readout label="Monitor" value={track.monitorCount.toLocaleString()} />
-            <Readout label="Watchlist" value={data.watchlistAnalytics.total.toLocaleString()} />
-            <Readout label="Ruled" value={track.humanRuledCount.toLocaleString()} />
-            <Readout
-              label="Need ruling"
-              value={(data.pendingEscalationCount ?? 0).toLocaleString()}
-              tone={data.pendingEscalationCount > 0 ? 'escalation' : undefined}
-            />
-          </div>
-        </header>
+        <RoomHeader
+          className="pb-phi-6"
+          eyebrow="Conviction"
+          title="Portfolio"
+          readouts={
+            <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
+              <Readout label="Conviction" value={track.investCount.toLocaleString()} />
+              <Readout label="Monitor" value={track.monitorCount.toLocaleString()} />
+              <Readout label="Watchlist" value={data.watchlistAnalytics.total.toLocaleString()} />
+              <Readout label="Ruled" value={track.humanRuledCount.toLocaleString()} />
+              <Readout
+                label="Need ruling"
+                value={(data.pendingEscalationCount ?? 0).toLocaleString()}
+                tone={data.pendingEscalationCount > 0 ? 'escalation' : undefined}
+              />
+            </div>
+          }
+        />
 
         <div className="grid grid-cols-1 gap-x-phi-7 gap-y-phi-6 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
           {/* ── Conviction book ── */}

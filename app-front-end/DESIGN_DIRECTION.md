@@ -84,7 +84,12 @@ operator, mandate, settings, and log out.
 
 The serif headline is the personality register: when Aethria addresses the principal
 (the front door, the Dispatch takeover, login), it speaks in Playfair. Inside the
-workspaces, the instrument is sans and mono.
+workspaces, the instrument is sans and mono — but **every room opens in the voice**:
+a `RoomHeader` with a tracked mono eyebrow and a Playfair title ending in the
+verdigris period (the wordmark's punctuation is the product's signature —
+"Portfolio." / "How this fund thinks."). The Decision Stage sets the company name in
+the same serif, so the subject of a judgment is addressed the way the Dispatch result
+addresses it.
 
 ## Flow
 

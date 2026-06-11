@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { motion } from 'framer-motion';
+import Reveal from '../components/Reveal';
 import { useAppFrame } from '../components/AppFrame';
 import AgentLogoutModal from '../components/AgentLogoutModal';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
@@ -8,32 +8,6 @@ import { useSinceAwaySummary } from '../hooks/useActivitySummary';
 import { isDealUnresolved } from '../lib/dealState';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
-
-const EASE = [0.16, 1, 0.3, 1] as const;
-
-/** Dispatch-style staggered reveal — the takeover's motion language is the house voice. */
-function Reveal({
-  delay,
-  y = 10,
-  className,
-  children,
-}: {
-  delay: number;
-  y?: number;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: EASE, delay }}
-      className={className}
-    >
-      {children}
-    </motion.div>
-  );
-}
 
 function recOf(s: Startup): string | null {
   const r = s.partner?.recommendation;

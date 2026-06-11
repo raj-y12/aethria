@@ -718,9 +718,11 @@ export default function SettingsPage() {
             <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]">
               <div className="min-w-0 px-phi-5 py-phi-6 lg:px-phi-7">
                 <header className="mb-phi-7 max-w-[54rem]">
-                  <p className="type-label-section text-oxford/45">Configuration · {draft.versionLabel}</p>
-                  <h1 className="mt-phi-2 type-title font-medium text-oxford">
-                    How this fund thinks
+                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/40">
+                    Configuration · {draft.versionLabel}
+                  </p>
+                  <h1 className="type-display mt-phi-3 text-[clamp(28px,3vw,42px)] leading-[1.08] text-oxford">
+                    How this fund thinks<span className="wordmark-dot">.</span>
                   </h1>
                   <p className="mt-phi-3 max-w-[42rem] type-body-sm leading-relaxed text-oxford/55">
                     Configure mandate, backend core scoring weights, runtime limits, and the app-level ruling and memo experience. Controls marked as display-only are saved for the interface but do not override reviewer or partner policy files.
