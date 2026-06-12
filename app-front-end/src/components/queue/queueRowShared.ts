@@ -53,7 +53,7 @@ export function buildRowAriaLabel(model: DocketRowModel, isSelected: boolean): s
     startup.scout.name,
     startup.scout.location?.trim(),
     model.sectorStage || 'Unknown sector',
-    attentionDriver.label,
+    attentionDriver.detail ?? attentionDriver.label,
     Number.isFinite(score) && score > 0 ? `Score ${score.toFixed(1)}` : '',
     rec ? `Recommendation ${rec}` : '',
     isSelected ? 'Selected case' : '',
