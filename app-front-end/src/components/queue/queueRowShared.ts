@@ -5,7 +5,6 @@ import type { QueueAttentionDriver, QueueRowContext } from '../../lib/queueAtten
 
 export interface DocketRowModel {
   startup: Startup;
-  displayIndex: string;
   sourceBadge: 'LOOKUP' | 'SCOUT';
   reviewBand: ReviewerQualityBand | null;
   decisionVariant: DecisionBadgeVariant;

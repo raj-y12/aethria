@@ -77,8 +77,7 @@ function getUnresolvedAt(startup: Startup): string | null {
 function buildDocketRow(
   startup: Startup,
   config: FundConfiguration,
-  watchlistSet: Set<string>,
-  displayIndex: string
+  watchlistSet: Set<string>
 ): DocketRowModel {
   const configuredScore = computeConfiguredScore(startup, config);
   const queueContext = buildQueueRowContext(startup, config, {
@@ -88,7 +87,6 @@ function buildDocketRow(
   const attentionDriver = resolveQueueAttentionDriver(queueContext);
   return {
     startup,
-    displayIndex,
     sourceBadge: getSourceBadge(startup),
     reviewBand: getReviewerQualityBand(startup.review),
     decisionVariant: getDecisionBadgeVariant(startup),
@@ -277,16 +275,9 @@ const WorkGrid = ({
 
   const rowRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
-  const stableIndex = useMemo(() => {
-    const byDiscovery = [...startups].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
-    return new Map(byDiscovery.map((s, i) => [s.id, (i + 1).toString().padStart(2, '0')]));
-  }, [startups]);
-
   const allModels = useMemo(() => {
-    return startups.map((startup) =>
-      buildDocketRow(startup, config, watchlistSet, stableIndex.get(startup.id) ?? '00')
-    );
-  }, [startups, config, watchlistSet, stableIndex]);
+    return startups.map((startup) => buildDocketRow(startup, config, watchlistSet));
+  }, [startups, config, watchlistSet]);
 
   const viewCounts = useMemo(
     (): Record<QueueView, number> => ({
