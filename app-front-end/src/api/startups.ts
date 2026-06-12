@@ -7,6 +7,10 @@ const API_BASE =
     : 'http://localhost:8000';
 
 export async function fetchStartups(): Promise<Startup[]> {
+  if (import.meta.env.VITE_USE_FIXTURES === '1') {
+    const { fixtureStartups } = await import('../fixtures/startups');
+    return fixtureStartups;
+  }
   const res = await authedFetch(`${API_BASE}/api/startups`, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`Startups API error: ${res.status}`);
   const data = await res.json();
@@ -15,6 +19,10 @@ export async function fetchStartups(): Promise<Startup[]> {
 
 /** Full record for memo / detail panel (GET /api/startups/:id). */
 export async function fetchStartupDetail(startupId: string): Promise<Startup | null> {
+  if (import.meta.env.VITE_USE_FIXTURES === '1') {
+    const { fixtureStartups } = await import('../fixtures/startups');
+    return fixtureStartups.find((s) => s.id === startupId) ?? null;
+  }
   const res = await authedFetch(
     `${API_BASE}/api/startups/${encodeURIComponent(startupId)}`,
     { headers: { Accept: 'application/json' } }
