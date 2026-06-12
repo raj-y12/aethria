@@ -1,42 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import AgentDispatch from './AgentDispatch';
+import Reveal from './Reveal';
 import { useFocusTrap } from '../hooks';
-
-const EASE = [0.16, 1, 0.3, 1] as const;
-/** Reverse-stagger anchor for exit — much shorter than enter so dismiss feels snappy. */
-const DISPATCH_EXIT_TAIL_DELAY = 0.1;
-const DISPATCH_EXIT_DURATION = 0.2;
-const DISPATCH_EXIT_STAGGER = 0.025;
-
-type DispatchExitCustom = { enterY: number; duration: number; enterDelay: number };
-
-function dispatchExitCustom(enterY: number, duration: number, enterDelay: number): DispatchExitCustom {
-  return { enterY, duration, enterDelay };
-}
-
-/** Propagates reverse-staggered exits to direct motion children. */
-const DISPATCH_EXIT_ORCHESTRATOR: Variants = {
-  exit: {
-    transition: {
-      staggerChildren: DISPATCH_EXIT_STAGGER,
-      staggerDirection: -1,
-    },
-  },
-};
-
-const DISPATCH_EXIT_PIECE: Variants = {
-  exit: ({ enterY, enterDelay }: DispatchExitCustom) => ({
-    opacity: 0,
-    y: enterY === 0 ? 10 : Math.abs(enterY),
-    transition: {
-      duration: DISPATCH_EXIT_DURATION,
-      ease: EASE,
-      delay: Math.max(0, DISPATCH_EXIT_TAIL_DELAY - enterDelay * 0.3),
-    },
-  }),
-};
 
 export interface LookupProgress {
   query: string;
@@ -119,7 +84,7 @@ type DispatchFooterAction = { label: string; onClick: () => void };
 
 function DispatchFooterBar({ actions }: { actions: DispatchFooterAction[] }) {
   return (
-    <div className="mt-phi-7 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 border-b border-oxford/10 pb-0.5">
+    <div className="mt-phi-7 flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
       {actions.map((action, index) => (
         <span key={action.label} className="inline-flex items-center">
           {index > 0 ? (
@@ -130,7 +95,7 @@ function DispatchFooterBar({ actions }: { actions: DispatchFooterAction[] }) {
           <button
             type="button"
             onClick={action.onClick}
-            className="type-meta uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction cursor-pointer"
+            className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction cursor-pointer"
           >
             {action.label}
           </button>
@@ -141,10 +106,8 @@ function DispatchFooterBar({ actions }: { actions: DispatchFooterAction[] }) {
 }
 
 /**
- * ⌘K dispatch — full-screen takeover styled to match AgentLogoutModal.
- * Single tracked lookup, always resumable: reopening returns to its live state
- * (progress or result). "Look up another" backgrounds the current one (it keeps
- * running server-side and lands in the queue) and resets the compose view.
+ * ⌘K dispatch — full-screen takeover styled to match the front door (Today).
+ * Chrome enter/exit (sidebar slide) is owned by AppFrame; content uses Reveal.
  */
 export default function DispatchCommandBar({
   open,
@@ -161,12 +124,7 @@ export default function DispatchCommandBar({
   onFocusChip,
 }: DispatchCommandBarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // aria-modal dialog → keep Tab focus inside the takeover (matches the memo modal
-  // and judgements panel). The compose view's own autofocus effect runs after and
-  // moves focus to the input.
   useFocusTrap(open, containerRef);
-  // Local override: "Look up another" shows the compose view even while a prior
-  // lookup is still tracked. Reset whenever the takeover closes.
   const [compose, setCompose] = useState(false);
   useEffect(() => {
     if (!open) setCompose(false);
@@ -180,7 +138,6 @@ export default function DispatchCommandBar({
         ? 'progress'
         : 'compose';
 
-  // Esc always closes — a running lookup keeps going in the background.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -193,18 +150,17 @@ export default function DispatchCommandBar({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  // Autofocus the input whenever the compose view is showing.
   useEffect(() => {
     if (!open || view !== 'compose') return;
     const id = window.setTimeout(() => {
       containerRef.current?.querySelector('input')?.focus();
-    }, 30);
+    }, 550);
     return () => window.clearTimeout(id);
   }, [open, view]);
 
   const handleSubmit = () => {
     onSubmit();
-    setCompose(false); // surface the new lookup's progress
+    setCompose(false);
   };
 
   const eyebrow = view === 'result' ? 'Dispatch Complete' : view === 'progress' ? 'Analyzing' : 'Dispatch';
@@ -214,6 +170,7 @@ export default function DispatchCommandBar({
       : view === 'progress'
         ? progress!.name || progress!.query
         : 'Look up a company';
+  const lookupRunning = isBusy || Boolean(progress);
   const footerActions: DispatchFooterAction[] =
     view === 'result'
       ? [
@@ -228,200 +185,119 @@ export default function DispatchCommandBar({
           ]
         : [
             ...(chips.length >= 1 ? [{ label: 'Back', onClick: () => setCompose(false) }] : []),
-            { label: 'Exit', onClick: onClose },
-            ...(onCancel ? [{ label: 'Cancel', onClick: onCancel }] : []),
+            ...(lookupRunning && onCancel
+              ? [{ label: 'Cancel', onClick: onCancel }]
+              : [{ label: 'Exit', onClick: onClose }]),
           ];
-  // Show the stack when there's more than one, or in compose (so you keep context
-  // of the lookup you're stepping away from).
   const showChips = chips.length >= 2 || (view === 'compose' && chips.length >= 1);
 
-  const modal = (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          key="dispatch-takeover"
-          ref={containerRef}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit="exit"
-          variants={{
-            exit: {
-              opacity: 0,
-              transition: {
-                duration: 0.18,
-                ease: EASE,
-                delay: 0.14,
-                staggerChildren: DISPATCH_EXIT_STAGGER,
-                staggerDirection: -1,
-                when: 'afterChildren',
-              },
-            },
-          }}
-          transition={{ duration: 0.4, ease: EASE }}
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-phi-6 bg-paper"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Look up a company"
-        >
-          {showChips ? (
-            <motion.div
-              variants={DISPATCH_EXIT_PIECE}
-              custom={dispatchExitCustom(-6, 0.3, 0)}
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, ease: EASE }}
-              className="mb-phi-7 flex flex-wrap items-center justify-center gap-phi-2"
-              aria-label="Tracked lookups"
-            >
-              {chips.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => {
-                    onFocusChip?.(c.id);
-                    setCompose(false);
-                  }}
-                  aria-pressed={c.active}
-                  className={`inline-flex items-center gap-phi-2 border px-phi-3 py-phi-1 font-mono text-[10px] uppercase tracking-[0.1em] transition-colors btn-interaction ${
-                    c.active
-                      ? 'border-oxford/30 bg-oxford/[0.06] text-oxford'
-                      : 'border-oxford/[0.12] text-oxford/45 hover:border-oxford/25 hover:text-oxford/70'
-                  }`}
-                >
-                  <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-none ${
-                      c.status === 'decided'
-                        ? 'bg-oxford'
-                        : c.status === 'reviewing'
-                          ? 'bg-oxford signal-dot-breathe'
-                          : 'bg-oxford/30 signal-dot-breathe'
-                    }`}
-                    aria-hidden
-                  />
-                  <span className="max-w-[14ch] truncate">{c.label}</span>
-                  {c.status === 'decided' ? <span className="text-oxford/40" aria-hidden>✓</span> : null}
-                </button>
-              ))}
-            </motion.div>
-          ) : null}
+  if (!open) return null;
 
-          <motion.div
-            key={view}
-            variants={DISPATCH_EXIT_ORCHESTRATOR}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit="exit"
-            transition={{ duration: 0.26, ease: EASE }}
-            className="flex w-full flex-col items-center"
-          >
-              <motion.p
-                variants={DISPATCH_EXIT_PIECE}
-                custom={dispatchExitCustom(10, 0.45, 0.05)}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, ease: EASE, delay: 0.05 }}
-                className="type-meta uppercase tracking-[0.16em] text-oxford/40 mb-phi-3"
-              >
-                {eyebrow}
-              </motion.p>
-
-              <motion.h1
-                variants={DISPATCH_EXIT_PIECE}
-                custom={dispatchExitCustom(12, 0.5, 0.1)}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
-                className={`type-display text-center text-[clamp(28px,4vw,52px)] font-medium text-oxford leading-[1.1] m-0 ${
-                  view === 'result' ? 'max-w-none whitespace-nowrap' : 'max-w-[15ch]'
+  return (
+    <div
+      ref={containerRef}
+      className="paper-dot-grid absolute inset-0 z-20 flex min-h-0 flex-col overflow-y-auto overscroll-contain bg-paper"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Look up a company"
+    >
+      <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7">
+        {showChips ? (
+          <Reveal delay={0.02} y={-6} className="mb-phi-7 flex flex-wrap items-center justify-center gap-phi-2">
+            {chips.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => {
+                  onFocusChip?.(c.id);
+                  setCompose(false);
+                }}
+                aria-pressed={c.active}
+                className={`inline-flex items-center gap-phi-2 border px-phi-3 py-phi-1 font-mono text-[10px] uppercase tracking-[0.1em] transition-colors btn-interaction ${
+                  c.active
+                    ? 'border-oxford/30 bg-oxford/[0.06] text-oxford'
+                    : 'border-oxford/[0.12] text-oxford/45 hover:border-oxford/25 hover:text-oxford/70'
                 }`}
               >
-                {title}
-              </motion.h1>
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-none ${
+                    c.status === 'decided'
+                      ? 'bg-oxford'
+                      : c.status === 'reviewing'
+                        ? 'bg-oxford signal-dot-breathe'
+                        : 'bg-oxford/30 signal-dot-breathe'
+                  }`}
+                  aria-hidden
+                />
+                <span className="max-w-[14ch] truncate">{c.label}</span>
+                {c.status === 'decided' ? <span className="text-oxford/40" aria-hidden>✓</span> : null}
+              </button>
+            ))}
+          </Reveal>
+        ) : null}
 
-              {view === 'result' ? (
-                <motion.div
-                  variants={DISPATCH_EXIT_PIECE}
-                  custom={dispatchExitCustom(10, 0.45, 0.16)}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.45, ease: EASE, delay: 0.16 }}
-                  className="mt-phi-6 flex w-full max-w-xl flex-col items-center"
-                >
-                  {result}
-                </motion.div>
-              ) : view === 'progress' ? (
-                <motion.div
-                  variants={DISPATCH_EXIT_PIECE}
-                  custom={dispatchExitCustom(10, 0.45, 0.16)}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.45, ease: EASE, delay: 0.16 }}
-                  className="mt-phi-3 flex flex-col items-center gap-phi-5"
-                >
-                  {progress!.sector ? (
-                    <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
-                      {progress!.sector}
-                    </p>
-                  ) : null}
-                  <ProgressSteps progress={progress!} />
-                  {message ? (
-                    <p className="type-body text-center text-oxford/45 max-w-[40ch]" aria-live="polite">
-                      {message}
-                    </p>
-                  ) : null}
-                </motion.div>
-              ) : (
-                <>
-                  <motion.p
-                    variants={DISPATCH_EXIT_PIECE}
-                    custom={dispatchExitCustom(0, 0.5, 0.18)}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.5, ease: EASE, delay: 0.18 }}
-                    className="type-body text-center text-oxford/50 mt-phi-3 mb-phi-8 max-w-[34ch]"
-                  >
-                    Search any company — evaluated against your active mandate. The result lands in the queue.
-                  </motion.p>
+        <div key={view} className="flex w-full flex-col items-center">
+          <Reveal delay={0.1}>
+            <p className="type-meta mb-phi-3 uppercase tracking-[0.16em] text-oxford/40">{eyebrow}</p>
+          </Reveal>
 
-                  <motion.div
-                    variants={DISPATCH_EXIT_PIECE}
-                    custom={dispatchExitCustom(10, 0.45, 0.25)}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.45, ease: EASE, delay: 0.25 }}
-                    className="flex w-full max-w-md flex-col items-center gap-phi-4"
-                  >
-                    <div className="w-full">
-                      <AgentDispatch
-                        input={input}
-                        setInput={setInput}
-                        onSubmit={handleSubmit}
-                        onCancel={onCancel}
-                        isBusy={isBusy}
-                        message={null}
-                        lookupPhase={null}
-                        displayMode="embedded"
-                      />
-                    </div>
-                  </motion.div>
-                </>
-              )}
-          </motion.div>
+          <Reveal delay={0.16} y={12}>
+            <h1
+              className={`type-display m-0 text-center text-[clamp(28px,4vw,52px)] font-medium leading-[1.1] text-oxford ${
+                view === 'result' ? 'max-w-none whitespace-nowrap' : 'max-w-[15ch]'
+              }`}
+            >
+              {title}
+            </h1>
+          </Reveal>
 
-          <motion.div
-            variants={DISPATCH_EXIT_PIECE}
-            custom={dispatchExitCustom(10, 0.45, 0.32)}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: EASE, delay: 0.32 }}
-          >
-            <DispatchFooterBar actions={footerActions} />
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          {view === 'result' ? (
+            <Reveal delay={0.24} className="mt-phi-6 flex w-full max-w-xl flex-col items-center">
+              {result}
+            </Reveal>
+          ) : view === 'progress' ? (
+            <Reveal delay={0.24} className="mt-phi-3 flex flex-col items-center gap-phi-5">
+              {progress!.sector ? (
+                <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
+                  {progress!.sector}
+                </p>
+              ) : null}
+              <ProgressSteps progress={progress!} />
+              {message ? (
+                <p className="type-body max-w-[40ch] text-center text-oxford/45" aria-live="polite">
+                  {message}
+                </p>
+              ) : null}
+            </Reveal>
+          ) : (
+            <>
+              <Reveal delay={0.24} className="mt-phi-3">
+                <p className="type-body mb-phi-8 max-w-[34ch] text-center text-oxford/50">
+                  Search any company against your active mandate and it lands in the queue.
+                </p>
+              </Reveal>
+              <Reveal delay={0.32} className="flex w-full max-w-md flex-col items-center gap-phi-4">
+                <div className="w-full">
+                  <AgentDispatch
+                    input={input}
+                    setInput={setInput}
+                    onSubmit={handleSubmit}
+                    onCancel={onCancel}
+                    isBusy={isBusy}
+                    message={null}
+                    lookupPhase={null}
+                    displayMode="embedded"
+                  />
+                </div>
+              </Reveal>
+            </>
+          )}
+        </div>
+
+        <Reveal delay={0.42}>
+          <DispatchFooterBar actions={footerActions} />
+        </Reveal>
+      </div>
+    </div>
   );
-
-  if (typeof document === 'undefined') return null;
-  return createPortal(modal, document.body);
 }

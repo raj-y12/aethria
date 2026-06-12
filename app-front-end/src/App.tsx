@@ -9,7 +9,6 @@ import TodayPage from './pages/TodayPage';
 import FlowPage from './pages/FlowPage';
 import PortfolioPage from './pages/PortfolioPage';
 import FundPage from './pages/FundPage';
-import GrainOverlay from './components/GrainOverlay';
 import LoadingAnimation from './components/LoadingAnimation';
 const SettingsPage = lazy(() => import('./settings/SettingsPage'));
 const AdminDashboardPage = lazy(() => import('./admin/AdminDashboardPage'));
@@ -78,7 +77,6 @@ function AppShell() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: entryTransition.appRevealMs / 1000, ease: [0.16, 1, 0.3, 1] }}
     >
-      <GrainOverlay opacity={0.028} />
       <AppFrame
         data={systemData}
         startupsError={systemData.startupsError}
@@ -156,7 +154,6 @@ function App() {
   if (isAdminRoute) {
     return (
       <>
-        <GrainOverlay opacity={0.028} />
         <Suspense fallback={<LoadingAnimation />}>
           <AdminDashboardPage />
         </Suspense>

@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import { motion } from 'framer-motion';
 import Reveal from '../components/Reveal';
 import { useAppFrame } from '../components/AppFrame';
 import AgentLogoutModal from '../components/AgentLogoutModal';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import { useSinceAwaySummary } from '../hooks/useActivitySummary';
+import { usePrefersReducedMotion } from '../hooks';
+import { transitionOrReduced } from '../design-system/motion';
+import { tokens } from '../design-system/tokens';
 import { isDealUnresolved } from '../lib/dealState';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
@@ -14,62 +18,57 @@ function recOf(s: Startup): string | null {
   return typeof r === 'string' && r ? r.toUpperCase() : null;
 }
 
-/**
- * A control key — one of the four doors. Flow is the single solid oxford key
- * (the product's one action is making judgments); the rest are quiet ghosts.
- */
+/** A control key — numeral, label, and live reading stacked; four keys stay inline. */
 function HomeKey({
   numeral,
   label,
   detail,
   detailTone = 'default',
-  solid = false,
   onClick,
 }: {
   numeral: string;
   label: string;
   detail: string;
   detailTone?: 'default' | 'escalation';
-  solid?: boolean;
   onClick: () => void;
 }) {
+  const reduceMotion = usePrefersReducedMotion();
+  const hoverEase = tokens.motion.ease;
+  const hoverDuration = tokens.motion.duration.short;
+  const labelTransition = transitionOrReduced(reduceMotion, {
+    duration: hoverDuration,
+    ease: hoverEase,
+  });
+
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
-      className={`group flex min-h-[112px] flex-col items-center justify-center gap-phi-2 rounded-none border px-phi-4 py-phi-5 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 ${
-        solid
-          ? 'border-oxford bg-oxford text-paper hover:bg-oxford/[0.92]'
-          : 'border-oxford/[0.14] bg-transparent text-oxford hover:border-oxford/45 hover:bg-oxford/[0.03]'
-      }`}
+      initial={false}
+      whileHover={{ backgroundColor: 'var(--color-oxford)' }}
+      whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+      transition={labelTransition}
+      className="group flex min-w-0 flex-1 flex-col items-center justify-center gap-phi-2 border-0 bg-paperDeep px-phi-4 py-phi-5 text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40"
     >
       <span
-        className={`font-mono text-[10px] tracking-[0.14em] ${solid ? 'text-paper/45' : 'text-oxford/30'}`}
+        className="font-mono text-[9px] tracking-[0.14em] text-oxford/35 transition-colors duration-[220ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:text-paper/50"
         aria-hidden
       >
         {numeral}
       </span>
-      <span
-        className={`font-mono text-[12px] font-semibold uppercase tracking-[0.16em] ${
-          solid ? 'text-paper' : 'text-oxford/85'
-        }`}
-      >
+      <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-oxford/85 transition-colors duration-[220ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:text-paper">
         {label}
       </span>
       <span
-        className={`font-mono text-[10px] tracking-[0.06em] tabular-nums ${
-          solid
-            ? detailTone === 'escalation'
-              ? 'text-escalation-bright'
-              : 'text-paper/55'
-            : detailTone === 'escalation'
-              ? 'text-escalation/85'
-              : 'text-oxford/40'
+        className={`text-center font-mono text-[9px] leading-snug tracking-[0.04em] tabular-nums transition-colors duration-[220ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          detailTone === 'escalation'
+            ? 'text-escalation/85 group-hover:text-escalation-bright'
+            : 'text-oxford/40 group-hover:text-paper/55'
         }`}
       >
         {detail}
       </span>
-    </button>
+    </motion.button>
   );
 }
 
@@ -82,7 +81,10 @@ export default function TodayPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { openDispatch, dispatchActive } = useAppFrame();
-  const sinceAway = useSinceAwaySummary();
+  // Acknowledges the away report (marks it seen) — the login screen is the one
+  // place that presents it. Rendering it here repeated the headline and shoved
+  // the layout down when the numbers arrived mid-entrance.
+  useSinceAwaySummary();
   const {
     displayName,
     agentActionPending,
@@ -161,24 +163,14 @@ export default function TodayPage({ data }: { data: SystemData }) {
           <p className="text-center font-mono text-[11px] tracking-[0.06em] tabular-nums text-oxford/45">
             {subline}
           </p>
-          {sinceAway ? (
-            <p className="mt-phi-2 text-center font-mono text-[10px] tracking-[0.06em] tabular-nums text-oxford/35">
-              While you were away — {sinceAway.found} discovered · {sinceAway.reviewed} evaluated ·{' '}
-              {sinceAway.agent_decided ?? sinceAway.decided} decided
-              {sinceAway.escalations > 0 ? (
-                <span className="text-escalation/80"> · {sinceAway.escalations} escalated</span>
-              ) : null}
-            </p>
-          ) : null}
         </Reveal>
 
         {/* ── The doors ── */}
-        <Reveal delay={0.32} className="mt-phi-7 w-full max-w-[42rem]">
-          <div className="grid grid-cols-2 gap-phi-3 sm:grid-cols-4" role="navigation" aria-label="Workspaces">
+        <Reveal delay={0.32} className="mt-phi-7 w-full max-w-[48rem]">
+          <div className="flex w-full flex-nowrap items-stretch justify-center gap-phi-3" role="navigation" aria-label="Workspaces">
             <HomeKey
               numeral="II"
               label="Flow"
-              solid
               detail={
                 needRuling > 0
                   ? `${needRuling} need ruling`
@@ -212,14 +204,16 @@ export default function TodayPage({ data }: { data: SystemData }) {
 
         {/* ── The footer bar — Dispatch's micro-action language ── */}
         <Reveal delay={0.42} className="mt-phi-8">
-          <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1 border-b border-oxford/10 pb-0.5">
-            <span className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/40">{displayName}</span>
+          <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
+            <span className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/40">
+              {displayName}
+            </span>
             {fundName || mandateVersion != null ? (
               <>
                 <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
                 <Link
                   to="/v1/fund"
-                  className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
+                  className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
                 >
                   {fundName || `Mandate v${mandateVersion}`}
                 </Link>
@@ -228,7 +222,7 @@ export default function TodayPage({ data }: { data: SystemData }) {
             <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
             <Link
               to="/v1/settings"
-              className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
+              className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
             >
               Settings
             </Link>
@@ -237,7 +231,7 @@ export default function TodayPage({ data }: { data: SystemData }) {
               type="button"
               onClick={requestLogout}
               disabled={agentActionPending}
-              className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 disabled:opacity-50 btn-interaction"
+              className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 disabled:opacity-50 btn-interaction"
             >
               {agentActionPending ? 'Updating…' : 'Log out'}
             </button>

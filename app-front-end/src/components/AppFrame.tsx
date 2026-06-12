@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { LookupResultSnapshot } from '@aethria/product-chrome';
 import AppSpine, {
   SPINE_WORKSPACES,
@@ -274,33 +274,19 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
     setSpineOverride,
   };
 
+  const chromeTransition = transitionOrReduced(reduceMotion, {
+    duration: tokens.motion.duration.long,
+    ease: tokens.motion.ease,
+    layout: { duration: tokens.motion.duration.long, ease: tokens.motion.ease },
+  });
+
+  /** Dispatch is a front-door surface — hide workspace chrome while it is open. */
+  const showSpine = !bareChrome && !dispatch.commandBarOpen;
+  const showMobileChrome = !isDesktop && !bareChrome && !dispatch.commandBarOpen;
+
   return (
     <AppFrameContext.Provider value={contextValue}>
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
-        <DispatchCommandBar
-          open={dispatch.commandBarOpen}
-          onClose={dispatch.closeCommandBar}
-          input={dispatch.input}
-          setInput={dispatch.setInput}
-          onSubmit={() => void dispatch.submit()}
-          onCancel={dispatch.cancel}
-          isBusy={dispatch.busy}
-          message={dispatch.message}
-          onClearMessage={dispatch.clearMessage}
-          lookupPhase={dispatch.phaseLabel}
-          progress={dispatch.progress}
-          chips={dispatch.chips}
-          onFocusChip={dispatch.focusChip}
-          result={
-            dispatch.pendingLookupMatch?.partner?.recommendation && dispatch.snapshotProps ? (
-              <LookupResultSnapshot
-                {...dispatch.snapshotProps}
-                onOpenMemo={dispatch.openLookupMemo}
-                className="w-full"
-              />
-            ) : null
-          }
-        />
         <LookupReadyToast
           name={dispatch.lookupReady?.scout?.name ?? null}
           recommendation={dispatch.lookupReady?.partner?.recommendation ?? null}
@@ -309,65 +295,74 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
         />
 
         {/* Mobile / tablet top nav — desktop carries identity in the spine */}
-        {!isDesktop && !bareChrome && (
-          <>
-            <MobileHeader onMenuToggle={() => setMobileMenuOpen((open) => !open)} />
-            <AnimatePresence>
-              {mobileMenuOpen && (
-                <motion.nav
-                  id="mobile-menu"
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={transitionOrReduced(reduceMotion, {
-                    duration: tokens.motion.duration.micro,
-                    ease: tokens.motion.ease,
-                  })}
-                  className="border-b border-white/[0.08] bg-oxford px-phi-4 py-phi-3"
-                  aria-label="Workspaces"
-                >
-                  <div className="flex flex-col items-stretch gap-phi-1">
-                    {SPINE_WORKSPACES.map((item) => (
+        <AnimatePresence initial={false}>
+          {showMobileChrome ? (
+            <motion.div
+              key="mobile-chrome"
+              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
+              transition={chromeTransition}
+              className="flex-none"
+            >
+              <MobileHeader onMenuToggle={() => setMobileMenuOpen((open) => !open)} />
+              <AnimatePresence>
+                {mobileMenuOpen && (
+                  <motion.nav
+                    id="mobile-menu"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={transitionOrReduced(reduceMotion, {
+                      duration: tokens.motion.duration.micro,
+                      ease: tokens.motion.ease,
+                    })}
+                    className="border-b border-white/[0.08] bg-oxford px-phi-4 py-phi-3"
+                    aria-label="Workspaces"
+                  >
+                    <div className="flex flex-col items-stretch gap-phi-1">
+                      {SPINE_WORKSPACES.map((item) => (
+                        <button
+                          key={item.href}
+                          type="button"
+                          onClick={() => {
+                            navigate(item.href);
+                            setMobileMenuOpen(false);
+                          }}
+                          className="type-label-tab flex min-h-[44px] items-center px-1 text-white/60 hover:text-white btn-interaction"
+                        >
+                          {item.label}
+                        </button>
+                      ))}
                       <button
-                        key={item.href}
                         type="button"
                         onClick={() => {
-                          navigate(item.href);
+                          navigate('/v1/settings');
                           setMobileMenuOpen(false);
                         }}
                         className="type-label-tab flex min-h-[44px] items-center px-1 text-white/60 hover:text-white btn-interaction"
                       >
-                        {item.label}
+                        Settings
                       </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigate('/v1/settings');
-                        setMobileMenuOpen(false);
-                      }}
-                      className="type-label-tab flex min-h-[44px] items-center px-1 text-white/60 hover:text-white btn-interaction"
-                    >
-                      Settings
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        requestMobileLogout();
-                      }}
-                      disabled={mobileLogoutPending}
-                      className="type-label-tab flex min-h-[44px] items-center border-t border-white/[0.07] px-1 text-white/60 hover:text-white disabled:opacity-50 btn-interaction"
-                    >
-                      {mobileLogoutPending ? 'Updating...' : 'Log out'}
-                    </button>
-                  </div>
-                </motion.nav>
-              )}
-            </AnimatePresence>
-            <AgentLogoutModal {...mobileLogoutModalProps} />
-          </>
-        )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          requestMobileLogout();
+                        }}
+                        disabled={mobileLogoutPending}
+                        className="type-label-tab flex min-h-[44px] items-center border-t border-white/[0.07] px-1 text-white/60 hover:text-white disabled:opacity-50 btn-interaction"
+                      >
+                        {mobileLogoutPending ? 'Updating...' : 'Log out'}
+                      </button>
+                    </div>
+                  </motion.nav>
+                )}
+              </AnimatePresence>
+              <AgentLogoutModal {...mobileLogoutModalProps} />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
         {startupsError && (
           <div className="flex-none border-b border-oxford/25 bg-warning px-6 py-2 type-label-tab text-oxford">
@@ -375,20 +370,62 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
           </div>
         )}
 
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          {!bareChrome && (
-            <AppSpine
-              telemetry={telemetry}
-              mandate={mandate}
-              dispatchActive={dispatch.lookupWorking}
-              onDispatch={dispatch.openCommandBar}
-              override={spineOverride}
-            />
-          )}
-          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper">
-            {children}
-          </main>
-        </div>
+        <LayoutGroup id="app-frame">
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <AnimatePresence initial={false} mode="popLayout">
+              {showSpine ? (
+                <motion.div
+                  key="spine"
+                  layout
+                  initial={reduceMotion ? { opacity: 1 } : { opacity: 0, x: -28 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -28 }}
+                  transition={chromeTransition}
+                  className="hidden lg:flex flex-none overflow-hidden"
+                >
+                  <AppSpine
+                    telemetry={telemetry}
+                    mandate={mandate}
+                    dispatchActive={dispatch.lookupWorking}
+                    onDispatch={dispatch.openCommandBar}
+                    override={spineOverride}
+                  />
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+            <motion.main
+              layout
+              transition={chromeTransition}
+              className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper"
+            >
+              {children}
+              <DispatchCommandBar
+                open={dispatch.commandBarOpen}
+                onClose={dispatch.closeCommandBar}
+                input={dispatch.input}
+                setInput={dispatch.setInput}
+                onSubmit={() => void dispatch.submit()}
+                onCancel={dispatch.cancel}
+                isBusy={dispatch.busy}
+                message={dispatch.message}
+                onClearMessage={dispatch.clearMessage}
+                lookupPhase={dispatch.phaseLabel}
+                progress={dispatch.progress}
+                chips={dispatch.chips}
+                onFocusChip={dispatch.focusChip}
+                result={
+                  dispatch.pendingLookupMatch?.partner?.recommendation && dispatch.snapshotProps ? (
+                    <LookupResultSnapshot
+                      {...dispatch.snapshotProps}
+                      onOpenMemo={dispatch.openLookupMemo}
+                      className="w-full"
+                    />
+                  ) : null
+                }
+              />
+            </motion.main>
+          </div>
+        </LayoutGroup>
       </div>
     </AppFrameContext.Provider>
   );

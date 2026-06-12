@@ -497,6 +497,10 @@
   .ease-smooth {
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   }
+  .scrollbar-gutter-stable {
+    scrollbar-gutter: stable;
+  }
+
   .no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none;

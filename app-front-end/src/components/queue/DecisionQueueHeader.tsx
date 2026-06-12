@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import type { CSSProperties } from 'react';
 import { tokens } from '../../design-system/tokens';
-import { productInteraction, productPanel, productText } from '../../design-system/productSystem';
+import { productInteraction, productText } from '../../design-system/productSystem';
 import type { FundConfiguration } from '../../lib/fundConfiguration';
 
 export type QueueView = 'ALL' | 'PRIORITY' | 'NEW' | 'STALE' | 'ESCALATED';
@@ -17,21 +18,17 @@ export type ReviewFilter = 'STRONG' | 'MEDIUM' | 'WEAK' | 'UNREVIEWED';
 
 export type SortFilter = 'QUEUE_PRIORITY' | 'NEWEST' | 'OLDEST' | 'UNRESOLVED_OLDEST';
 
-const QUEUE_VIEW_LABELS: { key: QueueView; label: string }[] = [
-  { key: 'ALL', label: 'All' },
-  { key: 'PRIORITY', label: 'Priority' },
-  { key: 'NEW', label: 'New' },
-  { key: 'STALE', label: 'Stale' },
-  { key: 'ESCALATED', label: 'Escalated' },
+const SORT_OPTIONS: { value: SortFilter; label: string }[] = [
+  { value: 'QUEUE_PRIORITY', label: 'Queue order' },
+  { value: 'NEWEST', label: 'Newest first' },
+  { value: 'OLDEST', label: 'Oldest first' },
+  { value: 'UNRESOLVED_OLDEST', label: 'Longest unresolved' },
 ];
 
-/** One cycling control — click advances to the next ordering. */
-const SORT_OPTIONS: { value: SortFilter; label: string; title: string }[] = [
-  { value: 'QUEUE_PRIORITY', label: 'Priority', title: 'Queue order' },
-  { value: 'NEWEST', label: 'Newest', title: 'Newest first' },
-  { value: 'OLDEST', label: 'Oldest', title: 'Oldest first' },
-  { value: 'UNRESOLVED_OLDEST', label: 'Longest open', title: 'Longest unresolved' },
-];
+const SORT_CHEVRON =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath fill='%23001433' fill-opacity='0.4' d='M0 2.5h8L4 6.5z'/%3E%3C/svg%3E\")";
+
+const sortSelectStyle: CSSProperties = { backgroundImage: SORT_CHEVRON };
 
 const SOURCE_FILTER_CHIPS: { key: SourceFilter; label: string }[] = [
   { key: 'SCOUT', label: 'SCOUT' },
@@ -70,10 +67,8 @@ function AdvancedChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`type-meta min-h-[30px] whitespace-nowrap rounded-none border px-phi-4 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-        active
-          ? 'border-oxford bg-oxford/[0.04] font-semibold text-oxford'
-          : 'border-oxford/[0.14] bg-transparent text-oxford/50 hover:border-oxford/35 hover:text-oxford/75'
+      className={`type-meta min-h-[36px] whitespace-nowrap px-phi-4 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+        active ? 'bg-oxford text-paper' : 'bg-oxford/[0.035] hover:bg-oxford/[0.065] text-oxford/[0.58]'
       }`}
     >
       {label}
@@ -81,64 +76,8 @@ function AdvancedChip({
   );
 }
 
-function QueueTab({
-  active,
-  label,
-  count,
-  onClick,
-  emphasize = false,
-  reduceMotion = false,
-}: {
-  active: boolean;
-  label: string;
-  count?: number;
-  onClick: () => void;
-  emphasize?: boolean;
-  reduceMotion?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`type-meta min-h-[36px] px-phi-3 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-        emphasize
-          ? active
-            ? 'rounded-none bg-oxford text-paper'
-            : 'rounded-none bg-oxford/[0.07] text-oxford hover:bg-oxford/[0.11]'
-          : active
-            ? 'text-oxford font-semibold'
-            : 'text-oxford/40 hover:text-oxford/70'
-      } uppercase tracking-[0.12em]`}
-    >
-      {label}
-      {count != null ? (
-        <motion.span
-          className={`ml-phi-1 inline-flex min-w-[1.5rem] items-center justify-center tabular-nums ${
-            emphasize
-              ? active
-                ? 'text-paper'
-                : 'rounded-none bg-paper px-phi-1 text-oxford'
-              : active
-                ? 'text-oxford/55'
-                : 'text-oxford/[0.28]'
-          }`}
-          initial={reduceMotion || !emphasize ? false : { scale: 0.92, opacity: 0.9 }}
-          animate={reduceMotion || !emphasize ? undefined : { scale: [0.92, 1.08, 1], opacity: [0.9, 1, 1] }}
-          transition={reduceMotion || !emphasize ? undefined : { duration: 0.42, ease: tokens.motion.ease }}
-        >
-          {count}
-        </motion.span>
-      ) : null}
-    </button>
-  );
-}
-
 export interface DecisionQueueHeaderProps {
   config: FundConfiguration;
-  queueView: QueueView;
-  onQueueViewChange: (view: QueueView) => void;
-  viewCounts: Record<QueueView, number>;
   sortFilter: SortFilter;
   onSortFilterChange: (sort: SortFilter) => void;
   sourceFilters: Set<SourceFilter>;
@@ -152,15 +91,18 @@ export interface DecisionQueueHeaderProps {
   showAdvancedFilters: boolean;
   onToggleAdvancedFilters: () => void;
   hasActiveFilters: boolean;
+  activeFilterCount: number;
   onResetFilters: () => void;
   reduceMotion: boolean;
 }
 
+/**
+ * The docket's single control line — one quiet mono register beneath the room
+ * header. Queue views live in the room header readouts (FlowPage); this line
+ * carries only ordering and refinement. No second header, no tab strip.
+ */
 export default function DecisionQueueHeader({
   config,
-  queueView,
-  onQueueViewChange,
-  viewCounts,
   sortFilter,
   onSortFilterChange,
   sourceFilters,
@@ -174,75 +116,53 @@ export default function DecisionQueueHeader({
   showAdvancedFilters,
   onToggleAdvancedFilters,
   hasActiveFilters,
+  activeFilterCount,
   onResetFilters,
   reduceMotion,
 }: DecisionQueueHeaderProps) {
   return (
-    <header
-      className={`sticky top-0 z-20 ${productPanel.header} !px-phi-0`}
+    <div
+      className="sticky top-0 z-10 bg-surface-canvas pb-phi-2"
+      title={`${config.thresholds.staleAfterHours}h stale · ${config.risk.sensitivity} risk`}
     >
-      <div className="flex min-w-0 flex-col gap-phi-2">
-        <p
-          className={productText.mutedLabel}
-          title={`${config.thresholds.staleAfterHours}h stale · ${config.risk.sensitivity} risk`}
-        >
-          Decision queue
-        </p>
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-1 border-b border-oxford/[0.06] pb-phi-2">
+        <span className="type-meta uppercase tracking-[0.12em] text-oxford/[0.32]">Docket</span>
 
-        <div className="flex min-w-0 flex-wrap items-center gap-x-phi-3 gap-y-phi-1">
-          <div className="flex items-center gap-0" role="group" aria-label="Queue views">
-            {QUEUE_VIEW_LABELS.map(({ key, label }) => (
-              <QueueTab
-                key={key}
-                active={queueView === key}
-                label={label}
-                count={
-                  key === 'ALL'
-                    ? viewCounts.ALL
-                    : key === 'NEW' && viewCounts.NEW > 0
-                      ? viewCounts.NEW
-                      : undefined
-                }
-                emphasize={key === 'NEW' && viewCounts.NEW > 0}
-                reduceMotion={reduceMotion}
-                onClick={() => onQueueViewChange(key)}
-              />
-            ))}
-          </div>
-
-          <div className="ml-auto flex items-center gap-x-phi-4">
-            {/* Sort — one cycling control, current order spelled out. */}
-            <button
-              type="button"
-              onClick={() => {
-                const i = SORT_OPTIONS.findIndex((o) => o.value === sortFilter);
-                onSortFilterChange(SORT_OPTIONS[(i + 1) % SORT_OPTIONS.length].value);
-              }}
-              title="Change ordering"
-              aria-label={`Ordering: ${SORT_OPTIONS.find((o) => o.value === sortFilter)?.title}. Click for next.`}
-              className="inline-flex h-9 shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] text-oxford/[0.38] transition-colors hover:text-oxford/70 btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
+        <div className="flex items-center gap-x-phi-4">
+          <label className="flex items-center gap-phi-2">
+            <span className="type-meta uppercase tracking-[0.12em] text-oxford/[0.32]">Sort</span>
+            <select
+              value={sortFilter}
+              onChange={(e) => onSortFilterChange(e.target.value as SortFilter)}
+              aria-label="Sort deals"
+              style={sortSelectStyle}
+              className="type-meta h-9 cursor-pointer appearance-none border-0 bg-transparent bg-no-repeat bg-[length:8px] bg-[center_right_2px] pr-5 uppercase tracking-[0.12em] text-oxford/55 outline-none transition-colors hover:text-oxford/80 focus-visible:outline-none"
             >
-              <span className="text-oxford/25">Sort</span>
-              <span className={sortFilter === 'QUEUE_PRIORITY' ? '' : 'font-semibold text-oxford/70'}>
-                {SORT_OPTIONS.find((o) => o.value === sortFilter)?.label}
+              {SORT_OPTIONS.map(({ value, label }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            onClick={onToggleAdvancedFilters}
+            aria-expanded={showAdvancedFilters}
+            className={`type-meta inline-flex h-9 shrink-0 items-center gap-phi-1 uppercase tracking-[0.12em] transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+              showAdvancedFilters || hasActiveFilters
+                ? 'text-oxford'
+                : 'text-oxford/[0.34] hover:text-oxford/55'
+            }`}
+          >
+            Filters
+            {activeFilterCount > 0 ? (
+              <span className="tabular-nums text-oxford/55" aria-label={`${activeFilterCount} active`}>
+                · {activeFilterCount}
               </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onToggleAdvancedFilters}
-              aria-expanded={showAdvancedFilters}
-              aria-label={showAdvancedFilters ? 'Hide filters' : 'Show filters'}
-              className={`inline-flex h-9 shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-                showAdvancedFilters || hasActiveFilters
-                  ? 'font-semibold text-oxford'
-                  : 'text-oxford/[0.38] hover:text-oxford/70'
-              }`}
-            >
-              Filters
-              {hasActiveFilters ? <span className="h-1.5 w-1.5 rounded-none bg-oxford" aria-hidden /> : null}
-            </button>
-          </div>
+            ) : null}
+          </button>
         </div>
       </div>
 
@@ -257,7 +177,7 @@ export default function DecisionQueueHeader({
             aria-label="Advanced queue filters"
             className="overflow-hidden"
           >
-            <div className="mt-phi-2 border-t border-oxford/[0.06] pt-phi-2">
+            <div className="mt-phi-2 pt-phi-2">
             <div role="group" aria-label="Deal source" className="mb-phi-3 flex min-w-0 flex-col gap-phi-1">
               <p className={productText.mutedLabel}>Source</p>
               <div className="flex flex-wrap gap-phi-2">
@@ -329,6 +249,6 @@ export default function DecisionQueueHeader({
           </motion.div>
         )}
       </AnimatePresence>
-    </header>
+    </div>
   );
 }

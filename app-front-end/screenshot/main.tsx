@@ -7,7 +7,6 @@ import '../src/index.css';
 import '@aethria/product-chrome';
 import { setTokenGetter } from '../src/api/auth';
 import AppFrame from '../src/components/AppFrame';
-import GrainOverlay from '../src/components/GrainOverlay';
 import TodayPage from '../src/pages/TodayPage';
 import FlowPage from '../src/pages/FlowPage';
 import PortfolioPage from '../src/pages/PortfolioPage';
@@ -44,7 +43,6 @@ function Harness({ data }: { data: SystemData }) {
 
   return (
     <div className="min-h-[100dvh]">
-      <GrainOverlay opacity={0.028} />
       <AppFrame data={data} startupsError={null} chrome={bare ? 'bare' : 'full'}>
         {isSettings ? (
           <SettingsPage />

@@ -6,6 +6,18 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "web-front-end", "run", "dev", "--", "--port", "3100", "--strictPort"],
       "port": 3100
+    },
+    {
+      "name": "app-front-end",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "app-front-end", "run", "dev", "--", "--port", "3200", "--strictPort"],
+      "port": 3200
+    },
+    {
+      "name": "app-screenshot-harness",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd app-front-end && npx vite --config vite.screenshot.config.ts"],
+      "port": 5181
     }
   ]
 }

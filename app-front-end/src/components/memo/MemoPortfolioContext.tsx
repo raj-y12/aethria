@@ -1,4 +1,5 @@
 import type { SignalItem } from '../../types/startup';
+import { formatDate } from '../../lib/dates';
 
 type Props = {
   startupId: string;
@@ -27,7 +28,7 @@ export default function MemoPortfolioContext({ startupId, signals }: Props) {
             </span>
             {signal.detected_at ? (
               <span className="memoPortfolioContextWhen">
-                {new Date(signal.detected_at).toLocaleDateString('en-GB')}
+                {formatDate(signal.detected_at)}
               </span>
             ) : null}
           </li>

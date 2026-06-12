@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import LoadingAnimation from '../components/LoadingAnimation';
+import { getQueryConfig } from '../lib/queryIntent';
+import { formatDateTime } from '../lib/dates';
 import { useAppFrame } from '../components/AppFrame';
 import { SpineNavButton } from '../components/SystemBar';
 import { fetchSettings, patchSettings, previewPolicy, publishPolicy, type Settings } from '../api/settings';
@@ -84,6 +86,69 @@ function serializeConfig(config: FundConfiguration): string {
   return JSON.stringify(rest);
 }
 
+function SettingsSidebarFooter({
+  unsaved,
+  lastSavedAt,
+  saving,
+  onSave,
+  onReset,
+}: {
+  unsaved: boolean;
+  lastSavedAt?: string | null;
+  saving: boolean;
+  onSave: () => void;
+  onReset: () => void;
+}) {
+  const statusDetail = unsaved
+    ? 'Changes not yet saved'
+    : lastSavedAt
+      ? `Saved · ${formatSettingsSavedAt(lastSavedAt)}`
+      : 'Save to persist fund configuration';
+
+  return (
+    <div
+      className="mt-phi-6 min-w-0 shrink-0 border-t border-oxford/[0.075] pt-phi-4"
+      aria-label="Draft status"
+    >
+      <div className="flex items-center justify-between gap-phi-2">
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">Draft</span>
+        <span
+          className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] transition-colors ${unsaved ? 'text-escalation/80' : 'text-oxford/45'}`}
+          aria-live="polite"
+        >
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-none signal-dot-breathe transition-colors ${unsaved ? 'bg-escalation/70' : 'bg-oxford'}`}
+            aria-hidden
+          />
+          {unsaved ? 'Unsaved' : 'Synced'}
+        </span>
+      </div>
+      <p className={`mt-phi-2 truncate type-body-sm leading-snug transition-colors ${unsaved ? 'text-oxford' : 'text-oxford/50'}`}>
+        {statusDetail}
+      </p>
+      <div className="mt-phi-4 flex flex-col gap-phi-2">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving || !unsaved}
+          className="w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {saving ? 'Saving…' : 'Save changes'}
+        </button>
+        <button
+          type="button"
+          onClick={onReset}
+          disabled={saving}
+          className={`${actionBtnCls} w-full justify-center`}
+          title="Restore local defaults; save to sync compatible fields to the backend"
+        >
+          Reset to defaults
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function serializeOperations(settings: Settings | null): string {
   if (!settings) return '';
   return JSON.stringify({
@@ -93,15 +158,8 @@ function serializeOperations(settings: Settings | null): string {
 }
 
 function formatSettingsSavedAt(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return 'Saved';
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
+  const formatted = formatDateTime(iso);
+  return formatted === '—' ? 'Saved' : formatted;
 }
 
 function TextField({
@@ -235,11 +293,7 @@ function ChipGroup({
               type="button"
               aria-pressed={active}
               onClick={() => toggle(option)}
-              className={`type-meta inline-flex min-h-[30px] items-center justify-center rounded-none border px-phi-4 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-                active
-                  ? 'border-oxford bg-oxford/[0.04] font-semibold text-oxford'
-                  : 'border-oxford/[0.14] bg-transparent text-oxford/50 hover:border-oxford/35 hover:text-oxford/75'
-              }`}
+              className={`type-meta inline-flex min-h-[36px] items-center justify-center rounded-none px-phi-3 transition-colors ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] text-oxford/[0.58] hover:bg-oxford/[0.075]'}`}
             >
               {option}
             </button>
@@ -274,7 +328,21 @@ function SettingsSection({
   );
 }
 
-function PreviewPanel({ config }: { config: FundConfiguration }) {
+function PreviewPanel({
+  config,
+  unsaved,
+  lastSavedAt,
+  saving,
+  onSave,
+  onReset,
+}: {
+  config: FundConfiguration;
+  unsaved: boolean;
+  lastSavedAt?: string | null;
+  saving: boolean;
+  onSave: () => void;
+  onReset: () => void;
+}) {
   const weightTotal = validateWeights(config.scoringWeights).total;
   return (
     <aside className="relative hidden min-h-full shrink-0 self-stretch border-l border-oxford/[0.08] xl:block">
@@ -320,6 +388,13 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
             </p>
           </div>
         </div>
+        <SettingsSidebarFooter
+          unsaved={unsaved}
+          lastSavedAt={lastSavedAt}
+          saving={saving}
+          onSave={onSave}
+          onReset={onReset}
+        />
       </div>
     </aside>
   );
@@ -331,8 +406,6 @@ export default function SettingsPage() {
   const { setSpineOverride } = useAppFrame();
 
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -349,21 +422,28 @@ export default function SettingsPage() {
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
   const [draft, setDraft] = useState<FundConfiguration>(configuration);
 
+  // Settings ride the shared ['settings'] cache (also fed by useSystemData):
+  // returning visitors get the page instantly instead of a loading takeover.
+  const settingsQuery = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => fetchSettings().catch(() => null),
+    ...getQueryConfig('STATIC'),
+  });
+
+  // Seed the editable draft once — later refetches (e.g. after invalidation)
+  // must never clobber in-progress edits.
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current || !settingsQuery.data) return;
+    seededRef.current = true;
+    setSettings(settingsQuery.data);
+    setSavedOperationsSnapshot(serializeOperations(settingsQuery.data));
+  }, [settingsQuery.data]);
+
+  const loading = settings == null && settingsQuery.isPending;
+
   useEffect(() => {
     let cancelled = false;
-    fetchSettings()
-      .then((data) => {
-        if (cancelled) return;
-        setSettings(data);
-        setSavedOperationsSnapshot(serializeOperations(data));
-        setLoadError(null);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Failed to load settings');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
     fetchAgentsStatus().then((data) => { if (!cancelled) setAgentsStatus(data ?? null); }).catch(() => undefined);
     fetchFundThesisSummary().then((data) => { if (!cancelled) setThesisSummary(data); }).catch(() => undefined);
     return () => { cancelled = true; };
@@ -494,9 +574,9 @@ export default function SettingsPage() {
   // ── The spine is the only rail: project section nav + draft state into it. ──
   // Handlers are reached through a ref so the projection effect re-runs only
   // when displayed values change, never on handler identity.
+  const lastSavedAt = draft.lastSavedAt;
   const spineActionsRef = useRef({ save: () => {}, reset: () => {} });
   spineActionsRef.current = { save: () => void handleSave(), reset: handleReset };
-  const lastSavedAt = draft.lastSavedAt;
 
   useEffect(() => {
     const scrollToSection = (id: SectionId) => {
@@ -516,6 +596,7 @@ export default function SettingsPage() {
             label="← Today"
             active={false}
             ariaPressed={false}
+            compact
             surface="oxford"
             onClick={() => navigate('/v1')}
           />
@@ -528,6 +609,7 @@ export default function SettingsPage() {
               label={section.label}
               active={activeSection === section.id}
               ariaPressed={activeSection === section.id}
+              compact
               surface="oxford"
               onClick={() => scrollToSection(section.id)}
             />
@@ -554,16 +636,12 @@ export default function SettingsPage() {
           <p className={`mt-phi-2 truncate font-sans text-[12px] leading-snug ${unsaved ? 'text-white/85' : 'text-white/45'}`}>
             {statusDetail}
           </p>
-          <div className="mt-phi-3 flex flex-col gap-phi-2">
+          <div className="mt-phi-3 flex flex-col gap-phi-2 xl:hidden">
             <button
               type="button"
               onClick={() => spineActionsRef.current.save()}
               disabled={saving || !unsaved}
-              className={
-                unsaved && !saving
-                  ? 'inline-flex h-9 w-full items-center justify-center rounded-none bg-paper font-mono text-[11px] uppercase tracking-[0.12em] text-oxford transition-opacity hover:opacity-90 btn-interaction'
-                  : 'inline-flex h-9 w-full cursor-not-allowed items-center justify-center rounded-none border border-white/[0.18] bg-transparent font-mono text-[11px] uppercase tracking-[0.12em] text-white/35'
-              }
+              className="w-full btn-aethria-solid !bg-paper !text-oxford disabled:cursor-not-allowed disabled:opacity-40"
             >
               {saving ? 'Saving…' : 'Save changes'}
             </button>
@@ -667,7 +745,15 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) return <LoadingAnimation />;
+  // In-place loader — never a full-screen takeover. The spine (with this
+  // page's section nav) stays mounted, so opening Settings doesn't "break".
+  if (loading) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center overflow-hidden bg-paper">
+        <LoadingAnimation fullScreen={false} />
+      </div>
+    );
+  }
 
   if (!settings) {
     return (
@@ -675,7 +761,7 @@ export default function SettingsPage() {
         <main className="flex min-h-0 flex-1 items-center justify-center">
           <div>
             <p className={sectionLabelCls}>Settings unavailable</p>
-            <p className="mt-phi-2 type-body-sm text-oxford/45">{loadError ?? 'The settings API did not return a payload.'}</p>
+            <p className="mt-phi-2 type-body-sm text-oxford/45">The settings API did not return a payload.</p>
           </div>
         </main>
       </div>
@@ -827,7 +913,7 @@ export default function SettingsPage() {
                           {policyBusy ? 'Publishing...' : 'Publish version'}
                         </button>
                         {draft.lastPublishedAt && (
-                          <p className="type-meta text-oxford/[0.38]">Last published {new Date(draft.lastPublishedAt).toLocaleString()}</p>
+                          <p className="type-meta text-oxford/[0.38]">Last published {formatDateTime(draft.lastPublishedAt)}</p>
                         )}
                       </div>
                     </div>
@@ -949,7 +1035,14 @@ export default function SettingsPage() {
                 </SettingsSection>
               </div>
 
-              <PreviewPanel config={draft} />
+              <PreviewPanel
+                config={draft}
+                unsaved={unsaved}
+                lastSavedAt={lastSavedAt}
+                saving={saving}
+                onSave={() => void handleSave()}
+                onReset={handleReset}
+              />
             </div>
           </div>
             </div>

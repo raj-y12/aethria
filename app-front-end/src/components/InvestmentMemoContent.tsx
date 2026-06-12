@@ -35,6 +35,7 @@ import {
 } from '../lib/fundConfiguration';
 import { findPrecedentCandidates } from '../lib/institutionalConviction';
 import { getNextStepText, parseNextStepItems } from '../lib/memoText';
+import { formatDate } from '../lib/dates';
 const MEMO_POLL_INITIAL_MS = 2000;
 const MEMO_POLL_MAX_MS = 15000;
 const MEMO_POLL_MAX_ATTEMPTS = 60;
@@ -1486,7 +1487,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       <li key={`${entry.timestamp}-${index}`} className="memoLedgerItem">
                         <div className="memoLedgerMeta">
                           <span>{decisionLabel(entry.new_decision)}</span>
-                          <span>{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('en-GB') : '—'}</span>
+                          <span>{formatDate(entry.timestamp)}</span>
                         </div>
                         {entry.rationale && (
                           <p className="memoLedgerText">{renderWithMonoNumbers(entry.rationale)}</p>

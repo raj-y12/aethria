@@ -1,6 +1,7 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import RoomHeader from '../components/RoomHeader';
-import SystemIntelligence from '../components/SystemIntelligence';
+import SystemIntelligence, { FundFacetNav, type FundFacetTab } from '../components/SystemIntelligence';
 import { useFundConfiguration } from '../hooks';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
@@ -28,14 +29,18 @@ function drift(v: number | null | undefined): string {
 }
 
 /**
- * Fund — the instrument itself. The mandate the system runs on, the record of
- * human judgment, the patterns in its decisions, its calibration, and how it
- * evolves. The old "Intelligence" panel's surfaces live here, organised by
- * what they say about the fund rather than where the data comes from.
+ * Fund — the instrument itself. Chrome (room header + facet tabs) sits in a
+ * fixed top band; only the tab panels scroll beneath it.
  */
 export default function FundPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<FundFacetTab>('thesis');
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
+
+  useEffect(() => {
+    bodyScrollRef.current?.scrollTo({ top: 0 });
+  }, [activeTab]);
   const runtime = data.fundThesisRuntime;
 
   const fundName =
@@ -46,54 +51,67 @@ export default function FundPage({ data }: { data: SystemData }) {
   const stats = runtime?.alignment_stats;
 
   return (
-    <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <div className="mx-auto w-full max-w-[1180px] px-phi-5 pb-phi-8 pt-phi-5">
-        <RoomHeader
-          className="border-b border-oxford/[0.075] pb-phi-6"
-          eyebrow={`The instrument${
-            runtime?.active_version_number != null ? ` · Mandate v${runtime.active_version_number}` : ''
-          }`}
-          title={fundName}
-          sub={
-            <Link
-              to="/v1/settings"
-              className="inline-block type-meta uppercase tracking-[0.1em] text-oxford/40 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-            >
-              Edit mandate →
-            </Link>
-          }
-          readouts={
-            <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
-              <HeaderReadout label="Mandate match" value={pct(stats?.pct_matching_thesis)} />
-              <HeaderReadout label="Mean alignment" value={pct(stats?.avg_alignment_score)} />
-              <HeaderReadout label="Drift" value={drift(stats?.drift_vs_previous)} />
-              <HeaderReadout
-                label="Reviewed"
-                value={(stats?.reviewed_with_thesis_count ?? 0).toLocaleString()}
-              />
-            </div>
-          }
-        />
+    <div className="page-transition-enter flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex-none bg-paper">
+        <div className="mx-auto w-full max-w-[1180px] px-phi-5 pt-phi-5">
+          <RoomHeader
+            className="pb-phi-5"
+            eyebrow={`The instrument${
+              runtime?.active_version_number != null ? ` · Mandate v${runtime.active_version_number}` : ''
+            }`}
+            title={fundName}
+            sub={
+              <Link
+                to="/v1/settings"
+                className="inline-block type-meta uppercase tracking-[0.1em] text-oxford/40 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+              >
+                Edit mandate →
+              </Link>
+            }
+            readouts={
+              <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
+                <HeaderReadout label="Mandate match" value={pct(stats?.pct_matching_thesis)} />
+                <HeaderReadout label="Mean alignment" value={pct(stats?.avg_alignment_score)} />
+                <HeaderReadout label="Drift" value={drift(stats?.drift_vs_previous)} />
+                <HeaderReadout
+                  label="Reviewed"
+                  value={(stats?.reviewed_with_thesis_count ?? 0).toLocaleString()}
+                />
+              </div>
+            }
+          />
+          <FundFacetNav activeTab={activeTab} onTabChange={setActiveTab} showRule={false} className="pt-phi-3" />
+        </div>
+      </div>
 
-        <SystemIntelligence
-          startups={data.startups}
-          onStartupClick={openDeal}
-          selectedStartupId={null}
-          rejectionAnalytics={data.rejectionAnalytics}
-          watchlistAnalytics={data.watchlistAnalytics}
-          concentrationAnalytics={data.concentrationAnalytics}
-          systemHealth={data.systemHealth}
-          metaReports={data.metaReports}
-          scoutWeights={data.scoutWeights}
-          calibrationState={data.calibrationState}
-          metaPromptState={data.metaPromptState}
-          metaEvalSet={data.metaEvalSet}
-          metaInsights={data.metaInsights}
-          fundThesisRuntime={data.fundThesisRuntime}
-          fundThesisRuntimeLoading={data.fundThesisRuntimeLoading}
-          fundThesisRuntimeError={data.fundThesisRuntimeError}
-          fundConfiguration={fundConfiguration}
-        />
+      <div
+        ref={bodyScrollRef}
+        className="scrollbar-gutter-stable min-h-0 flex-1 overflow-y-auto overscroll-contain bg-paper"
+      >
+        <div className="mx-auto w-full max-w-[1180px] px-phi-5 pb-phi-5 pt-phi-3">
+          <SystemIntelligence
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            hideNav
+            startups={data.startups}
+            onStartupClick={openDeal}
+            selectedStartupId={null}
+            rejectionAnalytics={data.rejectionAnalytics}
+            watchlistAnalytics={data.watchlistAnalytics}
+            concentrationAnalytics={data.concentrationAnalytics}
+            systemHealth={data.systemHealth}
+            metaReports={data.metaReports}
+            scoutWeights={data.scoutWeights}
+            calibrationState={data.calibrationState}
+            metaPromptState={data.metaPromptState}
+            metaEvalSet={data.metaEvalSet}
+            metaInsights={data.metaInsights}
+            fundThesisRuntime={data.fundThesisRuntime}
+            fundThesisRuntimeLoading={data.fundThesisRuntimeLoading}
+            fundThesisRuntimeError={data.fundThesisRuntimeError}
+            fundConfiguration={fundConfiguration}
+          />
+        </div>
       </div>
     </div>
   );

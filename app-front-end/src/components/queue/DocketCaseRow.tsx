@@ -26,7 +26,7 @@ interface DocketCaseRowProps {
  * Stage; repeating it here put the same sentence on screen three times.
  * Selection reads through the left bar, full ink, and weight — never size.
  */
-const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function DocketCaseRow(
+const DocketCaseRow = forwardRef<HTMLButtonElement, DocketCaseRowProps>(function DocketCaseRow(
   { model, isSelected, rowIndex = 0, onClick, onKeyDown },
   ref
 ) {
@@ -48,12 +48,11 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
   const selectedPadding = queueRowPadding.selected;
 
   return (
-    <motion.div
+    <motion.button
       ref={ref}
+      type="button"
       layout={!reduceMotion}
       transition={layoutTransition}
-      role="button"
-      tabIndex={0}
       aria-pressed={isSelected}
       aria-label={buildRowAriaLabel(model, isSelected)}
       onClick={onClick}
@@ -63,7 +62,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
         paddingTop: isSelected ? selectedPadding : ambientPadding,
         paddingBottom: isSelected ? selectedPadding : ambientPadding,
       }}
-      className={`group relative w-full min-w-0 cursor-pointer px-phi-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
+      className={`group relative block w-full min-w-0 cursor-pointer border-0 bg-transparent px-phi-0 text-left font-sans focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
         isSelected ? 'bg-paperDeep/35' : ''
       }`}
     >
@@ -94,13 +93,15 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
         </motion.span>
 
         <div className="flex min-w-0 items-baseline justify-between gap-phi-3">
-          <h2
+          {/* span, not h2 — heading content is invalid inside a button, and a
+              docket of rows is an index, not a document outline. */}
+          <span
             className={`min-w-0 truncate font-sans text-[clamp(14px,1.15vw,16px)] leading-[1.3] tracking-[-0.01em] transition-[color,font-weight] duration-150 ${
               isSelected ? 'font-semibold text-oxford' : 'font-normal text-oxford/55 group-hover:text-oxford/80'
             }`}
           >
             {startup.scout.name}
-          </h2>
+          </span>
           <div className="shrink-0 text-right">
             <QueueVerdictLine
               ctx={queueContext}
@@ -110,7 +111,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
           </div>
         </div>
       </div>
-    </motion.div>
+    </motion.button>
   );
 });
 

@@ -5,6 +5,7 @@ import type { SystemData } from '../hooks/useSystemData';
 import type { Startup, SignalItem } from '../types/startup';
 import { isDealHumanResolved } from '../lib/dealState';
 import { buildTrackRecord } from '../lib/trackRecord';
+import { formatDateTime } from '../lib/dates';
 
 function recOf(s: Startup): string | null {
   const r = s.partner?.recommendation;
@@ -41,9 +42,7 @@ function QuietEmpty({ children }: { children: React.ReactNode }) {
 }
 
 function signalWhen(sig: SignalItem): string {
-  if (!sig.detected_at) return '—';
-  const d = new Date(sig.detected_at);
-  return `${d.toLocaleDateString('en-GB')} ${d.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' })}`;
+  return formatDateTime(sig.detected_at);
 }
 
 /**
@@ -90,7 +89,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
 
   return (
     <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <div className="mx-auto w-full max-w-[1180px] px-phi-5 pb-phi-8 pt-phi-5">
+      <div className="mx-auto w-full max-w-[1180px] px-phi-5 py-phi-5">
         {/* ── Header: place + book composition in one line of sight ── */}
         <RoomHeader
           className="pb-phi-6"

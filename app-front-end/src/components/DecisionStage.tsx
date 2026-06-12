@@ -23,6 +23,8 @@ import type { Startup, SingleReview } from '../types/startup';
 interface DecisionStageProps {
   startup: Startup;
   fundConfiguration?: FundConfiguration;
+  /** Quiet utility action (e.g. IC pack PDF) — sits on the kicker line, not in its own header band. */
+  action?: React.ReactNode;
 }
 
 /** Conviction on the canonical 0–100 scale — same semantics as the queue. */
@@ -106,7 +108,7 @@ function Instrument({
   );
 }
 
-export default function DecisionStage({ startup, fundConfiguration }: DecisionStageProps) {
+export default function DecisionStage({ startup, fundConfiguration, action }: DecisionStageProps) {
   const reduceMotion = usePrefersReducedMotion();
   const config = fundConfiguration ?? createDefaultFundConfiguration();
 
@@ -165,20 +167,23 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
 
   return (
     <motion.section
-      aria-label="Active decision"
-      className="pt-phi-3 pb-phi-7"
+      aria-label={startup.scout.name}
+      className="pt-phi-1 pb-phi-7"
       initial={reduceMotion ? false : 'hidden'}
       animate="visible"
       variants={reduceMotion ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
     >
-      {/* Compression: one quiet line of context. */}
-      {kicker ? (
-        <motion.p
+      {/* Compression: one quiet line of context, with the utility action on its right. */}
+      {kicker || action ? (
+        <motion.div
           variants={STAGE_ITEM}
-          className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/[0.38]"
+          className="flex min-w-0 items-baseline justify-between gap-phi-4"
         >
-          {kicker}
-        </motion.p>
+          <p className="min-w-0 truncate font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/[0.38]">
+            {kicker}
+          </p>
+          {action ? <div className="shrink-0">{action}</div> : null}
+        </motion.div>
       ) : null}
 
       {/* Release: the number owns the canvas. */}

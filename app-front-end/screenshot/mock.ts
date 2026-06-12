@@ -306,7 +306,22 @@ export const MOCK_SYSTEM_DATA: SystemData = {
   metaInsights: null,
   fundThesisRuntime: {
     mode: 'active', thesis_ready: true, active_version_number: 3, thesis_mode: 'embedding',
-    parsed_json: { fund_name: "Aethria's Fund Thesis", sectors: ['B2B SaaS', 'AI', 'Climate'], stage_focus: ['Pre-seed', 'Seed'], geography: ['Europe', 'UK/Ireland'] },
+    parsed_json: {
+      fund_name: "Aethria's Fund Thesis",
+      sectors: ['B2B SaaS', 'AI', 'Climate'],
+      stage_focus: ['Pre-seed', 'Seed'],
+      geography: ['Europe', 'UK/Ireland'],
+      exclusions: ['Crypto', 'Consumer social'],
+      preferences: [
+        'We back European founders applying applied AI to unglamorous B2B workflows — vertical software where the wedge is a measurable operational saving, not a platform promise.',
+        'Recurring revenue or strong usage retention by seed',
+        'Founder-led sales with at least two reference customers',
+      ],
+      risk_profile: 'balanced',
+      check_size_min: 250_000,
+      check_size_max: 2_000_000,
+      ownership_target: 8,
+    },
     alignment_stats: { pct_matching_thesis: 72, avg_alignment_score: 0.68, reviewed_with_thesis_count: 118, drift_vs_previous: 0.04 },
     version_timeline: [
       { id: 'v3', version_number: 3, is_active: true, created_at: hoursAgo(300) },
