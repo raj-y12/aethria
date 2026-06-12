@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import { motion } from 'framer-motion';
 import { usePrefersReducedMotion } from '../../hooks';
 import type { VerdictBadgeConfig } from '../../lib/fundConfiguration';
-import QueueVerdictLine from './QueueVerdictLine';
+import DocketMarginColumn from './DocketMarginColumn';
 import { buildRowAriaLabel, type DocketRowModel } from './queueRowShared';
 import {
   QUEUE_ROW_LAYOUT_TRANSITION,
@@ -21,31 +21,28 @@ interface DocketCaseRowProps {
 }
 
 /**
- * The docket row — a pure index line: number, name, verdict. All context
- * (location, sector, standfirst, attention detail) belongs to the Decision
- * Stage; repeating it here put the same sentence on screen three times.
- * Selection reads through the left bar, full ink, and weight — never size.
+ * Annotated dossier row: a fixed margin column (verdict chip + score) against
+ * a two-line text block (name, one-liner · sector). Selection is the "open
+ * file" — name and score step up in size and ink, and the attention reason
+ * appears as a third line in the same muted voice as the one-liner.
  */
 const DocketCaseRow = forwardRef<HTMLButtonElement, DocketCaseRowProps>(function DocketCaseRow(
   { model, isSelected, rowIndex = 0, onClick, onKeyDown },
   ref
 ) {
   const reduceMotion = usePrefersReducedMotion();
-  const { startup, displayIndex, decisionVariant, queueContext } = model;
+  const { startup, decisionVariant, queueContext, attentionDriver } = model;
 
-  /* Left bar = selection only (the product-wide selection mark). Escalation is
-     carried by the burgundy "Needs ruling" verdict text — with most of a busy
-     queue escalated, per-row bars read as a wall of alarms, not a signal. */
   const spineVisible = isSelected;
-  const spineColor = spineVisible ? '#001433' : 'transparent';
-  const spineWidth = spineVisible ? 3 : 0;
-
   const layoutTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_LAYOUT_TRANSITION;
   const selectTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_SELECT_TRANSITION;
 
   const ambientPadding =
     rowIndex % 2 === 0 ? queueRowPadding.ambient : queueRowPadding.ambientAlt;
-  const selectedPadding = queueRowPadding.selected;
+  const selectedPadding = queueRowPadding.selected + 4;
+
+  const metaLine = [model.oneLiner, model.sectorStage].filter(Boolean).join(' · ');
+  const attentionLine = attentionDriver.detail ?? attentionDriver.label;
 
   return (
     <motion.button
@@ -73,42 +70,44 @@ const DocketCaseRow = forwardRef<HTMLButtonElement, DocketCaseRowProps>(function
         animate={{
           top: isSelected ? 10 : 9,
           bottom: isSelected ? 10 : 9,
-          width: spineWidth,
-          backgroundColor: spineColor,
-          opacity: spineWidth === 0 ? 0 : 1,
+          width: spineVisible ? 3 : 0,
+          backgroundColor: spineVisible ? '#001433' : 'transparent',
+          opacity: spineVisible ? 1 : 0,
         }}
         transition={selectTransition}
       />
 
-      <div className="grid grid-cols-[26px_minmax(0,1fr)] items-baseline gap-x-phi-4">
-        <motion.span
-          className="type-meta tabular-nums"
-          initial={false}
-          animate={{
-            color: isSelected ? 'rgba(0, 20, 51, 0.68)' : 'rgba(0, 20, 51, 0.24)',
-          }}
-          transition={selectTransition}
-        >
-          {displayIndex}
-        </motion.span>
+      <div className="flex items-start gap-phi-3">
+        <DocketMarginColumn
+          variant={decisionVariant}
+          score={queueContext.configuredScore}
+          prominent={isSelected}
+        />
 
-        <div className="flex min-w-0 items-baseline justify-between gap-phi-3">
-          {/* span, not h2 — heading content is invalid inside a button, and a
-              docket of rows is an index, not a document outline. */}
+        <div className="min-w-0 flex-1">
           <span
-            className={`min-w-0 truncate font-sans text-[clamp(14px,1.15vw,16px)] leading-[1.3] tracking-[-0.01em] transition-[color,font-weight] duration-150 ${
-              isSelected ? 'font-semibold text-oxford' : 'font-normal text-oxford/55 group-hover:text-oxford/80'
+            className={`block min-w-0 truncate font-sans transition-all duration-150 ${
+              isSelected
+                ? 'text-[22px] font-semibold leading-[1.2] tracking-[-0.015em] text-oxford'
+                : 'text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.3] tracking-[-0.01em] text-oxford/55 group-hover:text-oxford/80'
             }`}
           >
             {startup.scout.name}
           </span>
-          <div className="shrink-0 text-right">
-            <QueueVerdictLine
-              ctx={queueContext}
-              decisionVariant={decisionVariant}
-              prominent={isSelected}
-            />
-          </div>
+          {metaLine ? (
+            <span
+              className={`mt-1 block min-w-0 truncate text-[12px] leading-[1.45] ${
+                isSelected ? 'text-oxford/[0.62]' : 'text-oxford/50'
+              }`}
+            >
+              {metaLine}
+            </span>
+          ) : null}
+          {isSelected && attentionLine ? (
+            <span className="mt-2 block border-t border-dotted border-oxford/15 pt-2 text-[12px] leading-[1.45] text-oxford/50">
+              {attentionLine}
+            </span>
+          ) : null}
         </div>
       </div>
     </motion.button>

@@ -48,11 +48,13 @@ export function formatUnresolvedAgeDays(value: string): string {
 export function buildRowAriaLabel(model: DocketRowModel, isSelected: boolean): string {
   const { startup, attentionDriver, queueContext } = model;
   const rec = queueContext.startup.partner?.recommendation ?? '';
+  const score = queueContext.configuredScore;
   const parts = [
     startup.scout.name,
     startup.scout.location?.trim(),
     model.sectorStage || 'Unknown sector',
     attentionDriver.label,
+    Number.isFinite(score) && score > 0 ? `Score ${score.toFixed(1)}` : '',
     rec ? `Recommendation ${rec}` : '',
     isSelected ? 'Selected case' : '',
     'Press Enter to open memo',
