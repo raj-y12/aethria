@@ -182,6 +182,13 @@ class PortfolioEngine:
                 
                 # Check if decision already recorded
                 if startup_id not in existing_decision_startup_ids:
+                    # The scan projection omits review_info (heavy, unused for
+                    # already-executed rows); recover it per-row for new decisions.
+                    if review_data is None and hasattr(self.discovery_storage, "get_startup"):
+                        full = self.discovery_storage.get_startup(startup_id)
+                        if full is not None:
+                            full_entry = full.to_dict() if hasattr(full, "to_dict") else full
+                            review_data = full_entry.get("review_info") or full_entry.get("review")
                     # Add decision
                     decision_id = self.portfolio_store.add_decision(
                         startup_id=startup_id,

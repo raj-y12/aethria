@@ -14,7 +14,7 @@ class _InsertBuilder:
         self.table = table
         self._payload = None
 
-    def insert(self, payload):
+    def insert(self, payload, **kwargs):
         self._payload = payload
         return self
 

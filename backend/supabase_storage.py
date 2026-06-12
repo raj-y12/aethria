@@ -54,6 +54,14 @@ _LIST_SELECT_LEGACY_NO_UNRESOLVED = (
     "short_summary, partner_decision, partner_human_review_required, partner_info, human_resolution, "
     "conviction_state, created_at, updated_at"
 )
+# Portfolio execution scan runs every pipeline cycle over all decided rows.
+# review_info averages ~20KB/row and is only needed for not-yet-executed
+# decisions (refetched per-row in PortfolioEngine), so it stays out of the scan.
+_DECISION_SCAN_SELECT = (
+    "startup_id, scout_info, partner_info, human_resolution, financials, version, "
+    "conviction_state, queue_reason, priority_reason, unresolved_at, first_seen_at, "
+    "last_seen_by_user_at, acknowledged_at, created_at, updated_at"
+)
 _MEMO_PARTIAL_SELECT = (
     "startup_id, scout_info, review_info, partner_info, conviction_state, agent_trace, investment_memo_markdown"
 )
@@ -265,7 +273,9 @@ class SupabaseStartupsStorage:
         warned: set[str] = set()
         for _ in range(4):
             try:
-                self._client.table(TABLE).upsert(legacy, on_conflict="user_id,startup_id").execute()
+                self._client.table(TABLE).upsert(
+                    legacy, on_conflict="user_id,startup_id", returning="minimal"
+                ).execute()
                 return
             except Exception as e:
                 if _is_missing_agent_trace_error(e) and "agent_trace" in legacy:
@@ -325,7 +335,7 @@ class SupabaseStartupsStorage:
         }
         try:
             self._execute_with_retry(
-                lambda: self._client.table("scoring_trails").insert(row).execute()
+                lambda: self._client.table("scoring_trails").insert(row, returning="minimal").execute()
             )
             return True
         except Exception as e:
@@ -362,7 +372,7 @@ class SupabaseStartupsStorage:
             try:
                 (
                     self._client.table(TABLE)
-                    .update(payload)
+                    .update(payload, returning="minimal")
                     .eq("user_id", self._user_id)
                     .eq("startup_id", startup_id)
                     .execute()
@@ -1029,7 +1039,7 @@ class SupabaseStartupsStorage:
         try:
             q = (
                 self._client.table(TABLE)
-                .select("*")
+                .select(_DECISION_SCAN_SELECT)
                 .eq("user_id", self._user_id)
                 .not_.is_("partner_info", "null")
                 .order("updated_at", desc=True)
@@ -1131,7 +1141,9 @@ class SupabaseStartupsStorage:
             if not batch:
                 continue
             try:
-                self._client.table(TABLE).upsert(batch, on_conflict="user_id,startup_id").execute()
+                self._client.table(TABLE).upsert(
+                    batch, on_conflict="user_id,startup_id", returning="minimal"
+                ).execute()
             except Exception as e:
                 self.logger.error("replace_all upsert chunk failed: %s", e)
                 raise

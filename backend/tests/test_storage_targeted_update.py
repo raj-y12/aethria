@@ -27,7 +27,7 @@ class _Builder:
         self.kind = "select"
         return self
 
-    def update(self, payload):
+    def update(self, payload, **kwargs):
         self.kind = "update"
         self.payload = payload
         return self
