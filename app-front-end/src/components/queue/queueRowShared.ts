@@ -54,7 +54,7 @@ export function buildRowAriaLabel(model: DocketRowModel, isSelected: boolean): s
     startup.scout.location?.trim(),
     model.sectorStage || 'Unknown sector',
     attentionDriver.detail ?? attentionDriver.label,
-    Number.isFinite(score) && score > 0 ? `Score ${score.toFixed(1)}` : '',
+    Number.isFinite(score) && score > 0 ? `Score ${Math.round(score)}` : '',
     rec ? `Recommendation ${rec}` : '',
     isSelected ? 'Selected case' : '',
     'Press Enter to open memo',

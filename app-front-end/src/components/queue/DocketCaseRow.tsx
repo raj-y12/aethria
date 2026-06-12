@@ -59,9 +59,14 @@ const DocketCaseRow = forwardRef<HTMLButtonElement, DocketCaseRowProps>(function
         paddingTop: isSelected ? selectedPadding : ambientPadding,
         paddingBottom: isSelected ? selectedPadding : ambientPadding,
       }}
-      className={`group relative block w-full min-w-0 cursor-pointer border-0 bg-transparent px-phi-0 text-left font-sans focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
-        isSelected ? 'bg-paperDeep/35' : ''
-      }`}
+      /* paperDeep is a raw var() token (no <alpha-value>), so Tailwind's /35
+         modifier can't produce this tint — mix it explicitly. */
+      style={{
+        backgroundColor: isSelected
+          ? 'color-mix(in srgb, var(--color-paper-deep) 35%, transparent)'
+          : undefined,
+      }}
+      className="group relative block w-full min-w-0 cursor-pointer border-0 bg-transparent px-phi-0 text-left font-sans focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset"
     >
       <motion.span
         className="absolute left-0 top-0 bottom-0 block"
