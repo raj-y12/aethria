@@ -25,12 +25,11 @@ const QUEUE_VIEW_LABELS: { key: QueueView; label: string }[] = [
   { key: 'ESCALATED', label: 'Escalated' },
 ];
 
-/** One cycling control — click advances to the next ordering. */
 const SORT_OPTIONS: { value: SortFilter; label: string; title: string }[] = [
-  { value: 'QUEUE_PRIORITY', label: 'Priority', title: 'Queue order' },
-  { value: 'NEWEST', label: 'Newest', title: 'Newest first' },
-  { value: 'OLDEST', label: 'Oldest', title: 'Oldest first' },
-  { value: 'UNRESOLVED_OLDEST', label: 'Longest open', title: 'Longest unresolved' },
+  { value: 'QUEUE_PRIORITY', label: '↕', title: 'Queue order' },
+  { value: 'NEWEST', label: '↓', title: 'Newest first' },
+  { value: 'OLDEST', label: '↑', title: 'Oldest first' },
+  { value: 'UNRESOLVED_OLDEST', label: '↥', title: 'Longest unresolved' },
 ];
 
 const SOURCE_FILTER_CHIPS: { key: SourceFilter; label: string }[] = [
@@ -70,10 +69,8 @@ function AdvancedChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`type-meta min-h-[30px] whitespace-nowrap rounded-none border px-phi-4 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-        active
-          ? 'border-oxford bg-oxford/[0.04] font-semibold text-oxford'
-          : 'border-oxford/[0.14] bg-transparent text-oxford/50 hover:border-oxford/35 hover:text-oxford/75'
+      className={`type-meta text-[10px] min-h-[36px] whitespace-nowrap px-[40px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+        active ? 'bg-oxford text-paper' : 'bg-oxford/[0.035] hover:bg-oxford/[0.065] text-oxford/[0.58]'
       }`}
     >
       {label}
@@ -182,14 +179,11 @@ export default function DecisionQueueHeader({
       className={`sticky top-0 z-20 ${productPanel.header} !px-phi-0`}
     >
       <div className="flex min-w-0 flex-col gap-phi-2">
-        <p
-          className={productText.mutedLabel}
+        {/* The room header names the place — this strip is pure controls. */}
+        <div
+          className="flex min-w-0 flex-wrap items-center gap-x-phi-3 gap-y-phi-1"
           title={`${config.thresholds.staleAfterHours}h stale · ${config.risk.sensitivity} risk`}
         >
-          Decision queue
-        </p>
-
-        <div className="flex min-w-0 flex-wrap items-center gap-x-phi-3 gap-y-phi-1">
           <div className="flex items-center gap-0" role="group" aria-label="Queue views">
             {QUEUE_VIEW_LABELS.map(({ key, label }) => (
               <QueueTab
@@ -210,37 +204,38 @@ export default function DecisionQueueHeader({
             ))}
           </div>
 
-          <div className="ml-auto flex items-center gap-x-phi-4">
-            {/* Sort — one cycling control, current order spelled out. */}
-            <button
-              type="button"
-              onClick={() => {
-                const i = SORT_OPTIONS.findIndex((o) => o.value === sortFilter);
-                onSortFilterChange(SORT_OPTIONS[(i + 1) % SORT_OPTIONS.length].value);
-              }}
-              title="Change ordering"
-              aria-label={`Ordering: ${SORT_OPTIONS.find((o) => o.value === sortFilter)?.title}. Click for next.`}
-              className="inline-flex h-9 shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] text-oxford/[0.38] transition-colors hover:text-oxford/70 btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
-            >
-              <span className="text-oxford/25">Sort</span>
-              <span className={sortFilter === 'QUEUE_PRIORITY' ? '' : 'font-semibold text-oxford/70'}>
-                {SORT_OPTIONS.find((o) => o.value === sortFilter)?.label}
-              </span>
-            </button>
+          <div className="ml-auto flex items-center gap-x-phi-2">
+            <div className="relative shrink-0">
+              <select
+                value={sortFilter}
+                onChange={(e) => onSortFilterChange(e.target.value as SortFilter)}
+                aria-label={SORT_OPTIONS.find((o) => o.value === sortFilter)?.title ?? 'Sort deals'}
+                title={SORT_OPTIONS.find((o) => o.value === sortFilter)?.title}
+                className="appearance-none h-9 w-9 border-0 bg-transparent font-mono text-[15px] leading-none text-oxford/45 hover:text-oxford/75 transition-colors text-center outline-none cursor-pointer focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+              >
+                {SORT_OPTIONS.map(({ value, label, title }) => (
+                  <option key={value} value={value} title={title}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <button
               type="button"
               onClick={onToggleAdvancedFilters}
               aria-expanded={showAdvancedFilters}
-              aria-label={showAdvancedFilters ? 'Hide filters' : 'Show filters'}
-              className={`inline-flex h-9 shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-                showAdvancedFilters || hasActiveFilters
-                  ? 'font-semibold text-oxford'
-                  : 'text-oxford/[0.38] hover:text-oxford/70'
+              aria-label={showAdvancedFilters ? 'Hide filters' : 'More filters'}
+              className={`group inline-flex h-9 w-9 shrink-0 items-center justify-center leading-none transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+                showAdvancedFilters || hasActiveFilters ? 'text-oxford' : 'text-oxford/[0.34] hover:text-oxford/55'
               }`}
             >
-              Filters
-              {hasActiveFilters ? <span className="h-1.5 w-1.5 rounded-none bg-oxford" aria-hidden /> : null}
+              <span
+                aria-hidden
+                className={`inline-block font-sans text-[1.05rem] leading-none transition-[transform,color] duration-200 ease-out ${showAdvancedFilters ? 'rotate-90' : ''}`}
+              >
+                ›
+              </span>
             </button>
           </div>
         </div>

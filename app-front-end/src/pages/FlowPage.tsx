@@ -9,6 +9,7 @@ import InvestmentMemo from '../components/InvestmentMemo';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from '../components/InvestmentMemoContent';
 import AgentDispatch from '../components/AgentDispatch';
 import GhostTransition from '../components/GhostTransition';
+import RoomHeader from '../components/RoomHeader';
 import { useAppFrame } from '../components/AppFrame';
 import { tokens } from '../design-system/tokens';
 import { transitionOrReduced } from '../design-system/motion';
@@ -23,10 +24,27 @@ import {
 import { useAcknowledgeStartup } from '../hooks/useAcknowledgeStartup';
 import { fetchStartupDetail } from '../api/startups';
 import { getQueryConfig } from '../lib/queryIntent';
+import { isDealUnresolved } from '../lib/dealState';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
 
 const PANEL_ACTION_CLASS = productInteraction.panelActionInline;
+
+/** Instrument readout — a number with its label, no box (shared room language). */
+function Readout({ label, value, tone }: { label: string; value: string; tone?: 'escalation' }) {
+  return (
+    <div className="flex flex-col gap-phi-1">
+      <span
+        className={`font-mono text-[clamp(22px,2vw,30px)] font-semibold leading-none tracking-[-0.03em] tabular-nums ${
+          tone === 'escalation' ? 'text-escalation' : 'text-oxford'
+        }`}
+      >
+        {value}
+      </span>
+      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">{label}</span>
+    </div>
+  );
+}
 
 /**
  * Flow — the judgment workspace: queue | active decision. The queue is
@@ -124,6 +142,11 @@ export default function FlowPage({ data }: { data: SystemData }) {
     return () => setPageOverlayOpen(false);
   }, [useModal, setPageOverlayOpen]);
 
+  // Room readouts — the queue's state at a glance, in the shared header language.
+  const needRuling = data.pendingEscalationCount ?? 0;
+  const newCount = useMemo(() => startups.filter((s) => s.is_new_to_user).length, [startups]);
+  const openCount = useMemo(() => startups.filter(isDealUnresolved).length, [startups]);
+
   const watchlistIds = useMemo(() => {
     const ids = new Set<string>();
     for (const e of watchlistAnalytics?.entries ?? []) {
@@ -149,6 +172,24 @@ export default function FlowPage({ data }: { data: SystemData }) {
           />
         </div>
 
+        {/* The room opens like every other room — one header, then the instrument. */}
+        <RoomHeader
+          className="flex-none border-b border-oxford/[0.075] pb-phi-5"
+          eyebrow="Judgment"
+          title="Flow"
+          readouts={
+            <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
+              <Readout label="In queue" value={openCount.toLocaleString()} />
+              <Readout label="New" value={newCount.toLocaleString()} />
+              <Readout
+                label="Need ruling"
+                value={needRuling.toLocaleString()}
+                tone={needRuling > 0 ? 'escalation' : undefined}
+              />
+            </div>
+          }
+        />
+
         {startups.length === 0 ? (
         /* Zero state — one statement in the house voice, not two duplicate panels. */
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center pb-phi-8 text-center">
@@ -169,7 +210,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
           </button>
         </div>
       ) : (
-      <div className="aethria-flow-grid flex min-h-0 flex-1 flex-col overflow-hidden lg:grid">
+      <div className="aethria-flow-grid flex min-h-0 flex-1 flex-col overflow-hidden pt-phi-4 lg:grid">
           {/* ── Queue ─────────────────────────────────────────────── */}
           <section
             className="min-h-0 overflow-y-auto overscroll-contain lg:border-r lg:border-oxford/[0.06] lg:pr-phi-4"
@@ -194,10 +235,13 @@ export default function FlowPage({ data }: { data: SystemData }) {
             aria-live="polite"
             aria-label="Active decision"
           >
+            {/* No second heading — the room header names the place; the stage
+                cover names the subject. The strip carries only the action. */}
             {selectedStartup ? (
               <PanelShell
                 className="min-h-0 min-w-0 w-full flex-1 bg-paper"
-                title="Active decision"
+                title=""
+                showTitle={false}
                 headerClassName="!items-start !px-phi-0 !py-phi-2 min-h-[44px]"
                 actions={
                   <button

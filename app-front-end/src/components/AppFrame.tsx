@@ -376,15 +376,31 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
         )}
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {!bareChrome && (
-            <AppSpine
-              telemetry={telemetry}
-              mandate={mandate}
-              dispatchActive={dispatch.lookupWorking}
-              onDispatch={dispatch.openCommandBar}
-              override={spineOverride}
-            />
-          )}
+          {/* The spine unfolds from the left edge when leaving the front door
+              (bare chrome) for a workspace — and folds away on the way back. */}
+          <AnimatePresence initial={false}>
+            {!bareChrome && (
+              <motion.div
+                key="spine"
+                initial={reduceMotion ? false : { width: 0, opacity: 0 }}
+                animate={{ width: 'auto', opacity: 1 }}
+                exit={reduceMotion ? { opacity: 0 } : { width: 0, opacity: 0 }}
+                transition={transitionOrReduced(reduceMotion, {
+                  duration: tokens.motion.duration.medium,
+                  ease: tokens.motion.easeDrawer,
+                })}
+                className="flex-none overflow-hidden"
+              >
+                <AppSpine
+                  telemetry={telemetry}
+                  mandate={mandate}
+                  dispatchActive={dispatch.lookupWorking}
+                  onDispatch={dispatch.openCommandBar}
+                  override={spineOverride}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
           <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper">
             {children}
           </main>
