@@ -235,8 +235,10 @@ function ChipGroup({
               type="button"
               aria-pressed={active}
               onClick={() => toggle(option)}
-              className={`type-meta inline-flex min-h-[36px] items-center justify-center rounded-none px-[40px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-                active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] text-oxford/[0.58] hover:bg-oxford/[0.075]'
+              className={`type-meta inline-flex min-h-[30px] items-center justify-center rounded-none border px-phi-4 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+                active
+                  ? 'border-oxford bg-oxford/[0.04] font-semibold text-oxford'
+                  : 'border-oxford/[0.14] bg-transparent text-oxford/50 hover:border-oxford/35 hover:text-oxford/75'
               }`}
             >
               {option}

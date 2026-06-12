@@ -37,36 +37,34 @@ function HomeKey({
     <button
       type="button"
       onClick={onClick}
-      className={`group flex min-h-[80px] flex-col items-center justify-center gap-phi-1 rounded-none border-0 px-phi-3 py-phi-3 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 ${
+      className={`group flex min-h-[112px] flex-col items-center justify-center gap-phi-2 rounded-none border px-phi-4 py-phi-5 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 ${
         solid
-          ? 'bg-oxford text-paper hover:bg-oxford/[0.92]'
-          : 'bg-oxford/[0.045] text-oxford hover:bg-oxford hover:text-paper'
+          ? 'border-oxford bg-oxford text-paper hover:bg-oxford/[0.92]'
+          : 'border-oxford/[0.14] bg-transparent text-oxford hover:border-oxford/45 hover:bg-oxford/[0.03]'
       }`}
     >
       <span
-        className={`whitespace-nowrap font-mono text-[10px] tracking-[0.14em] ${
-          solid ? 'text-paper/45' : 'text-oxford/30 group-hover:text-paper/45'
-        }`}
+        className={`font-mono text-[10px] tracking-[0.14em] ${solid ? 'text-paper/45' : 'text-oxford/30'}`}
         aria-hidden
       >
         {numeral}
       </span>
       <span
-        className={`whitespace-nowrap font-mono text-[11px] font-semibold uppercase tracking-[0.16em] ${
-          solid ? 'text-paper' : 'text-oxford/85 group-hover:text-paper'
+        className={`font-mono text-[12px] font-semibold uppercase tracking-[0.16em] ${
+          solid ? 'text-paper' : 'text-oxford/85'
         }`}
       >
         {label}
       </span>
       <span
-        className={`whitespace-nowrap font-mono text-[10px] tracking-[0.06em] tabular-nums ${
+        className={`font-mono text-[10px] tracking-[0.06em] tabular-nums ${
           solid
             ? detailTone === 'escalation'
               ? 'text-escalation-bright'
               : 'text-paper/55'
             : detailTone === 'escalation'
-              ? 'text-escalation/85 group-hover:text-escalation-bright'
-              : 'text-oxford/40 group-hover:text-paper/55'
+              ? 'text-escalation/85'
+              : 'text-oxford/40'
         }`}
       >
         {detail}
@@ -175,7 +173,7 @@ export default function TodayPage({ data }: { data: SystemData }) {
         </Reveal>
 
         {/* ── The doors ── */}
-        <Reveal delay={0.32} className="mt-phi-7 w-full max-w-[38rem]">
+        <Reveal delay={0.32} className="mt-phi-7 w-full max-w-[42rem]">
           <div className="grid grid-cols-2 gap-phi-3 sm:grid-cols-4" role="navigation" aria-label="Workspaces">
             <HomeKey
               numeral="II"
@@ -214,14 +212,14 @@ export default function TodayPage({ data }: { data: SystemData }) {
 
         {/* ── The footer bar — Dispatch's micro-action language ── */}
         <Reveal delay={0.42} className="mt-phi-8">
-          <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
-            <span className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/40">{displayName}</span>
+          <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1 border-b border-oxford/10 pb-0.5">
+            <span className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/40">{displayName}</span>
             {fundName || mandateVersion != null ? (
               <>
                 <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
                 <Link
                   to="/v1/fund"
-                  className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
+                  className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
                 >
                   {fundName || `Mandate v${mandateVersion}`}
                 </Link>
@@ -230,7 +228,7 @@ export default function TodayPage({ data }: { data: SystemData }) {
             <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
             <Link
               to="/v1/settings"
-              className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
+              className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
             >
               Settings
             </Link>
@@ -239,7 +237,7 @@ export default function TodayPage({ data }: { data: SystemData }) {
               type="button"
               onClick={requestLogout}
               disabled={agentActionPending}
-              className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 disabled:opacity-50 btn-interaction"
+              className="type-meta px-1 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 disabled:opacity-50 btn-interaction"
             >
               {agentActionPending ? 'Updating…' : 'Log out'}
             </button>
