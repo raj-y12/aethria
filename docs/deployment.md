@@ -6,7 +6,7 @@ This cleanup intentionally preserves the current deploy roots:
 - `web-front-end`
 - `backend`
 
-Do not move these folders into `apps/`, `services/`, or another workspace layout until Vercel and Railway settings are changed together.
+Do not move these folders into `apps/`, `services/`, or another workspace layout until Vercel and Render settings are changed together.
 
 ## App Frontend
 
@@ -51,49 +51,17 @@ npm run dev
 npm run build
 ```
 
-## Backend (Railway)
+## Backend
 
-Host: [Railway](https://railway.com) — Docker deploy from repo root via `railway.toml`.
+Deploy root: `backend`
 
-| Setting | Value |
-|---------|-------|
-| Builder | Dockerfile (`backend/Dockerfile`) |
-| Build context | Repository root (includes `resources/`) |
-| Start command | `uvicorn api:app --host 0.0.0.0 --port $PORT --workers 1` (in Dockerfile) |
-| Health check | `GET /health` |
-| Watch paths | `backend/**`, `resources/**` |
+Start command assumption:
 
-Railway sets `PORT` automatically. Do not hardcode it in env vars.
-
-### Required Railway env vars
-
-Set these in the Railway service **Variables** tab (see [env.md](env.md)):
-
-- `OPENAI_API_KEY`
-- `USE_SUPABASE_STORAGE=1`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `CLERK_JWKS_URL`
-- `ALLOWED_ORIGINS` — comma-separated Vercel app URLs (e.g. `https://app.yourdomain.com,https://yourdomain.com`)
-
-### Recommended production env vars
-
-```
-MAX_CONCURRENT_PIPELINE_CYCLES=1
-RESUME_AGENT_LOOPS_ON_STARTUP=false
-MAX_RESUMED_AGENT_LOOPS=3
-FUND_THESIS_RUNTIME_ALIGNMENT_ROW_LIMIT=500
+```bash
+uvicorn api:app --host 0.0.0.0 --port $PORT --workers 1
 ```
 
-### After first deploy
-
-1. Copy the Railway public URL (e.g. `https://aethria-backend-production.up.railway.app`).
-2. Set `VITE_API_URL` to that URL in **Vercel** for `app-front-end` and `web-front-end`.
-3. Redeploy both frontends so the new API URL is baked into the build.
-4. Hit `https://<railway-url>/health` — expect `{"status":"ok"}`.
-5. Sign in on the app and confirm API calls succeed (check browser network tab).
-
-### Local backend
+Local command:
 
 ```bash
 cd backend
@@ -104,7 +72,7 @@ The root `run.py` also assumes `backend`, `app-front-end`, and `web-front-end` e
 
 ### Docker (local backend)
 
-For containerized local backend runs, see [docker.md](docker.md). Build context is the repo root; production uses the same image on Railway.
+For containerized local backend runs, see [docker.md](docker.md). Build context is the repo root; Render deployment is unchanged.
 
 ## Generated Files
 
