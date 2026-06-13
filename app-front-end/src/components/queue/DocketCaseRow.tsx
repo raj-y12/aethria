@@ -21,10 +21,8 @@ interface DocketCaseRowProps {
 }
 
 /**
- * Annotated dossier row: a fixed margin column (verdict chip + score) against
- * a two-line text block (name, one-liner · sector). Selection is the "open
- * file" — name and score step up in size and ink, and the attention reason
- * appears as a third line in the same muted voice as the one-liner.
+ * Annotated dossier row: text block (name, one-liner · sector) on the left,
+ * verdict chip + score on the right, divider between.
  */
 const DocketCaseRow = forwardRef<HTMLButtonElement, DocketCaseRowProps>(function DocketCaseRow(
   { model, isSelected, rowIndex = 0, onClick, onKeyDown },
@@ -33,7 +31,6 @@ const DocketCaseRow = forwardRef<HTMLButtonElement, DocketCaseRowProps>(function
   const reduceMotion = usePrefersReducedMotion();
   const { startup, decisionVariant, queueContext, attentionDriver } = model;
 
-  const spineVisible = isSelected;
   const layoutTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_LAYOUT_TRANSITION;
   const selectTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_SELECT_TRANSITION;
 
@@ -58,40 +55,16 @@ const DocketCaseRow = forwardRef<HTMLButtonElement, DocketCaseRowProps>(function
       animate={{
         paddingTop: isSelected ? selectedPadding : ambientPadding,
         paddingBottom: isSelected ? selectedPadding : ambientPadding,
-      }}
-      /* paperDeep is a raw var() token (no <alpha-value>), so Tailwind's /35
-         modifier can't produce this tint — mix it explicitly. */
-      style={{
         backgroundColor: isSelected
           ? 'color-mix(in srgb, var(--color-paper-deep) 35%, transparent)'
-          : undefined,
+          : 'rgba(0, 0, 0, 0)',
       }}
-      className="group relative block w-full min-w-0 cursor-pointer border-0 bg-transparent px-phi-0 text-left font-sans focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset"
+      className="group relative block w-full min-w-0 cursor-pointer rounded-none border-0 bg-transparent px-phi-0 text-left font-sans focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset"
     >
-      <motion.span
-        className="absolute left-0 top-0 bottom-0 block"
-        aria-hidden
-        initial={false}
-        animate={{
-          top: isSelected ? 10 : 9,
-          bottom: isSelected ? 10 : 9,
-          width: spineVisible ? 3 : 0,
-          backgroundColor: spineVisible ? '#001433' : 'transparent',
-          opacity: spineVisible ? 1 : 0,
-        }}
-        transition={selectTransition}
-      />
-
       <div className="flex items-start gap-phi-3">
-        <DocketMarginColumn
-          variant={decisionVariant}
-          score={queueContext.configuredScore}
-          prominent={isSelected}
-        />
-
         <div className="min-w-0 flex-1">
           <span
-            className={`block min-w-0 truncate font-sans transition-all duration-150 ${
+            className={`block min-w-0 font-sans transition-all duration-150 ${
               isSelected
                 ? 'text-[22px] font-semibold leading-[1.2] tracking-[-0.015em] text-oxford'
                 : 'text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.3] tracking-[-0.01em] text-oxford/55 group-hover:text-oxford/80'
@@ -101,7 +74,7 @@ const DocketCaseRow = forwardRef<HTMLButtonElement, DocketCaseRowProps>(function
           </span>
           {metaLine ? (
             <span
-              className={`mt-1 block min-w-0 truncate text-[12px] leading-[1.45] ${
+              className={`mt-1 block min-w-0 text-[12px] leading-[1.45] ${
                 isSelected ? 'text-oxford/[0.62]' : 'text-oxford/50'
               }`}
             >
@@ -114,6 +87,22 @@ const DocketCaseRow = forwardRef<HTMLButtonElement, DocketCaseRowProps>(function
             </span>
           ) : null}
         </div>
+
+        <div className="relative w-[3px] shrink-0 self-stretch" aria-hidden>
+          <motion.span
+            className={`absolute left-0 top-0 bottom-0 block transition-colors duration-150 ${
+              isSelected ? 'bg-oxford' : 'bg-oxford/10'
+            }`}
+            initial={false}
+            animate={{ width: isSelected ? 3 : 2 }}
+            transition={selectTransition}
+          />
+        </div>
+
+        <DocketMarginColumn
+          variant={decisionVariant}
+          score={queueContext.configuredScore}
+        />
       </div>
     </motion.button>
   );

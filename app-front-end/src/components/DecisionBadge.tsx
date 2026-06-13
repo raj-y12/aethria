@@ -50,7 +50,7 @@ export default function DecisionBadge({
 
   return (
     <span
-      className={`${VERDICT_CHIP_CLASS} ${DECISION_BADGE_CLASS[variant]}`}
+      className={`${VERDICT_CHIP_CLASS} rounded-none ${DECISION_BADGE_CLASS[variant]}`}
       style={style}
       aria-label={text}
     >

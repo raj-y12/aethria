@@ -156,8 +156,8 @@
     gap: var(--layout-col-gap);
     min-height: 0;
     overflow: hidden;
-    /* 34 / 66 — compressed queue, dominant stage */
-    grid-template-columns: minmax(0, 34fr) minmax(0, 66fr);
+    /* 38 / 62 — queue readable; stage still dominant (φ ≈ 38.2 : 61.8) */
+    grid-template-columns: minmax(0, 38fr) minmax(0, 62fr);
   }
 
   .aethria-flow-grid > * {
