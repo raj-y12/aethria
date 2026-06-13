@@ -19,9 +19,14 @@ function recOf(s: Startup): string | null {
 }
 
 /**
+ * Door hover: the cell dissolves to oxford and type inverts to paper — a calm
+ * crossfade, significant but restrained.
+ */
+const EASE = 'ease-[cubic-bezier(0.16,1,0.3,1)]';
+
+/**
  * A door — one entry in the editorial nav band. Numeral, label, and a quiet
- * reading, divided by hairlines. No fill, no box: hover draws a single rule
- * under the label and lifts the type. The whole band is the navigation.
+ * reading. On hover: the cell dissolves to oxford and the type inverts to paper.
  */
 function HomeDoor({
   numeral,
@@ -39,7 +44,6 @@ function HomeDoor({
   onClick: () => void;
 }) {
   const reduceMotion = usePrefersReducedMotion();
-  const ct = 'transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]';
 
   return (
     <motion.button
@@ -53,23 +57,32 @@ function HomeDoor({
         ease: tokens.motion.ease,
         delay: 0.18 + index * 0.04,
       })}
-      className="group relative flex flex-col items-center gap-phi-3 px-phi-5 py-phi-6 text-oxford transition-colors duration-150 hover:bg-oxford/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-oxford/30"
+      className="group relative flex flex-col items-center gap-phi-3 overflow-hidden px-phi-5 py-phi-6 text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-oxford/30"
     >
-      <span className={`font-mono text-[10px] tracking-[0.2em] text-oxford/30 ${ct} group-hover:text-oxford/55`} aria-hidden>
+      {/* The cell dissolves to a solid oxford plate — a crossfade, no motion. */}
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 z-0 bg-oxford opacity-0 transition-opacity duration-[360ms] ${EASE} group-hover:opacity-100`}
+      />
+
+      <span
+        className={`relative z-10 font-mono text-[10px] tracking-[0.2em] transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[3px] text-oxford/35 group-hover:text-paper/55 group-hover:delay-100`}
+        aria-hidden
+      >
         {numeral}
       </span>
-      <span className="relative inline-block">
-        <span className={`font-mono text-[12px] font-semibold uppercase tracking-[0.18em] text-oxford/75 ${ct} group-hover:text-oxford`}>
+      <span className="relative z-10 inline-block px-[3px]">
+        <span
+          className={`block font-mono text-[12px] font-semibold uppercase tracking-[0.18em] transition-[color] duration-300 ${EASE} text-oxford/80 group-hover:text-paper group-hover:delay-100`}
+        >
           {label}
         </span>
-        <span
-          aria-hidden
-          className="absolute -bottom-[6px] left-0 right-0 h-px origin-center scale-x-0 bg-oxford transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-x-100"
-        />
       </span>
       <span
-        className={`text-center font-mono text-[9.5px] leading-snug tracking-[0.06em] tabular-nums ${ct} ${
-          tone === 'escalation' ? 'text-escalation/85' : 'text-oxford/40 group-hover:text-oxford/60'
+        className={`relative z-10 text-center font-mono text-[9.5px] leading-snug tracking-[0.06em] tabular-nums transition-colors duration-300 ${EASE} ${
+          tone === 'escalation'
+            ? 'text-escalation/90 group-hover:text-escalation-bright'
+            : 'text-oxford/45 group-hover:text-paper/60 group-hover:delay-100'
         }`}
       >
         {detail}

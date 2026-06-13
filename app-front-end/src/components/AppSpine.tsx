@@ -45,7 +45,7 @@ interface AppSpineProps {
 }
 
 export const SPINE_WORKSPACES: Array<{ href: string; label: string; shortcut: string }> = [
-  { href: '/v1', label: 'Today', shortcut: '1' },
+  { href: '/v1', label: 'Home', shortcut: '1' },
   { href: '/v1/flow', label: 'Flow', shortcut: '2' },
   { href: '/v1/portfolio', label: 'Portfolio', shortcut: '3' },
   { href: '/v1/fund', label: 'Fund', shortcut: '4' },
