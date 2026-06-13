@@ -35,6 +35,7 @@ import {
 } from '../lib/fundConfiguration';
 import { findPrecedentCandidates } from '../lib/institutionalConviction';
 import { getNextStepText, parseNextStepItems } from '../lib/memoText';
+import { formatDate } from '../lib/dates';
 const MEMO_POLL_INITIAL_MS = 2000;
 const MEMO_POLL_MAX_MS = 15000;
 const MEMO_POLL_MAX_ATTEMPTS = 60;
@@ -128,6 +129,8 @@ export interface InvestmentMemoContentProps {
   startup: Startup | null;
   onClose?: () => void;
   embedded?: boolean;
+  /** Replaces the executive cover (e.g. the Flow Decision Stage owns the opening). */
+  coverOverride?: ReactNode;
   /** Share link / co-GP view: memo readable, ruling controls hidden. */
   readOnly?: boolean;
   onMemoPipelineReady?: () => void;
@@ -427,11 +430,24 @@ function cleanFactValue(value: unknown): string | null {
   return s;
 }
 
-function buildSnapshotRows(startup: Startup, blocker: string): Array<{ label: string; text: string }> {
+function buildSnapshotRows(
+  startup: Startup,
+  blocker: string,
+  omitStandfirst = false,
+): Array<{ label: string; text: string }> {
+  const whatItDoes = firstNonEmpty(
+    startup.scout.solution,
+    startup.scout.one_line,
+    startup.partner?.snapshot?.one_liner,
+  );
+  // Under a Decision Stage cover the standfirst already says this — once is enough.
+  const standfirst = (startup.scout.one_line ?? '').toString().replace(/\s+/g, ' ').trim();
+  const dropWhatItDoes =
+    omitStandfirst && whatItDoes.replace(/\s+/g, ' ').trim() === standfirst && standfirst !== '';
   return [
     {
       label: 'What it does',
-      text: firstNonEmpty(startup.scout.solution, startup.scout.one_line, startup.partner?.snapshot?.one_liner),
+      text: dropWhatItDoes ? '' : whatItDoes,
     },
     {
       label: 'Who it serves',
@@ -559,6 +575,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     startup,
     onClose,
     embedded = false,
+    coverOverride,
     readOnly = false,
     onMemoPipelineReady,
     onDecisionResolved,
@@ -857,8 +874,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [displayStartup, coverStandfirst]
   );
   const snapshotRows = useMemo(
-    () => (displayStartup ? buildSnapshotRows(displayStartup, coverBlocker) : []),
-    [displayStartup, coverBlocker]
+    () => (displayStartup ? buildSnapshotRows(displayStartup, coverBlocker, coverOverride != null) : []),
+    [displayStartup, coverBlocker, coverOverride]
   );
   // Decision confidence — surfaced on the verdict so the recommendation is honest
   // about how sure it is, not just what it concludes.
@@ -887,12 +904,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const vitalsStrip = useMemo(
     () =>
       [
-        { label: 'Location', value: cleanFactValue(displayStartup?.scout?.location) },
-        { label: 'Stage', value: cleanFactValue(displayStartup?.scout?.funding_stage) },
+        // Under a Decision Stage cover, the kicker already says location/stage.
+        ...(coverOverride == null
+          ? [
+              { label: 'Location', value: cleanFactValue(displayStartup?.scout?.location) },
+              { label: 'Stage', value: cleanFactValue(displayStartup?.scout?.funding_stage) },
+            ]
+          : []),
         { label: 'Market (TAM)', value: cleanFactValue(displayStartup?.scout?.est_tam) },
         { label: 'Valuation', value: cleanFactValue(fin?.valuation_est) },
       ].filter((v): v is { label: string; value: string } => !!v.value),
-    [displayStartup?.scout?.location, displayStartup?.scout?.funding_stage, displayStartup?.scout?.est_tam, fin?.valuation_est]
+    [coverOverride, displayStartup?.scout?.location, displayStartup?.scout?.funding_stage, displayStartup?.scout?.est_tam, fin?.valuation_est]
   );
   const fundingLine = cleanFactValue(fin?.funding_history);
   // Prefer the source-verified traction metric; fall back to the partner's narrative signal.
@@ -1000,14 +1022,15 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             transition={transitionOrReduced(reduceMotion, { duration: 0.24, ease: [0.23, 1, 0.32, 1] })}
           >
 
-            {/* ── Executive cover ── */}
+            {/* ── Executive cover (or the workspace's Decision Stage) ── */}
+            {coverOverride ?? (
             <header className="memoCover">
               {!embedded ? <p className="memoKicker">Investment Memo</p> : null}
               <div className="memoCoverTitleRow">
                 {headerLocation ? (
                   <p className="memoMeta memoCoverLocation">{renderWithMonoNumbers(headerLocation)}</p>
                 ) : null}
-                <h1 className="type-title font-semibold text-oxford-ink-emphasis m-0" id="memo-title">
+                <h1 className="memoCoverCompany" id="memo-title">
                   {companyName || '—'}
                 </h1>
                 {headerMeta ? <p className="memoMeta">{renderWithMonoNumbers(headerMeta)}</p> : null}
@@ -1087,6 +1110,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </dl>
               ) : null}
             </header>
+            )}
 
             {/* ── Company snapshot ── */}
             {(snapshotRows.length > 0 || hasVitals) && (
@@ -1099,7 +1123,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         {vitalsStrip.map((v) => (
                           <div key={v.label} className="flex items-baseline gap-2">
                             <dt className="type-label uppercase tracking-[0.06em] text-oxford/45">{v.label}</dt>
-                            <dd className="type-data text-oxford/82 tabular-nums">{renderWithMonoNumbers(v.value)}</dd>
+                            <dd className="type-data text-oxford/[0.82] tabular-nums">{renderWithMonoNumbers(v.value)}</dd>
                           </div>
                         ))}
                       </dl>
@@ -1197,7 +1221,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 { label: 'Competitive Landscape', items: compItems },
                 { label: 'Business Model', items: bizItems },
               ].filter((section) => section.items.length > 0);
-              const hasThesis = reviewHasThesisAlignment(displayStartup.review);
+              const thesisFitCount =
+                (displayStartup.review?.thesis_fit_points?.filter((x) => String(x ?? '').trim()).length ?? 0) +
+                (displayStartup.review?.thesis_deviation_points?.filter((x) => String(x ?? '').trim()).length ?? 0);
+              const hasThesis =
+                reviewHasThesisAlignment(displayStartup.review) &&
+                (coverOverride == null || thesisFitCount > 0);
               const hasScorecard = showScores && !!structuredScoring;
               const hasPanel = reviewerConsensusRows.length > 0;
               const hasDeepDive = improvements.length > 0 || assessmentReadouts.length > 0 || hasThesis;
@@ -1458,7 +1487,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       <li key={`${entry.timestamp}-${index}`} className="memoLedgerItem">
                         <div className="memoLedgerMeta">
                           <span>{decisionLabel(entry.new_decision)}</span>
-                          <span>{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('en-GB') : '—'}</span>
+                          <span>{formatDate(entry.timestamp)}</span>
                         </div>
                         {entry.rationale && (
                           <p className="memoLedgerText">{renderWithMonoNumbers(entry.rationale)}</p>

@@ -38,7 +38,7 @@ const nodeGlobals = {
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**'],
+    ignores: ['dist/**', 'node_modules/**', 'screenshot/**', 'vite.screenshot.config.ts'],
   },
   {
     files: ['src/**/*.{ts,tsx}', 'tests/**/*.ts', 'vite.config.ts'],

@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+const route = process.argv[2] ?? '/v1/settings';
+const out = process.argv[3] ?? '/tmp/page-tall.png';
+const h = Number(process.argv[4] ?? 3600);
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+const page = await browser.newPage({ viewport: { width: 1512, height: h }, ignoreHTTPSErrors: true });
+await page.goto(`http://localhost:5181/screenshot/index.html?route=${encodeURIComponent(route)}`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(2400);
+await page.screenshot({ path: out });
+await browser.close();
+console.log('ok', out);

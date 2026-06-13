@@ -4,15 +4,16 @@ import { useAuth } from '@clerk/react-router';
 import { motion } from 'framer-motion';
 import { setTokenGetter } from './api/auth';
 import { triggerAgents } from './api/agents';
-import MainLayout from './components/MainLayout';
-import GrainOverlay from './components/GrainOverlay';
+import AppFrame from './components/AppFrame';
+import TodayPage from './pages/TodayPage';
+import FlowPage from './pages/FlowPage';
+import PortfolioPage from './pages/PortfolioPage';
+import FundPage from './pages/FundPage';
 import LoadingAnimation from './components/LoadingAnimation';
 const SettingsPage = lazy(() => import('./settings/SettingsPage'));
 const AdminDashboardPage = lazy(() => import('./admin/AdminDashboardPage'));
-import WhileYouWereAway from './components/WhileYouWereAway';
 import { useSystemData } from './hooks/useSystemData';
 import { useAgentsEnabled } from './hooks/useAgentsEnabled';
-import { useActivitySummary } from './hooks/useActivitySummary';
 import { usePrefersReducedMotion } from './hooks';
 import LoginPage from './components/LoginPage';
 import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from './lib/loginEntryTransition';
@@ -24,16 +25,24 @@ const ADMIN_ROOT = '/admin';
 function AppShell() {
   const { pathname } = useLocation();
   const isSettingsRoute = pathname.startsWith(SETTINGS_ROOT);
-  const [isSystemPanelOpen, setIsSystemPanelOpen] = useState(false);
+  const isFundRoute = pathname.startsWith(`${APP_ROOT}/fund`);
+  const isPortfolioRoute = pathname.startsWith(`${APP_ROOT}/portfolio`);
+  const isFlowRoute = pathname.startsWith(`${APP_ROOT}/flow`) || pathname.startsWith(`${APP_ROOT}/deal`);
   const [arrivedFromLogin] = useState(() => sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY) === '1');
   const triggeredAgentsRef = useRef(false);
   const reduceMotion = usePrefersReducedMotion();
   const entryTransition = getLoginEntryTransition(reduceMotion);
   const systemData = useSystemData({
-    systemPanelOpen: !isSettingsRoute && isSystemPanelOpen,
+    // The Fund workspace surfaces meta/analytics — refresh them when it opens.
+    systemPanelOpen: !isSettingsRoute && isFundRoute,
   });
   const agentsEnabled = useAgentsEnabled();
-  const { summary, showSummary, loading, dismissSummary } = useActivitySummary();
+
+  // The login-entry handoff key is consumed here (captured into state above);
+  // clearing it after mount keeps later AppShell remounts from re-animating.
+  useEffect(() => {
+    sessionStorage.removeItem(LOGIN_ENTRY_SESSION_KEY);
+  }, []);
 
   // Warn the user before closing the tab if agents are actively running.
   useEffect(() => {
@@ -48,25 +57,12 @@ function AppShell() {
   }, [agentsEnabled]);
 
   useEffect(() => {
-    if (!isSettingsRoute) return;
-    setIsSystemPanelOpen(false);
-  }, [isSettingsRoute]);
-
-  useEffect(() => {
     if (!agentsEnabled || isSettingsRoute || triggeredAgentsRef.current) return;
     triggeredAgentsRef.current = true;
     void triggerAgents().catch(() => {
       triggeredAgentsRef.current = false;
     });
   }, [agentsEnabled, isSettingsRoute]);
-
-  if (loading && !arrivedFromLogin) {
-    return <LoadingAnimation />;
-  }
-
-  if (showSummary && summary) {
-    return <WhileYouWereAway summary={summary} onDismiss={dismissSummary} />;
-  }
 
   return (
     <motion.div
@@ -81,18 +77,26 @@ function AppShell() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: entryTransition.appRevealMs / 1000, ease: [0.16, 1, 0.3, 1] }}
     >
-      <GrainOverlay opacity={0.028} />
-      {isSettingsRoute ? (
-        <Suspense fallback={<LoadingAnimation />}>
-          <SettingsPage />
-        </Suspense>
-      ) : (
-        <MainLayout
-          data={systemData}
-          startupsError={systemData.startupsError}
-          onSystemPanelOpenChange={setIsSystemPanelOpen}
-        />
-      )}
+      <AppFrame
+        data={systemData}
+        startupsError={systemData.startupsError}
+        // The front door is a centered Dispatch-style surface with its own keys.
+        chrome={!isSettingsRoute && !isPortfolioRoute && !isFundRoute && !isFlowRoute ? 'bare' : 'full'}
+      >
+        {isSettingsRoute ? (
+          <Suspense fallback={<LoadingAnimation />}>
+            <SettingsPage />
+          </Suspense>
+        ) : isPortfolioRoute ? (
+          <PortfolioPage data={systemData} />
+        ) : isFundRoute ? (
+          <FundPage data={systemData} />
+        ) : isFlowRoute ? (
+          <FlowPage data={systemData} />
+        ) : (
+          <TodayPage data={systemData} />
+        )}
+      </AppFrame>
     </motion.div>
   );
 }
@@ -150,7 +154,6 @@ function App() {
   if (isAdminRoute) {
     return (
       <>
-        <GrainOverlay opacity={0.028} />
         <Suspense fallback={<LoadingAnimation />}>
           <AdminDashboardPage />
         </Suspense>

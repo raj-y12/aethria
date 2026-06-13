@@ -39,6 +39,15 @@ interface WorkGridProps {
   selectedId?: string | null;
   watchlistIds?: Set<string>;
   fundConfiguration?: FundConfiguration;
+  /** The canvas always has an anchor: select the top-priority row when nothing is selected. */
+  autoSelectFirst?: boolean;
+  /** Auto-selection callback — unlike onStartupClick it must not acknowledge new rows. */
+  onAutoSelect?: (startup: Startup) => void;
+  /** Controlled queue view — the room header readouts own view switching. */
+  queueView: QueueView;
+  onQueueViewChange: (view: QueueView) => void;
+  /** Reports per-view row counts so the room header readouts stay live. */
+  onViewCounts?: (counts: Record<QueueView, number>) => void;
 }
 
 const EMPTY_WATCHLIST_IDS = new Set<string>();
@@ -143,10 +152,20 @@ function priorityRank(row: DocketRowModel): number {
   return queueAttentionRank(row.startup);
 }
 
-const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConfiguration }: WorkGridProps): JSX.Element => {
+const WorkGrid = ({
+  startups,
+  onStartupClick,
+  selectedId,
+  watchlistIds,
+  fundConfiguration,
+  autoSelectFirst = false,
+  onAutoSelect,
+  queueView,
+  onQueueViewChange,
+  onViewCounts,
+}: WorkGridProps): JSX.Element => {
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
   const config = fundConfiguration ?? createDefaultFundConfiguration();
-  const [queueView, setQueueView] = useState<QueueView>('PRIORITY');
   const [searchParams, setSearchParams] = useSearchParams();
   // Deep-link from the rail attention cluster: ?queue=new|escalated|priority|stale.
   useEffect(() => {
@@ -160,11 +179,11 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
       all: 'ALL',
     };
     const next = map[q.toLowerCase()];
-    if (next) setQueueView(next);
+    if (next) onQueueViewChange(next);
     const params = new URLSearchParams(searchParams);
     params.delete('queue');
     setSearchParams(params, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, onQueueViewChange]);
   const [sourceFilters, setSourceFilters] = useState<Set<SourceFilter>>(() => new Set());
   const [outcomeFilters, setOutcomeFilters] = useState<Set<OutcomeFilter>>(() => new Set());
   const [flagFilters, setFlagFilters] = useState<Set<FlagFilter>>(() => new Set());
@@ -256,7 +275,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     [reduceMotion]
   );
 
-  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const rowRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   const stableIndex = useMemo(() => {
     const byDiscovery = [...startups].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
@@ -279,6 +298,10 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     }),
     [allModels]
   );
+
+  useEffect(() => {
+    onViewCounts?.(viewCounts);
+  }, [viewCounts, onViewCounts]);
 
   const orderedModels = useMemo(() => {
     const filtered = allModels.filter((row) => {
@@ -330,6 +353,16 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     if (pinnedNewId && selectedId !== pinnedNewId) setPinnedNewId(null);
   }, [selectedId, pinnedNewId]);
 
+  // The decision stage always has a subject: when nothing is selected, the
+  // top of the current view takes the canvas (without acknowledging it).
+  // Deep links (?queue=…, ?open=…) win — wait until they have been consumed.
+  useEffect(() => {
+    if (!autoSelectFirst || selectedId != null) return;
+    if (searchParams.get('queue') != null || searchParams.get('open') != null) return;
+    const first = orderedModels[0]?.startup;
+    if (first) onAutoSelect?.(first);
+  }, [autoSelectFirst, selectedId, orderedModels, onAutoSelect, searchParams]);
+
   const handleRowSelect = useCallback(
     (startup: Startup) => {
       if (queueView === 'NEW') setPinnedNewId(startup.id);
@@ -338,12 +371,11 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     [queueView, onStartupClick]
   );
 
+  // Enter/Space activate natively now that rows are real buttons — only the
+  // arrow-key roving focus needs handling.
   const handleRowKeyDown = useCallback(
-    (e: React.KeyboardEvent, model: DocketRowModel, idx: number) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        handleRowSelect(model.startup);
-      } else if (e.key === 'ArrowDown') {
+    (e: React.KeyboardEvent, idx: number) => {
+      if (e.key === 'ArrowDown') {
         e.preventDefault();
         const next = orderedModels[idx + 1];
         if (next) rowRefs.current.get(next.startup.id)?.focus();
@@ -353,14 +385,14 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         if (prev) rowRefs.current.get(prev.startup.id)?.focus();
       }
     },
-    [handleRowSelect, orderedModels]
+    [orderedModels]
   );
 
   if (startups.length === 0) {
     return (
       <div className="w-full h-full min-h-[12rem] flex flex-col items-center justify-center">
         <EmptyState
-          label="Decision queue"
+          label="Docket"
           body={`Scouts are filling the workspace against the active mandate. Stale pressure begins after ${config.thresholds.staleAfterHours} hours.`}
         />
       </div>
@@ -371,9 +403,6 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
     <div className="aethria-queue-surface w-full font-sans bg-surface-canvas selection:bg-oxford selection:text-paper">
       <DecisionQueueHeader
         config={config}
-        queueView={queueView}
-        onQueueViewChange={setQueueView}
-        viewCounts={viewCounts}
         sortFilter={sortFilter}
         onSortFilterChange={setSortFilter}
         sourceFilters={sourceFilters}
@@ -387,14 +416,17 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         showAdvancedFilters={showAdvancedFilters}
         onToggleAdvancedFilters={() => setShowAdvancedFilters((v) => !v)}
         hasActiveFilters={hasActiveFilters}
+        activeFilterCount={
+          sourceFilters.size + outcomeFilters.size + flagFilters.size + reviewFilters.size
+        }
         onResetFilters={resetFilters}
         reduceMotion={reduceMotion}
       />
 
       <LayoutGroup id="decision-queue">
         {orderedModels.length === 0 ? (
-          <div className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1">
-            <div className="min-h-[16rem] px-phi-4 py-phi-5">
+          <div className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1 pb-phi-6">
+            <div className="min-h-[16rem] py-phi-5">
               <motion.div
                 key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
                 className="max-w-[32rem]"
@@ -435,7 +467,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                       <>
                         <button
                           type="button"
-                          onClick={() => setQueueView('PRIORITY')}
+                          onClick={() => onQueueViewChange('PRIORITY')}
                           aria-label="Switch to priority queue view"
                           className={`${productInteraction.action} btn-interaction btn-interaction--no-press uppercase tracking-[0.12em] text-oxford font-semibold`}
                         >
@@ -443,7 +475,7 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
                         </button>
                         <button
                           type="button"
-                          onClick={() => setQueueView('ALL')}
+                          onClick={() => onQueueViewChange('ALL')}
                           aria-label="Switch to all deals view"
                           className={`${productInteraction.action} btn-interaction btn-interaction--no-press uppercase tracking-[0.12em] text-oxford/55`}
                         >
@@ -459,14 +491,14 @@ const WorkGrid = ({ startups, onStartupClick, selectedId, watchlistIds, fundConf
         ) : (
           <motion.div
             key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
-            className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1"
+            className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1 pb-phi-6"
             initial={reduceMotion ? false : 'hidden'}
             animate="visible"
             variants={listContainerVariants}
           >
             {orderedModels.map((model, idx) => {
               const isSelected = selectedId === model.startup.id;
-              const keyDown = (e: React.KeyboardEvent) => handleRowKeyDown(e, model, idx);
+              const keyDown = (e: React.KeyboardEvent) => handleRowKeyDown(e, idx);
 
               return (
                 <motion.div

@@ -5,10 +5,17 @@ import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import type { Startup, SignalItem, MetaCycleReport } from '../types/startup';
 import { formatReviewOverallStructuredScore } from '../lib/reviewScoring';
-import DecisionBadge from './DecisionBadge';
 import SignalEventRow from './SignalEventRow';
 import EmptyState from './EmptyState';
 import { UI_JUDGEMENTS_SUBTITLE } from '../design-system/ui-text';
+
+/** One stamp per entry — date + time, no seconds, no second timestamp line. */
+function feedStamp(iso: string): string {
+  const d = new Date(iso);
+  const day = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  const time = d.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  return `${day} · ${time}`;
+}
 
 interface LogEntry {
   id: string;
@@ -59,12 +66,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
         out.push({
           id: `${s.id}-scan`,
           iso: d,
-          timestamp: new Date(d).toLocaleTimeString('en-GB', {
-            hour12: false,
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }),
+          timestamp: feedStamp(d),
           message: `${s.scout.name} · ${s.scout.sector || '—'} · ${((s.scout.confidence ?? 0) * 100).toFixed(0)}%`,
           kind: 'scanned',
         });
@@ -75,12 +77,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
         out.push({
           id: `${s.id}-review`,
           iso: d,
-          timestamp: new Date(d).toLocaleTimeString('en-GB', {
-            hour12: false,
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }),
+          timestamp: feedStamp(d),
           message: `${s.scout.name} · Score ${overall}/10`,
           kind: 'reviewed',
         });
@@ -90,12 +87,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
         out.push({
           id: `${s.id}-dec`,
           iso: d,
-          timestamp: new Date(d).toLocaleTimeString('en-GB', {
-            hour12: false,
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }),
+          timestamp: feedStamp(d),
           message: s.scout.name,
           kind: 'decision',
           decision: s.partner.recommendation,
@@ -110,7 +102,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
         out.push({
           id: `sig-${sig.id ?? sig.detected_at}`,
           iso: d,
-          timestamp: new Date(d).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          timestamp: feedStamp(d),
           message: `Signal · ${sig.description?.slice(0, 60) ?? sig.signal_type}`,
           kind: 'signal_detected',
         });
@@ -125,7 +117,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
         out.push({
           id: `meta-${r.cycle_number}`,
           iso: r.ran_at,
-          timestamp: new Date(r.ran_at).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          timestamp: feedStamp(r.ran_at),
           message: mutCount > 0
             ? `Meta-Agent · Cycle ${r.cycle_number} · ${mutCount} mutations (${targets})`
             : `Meta-Agent · Cycle ${r.cycle_number} · System stable`,
@@ -141,7 +133,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
         out.push({
           id: `${s.id}-resolved`,
           iso: d,
-          timestamp: new Date(d).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          timestamp: feedStamp(d),
           message: `Resolved · ${s.scout.name} · ${s.human_resolution.decision}`,
           kind: 'escalation_resolved',
         });
@@ -178,36 +170,24 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
                 delay: reduceMotion ? 0 : i * 0.025,
                 ease: tokens.motion.ease,
               })}
-              className={i > 0 ? 'mt-phi-1' : ''}
+              className={i > 0 ? 'border-t border-oxford/[0.05]' : ''}
             >
               <SignalEventRow
                 layout="stacked"
                 timestamp={e.timestamp}
                 label={logProvenanceLabel(e.kind)}
-                body={e.message}
-                meta={
-                  e.iso
-                    ? new Date(e.iso).toLocaleString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false,
-                      })
-                    : undefined
-                }
-                trailing={
+                body={
                   e.kind === 'decision' && e.decision ? (
-                    <DecisionBadge
-                      variant={
-                        e.decision === 'INVEST' || e.decision === 'PASS' || e.decision === 'MONITOR'
-                          ? e.decision
-                          : 'undecided'
-                      }
-                    />
-                  ) : undefined
+                    <>
+                      {e.message}
+                      {/* Verdict inline with its subject — never floated to the panel edge. */}
+                      <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-oxford/80">
+                        {' '}· {e.decision}
+                      </span>
+                    </>
+                  ) : (
+                    e.message
+                  )
                 }
               />
             </motion.div>

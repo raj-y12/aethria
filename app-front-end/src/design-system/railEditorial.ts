@@ -1,7 +1,7 @@
 const bodyMetrics = 'font-sans text-[12px] leading-[1.48]';
 
 export const railEditorial = {
-  /** Primary wordmark — both MainLayout and SettingsPage asides (Playfair Display). Title case in markup. */
+  /** Primary wordmark — paper-surface asides (SettingsPage). Title case in markup. */
   wordmark:
     'font-wordmark font-medium text-[clamp(20px,1.75vw,26px)] leading-tight tracking-normal text-oxford',
 
@@ -17,7 +17,7 @@ export const railEditorial = {
   body: `${bodyMetrics} text-oxford/65`,
 
   /** Emphasized body — fund names, display names, active values. */
-  bodyStrong: `font-sans text-[14px] leading-[1.4] font-bold text-oxford/82`,
+  bodyStrong: `font-sans text-[14px] leading-[1.4] font-bold text-oxford/[0.82]`,
 
   /**
    * Large stat number — Space Mono (tabular), scaled for the narrow rail.
@@ -30,7 +30,7 @@ export const railEditorial = {
   statLabel: 'font-mono text-[11px] leading-none uppercase tracking-[0.10em] text-oxford/35',
 
   /** Sub-captions, timestamps, link text. */
-  meta: 'font-mono text-[10px] leading-[1.4] text-oxford/32 tracking-[0.06em]',
+  meta: 'font-mono text-[10px] leading-[1.4] text-oxford/[0.32] tracking-[0.06em]',
 
   /** Small stage/status labels inside rail rows. */
   statusLabel: 'font-mono text-[10px] leading-none uppercase tracking-[0.10em]',

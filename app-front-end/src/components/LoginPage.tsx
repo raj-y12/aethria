@@ -3,7 +3,6 @@ import { motion, AnimatePresence, animate } from 'framer-motion';
 import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { usePrefersReducedMotion } from '../hooks';
-import GrainOverlay from './GrainOverlay';
 import AuthInstitutionalFooter from './AuthInstitutionalFooter';
 import CountUp from './CountUp';
 import { fetchActivitySummaryWithToken, type ActivitySummary } from '../api/activity';
@@ -223,7 +222,6 @@ export default function LoginPage() {
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
-      <GrainOverlay opacity={0.028} />
       <div
         className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-hidden"
         style={{ padding: 'clamp(24px, 5vw, 56px)' }}
@@ -378,6 +376,10 @@ export default function LoginPage() {
                           lineHeight: 1,
                           color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
                           letterSpacing: '-0.03em',
+                          // Reserve the final digit width up front — the count-up
+                          // otherwise reflows the row every frame as digits grow.
+                          minWidth: `${stat.value.toLocaleString().length}ch`,
+                          fontVariantNumeric: 'tabular-nums',
                         }}
                       >
                         <CountUp to={stat.value} delay={0.22 + i * 0.07} reduceMotion={reduceMotion} />

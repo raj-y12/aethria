@@ -62,14 +62,14 @@ export function SpineNavButton({
 }) {
   const onPaper = surface === 'paper';
   const textActive = onPaper ? 'text-oxford' : 'text-white';
-  const textIdle = onPaper ? 'text-oxford/50 hover:text-oxford/80' : 'text-white/55 hover:text-white/88';
+  const textIdle = onPaper ? 'text-oxford/50 hover:text-oxford/80' : 'text-white/55 hover:text-white/[0.88]';
   const ring = onPaper ? 'focus-visible:ring-oxford/35' : 'focus-visible:ring-white/35';
   const bgActive = onPaper ? 'bg-surface-selected' : 'bg-white/[0.08]';
   const bgHover = onPaper ? 'hover:bg-oxford/[0.04]' : 'hover:bg-white/[0.05]';
   const shortcutActive = onPaper ? 'text-oxford/60' : 'text-white/75';
   const shortcutIdle = onPaper
     ? 'text-oxford/25 group-hover:text-oxford/45'
-    : 'text-white/30 group-hover:text-white/52';
+    : 'text-white/30 group-hover:text-white/[0.52]';
 
   return (
     <button
@@ -196,7 +196,7 @@ export default function SystemBar({
         className="hidden lg:flex flex-col h-auto w-full min-h-0 bg-transparent overflow-visible"
         aria-label="System"
       >
-        {/* Nav — workspace chrome only (wordmark + pipeline + clock live in MainLayout above) */}
+        {/* Nav — workspace chrome only (wordmark + pipeline + clock live in the host rail) */}
         {workspaceChrome ? (
           <div className="flex flex-col gap-0.5 w-full shrink-0">
               <SpineNavButton
@@ -272,8 +272,8 @@ export default function SystemBar({
         <div className="flex flex-col gap-5 h-full min-h-0">
           {/* Wordmark */}
           <div className="shrink-0 px-3">
-            <p className="font-wordmark font-medium text-[16px] leading-none tracking-[0.01em] text-white/80">
-              Aethria
+            <p className="font-wordmark font-medium text-[16px] leading-none tracking-[0.01em] text-paper">
+              Aethria<span className="wordmark-dot wordmark-dot--inverse">.</span>
             </p>
           </div>
 

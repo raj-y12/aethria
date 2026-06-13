@@ -1,65 +1,59 @@
-import { useState, useEffect, useCallback } from 'react';
-import { fetchActivitySummary, markActivitySeen, ActivitySummary } from '../api/activity';
+import { useEffect, useState } from 'react';
+import { fetchActivitySummary, markActivitySeen, type ActivitySummary } from '../api/activity';
 import { LOGIN_ENTRY_SESSION_KEY } from '../lib/loginEntryTransition';
 
-export interface UseActivitySummaryResult {
-  loading: boolean;
-  summary: ActivitySummary | null;
-  showSummary: boolean;
-  dismissSummary: () => void;
+function hasActivity(data: ActivitySummary): boolean {
+  return (
+    data.found > 0 ||
+    data.reviewed > 0 ||
+    (data.agent_decided ?? data.decided) > 0 ||
+    (data.human_reviewed ?? 0) > 0 ||
+    data.escalations > 0
+  );
 }
 
-export function useActivitySummary(): UseActivitySummaryResult {
-  const [loading, setLoading] = useState(true);
+/**
+ * Module-level single-flight: fetched once per page load, marked seen
+ * immediately, and the result stays readable for the whole session (so
+ * navigating between workspaces — or a StrictMode remount — doesn't lose it).
+ */
+let sinceAwayPromise: Promise<ActivitySummary | null> | undefined;
+
+function loadSinceAwayOnce(): Promise<ActivitySummary | null> {
+  if (sinceAwayPromise) return sinceAwayPromise;
+  // Just signed in — LoginPage already presented the activity report.
+  if (sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY)) {
+    sinceAwayPromise = Promise.resolve(null);
+    return sinceAwayPromise;
+  }
+  sinceAwayPromise = fetchActivitySummary()
+    .then((data) => {
+      if (!hasActivity(data)) return null;
+      // Acknowledge immediately — the next visit starts a fresh report.
+      markActivitySeen().catch(() => {});
+      return data;
+    })
+    .catch(() => null);
+  return sinceAwayPromise;
+}
+
+/**
+ * What the agents did since the last visit — shown on the front door (this
+ * replaced the full-screen "While you were away" interstitial). Returns null
+ * when there is nothing to report or the login screen already showed it.
+ */
+export function useSinceAwaySummary(): ActivitySummary | null {
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
-  const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
-    // Skip if we just logged in — LoginPage already showed the activity summary
-    const justLoggedIn = sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY);
-    if (justLoggedIn) {
-      sessionStorage.removeItem(LOGIN_ENTRY_SESSION_KEY);
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
-
-    // Safety valve: never block the app for more than 3s
-    const timer = setTimeout(() => {
-      if (!cancelled) setLoading(false);
-    }, 3000);
-
-    fetchActivitySummary()
-      .then((data) => {
-        if (cancelled) return;
-        clearTimeout(timer);
-        setSummary(data);
-        const hasActivity =
-          data.found > 0 ||
-          data.reviewed > 0 ||
-          (data.agent_decided ?? data.decided) > 0 ||
-          (data.human_reviewed ?? 0) > 0 ||
-          data.escalations > 0;
-        setShowSummary(hasActivity);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        clearTimeout(timer);
-        setLoading(false);
-      });
-
+    void loadSinceAwayOnce().then((data) => {
+      if (!cancelled && data) setSummary(data);
+    });
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
-  }, []); // runs once on mount
-
-  const dismissSummary = useCallback(() => {
-    setShowSummary(false);
-    markActivitySeen().catch(() => {});
   }, []);
 
-  return { loading, summary, showSummary, dismissSummary };
+  return summary;
 }

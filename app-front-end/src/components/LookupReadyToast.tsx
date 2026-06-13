@@ -31,7 +31,7 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
           role="status"
           aria-live="polite"
         >
-          <div className="pointer-events-auto flex max-w-[min(92vw,30rem)] items-center gap-phi-4 border border-oxford/15 bg-paper/95 px-phi-5 py-phi-3 shadow-[0_18px_44px_-18px_rgba(0,20,51,0.35)] backdrop-blur-sm">
+          <div className="pointer-events-auto flex max-w-[min(92vw,30rem)] items-center gap-phi-4 border border-oxford/25 bg-paper-bright px-phi-5 py-phi-3">
             <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe" aria-hidden />
             <span className="min-w-0 flex-1">
               <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">

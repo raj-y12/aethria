@@ -41,9 +41,9 @@ function QueueVerdictText({
       : tone === 'muted'
         ? prominent
           ? 'text-oxford/45'
-          : 'text-oxford/38'
+          : 'text-oxford/[0.38]'
         : prominent
-          ? 'text-oxford/72'
+          ? 'text-oxford/[0.72]'
           : 'text-oxford/50';
   return (
     <span className={`font-mono uppercase tracking-[0.08em] ${size} ${toneClass}`}>{children}</span>
@@ -70,7 +70,7 @@ export default function QueueVerdictLine({
   const convictionEl =
     convictionLabel != null ? (
       <>
-        <span className={prominent ? 'text-oxford/30' : 'text-oxford/24'} aria-hidden>
+        <span className={prominent ? 'text-oxford/30' : 'text-oxford/[0.24]'} aria-hidden>
           ·
         </span>
         <span

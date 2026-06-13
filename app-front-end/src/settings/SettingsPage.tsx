@@ -1,29 +1,27 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { useClerk } from '@clerk/react-router';
-import { useQueryClient } from '@tanstack/react-query';
-import MobileHeader from '../components/MobileHeader';
+import { useNavigate } from 'react-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import LoadingAnimation from '../components/LoadingAnimation';
-import AgentLogoutModal from '../components/AgentLogoutModal';
+import { getQueryConfig } from '../lib/queryIntent';
+import { formatDateTime } from '../lib/dates';
+import { useAppFrame } from '../components/AppFrame';
 import { SpineNavButton } from '../components/SystemBar';
 import { fetchSettings, patchSettings, previewPolicy, publishPolicy, type Settings } from '../api/settings';
-import { fetchAgentsStatus, toggleAgents, type AgentsStatus } from '../api/agents';
+import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
 import {
   fetchFundThesisSummary,
   postFundThesisVersion,
   type FundThesisSummary,
 } from '../api/fundThesis';
-import { railEditorial } from '../design-system/railEditorial';
-import { DECISION_BADGE_CLASS, REVIEWER_BADGE_CLASS, VERDICT_CHIP_CLASS } from '../design-system/verdictBadgeTokens';
-import { useAgentsEnabled, useFundConfiguration, useMediaQuery } from '../hooks';
+import DecisionBadge from '../components/DecisionBadge';
+import { useFundConfiguration } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
-import { applyDecisionThresholds, DEFAULT_DECISION_BOUNDARIES, validateDecisionThresholds } from '../lib/decisionThresholds';
+import { validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
   CANONICAL_DIMENSIONS,
   CANONICAL_DIMENSION_KEYS,
   DIMENSION_SCORE_BANDS,
   UNIVERSAL_SCORE_BANDS,
-  DEFAULT_VERDICT_BADGES,
   applyThesisVersionMetadata,
   buildFundConfigThesisPayload,
   clearFundConfiguration,
@@ -59,7 +57,6 @@ const sections: Array<{ id: SectionId; label: string; short: string }> = [
   { id: 'mandate', label: 'Fund Mandate', short: 'Mandate' },
   { id: 'budget', label: 'Operations', short: 'Ops' },
   { id: 'weights', label: 'Scoring Weights', short: 'Weights' },
-  { id: 'bands', label: 'Verdict Badges', short: 'Badges' },
   { id: 'thresholds', label: 'Decision Thresholds', short: 'Thresholds' },
   { id: 'risk', label: 'Adverse / Risk', short: 'Risk' },
   { id: 'memo', label: 'Memo Output', short: 'Memo' },
@@ -74,26 +71,12 @@ const inputCls =
 const selectCls =
   `${inputCls} cursor-pointer appearance-none bg-no-repeat bg-[length:10px] bg-[center_right_2px] pr-7`;
 const labelCls = 'type-label-section text-oxford/45';
-const sectionLabelCls = 'type-label-section text-oxford/72';
-const metaCls = 'type-meta text-oxford/42';
+const sectionLabelCls = 'type-label-section text-oxford/[0.72]';
+const metaCls = 'type-meta text-oxford/[0.42]';
 const actionBtnCls =
   'type-label-section inline-flex min-h-[36px] items-center rounded-none border-0 bg-transparent p-0 text-oxford/55 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
 const solidBtnCls =
   'type-label-section inline-flex min-h-[36px] items-center justify-center rounded-none bg-oxford px-phi-4 text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
-
-const RAIL_CLAMP_PAD = { paddingTop: 'clamp(5px, 0.6vw, 8px)', paddingBottom: 'clamp(5px, 0.6vw, 8px)' } as const;
-
-function WorkspaceExitButton({ className = 'w-full' }: { className?: string }) {
-  return (
-    <Link
-      to="/v1"
-      className={`btn-aethria-solid ${className}`}
-      aria-label="Return to conviction workspace"
-    >
-      Workspace
-    </Link>
-  );
-}
 
 function serializeConfig(config: FundConfiguration): string {
   const rest = { ...config } as Record<string, unknown>;
@@ -101,26 +84,6 @@ function serializeConfig(config: FundConfiguration): string {
     delete rest[key];
   }
   return JSON.stringify(rest);
-}
-
-function serializeOperations(settings: Settings | null): string {
-  if (!settings) return '';
-  return JSON.stringify({
-    agent_config: settings.agent_config,
-    cost_budget: settings.cost_budget,
-  });
-}
-
-function formatSettingsSavedAt(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return 'Saved';
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
 }
 
 function SettingsSidebarFooter({
@@ -144,11 +107,9 @@ function SettingsSidebarFooter({
 
   return (
     <div
-      className="min-w-0 shrink-0 border-t border-oxford/[0.075]"
-      style={{ paddingTop: 'clamp(5px, 0.6vw, 8px)' }}
+      className="mt-phi-6 min-w-0 shrink-0 border-t border-oxford/[0.075] pt-phi-4"
       aria-label="Draft status"
     >
-      {/* Eyebrow + live status — mirrors the workspace rail's Mandate card header. */}
       <div className="flex items-center justify-between gap-phi-2">
         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">Draft</span>
         <span
@@ -186,6 +147,19 @@ function SettingsSidebarFooter({
       </div>
     </div>
   );
+}
+
+function serializeOperations(settings: Settings | null): string {
+  if (!settings) return '';
+  return JSON.stringify({
+    agent_config: settings.agent_config,
+    cost_budget: settings.cost_budget,
+  });
+}
+
+function formatSettingsSavedAt(iso: string): string {
+  const formatted = formatDateTime(iso);
+  return formatted === '—' ? 'Saved' : formatted;
 }
 
 function TextField({
@@ -230,21 +204,6 @@ function TextField({
   );
 }
 
-function BadgeSwatch({ label, backgroundColor }: { label: string; backgroundColor: string }) {
-  const semanticClass =
-    DECISION_BADGE_CLASS[label as keyof typeof DECISION_BADGE_CLASS] ??
-    REVIEWER_BADGE_CLASS[label as keyof typeof REVIEWER_BADGE_CLASS] ??
-    '';
-  return (
-    <span
-      className={`${VERDICT_CHIP_CLASS} ${semanticClass}`}
-      style={{ backgroundColor }}
-    >
-      {label}
-    </span>
-  );
-}
-
 function TextAreaField({
   id,
   label,
@@ -268,7 +227,7 @@ function TextAreaField({
         rows={rows}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full resize-y rounded-none border border-oxford/[0.08] bg-oxford/[0.025] px-phi-3 py-phi-3 type-body-sm leading-relaxed text-oxford outline-none transition-colors placeholder:text-oxford/25 focus:border-oxford/28"
+        className="w-full resize-y rounded-none border border-oxford/[0.08] bg-oxford/[0.025] px-phi-3 py-phi-3 type-body-sm leading-relaxed text-oxford outline-none transition-colors placeholder:text-oxford/25 focus:border-oxford/[0.28]"
       />
       {hint && <p className={metaCls}>{hint}</p>}
     </div>
@@ -292,7 +251,7 @@ function ToggleRow({
     <div className="flex items-center justify-between gap-phi-5 border-b border-oxford/[0.055] py-phi-3 last:border-0">
       <div className="min-w-0">
         <label htmlFor={id} className="type-body-sm text-oxford">{label}</label>
-        {hint && <p className="mt-phi-1 type-meta leading-snug text-oxford/38">{hint}</p>}
+        {hint && <p className="mt-phi-1 type-meta leading-snug text-oxford/[0.38]">{hint}</p>}
       </div>
       <button
         id={id}
@@ -334,7 +293,7 @@ function ChipGroup({
               type="button"
               aria-pressed={active}
               onClick={() => toggle(option)}
-              className={`type-meta inline-flex min-h-[36px] items-center justify-center rounded-none px-[40px] transition-colors ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] text-oxford/58 hover:bg-oxford/[0.075]'}`}
+              className={`type-meta inline-flex min-h-[36px] items-center justify-center rounded-none px-phi-3 transition-colors ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] text-oxford/[0.58] hover:bg-oxford/[0.075]'}`}
             >
               {option}
             </button>
@@ -369,7 +328,21 @@ function SettingsSection({
   );
 }
 
-function PreviewPanel({ config }: { config: FundConfiguration }) {
+function PreviewPanel({
+  config,
+  unsaved,
+  lastSavedAt,
+  saving,
+  onSave,
+  onReset,
+}: {
+  config: FundConfiguration;
+  unsaved: boolean;
+  lastSavedAt?: string | null;
+  saving: boolean;
+  onSave: () => void;
+  onReset: () => void;
+}) {
   const weightTotal = validateWeights(config.scoringWeights).total;
   return (
     <aside className="relative hidden min-h-full shrink-0 self-stretch border-l border-oxford/[0.08] xl:block">
@@ -379,8 +352,8 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
           <div>
             <p className="type-meta text-oxford/35">Mandate</p>
             <p className="mt-phi-2 type-body-emphasis text-oxford">{config.mandate.fundName || 'Unnamed fund'}</p>
-            <p className="mt-phi-1 type-body-sm text-oxford/52">
-              {[...config.mandate.preferredStages, ...config.mandate.geographies].filter(Boolean).join(' / ') || 'No mandate scope set'}
+            <p className="mt-phi-1 type-body-sm text-oxford/[0.52]">
+              {[...config.mandate.preferredStages, ...config.mandate.geographies].filter(Boolean).join(' · ') || 'No mandate scope set'}
             </p>
           </div>
           <div className="border-t border-oxford/[0.06] pt-phi-4">
@@ -388,10 +361,10 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
             <p className={`mt-phi-2 font-mono text-[1.65rem] tabular-nums ${weightTotal === 100 ? 'text-oxford' : 'text-escalation/75'}`}>{weightTotal}%</p>
           </div>
           <div className="border-t border-oxford/[0.06] pt-phi-4">
-            <p className="type-meta text-oxford/35">Verdict badges</p>
+            <p className="type-meta text-oxford/35">Verdict marks</p>
             <div className="mt-phi-3 flex flex-wrap gap-phi-2">
-              {config.verdictBadges.map((item) => (
-                <BadgeSwatch key={item.id} label={item.id} backgroundColor={item.backgroundColor} />
+              {(['INVEST', 'MONITOR', 'PASS'] as const).map((id) => (
+                <DecisionBadge key={id} variant={id} />
               ))}
             </div>
           </div>
@@ -399,11 +372,11 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
             <p className="type-meta text-oxford/35">Score cutoffs</p>
             <div className="mt-phi-3 flex flex-col gap-phi-2">
               {config.scoreBands.map((item) => (
-                <p key={item.id} className="type-meta text-oxford/52">
+                <p key={item.id} className="type-meta text-oxford/[0.52]">
                   <span className="font-mono tabular-nums">{item.min}–{item.max}</span> {item.label}
                 </p>
               ))}
-              <p className="type-meta text-oxford/38">
+              <p className="type-meta text-oxford/[0.38]">
                 Stale after {config.thresholds.staleAfterHours}h · confidence ≥ {config.thresholds.confidenceFloor}
               </p>
             </div>
@@ -414,35 +387,29 @@ function PreviewPanel({ config }: { config: FundConfiguration }) {
               {config.risk.requireAcknowledgement ? `${config.risk.sensitivity} sensitivity` : 'Acknowledgement disabled'}
             </p>
           </div>
-          <div className="border-t border-oxford/[0.06] pt-phi-4">
-            <p className="type-meta text-oxford/35">Sample outcome</p>
-            <p className="mt-phi-2 type-body-emphasis text-oxford">Verdict display settings</p>
-            <p className="mt-phi-1 type-body-sm text-oxford/55">
-              Percentage bands shape configured score language in the app; badge colours shape the visible chips.
-            </p>
-          </div>
         </div>
+        <SettingsSidebarFooter
+          unsaved={unsaved}
+          lastSavedAt={lastSavedAt}
+          saving={saving}
+          onSave={onSave}
+          onReset={onReset}
+        />
       </div>
     </aside>
   );
 }
 
 export default function SettingsPage() {
-  const navigate = useNavigate();
-  const { signOut } = useClerk();
   const queryClient = useQueryClient();
-  const isDesktop = useMediaQuery('(min-width: 1024px)');
-  const agentsEnabled = useAgentsEnabled();
+  const navigate = useNavigate();
+  const { setSpineOverride } = useAppFrame();
 
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [activeSection, setActiveSection] = useState<SectionId>('mandate');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [thesisBusy, setThesisBusy] = useState(false);
@@ -455,21 +422,28 @@ export default function SettingsPage() {
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
   const [draft, setDraft] = useState<FundConfiguration>(configuration);
 
+  // Settings ride the shared ['settings'] cache (also fed by useSystemData):
+  // returning visitors get the page instantly instead of a loading takeover.
+  const settingsQuery = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => fetchSettings().catch(() => null),
+    ...getQueryConfig('STATIC'),
+  });
+
+  // Seed the editable draft once — later refetches (e.g. after invalidation)
+  // must never clobber in-progress edits.
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current || !settingsQuery.data) return;
+    seededRef.current = true;
+    setSettings(settingsQuery.data);
+    setSavedOperationsSnapshot(serializeOperations(settingsQuery.data));
+  }, [settingsQuery.data]);
+
+  const loading = settings == null && settingsQuery.isPending;
+
   useEffect(() => {
     let cancelled = false;
-    fetchSettings()
-      .then((data) => {
-        if (cancelled) return;
-        setSettings(data);
-        setSavedOperationsSnapshot(serializeOperations(data));
-        setLoadError(null);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Failed to load settings');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
     fetchAgentsStatus().then((data) => { if (!cancelled) setAgentsStatus(data ?? null); }).catch(() => undefined);
     fetchFundThesisSummary().then((data) => { if (!cancelled) setThesisSummary(data); }).catch(() => undefined);
     return () => { cancelled = true; };
@@ -520,10 +494,6 @@ export default function SettingsPage() {
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
   const thresholdValidation = useMemo(() => validateDecisionThresholds(draft), [draft]);
-  const scoreBandByVerdict = useMemo(
-    () => new Map(draft.scoreBands.map((band) => [band.label.toUpperCase(), band])),
-    [draft.scoreBands]
-  );
   const unsaved = serializeConfig(draft) !== savedSnapshot || serializeOperations(settings) !== savedOperationsSnapshot;
   const policyUnpublished = !!policyPreviewHash && policyPreviewHash !== draft.publishedPolicyHash;
   const thesisPublishDisabledReason = agentsStatus == null
@@ -600,6 +570,98 @@ export default function SettingsPage() {
     setStatus(null);
     setErrors([]);
   };
+
+  // ── The spine is the only rail: project section nav + draft state into it. ──
+  // Handlers are reached through a ref so the projection effect re-runs only
+  // when displayed values change, never on handler identity.
+  const lastSavedAt = draft.lastSavedAt;
+  const spineActionsRef = useRef({ save: () => {}, reset: () => {} });
+  spineActionsRef.current = { save: () => void handleSave(), reset: handleReset };
+
+  useEffect(() => {
+    const scrollToSection = (id: SectionId) => {
+      setActiveSection(id);
+      const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${id}`);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    const statusDetail = unsaved
+      ? 'Changes not yet saved'
+      : lastSavedAt
+        ? `Saved · ${formatSettingsSavedAt(lastSavedAt)}`
+        : 'Save to persist fund configuration';
+    setSpineOverride({
+      nav: (
+        <>
+          <SpineNavButton
+            label="← Today"
+            active={false}
+            ariaPressed={false}
+            compact
+            surface="oxford"
+            onClick={() => navigate('/v1')}
+          />
+          <p className="px-2 pb-phi-1 pt-phi-4 font-mono text-[10px] uppercase tracking-[0.12em] text-white/[0.38]">
+            Configuration
+          </p>
+          {sections.map((section) => (
+            <SpineNavButton
+              key={section.id}
+              label={section.label}
+              active={activeSection === section.id}
+              ariaPressed={activeSection === section.id}
+              compact
+              surface="oxford"
+              onClick={() => scrollToSection(section.id)}
+            />
+          ))}
+        </>
+      ),
+      footer: (
+        <section aria-label="Draft status" className="border-t border-white/[0.07] px-2 pt-phi-3">
+          <div className="flex items-center justify-between gap-phi-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/[0.38]">Draft</span>
+            <span
+              className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.10em] ${
+                unsaved ? 'text-escalation-bright/90' : 'text-white/45'
+              }`}
+              aria-live="polite"
+            >
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-none ${unsaved ? 'bg-escalation-bright/80' : 'bg-white/55'}`}
+                aria-hidden
+              />
+              {unsaved ? 'Unsaved' : 'Synced'}
+            </span>
+          </div>
+          <p className={`mt-phi-2 truncate font-sans text-[12px] leading-snug ${unsaved ? 'text-white/85' : 'text-white/45'}`}>
+            {statusDetail}
+          </p>
+          <div className="mt-phi-3 flex flex-col gap-phi-2 xl:hidden">
+            <button
+              type="button"
+              onClick={() => spineActionsRef.current.save()}
+              disabled={saving || !unsaved}
+              className="w-full btn-aethria-solid !bg-paper !text-oxford disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+            <button
+              type="button"
+              onClick={() => spineActionsRef.current.reset()}
+              disabled={saving}
+              className="inline-flex min-h-[32px] w-full items-center justify-center font-mono text-[10px] uppercase tracking-[0.12em] text-white/40 transition-colors hover:text-white/80 disabled:opacity-50 btn-interaction"
+              title="Restore local defaults; save to sync compatible fields to the backend"
+            >
+              Reset to defaults
+            </button>
+          </div>
+        </section>
+      ),
+    });
+  }, [setSpineOverride, navigate, activeSection, unsaved, saving, lastSavedAt]);
+
+  // Leaving the room returns the spine to the workspaces.
+  useEffect(() => () => setSpineOverride(null), [setSpineOverride]);
 
   const handlePreviewPolicy = async () => {
     setPolicyBusy(true);
@@ -683,115 +745,39 @@ export default function SettingsPage() {
     }
   };
 
-  const doLogout = () => {
-    localStorage.removeItem('aethria_last_activity');
-    sessionStorage.removeItem('auth');
-    sessionStorage.removeItem('authUser');
-    signOut?.().then(() => navigate('/sign-in', { replace: true }));
-  };
-
-  const handleTurnOffAndLogout = async () => { await toggleAgents(false); doLogout(); };
-  const handleTurnOnAndLogout = async () => { await toggleAgents(true); doLogout(); };
-  const displayName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('authUser') : null;
-
-  if (loading) return <LoadingAnimation />;
+  // In-place loader — never a full-screen takeover. The spine (with this
+  // page's section nav) stays mounted, so opening Settings doesn't "break".
+  if (loading) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center overflow-hidden bg-paper">
+        <LoadingAnimation fullScreen={false} />
+      </div>
+    );
+  }
 
   if (!settings) {
     return (
-      <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
+      <div className="flex h-full flex-col overflow-hidden bg-paper">
         <main className="flex min-h-0 flex-1 items-center justify-center">
           <div>
             <p className={sectionLabelCls}>Settings unavailable</p>
-            <p className="mt-phi-2 type-body-sm text-oxford/45">{loadError ?? 'The settings API did not return a payload.'}</p>
+            <p className="mt-phi-2 type-body-sm text-oxford/45">The settings API did not return a payload.</p>
           </div>
         </main>
       </div>
     );
   }
 
-  const mobileMenu = mobileMenuOpen ? (
-    <section className="border-b border-hairline bg-oxford px-phi-4 py-phi-3" aria-label="Menu">
-      <div className="flex flex-col items-start gap-phi-3">
-        <Link to="/v1" className="type-label-section text-white/70" onClick={() => setMobileMenuOpen(false)}>Overview</Link>
-        {displayName && <span className="type-label-section text-white/55">{displayName}</span>}
-        <button type="button" onClick={() => setShowLogoutModal(true)} className="type-label-section text-white/55">Log out</button>
-      </div>
-    </section>
-  ) : null;
-
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper text-oxford">
-      {!isDesktop && (
-        <>
-          <MobileHeader onMenuToggle={() => setMobileMenuOpen((open) => !open)} />
-          {mobileMenu}
-        </>
-      )}
-
+    <div className="flex h-full flex-col overflow-hidden bg-paper text-oxford">
       <main className="flex min-h-0 flex-1 overflow-hidden bg-paper">
-        <div
-          className="w-4 shrink-0 self-stretch origin-top sm:w-7 md:w-10"
-          style={{ backgroundColor: 'var(--color-oxford)' }}
-          aria-hidden
-        />
-
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper lg:flex-row lg:gap-[var(--layout-col-gap)]">
-            <aside className="aethria-workspace-sidebar paper-dot-grid hidden h-full min-h-0 max-h-full w-[18rem] shrink-0 flex-col overflow-hidden lg:flex">
-              <div
-                className="paper-dot-grid flex h-full min-h-0 flex-col justify-between overflow-hidden px-phi-4"
-                style={RAIL_CLAMP_PAD}
-              >
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                  <div className="min-w-0 shrink-0">
-                    <Link
-                      to="/v1"
-                      className={`${railEditorial.wordmark} inline-block hover:opacity-80 transition-opacity btn-interaction`}
-                      aria-label="Aethria — return to workspace"
-                    >
-                      Aethria<span className="wordmark-dot">.</span>
-                    </Link>
-                  </div>
-                  <div className="aethria-rail-nav-bleed mt-phi-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                    <p className={`${railEditorial.label} shrink-0 px-phi-4`}>Fund configuration</p>
-                    <nav
-                      className="mt-phi-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto"
-                      aria-label="Settings sections"
-                    >
-                    {sections.map((section, index) => (
-                      <SpineNavButton
-                        key={section.id}
-                        label={section.label}
-                        active={activeSection === section.id}
-                        ariaPressed={activeSection === section.id}
-                        shortcut={String(index + 1)}
-                        compact
-                        surface="paper"
-                        onClick={() => {
-                          setActiveSection(section.id);
-                          const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${section.id}`);
-                          target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }}
-                      />
-                    ))}
-                    </nav>
-                  </div>
-                </div>
-                <SettingsSidebarFooter
-                  unsaved={unsaved}
-                  lastSavedAt={draft.lastSavedAt}
-                  saving={saving}
-                  onSave={() => void handleSave()}
-                  onReset={handleReset}
-                />
-              </div>
-            </aside>
-
+          {/* Section nav + draft state live in the spine (setSpineOverride) — one rail. */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:h-full lg:min-h-0">
               <div className="flex items-center justify-between border-b border-oxford/[0.08] px-phi-5 py-phi-4 lg:hidden">
             <div className="flex min-w-0 flex-col gap-phi-2">
               <p className={sectionLabelCls}>Fund Configuration</p>
-              <WorkspaceExitButton className="w-fit" />
               {unsaved ? (
                 <p className="type-meta text-oxford/45">Unsaved changes</p>
               ) : null}
@@ -810,21 +796,13 @@ export default function SettingsPage() {
             <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]">
               <div className="min-w-0 px-phi-5 py-phi-6 lg:px-phi-7">
                 <header className="mb-phi-7 max-w-[54rem]">
-                  <div className="hidden items-center justify-between gap-phi-3 lg:flex">
-                    <p className="type-label-section text-oxford/45">{draft.versionLabel}</p>
-                    <Link
-                      to="/v1"
-                      className="type-meta inline-flex items-center gap-phi-1 text-oxford/45 transition-colors hover:text-oxford btn-interaction"
-                      aria-label="Return to conviction workspace"
-                    >
-                      <span aria-hidden="true">←</span> Workspace
-                    </Link>
-                  </div>
-                  <p className="type-label-section text-oxford/45 lg:hidden">{draft.versionLabel}</p>
-                  <h1 className="mt-phi-3 font-display text-[2.2rem] font-medium leading-[0.98] tracking-0 text-oxford sm:text-[3rem]">
-                    How this fund thinks
+                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/40">
+                    Configuration · {draft.versionLabel}
+                  </p>
+                  <h1 className="type-display mt-phi-3 text-[clamp(28px,3vw,42px)] leading-[1.08] text-oxford">
+                    How this fund thinks<span className="wordmark-dot">.</span>
                   </h1>
-                  <p className="mt-phi-4 max-w-[42rem] type-body leading-relaxed text-oxford/58">
+                  <p className="mt-phi-3 max-w-[42rem] type-body-sm leading-relaxed text-oxford/55">
                     Configure mandate, backend core scoring weights, runtime limits, and the app-level ruling and memo experience. Controls marked as display-only are saved for the interface but do not override reviewer or partner policy files.
                   </p>
                   {(status || errors.length > 0) && (
@@ -866,7 +844,7 @@ export default function SettingsPage() {
                       <button type="button" onClick={publishThesis} disabled={thesisBusy || thesisPublishDisabledReason != null} className={actionBtnCls}>
                         {thesisBusy ? 'Publishing...' : 'Publish fund thesis version'}
                       </button>
-                      <p className="type-meta text-oxford/38">
+                      <p className="type-meta text-oxford/[0.38]">
                         {thesisPublishDisabledReason ?? (thesisSummary ? `Active thesis v${thesisSummary.active_version_number}` : 'No active thesis loaded')}
                       </p>
                     </div>
@@ -935,76 +913,20 @@ export default function SettingsPage() {
                           {policyBusy ? 'Publishing...' : 'Publish version'}
                         </button>
                         {draft.lastPublishedAt && (
-                          <p className="type-meta text-oxford/38">Last published {new Date(draft.lastPublishedAt).toLocaleString()}</p>
+                          <p className="type-meta text-oxford/[0.38]">Last published {formatDateTime(draft.lastPublishedAt)}</p>
                         )}
                       </div>
                     </div>
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="bands" title="Verdict Badges" kicker="Badge colours for grid chips. Score ranges come from Decision Thresholds.">
-                  <div className="flex flex-col gap-phi-4">
-                    {!bandValidation.valid && (
-                      <div className="border border-escalation/25 bg-escalation/[0.035] px-phi-4 py-phi-3">
-                        {bandValidation.errors.map((error) => <p key={error} className="type-body-sm text-escalation/75">{error}</p>)}
-                      </div>
-                    )}
-                    <div className="border-b border-oxford/[0.055] pb-phi-4">
-                      <p className="type-body-sm leading-relaxed text-oxford/52">
-                        Colours apply to INVEST, MONITOR, and PASS chips. Percentage ranges sync from{' '}
-                        <a href="#thresholds" className="text-oxford/72 underline underline-offset-2 hover:text-oxford">Decision Thresholds</a>.
-                      </p>
-                    </div>
-                    <div className="border-b border-oxford/[0.055]">
-                      <div className="hidden border-b border-oxford/[0.055] pb-phi-2 sm:grid sm:grid-cols-[minmax(130px,1fr)_160px_180px] sm:gap-phi-4">
-                        <p className={labelCls}>Name</p>
-                        <p className={labelCls}>Colour</p>
-                        <p className={labelCls}>Percentages</p>
-                      </div>
-                      {draft.verdictBadges.map((badge) => (
-                        <div key={badge.id} className="grid gap-phi-3 border-b border-oxford/[0.055] py-phi-4 last:border-0 sm:grid-cols-[minmax(130px,1fr)_160px_180px] sm:items-center sm:gap-phi-4">
-                          <div>
-                            <p className="type-body-emphasis text-oxford">{badge.label}</p>
-                            <p className="mt-phi-1 type-meta text-oxford/38">{badge.id}</p>
-                          </div>
-                          <label htmlFor={`${badge.id}-colour`} className="flex min-w-0 cursor-pointer items-center gap-phi-2">
-                            <input
-                              id={`${badge.id}-colour`}
-                              type="color"
-                              value={badge.backgroundColor}
-                              onChange={(event) => updateDraft((current) => ({
-                                ...current,
-                                verdictBadges: current.verdictBadges.map((item) => item.id === badge.id ? { ...item, backgroundColor: event.target.value } : item),
-                              }))}
-                              className="h-8 w-8 shrink-0 cursor-pointer rounded-none border border-oxford/[0.10] bg-transparent p-0.5"
-                              aria-label={`${badge.label} badge colour`}
-                            />
-                            <BadgeSwatch label={badge.id} backgroundColor={badge.backgroundColor} />
-                          </label>
-                          {scoreBandByVerdict.get(badge.id) ? (
-                            <p className="font-mono text-sm tabular-nums text-oxford/55">
-                              {scoreBandByVerdict.get(badge.id)?.min}–{scoreBandByVerdict.get(badge.id)?.max}%
-                            </p>
-                          ) : (
-                            <p className="type-meta text-oxford/36">Reviewer badge</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-phi-4">
-                      <button
-                        type="button"
-                        onClick={() => updateDraft((current) => applyDecisionThresholds(current, DEFAULT_DECISION_BOUNDARIES))}
-                        className={actionBtnCls}
-                      >
-                        Restore default cutoffs
-                      </button>
-                      <button type="button" onClick={() => updateDraft((current) => ({ ...current, verdictBadges: DEFAULT_VERDICT_BADGES }))} className={actionBtnCls}>
-                        Restore default badge colours
-                      </button>
-                    </div>
+                {/* Verdict chips are typographic (one fill: INVEST) — the badge
+                    colour-picker section was retired with colour-coded chips. */}
+                {!bandValidation.valid && (
+                  <div className="mb-phi-5 border border-escalation/25 bg-escalation/[0.035] px-phi-4 py-phi-3">
+                    {bandValidation.errors.map((error) => <p key={error} className="type-body-sm text-escalation/75">{error}</p>)}
                   </div>
-                </SettingsSection>
+                )}
 
                 <SettingsSection id="thresholds" title="Decision Thresholds" kicker="Pass, Monitor, and Invest cutoffs — synced with Partner scoring and badge ranges.">
                   <DecisionThresholdsPanel draft={draft} updateDraft={updateDraft} updateThreshold={updateThreshold} />
@@ -1074,7 +996,7 @@ export default function SettingsPage() {
                 <SettingsSection id="rubric" title="Evaluation Framework" kicker="Aethria's institutional scoring framework. Dimensions are fixed to ensure score consistency across all evaluations — this is read-only reference. Adjust and publish weights in Scoring Weights.">
                   <div className="flex flex-col gap-phi-5">
                     <div className="border-b border-oxford/[0.06] pb-phi-4">
-                      <p className="type-body-sm leading-relaxed text-oxford/52">
+                      <p className="type-body-sm leading-relaxed text-oxford/[0.52]">
                         Every startup is evaluated across five institutional dimensions. Score definitions are fixed to ensure a 7 in Market always means the same thing regardless of fund configuration. You can adjust dimension weights to reflect your fund's investment priorities.
                       </p>
                     </div>
@@ -1113,22 +1035,20 @@ export default function SettingsPage() {
                 </SettingsSection>
               </div>
 
-              <PreviewPanel config={draft} />
+              <PreviewPanel
+                config={draft}
+                unsaved={unsaved}
+                lastSavedAt={lastSavedAt}
+                saving={saving}
+                onSave={() => void handleSave()}
+                onReset={handleReset}
+              />
             </div>
           </div>
             </div>
           </div>
         </div>
       </main>
-
-      <AgentLogoutModal
-        open={showLogoutModal}
-        agentsEnabled={agentsEnabled}
-        onCancel={() => setShowLogoutModal(false)}
-        onKeepRunning={() => { setShowLogoutModal(false); doLogout(); }}
-        onTurnOffAndLogout={handleTurnOffAndLogout}
-        onTurnOnAndLogout={handleTurnOnAndLogout}
-      />
     </div>
   );
 }

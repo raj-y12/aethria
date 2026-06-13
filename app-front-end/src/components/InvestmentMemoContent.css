@@ -164,7 +164,7 @@
   font-variant-numeric: tabular-nums;
 }
 .memoPanel--embedded .memoBody {
-  max-width: 39rem;
+  max-width: 100%;
   width: 100%;
 }
 
@@ -4045,6 +4045,19 @@
   color: rgba(var(--color-oxford-rgb), 0.78);
 }
 
+/* Cover company name — shares --case-title-* with the selected queue row so the
+   name reads at the same scale on both sides of the queue → memo handoff. */
+.memoCoverCompany {
+  margin: 0;
+  font-family: var(--memo-font-ui);
+  font-weight: 600;
+  font-size: var(--case-title-size, clamp(25px, 2.45vw, 34px));
+  line-height: var(--case-title-leading, 1.08);
+  letter-spacing: var(--case-title-tracking, -0.02em);
+  color: var(--color-oxford);
+  overflow-wrap: anywhere;
+}
+
 .memoCoverRuling {
   margin-top: clamp(30px, 4vw, 48px);
   padding-top: clamp(22px, 3vw, 34px);
@@ -4282,4 +4295,14 @@
   color: rgba(var(--color-oxford-rgb), 0.55);
   background: rgba(var(--color-oxford-rgb), 0.07);
   vertical-align: middle;
+}
+
+/* Commit ruling — solid oxford only when armed; disabled is a quiet ghost,
+   not a gray slab (same rule as the Settings save key). */
+.memoRulingSubmit:disabled {
+  background: transparent;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.15);
+  color: rgba(var(--color-oxford-rgb), 0.35);
+  opacity: 1;
+  cursor: not-allowed;
 }

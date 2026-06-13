@@ -1,0 +1,359 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import WorkGrid from '../components/WorkGrid';
+import DecisionStage from '../components/DecisionStage';
+import type { QueueView } from '../components/queue/DecisionQueueHeader';
+import InvestmentMemo from '../components/InvestmentMemo';
+import InvestmentMemoContent, { type InvestmentMemoContentHandle } from '../components/InvestmentMemoContent';
+import AgentDispatch from '../components/AgentDispatch';
+import RoomHeader from '../components/RoomHeader';
+import { useAppFrame } from '../components/AppFrame';
+import { tokens } from '../design-system/tokens';
+import { transitionOrReduced } from '../design-system/motion';
+import { productInteraction } from '../design-system/productSystem';
+import {
+  useEscapeKey,
+  useMediaQuery,
+  usePrefersReducedMotion,
+  useRestoreFocus,
+  useFundConfiguration,
+} from '../hooks';
+import { useAcknowledgeStartup } from '../hooks/useAcknowledgeStartup';
+import { fetchStartupDetail } from '../api/startups';
+import { getQueryConfig } from '../lib/queryIntent';
+import { isDealUnresolved } from '../lib/dealState';
+import type { SystemData } from '../hooks/useSystemData';
+import type { Startup } from '../types/startup';
+
+const PANEL_ACTION_CLASS = productInteraction.panelActionInline;
+
+/**
+ * A readout that is also the instrument's control: the numeral reads the queue
+ * and clicking it sets the view. One chrome band — no second tab strip below.
+ */
+function ReadoutKey({
+  label,
+  value,
+  tone,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  tone?: 'escalation';
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className="group flex flex-col items-start gap-phi-1 border-0 bg-transparent p-0 text-left btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
+    >
+      <span
+        className={`font-mono text-[clamp(22px,2vw,30px)] font-semibold leading-none tracking-[-0.03em] tabular-nums transition-colors ${
+          tone === 'escalation'
+            ? 'text-escalation'
+            : active
+              ? 'text-oxford'
+              : 'text-oxford/[0.42] group-hover:text-oxford/70'
+        }`}
+      >
+        {value}
+      </span>
+      <span className="relative type-meta uppercase tracking-[0.1em] text-oxford/40 transition-colors group-hover:text-oxford/60">
+        {label}
+        <span
+          aria-hidden
+          className={`absolute -bottom-[5px] left-0 right-0 h-[2px] bg-oxford transition-opacity ${
+            active ? 'underline-draw opacity-100' : 'opacity-0'
+          }`}
+        />
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Flow — the judgment workspace. One room header (like Portfolio and Fund), a
+ * compressed docket on the left, and the active memo on the right. No nested
+ * panel titles — the stage speaks through the company name and conviction.
+ */
+export default function FlowPage({ data }: { data: SystemData }) {
+  const { startups, signals, watchlistAnalytics } = data;
+  const { inlineDispatch, setPageOverlayOpen, openDispatch } = useAppFrame();
+  const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const reduceMotion = usePrefersReducedMotion();
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
+  const restoreRef = useRef<HTMLElement | null>(null);
+  const memoContentRef = useRef<InvestmentMemoContentHandle | null>(null);
+
+  // The room header readouts are the queue views — state lives here, the
+  // docket (WorkGrid) is controlled and reports its per-view counts back.
+  const [queueView, setQueueView] = useState<QueueView>('PRIORITY');
+  const [viewCounts, setViewCounts] = useState<Record<QueueView, number> | null>(null);
+  const selectView = useCallback(
+    (view: QueueView) => setQueueView((current) => (current === view && view !== 'PRIORITY' ? 'PRIORITY' : view)),
+    [],
+  );
+
+  const openCount = useMemo(() => startups.filter(isDealUnresolved).length, [startups]);
+  const newCount = useMemo(() => startups.filter((s) => s.is_new_to_user).length, [startups]);
+  const needRuling = data.pendingEscalationCount ?? 0;
+
+  const acknowledge = useAcknowledgeStartup(
+    useCallback((updated: Startup) => {
+      setSelectedStartup((current) => (current?.id === updated.id ? updated : current));
+    }, []),
+  );
+
+  const handleStartupClick = useCallback(
+    (startup: Startup) => {
+      restoreRef.current = document.activeElement as HTMLElement | null;
+      setSelectedStartup(startup.is_new_to_user ? acknowledge(startup) : startup);
+    },
+    [acknowledge],
+  );
+
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId || startups.length === 0) return;
+    const match = startups.find((s) => s.id === openId);
+    if (match) {
+      setSelectedStartup(match.is_new_to_user ? acknowledge(match) : match);
+    }
+    const params = new URLSearchParams(searchParams);
+    params.delete('open');
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams, startups, acknowledge]);
+
+  const memoOpen = !!selectedStartup;
+  const startupDetailQuery = useQuery({
+    queryKey: ['startup', 'detail', selectedStartup?.id],
+    queryFn: () => fetchStartupDetail(selectedStartup!.id),
+    enabled: Boolean(selectedStartup?.id && memoOpen),
+    ...getQueryConfig('STATIC'),
+  });
+  const memoStartup = startupDetailQuery.data ?? selectedStartup;
+
+  const handleMemoPipelineReady = useCallback(() => {
+    const id = selectedStartup?.id;
+    if (id) void queryClient.invalidateQueries({ queryKey: ['startup', 'detail', id] });
+  }, [queryClient, selectedStartup?.id]);
+
+  const handleDecisionResolved = useCallback(
+    (nextStartup: Startup) => {
+      queryClient.setQueryData<Startup[]>(['startups', 'list'], (prev) =>
+        prev?.map((s) => (s.id === nextStartup.id ? nextStartup : s)) ?? prev,
+      );
+      queryClient.setQueryData<Startup | null>(['startup', 'detail', nextStartup.id], nextStartup);
+      setSelectedStartup((current) => (current?.id === nextStartup.id ? nextStartup : current));
+      void queryClient.invalidateQueries({ queryKey: ['escalations'] });
+      void queryClient.invalidateQueries({ queryKey: ['settings'] });
+    },
+    [queryClient],
+  );
+
+  const handleCloseMemo = useCallback(() => setSelectedStartup(null), []);
+
+  useEscapeKey(handleCloseMemo, memoOpen && !isDesktop);
+  useRestoreFocus(memoOpen, restoreRef, true);
+
+  const handleAutoSelect = useCallback((startup: Startup) => {
+    setSelectedStartup(startup);
+  }, []);
+
+  const useModal = Boolean(selectedStartup && !isDesktop);
+  useEffect(() => {
+    setPageOverlayOpen(useModal);
+    return () => setPageOverlayOpen(false);
+  }, [useModal, setPageOverlayOpen]);
+
+  const watchlistIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of watchlistAnalytics?.entries ?? []) {
+      if (e?.startup_id) ids.add(e.startup_id);
+    }
+    return ids;
+  }, [watchlistAnalytics]);
+
+  const headerSub = (
+    <p className="type-body-sm text-oxford/45">
+      {selectedStartup
+        ? memoStartup?.scout?.name ?? selectedStartup.scout.name
+        : `The docket holds ${openCount.toLocaleString()} open ${openCount === 1 ? 'matter' : 'matters'} — the top of the queue takes the stage.`}
+      <span className="text-oxford/30">
+        {' '}
+        · Stale after {fundConfiguration.thresholds.staleAfterHours}h
+      </span>
+    </p>
+  );
+
+  return (
+    <div className="page-transition-enter flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1180px] flex-col px-phi-5 py-phi-5">
+        <div className="flex-none pb-phi-4 lg:hidden">
+          <AgentDispatch
+            input={inlineDispatch.input}
+            setInput={inlineDispatch.setInput}
+            onSubmit={inlineDispatch.onSubmit}
+            onCancel={inlineDispatch.onCancel}
+            isBusy={inlineDispatch.isBusy}
+            message={inlineDispatch.message}
+            onClearMessage={inlineDispatch.onClearMessage}
+            lookupPhase={inlineDispatch.lookupPhase}
+          />
+        </div>
+
+        <RoomHeader
+          className="border-b border-oxford/[0.075] pb-phi-5"
+          eyebrow="Judgment"
+          title="Flow"
+          sub={headerSub}
+          readouts={
+            <div
+              className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4"
+              role="group"
+              aria-label="Queue views"
+            >
+              <ReadoutKey
+                label="Open"
+                value={openCount.toLocaleString()}
+                active={queueView === 'PRIORITY'}
+                onClick={() => selectView('PRIORITY')}
+              />
+              <ReadoutKey
+                label="Need ruling"
+                value={(viewCounts?.ESCALATED ?? needRuling).toLocaleString()}
+                tone={(viewCounts?.ESCALATED ?? needRuling) > 0 ? 'escalation' : undefined}
+                active={queueView === 'ESCALATED'}
+                onClick={() => selectView('ESCALATED')}
+              />
+              <ReadoutKey
+                label="New"
+                value={(viewCounts?.NEW ?? newCount).toLocaleString()}
+                active={queueView === 'NEW'}
+                onClick={() => selectView('NEW')}
+              />
+              <ReadoutKey
+                label="Stale"
+                value={(viewCounts?.STALE ?? 0).toLocaleString()}
+                active={queueView === 'STALE'}
+                onClick={() => selectView('STALE')}
+              />
+              <ReadoutKey
+                label="In pipeline"
+                value={startups.length.toLocaleString()}
+                active={queueView === 'ALL'}
+                onClick={() => selectView('ALL')}
+              />
+            </div>
+          }
+        />
+
+        {startups.length === 0 ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
+            <span className="block h-2 w-2 rounded-none bg-brand-mark" aria-hidden />
+            <h2 className="type-display mt-phi-5 text-[clamp(26px,3vw,40px)] leading-[1.1] text-oxford">
+              The pipeline is filling.
+            </h2>
+            <p className="mt-phi-3 max-w-[36ch] font-mono text-[11px] tracking-[0.06em] text-oxford/45">
+              Scouts are searching against the active mandate. The first matter takes the stage when it lands.
+            </p>
+            <button
+              type="button"
+              onClick={openDispatch}
+              className="mt-phi-6 inline-flex min-h-[40px] items-center gap-phi-2 rounded-none border border-oxford/[0.14] px-phi-5 font-mono text-[11px] uppercase tracking-[0.14em] text-oxford/70 transition-colors hover:border-oxford/45 hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
+            >
+              Dispatch a lookup
+              <span className="text-oxford/35" aria-hidden>⌘K</span>
+            </button>
+          </div>
+        ) : (
+          <div className="aethria-flow-grid flex min-h-0 flex-1 flex-col overflow-hidden pt-phi-4 lg:grid">
+            <section className="min-h-0 overflow-y-auto overscroll-contain lg:border-r lg:border-oxford/[0.06] lg:pr-phi-4">
+              <WorkGrid
+                startups={startups}
+                onStartupClick={handleStartupClick}
+                selectedId={selectedStartup?.id ?? null}
+                watchlistIds={watchlistIds}
+                fundConfiguration={fundConfiguration}
+                autoSelectFirst={isDesktop}
+                onAutoSelect={handleAutoSelect}
+                queueView={queueView}
+                onQueueViewChange={setQueueView}
+                onViewCounts={setViewCounts}
+              />
+            </section>
+
+            <aside className="hidden min-h-0 min-w-0 flex-col overflow-hidden bg-paper lg:flex lg:pl-phi-4" aria-live="polite">
+              {selectedStartup && memoStartup ? (
+                <div className="memoShellContent memoShellContent--workspace min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-paper px-phi-0 pt-phi-3 pb-phi-6">
+                  <motion.div
+                    key={memoStartup.id}
+                    initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={transitionOrReduced(reduceMotion, {
+                      duration: tokens.motion.duration.micro,
+                      ease: tokens.motion.ease,
+                    })}
+                    className="h-full min-h-full bg-paper"
+                  >
+                    <InvestmentMemoContent
+                      ref={memoContentRef}
+                      startup={memoStartup}
+                      embedded
+                      coverOverride={
+                        <DecisionStage
+                          startup={memoStartup}
+                          fundConfiguration={fundConfiguration}
+                          action={
+                            <button
+                              type="button"
+                              onClick={() => memoContentRef.current?.downloadPDF()}
+                              className={PANEL_ACTION_CLASS}
+                              aria-label="Download IC pack as PDF"
+                            >
+                              IC pack (PDF)
+                            </button>
+                          }
+                        />
+                      }
+                      onMemoPipelineReady={handleMemoPipelineReady}
+                      onDecisionResolved={handleDecisionResolved}
+                      fundConfiguration={fundConfiguration}
+                      peerStartups={startups}
+                      portfolioSignals={signals}
+                    />
+                  </motion.div>
+                </div>
+              ) : null}
+            </aside>
+          </div>
+        )}
+      </div>
+
+      <AnimatePresence initial={false}>
+        {useModal && memoStartup && (
+          <InvestmentMemo
+            key={`memo-${memoStartup.id}`}
+            startup={memoStartup}
+            onClose={handleCloseMemo}
+            onMemoPipelineReady={handleMemoPipelineReady}
+            onDecisionResolved={handleDecisionResolved}
+            fundConfiguration={fundConfiguration}
+            peerStartups={startups}
+            portfolioSignals={signals}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

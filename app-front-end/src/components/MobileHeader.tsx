@@ -2,7 +2,7 @@ import { Link } from 'react-router';
 
 /**
  * Canonical mobile top bar: one height, padding, wordmark, and menu trigger.
- * Used by MainLayout and SettingsPage so nav chrome is identical.
+ * Used by AppFrame and SettingsPage so nav chrome is identical.
  */
 interface MobileHeaderProps {
   onMenuToggle: () => void;
@@ -16,7 +16,7 @@ export default function MobileHeader({ onMenuToggle }: MobileHeaderProps) {
     >
       <Link
         to="/v1"
-        className="font-wordmark text-[20px] font-medium leading-[1.4] text-white hover:opacity-90 btn-interaction"
+        className="font-wordmark text-[20px] font-medium leading-[1.4] text-paper hover:opacity-90 btn-interaction"
         aria-label="Aethria"
       >
         Aethria<span className="wordmark-dot wordmark-dot--inverse">.</span>

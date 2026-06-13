@@ -113,7 +113,7 @@ export function getConvictionTier(pct: number | null): ConvictionTier {
 
 /** Queue docket — monochrome conviction (no tier colour ramp). */
 export const QUEUE_CONVICTION_CLASS = {
-  ambient: 'text-oxford/42 font-normal tabular-nums',
+  ambient: 'text-oxford/[0.42] font-normal tabular-nums',
   prominent: 'text-oxford/55 font-normal tabular-nums',
 } as const;
 
@@ -122,10 +122,10 @@ export const CONVICTION_TIER_CLASS: Record<
   ConvictionTier,
   { ambient: string; prominent: string }
 > = {
-  none: { ambient: 'text-oxford/48 font-normal', prominent: 'text-oxford/55 font-normal' },
+  none: { ambient: 'text-oxford/[0.48] font-normal', prominent: 'text-oxford/55 font-normal' },
   low: { ambient: 'text-oxford/50 font-normal', prominent: 'text-oxford/55 font-normal' },
-  mid: { ambient: 'text-oxford/68 font-medium', prominent: 'text-oxford/72 font-medium' },
-  high: { ambient: 'text-oxford/88 font-semibold', prominent: 'text-oxford font-semibold' },
+  mid: { ambient: 'text-oxford/[0.68] font-medium', prominent: 'text-oxford/[0.72] font-medium' },
+  high: { ambient: 'text-oxford/[0.88] font-semibold', prominent: 'text-oxford font-semibold' },
 };
 
 /** Attention-worthy drivers that earn a badge — the "why look here" signal.

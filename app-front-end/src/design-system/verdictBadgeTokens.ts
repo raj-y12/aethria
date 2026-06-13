@@ -44,4 +44,3 @@ export const QUEUE_ANNOTATION_CLASS: Record<QueueAnnotationVariant, string> = {
   gold: 'bg-[#d9c9a3] text-[#4a3810]',
   positive: 'bg-[#b5d4bc] text-[#17442d]',
 };
-
