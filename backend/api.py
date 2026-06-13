@@ -170,6 +170,11 @@ RESUME_AGENT_LOOPS_ON_STARTUP = os.getenv("RESUME_AGENT_LOOPS_ON_STARTUP", "true
 )
 # 0 = no cap; otherwise max persistent loops resumed after restart.
 MAX_RESUMED_AGENT_LOOPS = max(0, int(os.getenv("MAX_RESUMED_AGENT_LOOPS", "0")))
+# Always-on memory sampler (independent of agents). Logs process RSS on an interval so
+# small-instance OOMs can be diagnosed: flat-but-high RSS => baseline/plan problem;
+# steadily climbing RSS => leak in the request path. 0 disables.
+RSS_SAMPLER_INTERVAL_SECONDS = max(0, int(os.getenv("RSS_SAMPLER_INTERVAL_SECONDS", "60")))
+_rss_sampler_task: Optional[asyncio.Task] = None
 _ADMIN_LOGIN_MAX_FAILURES = int(os.getenv("ADMIN_LOGIN_MAX_FAILURES", "5"))
 _ADMIN_LOGIN_WINDOW_SECONDS = int(os.getenv("ADMIN_LOGIN_WINDOW_SECONDS", "300"))
 _admin_login_attempts: Dict[str, List[float]] = {}
@@ -443,6 +448,29 @@ async def _stop_user_loop(user_id: str) -> None:
         _logger_agents.info("[AGENT LOOP] No live loop to stop for user %s", user_id[:12])
 
 
+async def _rss_sampler() -> None:
+    """
+    Always-on background sampler: logs process RSS on a fixed interval, regardless of
+    whether any agent loop is running. Lets us see the real memory curve on small Render
+    instances where OOMs happen with agents off. Also logs active per-user loop count so a
+    spike can be attributed to (or ruled out as) agent activity.
+    """
+    interval = RSS_SAMPLER_INTERVAL_SECONDS
+    if interval <= 0:
+        return
+    # Baseline at boot — compare against the plan limit (e.g. 512 MB Starter).
+    _logger_visible.info("[MEM] baseline rss_mb=%.1f at startup", _pipeline_rss_mb())
+    try:
+        while True:
+            await asyncio.sleep(interval)
+            active_loops = sum(1 for t in _per_user_loops.values() if not t.done())
+            _logger_visible.info(
+                "[MEM] rss_mb=%.1f active_agent_loops=%d", _pipeline_rss_mb(), active_loops
+            )
+    except asyncio.CancelledError:
+        raise
+
+
 async def _resume_all_user_loops() -> None:
     """
     Called once at server startup.
@@ -493,11 +521,13 @@ async def _resume_all_user_loops() -> None:
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     global _agent_queue, _agent_worker_task, _lookup_queue, _lookup_worker_task, _loops_lock
+    global _rss_sampler_task
     _loops_lock = asyncio.Lock()
     _agent_queue = asyncio.Queue()
     _lookup_queue = asyncio.Queue()
     _agent_worker_task = asyncio.create_task(_agent_worker())
     _lookup_worker_task = asyncio.create_task(_lookup_worker())
+    _rss_sampler_task = asyncio.create_task(_rss_sampler())
     _logger_agents.info("Pipeline agent worker + on-demand lookup worker started")
     # Resume persistent per-user loops for users that had agents enabled before restart
     await _resume_all_user_loops()
@@ -511,8 +541,8 @@ async def _lifespan(app: FastAPI):
             await t
         except asyncio.CancelledError:
             pass
-    # Cancel queue workers
-    for t in (_lookup_worker_task, _agent_worker_task):
+    # Cancel queue workers + memory sampler
+    for t in (_lookup_worker_task, _agent_worker_task, _rss_sampler_task):
         if t:
             t.cancel()
             try:

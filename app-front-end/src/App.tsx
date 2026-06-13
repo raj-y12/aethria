@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { setTokenGetter } from './api/auth';
 import { triggerAgents } from './api/agents';
 import AppFrame from './components/AppFrame';
-import TodayPage from './pages/TodayPage';
+import HomePage from './pages/HomePage';
 import FlowPage from './pages/FlowPage';
 import PortfolioPage from './pages/PortfolioPage';
 import FundPage from './pages/FundPage';
@@ -94,7 +94,7 @@ function AppShell() {
         ) : isFlowRoute ? (
           <FlowPage data={systemData} />
         ) : (
-          <TodayPage data={systemData} />
+          <HomePage data={systemData} />
         )}
       </AppFrame>
     </motion.div>

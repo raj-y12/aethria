@@ -7,7 +7,7 @@ import '../src/index.css';
 import '@aethria/product-chrome';
 import { setTokenGetter } from '../src/api/auth';
 import AppFrame from '../src/components/AppFrame';
-import TodayPage from '../src/pages/TodayPage';
+import HomePage from '../src/pages/HomePage';
 import FlowPage from '../src/pages/FlowPage';
 import PortfolioPage from '../src/pages/PortfolioPage';
 import FundPage from '../src/pages/FundPage';
@@ -53,7 +53,7 @@ function Harness({ data }: { data: SystemData }) {
         ) : isFlow ? (
           <FlowPage data={data} />
         ) : (
-          <TodayPage data={data} />
+          <HomePage data={data} />
         )}
       </AppFrame>
     </div>
