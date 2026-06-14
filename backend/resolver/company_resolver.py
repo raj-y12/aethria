@@ -592,6 +592,82 @@ def _assign_status(resolution: CompanyResolution, *, website_hint: Optional[str]
     return "LOW_CONFIDENCE"
 
 
+def _friendly_badge(source_type: str) -> Optional[str]:
+    return {
+        "official_site": "official",
+        "linkedin": "linkedin",
+        "crunchbase": "crunchbase",
+        "dealroom": "dealroom",
+        "yc": "yc",
+        "news": "news",
+    }.get(source_type)
+
+
+def _build_candidates(
+    resolution: CompanyResolution,
+    company: str,
+    *,
+    website_hint: Optional[str],
+) -> List[CompanyCandidate]:
+    """Group scored evidence into distinct company-owned domains.
+
+    Different registrable domains (lyra.ie vs lyra.com) are different companies,
+    so each becomes its own candidate with the best snippet on that domain.
+    Platform (LinkedIn/Crunchbase/...) and news hosts are never candidates —
+    they are evidence ABOUT a company, not the company's own site.
+    """
+    groups: Dict[str, Dict[str, Any]] = {}
+    for s in resolution.evidence_sources:
+        host = _host_of(s.url)
+        reg = registrable_domain(host)
+        if not reg or reg in _PLATFORM_REGISTRABLE_DOMAINS or reg in _NEWS_REGISTRABLE_DOMAINS:
+            continue
+        sim = _slug_similarity(company, host)
+        # Only domains that plausibly match the typed name are candidates.
+        if sim < 0.55 and s.match_score < 0.55:
+            continue
+        g = groups.setdefault(reg, {"best": s, "score": s.match_score, "badges": set()})
+        if s.match_score > g["score"]:
+            g["best"] = s
+            g["score"] = s.match_score
+        badge = _friendly_badge(s.source_type)
+        if badge:
+            g["badges"].add(badge)
+
+    candidates: List[CompanyCandidate] = []
+    for reg, g in groups.items():
+        best: EvidenceSource = g["best"]
+        candidates.append(
+            CompanyCandidate(
+                name=reg.split(".", 1)[0],
+                website=f"https://{reg}",
+                description=(best.snippet or best.title or "")[:200],
+                confidence=round(float(g["score"]), 3),
+                source_badges=sorted(g["badges"] or {"official"}),
+            )
+        )
+
+    # A user-provided website hint pins exactly one company.
+    if website_hint:
+        anchor = registrable_domain(hostname_from_user_hint(website_hint) or "")
+        if anchor:
+            pinned = [c for c in candidates if registrable_domain(_host_of(c.website)) == anchor]
+            if pinned:
+                return pinned[:1]
+            return [
+                CompanyCandidate(
+                    name=anchor.split(".", 1)[0],
+                    website=f"https://{anchor}",
+                    description=(resolution.description or "")[:200],
+                    confidence=max(resolution.confidence, 0.6),
+                    source_badges=["official"],
+                )
+            ]
+
+    candidates.sort(key=lambda c: c.confidence, reverse=True)
+    return candidates[:5]
+
+
 def resolve_company(
     company_name: str,
     *,
@@ -688,6 +764,7 @@ def resolve_company(
     resolution.confidence = _compute_confidence(resolution, website_hint=website_hint)
     resolution.missing_fields = _compute_missing_fields(resolution)
     resolution.resolution_status = _assign_status(resolution, website_hint=website_hint)
+    resolution.candidates = _build_candidates(resolution, company, website_hint=website_hint)
 
     if resolution.resolution_status == "NEEDS_REVIEW":
         alts = ", ".join(a.website or a.name for a in resolution.alternative_matches[:3])

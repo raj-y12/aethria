@@ -236,3 +236,56 @@ def test_engine_lookup_not_found_sets_transparent_outcome(monkeypatch):
         assert outcome["resolution"]["queries_used"]
     finally:
         engine.close()
+
+
+def test_distinct_domain_extensions_become_separate_candidates(monkeypatch):
+    sources = [
+        {
+            "title": "Lyra — Irish fintech",
+            "url": "https://lyra.ie",
+            "snippet": "Lyra is a Dublin-based payments startup for SMEs.",
+        },
+        {
+            "title": "Lyra — US analytics",
+            "url": "https://lyra.com",
+            "snippet": "Lyra builds healthcare analytics software in San Francisco.",
+        },
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    res = resolve_company("Lyra", user_id=USER)
+    domains = {c.website for c in res.candidates}
+    assert "https://lyra.ie" in domains
+    assert "https://lyra.com" in domains
+    assert len(res.candidates) >= 2
+    for c in res.candidates:
+        assert c.description  # each snapshot has a one-line description
+
+
+def test_single_clear_company_yields_one_candidate(monkeypatch):
+    sources = [
+        {
+            "title": "Acme Robotics — Home",
+            "url": "https://acmerobotics.com",
+            "snippet": "Acme Robotics builds warehouse automation robots.",
+        },
+        {
+            "title": "Acme Robotics | LinkedIn",
+            "url": "https://www.linkedin.com/company/acme-robotics",
+            "snippet": "Acme Robotics. Robotics. 11-50 employees.",
+        },
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    res = resolve_company("Acme Robotics", user_id=USER)
+    company_domains = {c.website for c in res.candidates}
+    assert company_domains == {"https://acmerobotics.com"}
+
+
+def test_website_hint_collapses_to_single_candidate(monkeypatch):
+    sources = [
+        {"title": "Lyra IE", "url": "https://lyra.ie", "snippet": "Dublin payments startup."},
+        {"title": "Lyra US", "url": "https://lyra.com", "snippet": "US healthcare analytics."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    res = resolve_company("Lyra", user_id=USER, website_hint="lyra.ie")
+    assert res.website == "https://lyra.ie"
+    assert [c.website for c in res.candidates] == ["https://lyra.ie"]
