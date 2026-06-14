@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import time
+from functools import partial
 from uuid import uuid4
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -3110,6 +3111,68 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
             "website": parsed.get("website"),
             "lookup_input_type": parsed.get("lookup_input_type"),
             "mode": "on_demand_lookup",
+        },
+    )
+
+
+_AMBIGUOUS_MIN_CONFIDENCE = 0.7
+
+
+def _resolve_status_for(resolution, website_hint: Optional[str]) -> str:
+    """Classify a resolution for the dispatch picker: resolved | ambiguous | not_found."""
+    candidates = list(getattr(resolution, "candidates", []) or [])
+    if resolution.resolution_status == "NOT_FOUND" or not candidates:
+        return "not_found"
+    if (website_hint or "").strip():
+        return "resolved"
+    strong = sum(1 for c in candidates if c.confidence >= _AMBIGUOUS_MIN_CONFIDENCE)
+    if strong >= 2:
+        return "ambiguous"
+    return "resolved"
+
+
+@app.post("/api/startups/lookup/resolve")
+async def resolve_lookup_candidates(request: Request, body: Dict[str, Any]):
+    """Cheap, synchronous, LLM-free identity resolution for the dispatch picker.
+
+    Body: {"lookup_input": "...", "website_hint": optional}. Returns the distinct
+    company candidates the typed name could mean WITHOUT running scout/reviewer/partner.
+    """
+    from resolver.company_resolver import resolve_company
+
+    lookup_input = str(body.get("lookup_input") or body.get("company_name") or "").strip()
+    if not lookup_input:
+        raise HTTPException(status_code=422, detail="lookup_input is required")
+    if len(lookup_input) > 300:
+        raise HTTPException(status_code=422, detail="lookup_input is too long")
+    user_id = require_authenticated_user(request)
+    limited = _enforce_rate_limits(
+        f"user:{user_id}:lookup", [_LOOKUP_MINUTE_POLICY, _LOOKUP_DAY_POLICY]
+    )
+    if limited is not None:
+        return limited
+
+    parsed = _parse_lookup_input(lookup_input)
+    company_name = str(parsed.get("company_name") or "").strip()
+    if not company_name:
+        raise HTTPException(status_code=422, detail="Could not derive company name from lookup_input")
+    website_hint = str(body.get("website_hint") or parsed.get("website") or "").strip() or None
+
+    loop = asyncio.get_event_loop()
+    resolution = await loop.run_in_executor(
+        None,
+        partial(resolve_company, company_name, user_id=user_id, website_hint=website_hint),
+    )
+    status = _resolve_status_for(resolution, website_hint=website_hint)
+    candidates = [c.model_dump(mode="json") for c in resolution.candidates]
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": status,
+            "canonical_name": resolution.canonical_name,
+            "company_name": company_name,
+            "website_hint": website_hint,
+            "candidates": candidates if status != "resolved" else candidates[:1],
         },
     )
 
