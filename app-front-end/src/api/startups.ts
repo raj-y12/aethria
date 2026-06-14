@@ -177,3 +177,59 @@ export async function cancelOnDemandLookups(lookupIds: string[]): Promise<void> 
     body: JSON.stringify({ lookup_ids: ids }),
   }).catch(() => undefined);
 }
+
+export interface LookupCandidate {
+  name: string;
+  website: string;
+  description: string;
+  confidence: number;
+  source_badges: string[];
+}
+
+export type LookupResolveStatus = 'resolved' | 'ambiguous' | 'not_found';
+
+export interface LookupResolveResult {
+  status: LookupResolveStatus;
+  canonicalName: string;
+  companyName: string;
+  websiteHint: string | null;
+  candidates: LookupCandidate[];
+}
+
+/**
+ * Cheap pre-flight: resolve a typed name into distinct company candidates
+ * (LLM-free). Drives the dispatch disambiguation picker before we queue the
+ * expensive scout/reviewer/partner pipeline.
+ */
+export async function resolveLookupCandidates(
+  lookupInput: string,
+  websiteHint?: string,
+): Promise<LookupResolveResult> {
+  const input = lookupInput.trim();
+  if (!input) throw new Error('lookupInput is required');
+  const res = await authedFetch(`${API_BASE}/api/startups/lookup/resolve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ lookup_input: input, website_hint: websiteHint?.trim() || undefined }),
+  });
+  if (!res.ok) throw new Error(`Resolve API error: ${res.status}`);
+  const data = await res.json();
+  const candidates: LookupCandidate[] = Array.isArray(data?.candidates)
+    ? data.candidates.map((c: Record<string, unknown>) => ({
+        name: String(c?.name ?? ''),
+        website: String(c?.website ?? ''),
+        description: String(c?.description ?? ''),
+        confidence: typeof c?.confidence === 'number' ? c.confidence : 0,
+        source_badges: Array.isArray(c?.source_badges) ? (c.source_badges as string[]) : [],
+      }))
+    : [];
+  const status: LookupResolveStatus =
+    data?.status === 'ambiguous' || data?.status === 'not_found' ? data.status : 'resolved';
+  return {
+    status,
+    canonicalName: String(data?.canonical_name ?? input),
+    companyName: String(data?.company_name ?? input),
+    websiteHint: typeof data?.website_hint === 'string' ? data.website_hint : null,
+    candidates,
+  };
+}
