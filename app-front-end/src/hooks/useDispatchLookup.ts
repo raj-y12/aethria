@@ -133,6 +133,7 @@ export function useDispatchLookup({
 
   const pickCandidate = useCallback(
     async (candidate: LookupCandidate) => {
+      if (busy) return;
       const requestSeq = requestSeqRef.current + 1;
       requestSeqRef.current = requestSeq;
       setBusy(true);
@@ -144,7 +145,7 @@ export function useDispatchLookup({
         if (requestSeqRef.current === requestSeq) setBusy(false);
       }
     },
-    [queueLookup],
+    [busy, queueLookup],
   );
 
   const refineWithWebsite = useCallback(
@@ -160,6 +161,13 @@ export function useDispatchLookup({
         if (resolved.status === 'ambiguous') {
           setCandidates(resolved.candidates);
           setMessage('Still more than one match — pick a candidate or refine again.');
+          return;
+        }
+        if (resolved.status === 'not_found') {
+          setCandidates([]);
+          setMessage(
+            `No company found at ${websiteHint}. Check the address and try again.`,
+          );
           return;
         }
         const pick = resolved.candidates[0];
