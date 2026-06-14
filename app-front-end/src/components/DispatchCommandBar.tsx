@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import AgentDispatch from './AgentDispatch';
 import Reveal from './Reveal';
 import { useFocusTrap } from '../hooks';
+import type { LookupCandidate } from '../api/startups';
 
 export interface LookupProgress {
   query: string;
@@ -45,6 +46,9 @@ interface DispatchCommandBarProps {
   /** Tracked lookups (active + backgrounded) shown as a focusable chip stack. */
   chips?: LookupChip[];
   onFocusChip?: (id: string) => void;
+  candidates?: LookupCandidate[];
+  onPickCandidate?: (candidate: LookupCandidate) => void;
+  onRefineWebsite?: (websiteHint: string) => void;
 }
 
 type StepState = 'done' | 'active' | 'pending';
@@ -133,6 +137,9 @@ export default function DispatchCommandBar({
   onRetry,
   chips = [],
   onFocusChip,
+  candidates,
+  onPickCandidate,
+  onRefineWebsite,
 }: DispatchCommandBarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(open, containerRef);
@@ -347,6 +354,9 @@ export default function DispatchCommandBar({
                     message={null}
                     lookupPhase={null}
                     displayMode="embedded"
+                    candidates={candidates}
+                    onPickCandidate={onPickCandidate}
+                    onRefineWebsite={onRefineWebsite}
                   />
                 </div>
               </Reveal>

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, type Ref, type KeyboardEvent } from 'react';
 import { railEditorial } from '../design-system/railEditorial';
 import { productInteraction, productText } from '../design-system/productSystem';
+import CandidatePicker from './CandidatePicker';
+import type { LookupCandidate } from '../api/startups';
 
 interface AgentDispatchProps {
   input: string;
@@ -13,6 +15,9 @@ interface AgentDispatchProps {
   onClearMessage?: () => void;
   lookupPhase: 'Scouting' | 'Reviewing' | 'Deciding' | null;
   displayMode?: 'drawer' | 'embedded' | 'embeddedCompact';
+  candidates?: LookupCandidate[];
+  onPickCandidate?: (candidate: LookupCandidate) => void;
+  onRefineWebsite?: (websiteHint: string) => void;
 }
 
 function formatLookupMessage(msg: string): string {
@@ -204,6 +209,9 @@ export default function AgentDispatch({
   onClearMessage,
   lookupPhase,
   displayMode = 'drawer',
+  candidates,
+  onPickCandidate,
+  onRefineWebsite,
 }: AgentDispatchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const lookupMessage = message ? formatLookupMessage(message) : null;
@@ -321,6 +329,14 @@ export default function AgentDispatch({
               if (isCompactEmbedded && e.key === 'Escape' && !isRunning) setExpanded(false);
             }}
           />
+          {candidates && candidates.length > 0 && onPickCandidate && onRefineWebsite ? (
+            <CandidatePicker
+              candidates={candidates}
+              onPick={onPickCandidate}
+              onRefine={onRefineWebsite}
+              busy={isBusy}
+            />
+          ) : null}
         </div>
       ) : !showCompactShell ? (
         <div
@@ -346,6 +362,14 @@ export default function AgentDispatch({
                   if (e.key === 'Escape' && !isBusy && !message) setExpanded(false);
                 }}
               />
+              {candidates && candidates.length > 0 && onPickCandidate && onRefineWebsite ? (
+                <CandidatePicker
+                  candidates={candidates}
+                  onPick={onPickCandidate}
+                  onRefine={onRefineWebsite}
+                  busy={isBusy}
+                />
+              ) : null}
             </div>
           </div>
         </div>

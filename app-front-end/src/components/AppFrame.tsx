@@ -415,6 +415,9 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                 onFocusChip={dispatch.focusChip}
                 failure={dispatch.failure}
                 onRetry={dispatch.dismissFailure}
+                candidates={dispatch.candidates}
+                onPickCandidate={dispatch.pickCandidate}
+                onRefineWebsite={dispatch.refineWithWebsite}
                 result={
                   dispatch.pendingLookupMatch?.partner?.recommendation && dispatch.snapshotProps ? (
                     <LookupResultSnapshot
