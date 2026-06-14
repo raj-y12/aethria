@@ -859,34 +859,25 @@
   font-size: var(--memo-size-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.48);
-  transition: color 140ms ease, border-color 140ms ease, opacity 140ms ease;
+  transition:
+    background-color 150ms var(--motion-ease),
+    border-color 150ms var(--motion-ease),
+    color 150ms var(--motion-ease),
+    opacity 150ms var(--motion-ease);
 }
-/* Outline button in the house language (btn-aethria): sharp corners, mono uppercase, accent
-   border to mark it as the risk gate. Fills on hover, scale-on-press. A real button, not a label. */
+/* Risk gate — soft escalation tint at rest; fills on hover (matches annotation chips). */
 .memoRiskAckButton {
   justify-self: start;
   height: 36px;
   padding: 0 22px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 38%, transparent);
   border-radius: 0;
-  background: transparent;
-  color: color-mix(in srgb, var(--color-accent) 80%, var(--color-oxford));
-  transition:
-    background-color 150ms var(--motion-ease),
-    color 150ms var(--motion-ease),
-    transform 120ms var(--motion-ease);
+  border: none;
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-paper));
+  color: var(--color-accent);
 }
-.memoDecisionChoice:hover:not([aria-pressed="true"]):not(:disabled) {
-  color: var(--color-oxford);
-  border-color: rgba(var(--color-oxford-rgb), 0.45);
-}
-.memoRiskAckButton:hover {
-  background: color-mix(in srgb, var(--color-accent) 86%, var(--color-oxford));
+.memoRiskAckButton:hover:not(:disabled) {
+  background: var(--color-accent);
   color: var(--color-paper);
-}
-.memoRiskAckButton:active {
-  transform: scale(0.97);
 }
 .memoRiskAckButton:focus,
 .memoRulingSubmit:focus,
@@ -953,36 +944,57 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
-/* Segmented ruling selector in the house language: sharp outline buttons, mono uppercase,
-   scale-on-press. The SELECTED option fills with plain print-ink — no verdict colour, matching
-   the neutral cover recommendation — so the selection reads from fill alone, not hue. */
+/* Segmented ruling selector: neutral at rest; selected = verdict bar + semantic chip fill
+   (same language as EscalationQueueMarker). */
 .memoDecisionChoice {
+  position: relative;
   height: 40px;
   min-height: 0;
   padding: 0 10px;
   text-align: center;
   justify-content: center;
-  border: 1px solid rgba(var(--color-oxford-rgb), 0.22);
   border-radius: 0;
-  background: transparent;
-  color: rgba(var(--color-oxford-rgb), 0.55);
+  font-weight: 600;
+  overflow: hidden;
+  border: none;
   transition:
     background-color 150ms var(--motion-ease),
-    border-color 150ms var(--motion-ease),
-    color 150ms var(--motion-ease),
-    transform 120ms var(--motion-ease);
+    color 150ms var(--motion-ease);
 }
-.memoDecisionChoice:active:not(:disabled) {
-  transform: scale(0.97);
+.memoDecisionChoice:not([aria-pressed="true"]) {
+  background: rgba(var(--color-oxford-rgb), 0.025);
+  color: rgba(var(--color-oxford-rgb), 0.78);
+}
+.memoDecisionChoice:hover:not([aria-pressed="true"]):not(:disabled) {
+  background: rgba(var(--color-oxford-rgb), 0.04);
+  color: var(--color-oxford);
 }
 .memoDecisionChoice[aria-pressed="true"] {
-  color: var(--color-paper);
-  border-color: transparent;
-  font-weight: 600;
+  padding-left: 14px;
+}
+.memoDecisionChoice[aria-pressed="true"]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
 }
 .memoDecisionChoice--yes[aria-pressed="true"],
 .memoDecisionChoice--maybe[aria-pressed="true"],
-.memoDecisionChoice--no[aria-pressed="true"] { background: var(--color-oxford); }
+.memoDecisionChoice--no[aria-pressed="true"] {
+  background: var(--color-oxford);
+  color: var(--color-paper);
+}
+.memoDecisionChoice--yes[aria-pressed="true"]::before {
+  background: #bfe3cc;
+}
+.memoDecisionChoice--maybe[aria-pressed="true"]::before {
+  background: #e5d39f;
+}
+.memoDecisionChoice--no[aria-pressed="true"]::before {
+  background: #eabfb7;
+}
 .memoDecisionChoice:disabled,
 .memoRulingSubmit:disabled,
 .memoRiskAckButton:disabled,
@@ -1065,8 +1077,7 @@
   order: 1;
 }
 /* Same shape/feel as the "Enter Aethria" solid button (.btn-aethria-solid): sharp corners,
-   36px height, generous 0 40px padding, opacity hover, and scale-on-press feedback. Colours
-   stay the commit button's own oxford fill / inverse text. */
+   36px height, generous 0 40px padding, opacity hover. */
 .memoRulingSubmit {
   height: 36px;
   min-height: 0;
@@ -1077,17 +1088,12 @@
   color: var(--text-inverse);
   transition:
     background-color 150ms var(--motion-ease),
-    opacity 150ms var(--motion-ease),
-    transform 120ms var(--motion-ease);
+    opacity 150ms var(--motion-ease);
 }
 .memoRulingSubmit:hover:not(:disabled) {
   background: rgba(var(--color-oxford-rgb), 0.85);
   color: var(--color-paper);
   opacity: 0.9;
-}
-.memoRulingSubmit:active:not(:disabled) {
-  transform: scale(0.97);
-  opacity: 0.88;
 }
 .memoRulingHint,
 .memoRulingError {

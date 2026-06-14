@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { usePrefersReducedMotion } from '../hooks';
 import AuthInstitutionalFooter from './AuthInstitutionalFooter';
-import CountUp from './CountUp';
+import ActivityStatsRow, { activityStatsFromSummary } from './ActivityStatsRow';
 import { fetchActivitySummaryWithToken, type ActivitySummary } from '../api/activity';
 import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from '../lib/loginEntryTransition';
 
@@ -17,13 +17,6 @@ function friendlyIdentifier(id: string): string {
   if (at > 0) return t.slice(0, at);
   return t.length > 36 ? `${t.slice(0, 33)}…` : t;
 }
-
-const STATS_CONFIG = (s: ActivitySummary) => [
-  { label: 'Discovered', value: s.found, accent: false },
-  { label: 'Evaluated', value: s.reviewed, accent: false },
-  { label: 'Agent-decided', value: s.agent_decided ?? s.decided, accent: false },
-  { label: 'Escalated', value: s.escalations, accent: true },
-];
 
 /** Input with an animated underline that expands from center on focus. */
 const AnimatedInput = React.forwardRef<
@@ -216,7 +209,7 @@ export default function LoginPage() {
 
   if (!isLoaded) return null;
 
-  const stats = activity ? STATS_CONFIG(activity) : null;
+  const stats = activity ? activityStatsFromSummary(activity) : null;
   const enterDelay = stats ? 0.22 + stats.length * 0.07 + 0.1 : 0.2;
   const entryTransition = getLoginEntryTransition(reduceMotion);
 
@@ -349,54 +342,8 @@ export default function LoginPage() {
 
               {/* Stats — numbers count up on reveal */}
               {!activityLoading && stats && (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    alignItems: 'flex-start',
-                    justifyContent: 'center',
-                    gap: 'clamp(48px, 8vw, 120px)',
-                    marginBottom: '64px',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  {stats.map((stat, i) => (
-                    <motion.div
-                      key={stat.label}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.45, ease: EASE, delay: 0.22 + i * 0.07 }}
-                      style={{ textAlign: 'center' }}
-                    >
-                      <div
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 'clamp(52px, 10vw, 96px)',
-                          fontWeight: 400,
-                          lineHeight: 1,
-                          color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
-                          letterSpacing: '-0.03em',
-                          // Reserve the final digit width up front — the count-up
-                          // otherwise reflows the row every frame as digits grow.
-                          minWidth: `${stat.value.toLocaleString().length}ch`,
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        <CountUp to={stat.value} delay={0.22 + i * 0.07} reduceMotion={reduceMotion} />
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: "var(--font-sans)",
-                          fontSize: '13px',
-                          color: 'rgba(var(--color-oxford-rgb), 0.6)',
-                          marginTop: '6px',
-                          letterSpacing: '0.01em',
-                        }}
-                      >
-                        {stat.label}
-                      </div>
-                    </motion.div>
-                  ))}
+                <div style={{ marginBottom: '64px' }}>
+                  <ActivityStatsRow stats={stats} reduceMotion={reduceMotion} />
                 </div>
               )}
 
