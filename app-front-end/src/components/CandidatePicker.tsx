@@ -12,7 +12,7 @@ interface CandidatePickerProps {
 
 /** Strip protocol so the registrable domain (and its .ie/.com/.co extension) reads cleanly. */
 function domainLabel(website: string): string {
-  return website.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  return website.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 }
 
 export default function CandidatePicker({ candidates, onPick, onRefine, busy }: CandidatePickerProps) {
@@ -45,6 +45,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy }: 
           type="button"
           disabled={busy}
           onClick={() => onPick(c)}
+          aria-label={`Select ${c.name}`}
           className="group w-full text-left border border-oxford/[0.10] hover:border-oxford/[0.30] bg-paper px-phi-3 py-phi-3 transition-colors disabled:opacity-60 btn-interaction"
         >
           <div className="flex items-baseline justify-between gap-phi-2">
@@ -56,9 +57,9 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy }: 
           ) : null}
           {c.source_badges.length ? (
             <div className="mt-phi-2 flex flex-wrap gap-phi-1">
-              {c.source_badges.map((b) => (
+              {c.source_badges.map((b, i) => (
                 <span
-                  key={b}
+                  key={`${b}-${i}`}
                   className="type-meta text-oxford/[0.40] border border-oxford/[0.10] px-phi-1 leading-[1.6]"
                 >
                   {b}
