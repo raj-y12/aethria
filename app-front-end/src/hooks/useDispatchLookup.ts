@@ -6,6 +6,8 @@ import {
   queueOnDemandLookup,
   fetchStartupDetail,
   fetchLookupJobStatus,
+  resolveLookupCandidates,
+  type LookupCandidate,
 } from '../api/startups';
 import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
@@ -55,6 +57,8 @@ export function useDispatchLookup({
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [candidates, setCandidates] = useState<LookupCandidate[]>([]);
+  const [refining, setRefining] = useState(false);
   const [pendingLookup, setPendingLookup] = useState<TrackedLookup | null>(null);
   // A lookup the scout could not resolve (company not found / ambiguous). Drives
   // the takeover's failure view — the "here's what we found" counterpart for misses.
@@ -68,41 +72,109 @@ export function useDispatchLookup({
 
   const storageKey = useMemo(() => getDispatchLookupStorageKey(userId), [userId]);
 
+  const queueLookup = useCallback(
+    async (value: string, requestSeq: number) => {
+      const lookupId = crypto.randomUUID();
+      const queued = await queueOnDemandLookup(value, lookupId);
+      if (requestSeqRef.current !== requestSeq) return;
+      const current = pendingLookup;
+      if (current && !current.autoOpened && current.lookupId !== queued.lookupId) {
+        setBackgroundLookups((bg) => [current, ...bg.filter((l) => l.lookupId !== current.lookupId)]);
+      }
+      setCandidates([]);
+      setRefining(false);
+      setPendingLookup({ lookupId: queued.lookupId, queryLabel: value, autoOpened: false });
+      setMessage(
+        `Lookup queued for ${queued.companyName}. We are now finding and validating the company profile.`,
+      );
+      setInput('');
+    },
+    [pendingLookup],
+  );
+
   const submit = useCallback(async () => {
     const value = input.trim();
-    // Allow starting a new lookup even while one is tracked ("Look up another"):
-    // the prior keeps running server-side and lands in the queue. Only block
-    // while a submit is mid-flight.
     if (!value || busy) return;
     const requestSeq = requestSeqRef.current + 1;
     requestSeqRef.current = requestSeq;
     setFailure(null);
     setBusy(true);
-    setMessage('Submitting lookup request...');
+    setMessage('Confirming the company identity...');
     try {
-      const lookupId = crypto.randomUUID();
-      const queued = await queueOnDemandLookup(value, lookupId);
-      if (requestSeqRef.current !== requestSeq) return;
-      // Background the lookup currently in focus so it survives as a chip.
-      const current = pendingLookup;
-      if (current && !current.autoOpened && current.lookupId !== queued.lookupId) {
-        setBackgroundLookups((bg) => [current, ...bg.filter((l) => l.lookupId !== current.lookupId)]);
+      let resolved;
+      try {
+        resolved = await resolveLookupCandidates(value);
+      } catch {
+        // Fail-safe: resolve outage must not break dispatch — queue directly.
+        await queueLookup(value, requestSeq);
+        return;
       }
-      setPendingLookup({
-        lookupId: queued.lookupId,
-        queryLabel: value,
-        autoOpened: false,
-      });
-      setMessage(
-        `Lookup queued for ${queued.companyName}. We are now finding and validating the company profile.`,
-      );
-      setInput('');
+      if (requestSeqRef.current !== requestSeq) return;
+      if (resolved.status === 'ambiguous') {
+        setCandidates(resolved.candidates);
+        setMessage('Multiple companies match — select the one you meant.');
+        return;
+      }
+      if (resolved.status === 'not_found') {
+        setCandidates([]);
+        setMessage(
+          `No clear match for ${value}. Add the company website to pin it (e.g. "${value} example.com").`,
+        );
+        return;
+      }
+      const pick = resolved.candidates[0];
+      await queueLookup(pick ? `${pick.name} ${pick.website}` : value, requestSeq);
     } catch {
       setMessage('Could not submit lookup request. Please retry in a few seconds.');
     } finally {
       if (requestSeqRef.current === requestSeq) setBusy(false);
     }
-  }, [input, busy, pendingLookup]);
+  }, [input, busy, queueLookup]);
+
+  const pickCandidate = useCallback(
+    async (candidate: LookupCandidate) => {
+      const requestSeq = requestSeqRef.current + 1;
+      requestSeqRef.current = requestSeq;
+      setBusy(true);
+      try {
+        await queueLookup(`${candidate.name} ${candidate.website}`, requestSeq);
+      } catch {
+        setMessage('Could not submit lookup request. Please retry in a few seconds.');
+      } finally {
+        if (requestSeqRef.current === requestSeq) setBusy(false);
+      }
+    },
+    [queueLookup],
+  );
+
+  const refineWithWebsite = useCallback(
+    async (websiteHint: string) => {
+      const value = input.trim() || websiteHint.trim();
+      const requestSeq = requestSeqRef.current + 1;
+      requestSeqRef.current = requestSeq;
+      setRefining(true);
+      setBusy(true);
+      try {
+        const resolved = await resolveLookupCandidates(value, websiteHint);
+        if (requestSeqRef.current !== requestSeq) return;
+        if (resolved.status === 'ambiguous') {
+          setCandidates(resolved.candidates);
+          setMessage('Still more than one match — pick a candidate or refine again.');
+          return;
+        }
+        const pick = resolved.candidates[0];
+        await queueLookup(pick ? `${pick.name} ${pick.website}` : `${value} ${websiteHint}`, requestSeq);
+      } catch {
+        setMessage('Could not resolve that website. Please retry.');
+      } finally {
+        if (requestSeqRef.current === requestSeq) {
+          setBusy(false);
+          setRefining(false);
+        }
+      }
+    },
+    [input, queueLookup],
+  );
 
   const cancel = useCallback(() => {
     const lookupIds = [
@@ -116,6 +188,8 @@ export function useDispatchLookup({
     setFailure(null);
     setMessage(null);
     setInput('');
+    setCandidates([]);
+    setRefining(false);
     setCommandBarOpen(false);
     if (storageKey && typeof window !== 'undefined') {
       window.localStorage.removeItem(storageKey);
@@ -376,5 +450,9 @@ export function useDispatchLookup({
     failure,
     dismissFailure,
     lookupWorking,
+    candidates,
+    pickCandidate,
+    refineWithWebsite,
+    refining,
   };
 }
