@@ -1,0 +1,1899 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Aethria — Brand Assets</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Aethria brand fonts -->
+    <link
+      rel="preconnect"
+      href="https://fonts.googleapis.com"
+    />
+    <link
+      rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        /* Core palette — aligned with app-front-end / web-front-end tokens */
+        --color-oxford: #001433;
+        --color-oxford-rgb: 0, 20, 51;
+        --color-paper: #f4f1ea;
+        --color-paper-bright: #f8f5ee;
+        --color-paper-deep: #e7e0d4;
+        --color-charcoal: #26313f;
+        --color-ivory: #f4f1ea;
+        --color-brand-mark: #3d6b5e;
+        --color-brand-mark-inverse: #7aab9a;
+        --color-accent: #3d6b5e;
+        --color-accent-strong: #2f574c;
+        --color-heritage-gold: #a88a5e;
+        --color-heritage-gold-soft: rgba(168, 138, 94, 0.35);
+        --color-brass: #8a704d;
+        --color-signal-blue: #c9d9ea;
+        --section-divider: rgba(var(--color-oxford-rgb), 0.1);
+
+        /* Typography roles */
+        --font-sans: 'Figtree', system-ui, -apple-system, sans-serif;
+        --font-display: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+        --font-wordmark: 'Playfair Display', 'Georgia', serif;
+        --font-mono: 'Space Mono', ui-monospace, monospace;
+
+        /* Legacy aliases used by banner renderer */
+        --oxford: var(--color-oxford);
+        --motion-oxford: #000e28;
+        --motion-oxford-rgb: 0, 14, 40;
+        --paper: var(--color-paper);
+        --paper-bright: var(--color-paper-bright);
+        --paper-deep: var(--color-paper-deep);
+        --charcoal: var(--color-charcoal);
+        --heritage-gold: var(--color-heritage-gold);
+        --gold-soft: var(--color-heritage-gold-soft);
+        --badge-blue: var(--color-signal-blue);
+        --badge-blue-ink: #253f5a;
+        --baby-blue: var(--color-signal-blue);
+        --hairline: var(--section-divider);
+        --hairline-strong: rgba(var(--color-oxford-rgb), 0.16);
+        --cream: var(--color-paper);
+        --warm-paper: var(--color-paper);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+
+      body {
+        min-height: 100vh;
+        background-color: var(--warm-paper);
+        color: var(--oxford);
+        font-family: var(--font-sans);
+        overflow-y: auto;
+        position: relative;
+      }
+
+      .page {
+        position: relative;
+        z-index: 1;
+        max-width: 1800px;
+        margin: 0 auto;
+        padding: 32px 20px 80px;
+        display: flex;
+        flex-direction: column;
+        gap: 40px;
+      }
+
+      .intro {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        opacity: 0.7;
+      }
+
+      .title {
+        margin-top: 8px;
+        font-family: var(--font-display);
+        font-weight: 500;
+        font-size: 28px;
+        letter-spacing: -0.02em;
+      }
+
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        opacity: 0.6;
+      }
+
+      .gallery {
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        margin-top: 16px;
+      }
+
+      .banner-card {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+        max-width: 100%;
+        overflow: hidden;
+      }
+
+      .banner-meta {
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        opacity: 0.6;
+      }
+
+      .frame {
+        margin: 0 auto;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        box-shadow: 0 0 0 1px var(--hairline);
+      }
+
+      /* Banner dimensions — 1584 x 396 */
+      .frame-banner {
+        width: 1584px;
+        height: 396px;
+        isolation: isolate;
+      }
+
+      /* Per-banner grain overlay, baked into each design */
+      .frame-banner::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        mix-blend-mode: overlay;
+        opacity: 0.18;
+        will-change: transform;
+        transform: translateZ(0);
+        z-index: 3;
+      }
+
+      .frame-banner::after {
+        content: '';
+        position: absolute;
+        inset: -30px -54px;
+        z-index: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, transparent 0%, rgba(0, 20, 51, 0.3) 25%, rgba(201, 217, 234, 0.46) 58%, transparent 100%),
+          linear-gradient(90deg, transparent 0%, rgba(201, 217, 234, 0.34) 38%, rgba(244, 241, 234, 0.44) 72%, transparent 100%),
+          linear-gradient(90deg, transparent 0%, rgba(0, 20, 51, 0.18) 28%, rgba(201, 217, 234, 0.26) 66%, transparent 100%),
+          linear-gradient(90deg, transparent 0%, rgba(248, 245, 238, 0.52) 45%, rgba(201, 217, 234, 0.2) 70%, transparent 100%),
+          linear-gradient(180deg, rgba(248, 245, 238, 0.62) 0%, rgba(231, 224, 212, 0.54) 47%, rgba(244, 241, 234, 0.8) 100%);
+        background-repeat: no-repeat;
+        background-size: 118% 92px, 82% 66px, 104% 76px, 73% 54px, 100% 100%;
+        background-position: -10% 3%, 18% 30%, -18% 58%, 45% 84%, 0 0;
+        filter: blur(18px);
+        transform: translateZ(0);
+      }
+
+      .frame-banner > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* Suites A–C: flat fills only — no shared motion blur / grain overlays */
+      .banner-blueprint.frame-banner::before,
+      .banner-blueprint.frame-banner::after,
+      .banner-blueprint-invert.frame-banner::before,
+      .banner-blueprint-invert.frame-banner::after,
+      .banner-metadata.frame-banner::before,
+      .banner-metadata.frame-banner::after,
+      .banner-metadata-invert.frame-banner::before,
+      .banner-metadata-invert.frame-banner::after,
+      .banner-seal.frame-banner::before,
+      .banner-seal.frame-banner::after,
+      .banner-seal-invert.frame-banner::before,
+      .banner-seal-invert.frame-banner::after {
+        display: none;
+      }
+
+      /* Global grain overlay (for on-page ambience; hidden during export) */
+      .grain-overlay {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        opacity: 0.04;
+        will-change: transform;
+        transform: translateZ(0);
+      }
+
+      /* Wordmark — Playfair + verdigris dot (matches app / marketing site) */
+      .profile-wordmark,
+      .blueprint-logo,
+      .motion-brand,
+      .wake-brand {
+        font-family: var(--font-wordmark);
+        font-weight: 500;
+      }
+
+      .wordmark-dot {
+        color: var(--color-brand-mark);
+      }
+
+      .frame-square-invert .wordmark-dot,
+      .banner-blueprint-invert .wordmark-dot,
+      .banner-metadata-invert .wordmark-dot,
+      .banner-seal-invert .wordmark-dot,
+      .banner-motion-invert .wordmark-dot,
+      .banner-wake-invert .wordmark-dot {
+        color: var(--color-brand-mark-inverse);
+      }
+
+      .profile-monogram,
+      .seal-a {
+        font-family: var(--font-wordmark);
+        font-weight: 500;
+      }
+
+      /* Suite A — Blueprint */
+      .banner-blueprint {
+        background-color: var(--paper);
+        color: var(--oxford);
+      }
+
+      .banner-blueprint-invert {
+        background-color: var(--oxford);
+        color: var(--cream);
+      }
+
+      .blueprint-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        padding: 56px 80px;
+      }
+
+      .blueprint-line {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        left: 33%;
+        background-color: currentColor;
+        opacity: 0.5;
+      }
+
+      .blueprint-logo {
+        position: absolute;
+        right: 80px;
+        bottom: 56px;
+        font-size: 64px;
+        letter-spacing: 0;
+        font-family: var(--font-wordmark);
+      }
+
+      /* Suite B — Metadata */
+      .banner-metadata {
+        background-color: var(--warm-paper);
+        color: var(--oxford);
+      }
+
+      .banner-metadata-invert {
+        background-color: var(--oxford);
+        color: var(--cream);
+      }
+
+      .metadata-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        padding: 40px 40px 40px 64px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: flex-end;
+        text-align: right;
+      }
+
+      .metadata-label {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+      }
+
+      /* Suite C — Seal */
+      .banner-seal {
+        background-color: var(--warm-paper);
+        color: var(--oxford);
+      }
+
+      .banner-seal-invert {
+        background-color: var(--oxford);
+        color: var(--cream);
+      }
+
+      .seal-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .seal-a {
+        font-size: 120px;
+        letter-spacing: 0;
+      }
+
+      /* Suite F — Motion Field */
+      .banner-motion {
+        background:
+          linear-gradient(90deg, rgba(var(--motion-oxford-rgb), 0.36) 0%, rgba(201, 217, 234, 0.34) 19%, transparent 48%),
+          linear-gradient(90deg, rgba(201, 217, 234, 0.2) 0%, transparent 64%),
+          linear-gradient(180deg, var(--paper-deep) 0%, var(--paper) 100%);
+        color: var(--motion-oxford);
+      }
+
+      .banner-motion-invert {
+        background:
+          linear-gradient(90deg, rgba(201, 217, 234, 0.28) 0%, rgba(244, 241, 234, 0.13) 21%, transparent 44%),
+          linear-gradient(90deg, rgba(244, 241, 234, 0.13) 0%, rgba(0, 20, 51, 0) 52%),
+          linear-gradient(180deg, var(--charcoal) 0%, var(--oxford) 100%);
+        color: var(--cream);
+      }
+
+      .motion-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .motion-inner::before,
+      .motion-inner::after,
+      .wake-inner::before,
+      .wake-inner::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .motion-inner::before,
+      .wake-inner::before {
+        background:
+          repeating-linear-gradient(0deg, rgba(244, 241, 234, 0.08) 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(90deg, rgba(0, 20, 51, 0.035) 0 1px, transparent 1px 11px);
+        mix-blend-mode: overlay;
+        opacity: 0.62;
+      }
+
+      .motion-inner::before {
+        background:
+          repeating-linear-gradient(0deg, rgba(244, 241, 234, 0.08) 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(90deg, rgba(var(--motion-oxford-rgb), 0.05) 0 1px, transparent 1px 11px);
+      }
+
+      .motion-inner::after,
+      .wake-inner::after {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='180' color-interpolation-filters='sRGB'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.8 0.72' numOctaves='5' seed='19' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0.42 0 0 0 0 0 0.42 0 0 0 0 0 0.42 0 0 0 0 0 .72 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-size: 220px 120px;
+        mix-blend-mode: overlay;
+        opacity: 0.46;
+      }
+
+      .motion-band {
+        position: absolute;
+        left: -14%;
+        width: 92%;
+        height: 56px;
+        background: linear-gradient(90deg, transparent, rgba(var(--motion-oxford-rgb), 0.38), rgba(201, 217, 234, 0.46), transparent);
+        opacity: 0.44;
+        filter: blur(18px);
+      }
+
+      .motion-band-one {
+        top: 8px;
+      }
+
+      .motion-band-two {
+        top: 66px;
+        width: 104%;
+        height: 86px;
+        opacity: 0.56;
+      }
+
+      .motion-band-three {
+        top: 160px;
+        width: 88%;
+        height: 70px;
+        opacity: 0.46;
+      }
+
+      .motion-band-four {
+        bottom: 12px;
+        width: 110%;
+        height: 88px;
+        opacity: 0.48;
+      }
+
+      .banner-motion-invert .motion-band {
+        background: linear-gradient(90deg, transparent, rgba(244, 241, 234, 0.18), rgba(201, 217, 234, 0.4), rgba(38, 49, 63, 0.24), transparent);
+      }
+
+      .motion-copy {
+        position: absolute;
+        top: 50%;
+        right: 8px;
+        width: 700px;
+        transform: translateY(-50%) translateX(44px);
+      }
+
+      .motion-brand {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 15px;
+        font-family: var(--font-wordmark);
+        font-size: 34px;
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .motion-headline {
+        margin: 0;
+        font-family: var(--font-sans);
+        font-weight: 500;
+        font-size: 58px;
+        line-height: 0.94;
+        letter-spacing: -0.02em;
+        color: var(--motion-oxford);
+        text-shadow: 0 0 18px rgba(244, 241, 234, 0.24);
+      }
+
+      .banner-motion-invert .motion-headline,
+      .banner-wake-invert .wake-headline {
+        color: var(--badge-blue);
+        text-shadow: 0 0 22px rgba(201, 217, 234, 0.14);
+      }
+
+      .motion-meta {
+        position: absolute;
+        left: 55px;
+        bottom: 34px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        line-height: 1.8;
+        text-transform: uppercase;
+        opacity: 0.62;
+      }
+
+      /* Suite G — Signal Wake (see .banner-wake below) */
+
+      .banner-motion {
+        background:
+          radial-gradient(920px 340px at -10% 18%, rgba(var(--motion-oxford-rgb), 0.46), rgba(var(--motion-oxford-rgb), 0) 62%),
+          linear-gradient(90deg, rgba(var(--motion-oxford-rgb), 0.26) 0%, rgba(201, 217, 234, 0.5) 25%, rgba(248, 245, 238, 0.38) 48%, rgba(244, 241, 234, 0.5) 69%, rgba(244, 241, 234, 0.86) 100%),
+          linear-gradient(180deg, var(--paper-deep) 0%, var(--paper) 100%);
+        color: var(--motion-oxford);
+      }
+
+      .banner-wake {
+        background:
+          radial-gradient(920px 340px at -10% 18%, rgba(0, 20, 51, 0.4), rgba(0, 20, 51, 0) 62%),
+          linear-gradient(90deg, rgba(0, 20, 51, 0.2) 0%, rgba(201, 217, 234, 0.5) 25%, rgba(248, 245, 238, 0.38) 48%, rgba(244, 241, 234, 0.5) 69%, rgba(244, 241, 234, 0.86) 100%),
+          linear-gradient(180deg, var(--paper-deep) 0%, var(--paper) 100%);
+        color: var(--oxford);
+      }
+
+      .banner-motion-invert {
+        background:
+          radial-gradient(980px 360px at -8% 16%, rgba(244, 241, 234, 0.28), rgba(244, 241, 234, 0) 58%),
+          linear-gradient(90deg, rgba(244, 241, 234, 0.1) 0%, rgba(201, 217, 234, 0.36) 25%, rgba(248, 245, 238, 0.12) 43%, rgba(var(--motion-oxford-rgb), 0.32) 68%, rgba(var(--motion-oxford-rgb), 0.98) 100%),
+          linear-gradient(180deg, var(--charcoal) 0%, var(--motion-oxford) 100%);
+        color: var(--cream);
+      }
+
+      .banner-wake-invert {
+        background:
+          radial-gradient(980px 360px at -8% 16%, rgba(244, 241, 234, 0.28), rgba(244, 241, 234, 0) 58%),
+          linear-gradient(90deg, rgba(244, 241, 234, 0.1) 0%, rgba(201, 217, 234, 0.36) 25%, rgba(248, 245, 238, 0.12) 43%, rgba(0, 20, 51, 0.28) 68%, rgba(0, 20, 51, 0.96) 100%),
+          linear-gradient(180deg, var(--charcoal) 0%, var(--oxford) 100%);
+        color: var(--cream);
+      }
+
+      .banner-motion-invert::after {
+        background:
+          linear-gradient(90deg, transparent 0%, rgba(244, 241, 234, 0.16) 24%, rgba(201, 217, 234, 0.36) 58%, transparent 100%),
+          linear-gradient(90deg, transparent 0%, rgba(201, 217, 234, 0.24) 42%, rgba(var(--motion-oxford-rgb), 0.32) 76%, transparent 100%),
+          linear-gradient(90deg, transparent 0%, rgba(244, 241, 234, 0.12) 34%, rgba(201, 217, 234, 0.22) 66%, transparent 100%),
+          linear-gradient(90deg, transparent 0%, rgba(38, 49, 63, 0.28) 45%, rgba(201, 217, 234, 0.16) 70%, transparent 100%),
+          linear-gradient(180deg, rgba(38, 49, 63, 0.76) 0%, rgba(var(--motion-oxford-rgb), 0.94) 100%);
+        background-repeat: no-repeat;
+        background-size: 116% 88px, 84% 68px, 102% 74px, 76% 56px, 100% 100%;
+        background-position: -9% 4%, 20% 31%, -16% 60%, 43% 84%, 0 0;
+      }
+
+      .banner-wake-invert::after {
+        background:
+          linear-gradient(90deg, transparent 0%, rgba(244, 241, 234, 0.16) 24%, rgba(201, 217, 234, 0.36) 58%, transparent 100%),
+          linear-gradient(90deg, transparent 0%, rgba(201, 217, 234, 0.24) 42%, rgba(0, 20, 51, 0.28) 76%, transparent 100%),
+          linear-gradient(90deg, transparent 0%, rgba(244, 241, 234, 0.12) 34%, rgba(201, 217, 234, 0.22) 66%, transparent 100%),
+          linear-gradient(90deg, transparent 0%, rgba(38, 49, 63, 0.28) 45%, rgba(201, 217, 234, 0.16) 70%, transparent 100%),
+          linear-gradient(180deg, rgba(38, 49, 63, 0.76) 0%, rgba(0, 20, 51, 0.92) 100%);
+        background-repeat: no-repeat;
+        background-size: 116% 88px, 84% 68px, 102% 74px, 76% 56px, 100% 100%;
+        background-position: -9% 4%, 20% 31%, -16% 60%, 43% 84%, 0 0;
+      }
+
+      .wake-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .wake-grid {
+        position: absolute;
+        inset: 34px 55px;
+        border-top: 1px solid rgba(244, 241, 234, 0.18);
+        border-bottom: 1px solid rgba(0, 20, 51, 0.18);
+        opacity: 0.34;
+      }
+
+      .wake-streak {
+        position: absolute;
+        left: 0;
+        right: 38.2%;
+        height: 34px;
+        background: linear-gradient(90deg, transparent, rgba(201, 217, 234, 0.4), rgba(0, 20, 51, 0.28), transparent);
+        opacity: 0.48;
+        filter: blur(16px);
+      }
+
+      .wake-streak-one {
+        top: 72px;
+      }
+
+      .wake-streak-two {
+        top: 130px;
+        right: 18%;
+        height: 64px;
+      }
+
+      .wake-streak-three {
+        top: 244px;
+        right: 44%;
+      }
+
+      .wake-brand {
+        position: absolute;
+        top: 46px;
+        right: 76px;
+        font-family: var(--font-wordmark);
+        font-size: 34px;
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .wake-headline {
+        position: absolute;
+        right: 76px;
+        bottom: 50px;
+        width: 710px;
+        margin: 0;
+        font-family: var(--font-sans);
+        font-weight: 500;
+        font-size: 56px;
+        line-height: 0.96;
+        letter-spacing: -0.02em;
+        color: var(--oxford);
+      }
+
+      /* Legacy LinkedIn profile & success layouts */
+      .asset-gallery {
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        margin-top: 16px;
+      }
+
+      .frame-square {
+        width: 1000px;
+        height: 1000px;
+        position: relative;
+      }
+
+      .frame-square-warm {
+        background-color: var(--warm-paper);
+        color: var(--oxford);
+      }
+
+      .frame-square-invert {
+        background-color: var(--oxford);
+        color: var(--cream);
+      }
+
+      .frame-success {
+        width: 1200px;
+        height: 627px;
+        background-color: var(--warm-paper);
+        position: relative;
+      }
+
+      .frame-square::before,
+      .frame-success::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        opacity: 0.04;
+        will-change: transform;
+        transform: translateZ(0);
+      }
+
+      .profile-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .profile-wordmark {
+        font-size: 170px;
+        letter-spacing: 0;
+      }
+
+      .profile-monogram {
+        font-size: 360px;
+        line-height: 1;
+        letter-spacing: -0.02em;
+      }
+
+      .success-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .success-copy {
+        max-width: 720px;
+        padding: 0 80px;
+        color: var(--oxford);
+      }
+
+      .success-heading {
+        margin: 0 0 12px;
+        font-family: var(--font-wordmark);
+        font-weight: 500;
+        font-size: 40px;
+        line-height: 1.2;
+      }
+
+      .success-subcopy {
+        margin: 0;
+        font-family: var(--font-wordmark);
+        font-weight: 500;
+        font-size: 28px;
+        line-height: 1.3;
+      }
+
+      /* Download button */
+      .download-button {
+        margin-left: 8px;
+        padding: 6px 10px;
+        border: 1px solid rgba(0, 33, 71, 0.35);
+        background-color: transparent;
+        border-radius: 999px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: inherit;
+        cursor: pointer;
+        opacity: 0.8;
+        transition: opacity 150ms ease, background-color 150ms ease, transform 150ms ease;
+      }
+
+      .download-button:hover {
+        opacity: 1;
+        background-color: rgba(0, 33, 71, 0.04);
+        transform: translateY(-0.5px);
+      }
+
+      .download-button:active {
+        transform: translateY(0);
+      }
+
+      /* Preview shells — display at readable size; export uses canvas at full resolution */
+      .preview-shell {
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 0 0 1px var(--hairline);
+        max-width: 100%;
+      }
+
+      .preview-shell-square {
+        width: 280px;
+        height: 280px;
+      }
+
+      .preview-shell-square .preview-scale {
+        width: 1000px;
+        height: 1000px;
+        transform: scale(0.28);
+        transform-origin: top left;
+      }
+
+      .preview-shell-banner {
+        width: min(100%, 792px);
+        aspect-ratio: 1584 / 396;
+        container-type: inline-size;
+      }
+
+      .preview-shell-banner .preview-scale {
+        width: 1584px;
+        height: 396px;
+        transform: scale(calc(100cqw / 1584));
+        transform-origin: top left;
+      }
+
+      @supports not (container-type: inline-size) {
+        .preview-shell-banner .preview-scale {
+          transform: scale(0.5);
+        }
+      }
+
+      .preview-scale .frame {
+        margin: 0;
+      }
+
+      /* Static downloadable files */
+      .file-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .file-card--wide {
+        grid-column: span 2;
+      }
+
+      @media (max-width: 520px) {
+        .file-card--wide { grid-column: span 1; }
+      }
+
+      .file-card {
+        border: 1px solid var(--hairline);
+        background: #fff;
+        overflow: hidden;
+      }
+
+      .file-preview {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: var(--paper);
+      }
+
+      .file-preview.wordmark {
+        aspect-ratio: 4 / 1;
+        padding: 14px 16px;
+      }
+
+      .file-preview.monogram { aspect-ratio: 1; }
+
+      .file-preview.icon {
+        aspect-ratio: 1;
+        max-width: 140px;
+        margin: 0 auto;
+      }
+
+      .file-preview.dark { background: var(--oxford); }
+
+      .file-preview img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+      }
+
+      .file-preview.wordmark img { width: 100%; max-height: 48px; object-fit: contain; }
+      .file-preview.monogram img { width: 64%; max-width: 120px; object-fit: contain; }
+      .file-preview.icon img { width: 48px; height: 48px; object-fit: contain; }
+      .file-preview.hero { padding: 0; aspect-ratio: 32 / 9; }
+      .file-preview.hero img { width: 100%; height: 100%; object-fit: cover; }
+
+      .file-meta {
+        padding: 12px 14px;
+        border-top: 1px solid var(--hairline);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        opacity: 0.72;
+      }
+
+      .file-meta strong {
+        display: block;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: none;
+        opacity: 1;
+        margin-bottom: 4px;
+      }
+
+      .file-meta .download-button {
+        margin-top: 8px;
+      }
+
+      .nav-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 20px;
+        margin-top: 20px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .nav-links a {
+        color: var(--oxford);
+        opacity: 0.55;
+        text-decoration: none;
+      }
+
+      .nav-links a:hover { opacity: 1; }
+
+      .color-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .color-chip {
+        border: 1px solid var(--hairline);
+        background: #fff;
+        cursor: pointer;
+        padding: 0;
+        min-width: 120px;
+        text-align: left;
+      }
+
+      .color-chip span:first-child {
+        display: block;
+        height: 48px;
+      }
+
+      .color-chip span:last-child {
+        display: block;
+        padding: 8px 10px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grain-overlay" aria-hidden="true"></div>
+    <main class="page">
+      <header>
+        <div class="intro">AETHRIA / BRAND ASSETS</div>
+        <div class="title">Download logos, banners, and brand files.</div>
+        <nav class="nav-links" aria-label="Sections">
+          <a href="#files">Logos</a>
+          <a href="#colors">Colors</a>
+          <a href="#profile">Profile</a>
+          <a href="#banners">Banners</a>
+          <a href="#hero">Hero</a>
+        </nav>
+      </header>
+
+      <section class="section" id="files" aria-label="Logo files">
+        <div class="section-label">Logos &amp; icons — SVG</div>
+        <div class="file-grid">
+          <article class="file-card file-card--wide">
+            <div class="file-preview wordmark"><img src="assets/logo-wordmark-light.svg" alt="" /></div>
+            <div class="file-meta"><strong>Wordmark — light</strong><span>480 × 120</span><a class="download-button" href="assets/logo-wordmark-light.svg" download="aethria-wordmark-light.svg">Download</a></div>
+          </article>
+          <article class="file-card file-card--wide">
+            <div class="file-preview wordmark dark"><img src="assets/logo-wordmark-dark.svg" alt="" /></div>
+            <div class="file-meta"><strong>Wordmark — dark</strong>480 × 120<a class="download-button" href="assets/logo-wordmark-dark.svg" download="aethria-wordmark-dark.svg">Download</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview monogram"><img src="assets/logo-monogram-light.svg" alt="" /></div>
+            <div class="file-meta"><strong>Monogram — light</strong>512 × 512<a class="download-button" href="assets/logo-monogram-light.svg" download="aethria-monogram-light.svg">Download</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview monogram dark"><img src="assets/logo-monogram-dark.svg" alt="" /></div>
+            <div class="file-meta"><strong>Monogram — dark</strong>512 × 512<a class="download-button" href="assets/logo-monogram-dark.svg" download="aethria-monogram-dark.svg">Download</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview icon dark"><img src="assets/logo-icon-light.svg" alt="" /></div>
+            <div class="file-meta"><strong>App icon</strong>32 × 32<a class="download-button" href="assets/logo-icon-light.svg" download="aethria-icon.svg">Download</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview icon"><img src="assets/logo-icon-transparent.svg" alt="" /></div>
+            <div class="file-meta"><strong>Icon — transparent</strong>32 × 32<a class="download-button" href="assets/logo-icon-transparent.svg" download="aethria-icon-transparent.svg">Download</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview icon dark"><img src="assets/favicon.svg" alt="" /></div>
+            <div class="file-meta"><strong>Favicon</strong>32 × 32<a class="download-button" href="assets/favicon.svg" download="favicon.svg">Download</a></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="colors" aria-label="Brand colors">
+        <div class="section-label">Color palette</div>
+        <div class="color-row">
+          <button class="color-chip" type="button" data-hex="#001433"><span style="background:#001433"></span><span>Oxford #001433</span></button>
+          <button class="color-chip" type="button" data-hex="#f4f1ea"><span style="background:#f4f1ea;border-bottom:1px solid var(--hairline)"></span><span>Paper #f4f1ea</span></button>
+          <button class="color-chip" type="button" data-hex="#f8f5ee"><span style="background:#f8f5ee;border-bottom:1px solid var(--hairline)"></span><span>Paper bright #f8f5ee</span></button>
+          <button class="color-chip" type="button" data-hex="#e7e0d4"><span style="background:#e7e0d4;border-bottom:1px solid var(--hairline)"></span><span>Paper deep #e7e0d4</span></button>
+          <button class="color-chip" type="button" data-hex="#26313f"><span style="background:#26313f"></span><span>Charcoal #26313f</span></button>
+          <button class="color-chip" type="button" data-hex="#3d6b5e"><span style="background:#3d6b5e"></span><span>Verdigris #3d6b5e</span></button>
+          <button class="color-chip" type="button" data-hex="#7aab9a"><span style="background:#7aab9a"></span><span>Verdigris inverse #7aab9a</span></button>
+          <button class="color-chip" type="button" data-hex="#a88a5e"><span style="background:#a88a5e"></span><span>Heritage gold #a88a5e</span></button>
+          <button class="color-chip" type="button" data-hex="#8a704d"><span style="background:#8a704d"></span><span>Brass #8a704d</span></button>
+          <button class="color-chip" type="button" data-hex="#c9d9ea"><span style="background:#c9d9ea"></span><span>Signal blue #c9d9ea</span></button>
+        </div>
+      </section>
+
+      <!-- Profile Pictures -->
+      <section class="section" id="profile" aria-label="LinkedIn profile pictures">
+        <div class="section-label">Profile Pictures — 1000 × 1000 px</div>
+        <div class="asset-gallery">
+          <article class="banner-card">
+            <div class="banner-meta">
+              Standard — Paper / Oxford
+              <button class="download-button" data-download="profile-standard">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-square">
+            <div class="preview-scale">
+            <div
+              class="frame frame-square frame-square-warm"
+              id="profile-standard"
+              data-width="1000"
+              data-height="1000"
+            >
+              <div class="profile-inner">
+                <div class="profile-wordmark">
+                  Aethria<span class="wordmark-dot">.</span>
+                </div>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <article class="banner-card">
+            <div class="banner-meta">
+              Inverted — Oxford / Cream
+              <button class="download-button" data-download="profile-inverted">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-square">
+            <div class="preview-scale">
+            <div
+              class="frame frame-square frame-square-invert"
+              id="profile-inverted"
+              data-width="1000"
+              data-height="1000"
+            >
+              <div class="profile-inner">
+                <div class="profile-wordmark">
+                  Aethria<span class="wordmark-dot">.</span>
+                </div>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <article class="banner-card">
+            <div class="banner-meta">
+              Monogram — Paper / Oxford
+              <button class="download-button" data-download="profile-monogram-paper">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-square">
+            <div class="preview-scale">
+            <div
+              class="frame frame-square frame-square-warm"
+              id="profile-monogram-paper"
+              data-width="1000"
+              data-height="1000"
+            >
+              <div class="profile-inner">
+                <span class="profile-monogram">A</span>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <article class="banner-card">
+            <div class="banner-meta">
+              Monogram — Oxford / Paper
+              <button class="download-button" data-download="profile-monogram-oxford">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-square">
+            <div class="preview-scale">
+            <div
+              class="frame frame-square frame-square-invert"
+              id="profile-monogram-oxford"
+              data-width="1000"
+              data-height="1000"
+            >
+              <div class="profile-inner">
+                <span class="profile-monogram">A</span>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="banners" aria-label="Banner mood gallery">
+        <div class="section-label">LinkedIn banners — 1584 × 396 px</div>
+        <div class="gallery">
+          <!-- Suite A — Blueprint (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite A — Blueprint / Paper
+              <button class="download-button" data-download="banner-blueprint">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-banner">
+            <div class="preview-scale">
+            <div
+              class="frame frame-banner banner-blueprint"
+              id="banner-blueprint"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="blueprint-inner">
+                <div class="blueprint-line"></div>
+                <div class="blueprint-logo">
+                  Aethria<span class="wordmark-dot">.</span>
+                </div>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <!-- Suite A — Blueprint (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite A — Blueprint / Oxford
+              <button class="download-button" data-download="banner-blueprint-invert">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-banner">
+            <div class="preview-scale">
+            <div
+              class="frame frame-banner banner-blueprint-invert"
+              id="banner-blueprint-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="blueprint-inner">
+                <div class="blueprint-line"></div>
+                <div class="blueprint-logo">
+                  Aethria<span class="wordmark-dot">.</span>
+                </div>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <!-- Suite B — Metadata (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite B — Metadata / Paper
+              <button class="download-button" data-download="banner-metadata">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-banner">
+            <div class="preview-scale">
+            <div
+              class="frame frame-banner banner-metadata"
+              id="banner-metadata"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="metadata-inner">
+                <div class="metadata-label">REGISTRY // 2026</div>
+                <div class="metadata-label">AETHRIA // SYSTEM</div>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <!-- Suite B — Metadata (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite B — Metadata / Oxford
+              <button class="download-button" data-download="banner-metadata-invert">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-banner">
+            <div class="preview-scale">
+            <div
+              class="frame frame-banner banner-metadata-invert"
+              id="banner-metadata-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="metadata-inner">
+                <div class="metadata-label">REGISTRY // 2026</div>
+                <div class="metadata-label">AETHRIA // SYSTEM</div>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <!-- Suite C — Seal (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite C — Seal / Paper
+              <button class="download-button" data-download="banner-seal">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-banner">
+            <div class="preview-scale">
+            <div
+              class="frame frame-banner banner-seal"
+              id="banner-seal"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="seal-inner">
+                <span class="seal-a">A</span>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <!-- Suite C — Seal (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite C — Seal / Oxford
+              <button class="download-button" data-download="banner-seal-invert">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-banner">
+            <div class="preview-scale">
+            <div
+              class="frame frame-banner banner-seal-invert"
+              id="banner-seal-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="seal-inner">
+                <span class="seal-a">A</span>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <!-- Suite F — Motion Field (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite F — Motion Field / Paper
+              <button class="download-button" data-download="banner-motion">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-banner">
+            <div class="preview-scale">
+            <div
+              class="frame frame-banner banner-motion"
+              id="banner-motion"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="motion-inner">
+                <div class="motion-band motion-band-one"></div>
+                <div class="motion-band motion-band-two"></div>
+                <div class="motion-band motion-band-three"></div>
+                <div class="motion-band motion-band-four"></div>
+                <div class="motion-meta">Scout<br />Review<br />Decide</div>
+                <div class="motion-copy">
+                  <div class="motion-brand">
+                    <span>Aethria<span class="wordmark-dot">.</span></span>
+                  </div>
+                  <h2 class="motion-headline">Discover Signals.<br />Score Conviction.<br />Move First.</h2>
+                </div>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <!-- Suite F — Motion Field (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite F — Motion Field / Oxford
+              <button class="download-button" data-download="banner-motion-invert">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-banner">
+            <div class="preview-scale">
+            <div
+              class="frame frame-banner banner-motion-invert"
+              id="banner-motion-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="motion-inner">
+                <div class="motion-band motion-band-one"></div>
+                <div class="motion-band motion-band-two"></div>
+                <div class="motion-band motion-band-three"></div>
+                <div class="motion-band motion-band-four"></div>
+                <div class="motion-meta">Scout<br />Review<br />Decide</div>
+                <div class="motion-copy">
+                  <div class="motion-brand">
+                    <span>Aethria<span class="wordmark-dot">.</span></span>
+                  </div>
+                  <h2 class="motion-headline">Discover Signals.<br />Score Conviction.<br />Move First.</h2>
+                </div>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <!-- Suite G — Signal Wake (Paper) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite G — Signal Wake / Paper
+              <button class="download-button" data-download="banner-wake">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-banner">
+            <div class="preview-scale">
+            <div
+              class="frame frame-banner banner-wake"
+              id="banner-wake"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="wake-inner">
+                <div class="wake-grid"></div>
+                <div class="wake-streak wake-streak-one"></div>
+                <div class="wake-streak wake-streak-two"></div>
+                <div class="wake-streak wake-streak-three"></div>
+                <div class="wake-brand">Aethria<span class="wordmark-dot">.</span></div>
+                <h2 class="wake-headline">Find the company before the market has a name for it.</h2>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+
+          <!-- Suite G — Signal Wake (Oxford, inverted) -->
+          <article class="banner-card">
+            <div class="banner-meta">
+              Suite G — Signal Wake / Oxford
+              <button class="download-button" data-download="banner-wake-invert">Download PNG</button>
+            </div>
+            <div class="preview-shell preview-shell-banner">
+            <div class="preview-scale">
+            <div
+              class="frame frame-banner banner-wake-invert"
+              id="banner-wake-invert"
+              data-width="1584"
+              data-height="396"
+            >
+              <div class="wake-inner">
+                <div class="wake-grid"></div>
+                <div class="wake-streak wake-streak-one"></div>
+                <div class="wake-streak wake-streak-two"></div>
+                <div class="wake-streak wake-streak-three"></div>
+                <div class="wake-brand">Aethria<span class="wordmark-dot">.</span></div>
+                <h2 class="wake-headline">Find the company before the market has a name for it.</h2>
+              </div>
+            </div>
+            </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="hero" aria-label="Hero assets">
+        <div class="section-label">Hero — 3840 × 1080 px PNG</div>
+        <article class="file-card" style="max-width:960px">
+          <div class="file-preview hero"><img src="assets/aethria_motion_blur_hero_4k.png" alt="Aethria motion blur hero" /></div>
+          <div class="file-meta"><strong>Motion blur hero</strong>4K presentation background<a class="download-button" href="assets/aethria_motion_blur_hero_4k.png" download="aethria-hero-4k.png">Download PNG</a></div>
+        </article>
+      </section>
+    </main>
+    <script>
+      // Canvas renderer used for PNG downloads. This avoids browser security
+      // restrictions around drawing foreignObject SVGs into a canvas.
+      (function () {
+        var COLORS = {
+          oxford: '#001433',
+          motionOxford: '#000e28',
+          motionOxfordRgb: '0, 14, 40',
+          paper: '#f4f1ea',
+          cream: '#f4f1ea',
+          paperBright: '#f8f5ee',
+          paperDeep: '#e7e0d4',
+          charcoal: '#26313f',
+          heritageGold: '#a88a5e',
+          badgeBlue: '#c9d9ea',
+          brandMark: '#3d6b5e',
+          brandMarkInverse: '#7aab9a',
+        };
+
+        function isInverted(id) {
+          return id.indexOf('invert') !== -1 || id.indexOf('inverted') !== -1 || id.indexOf('oxford') !== -1;
+        }
+
+        function makeCanvas(width, height, pixelRatio) {
+          var canvas = document.createElement('canvas');
+          canvas.width = width * pixelRatio;
+          canvas.height = height * pixelRatio;
+          canvas.style.width = width + 'px';
+          canvas.style.height = height + 'px';
+          var ctx = canvas.getContext('2d', { colorSpace: 'display-p3' }) || canvas.getContext('2d');
+          ctx.scale(pixelRatio, pixelRatio);
+          ctx.imageSmoothingEnabled = true;
+          if ('imageSmoothingQuality' in ctx) {
+            ctx.imageSmoothingQuality = 'high';
+          }
+          return { canvas: canvas, ctx: ctx, pixelRatio: pixelRatio };
+        }
+
+        function paintBase(ctx, width, height, inverted) {
+          ctx.fillStyle = inverted ? COLORS.oxford : COLORS.paper;
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        function isFlatBanner(id) {
+          return (
+            id.indexOf('banner-blueprint') === 0 ||
+            id.indexOf('banner-metadata') === 0 ||
+            id.indexOf('banner-seal') === 0
+          );
+        }
+
+        function paintBannerAtmosphere(ctx, width, height, inverted, variant) {
+          var oxfordRgb = variant === 'motion' ? COLORS.motionOxfordRgb : '0, 20, 51';
+          var oxfordHex = variant === 'motion' ? COLORS.motionOxford : COLORS.oxford;
+          var base = ctx.createLinearGradient(0, 0, 0, height);
+          if (inverted) {
+            base.addColorStop(0, COLORS.charcoal);
+            base.addColorStop(0.42, oxfordHex);
+            base.addColorStop(1, oxfordHex);
+          } else {
+            base.addColorStop(0, COLORS.paperDeep);
+            base.addColorStop(0.36, COLORS.badgeBlue);
+            base.addColorStop(0.72, COLORS.paper);
+            base.addColorStop(1, COLORS.paperBright);
+          }
+          ctx.fillStyle = base;
+          ctx.fillRect(0, 0, width, height);
+
+          drawGradientBand(
+            ctx,
+            -180,
+            -22,
+            width + 360,
+            height + 44,
+            inverted
+              ? [
+                  [0, 'rgba(244, 241, 234, 0.12)'],
+                  [0.2, 'rgba(201, 217, 234, 0.36)'],
+                  [0.42, 'rgba(248, 245, 238, 0.13)'],
+                  [0.68, 'rgba(' + oxfordRgb + ', 0.24)'],
+                  [1, 'rgba(' + oxfordRgb + ', 0.94)'],
+                ]
+              : [
+                  [0, 'rgba(' + oxfordRgb + ', 0.28)'],
+                  [0.24, 'rgba(201, 217, 234, 0.48)'],
+                  [0.44, 'rgba(248, 245, 238, 0.38)'],
+                  [0.7, 'rgba(244, 241, 234, 0.46)'],
+                  [1, 'rgba(244, 241, 234, 0.92)'],
+                ],
+            20,
+            1,
+          );
+
+          paintMotionBands(ctx, width, height, inverted, 0.82, variant);
+          paintPreviewColorWash(ctx, width, height, inverted, variant);
+        }
+
+        function paintPreviewColorWash(ctx, width, height, inverted, variant) {
+          var oxfordRgb = variant === 'motion' ? COLORS.motionOxfordRgb : '0, 20, 51';
+          ctx.save();
+          if (inverted) {
+            var darkWash = ctx.createLinearGradient(0, 0, width, 0);
+            darkWash.addColorStop(0, 'rgba(201, 217, 234, 0.08)');
+            darkWash.addColorStop(0.5, 'rgba(244, 241, 234, 0.04)');
+            darkWash.addColorStop(1, 'rgba(' + oxfordRgb + ', 0.16)');
+            ctx.globalCompositeOperation = 'screen';
+            ctx.fillStyle = darkWash;
+            ctx.fillRect(0, 0, width, height);
+          } else {
+            var coolWash = ctx.createLinearGradient(0, 0, width, 0);
+            coolWash.addColorStop(0, 'rgba(' + oxfordRgb + ', 0.2)');
+            coolWash.addColorStop(0.38, 'rgba(201, 217, 234, 0.28)');
+            coolWash.addColorStop(0.68, 'rgba(231, 224, 212, 0.2)');
+            coolWash.addColorStop(1, 'rgba(248, 245, 238, 0.06)');
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.fillStyle = coolWash;
+            ctx.fillRect(0, 0, width, height);
+
+            var paperLift = ctx.createLinearGradient(0, 0, width, 0);
+            paperLift.addColorStop(0, 'rgba(248, 245, 238, 0.06)');
+            paperLift.addColorStop(0.5, 'rgba(244, 241, 234, 0.12)');
+            paperLift.addColorStop(1, 'rgba(244, 241, 234, 0.18)');
+            ctx.globalCompositeOperation = 'screen';
+            ctx.fillStyle = paperLift;
+            ctx.fillRect(0, 0, width, height);
+          }
+          ctx.restore();
+        }
+
+        function paintMotionBands(ctx, width, height, inverted, alphaScale, variant) {
+          var oxfordRgb = variant === 'motion' ? COLORS.motionOxfordRgb : '0, 20, 51';
+          var bands = [
+            { x: -0.1, y: 12, w: 1.18, h: 62, blur: 18, a: 0.72 },
+            { x: 0.18, y: 96, w: 0.82, h: 48, blur: 22, a: 0.66 },
+            { x: -0.18, y: 186, w: 1.04, h: 54, blur: 19, a: 0.58 },
+            { x: 0.45, y: 304, w: 0.73, h: 42, blur: 16, a: 0.5 },
+            { x: -0.04, y: 246, w: 1.26, h: 34, blur: 20, a: 0.34 },
+          ];
+          bands.forEach(function (band, index) {
+            var stops = inverted
+              ? [
+                  [0, 'rgba(244, 241, 234, 0)'],
+                  [0.28, index % 2 ? 'rgba(201, 217, 234, 0.2)' : 'rgba(244, 241, 234, 0.14)'],
+                  [0.58, 'rgba(201, 217, 234, 0.34)'],
+                  [0.82, 'rgba(' + oxfordRgb + ', 0.18)'],
+                  [1, 'rgba(' + oxfordRgb + ', 0)'],
+                ]
+              : [
+                  [0, 'rgba(244, 241, 234, 0)'],
+                  [0.28, index % 2 ? 'rgba(' + oxfordRgb + ', 0.22)' : 'rgba(248, 245, 238, 0.32)'],
+                  [0.58, 'rgba(201, 217, 234, 0.36)'],
+                  [0.82, 'rgba(244, 241, 234, 0.26)'],
+                  [1, 'rgba(244, 241, 234, 0)'],
+                ];
+            drawGradientBand(ctx, width * band.x, band.y, width * band.w, band.h, stops, band.blur, band.a * (alphaScale || 1));
+          });
+        }
+
+        function paintGrain(ctx, width, height, color, opacity) {
+          ctx.save();
+          ctx.globalAlpha = opacity;
+          ctx.fillStyle = color;
+          var seed = 271828;
+          for (var y = 0; y < height; y += 6) {
+            for (var x = 0; x < width; x += 6) {
+              seed = (seed * 9301 + 49297) % 233280;
+              if (seed / 233280 > 0.55) {
+                ctx.fillRect(x, y, 1, 1);
+              }
+            }
+          }
+          ctx.restore();
+        }
+
+        function font(size, family) {
+          return '400 ' + size + 'px ' + family;
+        }
+
+        function mono(size) {
+          return font(size, '"Space Mono", ui-monospace, monospace');
+        }
+
+        function sans(size, weight) {
+          return (weight || 500) + ' ' + size + 'px ' + '"Figtree", system-ui, sans-serif';
+        }
+
+        function display(size, weight) {
+          return (weight || 500) + ' ' + size + 'px ' + '"Playfair Display", Georgia, serif';
+        }
+
+        function wordmarkWidth(ctx, size) {
+          ctx.font = display(size);
+          return ctx.measureText('Aethria.').width;
+        }
+
+        function drawWordmark(ctx, x, baseline, size, ink, inverted) {
+          ctx.save();
+          ctx.font = display(size);
+          ctx.textBaseline = 'alphabetic';
+          ctx.fillStyle = ink;
+          ctx.fillText('Aethria', x, baseline);
+          var dotX = x + ctx.measureText('Aethria').width;
+          ctx.fillStyle = inverted ? COLORS.brandMarkInverse : COLORS.brandMark;
+          ctx.fillText('.', dotX, baseline);
+          ctx.restore();
+        }
+
+        function drawCenteredWordmark(ctx, width, height, size, ink, inverted) {
+          ctx.save();
+          ctx.font = display(size);
+          var totalW = wordmarkWidth(ctx, size);
+          var x = (width - totalW) / 2;
+          var baseline = height / 2 + size * 0.28;
+          ctx.restore();
+          drawWordmark(ctx, x, baseline, size, ink, inverted);
+        }
+
+        function drawLabel(ctx, text, x, y, align, color, alpha) {
+          ctx.save();
+          ctx.globalAlpha = alpha == null ? 1 : alpha;
+          ctx.fillStyle = color;
+          ctx.font = mono(10);
+          ctx.textAlign = align || 'left';
+          ctx.textBaseline = 'top';
+          ctx.letterSpacing = '0.14em';
+          ctx.fillText(text, x, y);
+          ctx.restore();
+        }
+
+        function drawMultiLineLabel(ctx, lines, x, y, align, color) {
+          for (var i = 0; i < lines.length; i += 1) {
+            drawLabel(ctx, lines[i], x, y + i * 18, align, color, 0.64);
+          }
+        }
+
+        function drawBlurBand(ctx, x, y, width, height, color, alpha) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = color;
+          ctx.filter = 'blur(10px)';
+          ctx.fillRect(x, y, width, height);
+          ctx.filter = 'none';
+          ctx.restore();
+        }
+
+        function drawGradientBand(ctx, x, y, width, height, stops, blur, alpha) {
+          ctx.save();
+          ctx.globalAlpha = alpha == null ? 1 : alpha;
+          ctx.filter = blur ? 'blur(' + blur + 'px)' : 'none';
+          var gradient = ctx.createLinearGradient(x, y, x + width, y);
+          stops.forEach(function (stop) {
+            gradient.addColorStop(stop[0], stop[1]);
+          });
+          ctx.fillStyle = gradient;
+          ctx.fillRect(x, y, width, height);
+          ctx.filter = 'none';
+          ctx.restore();
+        }
+
+        function paintMotionBase(ctx, width, height, inverted, variant) {
+          paintBannerAtmosphere(ctx, width, height, inverted);
+        }
+
+        function paintScanGrain(ctx, width, height, inverted) {
+          ctx.save();
+          ctx.globalAlpha = inverted ? 0.18 : 0.12;
+          ctx.strokeStyle = inverted ? 'rgba(244, 241, 234, 0.36)' : 'rgba(0, 20, 51, 0.34)';
+          ctx.lineWidth = 1;
+          for (var y = 0; y < height; y += 4) {
+            ctx.beginPath();
+            ctx.moveTo(0, y + 0.5);
+            ctx.lineTo(width, y + 0.5);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          ctx.save();
+          var seed = inverted ? 918273 : 314159;
+          ctx.fillStyle = inverted ? 'rgba(244, 241, 234, 0.13)' : 'rgba(0, 20, 51, 0.11)';
+          for (var i = 0; i < 22000; i += 1) {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            var x = (seed % width) | 0;
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            var yPoint = (seed % height) | 0;
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            if ((seed & 255) > 108) {
+              ctx.fillRect(x, yPoint, 1, 1);
+            }
+          }
+          ctx.restore();
+        }
+
+        function drawStackedHeadline(ctx, lines, x, y, size, lineHeight, color) {
+          ctx.save();
+          ctx.fillStyle = color;
+          ctx.font = sans(size, 500);
+          ctx.textBaseline = 'top';
+          lines.forEach(function (line, index) {
+            ctx.fillText(line, x, y + index * size * lineHeight);
+          });
+          ctx.restore();
+        }
+
+        function paintDeviceGrain(canvas, inverted, intensity) {
+          var ctx = canvas.getContext('2d');
+          var width = canvas.width;
+          var height = canvas.height;
+          var image = ctx.getImageData(0, 0, width, height);
+          var data = image.data;
+          var seed = inverted ? 0x9e3779b9 : 0x6d2b79f5;
+          var amp = intensity || 9;
+          for (var i = 0; i < data.length; i += 4) {
+            seed ^= seed << 13;
+            seed ^= seed >>> 17;
+            seed ^= seed << 5;
+            var noise = ((seed >>> 24) & 255) - 128;
+            var dither = (noise / 128) * amp;
+            data[i] = Math.max(0, Math.min(255, data[i] + dither));
+            data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + dither));
+            data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + dither));
+          }
+          ctx.putImageData(image, 0, 0);
+
+          ctx.save();
+          ctx.globalAlpha = inverted ? 0.11 : 0.085;
+          ctx.fillStyle = inverted ? 'rgba(244, 241, 234, 0.75)' : 'rgba(0, 20, 51, 0.72)';
+          seed = inverted ? 0x45d9f3b : 0x12ab34cd;
+          var specks = Math.floor((width * height) / 92);
+          for (var p = 0; p < specks; p += 1) {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            var x = seed % width;
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            var y = seed % height;
+            ctx.fillRect(x, y, 1, 1);
+          }
+          ctx.restore();
+        }
+
+        function drawAsset(ctx, id, width, height) {
+          var inverted = isInverted(id);
+          var isMotion = id.indexOf('banner-motion') === 0;
+          var oxfordHex = isMotion ? COLORS.motionOxford : COLORS.oxford;
+          var bg = inverted ? oxfordHex : COLORS.paper;
+          var ink = inverted ? COLORS.cream : oxfordHex;
+          if (id.indexOf('banner-') === 0) {
+            if (isFlatBanner(id)) {
+              paintBase(ctx, width, height, inverted);
+            } else {
+              paintBannerAtmosphere(ctx, width, height, inverted, isMotion ? 'motion' : 'wake');
+            }
+          } else {
+            paintBase(ctx, width, height, inverted);
+          }
+
+          if (id.indexOf('profile-standard') === 0 || id.indexOf('profile-inverted') === 0) {
+            drawCenteredWordmark(ctx, width, height, 170, ink, inverted);
+          } else if (id.indexOf('profile-monogram') === 0) {
+            ctx.save();
+            ctx.fillStyle = ink;
+            ctx.font = display(360);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('A', width / 2, height / 2 + 12);
+            ctx.restore();
+          } else if (id.indexOf('banner-blueprint') === 0) {
+            ctx.save();
+            ctx.strokeStyle = ink;
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(width * 0.33, 0);
+            ctx.lineTo(width * 0.33, height);
+            ctx.stroke();
+            ctx.restore();
+            ctx.save();
+            var w = wordmarkWidth(ctx, 64);
+            ctx.restore();
+            drawWordmark(ctx, width - 80 - w, height - 56, 64, ink, inverted);
+          } else if (id.indexOf('banner-metadata') === 0) {
+            drawLabel(ctx, 'REGISTRY // 2026', width - 40, 40, 'right', ink, 1);
+            drawLabel(ctx, 'AETHRIA // SYSTEM', width - 40, height - 58, 'right', ink, 1);
+          } else if (id.indexOf('banner-seal') === 0) {
+            ctx.save();
+            ctx.fillStyle = ink;
+            ctx.font = display(120);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('A', width / 2, height / 2 - 4);
+            ctx.restore();
+          } else if (id.indexOf('banner-motion') === 0) {
+            paintMotionBands(ctx, width, height, inverted, 0.74, 'motion');
+            drawMultiLineLabel(ctx, ['SCOUT', 'REVIEW', 'DECIDE'], 55, height - 88, 'left', ink);
+            var copyX = width - 8 - 700 + 44;
+            var motionBrandSize = 34;
+            var motionHeadlineSize = 58;
+            var motionHeadlineLineHeight = 0.94;
+            var motionHeadlineLines = 3;
+            var motionCopyHeight =
+              motionBrandSize + 15 + motionHeadlineSize * motionHeadlineLineHeight * (motionHeadlineLines - 1) + motionHeadlineSize;
+            var motionCopyTop = (height - motionCopyHeight) / 2;
+            var motionBrandBaseline = motionCopyTop + motionBrandSize;
+            drawWordmark(ctx, copyX, motionBrandBaseline, motionBrandSize, ink, inverted);
+            drawStackedHeadline(
+              ctx,
+              ['Discover Signals.', 'Score Conviction.', 'Move First.'],
+              copyX,
+              motionCopyTop + motionBrandSize + 15,
+              motionHeadlineSize,
+              motionHeadlineLineHeight,
+              inverted ? COLORS.badgeBlue : COLORS.motionOxford,
+            );
+          } else if (id.indexOf('banner-wake') === 0) {
+            ctx.save();
+            ctx.strokeStyle = inverted ? 'rgba(244, 241, 234, 0.22)' : 'rgba(0, 20, 51, 0.2)';
+            ctx.globalAlpha = 0.34;
+            ctx.beginPath();
+            ctx.moveTo(55, 34);
+            ctx.lineTo(width - 55, 34);
+            ctx.moveTo(55, height - 34);
+            ctx.lineTo(width - 55, height - 34);
+            ctx.stroke();
+            ctx.restore();
+            var wakeStops = inverted
+              ? [
+                  [0, 'rgba(244, 241, 234, 0)'],
+                  [0.45, 'rgba(201, 217, 234, 0.32)'],
+                  [0.7, 'rgba(244, 241, 234, 0.18)'],
+                  [1, 'rgba(0, 20, 51, 0)'],
+                ]
+              : [
+                  [0, 'rgba(244, 241, 234, 0)'],
+                  [0.45, 'rgba(201, 217, 234, 0.3)'],
+                  [0.7, 'rgba(0, 20, 51, 0.24)'],
+                  [1, 'rgba(244, 241, 234, 0)'],
+                ];
+            drawGradientBand(ctx, -120, 72, width * 0.82, 40, wakeStops, 17, 0.72);
+            drawGradientBand(ctx, -120, 130, width, 72, wakeStops, 21, 0.8);
+            drawGradientBand(ctx, -120, 244, width * 0.72, 40, wakeStops, 16, 0.7);
+            var wakeWordmarkWidth = wordmarkWidth(ctx, 34);
+            drawWordmark(ctx, width - 76 - wakeWordmarkWidth, 84, 34, ink, inverted);
+            drawStackedHeadline(
+              ctx,
+              ['Find the company before the', 'market has a name for it.'],
+              width - 76 - 710,
+              height - 50 - 108,
+              56,
+              0.96,
+              inverted ? COLORS.badgeBlue : COLORS.oxford,
+            );
+          }
+
+          if (id.indexOf('banner-motion') === 0 || id.indexOf('banner-wake') === 0) {
+            paintScanGrain(ctx, width, height, inverted);
+          } else if (id.indexOf('banner-') !== 0) {
+            paintGrain(ctx, width, height, inverted ? COLORS.cream : COLORS.oxford, 0.045);
+          }
+          ctx.fillStyle = bg;
+        }
+
+        window.renderBrandAssetToPng = function (id, width, height, pixelRatio) {
+          var requestedRatio = pixelRatio || 1;
+          var exportRatio = requestedRatio;
+          var pair = makeCanvas(width, height, exportRatio);
+          drawAsset(pair.ctx, id, width, height);
+          if (id.indexOf('banner-') === 0 && !isFlatBanner(id)) {
+            paintDeviceGrain(pair.canvas, isInverted(id), 7.5);
+          }
+          return pair.canvas.toDataURL('image/png');
+        };
+      })();
+
+      (function () {
+        function waitForFonts() {
+          if (document.fonts && document.fonts.ready) {
+            return document.fonts.ready.catch(function (err) {
+              console.warn('Font loading issue, proceeding anyway:', err);
+            });
+          }
+          return Promise.resolve();
+        }
+
+        function downloadAsset(id, filename, width, height) {
+          var node = document.getElementById(id);
+          if (!node) {
+            console.error('Download target not found for id:', id);
+            return;
+          }
+
+          var renderer = window.renderBrandAssetToPng;
+          if (!renderer) {
+            console.error('Brand asset renderer not available on window.renderBrandAssetToPng');
+            return;
+          }
+
+          var grain = document.querySelector('.grain-overlay');
+          var previousVisibility = grain ? grain.style.visibility : '';
+
+          waitForFonts()
+            .then(function () {
+              if (grain) grain.style.visibility = 'hidden';
+              try {
+                return renderer(id, width, height, 1);
+              } catch (error) {
+                console.error('Synchronous brand asset render error:', error);
+                throw error;
+              }
+            })
+            .then(function (dataUrl) {
+              if (!dataUrl) return;
+              var link = document.createElement('a');
+              link.download = filename;
+              link.href = dataUrl;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            })
+            .catch(function (error) {
+              console.error('Could not generate image (tainted canvas or CORS?):', error);
+            })
+            .finally(function () {
+              if (grain) grain.style.visibility = previousVisibility || '';
+            });
+        }
+
+        document.addEventListener('click', function (event) {
+          var target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          var downloadId = target.getAttribute('data-download');
+          if (!downloadId) return;
+
+          event.preventDefault();
+
+          var node = document.getElementById(downloadId);
+          if (!node) return;
+
+          var widthAttr = node.getAttribute('data-width');
+          var heightAttr = node.getAttribute('data-height');
+          var width = widthAttr ? parseInt(widthAttr, 10) : 1584;
+          var height = heightAttr ? parseInt(heightAttr, 10) : 396;
+          var filename = downloadId + '.png';
+
+          downloadAsset(downloadId, filename, width, height);
+        });
+      })();
+
+      (function () {
+        document.querySelectorAll('.color-chip').forEach(function (chip) {
+          chip.addEventListener('click', function () {
+            var hex = chip.getAttribute('data-hex');
+            if (!hex || !navigator.clipboard) return;
+            navigator.clipboard.writeText(hex);
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
