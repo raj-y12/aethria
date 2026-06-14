@@ -189,6 +189,20 @@ class AlternativeMatch(BaseModel):
     match_score: float = 0.0
 
 
+class CompanyCandidate(BaseModel):
+    """A distinct company-owned entity the typed name could refer to.
+
+    Used by the dispatch disambiguation picker: each candidate is one
+    registrable domain (so foo.ie and foo.com are separate companies).
+    """
+
+    name: str
+    website: str
+    description: str = ""
+    confidence: float = 0.0
+    source_badges: List[str] = Field(default_factory=list)
+
+
 class ResolutionStageLog(BaseModel):
     """Per-stage debug record: what we asked, what we got, what we decided."""
 
@@ -219,6 +233,7 @@ class CompanyResolution(BaseModel):
     confidence: float = 0.0
     resolution_status: str = "NOT_FOUND"
     alternative_matches: List[AlternativeMatch] = Field(default_factory=list)
+    candidates: List[CompanyCandidate] = Field(default_factory=list)
     evidence_sources: List[EvidenceSource] = Field(default_factory=list)
     missing_fields: List[str] = Field(default_factory=list)
     queries_used: List[str] = Field(default_factory=list)
