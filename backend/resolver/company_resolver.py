@@ -603,6 +603,22 @@ def _friendly_badge(source_type: str) -> Optional[str]:
     }.get(source_type)
 
 
+def _candidate_display_name(reg: str, resolution: "CompanyResolution") -> str:
+    """Human-facing name for a candidate domain.
+
+    Prefer the resolver's canonical name when this domain is the resolved
+    primary; otherwise prettify the registrable slug (acme-robotics -> Acme Robotics).
+    """
+    if (
+        resolution.website
+        and registrable_domain(_host_of(resolution.website)) == reg
+        and resolution.canonical_name
+        and resolution.canonical_name != "Unknown"
+    ):
+        return resolution.canonical_name
+    return reg.split(".", 1)[0].replace("-", " ").title()
+
+
 def _build_candidates(
     resolution: CompanyResolution,
     company: str,
@@ -639,7 +655,7 @@ def _build_candidates(
         best: EvidenceSource = g["best"]
         candidates.append(
             CompanyCandidate(
-                name=reg.split(".", 1)[0],
+                name=_candidate_display_name(reg, resolution),
                 website=f"https://{reg}",
                 description=(best.snippet or best.title or "")[:200],
                 confidence=round(float(g["score"]), 3),
@@ -656,10 +672,10 @@ def _build_candidates(
                 return pinned[:1]
             return [
                 CompanyCandidate(
-                    name=anchor.split(".", 1)[0],
+                    name=_candidate_display_name(anchor, resolution),
                     website=f"https://{anchor}",
                     description=(resolution.description or "")[:200],
-                    confidence=max(resolution.confidence, 0.6),
+                    confidence=resolution.confidence,
                     source_badges=["official"],
                 )
             ]

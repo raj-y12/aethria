@@ -289,3 +289,23 @@ def test_website_hint_collapses_to_single_candidate(monkeypatch):
     res = resolve_company("Lyra", user_id=USER, website_hint="lyra.ie")
     assert res.website == "https://lyra.ie"
     assert [c.website for c in res.candidates] == ["https://lyra.ie"]
+
+
+def test_no_candidates_when_no_evidence(monkeypatch):
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack([]))
+    res = resolve_company("Totally Nonexistent Startup Zzz", user_id=USER)
+    assert res.candidates == []
+
+
+def test_candidate_name_is_prettified_for_hyphenated_domain(monkeypatch):
+    sources = [
+        {
+            "title": "Acme Robotics",
+            "url": "https://acme-robotics.com",
+            "snippet": "Acme Robotics builds warehouse automation robots.",
+        },
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    res = resolve_company("Acme Robotics", user_id=USER)
+    names = {c.name for c in res.candidates}
+    assert "acme-robotics" not in names  # not the raw slug
