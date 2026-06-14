@@ -6,10 +6,12 @@
  */
 import type { ReactNode } from 'react';
 import DecisionBadge from '../DecisionBadge';
+import EscalationQueueMarker from './EscalationQueueMarker';
 import type { DecisionBadgeVariant } from '../../lib/decisionBadgeVariant';
 import {
   getQueueConvictionPct,
   getVisibleRecommendation,
+  type QueueAttentionDriver,
   type QueueRowContext,
 } from '../../lib/queueAttentionDriver';
 
@@ -54,11 +56,13 @@ export default function QueueVerdictLine({
   ctx,
   decisionVariant,
   prominent = false,
+  attentionDriver,
 }: {
   ctx: QueueRowContext;
   decisionVariant: DecisionBadgeVariant;
   prominent?: boolean;
   badges?: unknown;
+  attentionDriver?: QueueAttentionDriver;
 }) {
   const recommendation = getVisibleRecommendation(ctx.startup);
   const convictionPct = getQueueConvictionPct(ctx);
@@ -82,6 +86,18 @@ export default function QueueVerdictLine({
         </span>
       </>
     ) : null;
+
+  if (ctx.isEscalated && attentionDriver) {
+    return (
+      <div
+        className="inline-flex flex-wrap items-center justify-end gap-x-phi-2 gap-y-0"
+        aria-label={`Escalated${convictionLabel != null ? `, ${convictionLabel}/10 conviction` : ''}`}
+      >
+        <EscalationQueueMarker ctx={ctx} driver={attentionDriver} />
+        {convictionEl}
+      </div>
+    );
+  }
 
   if (recommendation) {
     return (

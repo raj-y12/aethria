@@ -1,10 +1,18 @@
 import { forwardRef } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { usePrefersReducedMotion } from '../../hooks';
 import type { VerdictBadgeConfig } from '../../lib/fundConfiguration';
-import DocketMarginColumn from './DocketMarginColumn';
-import { buildRowAriaLabel, type DocketRowModel } from './queueRowShared';
+import QueueVerdictLine from './QueueVerdictLine';
+import QueueAttentionBadge from './QueueAttentionBadge';
+import { shouldRenderAttentionBadge } from '../../lib/queueAttentionDriver';
 import {
+  buildRowAriaLabel,
+  formatRowDate,
+  resolutionBadgeLabel,
+  type DocketRowModel,
+} from './queueRowShared';
+import {
+  QUEUE_ROW_CONTENT_TRANSITION,
   QUEUE_ROW_LAYOUT_TRANSITION,
   QUEUE_ROW_SELECT_TRANSITION,
 } from './queueRowMotion';
@@ -20,33 +28,55 @@ interface DocketCaseRowProps {
   badges?: VerdictBadgeConfig[];
 }
 
-/**
- * Annotated dossier row: text block (name, one-liner · sector) on the left,
- * verdict chip + score on the right, divider between.
- */
-const DocketCaseRow = forwardRef<HTMLButtonElement, DocketCaseRowProps>(function DocketCaseRow(
+const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function DocketCaseRow(
   { model, isSelected, rowIndex = 0, onClick, onKeyDown },
   ref
 ) {
   const reduceMotion = usePrefersReducedMotion();
-  const { startup, decisionVariant, queueContext, attentionDriver } = model;
+  const {
+    startup,
+    displayIndex,
+    decisionVariant,
+    queueContext,
+    attentionDriver,
+    oneLiner,
+    sectorStage,
+    sortKeyValue,
+  } = model;
+
+  const { isDecided, ageDays } = queueContext;
+
+  const spineVisible = isSelected;
+  const spineColor = spineVisible ? '#001433' : 'transparent';
+  const spineWidth = spineVisible ? 3 : 0;
 
   const layoutTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_LAYOUT_TRANSITION;
   const selectTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_SELECT_TRANSITION;
+  const contentTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_CONTENT_TRANSITION;
 
   const ambientPadding =
     rowIndex % 2 === 0 ? queueRowPadding.ambient : queueRowPadding.ambientAlt;
-  const selectedPadding = queueRowPadding.selected + 4;
+  const selectedPadding = queueRowPadding.selected;
+  const showAttentionBadge =
+    !isDecided && shouldRenderAttentionBadge(attentionDriver) && attentionDriver.key !== 'needs_ruling';
+  const showDateMeta = isSelected && Boolean(sortKeyValue);
+  const resolutionBadge = resolutionBadgeLabel(startup);
+  const hasMetaRow = Boolean(sectorStage) || showDateMeta || showAttentionBadge || Boolean(resolutionBadge);
 
-  const metaLine = [model.oneLiner, model.sectorStage].filter(Boolean).join(' · ');
-  const attentionLine = attentionDriver.detail ?? attentionDriver.label;
+  const metaSep = (needsSep: boolean) =>
+    needsSep ? (
+      <span className="type-meta text-oxford/20" aria-hidden>
+        ·
+      </span>
+    ) : null;
 
   return (
-    <motion.button
+    <motion.div
       ref={ref}
-      type="button"
       layout={!reduceMotion}
       transition={layoutTransition}
+      role="button"
+      tabIndex={0}
       aria-pressed={isSelected}
       aria-label={buildRowAriaLabel(model, isSelected)}
       onClick={onClick}
@@ -55,56 +85,148 @@ const DocketCaseRow = forwardRef<HTMLButtonElement, DocketCaseRowProps>(function
       animate={{
         paddingTop: isSelected ? selectedPadding : ambientPadding,
         paddingBottom: isSelected ? selectedPadding : ambientPadding,
-        backgroundColor: isSelected
-          ? 'color-mix(in srgb, var(--color-paper-deep) 35%, transparent)'
-          : 'rgba(0, 0, 0, 0)',
       }}
-      className="group relative block w-full min-w-0 cursor-pointer rounded-none border-0 bg-transparent px-phi-0 text-left font-sans focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset"
+      className={`group relative w-full min-w-0 cursor-pointer pl-1.5 pr-phi-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
+        isSelected ? 'bg-paperDeep/35' : ''
+      }`}
     >
-      <div className="flex items-start gap-phi-3">
-        <div className="min-w-0 flex-1">
-          <span
-            className={`block min-w-0 font-sans transition-all duration-150 ${
-              isSelected
-                ? 'text-[22px] font-semibold leading-[1.2] tracking-[-0.015em] text-oxford'
-                : 'text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.3] tracking-[-0.01em] text-oxford/55 group-hover:text-oxford/80'
+      <motion.span
+        className="absolute left-0 top-0 bottom-0 block"
+        aria-hidden
+        initial={false}
+        animate={{
+          top: isSelected ? 18 : 9,
+          bottom: isSelected ? 18 : 9,
+          width: spineWidth,
+          backgroundColor: spineColor,
+          opacity: spineWidth === 0 ? 0 : 1,
+        }}
+        transition={selectTransition}
+      />
+
+      <motion.div
+        layout={!reduceMotion}
+        className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-phi-3"
+        transition={layoutTransition}
+      >
+        <motion.span
+          className="type-meta tabular-nums self-start shrink-0 min-w-[2.75rem] pr-0.5 leading-none"
+          initial={false}
+          animate={{
+            color: isSelected ? 'rgba(0, 20, 51, 0.68)' : 'rgba(0, 20, 51, 0.24)',
+          }}
+          transition={selectTransition}
+        >
+          {displayIndex}
+        </motion.span>
+
+        <div className="min-w-0">
+          <div
+            className={`flex min-w-0 flex-col sm:flex-row sm:items-start sm:justify-between ${
+              isSelected ? 'gap-phi-3 sm:gap-phi-4' : 'gap-phi-1 sm:gap-phi-3'
             }`}
           >
-            {startup.scout.name}
-          </span>
-          {metaLine ? (
-            <span
-              className={`mt-1 block min-w-0 text-[12px] leading-[1.45] ${
-                isSelected ? 'text-oxford/[0.62]' : 'text-oxford/50'
-              }`}
+            <div className="min-w-0 flex-1">
+              {isSelected && startup.scout.location?.trim() ? (
+                <p className="mb-1.5 type-meta uppercase tracking-[0.12em] text-oxford/45">
+                  {startup.scout.location.trim()}
+                </p>
+              ) : null}
+              <motion.h2
+                layout={!reduceMotion}
+                className={`min-w-0 break-words font-sans transition-[color,font-weight] ${
+                  isSelected
+                    ? 'text-[clamp(15px,1.3vw,18px)] font-semibold leading-[1.15] tracking-[-0.01em] text-oxford'
+                    : 'text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.15] tracking-[-0.01em] text-oxford/55'
+                }`}
+                style={{
+                  transitionDuration: `${selectTransition.duration}s`,
+                  transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
+                transition={selectTransition}
+              >
+                {startup.scout.name}
+              </motion.h2>
+            </div>
+            <motion.div layout={!reduceMotion} className="shrink-0 sm:text-right sm:pt-px" transition={layoutTransition}>
+              <QueueVerdictLine
+                ctx={queueContext}
+                decisionVariant={decisionVariant}
+                prominent={isSelected}
+                attentionDriver={attentionDriver}
+              />
+            </motion.div>
+          </div>
+
+          {isSelected && hasMetaRow ? (
+            <motion.div
+              layout={!reduceMotion}
+              className="mt-phi-2 flex min-w-0 flex-wrap items-center gap-x-phi-2 gap-y-phi-1"
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={selectTransition}
             >
-              {metaLine}
-            </span>
+              {sectorStage ? (
+                <p className="type-meta uppercase tracking-[0.06em] text-oxford/42">{sectorStage}</p>
+              ) : null}
+              {showDateMeta ? (
+                <>
+                  {metaSep(Boolean(sectorStage))}
+                  <span className="type-meta tracking-[0.06em] text-oxford/42">
+                    {formatRowDate(sortKeyValue)}
+                  </span>
+                </>
+              ) : null}
+              {showAttentionBadge ? (
+                <>
+                  {metaSep(Boolean(sectorStage || showDateMeta))}
+                  <QueueAttentionBadge driver={attentionDriver} ctx={{ ageDays }} prominent={isSelected} />
+                </>
+              ) : null}
+              {resolutionBadge ? (
+                <>
+                  {metaSep(Boolean(sectorStage || showDateMeta || showAttentionBadge))}
+                  <span
+                    className="type-meta uppercase tracking-[0.08em] text-oxford/55"
+                    title="Company Resolver: identity evidence is incomplete — open the memo to see what was found and what's missing."
+                  >
+                    {resolutionBadge}
+                  </span>
+                </>
+              ) : null}
+            </motion.div>
           ) : null}
-          {isSelected && attentionLine ? (
-            <span className="mt-2 block border-t border-dotted border-oxford/15 pt-2 text-[12px] leading-[1.45] text-oxford/50">
-              {attentionLine}
-            </span>
-          ) : null}
-        </div>
 
-        <div className="relative w-[3px] shrink-0 self-stretch" aria-hidden>
-          <motion.span
-            className={`absolute left-0 top-0 bottom-0 block transition-colors duration-150 ${
-              isSelected ? 'bg-oxford' : 'bg-oxford/10'
-            }`}
-            initial={false}
-            animate={{ width: isSelected ? 3 : 2 }}
-            transition={selectTransition}
-          />
+          <AnimatePresence initial={false} mode="popLayout">
+            {isSelected && oneLiner ? (
+              <motion.p
+                key="oneliner-selected"
+                layout
+                initial={reduceMotion ? false : { opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                transition={contentTransition}
+                className="mt-phi-3 queue-row-prose text-[14px] leading-[1.55] text-oxford/72"
+              >
+                {oneLiner}
+              </motion.p>
+            ) : isSelected && attentionDriver.detail ? (
+              <motion.p
+                key="detail"
+                layout
+                initial={reduceMotion ? false : { opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                transition={contentTransition}
+                className="mt-phi-3 queue-row-prose text-[14px] leading-[1.55] text-oxford/62"
+              >
+                {attentionDriver.detail}
+              </motion.p>
+            ) : null}
+          </AnimatePresence>
         </div>
-
-        <DocketMarginColumn
-          variant={decisionVariant}
-          score={queueContext.configuredScore}
-        />
-      </div>
-    </motion.button>
+      </motion.div>
+    </motion.div>
   );
 });
 

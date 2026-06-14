@@ -213,8 +213,8 @@ export default function DispatchCommandBar({
         : view === 'progress'
           ? [
               { label: 'Back', onClick: () => setCompose(true) },
-              { label: 'Exit', onClick: onClose },
               ...(onCancel ? [{ label: 'Cancel', onClick: onCancel }] : []),
+              { label: 'Exit', onClick: onClose },
             ]
           : [
               ...(chips.length >= 1 ? [{ label: 'Back', onClick: () => setCompose(false) }] : []),

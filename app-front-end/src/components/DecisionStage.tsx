@@ -210,11 +210,10 @@ export default function DecisionStage({ startup, fundConfiguration, action }: De
         {state.word}
       </motion.p>
 
-      {/* The subject, in the house serif — the same register as the Dispatch
-          result and the front door headline. */}
+      {/* The subject — sans matches the selected docket row; size stays stage scale. */}
       <motion.h2
         variants={STAGE_ITEM}
-        className="type-display mt-phi-5 break-words leading-[1.05] text-oxford"
+        className="mt-phi-5 break-words font-sans font-semibold leading-[1.05] text-oxford"
         style={{ fontSize: 'clamp(34px, 3.8vw, 56px)' }}
       >
         {startup.scout.name}

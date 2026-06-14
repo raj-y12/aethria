@@ -278,7 +278,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
           </div>
         ) : (
           <div className="aethria-flow-grid flex min-h-0 flex-1 flex-col overflow-hidden pt-phi-4 lg:grid">
-            <section className="min-h-0 overflow-y-auto overscroll-contain lg:border-r lg:border-oxford/[0.06] lg:pr-phi-4">
+            <section className="min-h-0 overflow-y-auto overscroll-contain lg:pr-phi-4">
               <WorkGrid
                 startups={startups}
                 onStartupClick={handleStartupClick}

@@ -15,9 +15,9 @@ export const productInteraction = {
   /** Panel header actions (memo exports, close) — same scale as WorkGrid queue tabs. */
   panelAction:
     'type-label-section min-h-[36px] rounded-none border-0 bg-transparent px-phi-3 text-oxford/45 transition-colors hover:text-oxford/[0.72] disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset',
-  /** Inline header row — matches mutedLabel / queue kicker cap height (no 36px block). */
+  /** Inline kicker row — matches DecisionStage sector line (10px mono, 0.12em tracking). */
   panelActionInline:
-    'type-label-section inline-flex min-h-0 items-center rounded-none border-0 bg-transparent px-phi-3 py-0 text-oxford/45 transition-colors hover:text-oxford/[0.72] disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset',
+    'inline-flex min-h-0 items-center rounded-none border-0 bg-transparent p-0 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/[0.38] transition-colors hover:text-oxford/[0.55] disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset',
   quiet:
     'transition-colors duration-150 hover:bg-oxford/[0.035] focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 focus-visible:ring-inset',
   selected: 'bg-surface-selected text-oxford',
