@@ -23,6 +23,11 @@ type TrackedLookup = PersistedDispatchLookup;
 
 export type LookupPhaseLabel = 'Scouting' | 'Reviewing' | 'Deciding' | null;
 
+export interface LookupFailure {
+  query: string;
+  message: string;
+}
+
 interface UseDispatchLookupOptions {
   startups: Startup[];
   liveGate: QueryLiveGate;
@@ -51,6 +56,9 @@ export function useDispatchLookup({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pendingLookup, setPendingLookup] = useState<TrackedLookup | null>(null);
+  // A lookup the scout could not resolve (company not found / ambiguous). Drives
+  // the takeover's failure view — the "here's what we found" counterpart for misses.
+  const [failure, setFailure] = useState<LookupFailure | null>(null);
   const [hydratedStorageKey, setHydratedStorageKey] = useState<string | null>(null);
   // Other in-flight lookups the analyst started via "Look up another". The active
   // one (pendingLookup) keeps the full polling machinery; these are chips that can
@@ -68,6 +76,7 @@ export function useDispatchLookup({
     if (!value || busy) return;
     const requestSeq = requestSeqRef.current + 1;
     requestSeqRef.current = requestSeq;
+    setFailure(null);
     setBusy(true);
     setMessage('Submitting lookup request...');
     try {
@@ -104,6 +113,7 @@ export function useDispatchLookup({
     setBusy(false);
     setPendingLookup(null);
     setBackgroundLookups([]);
+    setFailure(null);
     setMessage(null);
     setInput('');
     setCommandBarOpen(false);
@@ -149,7 +159,10 @@ export function useDispatchLookup({
     ),
     staleTime: 4_000,
     refetchInterval: (q) => {
-      if (!liveGate.tabVisible || !liveGate.userActive) return false;
+      // A lookup in flight must keep checking even while the analyst sits still
+      // watching the takeover — the idle gate would otherwise freeze failure
+      // detection. Only stop when the tab is hidden or the job already failed.
+      if (!liveGate.tabVisible) return false;
       const row = q.state.data as { failed?: boolean } | undefined;
       if (row?.failed) return false;
       return 8_000;
@@ -161,18 +174,24 @@ export function useDispatchLookup({
     if (!pendingLookup || pendingLookupMatch) return;
     const row = lookupFailureQuery.data;
     if (!row?.failed) return;
-    setMessage(
+    const reason =
       row.message ??
-        `Lookup failed for ${pendingLookup.queryLabel}. Try adding the company website to disambiguate (example: "Aethria aethria.com").`,
-    );
+      `We couldn't confirm a company matching "${pendingLookup.queryLabel}". Try the exact name or add the website to disambiguate (example: "Aethria aethria.com").`;
+    setFailure({ query: pendingLookup.queryLabel, message: reason });
+    setMessage(null);
     setPendingLookup(null);
+    // Surface the fail page even if the analyst had closed the takeover.
+    setCommandBarOpen(true);
   }, [pendingLookup, pendingLookupMatch, lookupFailureQuery.data]);
 
   // Keep the startups list fresh while a lookup is in-flight so the new row
   // appears promptly instead of waiting for the normal list refresh interval.
   useEffect(() => {
     if (!pendingLookup || pendingLookupMatch) return;
-    if (!liveGate.tabVisible || !liveGate.userActive) return;
+    // Stay live through idle: the analyst watching the takeover isn't "active"
+    // (mousemove doesn't reset the idle gate), so gating on userActive here would
+    // stall the in-flight progress poll right when they're staring at it.
+    if (!liveGate.tabVisible) return;
 
     void queryClient.invalidateQueries({ queryKey: ['startups', 'list'] });
     const intervalId = window.setInterval(() => {
@@ -180,7 +199,7 @@ export function useDispatchLookup({
     }, 3_000);
 
     return () => window.clearInterval(intervalId);
-  }, [pendingLookup, pendingLookupMatch, liveGate.tabVisible, liveGate.userActive, queryClient]);
+  }, [pendingLookup, pendingLookupMatch, liveGate.tabVisible, queryClient]);
 
   useEffect(() => {
     if (!pendingLookup) return;
@@ -278,6 +297,9 @@ export function useDispatchLookup({
     setPendingLookup((prev) => (prev ? { ...prev, autoOpened: true } : prev));
   }, []);
 
+  // Leave the failure view (e.g. "Try again" → back to compose, or close).
+  const dismissFailure = useCallback(() => setFailure(null), []);
+
   // Resolve a tracked lookup's startup row (status from the live list).
   const findLookupMatch = useCallback(
     (id: string) =>
@@ -314,6 +336,7 @@ export function useDispatchLookup({
       if (id === pendingLookup?.lookupId) return;
       const target = backgroundLookups.find((l) => l.lookupId === id);
       if (!target) return;
+      setFailure(null);
       const demoted = pendingLookup && !pendingLookup.autoOpened ? pendingLookup : null;
       setBackgroundLookups((bg) => {
         const without = bg.filter((l) => l.lookupId !== id);
@@ -350,6 +373,8 @@ export function useDispatchLookup({
     openLookupMemo,
     lookupReady,
     dismissReady,
+    failure,
+    dismissFailure,
     lookupWorking,
   };
 }

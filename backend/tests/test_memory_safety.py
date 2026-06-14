@@ -92,6 +92,43 @@ def test_startups_endpoint_uses_bounded_projection(monkeypatch):
     assert captured == {"limit": api.DEFAULT_STARTUPS_LIST_LIMIT, "offset": 0}
 
 
+def test_startups_endpoint_does_not_full_row_fallback_on_projection_failure(monkeypatch):
+    """A failed projection (e.g. transient EAGAIN) must NOT trigger a full-row
+    select(*) fetch -- that amplifier drove RSS/egress until OOM. Expect a 503."""
+    import api
+    from fastapi import HTTPException
+
+    class FakeStorage(SupabaseStartupsStorage):
+        def __init__(self):
+            self.paginated_called = False
+
+        def get_list_projection_rows(self, *, limit=None, offset=0):
+            return None  # query failed
+
+        def get_startups_paginated(self, limit=50, offset=0):
+            self.paginated_called = True
+            return [], -1
+
+    storage = FakeStorage()
+    monkeypatch.setattr(api, "_get_storage", lambda request: storage)
+    monkeypatch.setattr(api, "_get_user_last_seen_at", lambda user_id: None)
+
+    with pytest.raises(HTTPException) as exc:
+        api.get_startups(SimpleNamespace(state=SimpleNamespace(user_id="user-1")))
+
+    assert exc.value.status_code == 503
+    assert storage.paginated_called is False
+
+
+def test_malloc_tuning_helpers_are_defensive():
+    """Allocator tuning must be a safe no-op off glibc (e.g. macOS dev)."""
+    from utils.malloc_tuning import cap_malloc_arenas, trim_malloc
+
+    cap_malloc_arenas()
+    cap_malloc_arenas(2)
+    trim_malloc()
+
+
 def test_resource_cleanup_helpers_are_defensive():
     from concurrent.futures import ThreadPoolExecutor
 

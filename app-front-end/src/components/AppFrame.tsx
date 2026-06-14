@@ -413,6 +413,8 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                 progress={dispatch.progress}
                 chips={dispatch.chips}
                 onFocusChip={dispatch.focusChip}
+                failure={dispatch.failure}
+                onRetry={dispatch.dismissFailure}
                 result={
                   dispatch.pendingLookupMatch?.partner?.recommendation && dispatch.snapshotProps ? (
                     <LookupResultSnapshot
