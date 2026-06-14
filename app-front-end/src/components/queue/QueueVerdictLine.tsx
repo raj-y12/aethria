@@ -66,9 +66,7 @@ export default function QueueVerdictLine({
 }) {
   const recommendation = getVisibleRecommendation(ctx.startup);
   const convictionPct = getQueueConvictionPct(ctx);
-  // Conviction on the canonical x/10 scale, consistent with the memo (audit B3). The
-  // bare 0–100 integer previously read like a percentage and used a different metric.
-  const convictionLabel = convictionPct != null ? (convictionPct / 10).toFixed(1) : null;
+  const convictionLabel = convictionPct != null ? String(convictionPct) : null;
   const badgeVariant = queueDecisionBadgeVariant(decisionVariant, recommendation);
 
   const convictionEl =
@@ -91,7 +89,7 @@ export default function QueueVerdictLine({
     return (
       <div
         className="inline-flex flex-wrap items-center justify-end gap-x-phi-2 gap-y-0"
-        aria-label={`Escalated${convictionLabel != null ? `, ${convictionLabel}/10 conviction` : ''}`}
+        aria-label={`Escalated${convictionLabel != null ? `, ${convictionLabel} conviction` : ''}`}
       >
         <EscalationQueueMarker ctx={ctx} driver={attentionDriver} />
         {convictionEl}
@@ -103,7 +101,7 @@ export default function QueueVerdictLine({
     return (
       <div
         className="inline-flex flex-wrap items-center justify-end gap-x-phi-2 gap-y-0"
-        aria-label={`${recommendation}${convictionLabel != null ? `, ${convictionLabel}/10 conviction` : ''}`}
+        aria-label={`${recommendation}${convictionLabel != null ? `, ${convictionLabel} conviction` : ''}`}
       >
         <DecisionBadge
           variant={recommendation}

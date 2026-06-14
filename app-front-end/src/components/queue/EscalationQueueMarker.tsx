@@ -1,7 +1,12 @@
 import type { CSSProperties } from 'react';
+import { QUEUE_ANNOTATION_CLASS, VERDICT_CHIP_CLASS } from '../../design-system/verdictBadgeTokens';
 import type { VerdictBadgeConfig } from '../../lib/fundConfiguration';
-import type { QueueAttentionDriver, QueueRowContext } from '../../lib/queueAttentionDriver';
-import QueueAttentionBadge from './QueueAttentionBadge';
+import {
+  attentionBadgeVariant,
+  attentionDriverBadgeLabel,
+  type QueueAttentionDriver,
+  type QueueRowContext,
+} from '../../lib/queueAttentionDriver';
 
 const PARTNER_VERDICT_BAR_FALLBACK: Record<'INVEST' | 'PASS' | 'MONITOR', string> = {
   INVEST: '#bfe3cc',
@@ -20,7 +25,7 @@ function partnerVerdictBarStyle(
   return { backgroundColor: custom ?? PARTNER_VERDICT_BAR_FALLBACK[recommendation] };
 }
 
-/** Escalated row marker — partner verdict colour bar + attention badge (reason on hover). */
+/** Escalated row marker — partner verdict bar fused with attention label. */
 export default function EscalationQueueMarker({
   ctx,
   driver,
@@ -30,19 +35,23 @@ export default function EscalationQueueMarker({
 }) {
   const recommendation = ctx.startup.partner?.recommendation ?? null;
   const reason = driver.detail?.trim();
+  const label = attentionDriverBadgeLabel(driver, { ageDays: ctx.ageDays });
+  if (!label) return null;
+
+  const variant = attentionBadgeVariant(driver);
 
   return (
     <div
-      className="inline-flex max-w-full items-stretch gap-phi-1 rounded-none"
+      className="inline-flex max-w-full items-stretch rounded-none"
       title={reason || undefined}
       aria-label={reason ? `${driver.label}. ${reason}` : driver.label}
     >
       <span
-        className="w-[5px] shrink-0 self-stretch"
+        className="w-[7px] shrink-0 self-stretch"
         style={partnerVerdictBarStyle(recommendation, ctx.fundConfiguration?.verdictBadges)}
         aria-hidden
       />
-      <QueueAttentionBadge driver={driver} ctx={{ ageDays: ctx.ageDays }} />
+      <span className={`${VERDICT_CHIP_CLASS} min-w-0 ${QUEUE_ANNOTATION_CLASS[variant]}`}>{label}</span>
     </div>
   );
 }

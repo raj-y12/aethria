@@ -970,7 +970,7 @@
   color: var(--color-oxford);
 }
 .memoDecisionChoice[aria-pressed="true"] {
-  padding-left: 14px;
+  padding-left: 16px;
 }
 .memoDecisionChoice[aria-pressed="true"]::before {
   content: '';
@@ -978,7 +978,7 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 5px;
+  width: 7px;
 }
 .memoDecisionChoice--yes[aria-pressed="true"],
 .memoDecisionChoice--maybe[aria-pressed="true"],
