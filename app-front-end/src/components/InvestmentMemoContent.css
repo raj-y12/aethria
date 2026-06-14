@@ -2557,7 +2557,7 @@
 .memoDocSectionHead {
   font-family: var(--memo-font-mono);
   font-size: var(--memo-size-ui);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: rgba(var(--color-oxford-rgb), 0.82);
   margin: 0 0 15px 0;
@@ -2566,6 +2566,15 @@
   gap: 12px;
   font-weight: 600;
   line-height: 1.35;
+}
+/* Editorial section marker — a short oxford hairline leading each head, echoing
+   the redesigned shell's label-on-a-rule language. */
+.memoDocSectionHead::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 16px;
+  height: 1px;
+  background: rgba(var(--color-oxford-rgb), 0.28);
 }
 .memoDocContestedKicker {
   font-family: var(--memo-font-mono);
@@ -4305,4 +4314,45 @@
   color: rgba(var(--color-oxford-rgb), 0.35);
   opacity: 1;
   cursor: not-allowed;
+}
+
+/* === Open-in: the document sections compose in sequence when a memo mounts.
+   The body is keyed on the memo, so this re-fires each time a memo opens or the
+   selected deal changes. The cover (<header>) is excluded — this starts at the
+   Snapshot, the first <section>. === */
+@keyframes memoSectionReveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.memoBody > section {
+  animation: memoSectionReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.memoBody > section:nth-of-type(1) { animation-delay: 0.05s; }
+.memoBody > section:nth-of-type(2) { animation-delay: 0.11s; }
+.memoBody > section:nth-of-type(3) { animation-delay: 0.17s; }
+.memoBody > section:nth-of-type(4) { animation-delay: 0.23s; }
+.memoBody > section:nth-of-type(5) { animation-delay: 0.29s; }
+.memoBody > section:nth-of-type(n + 6) { animation-delay: 0.35s; }
+@media (prefers-reduced-motion: reduce) {
+  .memoBody > section { animation: none; }
+}
+
+/* === Collapsed disclosure stack (Partner rationale, Decision context, Company
+   resolution, Sources) — single rows that were floating in dead space. Drop the
+   toggle's open-state bottom padding when collapsed, and tighten the gaps so the
+   footer disclosures read as a compact run, not full document sections. === */
+.memoDisclosureToggle[aria-expanded="false"] {
+  padding-bottom: 0;
+}
+.memoDocSection + .memoDisclosureSection {
+  margin-top: clamp(16px, 2vw, 22px);
+}
+.memoDisclosureSection + .memoDisclosureSection {
+  margin-top: clamp(11px, 1.5vw, 15px);
+}
+.memoPanel--embedded .memoDocSection + .memoDisclosureSection {
+  margin-top: clamp(14px, 1.8vw, 20px);
+}
+.memoPanel--embedded .memoDisclosureSection + .memoDisclosureSection {
+  margin-top: clamp(10px, 1.4vw, 13px);
 }

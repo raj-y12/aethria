@@ -202,8 +202,8 @@
 
 /* Editorial paper texture (ported from web-front-end) */
 .paper-dot-grid {
-  background-color: #f4f1ea;
-  background-image: radial-gradient(rgba(0, 20, 51, 0.055) 1px, transparent 1px);
+  background-color: #f2efe6;
+  background-image: radial-gradient(rgba(0, 20, 51, 0.08) 1px, transparent 1px);
   background-size: 28px 28px;
   background-repeat: repeat;
 }

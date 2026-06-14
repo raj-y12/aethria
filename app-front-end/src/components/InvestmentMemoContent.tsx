@@ -1013,13 +1013,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           <motion.div
             className="memoBody"
             key={contentKey}
-            initial={
-              reduceMotion
-                ? { opacity: 1, transform: 'translateY(0px)' }
-                : { opacity: 0, transform: 'translateY(16px)' }
-            }
-            animate={{ opacity: 1, transform: 'translateY(0px)' }}
-            transition={transitionOrReduced(reduceMotion, { duration: 0.24, ease: [0.23, 1, 0.32, 1] })}
+            // Opacity-only umbrella; the document sections carry the staggered
+            // open-in (memoSectionReveal in CSS) so transforms don't compound.
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.23, 1, 0.32, 1] })}
           >
 
             {/* ── Executive cover (or the workspace's Decision Stage) ── */}
