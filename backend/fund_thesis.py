@@ -5,8 +5,11 @@ get_active_thesis persists a default thesis on first access (no in-memory-only f
 from __future__ import annotations
 
 import logging
+import os
+import threading
+import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from tenant_context import require_user_id
 from utils.deal_context import scout_text_blob_lower
@@ -77,6 +80,7 @@ class ActiveThesis:
     parsed_json: Dict[str, Any]
     embedding: List[float]
     embedding_model: str
+    thesis_updated_at: Optional[str] = None
 
     def as_engine_context(self) -> Dict[str, Any]:
         emb = list(self.embedding or [])
@@ -110,6 +114,107 @@ def thesis_context_has_embeddings(ctx: Optional[Dict[str, Any]]) -> bool:
         return False
     emb = ctx.get("embedding") or []
     return isinstance(emb, list) and len(emb) > 0
+
+
+# Known embedding dimensions, so the metadata path can report dimension without
+# re-pulling the full embedding_vector (~1536 floats) from Supabase.
+_EMBED_MODEL_DIMS: Dict[str, int] = {
+    "text-embedding-3-small": 1536,
+    "text-embedding-3-large": 3072,
+    "text-embedding-ada-002": 1536,
+}
+
+
+@dataclass(frozen=True)
+class ActiveThesisMeta:
+    """
+    Lightweight resolved thesis: everything except the embedding_vector itself.
+    Used by metadata-only callers (e.g. /api/fund-thesis/runtime) so the ~1536-float
+    vector is never re-pulled when only mode / dimension / version info is needed.
+    """
+    thesis_id: str
+    version_id: str
+    version_number: int
+    raw_text: str
+    parsed_json: Dict[str, Any]
+    has_embeddings: bool
+    embedding_model: str
+    embedding_dim: int
+    thesis_updated_at: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Per-request / per-cycle resolved-thesis cache.
+#
+# get_active_thesis() issues a 3-query triad (fund_thesis -> versions -> embeddings)
+# and is called many times within seconds during a single pipeline cycle / lookup,
+# and again on every /api/fund-thesis/runtime poll. The active thesis is immutable
+# within such a window, so we collapse the burst with a short-TTL cache keyed by
+# user_id. Mutations (create/activate version, bootstrap re-link) invalidate it,
+# so staleness is bounded by TTL *and* cleared immediately on any write.
+# ---------------------------------------------------------------------------
+_thesis_cache_lock = threading.Lock()
+_thesis_full_cache: Dict[str, Tuple[float, Optional["ActiveThesis"]]] = {}
+_thesis_meta_cache: Dict[str, Tuple[float, Optional["ActiveThesisMeta"]]] = {}
+
+
+def _thesis_cache_ttl() -> float:
+    """Cache window in seconds (env-tunable). <= 0 disables caching entirely."""
+    try:
+        return float(os.getenv("FUND_THESIS_CACHE_TTL_SECONDS", "10"))
+    except (TypeError, ValueError):
+        return 10.0
+
+
+def invalidate_thesis_cache(user_id: Optional[str] = None) -> None:
+    """Drop cached thesis entries. Call after any thesis write. None clears all users."""
+    with _thesis_cache_lock:
+        if user_id:
+            _thesis_full_cache.pop(user_id, None)
+            _thesis_meta_cache.pop(user_id, None)
+        else:
+            _thesis_full_cache.clear()
+            _thesis_meta_cache.clear()
+
+
+def _meta_from_active(active: "ActiveThesis") -> "ActiveThesisMeta":
+    has = thesis_has_embeddings(active)
+    return ActiveThesisMeta(
+        thesis_id=active.thesis_id,
+        version_id=active.version_id,
+        version_number=active.version_number,
+        raw_text=active.raw_text,
+        parsed_json=active.parsed_json,
+        has_embeddings=has,
+        embedding_model=active.embedding_model if has else "none",
+        embedding_dim=len(active.embedding) if has else 0,
+        thesis_updated_at=active.thesis_updated_at,
+    )
+
+
+def _cache_store_full(uid: str, value: Optional["ActiveThesis"]) -> None:
+    # Never cache "missing" (None): it is rare, transient (pre-bootstrap), and caching
+    # it would make a post-bootstrap re-resolve return a stale None.
+    if value is None:
+        return
+    ttl = _thesis_cache_ttl()
+    if ttl <= 0:
+        return
+    expires = time.monotonic() + ttl
+    with _thesis_cache_lock:
+        _thesis_full_cache[uid] = (expires, value)
+        # A full resolve supersedes any cached metadata for the same window.
+        _thesis_meta_cache[uid] = (expires, _meta_from_active(value))
+
+
+def _cache_store_meta(uid: str, value: Optional["ActiveThesisMeta"]) -> None:
+    if value is None:
+        return
+    ttl = _thesis_cache_ttl()
+    if ttl <= 0:
+        return
+    with _thesis_cache_lock:
+        _thesis_meta_cache[uid] = (time.monotonic() + ttl, value)
 
 
 RULE_ALIGNMENT_MATCH_THRESHOLD = 6  # 0–10 scale; matches thesis_matches_fund when score >= this
@@ -233,15 +338,18 @@ def rule_based_thesis_alignment(
     }
 
 
-def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
+def _resolve_thesis_version_unsafe(
+    client: Any, uid: str
+) -> Tuple[str, str, int, str, Dict[str, Any], Optional[str]]:
     """
-    Load active thesis for uid (already validated).
-    Missing or empty embeddings resolve to [] (pipeline still runs); see TODO for async enrichment.
+    Resolve the active thesis version row (no embedding query).
+    Shared by the full and metadata-only resolvers.
+    Returns (thesis_id, version_id, version_number, raw_text, parsed_json, thesis_updated_at).
     """
     try:
         tr = (
             client.table("fund_thesis")
-            .select("id,active_version_id")
+            .select("id,active_version_id,updated_at")
             .eq("user_id", uid)
             .limit(1)
             .execute()
@@ -259,6 +367,8 @@ def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
     thesis_id = str(rows[0].get("id") or "").strip()
     av = rows[0].get("active_version_id")
     version_id = str(av).strip() if av else ""
+    ua = rows[0].get("updated_at")
+    thesis_updated_at = str(ua) if ua else None
     if not thesis_id or not version_id:
         raise FundThesisMissingError("no active_version_id on fund_thesis")
 
@@ -292,6 +402,77 @@ def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
     raw_text = str(v.get("raw_text") or "")
     pj = v.get("parsed_json")
     parsed_json: Dict[str, Any] = pj if isinstance(pj, dict) else {}
+    return thesis_id, version_id, version_number, raw_text, parsed_json, thesis_updated_at
+
+
+def _resolve_active_thesis_meta_unsafe(client: Any, uid: str) -> ActiveThesisMeta:
+    """
+    Metadata-only resolve: never pulls embedding_vector. Selects just `model` from
+    fund_thesis_embeddings to derive has_embeddings / dimension cheaply.
+    """
+    (
+        thesis_id,
+        version_id,
+        version_number,
+        raw_text,
+        parsed_json,
+        thesis_updated_at,
+    ) = _resolve_thesis_version_unsafe(client, uid)
+
+    model = "none"
+    has_emb = False
+    try:
+        er = (
+            client.table("fund_thesis_embeddings")
+            .select("model")
+            .eq("version_id", version_id)
+            .eq("user_id", uid)
+            .limit(1)
+            .execute()
+        )
+    except Exception as e:
+        if _is_transient_transport_error(e):
+            logger.debug("get_active_thesis_metadata embedding transient failure: %s", e)
+        else:
+            logger.warning("get_active_thesis_metadata embedding query failed: %s", e)
+        # Metadata is best-effort: a failed embedding-meta lookup degrades to rule_based.
+        model = "none"
+        has_emb = False
+    else:
+        erows = getattr(er, "data", None) or []
+        if erows:
+            model = str(erows[0].get("model") or "none")
+            has_emb = model.strip().lower() not in ("", "none")
+    if not has_emb:
+        model = "none"
+    dim = _EMBED_MODEL_DIMS.get(model, 0) if has_emb else 0
+
+    return ActiveThesisMeta(
+        thesis_id=thesis_id,
+        version_id=version_id,
+        version_number=version_number,
+        raw_text=raw_text,
+        parsed_json=parsed_json,
+        has_embeddings=has_emb,
+        embedding_model=model,
+        embedding_dim=dim,
+        thesis_updated_at=thesis_updated_at,
+    )
+
+
+def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
+    """
+    Load active thesis for uid (already validated).
+    Missing or empty embeddings resolve to [] (pipeline still runs); see TODO for async enrichment.
+    """
+    (
+        thesis_id,
+        version_id,
+        version_number,
+        raw_text,
+        parsed_json,
+        thesis_updated_at,
+    ) = _resolve_thesis_version_unsafe(client, uid)
 
     embedding: List[float] = []
     model = "none"
@@ -349,6 +530,7 @@ def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
         parsed_json=parsed_json,
         embedding=embedding,
         embedding_model=model or "none",
+        thesis_updated_at=thesis_updated_at,
     )
 
 
@@ -412,6 +594,7 @@ def _bootstrap_default_thesis_or_raise(client: Any, uid: str) -> None:
                     client.table("fund_thesis").update(
                         {"active_version_id": latest_vid, "updated_at": now_iso}
                     ).eq("id", thesis_id).eq("user_id", uid).execute()
+                    invalidate_thesis_cache(uid)
                     logger.info("[FundThesis] Re-linked active_version_id to v%s for user_id=%s", vrows[0].get("version_number"), uid[:24])
                     return
                 except Exception as e:
@@ -454,6 +637,7 @@ def _bootstrap_default_thesis_or_raise(client: Any, uid: str) -> None:
                 client.table("fund_thesis").update(
                     {"active_version_id": latest_vid, "updated_at": now_iso}
                 ).eq("id", thesis_id2).eq("user_id", uid).execute()
+                invalidate_thesis_cache(uid)
                 logger.info(
                     "[FundThesis] Re-linked active_version_id after concurrent bootstrap for user_id=%s",
                     uid[:24],
@@ -489,21 +673,72 @@ def _bootstrap_default_thesis_or_raise(client: Any, uid: str) -> None:
     logger.info("[FundThesis] Auto-created default thesis for user_id=%s", uid[:24])
 
 
-def get_active_thesis(client: Any, user_id: str) -> Optional[ActiveThesis]:
+def get_active_thesis(
+    client: Any, user_id: str, *, use_cache: bool = True
+) -> Optional[ActiveThesis]:
     """
     Resolve fund_thesis row and active version from Supabase (read-only).
     Returns None only when no thesis definitively exists for the user.
     Raises FundThesisQueryError on transient/unexpected DB errors so callers
     can distinguish "missing" from "unknown state" and avoid spurious bootstraps.
     Embeddings are optional ([] if absent).
+
+    Results are cached per user for a short window (FUND_THESIS_CACHE_TTL_SECONDS)
+    to collapse the redundant triad burst within one pipeline cycle / lookup; the
+    cache is invalidated on any thesis write. Pass use_cache=False to force a read
+    (e.g. immediately after a bootstrap, when staleness must not be tolerated).
     """
     uid = require_user_id(user_id, context="get_active_thesis")
+    if use_cache and _thesis_cache_ttl() > 0:
+        now = time.monotonic()
+        with _thesis_cache_lock:
+            hit = _thesis_full_cache.get(uid)
+        if hit is not None and hit[0] > now:
+            return hit[1]
     try:
-        return _resolve_active_thesis_unsafe(client, uid)
+        result: Optional[ActiveThesis] = _resolve_active_thesis_unsafe(client, uid)
+    except FundThesisQueryError:
+        raise  # never cache transient/unknown-state errors
+    except FundThesisMissingError:
+        result = None
+    if use_cache:
+        _cache_store_full(uid, result)
+    return result
+
+
+def get_active_thesis_metadata(
+    client: Any, user_id: str, *, use_cache: bool = True
+) -> Optional[ActiveThesisMeta]:
+    """
+    Metadata-only resolve (mode / dimension / version info) that never pulls the
+    embedding_vector. Use for endpoints like /api/fund-thesis/runtime that only
+    need to know whether embeddings exist, not their contents.
+
+    Served from the metadata cache, or derived for free from a warm full-thesis
+    cache entry; falls back to a lightweight Supabase read (model column only).
+    """
+    uid = require_user_id(user_id, context="get_active_thesis_metadata")
+    if use_cache and _thesis_cache_ttl() > 0:
+        now = time.monotonic()
+        with _thesis_cache_lock:
+            mhit = _thesis_meta_cache.get(uid)
+            if mhit is not None and mhit[0] > now:
+                return mhit[1]
+            fhit = _thesis_full_cache.get(uid)
+        if fhit is not None and fhit[0] > now:
+            derived = _meta_from_active(fhit[1]) if fhit[1] is not None else None
+            with _thesis_cache_lock:
+                _thesis_meta_cache[uid] = (fhit[0], derived)
+            return derived
+    try:
+        meta: Optional[ActiveThesisMeta] = _resolve_active_thesis_meta_unsafe(client, uid)
     except FundThesisQueryError:
         raise
     except FundThesisMissingError:
-        return None
+        meta = None
+    if use_cache:
+        _cache_store_meta(uid, meta)
+    return meta
 
 
 def count_user_startups(client: Any, user_id: str) -> int:
@@ -566,6 +801,43 @@ def _review_thesis_fields(ri: Any) -> tuple[Optional[float], Optional[bool], Opt
     return score, mb, version_id or None
 
 
+# PostgREST JSON projection: pull only the three thesis fields out of review_info
+# instead of the whole (large, multi-review) blob. Cuts egress per row from a full
+# review_info JSON to ~3 short scalars. Aliases map to _projected_thesis_fields keys.
+_THESIS_ALIGNMENT_PROJECTION = (
+    "v:review_info->>fund_thesis_version_id,"
+    "s:review_info->>thesis_alignment_score,"
+    "s2:review_info->>fund_thesis_alignment_score,"
+    "m:review_info->>thesis_matches_fund"
+)
+
+
+def _projected_thesis_fields(row: Any) -> tuple[Optional[float], Optional[bool], Optional[str]]:
+    """Parse a row projected via _THESIS_ALIGNMENT_PROJECTION (scalar strings, not a dict)."""
+    if not isinstance(row, dict):
+        return None, None, None
+    raw_score = row.get("s")
+    if raw_score is None or (isinstance(raw_score, str) and not raw_score.strip()):
+        raw_score = row.get("s2")
+    score: Optional[float] = None
+    if raw_score is not None and not (isinstance(raw_score, str) and not raw_score.strip()):
+        try:
+            score = float(raw_score)
+        except (TypeError, ValueError):
+            score = None
+    m_raw = row.get("m")
+    if m_raw is None:
+        mb: Optional[bool] = None
+    elif isinstance(m_raw, bool):
+        mb = m_raw
+    else:
+        s = str(m_raw).strip().lower()
+        mb = None if s == "" else s in ("true", "1", "yes", "t")
+    v = row.get("v")
+    version_id = str(v).strip() if v else None
+    return score, mb, version_id or None
+
+
 def compute_thesis_alignment_stats(
     client: Any,
     user_id: str,
@@ -575,7 +847,9 @@ def compute_thesis_alignment_stats(
     row_limit: int = 2000,
 ) -> Dict[str, Any]:
     """
-    Scan startups.review_info for thesis alignment fields (best-effort, bounded page size).
+    Aggregate thesis alignment from startups.review_info (best-effort, bounded page size).
+    Uses a projected query (only the 3 thesis sub-fields) rather than fetching the full
+    review_info blob, to keep Supabase egress / response size small under polling load.
     """
     uid = require_user_id(user_id, context="compute_thesis_alignment_stats")
     active_version_id = active_version_id.strip()
@@ -589,7 +863,7 @@ def compute_thesis_alignment_stats(
     try:
         r = (
             client.table("startups")
-            .select("review_info")
+            .select(_THESIS_ALIGNMENT_PROJECTION)
             .eq("user_id", uid)
             .not_.is_("review_info", "null")
             .limit(row_limit)
@@ -607,8 +881,7 @@ def compute_thesis_alignment_stats(
         }
 
     for row in rows:
-        ri = row.get("review_info")
-        score, matches, vid = _review_thesis_fields(ri)
+        score, matches, vid = _projected_thesis_fields(row)
         if vid != active_version_id:
             continue
         total_active += 1
@@ -619,8 +892,7 @@ def compute_thesis_alignment_stats(
 
     if prev:
         for row in rows:
-            ri = row.get("review_info")
-            score, _, vid = _review_thesis_fields(ri)
+            score, _, vid = _projected_thesis_fields(row)
             if vid == prev and score is not None:
                 scores_prev.append(score)
 

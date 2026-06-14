@@ -101,6 +101,7 @@ from fund_thesis import (
     _bootstrap_default_thesis_or_raise,
     compute_thesis_alignment_stats,
     get_active_thesis,
+    get_active_thesis_metadata,
     thesis_has_embeddings,
 )
 from fund_thesis_ops import (
@@ -175,6 +176,12 @@ MAX_RESUMED_AGENT_LOOPS = max(0, int(os.getenv("MAX_RESUMED_AGENT_LOOPS", "0")))
 # steadily climbing RSS => leak in the request path. 0 disables.
 RSS_SAMPLER_INTERVAL_SECONDS = max(0, int(os.getenv("RSS_SAMPLER_INTERVAL_SECONDS", "60")))
 _rss_sampler_task: Optional[asyncio.Task] = None
+
+# Cap glibc malloc arenas before the request threadpool grows, so freed JSON buffers
+# aren't retained per-thread (primary driver of climb-and-plateau RSS). No-op off glibc.
+from utils.malloc_tuning import cap_malloc_arenas, trim_malloc  # noqa: E402
+
+cap_malloc_arenas()
 _ADMIN_LOGIN_MAX_FAILURES = int(os.getenv("ADMIN_LOGIN_MAX_FAILURES", "5"))
 _ADMIN_LOGIN_WINDOW_SECONDS = int(os.getenv("ADMIN_LOGIN_WINDOW_SECONDS", "300"))
 _admin_login_attempts: Dict[str, List[float]] = {}
@@ -464,6 +471,9 @@ async def _rss_sampler() -> None:
         while True:
             await asyncio.sleep(interval)
             active_loops = sum(1 for t in _per_user_loops.values() if not t.done())
+            # Return free heap pages to the OS so RSS reflects live working set, not
+            # retained arenas from transient JSON spikes.
+            trim_malloc()
             _logger_visible.info(
                 "[MEM] rss_mb=%.1f active_agent_loops=%d", _pipeline_rss_mb(), active_loops
             )
@@ -1504,9 +1514,16 @@ def get_startups(
         rows = storage.get_list_projection_rows(limit=limit, offset=offset)
         if rows is not None:
             return [_list_projection_to_frontend(r, last_seen_at=last_seen_at) for r in rows]
-        raw_list, _next_offset = storage.get_startups_paginated(limit=limit, offset=offset)
-        full = [_backend_to_frontend(r, last_seen_at=last_seen_at) for r in raw_list]
-        return [_thin_list_from_full_frontend(x) for x in full]
+        # Projection returned None -> the query failed (e.g. transient EAGAIN). Do NOT
+        # fall back to a full-row select("*") fetch: this endpoint is polled heavily
+        # (~1/s during a lookup), and pulling full memo/review/scout/partner JSON for
+        # every row on each poll spikes egress and RSS until the instance OOMs. Signal a
+        # transient failure so the client keeps its last data and retries the next poll.
+        raise HTTPException(
+            status_code=503,
+            detail="Startup list temporarily unavailable; retry shortly.",
+            headers={"Retry-After": "2"},
+        )
     raw_list = storage.get_all()
     full = [_backend_to_frontend(r, last_seen_at=last_seen_at) for r in raw_list]
     return [_thin_list_from_full_frontend(x) for x in full]
@@ -2526,7 +2543,9 @@ def _get_fund_thesis_runtime_impl(request: Request):
     uid = request.state.user_id
     client = get_service_client()
     try:
-        active = get_active_thesis(client, uid)
+        # Metadata-only: never re-pulls the ~1536-float embedding_vector on this
+        # high-frequency poll; only mode / dimension / version info is needed here.
+        active = get_active_thesis_metadata(client, uid)
         if active is None:
             return JSONResponse(
                 status_code=200,
@@ -2552,7 +2571,7 @@ def _get_fund_thesis_runtime_impl(request: Request):
             },
         )
 
-    has_emb = thesis_has_embeddings(active)
+    has_emb = active.has_embeddings
     mode = "embedding" if has_emb else "rule_based"
     embedding_status = "ready" if has_emb else "pending"
     emb_model = (
@@ -2563,38 +2582,9 @@ def _get_fund_thesis_runtime_impl(request: Request):
     if has_emb and not emb_model:
         emb_model = "none"
 
-    prev_id: Optional[str] = None
-    if active.version_number > 1:
-        pr = (
-            client.table("fund_thesis_versions")
-            .select("id")
-            .eq("user_id", uid)
-            .eq("thesis_id", active.thesis_id)
-            .eq("version_number", active.version_number - 1)
-            .limit(1)
-            .execute()
-        )
-        prow = getattr(pr, "data", None) or []
-        if prow:
-            prev_id = str(prow[0].get("id") or "")
-
-    stats = compute_thesis_alignment_stats(
-        client,
-        uid,
-        active_version_id=active.version_id,
-        previous_version_id=prev_id,
-        row_limit=int(os.getenv("FUND_THESIS_RUNTIME_ALIGNMENT_ROW_LIMIT", "500")),
-    )
-
-    tr = (
-        client.table("fund_thesis")
-        .select("updated_at,active_version_id")
-        .eq("user_id", uid)
-        .limit(1)
-        .execute()
-    )
-    trow = (getattr(tr, "data", None) or [{}])[0]
-
+    # Fetch the version timeline once and reuse it: the immediately-previous version
+    # (for drift) is almost always present here (active is the newest version), so we
+    # derive prev_id from this result instead of issuing a separate point query.
     tl_r = (
         client.table("fund_thesis_versions")
         .select("id,version_number,is_active,created_at")
@@ -2606,7 +2596,36 @@ def _get_fund_thesis_runtime_impl(request: Request):
     )
     version_timeline = getattr(tl_r, "data", None) or []
 
-    dim = len(active.embedding)
+    prev_id: Optional[str] = None
+    if active.version_number > 1:
+        for row in version_timeline:
+            if row.get("version_number") == active.version_number - 1:
+                prev_id = str(row.get("id") or "") or None
+                break
+        # Fallback only if the predecessor fell outside the 15-row timeline window.
+        if prev_id is None:
+            pr = (
+                client.table("fund_thesis_versions")
+                .select("id")
+                .eq("user_id", uid)
+                .eq("thesis_id", active.thesis_id)
+                .eq("version_number", active.version_number - 1)
+                .limit(1)
+                .execute()
+            )
+            prow = getattr(pr, "data", None) or []
+            if prow:
+                prev_id = str(prow[0].get("id") or "") or None
+
+    stats = compute_thesis_alignment_stats(
+        client,
+        uid,
+        active_version_id=active.version_id,
+        previous_version_id=prev_id,
+        row_limit=int(os.getenv("FUND_THESIS_RUNTIME_ALIGNMENT_ROW_LIMIT", "500")),
+    )
+
+    dim = active.embedding_dim
     payload: Dict[str, Any] = {
         "thesis_version_id": active.version_id,
         "mode": mode,
@@ -2617,7 +2636,7 @@ def _get_fund_thesis_runtime_impl(request: Request):
         "thesis_ready": True,
         "active_version_id": active.version_id,
         "active_version_number": active.version_number,
-        "fund_thesis_updated_at": trow.get("updated_at"),
+        "fund_thesis_updated_at": active.thesis_updated_at,
         "thesis_mode": mode,
         "embedding": {
             "status": embedding_status,

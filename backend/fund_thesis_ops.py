@@ -113,7 +113,7 @@ def create_fund_thesis_version_for_user(
     Service-role Supabase client required.
     """
     from tenant_context import require_user_id
-    from fund_thesis import count_user_startups, insert_thesis_pipeline_link
+    from fund_thesis import count_user_startups, insert_thesis_pipeline_link, invalidate_thesis_cache
 
     uid = require_user_id(user_id, context="create_fund_thesis_version_for_user")
     raw = (raw_text or "").strip()
@@ -232,6 +232,8 @@ def create_fund_thesis_version_for_user(
     except Exception as e:
         logger.warning("insert_thesis_pipeline_link failed: %s", e)
 
+    invalidate_thesis_cache(uid)
+
     return {
         "thesis_id": thesis_id,
         "version_id": version_id,
@@ -295,7 +297,7 @@ def activate_fund_thesis_version(
 ) -> None:
     """Set one version active; must belong to user's thesis."""
     from tenant_context import require_user_id
-    from fund_thesis import count_user_startups, insert_thesis_pipeline_link
+    from fund_thesis import count_user_startups, insert_thesis_pipeline_link, invalidate_thesis_cache
 
     uid = require_user_id(user_id, context="activate_fund_thesis_version")
     vid = (version_id or "").strip()
@@ -335,3 +337,4 @@ def activate_fund_thesis_version(
         pipeline_run_id=pipeline_run_id,
         affected_startups_count=affected,
     )
+    invalidate_thesis_cache(uid)

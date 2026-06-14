@@ -8,6 +8,7 @@ Requires migrations 20260401000001_startups_list_projection_and_indexes.sql and
 from __future__ import annotations
 
 import logging
+import os
 import random
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -27,9 +28,13 @@ from utils.storage import _merge_startup_dict_patch
 logger = logging.getLogger(__name__)
 
 TABLE = "startups"
+# errno 11 (EAGAIN, Linux) / 35 (EAGAIN/EWOULDBLOCK, macOS): transient client-side
+# socket pressure under burst, not a Supabase failure (server logs stay 200). Retried
+# with exponential backoff so a burst never surfaces as a failed query.
 _TRANSIENT_ERRNOS = (35, 11)
-_RETRY_ATTEMPTS = 4
+_RETRY_ATTEMPTS = max(1, int(os.getenv("SUPABASE_RETRY_ATTEMPTS", "6")))
 _BASE_RETRY_DELAY_SECONDS = 0.08
+_MAX_RETRY_DELAY_SECONDS = float(os.getenv("SUPABASE_MAX_RETRY_DELAY_SECONDS", "1.5"))
 _QUEUE_AWARENESS_COLUMNS = (
     "first_seen_at",
     "last_seen_by_user_at",
@@ -219,7 +224,9 @@ class SupabaseStartupsStorage:
             except Exception as exc:
                 last_exc = exc
                 if attempt < _RETRY_ATTEMPTS and self._is_transient_error(exc):
-                    sleep_for = (_BASE_RETRY_DELAY_SECONDS * (2**attempt)) + random.uniform(0, 0.04)
+                    sleep_for = min(
+                        _BASE_RETRY_DELAY_SECONDS * (2**attempt), _MAX_RETRY_DELAY_SECONDS
+                    ) + random.uniform(0, 0.04)
                     time.sleep(sleep_for)
                     continue
                 raise
@@ -932,9 +939,11 @@ class SupabaseStartupsStorage:
         offset = 0
         while len(out) < limit:
             try:
+                # Project only the version-id sub-field instead of the full review_info
+                # blob (large, multi-review JSON) — this only needs to know if it's set.
                 r = (
                     self._client.table(TABLE)
-                    .select("startup_id,review_info")
+                    .select("startup_id,vid:review_info->>fund_thesis_version_id")
                     .eq("user_id", self._user_id)
                     .not_.is_("review_info", "null")
                     .order("updated_at", desc=True)
@@ -948,10 +957,7 @@ class SupabaseStartupsStorage:
             if not rows:
                 break
             for row in rows:
-                ri = row.get("review_info")
-                if not isinstance(ri, dict):
-                    continue
-                vid = ri.get("fund_thesis_version_id")
+                vid = row.get("vid")
                 if vid is not None and str(vid).strip():
                     continue
                 sid = row.get("startup_id")
