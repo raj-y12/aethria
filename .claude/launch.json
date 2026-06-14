@@ -18,6 +18,12 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": ["-c", "cd app-front-end && npx vite --config vite.screenshot.config.ts"],
       "port": 5181
+    },
+    {
+      "name": "brand-assets",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "brand-assets", "-l", "4400"],
+      "port": 4400
     }
   ]
 }
