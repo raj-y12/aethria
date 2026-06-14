@@ -18,6 +18,11 @@ export interface LookupChip {
   active: boolean;
 }
 
+export interface LookupFailure {
+  query: string;
+  message: string;
+}
+
 interface DispatchCommandBarProps {
   open: boolean;
   onClose: () => void;
@@ -33,6 +38,10 @@ interface DispatchCommandBarProps {
   progress?: LookupProgress | null;
   /** Result overview (LookupResultSnapshot) shown once the lookup has a decision. */
   result?: ReactNode;
+  /** Unresolved lookup (company not found / ambiguous) — drives the failure view. */
+  failure?: LookupFailure | null;
+  /** Leave the failure view back to a fresh compose surface ("Try again"). */
+  onRetry?: () => void;
   /** Tracked lookups (active + backgrounded) shown as a focusable chip stack. */
   chips?: LookupChip[];
   onFocusChip?: (id: string) => void;
@@ -120,6 +129,8 @@ export default function DispatchCommandBar({
   message,
   progress,
   result,
+  failure,
+  onRetry,
   chips = [],
   onFocusChip,
 }: DispatchCommandBarProps) {
@@ -130,13 +141,15 @@ export default function DispatchCommandBar({
     if (!open) setCompose(false);
   }, [open]);
 
-  const view: 'result' | 'progress' | 'compose' = compose
+  const view: 'result' | 'failure' | 'progress' | 'compose' = compose
     ? 'compose'
     : result
       ? 'result'
-      : progress
-        ? 'progress'
-        : 'compose';
+      : failure
+        ? 'failure'
+        : progress
+          ? 'progress'
+          : 'compose';
 
   useEffect(() => {
     if (!open) return;
@@ -163,13 +176,28 @@ export default function DispatchCommandBar({
     setCompose(false);
   };
 
-  const eyebrow = view === 'result' ? 'Dispatch Complete' : view === 'progress' ? 'Analyzing' : 'Dispatch';
+  // "Try again" from the failure view: clear the failure and reopen compose.
+  const handleRetry = () => {
+    onRetry?.();
+    setCompose(true);
+  };
+
+  const eyebrow =
+    view === 'result'
+      ? 'Dispatch Complete'
+      : view === 'failure'
+        ? 'Not Found'
+        : view === 'progress'
+          ? 'Analyzing'
+          : 'Dispatch';
   const title =
     view === 'result'
       ? 'Here’s what we found'
-      : view === 'progress'
-        ? progress!.name || progress!.query
-        : 'Look up a company';
+      : view === 'failure'
+        ? failure!.query
+        : view === 'progress'
+          ? progress!.name || progress!.query
+          : 'Look up a company';
   const lookupRunning = isBusy || Boolean(progress);
   const footerActions: DispatchFooterAction[] =
     view === 'result'
@@ -177,18 +205,23 @@ export default function DispatchCommandBar({
           { label: 'Back', onClick: () => setCompose(true) },
           { label: 'Exit', onClick: onClose },
         ]
-      : view === 'progress'
+      : view === 'failure'
         ? [
-            { label: 'Back', onClick: () => setCompose(true) },
+            { label: 'Try again', onClick: handleRetry },
             { label: 'Exit', onClick: onClose },
-            ...(onCancel ? [{ label: 'Cancel', onClick: onCancel }] : []),
           ]
-        : [
-            ...(chips.length >= 1 ? [{ label: 'Back', onClick: () => setCompose(false) }] : []),
-            ...(lookupRunning && onCancel
-              ? [{ label: 'Cancel', onClick: onCancel }]
-              : [{ label: 'Exit', onClick: onClose }]),
-          ];
+        : view === 'progress'
+          ? [
+              { label: 'Back', onClick: () => setCompose(true) },
+              { label: 'Exit', onClick: onClose },
+              ...(onCancel ? [{ label: 'Cancel', onClick: onCancel }] : []),
+            ]
+          : [
+              ...(chips.length >= 1 ? [{ label: 'Back', onClick: () => setCompose(false) }] : []),
+              ...(lookupRunning && onCancel
+                ? [{ label: 'Cancel', onClick: onCancel }]
+                : [{ label: 'Exit', onClick: onClose }]),
+            ];
   const showChips = chips.length >= 2 || (view === 'compose' && chips.length >= 1);
 
   if (!open) return null;
@@ -254,6 +287,33 @@ export default function DispatchCommandBar({
           {view === 'result' ? (
             <Reveal delay={0.24} className="mt-phi-6 flex w-full max-w-xl flex-col items-center">
               {result}
+            </Reveal>
+          ) : view === 'failure' ? (
+            <Reveal delay={0.24} className="mt-phi-6 flex w-full max-w-md flex-col items-center gap-phi-5">
+              <article
+                className="w-full border border-solid border-oxford/10 bg-paper px-phi-5 py-phi-5"
+                aria-label={`Lookup could not resolve ${failure!.query}`}
+              >
+                <div className="mb-phi-3 flex items-baseline justify-between gap-phi-3">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-oxford/40">Result</p>
+                  <p className="text-right font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/35">
+                    Unresolved
+                  </p>
+                </div>
+                <h3 className="font-sans text-xl font-semibold leading-tight tracking-tight text-oxford sm:text-2xl">
+                  No confirmed match
+                </h3>
+                <p className="mt-phi-3 font-sans text-[15px] leading-[1.6] text-oxford/58">
+                  {failure!.message}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  className="mt-phi-4 w-full border border-solid border-oxford/12 bg-oxford px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90"
+                >
+                  Try another lookup
+                </button>
+              </article>
             </Reveal>
           ) : view === 'progress' ? (
             <Reveal delay={0.24} className="mt-phi-3 flex flex-col items-center gap-phi-5">

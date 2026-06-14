@@ -28,7 +28,7 @@ if load_dotenv:
         load_dotenv()
 
 from tenant_context import TenantContext
-from pipeline_concurrency import pipeline_execution_slot
+from pipeline_concurrency import pipeline_execution_slot, lookup_execution_slot
 from supabase_doc_store import list_upsert
 from utils.settings_loader import load_settings, is_thesis_reprocess_agents_enabled
 from supabase_client import get_service_client
@@ -465,7 +465,8 @@ async def run_on_demand_lookup(
         return None
 
     user_id = user_id.strip()
-    async with pipeline_execution_slot(user_id):
+    # Lookups use their own slot so they never wait behind a full periodic cycle.
+    async with lookup_execution_slot(user_id):
         return await _run_on_demand_lookup_inner(
             user_id,
             company,

@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from typing import Dict, Optional
 
 _global_sem: Optional[asyncio.Semaphore] = None
+_lookup_sem: Optional[asyncio.Semaphore] = None
 _user_locks: Dict[str, asyncio.Lock] = {}
 
 
@@ -19,11 +20,22 @@ def max_concurrent_pipeline_cycles() -> int:
     return max(1, int(os.getenv("MAX_CONCURRENT_PIPELINE_CYCLES", "1")))
 
 
+def max_concurrent_lookups() -> int:
+    return max(1, int(os.getenv("MAX_CONCURRENT_LOOKUPS", "2")))
+
+
 def _get_global_sem() -> asyncio.Semaphore:
     global _global_sem
     if _global_sem is None:
         _global_sem = asyncio.Semaphore(max_concurrent_pipeline_cycles())
     return _global_sem
+
+
+def _get_lookup_sem() -> asyncio.Semaphore:
+    global _lookup_sem
+    if _lookup_sem is None:
+        _lookup_sem = asyncio.Semaphore(max_concurrent_lookups())
+    return _lookup_sem
 
 
 def _get_user_lock(user_id: str) -> asyncio.Lock:
@@ -50,4 +62,24 @@ async def pipeline_execution_slot(user_id: str):
         yield
     finally:
         user_lock.release()
+        sem.release()
+
+
+@asynccontextmanager
+async def lookup_execution_slot(user_id: str):
+    """Concurrency slot for on-demand lookups.
+
+    Independent of the periodic-cycle semaphore (and its per-user lock) so a
+    lookup never waits behind a full scout->reviewer->partner->portfolio->meta
+    cycle. Bounded by its own MAX_CONCURRENT_LOOKUPS to protect memory.
+    """
+    uid = (user_id or "").strip()
+    if not uid:
+        yield
+        return
+    sem = _get_lookup_sem()
+    await sem.acquire()
+    try:
+        yield
+    finally:
         sem.release()
