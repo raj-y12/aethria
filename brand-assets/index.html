@@ -410,7 +410,7 @@
         <div class="section-head">
           <span class="idx">01</span>
           <h2>Banner Studio</h2>
-          <span class="hint">1584 × 396 · LinkedIn / X header</span>
+          <span class="hint" id="studio-hint">1584 × 396 · LinkedIn header</span>
         </div>
         <div class="studio">
           <div class="stage">
@@ -425,6 +425,11 @@
           </div>
 
           <div class="controls">
+            <div class="ctl-group">
+              <span class="ctl-label">Platform</span>
+              <div class="presets" id="platform-pills"></div>
+            </div>
+
             <div class="ctl-group">
               <span class="ctl-label">Scheme</span>
               <div class="presets" id="preset-pills"></div>
@@ -610,6 +615,14 @@
         bloom:    { name: 'Bloom',    base: '#f1e8df', ink: '#2a1726', hole: '#2a1726', colors: ['#ff6b9d', '#ff9e3d', '#a06bff', '#5ad1ff'] },
         ink:      { name: 'Ink',      base: '#e9e5dc', ink: '#001433', hole: '#001433', colors: ['#001433', '#26313f', '#3d6b5e', '#7aab9a'] }
       };
+
+      var PLATFORMS = [
+        { id: 'linkedin',  name: 'LinkedIn',  w: 1584, h: 396,  label: 'LinkedIn header',    exportRatio: 3 },
+        { id: 'x',        name: 'X',         w: 1500, h: 500,  label: 'X header',           exportRatio: 3 },
+        { id: 'facebook', name: 'Facebook',  w: 1640, h: 624,  label: 'Facebook cover',      exportRatio: 2 },
+        { id: 'youtube',  name: 'YouTube',   w: 2560, h: 1440, label: 'YouTube channel art', exportRatio: 1 }
+      ];
+      var activePlatform = PLATFORMS[0];
 
       /* ---------------- mesh renderer ---------------- */
       var WARM = '#ff7a1a', COOL = '#1f6bff';
@@ -851,7 +864,7 @@
       var PREVIEW_RATIO = Math.min(2, (window.devicePixelRatio || 1) * 1.4);
 
       var studio = {
-        w: 1584, h: 396, seed: 7,
+        w: 1584, h: 396, exportRatio: 3, seed: 7,
         base: PRESETS.spectrum.base, ink: PRESETS.spectrum.ink, hole: PRESETS.spectrum.hole,
         colors: PRESETS.spectrum.colors.slice(),
         layout: 'statement', titleSize: 132,
@@ -868,6 +881,50 @@
           renderMesh(studioCanvas, studio, PREVIEW_RATIO);
         });
       }
+
+      function updateDims() {
+        var er = studio.exportRatio || EXPORT_RATIO;
+        var hint = document.getElementById('studio-hint');
+        var dims = document.getElementById('studio-dims');
+        if (hint) hint.textContent = studio.w + ' \xd7 ' + studio.h + ' \xb7 ' + activePlatform.label;
+        if (dims) dims.textContent = 'Export \xb7 ' + (studio.w * er) + ' \xd7 ' + (studio.h * er) + ' px \xb7 ' + er + '\xd7';
+      }
+
+      /* platform pills */
+      function platformRect(w, h) {
+        var aspect = w / h;
+        var rw = Math.round(Math.min(22, 22));
+        var rh = Math.round(rw / aspect);
+        rh = Math.max(rh, 4);
+        return '<span style="display:inline-flex;align-items:center;width:26px;height:14px;justify-content:center">' +
+          '<span style="display:block;width:' + rw + 'px;height:' + rh + 'px;border:1.5px solid currentColor;opacity:0.38;border-radius:1px"></span>' +
+          '</span>';
+      }
+      var platformPillWrap = document.getElementById('platform-pills');
+      function applyPlatform(id) {
+        var plat = null;
+        for (var i = 0; i < PLATFORMS.length; i++) { if (PLATFORMS[i].id === id) { plat = PLATFORMS[i]; break; } }
+        if (!plat) return;
+        activePlatform = plat;
+        studio.w = plat.w; studio.h = plat.h; studio.exportRatio = plat.exportRatio;
+        Array.prototype.forEach.call(platformPillWrap.children, function (c) {
+          c.setAttribute('aria-pressed', c.getAttribute('data-id') === id ? 'true' : 'false');
+        });
+        updateDims();
+        renderStudio();
+      }
+      PLATFORMS.forEach(function (plat) {
+        var b = document.createElement('button');
+        b.className = 'preset-pill';
+        b.type = 'button';
+        b.setAttribute('data-id', plat.id);
+        b.setAttribute('aria-pressed', plat.id === 'linkedin' ? 'true' : 'false');
+        b.innerHTML = platformRect(plat.w, plat.h) +
+          '<span>' + plat.name + '</span>' +
+          '<span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.04em;opacity:0.45;margin-left:4px">' + plat.w + '\xd7' + plat.h + '</span>';
+        b.addEventListener('click', function () { applyPlatform(plat.id); });
+        platformPillWrap.appendChild(b);
+      });
 
       /* preset pills */
       var pillWrap = document.getElementById('preset-pills');
@@ -951,9 +1008,10 @@
       document.getElementById('shuffle').addEventListener('click', function () { studio.seed = Math.floor(Math.random() * 99999); renderStudio(); });
       document.getElementById('studio-download').addEventListener('click', function () {
         var out = document.createElement('canvas');
-        renderMesh(out, studio, EXPORT_RATIO);
-        download(out, 'aethria-banner.png');
-        toast('Downloaded · ' + (studio.w * EXPORT_RATIO) + ' × ' + (studio.h * EXPORT_RATIO));
+        var er = studio.exportRatio || EXPORT_RATIO;
+        renderMesh(out, studio, er);
+        download(out, 'aethria-banner-' + (activePlatform ? activePlatform.id : 'linkedin') + '.png');
+        toast('Downloaded \xb7 ' + (studio.w * er) + ' \xd7 ' + (studio.h * er));
       });
 
       function seedFields() {
@@ -1093,7 +1151,7 @@
 
       /* ---------------- boot ---------------- */
       function boot() {
-        syncSwatches(); seedFields(); renderStudio();
+        syncSwatches(); seedFields(); updateDims(); renderStudio();
         GALLERY.length && galleryWrap.querySelectorAll('.gcard').forEach(function (card) {
           var cfg = card._cfg;
           renderMesh(cfg._canvas, cfg, PREVIEW_RATIO);
