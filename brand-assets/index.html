@@ -1081,7 +1081,11 @@
         { key: 'aethria',  mode: 'wordmark', label: 'Wordmark · Aethria' },
         { key: 'spectrum', mode: 'mono',     label: 'Monogram · Spectrum' },
         { key: 'tide',     mode: 'mono',     label: 'Monogram · Tide' },
-        { key: 'ink',      mode: 'wordmark', label: 'Wordmark · Ink' }
+        { key: 'ink',      mode: 'wordmark', label: 'Wordmark · Ink' },
+        { key: null, mode: 'wordmark-plain', label: 'Wordmark · Plain — Dark',
+          override: { base: '#001433', ink: '#f4f1ea', accent: '#3d6b5e' } },
+        { key: null, mode: 'wordmark-plain', label: 'Wordmark · Plain — Light',
+          override: { base: '#f4f1ea', ink: '#001433', accent: '#3d6b5e' } }
       ];
       var profileWrap = document.getElementById('profile-gallery');
       function renderProfile(canvas, cfg, ratio) {
@@ -1089,14 +1093,27 @@
         canvas.width = W; canvas.height = H;
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = cfg.base; ctx.fillRect(0, 0, W, H);
-        var blobs = buildBlobs({ seed: cfg.seed, colors: cfg.colors }, 1000, 1000);
-        blobs.forEach(function (b) { b.holeColor = cfg.hole; drawBlob(ctx, b, s); });
-        applyGrain(ctx, W, H, cfg.seed, 20);
+        var isPlain = cfg.mode === 'wordmark-plain';
+        if (!isPlain) {
+          var blobs = buildBlobs({ seed: cfg.seed, colors: cfg.colors }, 1000, 1000);
+          blobs.forEach(function (b) { b.holeColor = cfg.hole; drawBlob(ctx, b, s); });
+        }
+        applyGrain(ctx, W, H, cfg.seed, isPlain ? 10 : 20);
         ctx.fillStyle = cfg.ink;
         if (cfg.mode === 'mono') {
           ctx.font = '500 ' + (560 * s) + 'px "Playfair Display", Georgia, serif';
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           ctx.fillText('A', W / 2, H / 2 + 30 * s);
+        } else if (isPlain) {
+          var pSize = 180 * s;
+          ctx.font = '500 ' + pSize + 'px "Playfair Display", Georgia, serif';
+          ctx.textBaseline = 'middle';
+          var pWord = 'Aethria', pDot = '.';
+          var pWw = ctx.measureText(pWord).width, pDw = ctx.measureText(pDot).width;
+          var pX = (W - (pWw + pDw)) / 2;
+          ctx.textAlign = 'left';
+          ctx.fillStyle = cfg.ink; ctx.fillText(pWord, pX, H / 2);
+          ctx.fillStyle = cfg.accent; ctx.fillText(pDot, pX + pWw, H / 2);
         } else {
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           var size = 150 * s;
@@ -1110,12 +1127,16 @@
         }
       }
       PROFILES.forEach(function (item, n) {
-        var p = PRESETS[item.key];
-        var cfg = { base: p.base, ink: p.ink, hole: p.hole, colors: p.colors.slice(), seed: 3 + n * 5, mode: item.mode };
+        var p = item.key ? PRESETS[item.key] : null;
+        var cfg = p
+          ? { base: p.base, ink: p.ink, hole: p.hole, colors: p.colors.slice(), seed: 3 + n * 5, mode: item.mode }
+          : { base: item.override.base, ink: item.override.ink, hole: item.override.base,
+              accent: item.override.accent, colors: [item.override.accent], seed: 3 + n * 5, mode: item.mode };
+        var loadLabel = p ? p.name.toUpperCase() : 'PLAIN';
         var card = document.createElement('article');
         card.className = 'gcard';
         card.innerHTML =
-          '<div class="frame" style="aspect-ratio:1;max-width:360px"><div class="load">' + p.name.toUpperCase() + '</div>' +
+          '<div class="frame" style="aspect-ratio:1;max-width:360px"><div class="load">' + loadLabel + '</div>' +
           '<canvas width="1000" height="1000"></canvas></div>' +
           '<div class="meta"><strong>' + item.label + '</strong>' +
           '<button class="btn btn-solid dl">PNG</button></div>';
