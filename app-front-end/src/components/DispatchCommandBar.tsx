@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import AgentDispatch from './AgentDispatch';
+import CandidatePicker from './CandidatePicker';
 import Reveal from './Reveal';
 import { useFocusTrap } from '../hooks';
 import type { LookupCandidate } from '../api/startups';
@@ -8,6 +9,8 @@ export interface LookupProgress {
   query: string;
   name: string | null;
   sector: string | null;
+  /** Company identity confirmed (single match / candidate picked / lookup queued). */
+  resolved: boolean;
   found: boolean;
   reviewed: boolean;
 }
@@ -47,6 +50,8 @@ interface DispatchCommandBarProps {
   chips?: LookupChip[];
   onFocusChip?: (id: string) => void;
   candidates?: LookupCandidate[];
+  /** Resolver found no clear match — prompt for a website inside the stages screen. */
+  needsWebsite?: boolean;
   onPickCandidate?: (candidate: LookupCandidate) => void;
   onRefineWebsite?: (websiteHint: string) => void;
 }
@@ -55,7 +60,11 @@ type StepState = 'done' | 'active' | 'pending';
 
 function ProgressSteps({ progress }: { progress: LookupProgress }) {
   const steps: { label: string; state: StepState }[] = [
-    { label: 'Discover', state: progress.found ? 'done' : 'active' },
+    { label: 'Identify', state: progress.resolved ? 'done' : 'active' },
+    {
+      label: 'Discover',
+      state: progress.found ? 'done' : progress.resolved ? 'active' : 'pending',
+    },
     { label: 'Review', state: progress.reviewed ? 'done' : progress.found ? 'active' : 'pending' },
     { label: 'Decide', state: progress.reviewed ? 'active' : 'pending' },
   ];
@@ -138,6 +147,7 @@ export default function DispatchCommandBar({
   chips = [],
   onFocusChip,
   candidates,
+  needsWebsite = false,
   onPickCandidate,
   onRefineWebsite,
 }: DispatchCommandBarProps) {
@@ -189,13 +199,18 @@ export default function DispatchCommandBar({
     setCompose(true);
   };
 
+  // While the identity is still being confirmed (resolving / disambiguation),
+  // the stages screen leads with "Confirm Company" rather than "Analyzing".
+  const confirming = view === 'progress' && progress != null && !progress.resolved;
   const eyebrow =
     view === 'result'
       ? 'Dispatch Complete'
       : view === 'failure'
         ? 'Not Found'
         : view === 'progress'
-          ? 'Analyzing'
+          ? confirming
+            ? 'Confirm Company'
+            : 'Analyzing'
           : 'Dispatch';
   const title =
     view === 'result'
@@ -335,6 +350,23 @@ export default function DispatchCommandBar({
                   {message}
                 </p>
               ) : null}
+              {(candidates && candidates.length > 0) || needsWebsite ? (
+                onPickCandidate && onRefineWebsite ? (
+                  <div className="w-full max-w-md text-left">
+                    <CandidatePicker
+                      candidates={candidates ?? []}
+                      onPick={onPickCandidate}
+                      onRefine={onRefineWebsite}
+                      busy={isBusy}
+                      heading={
+                        candidates && candidates.length > 0
+                          ? undefined
+                          : 'No exact match — add the company website to pin the right one.'
+                      }
+                    />
+                  </div>
+                ) : null
+              ) : null}
             </Reveal>
           ) : (
             <>
@@ -354,9 +386,6 @@ export default function DispatchCommandBar({
                     message={null}
                     lookupPhase={null}
                     displayMode="embedded"
-                    candidates={candidates}
-                    onPickCandidate={onPickCandidate}
-                    onRefineWebsite={onRefineWebsite}
                   />
                 </div>
               </Reveal>

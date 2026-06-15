@@ -59,6 +59,16 @@ export function useDispatchLookup({
   const [message, setMessage] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<LookupCandidate[]>([]);
   const [refining, setRefining] = useState(false);
+  // Active dispatch session: true from the moment the analyst submits until the
+  // lookup resolves, fails, or is cleared. Drives the takeover straight to the
+  // stages screen so identity confirmation + disambiguation live there, not on
+  // the compose surface.
+  const [dispatching, setDispatching] = useState(false);
+  // Resolver returned no clear match — ask the analyst for a website to pin it.
+  const [needsWebsite, setNeedsWebsite] = useState(false);
+  // The analyst's own words for the lookup, kept for the stages-screen heading
+  // before the scout has resolved a canonical company name.
+  const [activeQuery, setActiveQuery] = useState('');
   const [pendingLookup, setPendingLookup] = useState<TrackedLookup | null>(null);
   // A lookup the scout could not resolve (company not found / ambiguous). Drives
   // the takeover's failure view — the "here's what we found" counterpart for misses.
@@ -83,6 +93,7 @@ export function useDispatchLookup({
       }
       setCandidates([]);
       setRefining(false);
+      setNeedsWebsite(false);
       setPendingLookup({ lookupId: queued.lookupId, queryLabel: value, autoOpened: false });
       setMessage(
         `Lookup queued for ${queued.companyName}. We are now finding and validating the company profile.`,
@@ -98,6 +109,10 @@ export function useDispatchLookup({
     const requestSeq = requestSeqRef.current + 1;
     requestSeqRef.current = requestSeq;
     setFailure(null);
+    setDispatching(true);
+    setActiveQuery(value);
+    setNeedsWebsite(false);
+    setCandidates([]);
     setBusy(true);
     setMessage('Confirming the company identity...');
     try {
@@ -117,6 +132,7 @@ export function useDispatchLookup({
       }
       if (resolved.status === 'not_found') {
         setCandidates([]);
+        setNeedsWebsite(true);
         setMessage(
           `No clear match for ${value}. Add the company website to pin it (e.g. "${value} example.com").`,
         );
@@ -136,6 +152,7 @@ export function useDispatchLookup({
       if (busy) return;
       const requestSeq = requestSeqRef.current + 1;
       requestSeqRef.current = requestSeq;
+      setNeedsWebsite(false);
       setBusy(true);
       try {
         await queueLookup(`${candidate.name} ${candidate.website}`, requestSeq);
@@ -160,11 +177,13 @@ export function useDispatchLookup({
         if (requestSeqRef.current !== requestSeq) return;
         if (resolved.status === 'ambiguous') {
           setCandidates(resolved.candidates);
+          setNeedsWebsite(false);
           setMessage('Still more than one match — pick a candidate or refine again.');
           return;
         }
         if (resolved.status === 'not_found') {
           setCandidates([]);
+          setNeedsWebsite(true);
           setMessage(
             `No company found at ${websiteHint}. Check the address and try again.`,
           );
@@ -191,6 +210,9 @@ export function useDispatchLookup({
     ].filter((id): id is string => Boolean(id?.trim()));
     requestSeqRef.current += 1;
     setBusy(false);
+    setDispatching(false);
+    setNeedsWebsite(false);
+    setActiveQuery('');
     setPendingLookup(null);
     setBackgroundLookups([]);
     setFailure(null);
@@ -261,6 +283,8 @@ export function useDispatchLookup({
       `We couldn't confirm a company matching "${pendingLookup.queryLabel}". Try the exact name or add the website to disambiguate (example: "Aethria aethria.com").`;
     setFailure({ query: pendingLookup.queryLabel, message: reason });
     setMessage(null);
+    setDispatching(false);
+    setNeedsWebsite(false);
     setPendingLookup(null);
     // Surface the fail page even if the analyst had closed the takeover.
     setCommandBarOpen(true);
@@ -345,18 +369,23 @@ export function useDispatchLookup({
     return buildLookupSnapshotProps(src, pendingLookup?.queryLabel, fundConfiguration?.verdictBadges);
   }, [lookupDetailQuery.data, pendingLookupMatch, pendingLookup?.queryLabel, fundConfiguration?.verdictBadges]);
 
-  // In-flight lookup → drives the takeover's progressive reveal (null once decided).
+  // Active dispatch → drives the takeover's stages screen. Non-null from the
+  // moment of submit (identity confirmation / disambiguation) through the
+  // in-flight pipeline, null once decided (the result snapshot takes over).
   const progress = useMemo((): LookupProgress | null => {
-    if (!pendingLookup) return null;
+    if (!dispatching && !pendingLookup) return null;
     if (pendingLookupMatch?.partner?.recommendation) return null;
     return {
-      query: pendingLookup.queryLabel,
+      query: activeQuery || pendingLookup?.queryLabel || '',
       name: pendingLookupMatch?.scout?.name ?? null,
       sector: pendingLookupMatch?.scout?.sector ?? null,
+      // Identity confirmed once a lookup has actually been queued; until then the
+      // analyst is still on the Identify stage (resolving / picking a candidate).
+      resolved: pendingLookup != null,
       found: !!pendingLookupMatch,
       reviewed: !!pendingLookupMatch?.review,
     };
-  }, [pendingLookup, pendingLookupMatch]);
+  }, [dispatching, activeQuery, pendingLookup, pendingLookupMatch]);
 
   // A finished lookup the analyst hasn't opened yet → "ready" toast.
   const lookupReady =
@@ -371,6 +400,9 @@ export function useDispatchLookup({
     onOpenMemo(pendingLookupMatch);
     // Opened → clear the active lookup entirely (don't auto-jump to another).
     // Any backgrounded lookups remain as chips, reachable on reopen.
+    setDispatching(false);
+    setNeedsWebsite(false);
+    setActiveQuery('');
     setPendingLookup(null);
     setCommandBarOpen(false); // close the takeover so the memo is visible
   }, [pendingLookupMatch, onOpenMemo]);
@@ -459,6 +491,7 @@ export function useDispatchLookup({
     dismissFailure,
     lookupWorking,
     candidates,
+    needsWebsite,
     pickCandidate,
     refineWithWebsite,
     refining,

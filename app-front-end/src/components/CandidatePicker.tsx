@@ -8,6 +8,8 @@ interface CandidatePickerProps {
   onPick: (candidate: LookupCandidate) => void;
   onRefine: (websiteHint: string) => void;
   busy?: boolean;
+  /** Override the prompt above the list (e.g. the no-match "add a website" case). */
+  heading?: string;
 }
 
 /** Strip protocol so the registrable domain (and its .ie/.com/.co extension) reads cleanly. */
@@ -15,7 +17,7 @@ function domainLabel(website: string): string {
   return website.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 }
 
-export default function CandidatePicker({ candidates, onPick, onRefine, busy }: CandidatePickerProps) {
+export default function CandidatePicker({ candidates, onPick, onRefine, busy, heading }: CandidatePickerProps) {
   const [refineOpen, setRefineOpen] = useState(false);
   const [website, setWebsite] = useState('');
 
@@ -36,7 +38,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy }: 
       aria-label="Select the company you meant"
     >
       <p className="type-meta text-oxford/[0.45]">
-        More than one company matches — select the one you meant.
+        {heading ?? 'More than one company matches — select the one you meant.'}
       </p>
 
       {candidates.map((c) => (
@@ -94,7 +96,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy }: 
           disabled={busy}
           className="justify-self-start type-meta text-oxford/[0.40] hover:text-oxford/[0.70] bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
         >
-          None of these — add a website
+          {candidates.length ? 'None of these — add a website' : 'Add a website'}
         </button>
       )}
     </motion.div>

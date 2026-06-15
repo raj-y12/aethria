@@ -416,6 +416,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                 failure={dispatch.failure}
                 onRetry={dispatch.dismissFailure}
                 candidates={dispatch.candidates}
+                needsWebsite={dispatch.needsWebsite}
                 onPickCandidate={dispatch.pickCandidate}
                 onRefineWebsite={dispatch.refineWithWebsite}
                 result={
