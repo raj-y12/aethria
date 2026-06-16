@@ -393,8 +393,6 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
               ) : null}
             </AnimatePresence>
             <motion.main
-              layout
-              transition={chromeTransition}
               className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper"
             >
               {children}

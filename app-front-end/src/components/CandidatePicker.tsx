@@ -51,8 +51,8 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
           className="group w-full text-left border border-oxford/[0.10] hover:border-oxford/[0.30] bg-paper px-phi-3 py-phi-3 transition-colors disabled:opacity-60 btn-interaction"
         >
           <div className="flex items-baseline justify-between gap-phi-2">
-            <span className="font-sans font-medium text-[13px] text-oxford truncate">{c.name}</span>
-            <span className="type-meta text-oxford/[0.50] shrink-0">{domainLabel(c.website)}</span>
+            <span className="min-w-0 truncate font-sans font-medium text-[13px] text-oxford">{c.name}</span>
+            <span className="type-meta shrink-0 max-w-[45%] truncate text-oxford/[0.50]">{domainLabel(c.website)}</span>
           </div>
           {c.description ? (
             <p className="mt-phi-1 type-meta text-oxford/[0.55] line-clamp-2">{c.description}</p>
