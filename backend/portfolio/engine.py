@@ -172,7 +172,17 @@ class PortfolioEngine:
                         partner_data.get("recommendation")
                     )
                 
-                startup_id = startup_data.get("id") if startup_data else entry.get("startup_id", entry.get("id"))
+                # The canonical id is the entry's top-level startup_id. The old
+                # `startup_data.get("id")` read scout_info, which has no "id"
+                # key, so it always returned None — poisoning every decision /
+                # watchlist / rejection with a null startup_id and collapsing the
+                # dedup set to {None}, which skipped nearly every startup.
+                startup_id = (
+                    entry.get("startup_id")
+                    or entry.get("id")
+                    or (startup_data or {}).get("startup_id")
+                    or (startup_data or {}).get("id")
+                )
                 
                 # Check if already processed (exists in portfolio store)
                 existing_startup = self.portfolio_store.get_startup(startup_id)
