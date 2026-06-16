@@ -204,6 +204,15 @@ const WorkGrid = ({
     const timer = window.setTimeout(() => setAutoSelectReady(true), 460);
     return () => window.clearTimeout(timer);
   }, [reduceMotion]);
+  // Let the chrome (spine slide + page-enter) land before the docket staggers
+  // in — otherwise the sidebar, the rows, and the memo all animate at once and
+  // the entrance stutters. After this window, re-staggers (filter/sort) are snappy.
+  const [chromeSettled, setChromeSettled] = useState(reduceMotion);
+  useEffect(() => {
+    if (reduceMotion) return;
+    const timer = window.setTimeout(() => setChromeSettled(true), 900);
+    return () => window.clearTimeout(timer);
+  }, [reduceMotion]);
   const hasActiveFilters =
     sourceFilters.size > 0 ||
     outcomeFilters.size > 0 ||
@@ -241,9 +250,9 @@ const WorkGrid = ({
       ? undefined
       : {
           hidden: {},
-          visible: { transition: { staggerChildren: 0.04, delayChildren: 0.04 } },
+          visible: { transition: { staggerChildren: 0.04, delayChildren: chromeSettled ? 0.04 : 0.35 } },
         },
-    [reduceMotion]
+    [reduceMotion, chromeSettled]
   );
 
   const rowVariants = useMemo((): Variants | undefined =>
