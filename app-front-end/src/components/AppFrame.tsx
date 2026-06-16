@@ -376,7 +376,6 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
               {showSpine ? (
                 <motion.div
                   key="spine"
-                  layout
                   initial={reduceMotion ? { opacity: 1 } : { opacity: 0, x: -28 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -28 }}
