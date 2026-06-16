@@ -163,7 +163,8 @@ class PortfolioEngine:
                 
                 # Check for human resolution override
                 human_resolution = entry.get("human_resolution")
-                if human_resolution and human_resolution.get("decision"):
+                is_resolved = bool(human_resolution and human_resolution.get("decision"))
+                if is_resolved:
                     partner_data = dict(partner_data)
                     partner_data["decision"] = human_resolution["decision"]
                 elif partner_data.get("recommendation") and not partner_data.get("decision"):
@@ -171,7 +172,17 @@ class PortfolioEngine:
                     partner_data["decision"] = legacy_from_recommendation(
                         partner_data.get("recommendation")
                     )
-                
+
+                # Unresolved escalations are not decisions yet — the Partner
+                # deferred to human judgment (human_review_required=True with no
+                # human_resolution). Skip routing entirely so they don't land on
+                # the watchlist (or in decisions); they stay in the escalation
+                # queue (startups.partner_human_review_required) until ruled. Once
+                # a human rules, human_resolution.decision is set and the row flows
+                # through normal routing above (MAYBE → watchlist, etc.).
+                if partner_data.get("human_review_required") and not is_resolved:
+                    continue
+
                 # The canonical id is the entry's top-level startup_id. The old
                 # `startup_data.get("id")` read scout_info, which has no "id"
                 # key, so it always returned None — poisoning every decision /

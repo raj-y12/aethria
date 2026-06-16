@@ -212,8 +212,13 @@ class _FakeDiscoveryStorage:
         return self._entries
 
 
-def _portfolio_entry(startup_id, recommendation):
-    return {
+def _portfolio_entry(
+    startup_id,
+    recommendation,
+    human_review_required=False,
+    human_resolution=None,
+):
+    entry = {
         "scout_info": {
             "id": startup_id,
             "name": startup_id,
@@ -238,8 +243,12 @@ def _portfolio_entry(startup_id, recommendation):
             "recommendation": recommendation,
             "confidence": 8,
             "rationale": f"{recommendation} rationale",
+            "human_review_required": human_review_required,
         },
     }
+    if human_resolution is not None:
+        entry["human_resolution"] = human_resolution
+    return entry
 
 
 @pytest.mark.asyncio
@@ -270,3 +279,45 @@ async def test_portfolio_engine_routes_partner_recommendations(monkeypatch, tmp_
     assert [r["startup_id"] for r in store.get_all_portfolio()] == ["invest-startup"]
     assert [r["startup_id"] for r in store.get_all_watchlist()] == ["monitor-startup"]
     assert [r["startup_id"] for r in store.get_all_rejections()] == ["pass-startup"]
+
+
+@pytest.mark.asyncio
+async def test_unresolved_escalation_is_not_routed_until_ruled(monkeypatch, tmp_path):
+    """Escalated MONITORs (human_review_required, no ruling) stay off the
+    watchlist; once a human rules MAYBE, the company flows onto it."""
+    monkeypatch.delenv("USE_SUPABASE_STORAGE", raising=False)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+
+    store = PortfolioStore(data_dir=str(tmp_path / "portfolio"))
+    discovery_storage = _FakeDiscoveryStorage(
+        [
+            # Escalated, unresolved → must NOT be routed anywhere yet.
+            _portfolio_entry(
+                "escalated-startup", "MONITOR", human_review_required=True
+            ),
+            # Escalated but ruled MAYBE by a human → routes to watchlist.
+            _portfolio_entry(
+                "ruled-startup",
+                "MONITOR",
+                human_review_required=True,
+                human_resolution={"decision": "MAYBE", "resolved_at": "2026-06-16T00:00:00Z"},
+            ),
+        ]
+    )
+    engine = PortfolioEngine(
+        discovery_storage=discovery_storage,
+        portfolio_store=store,
+        execution_interval=0,
+        signal_interval=999999,
+        feedback_interval=999999,
+        health_interval=999999,
+    )
+
+    await engine._run_execution()
+
+    # Only the ruled company lands on the watchlist; the unresolved
+    # escalation is absent from every store.
+    assert [r["startup_id"] for r in store.get_all_watchlist()] == ["ruled-startup"]
+    assert store.get_all_portfolio() == []
+    assert store.get_all_rejections() == []
