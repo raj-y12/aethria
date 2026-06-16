@@ -1,6 +1,7 @@
 import { useState, useLayoutEffect, useEffect, useRef, lazy, Suspense } from 'react';
 import { useLocation, Navigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { setTokenGetter } from './api/auth';
 import { triggerAgents } from './api/agents';
@@ -103,9 +104,25 @@ function AppShell() {
 
 function App() {
   const { pathname } = useLocation();
-  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { isLoaded, isSignedIn, getToken, userId } = useAuth();
+  const queryClient = useQueryClient();
   const [tokenReady, setTokenReady] = useState(false);
   const loginEntryHandoffRef = useRef(false);
+
+  // The query cache is a module-level singleton, so it survives sign-out →
+  // sign-in within the same SPA session. Without clearing it, a different
+  // account that logs in next reads the previous tenant's cached data until a
+  // hard reload. Drop the entire cache whenever the signed-in user changes
+  // (account switch or sign-out). The initial undefined → id assignment is
+  // skipped so we never clear a freshly-populated cache on first load.
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevUserIdRef.current;
+    if (prev !== undefined && prev !== userId) {
+      queryClient.clear();
+    }
+    prevUserIdRef.current = userId;
+  }, [userId, queryClient]);
 
   useLayoutEffect(() => {
     if (!isSignedIn) {
