@@ -246,12 +246,6 @@ export default function FlowPage({ data }: { data: SystemData }) {
                 active={queueView === 'STALE'}
                 onClick={() => selectView('STALE')}
               />
-              <ReadoutKey
-                label="In pipeline"
-                value={startups.length.toLocaleString()}
-                active={queueView === 'ALL'}
-                onClick={() => selectView('ALL')}
-              />
             </div>
           }
         />
@@ -263,7 +257,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
               The pipeline is filling.
             </h2>
             <p className="mt-phi-3 max-w-[36ch] font-mono text-[11px] tracking-[0.06em] text-oxford/45">
-              Scouts are searching against the active mandate. The first matter takes the stage when it lands.
+              Scouts are searching against your mandate. New matters appear here as they land.
             </p>
             <button
               type="button"

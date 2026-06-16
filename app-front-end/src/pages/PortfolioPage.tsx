@@ -156,7 +156,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                 detail={data.concentrationAnalytics.most_concentrated_sector || undefined}
               />
               {sectorRows.length === 0 ? (
-                <QuietEmpty>Distribution appears once the pipeline has decided deals to cluster.</QuietEmpty>
+                <QuietEmpty>Appears once deals are decided.</QuietEmpty>
               ) : (
                 <ul className="mt-phi-4 flex flex-col gap-phi-3">
                   {sectorRows.map((row) => (
