@@ -85,7 +85,7 @@ function SpineReadout({
       >
         {value}
       </span>
-      <span className="mt-phi-1 font-mono text-[9px] uppercase tracking-[0.1em] text-white/35">{label}</span>
+      <span className="mt-phi-1 font-mono text-[9px] uppercase tracking-[0.1em] text-white/45">{label}</span>
     </>
   );
 
@@ -157,7 +157,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
             >
               Aethria<span className="wordmark-dot wordmark-dot--inverse">.</span>
             </Link>
-            <p className="mt-phi-2 font-mono text-[10px] tabular-nums tracking-[0.08em] text-white/35" aria-hidden>
+            <p className="mt-phi-2 font-mono text-[10px] tabular-nums tracking-[0.08em] text-white/45" aria-hidden>
               {timeShort} · {dateShort}
             </p>
           </div>
@@ -210,7 +210,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                 className="bg-white/[0.04] px-phi-3 py-phi-4"
               >
                 <div className="flex items-baseline justify-between gap-phi-2">
-                  <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">Pipeline</span>
+                  <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/45">Pipeline</span>
                   <span
                     className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[9px] uppercase tracking-[0.1em] ${pipelineTone.text}`}
                   >
@@ -228,41 +228,25 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                   </Link>
                 ) : null}
 
-                <div
-                  className="mt-phi-4 grid grid-cols-3 gap-x-phi-2 gap-y-phi-3"
-                  aria-live="polite"
-                >
+                {/* One number that needs judgment — Need ruling when there is
+                    work to rule, otherwise Open. The room headers carry the full
+                    readout set; the spine stays a single ambient signal. */}
+                <div className="mt-phi-4" aria-live="polite">
                   <SpineReadout
-                    label="Need ruling"
-                    value={telemetry.pendingEscalations.toLocaleString()}
+                    label={hasEscalations ? 'Need ruling' : 'Open'}
+                    value={(hasEscalations ? telemetry.pendingEscalations : telemetry.openInProgressCount).toLocaleString()}
                     tone={hasEscalations ? 'escalation' : 'default'}
                     onClick={
-                      hasEscalations
-                        ? () => navigate('/v1/flow?queue=escalated')
-                        : undefined
+                      hasEscalations ? () => navigate('/v1/flow?queue=escalated') : () => navigate('/v1/flow')
                     }
                   />
-                  <SpineReadout
-                    label="Open"
-                    value={telemetry.openInProgressCount.toLocaleString()}
-                  />
-                  <SpineReadout
-                    label="In pipe"
-                    value={telemetry.totalCount.toLocaleString()}
-                  />
+                  <p className="mt-phi-2 font-mono text-[9px] tracking-[0.06em] tabular-nums text-white/45">
+                    {hasEscalations
+                      ? `${telemetry.openInProgressCount.toLocaleString()} open`
+                      : `${telemetry.totalCount.toLocaleString()} in pipeline`}
+                    {telemetry.newCount > 0 ? ` · ${telemetry.newCount.toLocaleString()} new` : ''}
+                  </p>
                 </div>
-
-                <p className="mt-phi-3 font-mono text-[9px] tracking-[0.04em] tabular-nums text-white/30">
-                  {telemetry.agentDecidedCount.toLocaleString()} rec
-                  <span className="mx-phi-2 text-white/15" aria-hidden>·</span>
-                  {telemetry.humanRuledCount.toLocaleString()} ruled
-                  {telemetry.newCount > 0 ? (
-                    <>
-                      <span className="mx-phi-2 text-white/15" aria-hidden>·</span>
-                      <span className="text-white/45">{telemetry.newCount.toLocaleString()} new</span>
-                    </>
-                  ) : null}
-                </p>
 
                 <button
                   type="button"
@@ -275,7 +259,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                   }
                   className="group mt-phi-4 w-full min-w-0 border-l border-white/20 py-phi-1 pl-phi-3 text-left transition-colors hover:border-white/35 btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
                 >
-                  <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
+                  <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/45">
                     Mandate
                     {mandate.hasThesis && mandate.versionNumber != null ? ` · v${mandate.versionNumber}` : ''}
                     {!mandate.hasThesis ? ' · set up' : ''}

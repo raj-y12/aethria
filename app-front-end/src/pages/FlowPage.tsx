@@ -188,17 +188,15 @@ export default function FlowPage({ data }: { data: SystemData }) {
     <p className="type-body-sm text-oxford/45">
       {selectedStartup
         ? memoStartup?.scout?.name ?? selectedStartup.scout.name
-        : `The docket holds ${openCount.toLocaleString()} open ${openCount === 1 ? 'matter' : 'matters'} — the top of the queue takes the stage.`}
-      <span className="text-oxford/30">
-        {' '}
-        · Stale after {fundConfiguration.thresholds.staleAfterHours}h
-      </span>
+        : openCount > 0
+          ? 'Top of the queue takes the stage.'
+          : 'Nothing open — the desk is clear.'}
     </p>
   );
 
   return (
     <div className="page-transition-enter flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1180px] flex-col px-phi-5 py-phi-5">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1180px] flex-col px-phi-5 pt-phi-6 pb-phi-5">
         <div className="flex-none pb-phi-4 lg:hidden">
           <AgentDispatch
             input={inlineDispatch.input}
@@ -248,12 +246,6 @@ export default function FlowPage({ data }: { data: SystemData }) {
                 active={queueView === 'STALE'}
                 onClick={() => selectView('STALE')}
               />
-              <ReadoutKey
-                label="In pipeline"
-                value={startups.length.toLocaleString()}
-                active={queueView === 'ALL'}
-                onClick={() => selectView('ALL')}
-              />
             </div>
           }
         />
@@ -265,7 +257,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
               The pipeline is filling.
             </h2>
             <p className="mt-phi-3 max-w-[36ch] font-mono text-[11px] tracking-[0.06em] text-oxford/45">
-              Scouts are searching against the active mandate. The first matter takes the stage when it lands.
+              Scouts are searching against your mandate. New matters appear here as they land.
             </p>
             <button
               type="button"

@@ -89,7 +89,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
 
   return (
     <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <div className="mx-auto w-full max-w-[1180px] px-phi-5 py-phi-5">
+      <div className="mx-auto w-full max-w-[1180px] px-phi-5 pt-phi-6 pb-phi-8">
         {/* ── Header: place + book composition in one line of sight ── */}
         <RoomHeader
           className="pb-phi-6"
@@ -156,7 +156,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                 detail={data.concentrationAnalytics.most_concentrated_sector || undefined}
               />
               {sectorRows.length === 0 ? (
-                <QuietEmpty>Distribution appears once the pipeline has decided deals to cluster.</QuietEmpty>
+                <QuietEmpty>Appears once deals are decided.</QuietEmpty>
               ) : (
                 <ul className="mt-phi-4 flex flex-col gap-phi-3">
                   {sectorRows.map((row) => (

@@ -393,7 +393,7 @@ const WorkGrid = ({
       <div className="w-full h-full min-h-[12rem] flex flex-col items-center justify-center">
         <EmptyState
           label="Docket"
-          body={`Scouts are filling the workspace against the active mandate. Stale pressure begins after ${config.thresholds.staleAfterHours} hours.`}
+          body="Scouts are searching against your mandate. New matters appear here as they land."
         />
       </div>
     );
