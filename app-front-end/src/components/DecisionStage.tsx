@@ -75,9 +75,9 @@ function Track({ pct, split = false, delay = 0 }: { pct: number; split?: boolean
   const reduceMotion = usePrefersReducedMotion();
   const clamped = Math.min(1, Math.max(0, pct / 100));
   return (
-    <div className="relative h-[3px] w-full bg-oxford/10">
+    <div className="relative h-px w-full bg-oxford/10">
       <motion.div
-        className={`absolute inset-0 origin-left ${split ? 'bg-escalation/60' : 'bg-oxford/70'}`}
+        className={`absolute inset-0 origin-left ${split ? 'bg-escalation/55' : 'bg-oxford/45'}`}
         initial={reduceMotion ? { scaleX: clamped } : { scaleX: 0 }}
         animate={{ scaleX: clamped }}
         transition={{ duration: 0.9, delay: reduceMotion ? 0 : delay, ease: [0.16, 1, 0.3, 1] }}
@@ -246,7 +246,7 @@ export default function DecisionStage({ startup, fundConfiguration, action }: De
               reading={split ? `SPLIT${spread != null ? ` · Δ${spread.toFixed(1)}` : ''}` : 'ALIGNED'}
             >
               {/* Agreement map: each reviewer's mean as a tick on the 0–10 axis. */}
-              <div className="relative h-[3px] w-full bg-oxford/10" aria-hidden>
+              <div className="relative h-px w-full bg-oxford/10" aria-hidden>
                 {reviewerMeans.map((mean, i) => (
                   <motion.span
                     key={i}
