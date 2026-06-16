@@ -195,6 +195,15 @@ const WorkGrid = ({
   // the analyst clicks off it (closes the memo or selects another row).
   const [pinnedNewId, setPinnedNewId] = useState<string | null>(null);
   const reduceMotion = usePrefersReducedMotion();
+  // Defer the default top-of-queue auto-selection until the page-entrance
+  // animation has settled. Auto-select mounts the (heavy) memo and expands the
+  // first row; doing that mid-entrance is what made Flow stutter on open.
+  const [autoSelectReady, setAutoSelectReady] = useState(reduceMotion);
+  useEffect(() => {
+    if (reduceMotion) return;
+    const timer = window.setTimeout(() => setAutoSelectReady(true), 460);
+    return () => window.clearTimeout(timer);
+  }, [reduceMotion]);
   const hasActiveFilters =
     sourceFilters.size > 0 ||
     outcomeFilters.size > 0 ||
@@ -357,11 +366,11 @@ const WorkGrid = ({
   // top of the current view takes the canvas (without acknowledging it).
   // Deep links (?queue=…, ?open=…) win — wait until they have been consumed.
   useEffect(() => {
-    if (!autoSelectFirst || selectedId != null) return;
+    if (!autoSelectFirst || selectedId != null || !autoSelectReady) return;
     if (searchParams.get('queue') != null || searchParams.get('open') != null) return;
     const first = orderedModels[0]?.startup;
     if (first) onAutoSelect?.(first);
-  }, [autoSelectFirst, selectedId, orderedModels, onAutoSelect, searchParams]);
+  }, [autoSelectFirst, autoSelectReady, selectedId, orderedModels, onAutoSelect, searchParams]);
 
   const handleRowSelect = useCallback(
     (startup: Startup) => {

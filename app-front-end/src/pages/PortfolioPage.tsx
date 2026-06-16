@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
+import { motion } from 'framer-motion';
 import RoomHeader from '../components/RoomHeader';
+import { usePrefersReducedMotion } from '../hooks';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup, SignalItem } from '../types/startup';
 import { isDealHumanResolved } from '../lib/dealState';
@@ -52,6 +54,7 @@ function signalWhen(sig: SignalItem): string {
  */
 export default function PortfolioPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
+  const reduceMotion = usePrefersReducedMotion();
   const openDeal = (id: string) => navigate(`/v1/flow?open=${id}`);
 
   const track = useMemo(
@@ -159,13 +162,16 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                 <QuietEmpty>Appears once deals are decided.</QuietEmpty>
               ) : (
                 <ul className="mt-phi-4 flex flex-col gap-phi-3">
-                  {sectorRows.map((row) => (
+                  {sectorRows.map((row, i) => (
                     <li key={row.sector} className="grid grid-cols-[minmax(90px,140px)_1fr_64px] items-center gap-phi-4">
                       <span className="truncate type-meta uppercase tracking-[0.1em] text-oxford/55">{row.sector}</span>
                       <span className="relative block h-px bg-oxford/10">
-                        <span
-                          className="absolute inset-y-0 left-0 bg-oxford/45"
+                        <motion.span
+                          className="absolute inset-y-0 left-0 origin-left bg-oxford/45"
                           style={{ width: `${Math.max(2, Math.min(100, (row.count / maxSectorCount) * 100))}%` }}
+                          initial={reduceMotion ? { scaleX: 1 } : { scaleX: 0 }}
+                          animate={{ scaleX: 1 }}
+                          transition={{ duration: 0.9, delay: reduceMotion ? 0 : 0.1 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                         />
                       </span>
                       <span className="text-right font-mono text-[11px] tabular-nums text-oxford/50">
