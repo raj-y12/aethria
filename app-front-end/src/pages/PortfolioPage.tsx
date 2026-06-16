@@ -89,7 +89,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
 
   return (
     <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <div className="mx-auto w-full max-w-[1180px] px-phi-5 py-phi-5">
+      <div className="mx-auto w-full max-w-[1180px] px-phi-5 pt-phi-6 pb-phi-8">
         {/* ── Header: place + book composition in one line of sight ── */}
         <RoomHeader
           className="pb-phi-6"

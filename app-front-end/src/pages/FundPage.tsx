@@ -53,7 +53,7 @@ export default function FundPage({ data }: { data: SystemData }) {
   return (
     <div className="page-transition-enter flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex-none bg-paper">
-        <div className="mx-auto w-full max-w-[1180px] px-phi-5 pt-phi-5">
+        <div className="mx-auto w-full max-w-[1180px] px-phi-5 pt-phi-6">
           <RoomHeader
             className="pb-phi-5"
             eyebrow={`The instrument${

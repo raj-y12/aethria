@@ -252,17 +252,11 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                   />
                 </div>
 
-                <p className="mt-phi-3 font-mono text-[9px] tracking-[0.04em] tabular-nums text-white/30">
-                  {telemetry.agentDecidedCount.toLocaleString()} rec
-                  <span className="mx-phi-2 text-white/15" aria-hidden>·</span>
-                  {telemetry.humanRuledCount.toLocaleString()} ruled
-                  {telemetry.newCount > 0 ? (
-                    <>
-                      <span className="mx-phi-2 text-white/15" aria-hidden>·</span>
-                      <span className="text-white/45">{telemetry.newCount.toLocaleString()} new</span>
-                    </>
-                  ) : null}
-                </p>
+                {telemetry.newCount > 0 ? (
+                  <p className="mt-phi-3 font-mono text-[9px] tracking-[0.06em] tabular-nums text-white/45">
+                    {telemetry.newCount.toLocaleString()} new since you left
+                  </p>
+                ) : null}
 
                 <button
                   type="button"

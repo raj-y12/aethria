@@ -188,17 +188,15 @@ export default function FlowPage({ data }: { data: SystemData }) {
     <p className="type-body-sm text-oxford/45">
       {selectedStartup
         ? memoStartup?.scout?.name ?? selectedStartup.scout.name
-        : `The docket holds ${openCount.toLocaleString()} open ${openCount === 1 ? 'matter' : 'matters'} — the top of the queue takes the stage.`}
-      <span className="text-oxford/30">
-        {' '}
-        · Stale after {fundConfiguration.thresholds.staleAfterHours}h
-      </span>
+        : openCount > 0
+          ? 'Top of the queue takes the stage.'
+          : 'Nothing open — the desk is clear.'}
     </p>
   );
 
   return (
     <div className="page-transition-enter flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1180px] flex-col px-phi-5 py-phi-5">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1180px] flex-col px-phi-5 pt-phi-6 pb-phi-5">
         <div className="flex-none pb-phi-4 lg:hidden">
           <AgentDispatch
             input={inlineDispatch.input}
