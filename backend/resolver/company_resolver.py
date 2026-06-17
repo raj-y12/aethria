@@ -100,6 +100,33 @@ _NEWS_REGISTRABLE_DOMAINS = frozenset(
         "theverge.com",
         "finsmes.com",
         "siliconangle.com",
+        # General-news aggregators / outlets: they host articles ABOUT companies,
+        # so they are evidence, never company candidates or identity sources.
+        "yahoo.com",
+        "msn.com",
+        "cnn.com",
+        "nytimes.com",
+        "theguardian.com",
+        "bbc.com",
+        "bbc.co.uk",
+        "washingtonpost.com",
+        "apnews.com",
+        "nbcnews.com",
+        "cbsnews.com",
+        "marketwatch.com",
+        "seekingalpha.com",
+        "fool.com",
+        "barrons.com",
+        "fastcompany.com",
+        "inc.com",
+        "entrepreneur.com",
+        "cnet.com",
+        "zdnet.com",
+        "engadget.com",
+        "mashable.com",
+        "time.com",
+        "newsweek.com",
+        "economist.com",
     }
 )
 
@@ -639,8 +666,11 @@ def _build_candidates(
         if not reg or reg in _PLATFORM_REGISTRABLE_DOMAINS or reg in _NEWS_REGISTRABLE_DOMAINS:
             continue
         sim = _slug_similarity(company, host)
-        # Only domains that plausibly match the typed name are candidates.
-        if sim < 0.55 and s.match_score < 0.55:
+        # Candidates must be the company's OWN domain — its slug has to resemble the
+        # typed name. A high match_score alone is NOT enough: it usually means the
+        # name merely appears in a page's title/snippet (e.g. a Yahoo/news article
+        # ABOUT the company), which is evidence, not a separate company candidate.
+        if sim < 0.55:
             continue
         g = groups.setdefault(reg, {"best": s, "score": s.match_score, "badges": set()})
         if s.match_score > g["score"]:
