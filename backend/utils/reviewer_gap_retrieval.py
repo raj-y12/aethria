@@ -11,7 +11,6 @@ import os
 from typing import Any, Dict, List
 from urllib.parse import urlparse
 
-from utils.recency import recency_query
 from utils.reference_verify import hostname_from_user_hint
 from utils.scout_field_gaps import is_missing_tam, is_weak_funding_stage
 
@@ -153,13 +152,11 @@ def fetch_reviewer_gap_pack(scout: Dict[str, Any], user_id: str) -> Dict[str, An
     except ValueError:
         max_total = 12
 
-    label = _company_search_label(scout)
     pack = retrieve_source_pack_merged(
         queries=queries,
         user_id=uid,
         max_per_query=max(max_per, 3),
         max_total_sources=max(min(max_total, 20), 5),
-        recency_query=recency_query(label) if label else None,
     )
     pack = _restrict_pack_to_lookup_website(pack, scout)
     sources = pack.get("sources") or []
