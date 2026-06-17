@@ -44,6 +44,15 @@ def tavily_time_range() -> str:
     return "month" if recency_window_months() <= 1 else "year"
 
 
+def recency_window_days() -> int:
+    """Recency window expressed in days for Tavily's news `days` parameter.
+
+    Capped at 365 — news older than a year is not "recent" for our purposes and
+    Tavily's news topic is tuned for recent coverage.
+    """
+    return max(7, min(recency_window_months() * 31, 365))
+
+
 def scout_recency_directive() -> str:
     """Date anchor + recency mandate for Scout LLM calls (open discovery + lookup)."""
     today = current_date_iso()
@@ -56,7 +65,12 @@ def scout_recency_directive() -> str:
         f"{months} months — funding rounds, acquisitions / M&A, IPOs, leadership changes, "
         "major product launches, and valuation changes. When such an event exists, reflect it "
         "in why_now and primary_thesis, prefer sources that show a publication date, and state "
-        "the event's date when known. Never invent an event you cannot ground in a cited source."
+        "the event's date when known. Never invent an event you cannot ground in a cited source.\n"
+        "BREAKING-EVENT PRIORITY: if ANY retrieved source dated within the window reports an "
+        "acquisition, merger, IPO, shutdown, major funding round, or CEO change, you MUST state "
+        "that event explicitly in why_now WITH its date and INCLUDE that source's URL in "
+        "references — even when it is a news site rather than the company's own domain. Do NOT "
+        "describe older funding as the latest status when a more recent material event is in the sources."
     )
 
 

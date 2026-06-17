@@ -65,11 +65,15 @@ def tavily_search(
     max_results: int = 10,
     timeout: float | None = None,
     time_range: str | None = None,
+    topic: str | None = None,
+    days: int | None = None,
 ) -> List[Dict[str, str]]:
     """
     Return normalized Tavily results as [{title, url, snippet}, ...].
 
     time_range: optional Tavily recency filter ("day"|"week"|"month"|"year").
+    topic: "general" (default) or "news" — "news" returns recency-ranked news.
+    days: with topic="news", limit results to the last N days.
     Invalid values are ignored.
     """
     api_key = os.getenv("TAVILY_API_KEY", "").strip()
@@ -90,6 +94,11 @@ def tavily_search(
     }
     if isinstance(time_range, str) and time_range.strip().lower() in ("day", "week", "month", "year"):
         body["time_range"] = time_range.strip().lower()
+    if isinstance(topic, str) and topic.strip().lower() in ("general", "news"):
+        body["topic"] = topic.strip().lower()
+        # Tavily's `days` parameter only applies to the news topic.
+        if body["topic"] == "news" and isinstance(days, int) and days > 0:
+            body["days"] = days
     payload = json.dumps(body).encode("utf-8")
     req = Request(
         "https://api.tavily.com/search",
