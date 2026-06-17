@@ -16,6 +16,7 @@ from openai import OpenAI
 
 from reviewer.schema import ReviewerOutput, validate_reviewer_output
 from utils.prompt_version import hash_prompt
+from utils.recency import reviewer_recency_directive
 from utils.scoring import DEFAULT_SCORE_SOURCE
 from utils.reviewer_structured_signals_clamp import clamp_structured_signals_evidence
 
@@ -792,7 +793,9 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 )
 
             user_content = (
-                f"Evaluate this startup idea discovered by a Scout:\n\n{scout_text}{supplement_block}{resource_thesis_block}{thesis_block}\n\n"
+                reviewer_recency_directive()
+                + "\n\n"
+                + f"Evaluate this startup idea discovered by a Scout:\n\n{scout_text}{supplement_block}{resource_thesis_block}{thesis_block}\n\n"
                 "Review Scout hypotheses when provided: evaluate assumptions and flag critical unknowns in assumption_feedback. "
                 f"{grounding_clause} "
                 f"{score_directive}"

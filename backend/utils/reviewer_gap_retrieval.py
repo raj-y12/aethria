@@ -11,6 +11,7 @@ import os
 from typing import Any, Dict, List
 from urllib.parse import urlparse
 
+from utils.recency import recency_query
 from utils.reference_verify import hostname_from_user_hint
 from utils.scout_field_gaps import is_missing_tam, is_weak_funding_stage
 
@@ -59,6 +60,7 @@ def build_gap_queries(scout: Dict[str, Any]) -> List[str]:
     if is_weak_funding_stage(scout.get("funding_stage")):
         queries.append(f"{label} startup funding round investors valuation raised")
     queries.append(f"{label} startup founders team CEO traction customers pilots")
+    queries.append(recency_query(label))
     # De-dupe while preserving order
     seen: set[str] = set()
     out: List[str] = []

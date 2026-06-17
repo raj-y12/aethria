@@ -31,6 +31,7 @@ from utils.reference_verify import (
     hostname_from_user_hint,
     registrable_domain,
 )
+from utils.recency import recency_query, scout_recency_directive
 from utils.retrieval_grounding import (
     log_pre_filter_cited_urls,
     render_sources_for_prompt,
@@ -829,6 +830,7 @@ class Scout(ABC):
                     queries=[
                         f"{lens} early-stage startup VC funding seed series traction news",
                         f"{lens} startup customers pilots revenue growth founders team",
+                        recency_query(f"{lens} startup"),
                     ],
                     user_id=self._tenant_user_id,
                 )
@@ -851,7 +853,9 @@ class Scout(ABC):
                     {
                         "role": "user",
                         "content": (
-                            self._fund_thesis_user_block()
+                            scout_recency_directive()
+                            + "\n\n"
+                            + self._fund_thesis_user_block()
                             + (
                                 (
                                     "\n\n"
@@ -972,6 +976,7 @@ class Scout(ABC):
                         f"{nq} startup funding round investors valuation site",
                         f"{nq} product customers traction revenue users pilots",
                         f"{nq} founders CEO CTO leadership engineering team",
+                        recency_query(nq),
                     ],
                     user_id=self._tenant_user_id,
                 )
@@ -1006,7 +1011,9 @@ class Scout(ABC):
                 source_pack = self._merge_resolution_sources(source_pack, resolution)
 
             user_prompt = (
-                "Analyze the specific company named in the untrusted lookup block below. "
+                scout_recency_directive()
+                + "\n\n"
+                + "Analyze the specific company named in the untrusted lookup block below. "
                 "Do not pick a different company. "
                 + prompt_safety_instruction()
                 + "\n\n"
