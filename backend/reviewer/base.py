@@ -813,22 +813,40 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 "Do not include any text before or after the JSON. Output only the JSON object."
             )
             
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": self.SYSTEM_PROMPT},
-                    {"role": "user", "content": user_content},
-                ],
-                response_format={"type": "json_object"},
-                max_completion_tokens=_reviewer_max_completion_tokens(),
-            )
-            
-            if hasattr(response, 'usage') and response.usage:
-                self._last_token_usage = getattr(response.usage, 'total_tokens', 0) or 0
-            else:
-                self._last_token_usage = 0
+            # gpt-5-class reasoning models can spend the entire completion budget on
+            # reasoning tokens and return EMPTY content (finish_reason=length). Retry
+            # once with a larger budget before giving up, so a borderline-large prompt
+            # doesn't silently fail the whole review.
+            base_budget = _reviewer_max_completion_tokens()
+            budgets = [base_budget]
+            if base_budget < 16384:
+                budgets.append(min(base_budget * 2, 16384))
 
-            content, diagnostic = _chat_completion_content(response)
+            self._last_token_usage = 0
+            content, diagnostic = "", {}
+            for budget in budgets:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": self.SYSTEM_PROMPT},
+                        {"role": "user", "content": user_content},
+                    ],
+                    response_format={"type": "json_object"},
+                    max_completion_tokens=budget,
+                )
+                if hasattr(response, 'usage') and response.usage:
+                    self._last_token_usage += getattr(response.usage, 'total_tokens', 0) or 0
+
+                content, diagnostic = _chat_completion_content(response)
+                if content:
+                    break
+                if diagnostic.get("finish_reason") != "length":
+                    break  # empty for some other reason — retrying won't help
+                self.logger.warning(
+                    "Reviewer LLM empty (finish_reason=length) at budget=%s; retrying with more room",
+                    budget,
+                )
+
             if not content:
                 self.logger.error(
                     "Empty response from LLM: model=%s finish_reason=%s total_tokens=%s "

@@ -59,18 +59,25 @@ def _normalize_sources(raw_results: List[Dict[str, str]]) -> List[Dict[str, str]
 
 
 def retrieve_source_pack(
-    *, query: str, user_id: str, max_results: int | None = None, time_range: str | None = None
+    *,
+    query: str,
+    user_id: str,
+    max_results: int | None = None,
+    time_range: str | None = None,
+    topic: str | None = None,
+    days: int | None = None,
 ) -> Dict[str, Any]:
     """
     Build retrieval source pack with provider metadata and URL allowlist.
 
     time_range: optional Tavily recency filter ("day"|"week"|"month"|"year").
+    topic/days: optional Tavily news-topic recency controls.
     """
     if max_results is None:
         max_results = _default_max_results()
     used_provider = "tavily"
     raw: List[Dict[str, str]] = tavily_search(
-        query=query, max_results=max_results, time_range=time_range
+        query=query, max_results=max_results, time_range=time_range, topic=topic, days=days
     )
 
     sources = _normalize_sources(raw)
@@ -120,34 +127,27 @@ def retrieve_source_pack_merged(
         max_total_sources = int(os.getenv("SCOUT_RETRIEVAL_MERGED_CAP", "16"))
     max_total_sources = max(5, min(max_total_sources, 24))
 
-    # (query, time_range) pairs: general queries are unfiltered; the optional
-    # recency query carries the Tavily time filter.
-    query_plan: List[tuple[str, str | None]] = [
-        (str(q).strip(), None) for q in queries if str(q).strip()
-    ]
+    general_queries = [str(q).strip() for q in queries if str(q).strip()]
     rq = str(recency_query or "").strip()
-    if rq:
-        from utils.recency import tavily_time_range
-
-        query_plan.append((rq, (recency_time_range or tavily_time_range())))
-    if not query_plan:
+    if not general_queries and not rq:
         return {
             "provider": "tavily",
             "query": "",
             "sources": [],
             "url_allowlist": set(),
         }
-    cleaned_queries = [q for q, _ in query_plan]
 
     merged_rows: List[Dict[str, str]] = []
     seen_norm: Set[str] = set()
     used_provider = "tavily"
 
-    for q, tr in query_plan:
-        pack = retrieve_source_pack(
-            query=q, user_id=user_id, max_results=max_per_query, time_range=tr
-        )
-        for row in pack.get("sources") or []:
+    def _ingest(rows: List[Dict[str, str]], limit: int | None) -> None:
+        added = 0
+        for row in rows or []:
+            if len(merged_rows) >= max_total_sources:
+                return
+            if limit is not None and added >= limit:
+                return
             url = str(row.get("url") or "").strip()
             nu = normalize_url_for_match(url)
             if not nu or nu in seen_norm:
@@ -160,11 +160,44 @@ def retrieve_source_pack_merged(
                     "snippet": str(row.get("snippet") or "").strip(),
                 }
             )
-            if len(merged_rows) >= max_total_sources:
-                break
+            added += 1
+
+    # Recency FIRST, with a reserved quota, so a breaking event (acquisition, IPO,
+    # round) is never starved out of the source pack by the general queries hitting
+    # the cap. The recency query runs against Tavily's news topic (recency-ranked),
+    # with a general-search fallback if news returns nothing.
+    if rq:
+        from utils.recency import recency_window_days, tavily_time_range
+
+        tr = recency_time_range or tavily_time_range()
+        reserved = int(os.getenv("SCOUT_RECENCY_RESERVED_SLOTS", "5"))
+        reserved = max(2, min(reserved, max_total_sources - 1))
+        news = retrieve_source_pack(
+            query=rq,
+            user_id=user_id,
+            max_results=max_per_query,
+            time_range=tr,
+            topic="news",
+            days=recency_window_days(),
+        )
+        rows = news.get("sources") or []
+        if not rows:
+            rows = (
+                retrieve_source_pack(
+                    query=rq, user_id=user_id, max_results=max_per_query, time_range=tr
+                ).get("sources")
+                or []
+            )
+        _ingest(rows, limit=reserved)
+
+    # General queries fill the remaining slots.
+    for q in general_queries:
         if len(merged_rows) >= max_total_sources:
             break
+        pack = retrieve_source_pack(query=q, user_id=user_id, max_results=max_per_query)
+        _ingest(pack.get("sources"), limit=None)
 
+    cleaned_queries = ([rq] if rq else []) + general_queries
     sources = _normalize_sources(merged_rows)
     allowlist: Set[str] = {s["url"] for s in sources if s.get("url")}
     logger.info(
