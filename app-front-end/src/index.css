@@ -688,6 +688,25 @@
   animation: aethria-pulse 1.5s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
+/* Dispatch dot-grid: a random handful of grid dots blink while a lookup runs.
+   Each dot fades in/out (peak opacity per-dot via --pulse-peak) and relocates
+   to a new grid cell on each cycle, so the active set drifts organically. */
+@keyframes dot-grid-pulse {
+  0% { opacity: 0; transform: scale(0.6); }
+  50% { opacity: var(--pulse-peak, 0.32); transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+.dot-grid-pulse {
+  opacity: 0;
+  border-radius: 9999px;
+  background-color: rgba(var(--color-oxford-rgb), 0.85);
+  animation-name: dot-grid-pulse;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-iteration-count: infinite;
+  will-change: opacity, transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .escalation-pulse,
   .escalation-dot-active,
@@ -696,7 +715,8 @@
   .signal-dot-breathe,
   .underline-draw,
   .pulse-soft,
-  .pulse-fast {
+  .pulse-fast,
+  .dot-grid-pulse {
     animation: none !important;
   }
 }

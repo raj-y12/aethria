@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import AgentDispatch from './AgentDispatch';
 import CandidatePicker from './CandidatePicker';
+import DispatchDotPulse from './DispatchDotPulse';
 import Reveal from './Reveal';
 import { useFocusTrap } from '../hooks';
 import type { LookupCandidate } from '../api/startups';
@@ -256,7 +257,8 @@ export default function DispatchCommandBar({
       aria-modal="true"
       aria-label="Look up a company"
     >
-      <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7">
+      <DispatchDotPulse active={lookupRunning} />
+      <div className="relative z-10 flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7">
         {showChips ? (
           <Reveal delay={0.02} y={-6} className="mb-phi-7 flex flex-wrap items-center justify-center gap-phi-2">
             {chips.map((c) => (
