@@ -19,15 +19,12 @@ function recOf(s: Startup): string | null {
 }
 
 /**
- * Door hover: the cell dissolves to oxford and type inverts to paper — a calm
- * crossfade, significant but restrained.
+ * Door hover: a whisper of oxford tint lifts the cell, a hairline draws in from
+ * the centre, and the type rises and deepens — sleek, clean, chic. No slab.
  */
 const EASE = 'ease-[cubic-bezier(0.16,1,0.3,1)]';
 
-/**
- * A door — one entry in the editorial nav band. Numeral, label, and a quiet
- * reading. On hover: the cell dissolves to oxford and the type inverts to paper.
- */
+/** A door — one entry in the editorial nav band. Numeral, label, and a quiet reading. */
 function HomeDoor({
   numeral,
   label,
@@ -59,21 +56,28 @@ function HomeDoor({
       })}
       className="group relative flex flex-col items-center gap-phi-3 overflow-hidden px-phi-5 py-phi-6 text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-oxford/30"
     >
-      {/* The cell dissolves to a solid oxford plate — a crossfade, no motion. */}
+      {/* A whisper of oxford tint lifts the cell — airy, never a slab. */}
       <span
         aria-hidden
-        className={`pointer-events-none absolute inset-0 z-0 bg-oxford opacity-0 transition-opacity duration-[360ms] ${EASE} group-hover:opacity-100`}
+        className={`pointer-events-none absolute inset-0 z-0 bg-oxford opacity-0 transition-opacity duration-[420ms] ${EASE} group-hover:opacity-[0.04]`}
+      />
+      {/* An editorial hairline that draws in from the centre. */}
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute inset-x-phi-5 bottom-[14px] z-10 h-px origin-center scale-x-0 transition-transform duration-[420ms] ${EASE} group-hover:scale-x-100 ${
+          tone === 'escalation' ? 'bg-escalation/70' : 'bg-oxford/45'
+        }`}
       />
 
       <span
-        className={`relative z-10 font-mono text-[10px] tracking-[0.2em] transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[3px] text-oxford/35 group-hover:text-paper/55 group-hover:delay-100`}
+        className={`relative z-10 font-mono text-[10px] tracking-[0.2em] transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[2px] text-oxford/30 group-hover:text-oxford/70`}
         aria-hidden
       >
         {numeral}
       </span>
       <span className="relative z-10 inline-block px-[3px]">
         <span
-          className={`block font-mono text-[12px] font-semibold uppercase tracking-[0.18em] transition-[color] duration-300 ${EASE} text-oxford/80 group-hover:text-paper group-hover:delay-100`}
+          className={`block font-mono text-[12px] font-semibold uppercase tracking-[0.18em] transition-[transform,color] duration-300 ${EASE} text-oxford/75 group-hover:-translate-y-[1px] group-hover:text-oxford`}
         >
           {label}
         </span>
@@ -82,7 +86,7 @@ function HomeDoor({
         className={`relative z-10 text-center font-mono text-[9.5px] leading-snug tracking-[0.06em] tabular-nums transition-colors duration-300 ${EASE} ${
           tone === 'escalation'
             ? 'text-escalation/90 group-hover:text-escalation-bright'
-            : 'text-oxford/45 group-hover:text-paper/60 group-hover:delay-100'
+            : 'text-oxford/45 group-hover:text-oxford/70'
         }`}
       >
         {detail}
