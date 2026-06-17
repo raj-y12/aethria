@@ -59,15 +59,19 @@ def _normalize_sources(raw_results: List[Dict[str, str]]) -> List[Dict[str, str]
 
 
 def retrieve_source_pack(
-    *, query: str, user_id: str, max_results: int | None = None
+    *, query: str, user_id: str, max_results: int | None = None, time_range: str | None = None
 ) -> Dict[str, Any]:
     """
     Build retrieval source pack with provider metadata and URL allowlist.
+
+    time_range: optional Tavily recency filter ("day"|"week"|"month"|"year").
     """
     if max_results is None:
         max_results = _default_max_results()
     used_provider = "tavily"
-    raw: List[Dict[str, str]] = tavily_search(query=query, max_results=max_results)
+    raw: List[Dict[str, str]] = tavily_search(
+        query=query, max_results=max_results, time_range=time_range
+    )
 
     sources = _normalize_sources(raw)
     allowlist: Set[str] = {s["url"] for s in sources if s.get("url")}
@@ -99,10 +103,16 @@ def retrieve_source_pack_merged(
     user_id: str,
     max_per_query: int | None = None,
     max_total_sources: int | None = None,
+    recency_query: str | None = None,
+    recency_time_range: str | None = None,
 ) -> Dict[str, Any]:
     """
     Run retrieval for several queries, merge by normalized URL (first occurrence wins),
     cap total sources, and re-number [S1], [S2], ... for the prompt.
+
+    recency_query: optional extra query run with a Tavily time filter so fresh,
+    dated pages (funding/M&A/leadership) actually surface. The time filter is
+    scoped to ONLY this query — the identity/general queries stay unfiltered.
     """
     if max_per_query is None:
         max_per_query = max(4, min(_default_max_results(), 10))
@@ -110,21 +120,33 @@ def retrieve_source_pack_merged(
         max_total_sources = int(os.getenv("SCOUT_RETRIEVAL_MERGED_CAP", "16"))
     max_total_sources = max(5, min(max_total_sources, 24))
 
-    cleaned_queries = [str(q).strip() for q in queries if str(q).strip()]
-    if not cleaned_queries:
+    # (query, time_range) pairs: general queries are unfiltered; the optional
+    # recency query carries the Tavily time filter.
+    query_plan: List[tuple[str, str | None]] = [
+        (str(q).strip(), None) for q in queries if str(q).strip()
+    ]
+    rq = str(recency_query or "").strip()
+    if rq:
+        from utils.recency import tavily_time_range
+
+        query_plan.append((rq, (recency_time_range or tavily_time_range())))
+    if not query_plan:
         return {
             "provider": "tavily",
             "query": "",
             "sources": [],
             "url_allowlist": set(),
         }
+    cleaned_queries = [q for q, _ in query_plan]
 
     merged_rows: List[Dict[str, str]] = []
     seen_norm: Set[str] = set()
     used_provider = "tavily"
 
-    for q in cleaned_queries:
-        pack = retrieve_source_pack(query=q, user_id=user_id, max_results=max_per_query)
+    for q, tr in query_plan:
+        pack = retrieve_source_pack(
+            query=q, user_id=user_id, max_results=max_per_query, time_range=tr
+        )
         for row in pack.get("sources") or []:
             url = str(row.get("url") or "").strip()
             nu = normalize_url_for_match(url)

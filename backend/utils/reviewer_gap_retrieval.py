@@ -60,7 +60,6 @@ def build_gap_queries(scout: Dict[str, Any]) -> List[str]:
     if is_weak_funding_stage(scout.get("funding_stage")):
         queries.append(f"{label} startup funding round investors valuation raised")
     queries.append(f"{label} startup founders team CEO traction customers pilots")
-    queries.append(recency_query(label))
     # De-dupe while preserving order
     seen: set[str] = set()
     out: List[str] = []
@@ -154,11 +153,13 @@ def fetch_reviewer_gap_pack(scout: Dict[str, Any], user_id: str) -> Dict[str, An
     except ValueError:
         max_total = 12
 
+    label = _company_search_label(scout)
     pack = retrieve_source_pack_merged(
         queries=queries,
         user_id=uid,
         max_per_query=max(max_per, 3),
         max_total_sources=max(min(max_total, 20), 5),
+        recency_query=recency_query(label) if label else None,
     )
     pack = _restrict_pack_to_lookup_website(pack, scout)
     sources = pack.get("sources") or []

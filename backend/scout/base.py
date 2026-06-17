@@ -830,8 +830,8 @@ class Scout(ABC):
                     queries=[
                         f"{lens} early-stage startup VC funding seed series traction news",
                         f"{lens} startup customers pilots revenue growth founders team",
-                        recency_query(f"{lens} startup"),
                     ],
+                    recency_query=recency_query(f"{lens} startup"),
                     user_id=self._tenant_user_id,
                 )
                 if fail_closed and not source_pack["sources"]:
@@ -976,8 +976,8 @@ class Scout(ABC):
                         f"{nq} startup funding round investors valuation site",
                         f"{nq} product customers traction revenue users pilots",
                         f"{nq} founders CEO CTO leadership engineering team",
-                        recency_query(nq),
                     ],
+                    recency_query=recency_query(nq),
                     user_id=self._tenant_user_id,
                 )
                 source_pack["sources"] = self._rank_company_lookup_sources(

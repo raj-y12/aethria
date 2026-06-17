@@ -60,9 +60,17 @@ def _normalize_result(
     return {"title": title, "url": url, "snippet": snippet}
 
 
-def tavily_search(query: str, max_results: int = 10, timeout: float | None = None) -> List[Dict[str, str]]:
+def tavily_search(
+    query: str,
+    max_results: int = 10,
+    timeout: float | None = None,
+    time_range: str | None = None,
+) -> List[Dict[str, str]]:
     """
     Return normalized Tavily results as [{title, url, snippet}, ...].
+
+    time_range: optional Tavily recency filter ("day"|"week"|"month"|"year").
+    Invalid values are ignored.
     """
     api_key = os.getenv("TAVILY_API_KEY", "").strip()
     if not api_key:
@@ -80,6 +88,8 @@ def tavily_search(query: str, max_results: int = 10, timeout: float | None = Non
         "include_answer": False,
         "include_raw_content": raw_flag,
     }
+    if isinstance(time_range, str) and time_range.strip().lower() in ("day", "week", "month", "year"):
+        body["time_range"] = time_range.strip().lower()
     payload = json.dumps(body).encode("utf-8")
     req = Request(
         "https://api.tavily.com/search",

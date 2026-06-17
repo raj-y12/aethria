@@ -33,6 +33,17 @@ def recency_window_months() -> int:
     return max(1, min(n, 36))
 
 
+def tavily_time_range() -> str:
+    """Coarse Tavily `time_range` matching the recency window.
+
+    Tavily only offers day/week/month/year granularity, so the window is mapped
+    to the nearest range that won't exclude in-window results: <=1mo -> month,
+    otherwise year. This biases the recency query toward fresh pages without
+    hard-dropping anything the prompt-level window still allows.
+    """
+    return "month" if recency_window_months() <= 1 else "year"
+
+
 def scout_recency_directive() -> str:
     """Date anchor + recency mandate for Scout LLM calls (open discovery + lookup)."""
     today = current_date_iso()

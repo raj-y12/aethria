@@ -192,7 +192,7 @@ Aethria is trying to make venture firms behave like institutions with explicit j
    The architecture is converging, but the authoritative control-plane story needs tightening.
 
 4. **External data integrations are still limited.**
-   The system has retrieval grounding and SERP/Tavily paths, but lacks deep integrations with CRM, email, meetings, data rooms, cap tables, PitchBook/Crunchbase/Dealroom, or portfolio systems.
+   The system has Tavily-based retrieval grounding, but lacks deep integrations with CRM, email, meetings, data rooms, cap tables, PitchBook/Crunchbase/Dealroom, or portfolio systems.
 
 5. **Collaboration workflows are early.**
    Human rulings exist, but multi-partner comments, IC votes, ownership, assignments, and approval workflows are not yet mature.

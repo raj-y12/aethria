@@ -21,7 +21,7 @@ Evidence basis: live `pg_class`/`pg_stat` sizing + per-table code-reference scan
 | fund_thesis_pipeline_link | 45 | KEEP | Link table; fine. |
 | settings | 6 / 264 KB | **MERGE → kv_store** | KV shape via doc-store. 54 KB/row — trim dead keys. |
 | memory | 7 | MERGE → kv_store | KV shape. |
-| serp_usage | 1 | MERGE → kv_store | KV shape. |
+| serp_usage | — | **DROPPED** (2026-06-17) | SerpAPI removed; platform uses Tavily only. See migration `20260617000001_drop_serp_usage_table.sql`. |
 | analytics_sector_concentration | 4 / 496 KB | **MERGE → kv_store** | 248 KB for 2 rows — recompute-on-read instead of persisting a fat blob. |
 | meta_prompt_library | 2 / 144 KB | MERGE → kv_store | KV shape; prompt history accreting in one cell. |
 | meta_scout_weights | 0 | MERGE → kv_store | KV shape, written by meta agent. |
