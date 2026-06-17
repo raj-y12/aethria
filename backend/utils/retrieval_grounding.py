@@ -8,7 +8,6 @@ import os
 from typing import Any, Dict, List, Set
 
 from utils.reference_verify import extract_http_urls, normalize_url_for_match
-from utils.settings_loader import get_scout_retrieval_provider
 from utils.tavily_client import tavily_search
 from security.prompt_safety import flag_prompt_injection, isolate_untrusted_text, prompt_safety_instruction
 
@@ -67,25 +66,8 @@ def retrieve_source_pack(
     """
     if max_results is None:
         max_results = _default_max_results()
-    provider = get_scout_retrieval_provider(user_id)
-    raw: List[Dict[str, str]] = []
-    used_provider = provider
-
-    if provider == "tavily":
-        raw = tavily_search(query=query, max_results=max_results)
-        if not raw:
-            try:
-                from utils.serp_client import search_serp_results
-
-                raw = search_serp_results(query=query, user_id=user_id, num_results=max_results)
-                if raw:
-                    used_provider = "serpapi"
-            except Exception:
-                raw = []
-    elif provider == "serpapi":
-        from utils.serp_client import search_serp_results
-
-        raw = search_serp_results(query=query, user_id=user_id, num_results=max_results)
+    used_provider = "tavily"
+    raw: List[Dict[str, str]] = tavily_search(query=query, max_results=max_results)
 
     sources = _normalize_sources(raw)
     allowlist: Set[str] = {s["url"] for s in sources if s.get("url")}
@@ -131,7 +113,7 @@ def retrieve_source_pack_merged(
     cleaned_queries = [str(q).strip() for q in queries if str(q).strip()]
     if not cleaned_queries:
         return {
-            "provider": get_scout_retrieval_provider(user_id),
+            "provider": "tavily",
             "query": "",
             "sources": [],
             "url_allowlist": set(),
@@ -139,13 +121,10 @@ def retrieve_source_pack_merged(
 
     merged_rows: List[Dict[str, str]] = []
     seen_norm: Set[str] = set()
-    used_provider = get_scout_retrieval_provider(user_id)
+    used_provider = "tavily"
 
     for q in cleaned_queries:
         pack = retrieve_source_pack(query=q, user_id=user_id, max_results=max_per_query)
-        prov = str(pack.get("provider") or "")
-        if prov and used_provider == "tavily" and prov != "tavily":
-            used_provider = prov
         for row in pack.get("sources") or []:
             url = str(row.get("url") or "").strip()
             nu = normalize_url_for_match(url)

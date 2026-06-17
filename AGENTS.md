@@ -32,7 +32,7 @@ Every storage read/write and engine instantiation requires an explicit `user_id`
 
 | Module | Role |
 |---|---|
-| `scout/` | 4 scout personas (Market-Driven, Builder/Technical, Pain-Point, Contrarian). Each uses OpenAI + SERP to discover **real** companies. |
+| `scout/` | 4 scout personas (Market-Driven, Builder/Technical, Pain-Point, Contrarian). Each uses OpenAI + Tavily web search to discover **real** companies. |
 | `reviewer/` | 3 reviewer personas (Default, Skeptical, Opportunist). Score scouts against fund thesis (market/product/technical/execution/defensibility, 1–10). |
 | `partner/` | Rule-based decision engine (INVEST / PASS / MONITOR) using versioned rules in `resources/config/partner_rules/v1.json`. LLM only for edge cases. |
 | `portfolio/` | Tracks accepted (YES) companies: execution, signals, feedback, health checks. |

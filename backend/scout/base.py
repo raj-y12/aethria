@@ -92,7 +92,7 @@ class Scout(ABC):
         Initialize a Scout.
 
         Args:
-            tenant_user_id: Clerk user id for SERP usage and settings (explicit tenant).
+            tenant_user_id: Clerk user id for retrieval and settings (explicit tenant).
         """
         self._tenant_user_id = require_user_id(tenant_user_id, context=f"Scout.{scout_type}")
         self.scout_type = scout_type

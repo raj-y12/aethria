@@ -336,7 +336,6 @@ export const MOCK_SYSTEM_DATA: SystemData = {
     agent_config: {
       scouts_enabled: true, reviewers_enabled: true, partners_enabled: true,
       max_agents_per_run: 4, confidence_threshold: 0.55, scout_region: 'europe',
-      scout_serp_enabled: true, scout_serp_daily_budget: 40,
     },
     portfolio: { auto_watchlist: true, signal_scan_frequency: 'daily', memo_verbosity: 'standard' },
     system_health: { calibration_warning: null, pending_escalations: 2, queue_depths: { unreviewed: 1, undecided: 0, watchlist: 4 }, budget_status: [] },

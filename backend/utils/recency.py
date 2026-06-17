@@ -64,9 +64,8 @@ def reviewer_recency_directive() -> str:
 def recency_query(label: str) -> str:
     """A dated recent-events retrieval query for a company / lens label.
 
-    Recency is expressed with query *terms* (year + event keywords) so it works
-    uniformly across providers (Tavily, SerpAPI) without a provider-specific time
-    filter.
+    Recency is expressed with query *terms* (year + event keywords) so Tavily
+    surfaces fresh results without a provider-specific time filter.
     """
     label = (label or "").strip()
     if not label:

@@ -927,20 +927,10 @@ def _validate_settings(body: dict) -> list[str]:
                     errors.append("agent_config.scout_region must be a string")
                 elif ac["scout_region"] not in ("europe", "global"):
                     errors.append("agent_config.scout_region must be one of: europe, global")
-            if "scout_serp_enabled" in ac and not isinstance(ac["scout_serp_enabled"], bool):
-                errors.append("agent_config.scout_serp_enabled must be a boolean")
-            if "scout_serp_daily_budget" in ac:
-                v = ac["scout_serp_daily_budget"]
-                if not isinstance(v, (int, float)) or v < 0:
-                    errors.append("agent_config.scout_serp_daily_budget must be a non-negative number")
             if "scout_grounded_citations_enabled" in ac and not isinstance(ac["scout_grounded_citations_enabled"], bool):
                 errors.append("agent_config.scout_grounded_citations_enabled must be a boolean")
             if "scout_fail_closed_on_empty_retrieval" in ac and not isinstance(ac["scout_fail_closed_on_empty_retrieval"], bool):
                 errors.append("agent_config.scout_fail_closed_on_empty_retrieval must be a boolean")
-            if "scout_retrieval_provider" in ac:
-                v = ac["scout_retrieval_provider"]
-                if not isinstance(v, str) or v not in ("tavily", "serpapi"):
-                    errors.append("agent_config.scout_retrieval_provider must be one of: tavily, serpapi")
     fi = body.get("fund_identity")
     if fi is not None:
         if not isinstance(fi, dict):
