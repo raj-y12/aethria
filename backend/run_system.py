@@ -59,7 +59,7 @@ class ColorFormatter(logging.Formatter):
         "partner.engine": "\033[38;5;220m",   # yellow
         "portfolio.engine": "\033[38;5;40m",  # green
         "storage": "\033[38;5;33m",           # blue
-        "serp": "\033[38;5;208m",             # orange
+        "retrieval_grounding": "\033[38;5;208m",  # orange
         "system": "\033[38;5;250m",           # grey
     }
 

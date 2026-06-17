@@ -58,7 +58,7 @@ class ScoutEngine:
         Initialize the Scout engine.
 
         Args:
-            tenant_user_id: Explicit Clerk user id (settings, SERP, meta weights).
+            tenant_user_id: Explicit Clerk user id (settings, retrieval, meta weights).
         """
         inferred = (tenant_user_id or "").strip()
         if not inferred and storage is not None:

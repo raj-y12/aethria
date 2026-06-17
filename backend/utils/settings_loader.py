@@ -127,9 +127,6 @@ DEFAULT_SETTINGS = {
         # Default fail-open to preserve pipeline throughput when retrieval providers
         # are flaky; strict mode can be re-enabled per user in settings.
         "scout_fail_closed_on_empty_retrieval": False,
-        "scout_retrieval_provider": "tavily",
-        "scout_serp_enabled": False,
-        "scout_serp_daily_budget": 5,
     },
     "portfolio": {
         "auto_watchlist": True,
@@ -473,10 +470,6 @@ def get_scout_region(user_id: Optional[str] = None) -> str:
     return region
 
 
-def is_scout_serp_enabled(user_id: Optional[str] = None) -> bool:
-    return bool(load_settings(user_id).get("agent_config", {}).get("scout_serp_enabled", False))
-
-
 def is_scout_grounded_citations_enabled(user_id: Optional[str] = None) -> bool:
     return bool(
         load_settings(user_id).get("agent_config", {}).get("scout_grounded_citations_enabled", True)
@@ -489,12 +482,6 @@ def is_scout_fail_closed_on_empty_retrieval(user_id: Optional[str] = None) -> bo
     )
 
 
-def get_scout_retrieval_provider(user_id: Optional[str] = None) -> str:
-    raw = str(load_settings(user_id).get("agent_config", {}).get("scout_retrieval_provider", "tavily"))
-    lowered = raw.strip().lower()
-    return lowered if lowered in ("tavily", "serpapi") else "tavily"
-
-
 def get_canonical_website_hostname(user_id: Optional[str] = None) -> Optional[str]:
     try:
         from utils.reference_verify import hostname_from_user_hint
@@ -502,15 +489,6 @@ def get_canonical_website_hostname(user_id: Optional[str] = None) -> Optional[st
         return None
     raw = (load_settings(user_id).get("fund_identity") or {}).get("canonical_website")
     return hostname_from_user_hint(raw) if raw else None
-
-
-def get_scout_serp_daily_budget(user_id: Optional[str] = None) -> int:
-    raw = load_settings(user_id).get("agent_config", {}).get("scout_serp_daily_budget", 5)
-    try:
-        n = int(raw)
-    except Exception:
-        return 5
-    return max(0, n)
 
 
 def get_meta_agent_settings() -> dict:

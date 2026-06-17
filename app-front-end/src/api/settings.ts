@@ -28,9 +28,6 @@ export interface AgentConfig {
   scout_region: string; // "europe" | "global"
   scout_grounded_citations_enabled?: boolean;
   scout_fail_closed_on_empty_retrieval?: boolean;
-  scout_retrieval_provider?: 'tavily' | 'serpapi' | string;
-  scout_serp_enabled: boolean;
-  scout_serp_daily_budget: number;
 }
 
 export interface Portfolio {

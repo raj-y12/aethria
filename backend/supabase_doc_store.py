@@ -1,7 +1,7 @@
 """
 Supabase-backed storage for list and doc JSON blobs.
 Every operation requires an explicit user_id (no run_context or default tenant).
-Uses get_service_client(); tables: portfolio_*, memory, settings, serp_usage, analytics_*, meta_*.
+Uses get_service_client(); tables: portfolio_*, memory, settings, analytics_*, meta_*.
 """
 import logging
 import time
@@ -193,7 +193,6 @@ DOC_TABLES = {
     "portfolio_budgets",
     "memory",
     "settings",
-    "serp_usage",
     "analytics_sector_concentration",
     "meta_prompt_library",
     "meta_scout_weights",

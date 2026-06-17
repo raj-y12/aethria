@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 from datetime import datetime
 
 from models import Startup
+from utils.recency import memo_recency_note
 from utils.scoring import compute_overall_score, score_to_label
 from utils.score_semantics import rubric_band_for_numeric, rubric_score_bands_markdown_footnote
 
@@ -182,6 +183,7 @@ class MemoGenerator:
             lines.append(f"# Investment Memo: {startup.scout_info.name}")
             lines.append("")
             lines.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            lines.append(memo_recency_note())
             lines.append(f"**Startup ID:** {startup.startup_id}")
             lines.append("")
             lines.append("---")
