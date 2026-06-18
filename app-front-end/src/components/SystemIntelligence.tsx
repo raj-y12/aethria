@@ -799,7 +799,7 @@ function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSe
             </div>
           )}
           {whyLines.length > 0 && (
-            <div className="mt-phi-4 flex max-w-[44rem] flex-col gap-phi-2 border-l-2 border-oxford/20 pl-phi-4">
+            <div className="mt-phi-4 flex max-w-[44rem] flex-col gap-phi-2 border-l border-oxford/20 pl-phi-4">
               <span className="type-meta uppercase tracking-[0.12em] text-oxford/35">Why no further action</span>
               {whyLines.map((line, i) => (
                 <p key={i} className="type-meta text-oxford/55 leading-relaxed">{line}</p>

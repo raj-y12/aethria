@@ -271,7 +271,7 @@ export default function DecisionStage({ startup, fundConfiguration, action }: De
 
       {/* What decides it — the single question the deal hinges on. */}
       {focalQuestion ? (
-        <motion.div variants={STAGE_ITEM} className="mt-phi-5 border-l-2 border-oxford/25 pl-phi-4">
+        <motion.div variants={STAGE_ITEM} className="mt-phi-5 border-l border-oxford/25 pl-phi-4">
           <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/[0.38]">What decides it</p>
           <p className="mt-phi-1 max-w-[34rem] font-sans text-[14px] leading-[1.5] text-oxford/80">
             {focalQuestion}
