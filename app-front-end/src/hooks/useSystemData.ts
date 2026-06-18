@@ -102,13 +102,17 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     }
   }, [systemPanelOpen, isTabVisible, queryClient]);
 
+  // The deal-flow grid is the primary surface users watch update, so it should
+  // feel near-live while they're actively looking. Poll briskly (15s) when the
+  // tab is visible AND there's been recent input; back off to 60s when the tab
+  // is visible but idle, and stop entirely when hidden — keeping backend egress
+  // conservative when nobody's watching.
+  const startupsPollMs = isTabVisible ? (userActive ? 15_000 : 60_000) : false;
   const startupsQuery = useQuery({
     queryKey: ['startups', 'list'],
     queryFn: fetchStartups,
-    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 60_000 }),
-    // Keep WorkGrid current even during reading/idle periods while tab is visible,
-    // while keeping request volume conservative for backend egress.
-    refetchInterval: isTabVisible ? 60_000 : false,
+    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 15_000 }),
+    refetchInterval: startupsPollMs,
     placeholderData: (prev) => prev ?? [],
   });
 
