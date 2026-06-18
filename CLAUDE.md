@@ -19,6 +19,7 @@ Each stage is async, user-scoped, and gated by the active **FundThesis**. No the
 - **Periodic pipeline**: `POST /api/agents/trigger` → enqueued in `_agent_queue` → `run_one_pipeline_cycle(user_id)`
 - **On-demand lookup**: `POST /api/startups/lookup` → `_lookup_queue` → `run_on_demand_lookup(user_id, company_name)`
 - **Frontend reads**: `GET /api/startups`, `GET /api/memo/:id`, `GET /api/settings`, etc.
+- **Live updates (push)**: `GET /api/stream` (SSE). Pipeline stages call `event_bus.publish(user_id, …)`; the frontend (`useStartupsStream`) refetches on each `startups_changed` nudge instead of polling on a timer. In-process, single-instance — see `event_bus.py` for the multi-instance backplane seam. Polling stays as a slow backstop.
 
 ### Multi-tenancy
 

@@ -28,6 +28,7 @@ if load_dotenv:
         load_dotenv()
 
 from tenant_context import TenantContext
+from event_bus import publish as _publish_event
 from pipeline_concurrency import pipeline_execution_slot, lookup_execution_slot
 from supabase_doc_store import list_upsert
 from utils.settings_loader import load_settings, is_thesis_reprocess_agents_enabled
@@ -180,6 +181,20 @@ def _rss_mb() -> float:
         return -1.0
 
 
+def _notify_startups_changed(user_id: str, reason: str) -> None:
+    """Best-effort SSE nudge: tell connected clients their deal-flow changed.
+
+    A pipeline stage just mutated the user's startups, so push a lightweight
+    event that makes the frontend refetch immediately instead of waiting for
+    its next poll tick. Never raises — a failed notify must not affect the
+    pipeline. When no client is connected this is a cheap no-op.
+    """
+    try:
+        _publish_event(user_id, {"type": "startups_changed", "reason": reason})
+    except Exception as e:  # pragma: no cover - defensive
+        logger.debug("[%s] startups_changed notify failed: %s", user_id[:12], e)
+
+
 def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str) -> None:
     lid = (lookup_id or "").strip()
     if not lid or not user_id or not str(user_id).strip():
@@ -322,6 +337,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
         if scouts_enabled:
             agents_executed += len(getattr(scout_engine, "scouts", []) or [])
             await scout_engine.run_cycle(pipeline_run_id=pipeline_run_id)
+            _notify_startups_changed(user_id, "scout")
         else:
             logger.info("[%s] Scout stage skipped (disabled in settings)", user_id[:12])
 
@@ -339,6 +355,8 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
                 )
             reviewed_count = await reviewer_engine.run_cycle(pipeline_run_id=pipeline_run_id)
             _activity_reviewed_count = reviewed_count or 0
+            if _activity_reviewed_count > 0:
+                _notify_startups_changed(user_id, "reviewer")
             reviewer_stats = getattr(reviewer_engine, "last_cycle_stats", {}) or {}
             unreviewed_after = _safe_stage_count(storage, "count_unreviewed", user_id)
             if reviewed_count > 0 or (unreviewed_before or 0) > 0 or (unreviewed_after or 0) > 0:
@@ -367,6 +385,8 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
             decided_count = await partner_engine.run_cycle(pipeline_run_id=pipeline_run_id)
             _activity_decided_count = decided_count or 0
             _activity_escalations_count = getattr(partner_engine, "last_cycle_escalations", 0)
+            if _activity_decided_count > 0 or _activity_escalations_count > 0:
+                _notify_startups_changed(user_id, "partner")
             undecided_after = _safe_stage_count(storage, "count_undecided", user_id)
             if decided_count > 0 or (undecided_before or 0) > 0 or (undecided_after or 0) > 0:
                 _visible_info(
@@ -614,6 +634,8 @@ async def _run_on_demand_lookup_inner(
             )
             _record_lookup_failure(user_id, lid, message)
             return None
+        # The scout persisted a row — nudge the UI so the card appears at once.
+        _notify_startups_changed(user_id, "lookup_scout")
         if cancelled():
             logger.info("[%s] Lookup cancelled after scout: %s (%s)", user_id[:12], company, startup_id)
             return startup_id
@@ -639,6 +661,7 @@ async def _run_on_demand_lookup_inner(
             # Do not mark lookup as failed when scout persisted a startup successfully.
             # This is a partial completion state; UI should keep polling/matching rows.
             return startup_id
+        _notify_startups_changed(user_id, "lookup_reviewer")
         if cancelled():
             logger.info("[%s] Lookup cancelled after review: %s (%s)", user_id[:12], company, startup_id)
             return startup_id
@@ -659,6 +682,8 @@ async def _run_on_demand_lookup_inner(
                 await asyncio.sleep(0.6 * attempt)
         if not decided:
             logger.warning("[%s] On-demand lookup not decided yet: %s", user_id[:12], startup_id)
+        else:
+            _notify_startups_changed(user_id, "lookup_partner")
         logger.info(
             "[%s] On-demand lookup completed for %s (%s) rss_mb_end=%.1f",
             user_id[:12],

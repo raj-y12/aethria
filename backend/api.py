@@ -35,7 +35,7 @@ if load_dotenv:
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from utils.storage import Storage
 from security.rate_limiter import (
@@ -58,6 +58,7 @@ from utils.settings_loader import (
     is_cost_budget_enabled,
 )
 from auth_clerk import verify_clerk_token
+import event_bus
 from admin_auth import admin_token_ttl_seconds, issue_admin_token, validate_admin_secret, verify_admin_token
 from admin_audit import record_admin_audit_event
 from admin_service import build_admin_overview
@@ -124,6 +125,13 @@ _lookup_worker_task: Optional[asyncio.Task] = None
 _cancelled_lookup_ids: set[str] = set()
 _logger_agents = logging.getLogger("api.agents")
 _logger_visible = logging.getLogger("uvicorn.error")
+
+# SSE (GET /api/stream): keepalive cadence and a hard cap on concurrent streams
+# per process so a flood of connections can't exhaust a small instance. When the
+# cap is hit the client gets 503 and falls back to its polling cadence.
+_SSE_KEEPALIVE_SECONDS = max(5, int(os.getenv("SSE_KEEPALIVE_SECONDS", "20") or "20"))
+_SSE_MAX_CONNECTIONS = max(1, int(os.getenv("SSE_MAX_CONNECTIONS", "200") or "200"))
+
 _LOOKUP_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{8,128}$")
 _LOOKUP_LEADING_PHRASE_RE = re.compile(
     r"(?i)^\s*(?:find|lookup|look\s+up|search(?:\s+for)?|analy[sz]e|evaluate|check(?:\s+out)?|research)\s+"
@@ -1518,6 +1526,72 @@ def get_startups(
     raw_list = storage.get_all()
     full = [_backend_to_frontend(r, last_seen_at=last_seen_at) for r in raw_list]
     return [_thin_list_from_full_frontend(x) for x in full]
+
+
+async def _sse_event_source(queue, *, keepalive_seconds, on_close=None):
+    """Yield SSE frames for one subscriber queue.
+
+    Emits a ``: connected`` comment first (flushes headers / primes proxies),
+    then a ``data:`` frame per published event, with a ``: keepalive`` comment
+    whenever the connection sits idle longer than ``keepalive_seconds``. The
+    keepalive doubles as disconnect detection: once the client is gone the yield
+    raises, the generator is closed, and ``on_close`` (unsubscribe) runs.
+    """
+    try:
+        yield ": connected\n\n"
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=keepalive_seconds)
+            except asyncio.TimeoutError:
+                yield ": keepalive\n\n"
+                continue
+            yield f"data: {json.dumps(event)}\n\n"
+    finally:
+        if on_close is not None:
+            on_close()
+
+
+@app.get("/api/stream")
+async def event_stream(request: Request):
+    """
+    Server-Sent Events: push lightweight "startups_changed" nudges so the
+    frontend can refetch the deal-flow the moment a pipeline stage writes new
+    data, instead of waiting for its next poll tick.
+
+    The payload is intentionally tiny (a nudge, not the data) — the client
+    reacts by invalidating its TanStack query and refetching through the normal
+    typed REST client, so this stream never duplicates startup serialization.
+
+    Auth uses the standard Clerk path: the frontend consumes this with `fetch`
+    (not the native EventSource), so it sends the usual `Authorization: Bearer`
+    header and `clerk_auth_middleware` has already set `request.state.user_id`.
+    """
+    user_id = getattr(request.state, "user_id", None)
+    if not user_id:
+        # Should be unreachable behind the auth middleware, but never leak a
+        # stream without a tenant.
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization token")
+
+    if event_bus.total_subscribers() >= _SSE_MAX_CONNECTIONS:
+        raise HTTPException(
+            status_code=503,
+            detail="Too many active streams; retry shortly (polling continues meanwhile).",
+            headers={"Retry-After": "30"},
+        )
+
+    queue = event_bus.subscribe(user_id)
+    source = _sse_event_source(
+        queue,
+        keepalive_seconds=_SSE_KEEPALIVE_SECONDS,
+        on_close=lambda: event_bus.unsubscribe(user_id, queue),
+    )
+    headers = {
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        # Disable nginx-style proxy buffering so events flush immediately.
+        "X-Accel-Buffering": "no",
+    }
+    return StreamingResponse(source, media_type="text/event-stream", headers=headers)
 
 
 @app.get("/api/startups/lookup-status")
