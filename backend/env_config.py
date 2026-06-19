@@ -202,6 +202,17 @@ REGISTRY: List[EnvVar] = [
            "If set, /metrics requires this value as a Bearer token. Leave empty "
            "only on a trusted/private network."),
 
+    # --- Event bus / multi-instance -----------------------------------------
+    EnvVar("EVENT_BUS_BACKPLANE", "str", "memory", "Event bus",
+           "SSE event fan-out: 'memory' (single instance) or 'postgres' "
+           "(LISTEN/NOTIFY for multi-instance delivery)."),
+    EnvVar("DATABASE_URL", "secret", "", "Event bus",
+           "Direct Postgres connection string for the LISTEN/NOTIFY backplane "
+           "(Supabase exposes one). Required when EVENT_BUS_BACKPLANE=postgres."),
+    EnvVar("SUPABASE_DB_URL", "secret", "", "Event bus",
+           "Fallback Postgres connection string for the backplane (used if "
+           "DATABASE_URL is unset)."),
+
     # --- Scoring / retrieval / misc -----------------------------------------
     EnvVar("USE_STRUCTURED_SCORING", "bool", "true", "Scoring / misc", "Use the deterministic structured scoring engine."),
     EnvVar("SKIP_READ_ENRICH_SCORES", "bool", "", "Scoring / misc", "Skip score enrichment on read (perf)."),

@@ -552,9 +552,16 @@ async def _lifespan(app: FastAPI):
     _lookup_worker_task = asyncio.create_task(_lookup_worker())
     _rss_sampler_task = asyncio.create_task(_rss_sampler())
     _logger_agents.info("Pipeline agent worker + on-demand lookup worker started")
+    # Opt-in multi-instance SSE backplane (no-op unless EVENT_BUS_BACKPLANE=postgres).
+    if event_bus.backplane_enabled():
+        try:
+            await event_bus.start_backplane()
+        except Exception as e:  # pragma: no cover - never block startup
+            _logger_agents.warning("event_bus backplane failed to start: %s", e)
     # Resume persistent per-user loops for users that had agents enabled before restart
     await _resume_all_user_loops()
     yield
+    await event_bus.stop_backplane()
     # Cancel all per-user loops first
     loop_tasks = list(_per_user_loops.values())
     for t in loop_tasks:
