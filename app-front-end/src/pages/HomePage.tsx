@@ -7,6 +7,7 @@ import AgentLogoutModal from '../components/AgentLogoutModal';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import { useSinceAwaySummary } from '../hooks/useActivitySummary';
 import { usePrefersReducedMotion } from '../hooks';
+import { useFundReadiness } from '../hooks/useFundReadiness';
 import { transitionOrReduced } from '../design-system/motion';
 import { tokens } from '../design-system/tokens';
 import { isDealUnresolved } from '../lib/dealState';
@@ -112,6 +113,7 @@ export default function HomePage({ data }: { data: SystemData }) {
     requestLogout,
     logoutModalProps,
   } = useAgentLogoutFlow();
+  const { mandatePublished, loading: fundReadinessLoading } = useFundReadiness();
   const { startups } = data;
 
   // Legacy deep links (/v1?open=…, /v1?queue=…) belong to Flow.
@@ -157,6 +159,12 @@ export default function HomePage({ data }: { data: SystemData }) {
     .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
     .toUpperCase()} · ${now.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' })}`;
 
+  // First-run: no mandate published yet. Show a quiet editorial prompt.
+  // We wait until the readiness check resolves (loading=false) to avoid a
+  // flash for returning users — the hook defaults mandatePublished:true on
+  // error so users are never falsely trapped.
+  const showFirstRun = !fundReadinessLoading && !mandatePublished;
+
   return (
     <div className="paper-dot-grid relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain">
       <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7">
@@ -174,56 +182,83 @@ export default function HomePage({ data }: { data: SystemData }) {
           </p>
         </Reveal>
 
-        <Reveal delay={0.16} y={10} className="mt-phi-5">
-          <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.6vw,58px)] font-medium leading-[1.06] tracking-[-0.015em] text-oxford">
-            {headline}
-          </h1>
-        </Reveal>
+        {showFirstRun ? (
+          <>
+            <Reveal delay={0.16} y={10} className="mt-phi-5">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.6vw,58px)] font-medium leading-[1.06] tracking-[-0.015em] text-oxford">
+                Define your mandate.
+              </h1>
+            </Reveal>
 
-        <Reveal delay={0.24} className="mt-phi-5">
-          <p className="text-center font-mono text-[10.5px] tracking-[0.1em] tabular-nums text-oxford/45">
-            {subline}
-          </p>
-        </Reveal>
+            <Reveal delay={0.24} className="mt-phi-5">
+              <p className="text-center font-mono text-[10.5px] tracking-[0.1em] text-oxford/45">
+                Aethria won't scout or evaluate until a fund mandate is published.
+              </p>
+            </Reveal>
 
-        {/* ── The doors — one editorial band ── */}
-        <div className="mt-phi-8 w-full max-w-[46rem] border-y border-oxford/[0.12]">
-          <div
-            className="grid grid-cols-4 divide-x divide-oxford/[0.08]"
-            role="navigation"
-            aria-label="Workspaces"
-          >
-            <HomeDoor
-              numeral="II"
-              label="Flow"
-              detail={needRuling > 0 ? `${needRuling} need ruling` : `${openCount} open`}
-              tone={needRuling > 0 ? 'escalation' : 'default'}
-              index={0}
-              onClick={() => navigate('/v1/flow')}
-            />
-            <HomeDoor
-              numeral="III"
-              label="Portfolio"
-              detail={`${convictionCount} conviction · ${watchTotal} watch`}
-              index={1}
-              onClick={() => navigate('/v1/portfolio')}
-            />
-            <HomeDoor
-              numeral="IV"
-              label="Fund"
-              detail={mandateVersion != null ? `Mandate v${mandateVersion}` : 'No mandate'}
-              index={2}
-              onClick={() => navigate('/v1/fund')}
-            />
-            <HomeDoor
-              numeral="⌘K"
-              label="Dispatch"
-              detail={dispatchActive ? 'Lookup running' : 'Look up a company'}
-              index={3}
-              onClick={openDispatch}
-            />
-          </div>
-        </div>
+            <Reveal delay={0.32} className="mt-phi-7">
+              <Link
+                to="/v1/settings"
+                className="type-meta border-b border-oxford/30 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/60 transition-colors hover:text-oxford btn-interaction"
+              >
+                Set mandate →
+              </Link>
+            </Reveal>
+          </>
+        ) : (
+          <>
+            <Reveal delay={0.16} y={10} className="mt-phi-5">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.6vw,58px)] font-medium leading-[1.06] tracking-[-0.015em] text-oxford">
+                {headline}
+              </h1>
+            </Reveal>
+
+            <Reveal delay={0.24} className="mt-phi-5">
+              <p className="text-center font-mono text-[10.5px] tracking-[0.1em] tabular-nums text-oxford/45">
+                {subline}
+              </p>
+            </Reveal>
+
+            {/* ── The doors — one editorial band ── */}
+            <div className="mt-phi-8 w-full max-w-[46rem] border-y border-oxford/[0.12]">
+              <div
+                className="grid grid-cols-4 divide-x divide-oxford/[0.08]"
+                role="navigation"
+                aria-label="Workspaces"
+              >
+                <HomeDoor
+                  numeral="II"
+                  label="Flow"
+                  detail={needRuling > 0 ? `${needRuling} need ruling` : `${openCount} open`}
+                  tone={needRuling > 0 ? 'escalation' : 'default'}
+                  index={0}
+                  onClick={() => navigate('/v1/flow')}
+                />
+                <HomeDoor
+                  numeral="III"
+                  label="Portfolio"
+                  detail={`${convictionCount} conviction · ${watchTotal} watch`}
+                  index={1}
+                  onClick={() => navigate('/v1/portfolio')}
+                />
+                <HomeDoor
+                  numeral="IV"
+                  label="Fund"
+                  detail={mandateVersion != null ? `Mandate v${mandateVersion}` : 'No mandate'}
+                  index={2}
+                  onClick={() => navigate('/v1/fund')}
+                />
+                <HomeDoor
+                  numeral="⌘K"
+                  label="Dispatch"
+                  detail={dispatchActive ? 'Lookup running' : 'Look up a company'}
+                  index={3}
+                  onClick={openDispatch}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         {/* ── The footer bar — Dispatch's micro-action language ── */}
         <Reveal delay={0.36} className="mt-phi-8">
