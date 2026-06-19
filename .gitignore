@@ -38,3 +38,6 @@ app-front-end/.superpowers/
 # Archived experiments and local maintenance scratch space
 scripts/
 unused_components/
+
+# Local portfolio JSON fallback store (Supabase is the source of truth in prod)
+data/portfolio/
