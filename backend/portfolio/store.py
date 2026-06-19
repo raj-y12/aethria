@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from utils.timeutil import utcnow, ensure_aware
 from uuid import uuid4
 import fcntl
 import os
@@ -140,7 +141,7 @@ class PortfolioStore:
             "why_now": record.get("why_now", ""),
             "scout_type": record.get("scout_type", ""),
             "scout_confidence": record.get("scout_confidence", 0.0),
-            "discovered_at": record.get("discovered_at") or datetime.now().isoformat(),
+            "discovered_at": record.get("discovered_at") or utcnow().isoformat(),
             "version": int(record.get("version") or 1),
             "metadata": record.get("metadata") if isinstance(record.get("metadata"), dict) else {},
         }
@@ -323,7 +324,7 @@ class PortfolioStore:
             "why_now": scout_output.get("why_now", ""),
             "scout_type": scout_output.get("scout_type", ""),
             "scout_confidence": scout_output.get("confidence", 0.0),
-            "discovered_at": datetime.now().isoformat(),
+            "discovered_at": utcnow().isoformat(),
             "version": 1,
             "metadata": {
                 "agent_id": agent_id,
@@ -362,7 +363,7 @@ class PortfolioStore:
             "next_action": partner_output.get("next_action", ""),
             "human_review_required": partner_output.get("human_review_required", False),
             "partner_agent_id": agent_id,
-            "decided_at": datetime.now().isoformat(),
+            "decided_at": utcnow().isoformat(),
             "version": 1,
         }
         
@@ -384,7 +385,7 @@ class PortfolioStore:
             "id": portfolio_id,
             "startup_id": startup_id,
             "decision_id": decision_id,
-            "accepted_at": datetime.now().isoformat(),
+            "accepted_at": utcnow().isoformat(),
             "status": "active",
             "key_risks": key_risks,
             "follow_up_triggers": follow_up_triggers,
@@ -412,7 +413,7 @@ class PortfolioStore:
             "id": rejection_id,
             "startup_id": startup_id,
             "decision_id": decision_id,
-            "rejected_at": datetime.now().isoformat(),
+            "rejected_at": utcnow().isoformat(),
             "reason_code": reason_code,
             "rationale": rationale,
             "key_risks": key_risks,
@@ -433,7 +434,7 @@ class PortfolioStore:
     ) -> str:
         """Add company to watchlist."""
         watchlist_id = str(uuid4())
-        now = datetime.now()
+        now = utcnow()
         
         from datetime import timedelta
         next_check = now + timedelta(days=check_interval_days)
@@ -463,11 +464,11 @@ class PortfolioStore:
         records = self._read_file(self.files["watchlist"])
         for i, record in enumerate(records):
             if record.get("id") == watchlist_id:
-                record["last_checked_at"] = datetime.now().isoformat()
+                record["last_checked_at"] = utcnow().isoformat()
                 record["cached_summary"] = new_summary
                 from datetime import timedelta
                 interval = record.get("check_interval_days", 30)
-                next_check = datetime.now() + timedelta(days=interval)
+                next_check = utcnow() + timedelta(days=interval)
                 record["next_check_at"] = next_check.isoformat()
                 record["version"] = record.get("version", 1) + 1
                 if self._using_supabase() and self._supabase_tables.get("watchlist"):
@@ -501,7 +502,7 @@ class PortfolioStore:
             "signal_type": signal_type,
             "strength": strength,
             "description": description,
-            "detected_at": datetime.now().isoformat(),
+            "detected_at": utcnow().isoformat(),
             "affected_confidence": affected_confidence,
             "tracker_agent_id": agent_id,
             "version": 1,
@@ -529,7 +530,7 @@ class PortfolioStore:
             "agent_type": agent_type,
             "metric_name": metric_name,
             "metric_value": metric_value,
-            "calculated_at": datetime.now().isoformat(),
+            "calculated_at": utcnow().isoformat(),
             "period_start": period_start,
             "period_end": period_end,
             "sample_size": sample_size,
@@ -550,13 +551,13 @@ class PortfolioStore:
     def get_watchlist_due_for_check(self) -> List[Dict[str, Any]]:
         """Get watchlist entries due for check."""
         records = self._read_file(self.files["watchlist"])
-        now = datetime.now()
+        now = utcnow()
         
         due = []
         for record in records:
             next_check_str = record.get("next_check_at")
             if next_check_str:
-                next_check = datetime.fromisoformat(next_check_str)
+                next_check = ensure_aware(datetime.fromisoformat(next_check_str))
                 if next_check <= now:
                     due.append(record)
         

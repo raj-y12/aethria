@@ -6,6 +6,7 @@ Enforces strict validation and nested structure for Scout → Reviewer → Partn
 from pydantic import BaseModel, Field
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime
+from utils.timeutil import utcnow, ensure_aware
 from uuid import uuid4
 
 RulingDecision = Literal["YES", "NO", "MAYBE"]
@@ -180,7 +181,7 @@ class ScoutInfo(BaseModel):
     # Full CompanyResolution payload (canonical name, website, linkedin/crunchbase URLs,
     # founder names, confidence, alternatives, evidence sources, missing fields, stage log).
     company_resolution: Optional[Dict[str, Any]] = None
-    discovered_at: datetime = Field(default_factory=datetime.now)
+    discovered_at: datetime = Field(default_factory=utcnow)
     # Hash of the system prompt used by the Scout when this discovery was created.
     prompt_version: Optional[str] = None
 
@@ -252,7 +253,7 @@ class ReviewInfo(BaseModel):
     diligence_red_flags: List[str] = Field(default_factory=list)  # Missing data flags
     assumption_feedback: List[str] = Field(default_factory=list)  # Comments on Scout assumptions; critical unknowns
     reviewer_agent_id: Optional[str] = None
-    reviewed_at: datetime = Field(default_factory=datetime.now)
+    reviewed_at: datetime = Field(default_factory=utcnow)
     # VC qualitative fields (optional; use [MISSING] when info absent)
     team_analysis: Optional[List[str]] = None  # Founders, roles, experience, unfair advantage
     competition_analysis: Optional[List[str]] = None  # Competitors, market position, differentiation
@@ -335,7 +336,7 @@ class PartnerInfo(BaseModel):
     human_review_required: bool = False
     # Metadata set by engine — not from LLM output
     partner_agent_id: Optional[str] = None
-    partnered_at: datetime = Field(default_factory=datetime.now)
+    partnered_at: datetime = Field(default_factory=utcnow)
     llm_fallback_reason: Optional[str] = None
     prompt_version: Optional[str] = None
     decision_drivers: Optional[List[str]] = None
@@ -408,12 +409,12 @@ class Startup(BaseModel):
     
     # Metadata
     version: int = 1
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
-    
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
     def update_timestamp(self):
         """Update the updated_at timestamp."""
-        self.updated_at = datetime.now()
+        self.updated_at = utcnow()
     
     def to_dict(self) -> dict:
         """Convert to dict with ISO timestamp strings."""
@@ -422,14 +423,20 @@ class Startup(BaseModel):
     
     @classmethod
     def _normalize_timestamp(cls, value: Any) -> Optional[datetime]:
-        """Convert ISO string or datetime to datetime; None stays None for optional fields."""
+        """Convert ISO string or datetime to a tz-aware UTC datetime; None stays None.
+
+        Legacy rows persisted before the tz-aware standardization stored ISO
+        strings without an offset; ``ensure_aware`` (via ``parse_iso``) coerces
+        those to UTC so they never collide with aware ``utcnow()`` values in a
+        comparison.
+        """
         if value is None:
             return None
         if isinstance(value, datetime):
-            return value
+            return ensure_aware(value)
         if isinstance(value, str):
             try:
-                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+                return ensure_aware(datetime.fromisoformat(value.replace("Z", "+00:00")))
             except ValueError:
                 return None
         return None
@@ -450,27 +457,27 @@ class Startup(BaseModel):
             if key in data:
                 v = cls._normalize_timestamp(data[key])
                 data[key] = v if v is not None else (
-                    datetime.now() if key in ("created_at", "updated_at") else None
+                    utcnow() if key in ("created_at", "updated_at") else None
                 )
         # Nested: scout_info.discovered_at
         if "scout_info" in data and isinstance(data["scout_info"], dict):
             si = dict(data["scout_info"])
             if "discovered_at" in si:
                 v = cls._normalize_timestamp(si["discovered_at"])
-                si["discovered_at"] = v if v is not None else datetime.now()
+                si["discovered_at"] = v if v is not None else utcnow()
             data["scout_info"] = si
         # Nested: review_info.reviewed_at
         if "review_info" in data and data["review_info"] and isinstance(data["review_info"], dict):
             ri = dict(data["review_info"])
             if "reviewed_at" in ri:
                 v = cls._normalize_timestamp(ri["reviewed_at"])
-                ri["reviewed_at"] = v if v is not None else datetime.now()
+                ri["reviewed_at"] = v if v is not None else utcnow()
             data["review_info"] = ri
         # Nested: partner_info.partnered_at
         if "partner_info" in data and data["partner_info"] and isinstance(data["partner_info"], dict):
             pi = dict(data["partner_info"])
             if "partnered_at" in pi:
                 v = cls._normalize_timestamp(pi["partnered_at"])
-                pi["partnered_at"] = v if v is not None else datetime.now()
+                pi["partnered_at"] = v if v is not None else utcnow()
             data["partner_info"] = pi
         return cls.model_validate(data)

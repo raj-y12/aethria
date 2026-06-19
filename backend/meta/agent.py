@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
+from utils.timeutil import utcnow
 
 from tenant_context import TenantContext, require_user_id
 from meta.analyser import MetaAnalyser
@@ -108,7 +109,7 @@ class MetaAgent:
             finally:
                 mutator.close()
 
-        now = datetime.now()
+        now = utcnow()
         report = {
             "cycle_number": cycle_number,
             "ran_at": now.isoformat(),

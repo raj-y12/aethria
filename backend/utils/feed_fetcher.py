@@ -10,6 +10,7 @@ import fcntl
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from utils.timeutil import utcnow
 import urllib.request
 import urllib.error
 import xml.etree.ElementTree as ET
@@ -93,7 +94,7 @@ class FeedFetcher:
     def _fetch_rss(self, source_name: str, url: str) -> List[Dict[str, str]]:
         """Parse RSS feed and extract items."""
         import re
-        now = datetime.now().isoformat()
+        now = utcnow().isoformat()
         req = urllib.request.Request(url, headers={"User-Agent": "Aethria/1.0"})
         with urllib.request.urlopen(req, timeout=10) as resp:
             xml_data = resp.read()
@@ -126,7 +127,7 @@ class FeedFetcher:
     def _fetch_github_trending(self) -> List[Dict[str, str]]:
         """Scrape GitHub trending page for repo names and descriptions."""
         import re
-        now = datetime.now().isoformat()
+        now = utcnow().isoformat()
         req = urllib.request.Request(GITHUB_TRENDING_URL, headers={"User-Agent": "Aethria/1.0"})
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:

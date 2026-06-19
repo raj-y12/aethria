@@ -8,6 +8,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, Any, List
 from datetime import datetime
+from utils.timeutil import utcnow
 
 from supabase_doc_store import doc_get, doc_set
 
@@ -45,7 +46,7 @@ class ClusterAnalyzer:
                 "by_theme": {},
                 "most_concentrated_sector": "",
                 "most_concentrated_theme": "",
-                "last_updated": datetime.now().isoformat(),
+                "last_updated": utcnow().isoformat(),
             }
             self._write(result)
             return result
@@ -118,7 +119,7 @@ class ClusterAnalyzer:
             "by_theme": by_theme,
             "most_concentrated_sector": most_concentrated_sector,
             "most_concentrated_theme": most_concentrated_theme,
-            "last_updated": datetime.now().isoformat(),
+            "last_updated": utcnow().isoformat(),
         }
         self._write(result)
         return result

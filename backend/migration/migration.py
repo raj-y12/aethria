@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime
+from utils.timeutil import utcnow
 
 from models import Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
 from utils.storage import Storage
@@ -25,15 +26,15 @@ PARTNER_DECISION_MAP = {"INVEST": "YES", "WATCH": "MAYBE", "PASS": "NO"}
 def _parse_ts(value: Any) -> datetime:
     """Parse timestamp from old entry; fallback to now."""
     if value is None:
-        return datetime.now()
+        return utcnow()
     if isinstance(value, datetime):
         return value
     if isinstance(value, str):
         try:
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
-            return datetime.now()
-    return datetime.now()
+            return utcnow()
+    return utcnow()
 
 
 def migrate_old_to_new(old_file: str, new_file: str) -> None:

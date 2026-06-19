@@ -17,6 +17,7 @@ from uuid import uuid4
 from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from utils.timeutil import utcnow, ensure_aware
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
@@ -827,9 +828,9 @@ def _get_system_health(
                 continue
             for agent_id, last_call_str in last_calls.items():
                 try:
-                    last_call_time = datetime.fromisoformat(last_call_str)
+                    last_call_time = ensure_aware(datetime.fromisoformat(last_call_str))
                     cooldown_seconds = cost_controller.cooldowns.get(agent_type, 60)
-                    delta = (datetime.now() - last_call_time).total_seconds()
+                    delta = (utcnow() - last_call_time).total_seconds()
                     in_cooldown = delta < cooldown_seconds
                     cooldown_until = (
                         (last_call_time.replace(tzinfo=timezone.utc) + timedelta(seconds=cooldown_seconds)).isoformat()

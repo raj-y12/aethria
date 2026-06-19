@@ -7,6 +7,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 from datetime import datetime
+from utils.timeutil import utcnow
 
 from functools import partial
 
@@ -159,7 +160,7 @@ class ScoutEngine:
         Returns:
             List of valid ScoutOutputs (may be empty if all Scouts fail)
         """
-        self.logger.info(f"Starting discovery cycle at {datetime.now().isoformat()}")
+        self.logger.info(f"Starting discovery cycle at {utcnow().isoformat()}")
         if not is_scouts_enabled(self.tenant_user_id):
             self.logger.info("Discovery cycle skipped (scouts disabled in settings)")
             return []

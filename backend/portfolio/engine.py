@@ -12,6 +12,7 @@ import logging
 import os
 from typing import Optional
 from datetime import datetime, timedelta
+from utils.timeutil import utcnow, ensure_aware
 
 from portfolio.store import PortfolioStore
 from portfolio.execution import ExecutionAgent
@@ -110,14 +111,14 @@ class PortfolioEngine:
         self.running = False
         
         # Track last run times
-        self.last_execution = datetime.now()
-        self.last_signal = datetime.now()
-        self.last_feedback = datetime.now()
-        self.last_health = datetime.now()
+        self.last_execution = utcnow()
+        self.last_signal = utcnow()
+        self.last_feedback = utcnow()
+        self.last_health = utcnow()
     
     async def run_cycle(self):
         """Run one cycle of all portfolio components."""
-        now = datetime.now()
+        now = utcnow()
         
         # Execution Agent: Process new Partner decisions
         if (now - self.last_execution).total_seconds() >= self.execution_interval:
@@ -267,7 +268,7 @@ class PortfolioEngine:
             if not watchlist:
                 return
 
-            now = datetime.now()
+            now = utcnow()
             signals = self.portfolio_store._read_file(self.portfolio_store.files["signals"])
             signal_startup_ids = {s.get("startup_id") for s in signals}
 
@@ -276,7 +277,7 @@ class PortfolioEngine:
                 added_at_str = entry.get("added_at")
                 if not added_at_str:
                     continue
-                added_at = datetime.fromisoformat(added_at_str)
+                added_at = ensure_aware(datetime.fromisoformat(added_at_str))
                 days = (now - added_at).days
 
                 has_signals = startup_id in signal_startup_ids

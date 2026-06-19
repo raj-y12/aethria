@@ -8,6 +8,7 @@ import logging
 import os
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
+from utils.timeutil import utcnow
 
 from partner.decision import PartnerDecisionEngine
 from partner.schema import validate_partner_output
@@ -327,7 +328,7 @@ class PartnerEngine:
         Returns:
             Number of decisions made in this cycle
         """
-        self.logger.info(f"Starting decision cycle at {datetime.now().isoformat()}")
+        self.logger.info(f"Starting decision cycle at {utcnow().isoformat()}")
         if not is_partners_enabled(self.tenant_user_id):
             self.logger.info("Decision cycle skipped (partners disabled in settings)")
             return 0

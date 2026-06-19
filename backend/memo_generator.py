@@ -13,6 +13,7 @@ import resource
 import time
 from typing import Any, Dict, Optional
 from datetime import datetime
+from utils.timeutil import utcnow
 
 from models import Startup
 from utils.recency import memo_recency_note
@@ -182,7 +183,7 @@ class MemoGenerator:
         if not for_display:
             lines.append(f"# Investment Memo: {startup.scout_info.name}")
             lines.append("")
-            lines.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            lines.append(f"**Generated:** {utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
             lines.append(memo_recency_note())
             lines.append(f"**Startup ID:** {startup.startup_id}")
             lines.append("")

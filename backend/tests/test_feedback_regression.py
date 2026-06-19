@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from portfolio.feedback import FeedbackLoop
 
@@ -6,9 +6,10 @@ from portfolio.feedback import FeedbackLoop
 class _FakePortfolioStore:
     def __init__(self):
         self._metrics = []
-        # Pre-compute timestamp so it is guaranteed to precede period_end = datetime.now()
-        # called in the test body (which runs after store construction).
-        self._now = datetime.now().isoformat()
+        # Pre-compute timestamp so it is guaranteed to precede period_end = utcnow()
+        # called in the test body (which runs after store construction). The backend
+        # standardizes on tz-aware UTC, so decided_at must carry an offset too.
+        self._now = datetime.now(timezone.utc).isoformat()
 
     def get_all_decisions(self):
         now = self._now
@@ -63,7 +64,7 @@ class _FakePortfolioStore:
 def test_partner_metrics_normalizes_legacy_decisions_without_crash():
     store = _FakePortfolioStore()
     feedback = FeedbackLoop(store)
-    period_end = datetime.now()
+    period_end = datetime.now(timezone.utc)
     period_start = period_end - timedelta(days=1)
 
     metric_ids = feedback._calculate_partner_metrics(period_start, period_end)

@@ -7,6 +7,7 @@ Machine-readable for future Meta-Agent use.
 import logging
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
+from utils.timeutil import utcnow, ensure_aware
 from collections import defaultdict
 
 from portfolio.store import PortfolioStore
@@ -52,7 +53,7 @@ class FeedbackLoop:
         Returns:
             List of metric IDs created
         """
-        period_end = datetime.now()
+        period_end = utcnow()
         period_start = period_end - timedelta(days=period_days)
         
         self.logger.info(
@@ -267,7 +268,7 @@ class FeedbackLoop:
             elif strong_pct > 0.60:
                 calibration_warning = "Too lenient (>60% STRONG)"
             
-            now = datetime.now()
+            now = utcnow()
             self.store.add_agent_metric(
                 agent_id="reviewer_calibration",
                 agent_type="reviewer",
@@ -316,7 +317,7 @@ class FeedbackLoop:
             return False
         
         try:
-            timestamp = datetime.fromisoformat(timestamp_str)
+            timestamp = ensure_aware(datetime.fromisoformat(timestamp_str))
             return period_start <= timestamp <= period_end
         except (ValueError, TypeError):
             return False

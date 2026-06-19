@@ -6,6 +6,7 @@ import logging
 import os
 from typing import Dict, Any, List
 from datetime import datetime
+from utils.timeutil import utcnow
 
 from supabase_doc_store import doc_get, doc_set, list_append_only
 
@@ -100,7 +101,7 @@ class ScoutReweighter:
             self.logger.info("[Reweighter] Weights stable, no reweighting needed")
             return []
 
-        now = datetime.now().isoformat()
+        now = utcnow().isoformat()
         updates = []
         for name in dampened:
             prev = current_weights.get(name, 0.25)

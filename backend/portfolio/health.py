@@ -11,6 +11,7 @@ import logging
 import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
+from utils.timeutil import utcnow, ensure_aware
 from collections import defaultdict
 from uuid import uuid4
 
@@ -121,8 +122,8 @@ class HealthMonitor:
         if not most_recent:
             return None
         
-        last_decision_time = datetime.fromisoformat(most_recent.get("decided_at", ""))
-        hours_since = (datetime.now() - last_decision_time).total_seconds() / 3600
+        last_decision_time = ensure_aware(datetime.fromisoformat(most_recent.get("decided_at", "")))
+        hours_since = (utcnow() - last_decision_time).total_seconds() / 3600
         
         if hours_since > 24:  # No decisions in 24 hours
             severity = "low" if hours_since < 48 else "medium" if hours_since < 72 else "high"

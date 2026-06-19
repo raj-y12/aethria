@@ -9,6 +9,7 @@ import os
 import resource
 import time
 from datetime import datetime, timedelta, timezone
+from utils.timeutil import utcnow
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 from uuid import uuid4
@@ -406,10 +407,10 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
             feedback_interval=86400,
             health_interval=3600,
         )
-        portfolio_engine.last_execution = datetime.now() - timedelta(days=1)
-        portfolio_engine.last_signal = datetime.now() - timedelta(days=1)
-        portfolio_engine.last_feedback = datetime.now() - timedelta(days=1)
-        portfolio_engine.last_health = datetime.now() - timedelta(days=1)
+        portfolio_engine.last_execution = utcnow() - timedelta(days=1)
+        portfolio_engine.last_signal = utcnow() - timedelta(days=1)
+        portfolio_engine.last_feedback = utcnow() - timedelta(days=1)
+        portfolio_engine.last_health = utcnow() - timedelta(days=1)
         agents_executed += 1
         await portfolio_engine.run_cycle()
 

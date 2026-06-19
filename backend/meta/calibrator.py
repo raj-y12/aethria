@@ -6,6 +6,7 @@ import logging
 import os
 from typing import Dict, Any, List
 from datetime import datetime
+from utils.timeutil import utcnow
 
 from supabase_doc_store import doc_get, doc_set, list_append_only
 
@@ -50,7 +51,7 @@ class ThresholdCalibrator:
         reviewer_health = self.signal.get("reviewer_health", {})
         warning = reviewer_health.get("calibration_warning")
         changes = []
-        now = datetime.now().isoformat()
+        now = utcnow().isoformat()
 
         last_cal_cycle = self.state.get("last_calibrated_cycle", 0)
         if (self.cycle_number - last_cal_cycle) < CALIBRATION_PARAM_COOLDOWN and last_cal_cycle > 0:
@@ -190,6 +191,6 @@ class ThresholdCalibrator:
                 user_id=self.user_id,
             )
 
-        state["last_calibrated_at"] = datetime.now().isoformat()
+        state["last_calibrated_at"] = utcnow().isoformat()
         state["last_calibrated_cycle"] = changes[0]["cycle_number"] if changes else 0
         doc_set(_CALIBRATION_TABLE, state, user_id=self.user_id)

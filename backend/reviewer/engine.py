@@ -7,6 +7,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 from datetime import datetime
+from utils.timeutil import utcnow
 
 from reviewer.reviewer import DefaultReviewer
 from reviewer.skeptical import SkepticalReviewer
@@ -547,7 +548,7 @@ class ReviewerEngine:
         Returns:
             Number of entries reviewed in this cycle
         """
-        self.logger.info(f"Starting review cycle at {datetime.now().isoformat()}")
+        self.logger.info(f"Starting review cycle at {utcnow().isoformat()}")
         if not is_reviewers_enabled(self.tenant_user_id):
             self.logger.info("Review cycle skipped (reviewers disabled in settings)")
             self.last_cycle_stats = {

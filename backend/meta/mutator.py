@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from utils.timeutil import utcnow
 from uuid import uuid4
 
 from utils.prompt_version import hash_prompt
@@ -332,7 +333,7 @@ class PromptMutator:
             min_ratio=float(lim["min_ratio"]),
             max_growth=float(lim["max_growth"]),
         )
-        now = datetime.now().isoformat()
+        now = utcnow().isoformat()
         if reject:
             self.logger.warning(
                 "[Mutator] Rejected prompt for %s: %s", agent_name, reject

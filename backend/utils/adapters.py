@@ -2,10 +2,11 @@
 Adapters to convert between old format and new Pydantic models.
 
 Maintains backward compatibility during migration.
-Timestamps are taken from stored data when available; fallback to datetime.now().
+Timestamps are taken from stored data when available; fallback to utcnow().
 """
 from typing import Dict, Any, Optional
 from datetime import datetime
+from utils.timeutil import utcnow
 
 from uuid import uuid4
 from models import ScoutInfo, ReviewInfo, PartnerInfo, PartnerSnapshot, Financials, AethriaView
@@ -51,7 +52,7 @@ def _parse_timestamp(value: Any) -> Optional[datetime]:
 def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
     """
     Convert old ScoutOutput to new ScoutInfo Pydantic model.
-    Uses discovered_at from input when available; otherwise datetime.now().
+    Uses discovered_at from input when available; otherwise utcnow().
     
     Args:
         scout_output: Old ScoutOutput dict (may include discovered_at from storage)
@@ -61,7 +62,7 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
     """
     discovered = _parse_timestamp(scout_output.get("discovered_at"))
     if discovered is None:
-        discovered = datetime.now()
+        discovered = utcnow()
     raw_id = scout_output.get("id") or ""
     startup_id = raw_id if isinstance(raw_id, str) and raw_id.strip() else str(uuid4())
     return ScoutInfo(
@@ -109,7 +110,7 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
     """
     Convert old ReviewerOutput to new ReviewInfo Pydantic model.
     Preserves defensibility_score and diligence_red_flags.
-    Uses reviewed_at from input when available; otherwise datetime.now().
+    Uses reviewed_at from input when available; otherwise utcnow().
     
     Args:
         reviewer_output: Old ReviewerOutput dict (may include reviewed_at from storage)
@@ -119,7 +120,7 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
     """
     reviewed = _parse_timestamp(reviewer_output.get("reviewed_at"))
     if reviewed is None:
-        reviewed = datetime.now()
+        reviewed = utcnow()
     enriched = enrich_scores(reviewer_output)
     return ReviewInfo(
         market_score=enriched.get("market_score", 5),
@@ -208,7 +209,7 @@ def partner_output_to_partner_info(partner_output: Dict[str, Any]) -> PartnerInf
     """
     partnered = _parse_timestamp(partner_output.get("partnered_at"))
     if partnered is None:
-        partnered = datetime.now()
+        partnered = utcnow()
 
     snap_raw = partner_output.get("snapshot") or {}
     snapshot = PartnerSnapshot(

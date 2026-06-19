@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+from utils.timeutil import utcnow, ensure_aware
 from collections import defaultdict
 import os
 
@@ -104,7 +105,7 @@ class CostController:
     
     def _reset_daily_budgets(self):
         """Reset daily budgets if new day."""
-        now = datetime.now()
+        now = utcnow()
         today = now.date().isoformat()
         
         for agent_type in self.default_budgets:
@@ -171,10 +172,10 @@ class CostController:
         last_call = last_calls.get(agent_id)
         
         if last_call:
-            last_call_time = datetime.fromisoformat(last_call)
+            last_call_time = ensure_aware(datetime.fromisoformat(last_call))
             cooldown_seconds = self.cooldowns.get(agent_type, 60)
             
-            if (datetime.now() - last_call_time).total_seconds() < cooldown_seconds:
+            if (utcnow() - last_call_time).total_seconds() < cooldown_seconds:
                 return False, f"Cooldown period not expired"
         
         return True, None
@@ -197,7 +198,7 @@ class CostController:
         
         if agent_type not in self.budgets:
             self.budgets[agent_type] = {
-                "last_reset_date": datetime.now().date().isoformat(),
+                "last_reset_date": utcnow().date().isoformat(),
                 "calls_today": 0,
                 "tokens_today": 0,
                 "last_call_time": {},
@@ -211,7 +212,7 @@ class CostController:
             + (max(0, int(tokens_used or 0)) / 1000.0) * self.token_cost_per_1k_usd,
             8,
         )
-        budget["last_call_time"][agent_id] = datetime.now().isoformat()
+        budget["last_call_time"][agent_id] = utcnow().isoformat()
         
         self._save_budgets()
         
