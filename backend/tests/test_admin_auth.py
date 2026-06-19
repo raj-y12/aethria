@@ -10,7 +10,7 @@ def _isolated_admin_security_state(monkeypatch):
     from security.rate_limiter import InMemorySecurityStore
 
     api._admin_login_attempts.clear()
-    monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
+    monkeypatch.setattr(__import__("routers.deps", fromlist=["x"]), "_security_store", InMemorySecurityStore())
 
 
 def test_admin_token_round_trip(monkeypatch):

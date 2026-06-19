@@ -27,7 +27,7 @@ def test_authenticated_lookup_rate_limit_is_per_user(monkeypatch):
     store = InMemorySecurityStore()
     users = iter(["user_a"] * 6 + ["user_b"])
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "0")
-    monkeypatch.setattr(api, "_security_store", store)
+    monkeypatch.setattr(__import__("routers.deps", fromlist=["x"]), "_security_store", store)
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: next(users))
     monkeypatch.setattr(api, "_lookup_queue", _FakeQueue())
 
@@ -63,7 +63,7 @@ def test_duplicate_lookup_id_is_coalesced_without_second_enqueue(monkeypatch):
 
     queue = _FakeQueue()
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "0")
-    monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
+    monkeypatch.setattr(__import__("routers.deps", fromlist=["x"]), "_security_store", InMemorySecurityStore())
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
     monkeypatch.setattr(api, "_lookup_queue", queue)
 
@@ -89,7 +89,7 @@ def test_cancel_lookup_marks_lookup_cancelled(monkeypatch):
     import api
     from security.rate_limiter import InMemorySecurityStore
 
-    monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
+    monkeypatch.setattr(__import__("routers.deps", fromlist=["x"]), "_security_store", InMemorySecurityStore())
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
     monkeypatch.setattr(api, "_cancelled_lookup_ids", set())
 
@@ -114,7 +114,7 @@ def test_manual_agent_trigger_when_ops_off_is_coalesced_without_second_enqueue(m
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service")
-    monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
+    monkeypatch.setattr(__import__("routers.deps", fromlist=["x"]), "_security_store", InMemorySecurityStore())
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
     monkeypatch.setattr(api, "_agent_queue", queue)
     monkeypatch.setattr(api, "load_settings", lambda user_id: {"agent_config": {"scouts_enabled": False}})
@@ -144,7 +144,7 @@ def test_agent_trigger_ignores_when_persistent_loop_already_running(monkeypatch)
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service")
-    monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
+    monkeypatch.setattr(__import__("routers.deps", fromlist=["x"]), "_security_store", InMemorySecurityStore())
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
     monkeypatch.setattr(api, "_agent_queue", queue)
     monkeypatch.setitem(api._per_user_loops, "user_a", _LiveTask())
@@ -174,7 +174,7 @@ def test_agent_trigger_starts_persistent_loop_without_queueing_when_ops_on(monke
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service")
-    monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
+    monkeypatch.setattr(__import__("routers.deps", fromlist=["x"]), "_security_store", InMemorySecurityStore())
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
     monkeypatch.setattr(api, "_agent_queue", queue)
     monkeypatch.setattr(api, "_loops_lock", object())
@@ -255,7 +255,7 @@ def test_admin_overview_rate_limited_by_admin_token(monkeypatch):
 
     monkeypatch.setenv("ADMIN_DASHBOARD_ENABLED", "true")
     monkeypatch.setenv("ADMIN_TOKEN_SECRET", "test-token-secret-with-at-least-32-bytes")
-    monkeypatch.setattr(api, "_security_store", InMemorySecurityStore())
+    monkeypatch.setattr(__import__("routers.deps", fromlist=["x"]), "_security_store", InMemorySecurityStore())
     monkeypatch.setattr(api, "record_admin_audit_event", lambda **kwargs: None)
     monkeypatch.setattr(api, "build_admin_overview", lambda loop_status_by_user: {"users": []})
 

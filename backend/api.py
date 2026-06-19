@@ -62,6 +62,27 @@ from utils.settings_loader import (
 from auth_clerk import verify_clerk_token
 import event_bus
 import metrics
+from routers.deps import (
+    enforce_rate_limits as _enforce_rate_limits,
+    acquire_security_lock as _acquire_security_lock,
+    release_security_lock as _release_security_lock,
+    get_security_store as _get_security_store,
+    client_host as _client_host,
+    is_production_env as _is_production_env,
+    now_iso as _now_iso,
+    get_root as _get_root,
+    get_portfolio_store as _get_portfolio_store,
+    get_storage as _get_storage,
+    require_supabase_for_thesis as _require_supabase_for_thesis,
+    safe_table_execute as _safe_table_execute,
+    LOOKUP_MINUTE_POLICY as _LOOKUP_MINUTE_POLICY,
+    LOOKUP_DAY_POLICY as _LOOKUP_DAY_POLICY,
+    AGENT_TRIGGER_POLICY as _AGENT_TRIGGER_POLICY,
+    META_TRIGGER_POLICY as _META_TRIGGER_POLICY,
+    SETTINGS_MUTATION_POLICY as _SETTINGS_MUTATION_POLICY,
+    ADMIN_LOGIN_POLICY as _ADMIN_LOGIN_POLICY,
+    ADMIN_OVERVIEW_POLICY as _ADMIN_OVERVIEW_POLICY,
+)
 from admin_auth import admin_token_ttl_seconds, issue_admin_token, validate_admin_secret, verify_admin_token
 from admin_audit import record_admin_audit_event
 from admin_service import build_admin_overview
@@ -198,15 +219,8 @@ cap_malloc_arenas()
 _ADMIN_LOGIN_MAX_FAILURES = int(os.getenv("ADMIN_LOGIN_MAX_FAILURES", "5"))
 _ADMIN_LOGIN_WINDOW_SECONDS = int(os.getenv("ADMIN_LOGIN_WINDOW_SECONDS", "300"))
 _admin_login_attempts: Dict[str, List[float]] = {}
-_security_store = None
 
-_LOOKUP_MINUTE_POLICY = RateLimitPolicy("lookup_minute", limit=5, window_seconds=60)
-_LOOKUP_DAY_POLICY = RateLimitPolicy("lookup_day", limit=50, window_seconds=86400)
-_AGENT_TRIGGER_POLICY = RateLimitPolicy("agent_trigger_minute", limit=1, window_seconds=60)
-_META_TRIGGER_POLICY = RateLimitPolicy("meta_trigger_hour", limit=1, window_seconds=3600)
-_SETTINGS_MUTATION_POLICY = RateLimitPolicy("settings_mutation_minute", limit=30, window_seconds=60)
-_ADMIN_LOGIN_POLICY = RateLimitPolicy("admin_login_minute", limit=10, window_seconds=60)
-_ADMIN_OVERVIEW_POLICY = RateLimitPolicy("admin_overview_minute", limit=30, window_seconds=60)
+# Rate-limit policies + shared security/storage helpers now live in routers/deps.py
 
 _AGENT_TRIGGER_LOCK_TTL_SECONDS = int(os.getenv("AGENT_TRIGGER_LOCK_TTL_SECONDS", "900"))
 _LOOKUP_LOCK_TTL_SECONDS = int(os.getenv("LOOKUP_LOCK_TTL_SECONDS", "900"))
@@ -217,15 +231,6 @@ MAX_STARTUPS_LIST_LIMIT = max(
     DEFAULT_STARTUPS_LIST_LIMIT,
     min(int(os.getenv("STARTUPS_LIST_MAX_LIMIT", "500")), 1000),
 )
-
-
-def _safe_table_execute(fn, *, default_data, warn_label: str):
-    """Best-effort supabase query wrapper for non-critical API enrichments."""
-    try:
-        return fn()
-    except Exception as e:
-        _logger_agents.warning("%s failed; returning fallback: %s", warn_label, e)
-        return default_data
 
 
 def _is_retryable_thesis_transport_error(err: Exception) -> bool:
@@ -603,47 +608,6 @@ app.add_middleware(
 )
 
 
-def _get_security_store():
-    global _security_store
-    if _security_store is None:
-        _security_store = build_security_store()
-    return _security_store
-
-
-def _enforce_rate_limits(key: str, policies: List[RateLimitPolicy]):
-    limiter = FixedWindowRateLimiter(store=_get_security_store())
-    for policy in policies:
-        decision = limiter.check(key, policy)
-        if not decision.allowed:
-            return rate_limit_exceeded(retry_after_seconds=decision.retry_after_seconds)
-    return None
-
-
-def _acquire_security_lock(key: str, *, ttl_seconds: int) -> bool:
-    return bool(_get_security_store().acquire_lock(f"lock:{key}", ttl_seconds=ttl_seconds))
-
-
-def _release_security_lock(key: Optional[str]) -> None:
-    if not key:
-        return
-    try:
-        _get_security_store().release_lock(f"lock:{key}")
-    except Exception as exc:
-        _logger_agents.debug("security lock release failed key=%s error=%s", key, exc)
-
-
-def _client_host(request: Request) -> str:
-    forwarded = str(request.headers.get("x-forwarded-for") or "").split(",", 1)[0].strip()
-    if forwarded:
-        return forwarded
-    return (request.client.host if request.client else "") or "unknown"
-
-
-def _is_production_env() -> bool:
-    env = (os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or os.getenv("FASTAPI_ENV") or "").lower()
-    return env in ("production", "prod")
-
-
 def _admin_dashboard_enabled() -> bool:
     raw = os.getenv("ADMIN_DASHBOARD_ENABLED")
     if _is_production_env():
@@ -691,21 +655,6 @@ async def clerk_auth_middleware(request: Request, call_next):
     request.state.user_id = user_id
     request.state.clerk_jwt = token
     return await call_next(request)
-
-
-def _now_iso() -> str:
-    """Return current time as ISO 8601 string in UTC."""
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _get_root() -> Path:
-    return Path(__file__).resolve().parent
-
-
-def _get_portfolio_store(user_id: str) -> PortfolioStore:
-    """Return a PortfolioStore for the authenticated tenant (explicit user_id)."""
-    root = _get_root()
-    return PortfolioStore(data_dir=str(root / "data" / "portfolio"), user_id=user_id)
 
 
 def _read_json_list(path: Path) -> List[Dict[str, Any]]:
@@ -1498,16 +1447,6 @@ def _aggregate_activity_totals(
         totals["escalations"] += int(r.get("escalations_count", 0) or 0)
     totals["decided"] = totals["agent_decided"]
     return totals
-
-
-def _get_storage(request: Request):
-    """Return Supabase startups storage for the authenticated user.
-    Uses service-role client and Clerk-derived user_id; we never send Clerk JWT to Supabase.
-    """
-    return SupabaseStartupsStorage(
-        get_service_client(),
-        request.state.user_id,
-    )
 
 
 @app.get("/api/startups")
@@ -2532,12 +2471,6 @@ async def agents_status(request: Request):
         "active_thesis_version_id": active_thesis_version_id,
         "thesis_error": thesis_error,
     }
-
-
-def _require_supabase_for_thesis() -> None:
-    use_supabase = env_config.use_supabase_storage()
-    if not use_supabase or not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_SERVICE_ROLE_KEY"):
-        raise HTTPException(status_code=503, detail="Supabase storage is required for fund thesis")
 
 
 @app.get("/api/fund-thesis")
