@@ -264,17 +264,17 @@ class _RuntimeClient:
 
 
 def test_runtime_endpoint_folds_queries(monkeypatch):
-    import api
+    from routers import fund_thesis as _ftr
 
     monkeypatch.setenv("FUND_THESIS_CACHE_TTL_SECONDS", "30")
     invalidate_thesis_cache()
     client = _RuntimeClient()
-    monkeypatch.setattr(api, "_require_supabase_for_thesis", lambda: None)
-    monkeypatch.setattr(api, "get_service_client", lambda: client)
+    monkeypatch.setattr(_ftr, "_require_supabase_for_thesis", lambda: None)
+    monkeypatch.setattr(_ftr, "get_service_client", lambda: client)
 
     from types import SimpleNamespace
     request = SimpleNamespace(state=SimpleNamespace(user_id="u1"))
-    resp = api.get_fund_thesis_runtime(request)
+    resp = _ftr.get_fund_thesis_runtime(request)
 
     import json
     body = json.loads(resp.body)
