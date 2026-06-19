@@ -21,6 +21,7 @@ import { fetchFundThesisRuntime, type FundThesisRuntime } from '../api/fundThesi
 import { fetchSettings } from '../api/settings';
 import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { useQueryLiveGate } from './useQueryLiveGate';
+import { useStartupsStream } from './useStartupsStream';
 import type {
   Startup, EscalationItem, SignalItem,
   RejectionAnalytics, WatchlistAnalytics, ConcentrationAnalytics,
@@ -102,13 +103,28 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     }
   }, [systemPanelOpen, isTabVisible, queryClient]);
 
+  // Push-based freshness: an SSE stream nudges us to refetch the moment the
+  // pipeline writes new data. Only run it while the tab is visible (bounds open
+  // connections; the tab-focus invalidation above covers the return trip).
+  const streamConnected = useStartupsStream(isTabVisible);
+
+  // The deal-flow grid is the primary surface users watch update. When the push
+  // stream is healthy, polling is just a slow safety net (90s) since updates
+  // arrive instantly. If the stream is down (or the tab is hidden), fall back to
+  // the brisk activity-aware cadence so the grid still stays fresh — while
+  // keeping backend egress conservative when nobody's watching.
+  const startupsPollMs = !isTabVisible
+    ? false
+    : streamConnected
+      ? 90_000
+      : userActive
+        ? 15_000
+        : 60_000;
   const startupsQuery = useQuery({
     queryKey: ['startups', 'list'],
     queryFn: fetchStartups,
-    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 60_000 }),
-    // Keep WorkGrid current even during reading/idle periods while tab is visible,
-    // while keeping request volume conservative for backend egress.
-    refetchInterval: isTabVisible ? 60_000 : false,
+    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 15_000 }),
+    refetchInterval: startupsPollMs,
     placeholderData: (prev) => prev ?? [],
   });
 
