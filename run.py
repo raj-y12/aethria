@@ -311,8 +311,13 @@ def main() -> int:
         if backend_proc.poll() is not None:
             print("  [run.py] Backend process exited during startup.", flush=True)
             return 1
+        # `--force` re-optimizes Vite's dep cache on every launch. Without it, a
+        # branch switch that adds/removes/renames files can leave node_modules/.vite
+        # inconsistent, which renders a blank page with no error in the console.
+        # Paying ~200ms of re-optimization here trades that silent failure for a
+        # reliably fresh dev server.
         app_proc = subprocess.Popen(
-            ["npm", "run", "dev"],
+            ["npm", "run", "dev", "--", "--force"],
             cwd=str(APP_FRONTEND_DIR),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -320,7 +325,7 @@ def main() -> int:
             shell=os.name == "nt",
         )
         web_proc = subprocess.Popen(
-            ["npm", "run", "dev"],
+            ["npm", "run", "dev", "--", "--force"],
             cwd=str(WEB_FRONTEND_DIR),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
