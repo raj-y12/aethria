@@ -111,6 +111,7 @@ from fund_thesis import (
 )
 from fund_thesis_ops import (
     activate_fund_thesis_version,
+    backfill_thesis_embeddings,
     create_fund_thesis_version_for_user,
     sync_fund_config_to_active_thesis,
 )
@@ -2838,6 +2839,40 @@ async def api_post_fund_thesis_reprocess_missing(
     try:
         result = await reprocess_startups_missing_fund_thesis(uid, dry_run=dry_run)
     except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return result
+
+
+@app.post("/api/fund-thesis/backfill-embeddings")
+async def api_post_fund_thesis_backfill_embeddings(
+    request: Request,
+    dry_run: bool = Query(False, description="If true, return eligible count only (no OpenAI calls)"),
+    only_active: bool = Query(False, description="If true, backfill only the active version"),
+):
+    """
+    Generate real embeddings for thesis versions stored without one (empty vector
+    / model 'none'). Idempotent and tenant-scoped. Useful after a thesis was
+    bootstrapped before OPENAI_API_KEY was configured.
+    """
+    _require_supabase_for_thesis()
+    uid = require_authenticated_user(request)
+    limited = _enforce_rate_limits(f"user:{uid}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    if limited:
+        return limited
+    client = get_service_client()
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not dry_run and not api_key:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY required to backfill embeddings")
+    try:
+        result = await asyncio.to_thread(
+            backfill_thesis_embeddings,
+            client,
+            uid,
+            api_key=api_key,
+            only_active=only_active,
+            dry_run=dry_run,
+        )
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return result
 

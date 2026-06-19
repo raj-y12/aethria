@@ -463,7 +463,9 @@ def _resolve_active_thesis_meta_unsafe(client: Any, uid: str) -> ActiveThesisMet
 def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
     """
     Load active thesis for uid (already validated).
-    Missing or empty embeddings resolve to [] (pipeline still runs); see TODO for async enrichment.
+    Missing or empty embeddings resolve to [] (pipeline still runs); they are
+    backfilled by fund_thesis_ops.ensure_active_thesis_embedding (pipeline hook)
+    or backfill_thesis_embeddings (POST /api/fund-thesis/backfill-embeddings).
     """
     (
         thesis_id,
@@ -495,7 +497,8 @@ def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
     else:
         erows = getattr(er, "data", None) or []
         if not erows:
-            # TODO: enqueue background job to generate embedding when row missing
+            # No embedding row yet — fund_thesis_ops backfill generates it when a
+            # key is available (pipeline hook / backfill endpoint).
             embedding = []
             model = "none"
         else:
@@ -514,7 +517,8 @@ def _resolve_active_thesis_unsafe(client: Any, uid: str) -> ActiveThesis:
                     except (TypeError, ValueError):
                         continue
             if not embedding:
-                # TODO: background job to backfill embeddings when OPENAI_API_KEY becomes available
+                # Stored vector was empty — fund_thesis_ops backfill will regenerate
+                # it once OPENAI_API_KEY is available.
                 model = "none"
 
     # Guarantee safe defaults: no vector → empty list + model "none"

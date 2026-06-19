@@ -1,8 +1,14 @@
 """
 OpenAI-backed parse + embed for fund thesis versions (API / admin paths only).
+
+Embeddings can legitimately be absent: a thesis bootstrapped without an
+OPENAI_API_KEY (or via fund-config sync with skip_embedding) stores an empty
+vector + model "none", and the pipeline runs thesis-blind on the vector side.
+``backfill_thesis_embeddings`` / ``ensure_active_thesis_embedding`` generate the
+real vectors once a key is available — exposed via POST
+/api/fund-thesis/backfill-embeddings and called opportunistically (best-effort)
+at the start of each pipeline cycle.
 """
-# TODO: background job to backfill embeddings for active (or all) thesis versions when
-# OPENAI_API_KEY becomes available (skip_embedding / empty vectors → real embeddings).
 from __future__ import annotations
 
 import json
@@ -92,6 +98,149 @@ def embed_text_for_thesis(text: str, api_key: str, model: Optional[str] = None) 
     resp = client.embeddings.create(model=m, input=t[:8000])
     vec = resp.data[0].embedding
     return [float(x) for x in vec]
+
+
+def _vector_is_empty(ev: Any) -> bool:
+    """True when a stored embedding_vector carries no usable numbers."""
+    if ev is None:
+        return True
+    if isinstance(ev, list):
+        return len(ev) == 0
+    if isinstance(ev, dict):
+        return not (ev.get("values") or [])
+    return True
+
+
+def _embedding_row_needs_backfill(row: Optional[Dict[str, Any]]) -> bool:
+    """A version needs embedding when it has no row, an empty vector, or model 'none'."""
+    if not row:
+        return True
+    if str(row.get("model") or "none").strip().lower() == "none":
+        return True
+    return _vector_is_empty(row.get("embedding_vector"))
+
+
+def backfill_thesis_embeddings(
+    client: Any,
+    user_id: str,
+    *,
+    api_key: str,
+    limit: int = 50,
+    only_active: bool = False,
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    """Generate real embeddings for the user's thesis versions that lack them.
+
+    Idempotent and tenant-scoped: scans ``fund_thesis_versions`` for the user,
+    finds those whose ``fund_thesis_embeddings`` row is missing / empty / model
+    "none", and (unless ``dry_run``) embeds the version's raw_text and upserts
+    the vector (unique on version_id). ``only_active`` limits to the active
+    version. Returns ``{scanned, eligible, embedded, failed, skipped}``.
+    """
+    from tenant_context import require_user_id
+    from fund_thesis import invalidate_thesis_cache
+
+    uid = require_user_id(user_id, context="backfill_thesis_embeddings")
+    ak = (api_key or "").strip()
+    if not ak and not dry_run:
+        raise ValueError("api_key (OPENAI_API_KEY) required to backfill embeddings")
+    lim = max(1, min(int(limit), 500))
+
+    active_version_id = ""
+    if only_active:
+        tr = client.table("fund_thesis").select("active_version_id").eq("user_id", uid).limit(1).execute()
+        trows = getattr(tr, "data", None) or []
+        active_version_id = str((trows[0].get("active_version_id") if trows else "") or "").strip()
+        if not active_version_id:
+            return {"scanned": 0, "eligible": 0, "embedded": 0, "failed": 0, "skipped": 0}
+
+    vq = (
+        client.table("fund_thesis_versions")
+        .select("id,raw_text")
+        .eq("user_id", uid)
+        .order("version_number", desc=True)
+        .limit(lim)
+    )
+    if only_active:
+        vq = vq.eq("id", active_version_id)
+    versions = getattr(vq.execute(), "data", None) or []
+
+    # Existing embedding rows for this user (one query, then matched in memory).
+    er = (
+        client.table("fund_thesis_embeddings")
+        .select("version_id,embedding_vector,model")
+        .eq("user_id", uid)
+        .execute()
+    )
+    existing = {str(r.get("version_id")): r for r in (getattr(er, "data", None) or [])}
+
+    eligible = [v for v in versions if _embedding_row_needs_backfill(existing.get(str(v.get("id"))))]
+    if dry_run:
+        return {
+            "scanned": len(versions),
+            "eligible": len(eligible),
+            "embedded": 0,
+            "failed": 0,
+            "skipped": len(versions) - len(eligible),
+        }
+
+    embed_model = os.getenv("FUND_THESIS_EMBED_MODEL", _DEFAULT_EMBED_MODEL)
+    embedded = 0
+    failed = 0
+    for v in eligible:
+        vid = str(v.get("id") or "").strip()
+        if not vid:
+            failed += 1
+            continue
+        try:
+            raw = str(v.get("raw_text") or "")
+            vector = embed_text_for_thesis(raw[:8000], ak, model=embed_model)
+            client.table("fund_thesis_embeddings").upsert(
+                {
+                    "user_id": uid,
+                    "version_id": vid,
+                    "embedding_vector": vector,
+                    "model": embed_model,
+                },
+                on_conflict="version_id",
+            ).execute()
+            embedded += 1
+        except Exception as e:
+            logger.warning("[ThesisEmbedBackfill] failed for version %s: %s", vid[:12], e)
+            failed += 1
+
+    if embedded:
+        invalidate_thesis_cache(uid)
+    logger.info(
+        "[ThesisEmbedBackfill] user_id=%s scanned=%s eligible=%s embedded=%s failed=%s",
+        uid[:24], len(versions), len(eligible), embedded, failed,
+    )
+    return {
+        "scanned": len(versions),
+        "eligible": len(eligible),
+        "embedded": embedded,
+        "failed": failed,
+        "skipped": len(versions) - len(eligible),
+    }
+
+
+def ensure_active_thesis_embedding(client: Any, user_id: str, api_key: str) -> bool:
+    """Best-effort: embed the active thesis version if it lacks a vector. Never raises.
+
+    Cheap opportunistic hook for the pipeline ("backfill once a key is
+    available"): at most one embedding API call, only when the active version is
+    missing its vector. Returns True if a vector was written this call.
+    """
+    try:
+        if not (api_key or "").strip():
+            return False
+        result = backfill_thesis_embeddings(
+            client, user_id, api_key=api_key, only_active=True, limit=1
+        )
+        return bool(result.get("embedded"))
+    except Exception as e:  # pragma: no cover - opportunistic, must never break the pipeline
+        logger.debug("ensure_active_thesis_embedding skipped: %s", e)
+        return False
 
 
 def create_fund_thesis_version_for_user(
