@@ -61,6 +61,7 @@ from utils.settings_loader import (
 )
 from auth_clerk import verify_clerk_token
 import event_bus
+import metrics
 from admin_auth import admin_token_ttl_seconds, issue_admin_token, validate_admin_secret, verify_admin_token
 from admin_audit import record_admin_audit_event
 from admin_service import build_admin_overview
@@ -643,7 +644,7 @@ def _admin_dashboard_enabled() -> bool:
 
 
 # Public paths that skip Clerk JWT auth
-_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc", "/redoc/", "/openapi.json/"}
+_PUBLIC_PATHS = {"/health", "/metrics", "/docs", "/openapi.json", "/redoc", "/redoc/", "/openapi.json/"}
 _ADMIN_PATH_PREFIX = "/api/admin/"
 
 @app.middleware("http")
@@ -1742,6 +1743,36 @@ def get_startup_memo(request: Request, startup_id: str):
 def health():
     """Lightweight health check (public; no auth). Pending escalations require auth via /api/settings."""
     return {"status": "ok"}
+
+
+@app.get("/metrics")
+def prometheus_metrics(request: Request):
+    """Prometheus exposition: pipeline throughput/latency, lookup outcomes, queue
+    depth, SSE subscribers, persistent loops.
+
+    Bypasses Clerk auth (it's a machine endpoint scraped by Prometheus, not the
+    SPA). When METRICS_TOKEN is set it must be presented as a Bearer token —
+    leave it unset only on a trusted/private network. METRICS_ENABLED=0 hides it.
+    """
+    if not env_config.get_bool("METRICS_ENABLED"):
+        raise HTTPException(status_code=404, detail="Not found")
+    token = env_config.get_str("METRICS_TOKEN")
+    if token:
+        auth = request.headers.get("Authorization", "")
+        presented = auth[7:].strip() if auth.startswith("Bearer ") else ""
+        if presented != token:
+            raise HTTPException(status_code=401, detail="Missing or invalid metrics token")
+    agent_depth = _agent_queue.qsize() if _agent_queue is not None else 0
+    lookup_depth = _lookup_queue.qsize() if _lookup_queue is not None else 0
+    body = metrics.render(
+        sse_subscribers=event_bus.total_subscribers(),
+        agent_queue_depth=agent_depth,
+        lookup_queue_depth=lookup_depth,
+        persistent_loops=len(_per_user_loops),
+    )
+    from fastapi.responses import Response
+
+    return Response(content=body, media_type=metrics.CONTENT_TYPE_LATEST)
 
 
 def _admin_bearer_token(request: Request) -> str:

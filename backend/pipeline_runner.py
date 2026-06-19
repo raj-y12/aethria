@@ -7,6 +7,7 @@ import gc
 import logging
 import os
 import env_config
+import metrics
 import resource
 import time
 from datetime import datetime, timedelta, timezone
@@ -445,11 +446,17 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
             logger.warning("[%s] Could not persist pipeline_activity: %s", user_id[:12], _act_err)
 
         gc.collect()
+        _cycle_duration = time.perf_counter() - started_at
+        metrics.observe_pipeline_cycle(_cycle_duration, outcome="success")
+        metrics.inc_stage("startups_found", _activity_startups_found)
+        metrics.inc_stage("reviewed", _activity_reviewed_count)
+        metrics.inc_stage("decided", _activity_decided_count)
+        metrics.inc_stage("escalations", _activity_escalations_count)
         logger.info(
             "[%s] Pipeline cycle completed rss_mb_end=%.1f duration_s=%.2f startups_before=%s startups_after=%s startups_found=%s reviewed=%s decided=%s escalations=%s agents_executed=%s",
             user_id[:12],
             _rss_mb(),
-            time.perf_counter() - started_at,
+            _cycle_duration,
             total_startups_before,
             total_startups_after,
             _activity_startups_found,
@@ -459,6 +466,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
             agents_executed,
         )
     except Exception as e:
+        metrics.observe_pipeline_cycle(time.perf_counter() - started_at, outcome="error")
         logger.exception("[%s] Pipeline cycle error: %s", user_id[:12], e)
         raise
     finally:
@@ -635,6 +643,7 @@ async def _run_on_demand_lookup_inner(
                 outcome.get("status") or "unknown",
             )
             _record_lookup_failure(user_id, lid, message)
+            metrics.inc_lookup("not_found")
             return None
         # The scout persisted a row — nudge the UI so the card appears at once.
         _notify_startups_changed(user_id, "lookup_scout")
@@ -693,8 +702,10 @@ async def _run_on_demand_lookup_inner(
             startup_id,
             _rss_mb(),
         )
+        metrics.inc_lookup("success")
         return startup_id
     except Exception as e:
+        metrics.inc_lookup("error")
         logger.exception("[%s] On-demand lookup error (%s): %s", user_id[:12], company, e)
         _record_lookup_failure(
             user_id,

@@ -195,6 +195,13 @@ REGISTRY: List[EnvVar] = [
     EnvVar("ADMIN_LOGIN_MAX_FAILURES", "int", "5", "Admin", "Admin login failures before throttling."),
     EnvVar("ADMIN_LOGIN_WINDOW_SECONDS", "int", "300", "Admin", "Admin login failure window."),
 
+    # --- Observability -------------------------------------------------------
+    EnvVar("METRICS_ENABLED", "bool", "true", "Observability",
+           "Expose the Prometheus /metrics endpoint."),
+    EnvVar("METRICS_TOKEN", "secret", "", "Observability",
+           "If set, /metrics requires this value as a Bearer token. Leave empty "
+           "only on a trusted/private network."),
+
     # --- Scoring / retrieval / misc -----------------------------------------
     EnvVar("USE_STRUCTURED_SCORING", "bool", "true", "Scoring / misc", "Use the deterministic structured scoring engine."),
     EnvVar("SKIP_READ_ENRICH_SCORES", "bool", "", "Scoring / misc", "Skip score enrichment on read (perf)."),
