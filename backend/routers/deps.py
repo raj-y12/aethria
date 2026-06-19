@@ -33,6 +33,11 @@ from supabase_client import get_service_client
 from supabase_storage import SupabaseStartupsStorage
 from portfolio.store import PortfolioStore
 from utils.storage import Storage
+from datetime import datetime, timezone, timedelta
+import json
+from portfolio.cost_control import CostController
+from utils.settings_loader import is_cost_budget_enabled
+from utils.timeutil import utcnow, ensure_aware
 
 logger = logging.getLogger("api.deps")
 
@@ -128,3 +133,172 @@ def safe_table_execute(fn, *, default_data, warn_label: str):
     except Exception as e:
         logger.warning("%s failed; returning fallback: %s", warn_label, e)
         return default_data
+
+
+# ---------------------------------------------------------------------------
+# Read helpers + system-health assembly (shared by settings, escalations, analytics)
+# ---------------------------------------------------------------------------
+def read_json_list(path: Path) -> List[Dict[str, Any]]:
+    """Best-effort JSON list reader. Returns [] on missing/invalid files."""
+    if not path.exists():
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def read_json_dict_file(path: Path, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Best-effort reader from Supabase or file. Returns {} on missing/invalid."""
+    if path and "sector_concentration" in str(path):
+        from supabase_doc_store import doc_get
+        data = doc_get("analytics_sector_concentration", user_id=user_id)
+        return data if isinstance(data, dict) else {}
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def get_pending_escalations(
+    storage: Union[Storage, SupabaseStartupsStorage],
+) -> List[Dict[str, Any]]:
+    """
+    Return raw startup dicts where partner_info.human_review_required is True
+    and no human_resolution has been recorded.
+    """
+    if isinstance(storage, SupabaseStartupsStorage):
+        return storage.query_pending_escalations_raw()
+    raw = storage.get_all()
+    pending: List[Dict[str, Any]] = []
+    for item in raw:
+        partner = item.get("partner_info") or item.get("partner")
+        if not partner:
+            continue
+        if not partner.get("human_review_required"):
+            continue
+        human_resolution = item.get("human_resolution")
+        if human_resolution and human_resolution.get("resolved_at"):
+            continue
+        pending.append(item)
+    return pending
+
+
+def startup_name_index(storage: Union[Storage, SupabaseStartupsStorage]) -> Dict[str, str]:
+    """startup_id -> display name without loading full startup JSON when on Supabase."""
+    if isinstance(storage, SupabaseStartupsStorage):
+        return storage.get_startup_id_name_map()
+    out: Dict[str, str] = {}
+    for s in storage.get_all():
+        sid = s.get("startup_id") or s.get("id")
+        if not sid:
+            continue
+        name = (s.get("scout_info") or {}).get("name") or (s.get("scout") or {}).get("name") or ""
+        out[str(sid)] = name
+    return out
+
+
+def get_system_health(
+    storage: Union[Storage, SupabaseStartupsStorage],
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Assemble system health object from multiple backend sources.
+    Mirrors the shape expected by the front-end SystemHealth type.
+    budget_status is only populated when cost_budget.enabled for this user.
+    """
+    # Calibration warning from portfolio agent_metrics (Supabase)
+    portfolio_store = get_portfolio_store(user_id) if user_id else None
+    calibration_warning = None
+    metrics_file = portfolio_store.files.get("agent_metrics") if portfolio_store else None
+    if portfolio_store and metrics_file is not None:
+        metrics = portfolio_store._read_file(metrics_file)
+        for m in metrics:
+            if m.get("id") == "verdict_distribution":
+                calibration_warning = m.get("calibration_warning")
+                break
+
+    # Pending escalations based on startups requiring human review
+    pending_escalations = len(get_pending_escalations(storage))
+
+    # Queue depths
+    try:
+        unreviewed = storage.count_unreviewed()
+    except Exception:
+        unreviewed = 0
+    try:
+        undecided = storage.count_undecided()
+    except Exception:
+        undecided = 0
+    try:
+        watchlist = len(portfolio_store.get_all_watchlist()) if portfolio_store else 0
+    except Exception:
+        watchlist = 0
+
+    # Budget status only when cost budget enforcement is enabled for this user
+    budget_status: List[Dict[str, Any]] = []
+    if is_cost_budget_enabled(user_id):
+        cost_controller = CostController(user_id=user_id)
+        all_budgets: Dict[str, Any] = getattr(cost_controller, "budgets", {}) or {}
+        for agent_type, defaults in cost_controller.default_budgets.items():
+            agent_budget = all_budgets.get(agent_type, {})
+            calls_today = agent_budget.get("calls_today", 0)
+            tokens_today = agent_budget.get("tokens_today", 0)
+            last_calls = agent_budget.get("last_call_time") or {}
+            if not isinstance(last_calls, dict):
+                last_calls = {}
+            if not last_calls:
+                budget_status.append(
+                    {
+                        "agent_id": agent_type,
+                        "daily_calls_used": calls_today,
+                        "daily_calls_limit": defaults.get("calls", 0),
+                        "daily_tokens_used": tokens_today,
+                        "daily_tokens_limit": defaults.get("tokens", 0),
+                        "in_cooldown": False,
+                        "cooldown_until": None,
+                    }
+                )
+                continue
+            for agent_id, last_call_str in last_calls.items():
+                try:
+                    last_call_time = ensure_aware(datetime.fromisoformat(last_call_str))
+                    cooldown_seconds = cost_controller.cooldowns.get(agent_type, 60)
+                    delta = (utcnow() - last_call_time).total_seconds()
+                    in_cooldown = delta < cooldown_seconds
+                    cooldown_until = (
+                        (last_call_time.replace(tzinfo=timezone.utc) + timedelta(seconds=cooldown_seconds)).isoformat()
+                        if in_cooldown
+                        else None
+                    )
+                except Exception:
+                    in_cooldown = False
+                    cooldown_until = None
+                budget_status.append(
+                    {
+                        "agent_id": str(agent_id),
+                        "daily_calls_used": calls_today,
+                        "daily_calls_limit": defaults.get("calls", 0),
+                        "daily_tokens_used": tokens_today,
+                        "daily_tokens_limit": defaults.get("tokens", 0),
+                        "in_cooldown": in_cooldown,
+                        "cooldown_until": cooldown_until,
+                    }
+                )
+
+    return {
+        "calibration_warning": calibration_warning,
+        "pending_escalations": pending_escalations,
+        "queue_depths": {
+            "unreviewed": unreviewed,
+            "undecided": undecided,
+            "watchlist": watchlist,
+        },
+        "budget_status": budget_status,
+    }

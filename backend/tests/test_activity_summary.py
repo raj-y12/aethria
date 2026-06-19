@@ -2,7 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from api import _aggregate_activity_totals, _backend_to_frontend, acknowledge_startup
+from api import _backend_to_frontend, acknowledge_startup
+from routers.analytics import _aggregate_activity_totals
 
 
 def test_activity_totals_split_agent_and_human_decisions():
