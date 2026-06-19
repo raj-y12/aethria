@@ -49,10 +49,13 @@ const staleStartup = {
   id: 'stale',
   scout: { id: 'stale', name: 'StaleCo', confidence: 0.7 },
   timestamps: {
+    // Latest activity is minutes old (would NOT be stale on its own); unresolved_at
+    // is older than the default staleAfterHours (48h). now is 2026-05-25T12:00Z, so
+    // unresolved_at below is ~54h earlier — stale iff unresolved_at is consulted.
     discovered_at: '2026-05-25T11:00:00.000Z',
     reviewed_at: '2026-05-25T11:15:00.000Z',
     partnered_at: '2026-05-25T11:30:00.000Z',
-    unresolved_at: '2026-05-24T06:00:00.000Z',
+    unresolved_at: '2026-05-23T06:00:00.000Z',
   },
 } as Startup;
 

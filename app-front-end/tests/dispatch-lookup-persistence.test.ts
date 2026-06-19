@@ -1,3 +1,4 @@
+import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   DISPATCH_LOOKUP_STORAGE_VERSION,
@@ -28,54 +29,56 @@ class MemoryStorage implements Storage {
   }
 }
 
-const storage = new MemoryStorage();
-const key = getDispatchLookupStorageKey('user_123');
-const now = Date.parse('2026-06-02T12:00:00.000Z');
+describe('dispatch lookup persistence', () => {
+  it('saves, dedupes, expires, and clears lookup snapshots', () => {
+    const storage = new MemoryStorage();
+    const key = getDispatchLookupStorageKey('user_123');
+    const now = Date.parse('2026-06-02T12:00:00.000Z');
 
-assert.equal(key, 'aethria.dispatch.lookups.v1:user_123');
+    assert.equal(key, 'aethria.dispatch.lookups.v1:user_123');
 
-saveDispatchLookupSnapshot(storage, key, {
-  pendingLookup: { lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false },
-  backgroundLookups: [
-    { lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false },
-    { lookupId: 'lookup-active-1', queryLabel: 'Duplicate', autoOpened: false },
-  ],
-}, now);
+    saveDispatchLookupSnapshot(storage, key, {
+      pendingLookup: { lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false },
+      backgroundLookups: [
+        { lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false },
+        { lookupId: 'lookup-active-1', queryLabel: 'Duplicate', autoOpened: false },
+      ],
+    }, now);
 
-assert.deepEqual(loadDispatchLookupSnapshot(storage, key, now + 5_000), {
-  pendingLookup: { lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false },
-  backgroundLookups: [
-    { lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false },
-  ],
+    assert.deepEqual(loadDispatchLookupSnapshot(storage, key, now + 5_000), {
+      pendingLookup: { lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false },
+      backgroundLookups: [
+        { lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false },
+      ],
+    });
+
+    const raw = storage.getItem(key);
+    assert.ok(raw);
+    const parsed = JSON.parse(raw);
+    assert.equal(parsed.version, DISPATCH_LOOKUP_STORAGE_VERSION);
+    assert.equal(parsed.updatedAt, now);
+
+    storage.setItem(key, '{bad json');
+    assert.deepEqual(loadDispatchLookupSnapshot(storage, key, now), {
+      pendingLookup: null,
+      backgroundLookups: [],
+    });
+
+    storage.setItem(key, JSON.stringify({
+      version: DISPATCH_LOOKUP_STORAGE_VERSION,
+      updatedAt: now - 25 * 60 * 60 * 1000,
+      pendingLookup: { lookupId: 'stale-lookup', queryLabel: 'Old', autoOpened: false },
+      backgroundLookups: [],
+    }));
+    assert.deepEqual(loadDispatchLookupSnapshot(storage, key, now), {
+      pendingLookup: null,
+      backgroundLookups: [],
+    });
+
+    saveDispatchLookupSnapshot(storage, key, {
+      pendingLookup: null,
+      backgroundLookups: [],
+    }, now);
+    assert.equal(storage.getItem(key), null);
+  });
 });
-
-const raw = storage.getItem(key);
-assert.ok(raw);
-const parsed = JSON.parse(raw);
-assert.equal(parsed.version, DISPATCH_LOOKUP_STORAGE_VERSION);
-assert.equal(parsed.updatedAt, now);
-
-storage.setItem(key, '{bad json');
-assert.deepEqual(loadDispatchLookupSnapshot(storage, key, now), {
-  pendingLookup: null,
-  backgroundLookups: [],
-});
-
-storage.setItem(key, JSON.stringify({
-  version: DISPATCH_LOOKUP_STORAGE_VERSION,
-  updatedAt: now - 25 * 60 * 60 * 1000,
-  pendingLookup: { lookupId: 'stale-lookup', queryLabel: 'Old', autoOpened: false },
-  backgroundLookups: [],
-}));
-assert.deepEqual(loadDispatchLookupSnapshot(storage, key, now), {
-  pendingLookup: null,
-  backgroundLookups: [],
-});
-
-saveDispatchLookupSnapshot(storage, key, {
-  pendingLookup: null,
-  backgroundLookups: [],
-}, now);
-assert.equal(storage.getItem(key), null);
-
-console.log('dispatch lookup persistence tests passed');

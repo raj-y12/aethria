@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
@@ -21,5 +22,14 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    // Playwright e2e specs live under e2e/ and run via `npm run test:e2e`,
+    // not the Vitest unit runner.
+    exclude: ['node_modules', 'dist', 'e2e/**'],
+    css: false,
   },
 })
