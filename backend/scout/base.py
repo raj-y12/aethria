@@ -8,6 +8,7 @@ import json
 import logging
 import asyncio
 import os
+import env_config
 import re
 import ssl
 from concurrent.futures import ThreadPoolExecutor
@@ -194,7 +195,7 @@ class Scout(ABC):
         Load promoted prompt for this Scout: Supabase meta_prompt_library + prompt_active
         when USE_SUPABASE_STORAGE; else latest key from local data/meta/prompt_library.json.
         """
-        use_sb = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+        use_sb = env_config.use_supabase_storage()
         if use_sb and self._tenant_user_id:
             try:
                 from meta.prompt_gating import load_prompt_active, load_prompt_library

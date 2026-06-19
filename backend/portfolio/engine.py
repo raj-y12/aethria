@@ -10,6 +10,7 @@ Runs:
 import asyncio
 import logging
 import os
+import env_config
 from typing import Optional
 from datetime import datetime, timedelta
 from utils.timeutil import utcnow, ensure_aware
@@ -69,7 +70,7 @@ class PortfolioEngine:
         tenant_uid = getattr(self.portfolio_store, "_tenant_user_id", None)
         if not tenant_uid:
             tenant_uid = os.getenv("AETHRIA_AGENT_USER_ID", "").strip() or None
-        use_sb = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+        use_sb = env_config.use_supabase_storage()
         if use_sb and not tenant_uid:
             raise RuntimeError(
                 "PortfolioEngine requires explicit tenant: set PortfolioStore(..., user_id=...) "

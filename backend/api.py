@@ -10,6 +10,7 @@ import gc
 import json
 import logging
 import os
+import env_config
 import re
 import time
 from functools import partial
@@ -502,7 +503,7 @@ async def _resume_all_user_loops() -> None:
             "[AGENT LOOP] Skipping resume on startup (RESUME_AGENT_LOOPS_ON_STARTUP=false)"
         )
         return
-    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
         return
     try:
@@ -1607,7 +1608,7 @@ async def lookup_job_status(request: Request, lookup_id: str = ""):
             status_code=422,
             detail="lookup_id query parameter must be 8-128 characters [a-zA-Z0-9_-]",
         )
-    if os.getenv("USE_SUPABASE_STORAGE", "").lower() not in ("1", "true", "yes"):
+    if not env_config.use_supabase_storage():
         return {"lookup_id": raw, "failed": False}
     row = list_get_by_id("lookup_job_outcomes", raw, user_id=uid)
     if not row or row.get("status") != "failed":
@@ -2428,7 +2429,7 @@ async def agents_status(request: Request):
     Does not expose secrets; use to see why agents might be skipped on e.g. Render.
     Includes fund thesis readiness for the authenticated user.
     """
-    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    use_supabase = env_config.use_supabase_storage()
     supabase_configured = bool(
         use_supabase
         and os.getenv("SUPABASE_URL")
@@ -2495,7 +2496,7 @@ async def agents_status(request: Request):
 
 
 def _require_supabase_for_thesis() -> None:
-    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    use_supabase = env_config.use_supabase_storage()
     if not use_supabase or not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_SERVICE_ROLE_KEY"):
         raise HTTPException(status_code=503, detail="Supabase storage is required for fund thesis")
 
@@ -2818,7 +2819,7 @@ async def trigger_agents(request: Request):
     When Ops/Agents is off, enqueue a manual one-shot cycle.
     """
     user_id = require_authenticated_user(request)
-    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
         _logger_agents.info(
             "trigger_agents skipped user=%s reason=supabase_required",
@@ -3447,7 +3448,7 @@ async def get_rejection_analytics(request: Request):
     Return rejection analytics summarising red flags, sectors, and scores (tenant-scoped).
     """
     root = _get_root()
-    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    use_supabase = env_config.use_supabase_storage()
     uid = request.state.user_id
     analyzer = RejectionAnalyzer(
         data_dir=str(root / "data" / "portfolio"),

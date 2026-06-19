@@ -8,6 +8,7 @@ import hashlib
 import json
 import logging
 import os
+import env_config
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def _using_supabase() -> bool:
-    return os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    return env_config.use_supabase_storage()
 
 
 def _settings_key(user_id: Optional[str], *, for_save: bool = False) -> Optional[str]:

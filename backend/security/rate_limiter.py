@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import env_config
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from threading import Lock
@@ -181,7 +182,7 @@ _WARNED_MEMORY_FALLBACK = False
 def build_security_store() -> InMemorySecurityStore | SupabaseSecurityStore:
     """Prefer Supabase in production-capable deployments; fall back to memory for dev/test."""
     global _WARNED_MEMORY_FALLBACK
-    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    use_supabase = env_config.use_supabase_storage()
     if use_supabase and os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"):
         try:
             from supabase_client import get_service_client

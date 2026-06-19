@@ -6,6 +6,7 @@ import asyncio
 import gc
 import logging
 import os
+import env_config
 import resource
 import time
 from datetime import datetime, timedelta, timezone
@@ -200,7 +201,7 @@ def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str)
     lid = (lookup_id or "").strip()
     if not lid or not user_id or not str(user_id).strip():
         return
-    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
         return
     uid = user_id.strip()
@@ -243,7 +244,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
         tenant.user_id[:24],
     )
 
-    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
         logger.info("[%s] Skipping pipeline (USE_SUPABASE_STORAGE not set)", user_id[:12])
         return
@@ -526,7 +527,7 @@ async def _run_on_demand_lookup_inner(
         logger.info("[%s] Lookup cancelled before start: %s", user_id[:12], lid or company)
         return None
 
-    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
         logger.info("[%s] Skipping lookup (USE_SUPABASE_STORAGE not set)", user_id[:12])
         _record_lookup_failure(
@@ -720,7 +721,7 @@ async def reprocess_startups_missing_fund_thesis(
     if not uid:
         return {"dry_run": True, "eligible": 0} if dry_run else {"processed": 0, "skipped": 0, "failed": 0}
 
-    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
         return {"dry_run": True, "eligible": 0} if dry_run else {"processed": 0, "skipped": 0, "failed": 0}
 

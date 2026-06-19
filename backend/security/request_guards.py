@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import env_config
 import re
 from typing import Any
 
@@ -31,7 +32,7 @@ def validate_route_id(value: Any, *, field_name: str = "id") -> str:
 
 
 def require_supabase_enabled_for_pipeline() -> None:
-    if os.getenv("USE_SUPABASE_STORAGE", "").lower() not in ("1", "true", "yes"):
+    if not env_config.use_supabase_storage():
         raise HTTPException(status_code=503, detail="Supabase storage is required for this operation")
 
 

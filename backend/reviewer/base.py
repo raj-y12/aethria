@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 import json
 import os
+import env_config
 import logging
 import asyncio
 import re
@@ -529,7 +530,7 @@ class Reviewer(ABC):
 
     def _load_prompt_from_library(self) -> None:
         """Load promoted prompt from Supabase when enabled; else latest local library file."""
-        use_sb = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+        use_sb = env_config.use_supabase_storage()
         if use_sb and self._tenant_user_id:
             try:
                 from meta.prompt_gating import load_prompt_active, load_prompt_library

@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import sys
 import os
+import env_config
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -119,7 +120,7 @@ async def run_system(user_id: Optional[str]):
         raise ValueError("OPENAI_API_KEY environment variable is required")
     
     storage_path = os.getenv("STORAGE_PATH", "data/startups.json")
-    use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
+    use_supabase = env_config.use_supabase_storage()
     scout_interval = int(os.getenv("SCOUT_INTERVAL_SECONDS", "300"))
     reviewer_interval = int(os.getenv("REVIEWER_INTERVAL_SECONDS", "60"))
     partner_interval = int(os.getenv("PARTNER_INTERVAL_SECONDS", "30"))
