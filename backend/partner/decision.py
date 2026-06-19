@@ -181,8 +181,8 @@ def _extract_chat_message_content(message: Any) -> str:
     if isinstance(parsed, dict):
         try:
             return json.dumps(parsed, ensure_ascii=False)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("parsed->json serialization failed; falling through: %s", e)
     refusal = getattr(message, "refusal", None)
     if isinstance(refusal, str) and refusal.strip():
         return refusal.strip()
@@ -676,8 +676,8 @@ class PartnerDecisionEngine:
                 resource_ctx = "" if fund_thesis else format_fund_thesis_context_for_prompt()
                 if resource_ctx:
                     thesis_block = (thesis_block or "") + resource_ctx
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Resource fund-thesis context unavailable: %s", e)
 
         market_score = review_output.get("market_score", 0)
         product_score = review_output.get("product_score", 0)

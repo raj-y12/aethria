@@ -2244,8 +2244,8 @@ async def post_meta_prompt_promote(request: Request):
             },
             user_id=uid,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        _logger_agents.debug("Could not persist prompt action audit: %s", e)
 
     return {"ok": True, "active": active, "promoted": library_key}
 
@@ -2291,8 +2291,8 @@ async def post_meta_prompt_reset(request: Request):
             },
             user_id=uid,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        _logger_agents.debug("Could not persist prompt action audit: %s", e)
 
     return {"ok": True, "active": active}
 
@@ -2465,8 +2465,8 @@ async def agents_status(request: Request):
             or ac.get("reviewers_enabled", False)
             or ac.get("partners_enabled", False)
         )
-    except Exception:
-        pass
+    except Exception as e:
+        _logger_agents.debug("Could not compute user_agents_enabled: %s", e)
     return {
         "worker_ready": _agent_queue is not None,
         "lookup_worker_ready": _lookup_queue is not None,
@@ -2959,8 +2959,8 @@ async def toggle_agents(request: Request):
     body: Dict[str, Any] = {}
     try:
         body = await request.json()
-    except Exception:
-        pass
+    except Exception as e:
+        _logger_agents.debug("Request body not JSON; using empty body: %s", e)
 
     enabled = bool(body.get("enabled", False))
 
@@ -3380,8 +3380,8 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
             st = storage.get_startup(startup_id)
             if st and st.partner_info is not None:
                 ai_rec = st.partner_info.recommendation
-        except Exception:
-            pass
+        except Exception as e:
+            _logger_agents.debug("Could not read AI recommendation for escalation: %s", e)
         list_append_only(
             "meta_mutation_log",
             {
@@ -3400,8 +3400,8 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
             },
             user_id=request.state.user_id,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        _logger_agents.debug("Could not persist escalation resolution: %s", e)
 
     try:
         current = load_settings(request.state.user_id)
@@ -3416,8 +3416,8 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
             historical.append(latest)
             fund_memory["historical_decisions"] = historical[-200:]
             save_settings(current, request.state.user_id)
-    except Exception:
-        pass
+    except Exception as e:
+        _logger_agents.debug("Could not append decision to fund memory: %s", e)
 
     return {"status": "ok"}
 

@@ -735,8 +735,8 @@ class Scout(ABC):
                     add = getattr(response.usage, "total_tokens", None)
                     if isinstance(add, int):
                         self._last_token_usage += add
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug("Token usage accounting skipped: %s", e)
             content = response.choices[0].message.content
             if not content:
                 return None
@@ -924,8 +924,8 @@ class Scout(ABC):
                     total = getattr(response.usage, "total_tokens", None)
                     if isinstance(total, int):
                         self._last_token_usage += total
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug("Token usage accounting skipped: %s", e)
 
             content = response.choices[0].message.content
             if not content:
@@ -1088,8 +1088,8 @@ class Scout(ABC):
                     total = getattr(response.usage, "total_tokens", None)
                     if isinstance(total, int):
                         self._last_token_usage += total
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug("Token usage accounting skipped: %s", e)
             content = response.choices[0].message.content
             if not content:
                 self.logger.error("Empty response from LLM (company lookup)")

@@ -58,8 +58,8 @@ def _tune_postgrest_pool(client: Client) -> None:
         pg.session = tuned
         try:
             old.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Old session close failed (non-fatal): %s", e)
         logger.info(
             "PostgREST pool tuned: max_connections=%d max_keepalive=%d keepalive_expiry=%.0fs",
             _POOL_MAX_CONNECTIONS,

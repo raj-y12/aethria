@@ -32,8 +32,8 @@ def _as_plain_obj(value: Any) -> Any:
     if hasattr(value, "model_dump"):
         try:
             return value.model_dump()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("model_dump() failed; falling through: %s", e)
     if hasattr(value, "__dict__"):
         return vars(value)
     return value

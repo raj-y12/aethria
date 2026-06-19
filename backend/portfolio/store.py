@@ -268,8 +268,8 @@ class PortfolioStore:
                 if temp_path.exists():
                     try:
                         temp_path.unlink()
-                    except:
-                        pass
+                    except Exception as e:
+                        self.logger.debug("Temp file cleanup failed: %s", e)
     
     def _append_record(self, file_key: str, record: Dict[str, Any]) -> str:
         """

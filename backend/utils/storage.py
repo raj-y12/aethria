@@ -91,8 +91,8 @@ class Storage:
                             raw = f.read()
                         if not raw.strip():
                             return []
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self.logger.debug("Empty-file probe failed: %s", e)
                     raise ValueError(f"Failed to read storage after {_READ_RETRIES} retries") from e
                 time.sleep(_READ_RETRY_DELAY * (attempt + 1))
         return []
@@ -132,8 +132,8 @@ class Storage:
                 if temp_path.exists():
                     try:
                         temp_path.unlink()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self.logger.debug("Temp file cleanup failed: %s", e)
 
     def add_startup(
         self,

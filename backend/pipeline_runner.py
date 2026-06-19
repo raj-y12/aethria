@@ -333,8 +333,8 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
             _r = get_service_client().table("startups").select("startup_id", count="exact").eq("user_id", user_id).execute()
             total_startups_before = int(getattr(_r, "count", None) or 0)
             _activity_startups_before = total_startups_before
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("[%s] startups_before count unavailable: %s", user_id[:12], e)
         if scouts_enabled:
             agents_executed += len(getattr(scout_engine, "scouts", []) or [])
             await scout_engine.run_cycle(pipeline_run_id=pipeline_run_id)

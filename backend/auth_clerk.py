@@ -17,8 +17,8 @@ def _use_certifi_ssl() -> None:
     """Use certifi CA bundle for default HTTPS so JWKS fetch to Clerk succeeds on macOS."""
     try:
         ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=certifi.where())
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Could not install certifi SSL context: %s", e)
 
 
 _use_certifi_ssl()
