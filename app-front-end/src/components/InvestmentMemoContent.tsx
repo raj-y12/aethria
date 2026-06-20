@@ -2,16 +2,13 @@ import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useSt
 import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
 import './InvestmentMemoContent.css';
-import type { Review, ScoringDimensionKey, SignalItem, SingleReview, Startup } from '../types/startup';
+import type { ScoringDimensionKey, SignalItem, Startup } from '../types/startup';
 import { normalizeStructuredScoring } from '../lib/reviewScoring';
 import {
   buildMemoPDF,
   icPackSafeBaseName,
   getPipelineReplaySteps,
-  type PipelineReplayStep,
 } from '../lib/memoIcPack';
-import { memoReferenceHref, memoReferenceLabel } from '../lib/memoReferenceHref';
-import { DECISION_LABELS } from '../design-system/semantics';
 import { UI_DETAIL_EMPTY_HINT } from '../design-system/ui-text';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
@@ -20,14 +17,14 @@ import MemoRulingSection from './memo/MemoRulingSection';
 import MemoPrecedentStrip from './memo/MemoPrecedentStrip';
 import MemoPortfolioContext from './memo/MemoPortfolioContext';
 import { DECISION_BADGE_LABEL } from './DecisionBadge';
-import { getDecisionBadgeVariant, type DecisionBadgeVariant } from '../lib/decisionBadgeVariant';
+import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 import { resolveEscalation } from '../api/escalations';
 import {
   buildOptimisticResolution,
   isDealDecided,
   type RulingDecision,
 } from '../lib/dealState';
-import { extractAdverseRegister, type AdverseRegisterItem, type AdverseSeverity } from '../lib/adverseRegister';
+import { extractAdverseRegister, type AdverseRegisterItem } from '../lib/adverseRegister';
 import {
   createDefaultFundConfiguration,
   shouldGateRisk,
@@ -48,34 +45,35 @@ const SCORING_DIMENSIONS: Array<{ key: ScoringDimensionKey; label: string; id: s
   { key: 'defensibility', label: 'Defensibility', id: 'memo-score-defensibility' },
 ];
 
-function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | null): Startup {
-  if (!partial) return base;
-  return {
-    ...base,
-    scout: partial.scout ?? base.scout,
-    review: partial.review ?? base.review,
-    partner: partial.partner ?? base.partner,
-    financials: partial.financials ?? base.financials,
-  };
-}
-
-const MEMO_GENERATING_DETAIL_AWAITING = 'Reviewers scoring against your thesis.';
-const MEMO_GENERATING_DETAIL_UNDECIDED = 'Partner engine determining the call.';
-const MEMO_GENERATING_DETAIL_ESCALATION = 'Partner flagged this for human review.';
-const MEMO_GENERATING_DETAIL_FORMATTING = 'Finalising the memo.';
-
-function memoGeneratingDetailForVariant(variant: DecisionBadgeVariant): string {
-  switch (variant) {
-    case 'awaiting':
-      return MEMO_GENERATING_DETAIL_AWAITING;
-    case 'undecided':
-      return MEMO_GENERATING_DETAIL_UNDECIDED;
-    case 'escalation':
-      return MEMO_GENERATING_DETAIL_ESCALATION;
-    default:
-      return MEMO_GENERATING_DETAIL_FORMATTING;
-  }
-}
+import {
+  mergeMemoPartial,
+  memoGeneratingDetailForVariant,
+  memoSourceRows,
+  reviewHasThesisAlignment,
+  normalizeListItemText,
+  normalizeMemoKey,
+  renderWithMonoNumbers,
+  partnerDecisionHeadline,
+  toJudgmentReasoning,
+  firstNonEmpty,
+  getPartnerEconomicBadgeVariant,
+  formatSectorAndCategory,
+  memoHeaderThesisLine,
+  isLookupStartup,
+  pipelineReplayOneLiner,
+  decisionLabel,
+  uniqueRiskItems,
+  missingDataItems,
+  sourceSupportLine,
+  collapseWhitespace,
+  clipText,
+  leadSentences,
+  reviewerMeanScore,
+  buildInvestmentCase,
+  cleanFactValue,
+  buildSnapshotRows,
+  buildKillers,
+} from './memo/memoContentHelpers';
 
 const RESOLUTION_SECTION_LABELS: Record<string, string> = {
   FOUND: 'Identity confirmed',
@@ -93,37 +91,6 @@ const RESOLUTION_MISSING_FIELD_LABELS: Record<string, string> = {
   description: 'company description',
   news_mentions: 'news mentions',
 };
-
-function memoSourceRows(startup: Startup) {
-  const structured = startup.scout.source_evidence ?? [];
-  if (structured.length > 0) {
-    return structured.map((item) => ({
-      reference: item.reference,
-      supports: item.supports || 'Company evidence',
-      href: item.url || memoReferenceHref(item.reference),
-      label: memoReferenceLabel(item.reference),
-    }));
-  }
-  return (startup.scout.references ?? [])
-    .map((r) => String(r ?? '').trim())
-    .filter(Boolean)
-    .map((ref) => ({
-      reference: ref,
-      supports: 'Company evidence',
-      href: memoReferenceHref(ref),
-      label: memoReferenceLabel(ref),
-    }));
-}
-
-function reviewHasThesisAlignment(r: Review | null | undefined): boolean {
-  if (!r) return false;
-  return (
-    r.thesis_alignment_score != null ||
-    (r.thesis_fit_points?.length ?? 0) > 0 ||
-    (r.thesis_deviation_points?.length ?? 0) > 0 ||
-    r.thesis_matches_fund != null
-  );
-}
 
 export interface InvestmentMemoContentProps {
   startup: Startup | null;
@@ -144,131 +111,7 @@ export interface InvestmentMemoContentHandle {
   downloadPDF: () => void;
 }
 
-function normalizeParagraphs(value: unknown): string[] {
-  if (value == null) return [];
-  if (Array.isArray(value)) {
-    return value
-      .map((v) => String(v ?? '').replace(/\s*\n+\s*/g, ' ').trim())
-      .filter(Boolean)
-      .flatMap((v) => [v]);
-  }
-  if (typeof value === 'string') return [value.replace(/\s*\n+\s*/g, ' ').trim()].filter(Boolean);
-  return [];
-}
-
-function normalizeListItemText(value: unknown): string {
-  return String(value ?? "")
-    .replace(/^\s*[•·*-]\s+/, "")
-    .trim();
-}
-
-function normalizeMemoKey(value: unknown): string {
-  return String(value ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-const MEMO_NUMBER_TOKEN_REGEX = /(?:[$€£¥]\s*)?\d[\d,]*(?:\.\d+)?(?:%|x|X|k|K|m|M|b|B)?(?:\/\d+(?:\.\d+)?)?/g;
-
-function renderWithMonoNumbers(value: unknown): ReactNode {
-  const text = String(value ?? '');
-  if (!text) return text;
-  const parts: ReactNode[] = [];
-  let lastIndex = 0;
-  let tokenIndex = 0;
-  for (const match of text.matchAll(MEMO_NUMBER_TOKEN_REGEX)) {
-    const token = match[0];
-    const start = match.index ?? 0;
-    if (start > lastIndex) {
-      parts.push(text.slice(lastIndex, start));
-    }
-    parts.push(
-      <span key={`memo-num-${start}-${tokenIndex}`} className="memoNum">
-        {token}
-      </span>
-    );
-    lastIndex = start + token.length;
-    tokenIndex += 1;
-  }
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
-  }
-  return parts.length ? <>{parts}</> : text;
-}
-
-function partnerDecisionHeadline(startup: Startup): string {
-  const rec = startup.partner?.recommendation;
-  if (rec == null) return '—';
-  return DECISION_LABELS[rec] ?? String(rec);
-}
-
-function toJudgmentReasoning(startup: Startup): string[] {
-  const rationale = startup.partner?.decision_rationale;
-  if (!rationale) return [];
-  return normalizeParagraphs(rationale);
-}
-
-function firstNonEmpty(...values: Array<unknown>): string {
-  for (const value of values) {
-    const text = String(value ?? '').trim();
-    if (text) return text;
-  }
-  return '';
-}
-
-function getPartnerEconomicBadgeVariant(startup: Startup): 'INVEST' | 'PASS' | 'MONITOR' | null {
-  const rec = startup.partner?.recommendation;
-  if (rec == null) return null;
-  if (rec === 'INVEST') return 'INVEST';
-  if (rec === 'PASS') return 'PASS';
-  return 'MONITOR';
-}
-
-function formatSectorAndCategory(startup: Startup): string {
-  const sector = startup.scout.sector?.trim() || '—';
-  const category = startup.scout.funding_stage?.trim() || startup.scout.scout_type?.trim() || '';
-  return (category ? `${sector} · ${category}` : sector).toUpperCase();
-}
-
-function memoHeaderThesisLine(startup: Startup): string {
-  const scoutOneLine = startup.scout.one_line?.trim();
-  if (scoutOneLine) return scoutOneLine;
-  const candidates = [
-    startup.partner?.snapshot?.key_signal,
-    startup.partner?.decision_drivers?.[0],
-    startup.review?.aethria_view?.thesis_fit_line,
-    startup.review?.investment_thesis?.[0],
-    startup.partner?.thesis,
-    startup.partner?.why_this_matters,
-    startup.partner?.snapshot?.one_liner,
-    startup.review?.overall_summary,
-    startup.scout.primary_thesis,
-  ];
-
-  for (const candidate of candidates) {
-    const value = String(candidate ?? '').trim();
-    if (!value) continue;
-    return value;
-  }
-
-  return '';
-}
-
-function isLookupStartup(startup: Startup): boolean {
-  return (startup.scout.origin_type ?? '').toLowerCase() === 'on_demand_lookup';
-}
-
 const actionBtnCls = 'memoAction';
-
-function pipelineReplayOneLiner(steps: PipelineReplayStep[]): string {
-  if (!steps.length) return '';
-  const flow = steps.map((s) => s.label).join(' → ');
-  const last = [...steps].reverse().find((s) => s.atDisplay && s.atDisplay !== '—');
-  const tail = last?.atDisplay;
-  return tail ? `${flow} · ${tail}` : flow;
-}
 
 const SEVERITY_LABEL: Record<AdverseRegisterItem['severity'], string> = {
   high: 'High',
@@ -276,227 +119,12 @@ const SEVERITY_LABEL: Record<AdverseRegisterItem['severity'], string> = {
   low: 'Low',
 };
 
-function decisionLabel(decision: RulingDecision): string {
-  if (decision === 'YES') return 'Invest';
-  if (decision === 'NO') return 'Pass';
-  return 'Monitor';
-}
-
-function uniqueRiskItems(startup: Startup | null): { risks: string[]; mitigation: string[] } {
-  if (!startup) return { risks: [], mitigation: [] };
-  const combined = [
-    ...(startup.review?.diligence_red_flags ?? []),
-    ...(startup.review?.key_risks ?? []),
-    ...(startup.partner?.risks ?? []),
-  ].map((r) => String(r ?? '').trim()).filter(Boolean);
-  const seen = new Set<string>();
-  const risks = combined.filter((r) => {
-    const key = r.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  const mitigation = (startup.review?.risk_mitigation ?? []).filter((s) => String(s ?? '').trim());
-  return { risks, mitigation };
-}
-
-function adverseCoverageKeys(adverseItems: AdverseRegisterItem[]): Set<string> {
-  const keys = new Set<string>();
-  for (const item of adverseItems) {
-    keys.add(item.whyItMatters.toLowerCase());
-    keys.add(item.title.toLowerCase());
-  }
-  return keys;
-}
-
-function isAdverseCovered(text: string, adverseItems: AdverseRegisterItem[]): boolean {
-  const key = text.toLowerCase();
-  const keys = adverseCoverageKeys(adverseItems);
-  if (keys.has(key)) return true;
-  return adverseItems.some((item) => {
-    const why = item.whyItMatters.toLowerCase();
-    return why.includes(key) || key.includes(why);
-  });
-}
-
-function missingDataItems(startup: Startup | null, adverseItems: AdverseRegisterItem[]): string[] {
-  if (!startup) return [];
-  const items = [
-    startup.scout.biggest_unknown?.trim(),
-    ...(startup.review?.diligence_red_flags ?? []).filter((item) => /missing|unknown|unclear/i.test(String(item))),
-  ].map((item) => String(item ?? '').trim()).filter(Boolean);
-  const seen = new Set<string>();
-  const skipAdverseOverlap = adverseItems.length > 0;
-  return items.filter((item) => {
-    const key = item.toLowerCase();
-    if (seen.has(key)) return false;
-    if (skipAdverseOverlap && isAdverseCovered(item, adverseItems)) return false;
-    seen.add(key);
-    return true;
-  }).slice(0, 5);
-}
-
-function sourceSupportLine(source: ReturnType<typeof memoSourceRows>[number], showConfidence: boolean): string {
-  if (!showConfidence) return source.supports;
-  return `${source.supports} · Scout confidence signal`;
-}
-
 const REVIEWER_LABELS: Record<string, string> = {
   DefaultReviewer: 'Default',
   SkepticalReviewer: 'Skeptical',
   OpportunistReviewer: 'Opportunist',
 };
 
-function collapseWhitespace(value: unknown): string {
-  return String(value ?? '').replace(/\s+/g, ' ').trim();
-}
-
-// Truncation is intentionally disabled across the memo — full text is shown everywhere,
-// nothing is cut mid-thought. Both helpers keep their signatures (so the many call sites
-// stay unchanged) but now just normalize whitespace and return the complete string.
-function clipText(value: unknown, _maxLen?: number): string {
-  return collapseWhitespace(value);
-}
-
-// A short lede made of WHOLE sentences (never cut mid-thought, never an ellipsis). Used for
-// the cover standfirst so it stays a lede, not the full multi-paragraph thesis — the complete
-// text still appears in the body sections, so nothing is lost.
-function leadSentences(value: unknown, maxChars = 260): string {
-  const text = collapseWhitespace(value);
-  if (!text) return '';
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  let out = sentences[0] ?? text;
-  for (let i = 1; i < sentences.length; i += 1) {
-    if (`${out} ${sentences[i]}`.length > maxChars) break;
-    out = `${out} ${sentences[i]}`;
-  }
-  return out;
-}
-
-function reviewerMeanScore(rv: SingleReview): number | null {
-  const vals = [
-    rv.market_score,
-    rv.product_score,
-    rv.technical_score,
-    rv.execution_score,
-    rv.defensibility_score,
-  ]
-    .map((v) => Number(v))
-    .filter((v) => Number.isFinite(v));
-  if (!vals.length) return null;
-  return vals.reduce((a, b) => a + b, 0) / vals.length;
-}
-
-/**
- * Investment case observations — partner-voiced reasons this might matter, drawn from
- * narrative fields only (no scoring terms or system metadata). Deduped, capped at five.
- */
-function buildInvestmentCase(startup: Startup, exclude: string): string[] {
-  const candidates = [
-    startup.partner?.why_this_matters,
-    startup.partner?.market_insight,
-    startup.partner?.product_edge,
-    startup.partner?.traction_signals,
-    startup.review?.aethria_view?.thesis_fit_line,
-    ...(startup.review?.investment_thesis ?? []),
-    ...(startup.partner?.decision_drivers ?? []),
-    startup.scout.why_now,
-    startup.scout.primary_thesis,
-  ];
-  const seen = new Set<string>();
-  const excludeKey = normalizeMemoKey(exclude);
-  if (excludeKey) seen.add(excludeKey);
-  const points: string[] = [];
-  for (const candidate of candidates) {
-    const text = collapseWhitespace(candidate);
-    if (!text) continue;
-    const key = normalizeMemoKey(text);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    points.push(clipText(text, 240));
-    if (points.length >= 5) break;
-  }
-  return points;
-}
-
-/** A fact is shown only when it carries real signal — empty, [MISSING], and
- *  non-answers ("unknown"/"n/a"/"tbd") collapse to null so the memo never renders
- *  a hollow "Stage: Unknown" row. Honest absence beats filler. */
-function cleanFactValue(value: unknown): string | null {
-  const s = String(value ?? '').trim();
-  if (!s) return null;
-  if (/^\[?\s*missing/i.test(s)) return null;
-  if (['unknown', 'n/a', 'na', 'tbd', 'none', '—', '-'].includes(s.toLowerCase())) return null;
-  return s;
-}
-
-function buildSnapshotRows(
-  startup: Startup,
-  blocker: string,
-  omitStandfirst = false,
-): Array<{ label: string; text: string }> {
-  const whatItDoes = firstNonEmpty(
-    startup.scout.solution,
-    startup.scout.one_line,
-    startup.partner?.snapshot?.one_liner,
-  );
-  // Under a Decision Stage cover the standfirst already says this — once is enough.
-  const standfirst = (startup.scout.one_line ?? '').toString().replace(/\s+/g, ' ').trim();
-  const dropWhatItDoes =
-    omitStandfirst && whatItDoes.replace(/\s+/g, ' ').trim() === standfirst && standfirst !== '';
-  return [
-    {
-      label: 'What it does',
-      text: dropWhatItDoes ? '' : whatItDoes,
-    },
-    {
-      label: 'Who it serves',
-      text: firstNonEmpty(startup.scout.target_users, startup.scout.problem),
-    },
-    {
-      label: 'Why Aethria flagged it',
-      text: firstNonEmpty(
-        startup.partner?.snapshot?.key_signal,
-        startup.partner?.decision_drivers?.[0],
-        startup.scout.why_now,
-        startup.partner?.why_this_matters,
-      ),
-    },
-    { label: 'What limits conviction', text: blocker },
-  ]
-    .map((row) => ({ label: row.label, text: clipText(row.text, 220) }))
-    .filter((row) => row.text);
-}
-
-interface MemoKiller {
-  statement: string;
-  severity: AdverseSeverity;
-}
-
-/** Ranked, deduped, compressed conviction-limiters. One strong statement beats three similar warnings. */
-function buildKillers(adverse: AdverseRegisterItem[], fallbackRisks: string[]): MemoKiller[] {
-  const seen = new Set<string>();
-  const killers: MemoKiller[] = [];
-  for (const item of adverse) {
-    const statement = clipText(item.whyItMatters || item.title, 220);
-    const key = normalizeMemoKey(statement);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    killers.push({ statement, severity: item.severity });
-    if (killers.length >= 4) break;
-  }
-  if (!killers.length) {
-    for (const risk of fallbackRisks) {
-      const statement = clipText(risk, 220);
-      const key = normalizeMemoKey(statement);
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      killers.push({ statement, severity: 'medium' });
-      if (killers.length >= 3) break;
-    }
-  }
-  return killers;
-}
 
 /** A list that shows the first `cap` items and reveals the rest in place via "Show N more".
  *  Used for long memo lists so the collapsed view stays tight without ever truncating content. */
