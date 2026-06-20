@@ -17,18 +17,23 @@ def test_metrics_endpoint_public_and_prometheus_format(client):
     resp = client.get("/metrics")
     assert resp.status_code == 200
     body = resp.text
-    # Either real exposition or the graceful no-dep fallback.
-    assert "aethria_" in body or "metrics unavailable" in body
+    assert "aethria_" in body
+    assert resp.headers["content-type"].startswith("text/plain")
 
 
 def test_metrics_reports_live_gauges(client):
-    import metrics
-
-    if not metrics.ENABLED:
-        pytest.skip("prometheus_client not installed")
     resp = client.get("/metrics")
     assert "aethria_sse_subscribers" in resp.text
     assert "aethria_agent_queue_depth" in resp.text
+
+
+def test_metrics_exposition_is_well_formed(client):
+    # HELP/TYPE precede their series; histogram has the canonical bucket/sum/count.
+    body = client.get("/metrics").text
+    assert "# TYPE aethria_pipeline_cycles_total counter" in body
+    assert "# TYPE aethria_pipeline_cycle_duration_seconds histogram" in body
+    assert 'aethria_pipeline_cycle_duration_seconds_bucket{le="+Inf"}' in body
+    assert "aethria_pipeline_cycle_duration_seconds_count" in body
 
 
 def test_metrics_token_required_when_set(monkeypatch):
