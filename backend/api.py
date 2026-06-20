@@ -135,12 +135,7 @@ from fund_thesis import (
     get_active_thesis_metadata,
     thesis_has_embeddings,
 )
-from fund_thesis_ops import (
-    activate_fund_thesis_version,
-    backfill_thesis_embeddings,
-    create_fund_thesis_version_for_user,
-    sync_fund_config_to_active_thesis,
-)
+from fund_thesis_ops import sync_fund_config_to_active_thesis
 from models import FundConfig, FundMemory, Startup, UserPreferences
 from conviction_state import build_conviction_patch
 from core import policy_resolver
