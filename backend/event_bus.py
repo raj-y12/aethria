@@ -115,19 +115,8 @@ def _enqueue_notify(user_id: str, event: Dict[str, Any]) -> None:
     """Best-effort enqueue for the outbound NOTIFY sender (drop-oldest if full)."""
     assert _notify_queue is not None
     msg = {"instance": _INSTANCE_ID, "user_id": user_id, "event": event}
-    try:
-        _notify_queue.put_nowait(msg)
-        return
-    except asyncio.QueueFull:
-        pass
-    try:
-        _notify_queue.get_nowait()
-    except asyncio.QueueEmpty:
-        pass
-    try:
-        _notify_queue.put_nowait(msg)
-    except asyncio.QueueFull:  # pragma: no cover - pathological
-        logger.debug("event_bus: dropped a backplane notify (sender saturated)")
+    # Same bounded drop-oldest policy as subscriber delivery — reuse _offer.
+    _offer(_notify_queue, msg)
 
 
 def _offer(queue: "asyncio.Queue[Dict[str, Any]]", event: Dict[str, Any]) -> bool:

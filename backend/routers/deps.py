@@ -272,7 +272,7 @@ def get_system_health(
                     delta = (utcnow() - last_call_time).total_seconds()
                     in_cooldown = delta < cooldown_seconds
                     cooldown_until = (
-                        (last_call_time.replace(tzinfo=timezone.utc) + timedelta(seconds=cooldown_seconds)).isoformat()
+                        (last_call_time + timedelta(seconds=cooldown_seconds)).isoformat()
                         if in_cooldown
                         else None
                     )

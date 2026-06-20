@@ -301,12 +301,14 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
             return
         thesis_ctx = active.as_engine_context()
         # Opportunistic embedding backfill: a thesis bootstrapped without a key
-        # stores an empty vector. Now that we have a key (api_key is set below),
-        # generate the active version's vector once. Best-effort; never blocks.
+        # stores an empty vector. Now that api_key is present, generate the active
+        # version's vector once. ensure_active_thesis_embedding does blocking
+        # OpenAI + Supabase I/O, so run it off the event loop (to_thread) — never
+        # call it directly inside this coroutine. Best-effort.
         if api_key and not (getattr(active, "embedding", None) or []):
             from fund_thesis_ops import ensure_active_thesis_embedding
 
-            if ensure_active_thesis_embedding(svc, user_id, api_key):
+            if await asyncio.to_thread(ensure_active_thesis_embedding, svc, user_id, api_key):
                 logger.info("[%s] Backfilled active thesis embedding", user_id[:12])
     except FundThesisIncompleteError as e:
         logger.warning("[%s] Pipeline skipped (fund thesis): %s", user_id[:12], e)
