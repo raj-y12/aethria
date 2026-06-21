@@ -460,7 +460,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   }, [displayStartup?.review]);
   const openingRiskItems = useMemo(() => {
     const items = [
-      ...adverseRegister.map((item) => item.title),
+      ...adverseRegister.map((item) => item.whyItMatters || item.title),
       ...missingEvidenceItems,
       ...riskFactors.risks,
     ].map((item) => normalizeListItemText(item)).filter(Boolean);
