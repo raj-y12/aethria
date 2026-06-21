@@ -3,7 +3,7 @@
  *
  * Presentation model:
  * - Partner recommendation + pipeline state → filled DecisionBadge in QueueVerdictLine + conviction %
- * - Why look here (split, ruling, stale, evidence) → one filled QueueAttentionBadge
+ * - Why look here (ruling, stale, evidence) → one filled QueueAttentionBadge
  *
  * List API limitations (do not invent fields):
  * - partner.confidence, decision_drivers, snapshot not on list projection
@@ -132,7 +132,6 @@ export const CONVICTION_TIER_CLASS: Record<
  *  Calm states (ready / awaiting_review / on_monitor / high_conviction / decided) do not. */
 const ATTENTION_BADGE_KEYS: ReadonlySet<QueueAttentionDriverKey> = new Set([
   'needs_ruling',
-  'reviewer_split',
   'stale',
   'missing_evidence',
   'mandate_conflict',
@@ -276,18 +275,6 @@ export function resolveQueueAttentionDriver(ctx: QueueRowContext): QueueAttentio
       label: `Ruled · ${humanDecisionLabel(decision)}`,
       detail: startup.human_resolution?.notes?.trim() || undefined,
       tone: 'quiet',
-    };
-  }
-
-  if (startup.review?.reviewer_disagreement) {
-    return {
-      key: 'reviewer_split',
-      label: 'Reviewer split',
-      detail:
-        startup.review.disagreement_summary?.[0]?.trim() ||
-        startup.review.aethria_view?.tension_summary?.trim() ||
-        'Multiple reviewer verdicts diverge on this case.',
-      tone: 'critical',
     };
   }
 

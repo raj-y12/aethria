@@ -1134,16 +1134,27 @@ class SupabaseStartupsStorage:
             )
 
     def replace_all(self, items: List[dict]) -> None:
+        """Make the tenant's rows exactly ``items``.
+
+        Upsert-first, prune-after — NOT delete-everything-then-reinsert. The old
+        order ran a DELETE of all rows up front, so any failure (EAGAIN, OOM, a
+        bad row mid-batch) between the delete and the re-insert left the tenant
+        with a partial or empty table and no rollback. Supabase's HTTP client has
+        no multi-statement transaction, so instead we (1) upsert every new row,
+        and only once they all succeed (2) delete the rows that are no longer
+        present. A failure during step 1 leaves the existing data intact.
+        """
         if not isinstance(items, list):
             raise TypeError("items must be a list of dicts")
-        try:
-            self._client.table(TABLE).delete().eq("user_id", self._user_id).execute()
-        except Exception as e:
-            self.logger.error("replace_all delete failed: %s", e)
-            raise
         chunk = 80
+        new_ids: set[str] = set()
+        # 1) Upsert all new/updated rows first.
         for i in range(0, len(items), chunk):
             batch = [_dict_to_row(d, self._user_id) for d in items[i : i + chunk]]
+            for row in batch:
+                sid = row.get("startup_id")
+                if sid:
+                    new_ids.add(str(sid))
             if not batch:
                 continue
             try:
@@ -1152,6 +1163,32 @@ class SupabaseStartupsStorage:
                 ).execute()
             except Exception as e:
                 self.logger.error("replace_all upsert chunk failed: %s", e)
+                raise
+        # 2) Only after all upserts succeed, prune rows that are no longer present.
+        try:
+            r = (
+                self._client.table(TABLE)
+                .select("startup_id")
+                .eq("user_id", self._user_id)
+                .execute()
+            )
+            existing_ids = {
+                str(row.get("startup_id"))
+                for row in (getattr(r, "data", None) or [])
+                if isinstance(row, dict) and row.get("startup_id")
+            }
+        except Exception as e:
+            self.logger.error("replace_all prune scan failed (existing data left intact): %s", e)
+            raise
+        stale = list(existing_ids - new_ids)
+        for i in range(0, len(stale), chunk):
+            ids = stale[i : i + chunk]
+            try:
+                self._client.table(TABLE).delete().eq("user_id", self._user_id).in_(
+                    "startup_id", ids
+                ).execute()
+            except Exception as e:
+                self.logger.error("replace_all prune delete failed: %s", e)
                 raise
 
     def reset_to_empty(self) -> None:

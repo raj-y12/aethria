@@ -55,3 +55,19 @@ def test_metrics_disabled_returns_404(monkeypatch):
     importlib.reload(api)
     c = TestClient(api.app)
     assert c.get("/metrics").status_code == 404
+
+
+def test_metrics_closed_by_default_in_production(monkeypatch):
+    # In prod with no token set, the endpoint must fail closed (404), not leak.
+    monkeypatch.setenv("METRICS_ENABLED", "true")
+    monkeypatch.delenv("METRICS_TOKEN", raising=False)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    import api
+    importlib.reload(api)
+    c = TestClient(api.app)
+    assert c.get("/metrics").status_code == 404
+    # With a token configured in prod, it's reachable when presented.
+    monkeypatch.setenv("METRICS_TOKEN", "tok")
+    importlib.reload(api)
+    c = TestClient(api.app)
+    assert c.get("/metrics", headers={"Authorization": "Bearer tok"}).status_code == 200

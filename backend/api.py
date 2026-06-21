@@ -1504,12 +1504,18 @@ def prometheus_metrics(request: Request):
     depth, SSE subscribers, persistent loops.
 
     Bypasses Clerk auth (it's a machine endpoint scraped by Prometheus, not the
-    SPA). When METRICS_TOKEN is set it must be presented as a Bearer token —
-    leave it unset only on a trusted/private network. METRICS_ENABLED=0 hides it.
+    SPA). When METRICS_TOKEN is set it must be presented as a Bearer token.
+    METRICS_ENABLED=0 hides it. In production the endpoint is CLOSED BY DEFAULT:
+    if METRICS_TOKEN is unset it returns 404, so a public ingress can't scrape
+    operational data unless an operator opts in by setting the token. Outside
+    production it stays open for local Prometheus/dev convenience.
     """
     if not env_config.get_bool("METRICS_ENABLED"):
         raise HTTPException(status_code=404, detail="Not found")
     token = env_config.get_str("METRICS_TOKEN")
+    if not token and _is_production_env():
+        # Fail closed in prod rather than expose queue depths / loop counts publicly.
+        raise HTTPException(status_code=404, detail="Not found")
     if token:
         auth = request.headers.get("Authorization", "")
         presented = auth[7:].strip() if auth.startswith("Bearer ") else ""
