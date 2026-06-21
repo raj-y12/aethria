@@ -115,8 +115,12 @@ function App() {
   // hard reload. Drop the entire cache whenever the signed-in user changes
   // (account switch or sign-out). The initial undefined → id assignment is
   // skipped so we never clear a freshly-populated cache on first load.
+  // useLayoutEffect (not useEffect) so the cache is cleared before the browser
+  // paints the frame for the new identity — a passive effect runs a tick later,
+  // after AppShell has already rendered the previous tenant's cached startups/
+  // memos/settings, briefly showing one account's confidential data under another.
   const prevUserIdRef = useRef<string | null | undefined>(undefined);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const prev = prevUserIdRef.current;
     if (prev !== undefined && prev !== userId) {
       queryClient.clear();

@@ -631,11 +631,19 @@ export function computeConfiguredScore(startup: Startup, config: FundConfigurati
     timing: deriveTimingScore(startup),
     fundFit: deriveFundFitScore(startup),
   };
-  const available = config.scoringWeights.filter((weight) => scores[weight.key] != null && Number.isFinite(scores[weight.key]));
-  if (!available.length) return Math.round((startup.scout.confidence ?? 0.5) * 100);
+  const available = config.scoringWeights.filter(
+    (weight) =>
+      scores[weight.key] != null
+      && Number.isFinite(scores[weight.key])
+      && Number.isFinite(weight.weight),
+  );
+  const fallback = Math.round((startup.scout.confidence ?? 0.5) * 100);
+  if (!available.length) return fallback;
   const weighted = available.reduce((sum, weight) => sum + ((scores[weight.key] ?? 0) * 10 * weight.weight), 0);
   const totalWeight = available.reduce((sum, weight) => sum + weight.weight, 0);
-  return Math.round(weighted / totalWeight);
+  if (!(totalWeight > 0)) return fallback;
+  const result = Math.round(weighted / totalWeight);
+  return Number.isFinite(result) ? result : fallback;
 }
 
 export function isStartupStaleByConfig(startup: Startup, config: FundConfiguration, now = Date.now()): boolean {
@@ -694,9 +702,14 @@ function mergeCanonicalWeights(base: ScoringWeight[], saved?: ScoringWeight[]): 
   return base.map((item) => {
     const savedItem = savedMap.get(item.key);
     const canonical = CANONICAL_DIMENSIONS[item.key as CoreDimensionKey];
+    // A corrupted saved config (non-numeric / NaN weight) must not propagate — it
+    // would make computeConfiguredScore return NaN, and bandForScore(NaN) falls
+    // through to the top band, mislabelling every startup "Invest". Coerce and
+    // fall back to the canonical/base weight when the saved value isn't finite.
+    const savedWeight = Number(savedItem?.weight);
     return {
       ...item,
-      weight: savedItem?.weight ?? item.weight,
+      weight: Number.isFinite(savedWeight) ? savedWeight : item.weight,
       label: canonical?.label ?? item.label,
       description: canonical?.description ?? item.description,
     };

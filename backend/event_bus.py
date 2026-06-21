@@ -195,6 +195,11 @@ async def _sender_loop() -> None:
                 _notify_queue.task_done()
         except asyncio.CancelledError:
             break
+        except Exception as e:  # pragma: no cover - never let the sender task die
+            # An unexpected error in get()/serialization must not kill the loop —
+            # otherwise publish() keeps enqueuing and cross-instance fan-out is
+            # silently dead while the local path still works.
+            logger.warning("event_bus: sender loop iteration failed (continuing): %s", e)
 
 
 Connector = Callable[[str], Awaitable[Any]]

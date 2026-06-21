@@ -417,13 +417,31 @@ class ReviewerEngine:
         """Replace LLM-assigned numeric scores with deterministic weighted scores."""
         if not self.structured_scoring_engine:
             return reviewer_output
+        from config.scoring_config import DEFAULT_SCORE
+
         trace = self.structured_scoring_engine.score(scout_output, reviewer_output)
+        # The engine's overall already EXCLUDES no-evidence ("unscored") dimensions.
+        # But the per-dimension integer fields below are read by the partner's plain
+        # 4-dim mean and by its contradiction check (max-min gap). If we stamp the
+        # neutral DEFAULT_SCORE placeholder onto an unscored dimension, it both drags
+        # that mean (demoting e.g. INVEST→MONITOR) and can fabricate a contradiction
+        # gap. Instead, an unscored dimension inherits the overall score, so it stays
+        # consistent with the headline and never invents disagreement.
+        overall = trace.get("overall_score")
+        inherit = int(round(float(overall))) if overall is not None else int(round(DEFAULT_SCORE))
+
+        def _dim_int(dim: str) -> int:
+            details = trace.get(dim) if isinstance(trace.get(dim), dict) else {}
+            if details.get("unscored") and overall is not None:
+                return inherit
+            return int(round(float(details.get("score", DEFAULT_SCORE))))
+
         updated = dict(reviewer_output)
-        updated["market_score"] = int(round(float(trace["market"]["score"])))
-        updated["product_score"] = int(round(float(trace["product"]["score"])))
-        updated["technical_score"] = int(round(float(trace["technical"]["score"])))
-        updated["execution_score"] = int(round(float(trace["execution"]["score"])))
-        updated["defensibility_score"] = int(round(float(trace["defensibility"]["score"])))
+        updated["market_score"] = _dim_int("market")
+        updated["product_score"] = _dim_int("product")
+        updated["technical_score"] = _dim_int("technical")
+        updated["execution_score"] = _dim_int("execution")
+        updated["defensibility_score"] = _dim_int("defensibility")
         updated["structured_scoring"] = trace
         updated["score_source"] = "Structured assessment framework"
         updated["score_reasoning"] = self._score_reasoning_from_structured_trace(trace)

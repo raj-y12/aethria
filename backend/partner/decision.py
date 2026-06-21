@@ -728,6 +728,14 @@ class PartnerDecisionEngine:
                 min_avg_strong_yes = float(fc_thresholds.get("escalation", min_avg_strong_yes * 10)) / 10.0
                 min_avg_medium_maybe = float(fc_thresholds.get("monitor", min_avg_medium_maybe * 10)) / 10.0
                 min_avg_borderline_low = float(fc_thresholds.get("autoPass", min_avg_borderline_low * 10)) / 10.0
+                # Preserve the ordering invariant the rule ladder depends on:
+                # autoPass <= partnerReview <= monitor <= escalation. A fund_config
+                # with monitor > escalation (no backend model validator forbids it)
+                # would otherwise push min_avg_medium_maybe above min_avg_strong_yes,
+                # making the MEDIUM-escalation rule unreachable and silently dropping
+                # high-avg contested deals to the no-human-review default branch.
+                min_avg_medium_maybe = min(min_avg_medium_maybe, min_avg_strong_yes)
+                min_avg_borderline_low = min(min_avg_borderline_low, min_avg_pass)
             except (TypeError, ValueError):
                 pass
 

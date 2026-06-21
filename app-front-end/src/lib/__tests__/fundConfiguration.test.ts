@@ -35,6 +35,22 @@ describe('createDefaultFundConfiguration', () => {
   });
 });
 
+describe('weight sanitization (corrupt saved config)', () => {
+  it('drops a non-finite saved weight back to the canonical default', () => {
+    const cfg = createDefaultFundConfiguration({
+      fund_config: {
+        scoringWeights: [
+          { key: 'market', weight: Number.NaN, label: 'Market', description: '' },
+          { key: 'product', weight: 'oops', label: 'Product', description: '' },
+        ],
+      },
+    } as never);
+    // A NaN/string weight must not survive — it would make computeConfiguredScore
+    // return NaN and mislabel every startup "Invest".
+    expect(cfg.scoringWeights.every((w) => Number.isFinite(w.weight))).toBe(true);
+  });
+});
+
 describe('badgeTextColorForBackground', () => {
   it('uses dark text on light backgrounds', () => {
     expect(badgeTextColorForBackground('#ffffff')).toBe('#1a2b48');

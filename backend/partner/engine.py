@@ -240,7 +240,12 @@ class PartnerEngine:
         pr = (pipeline_run_id or "").strip() or None
         client, uid = self._supabase_client_uid()
 
-        decision = self.decision_engine.decide(
+        # decision_engine.decide() is synchronous and, on the LLM-fallback path,
+        # makes a blocking OpenAI call. Run it off the event loop so a partner LLM
+        # round-trip never freezes SSE streams or the queue workers — the Scout and
+        # Reviewer engines already offload their .create() calls the same way.
+        decision = await asyncio.to_thread(
+            self.decision_engine.decide,
             scout_output,
             review_output,
             fund_thesis=self.fund_thesis,
@@ -264,7 +269,8 @@ class PartnerEngine:
             validate_partner_output(decision)
         except ValueError as ve:
             self.logger.warning("Partner output validation failed for %s: %s — retrying", entry_id, ve)
-            decision = self._retry_json_fix(decision)
+            # _retry_json_fix makes a second blocking OpenAI call — also off-loop.
+            decision = await asyncio.to_thread(self._retry_json_fix, decision)
             try:
                 validate_partner_output(decision)
             except ValueError as ve2:

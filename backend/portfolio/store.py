@@ -163,6 +163,37 @@ class PortfolioStore:
             self.logger.warning("Supabase startups read failed; using local fallback: %s", e)
             return self._read_local_file(self.files["startups"])
 
+    def _duplicate_startup_id_supabase(self, name: str) -> Optional[str]:
+        """Return the id of an existing portfolio startup with the same (case-insensitive)
+        name, or None. Targeted query — does NOT download the whole table (the old
+        name-dedup re-fetched every row on every insert, an O(n) egress hit per add).
+        """
+        new_name = (name or "").strip()
+        if not new_name:
+            return None
+        try:
+            uid = self._supabase_uid()
+            # ILIKE does the case-insensitive match; escape LIKE metacharacters so a
+            # name containing % or _ matches literally, then confirm exact equality.
+            pattern = new_name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            r = (
+                self._supabase_client()
+                .table(self._supabase_tables["startups"])
+                .select("id,name")
+                .eq("user_id", uid)
+                .ilike("name", pattern)
+                .limit(5)
+                .execute()
+            )
+            rows = (r.data or []) if hasattr(r, "data") else []
+            target = new_name.lower()
+            for row in rows:
+                if isinstance(row, dict) and (row.get("name") or "").strip().lower() == target:
+                    return row.get("id")
+        except Exception as e:
+            self.logger.warning("Supabase duplicate-name check failed; allowing add: %s", e)
+        return None
+
     def _upsert_startup_supabase(self, record: Dict[str, Any]) -> str:
         uid = self._supabase_uid()
         row = self._startup_record_to_row(record)
@@ -333,14 +364,12 @@ class PortfolioStore:
         }
         
         if self._using_supabase():
-            # Keep legacy duplicate protection for name-based duplicates.
-            existing = self._get_startups_supabase()
-            new_name = (record.get("name") or "").strip().lower()
-            for row in existing:
-                existing_name = (row.get("name") or "").strip().lower()
-                if existing_name and existing_name == new_name:
-                    self.logger.info("Duplicate company name detected in Supabase; skipping add: %s", record.get("name"))
-                    return row.get("id") or startup_id
+            # Legacy duplicate protection for name-based duplicates — targeted query,
+            # not a full-table scan.
+            dup_id = self._duplicate_startup_id_supabase(record.get("name") or "")
+            if dup_id:
+                self.logger.info("Duplicate company name detected in Supabase; skipping add: %s", record.get("name"))
+                return dup_id or startup_id
         return self._append_record("startups", record)
     
     # Decision methods

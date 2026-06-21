@@ -371,10 +371,13 @@ def recommendation_for_score_from_fund_config(score_0_to_10: float, fund_config:
                 continue
             if lo <= score_100 <= hi:
                 label = str(band.get("label") or "").lower()
+                # Advance-intent wins: a label like "Pass to Partner — proceed"
+                # carries both substrings but means INVEST, so check invest/proceed
+                # BEFORE the "pass" reject match.
+                if "invest" in label or "proceed" in label:
+                    return "INVEST"
                 if "pass" in label:
                     return "PASS"
-                if "proceed" in label or "invest" in label:
-                    return "INVEST"
                 return "MONITOR"
     thresholds = fund_config.get("thresholds") if isinstance(fund_config.get("thresholds"), dict) else {}
     invest_bar = float(thresholds.get("escalation") or 80) / 10.0
