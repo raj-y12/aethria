@@ -43,6 +43,9 @@ logger = logging.getLogger("api.deps")
 # --- Rate-limit policies (shared across routers + api) ----------------------
 LOOKUP_MINUTE_POLICY = RateLimitPolicy("lookup_minute", limit=5, window_seconds=60)
 LOOKUP_DAY_POLICY = RateLimitPolicy("lookup_day", limit=50, window_seconds=86400)
+# Candidate resolution is cheap (deterministic, LLM-free) so it gets its own,
+# looser bucket — a disambiguation resolve must not eat the queue's lookup budget.
+RESOLVE_MINUTE_POLICY = RateLimitPolicy("resolve_minute", limit=30, window_seconds=60)
 AGENT_TRIGGER_POLICY = RateLimitPolicy("agent_trigger_minute", limit=1, window_seconds=60)
 META_TRIGGER_POLICY = RateLimitPolicy("meta_trigger_hour", limit=1, window_seconds=3600)
 SETTINGS_MUTATION_POLICY = RateLimitPolicy("settings_mutation_minute", limit=30, window_seconds=60)

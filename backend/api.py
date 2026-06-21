@@ -82,6 +82,7 @@ from routers.deps import (
     get_system_health as _get_system_health,
     LOOKUP_MINUTE_POLICY as _LOOKUP_MINUTE_POLICY,
     LOOKUP_DAY_POLICY as _LOOKUP_DAY_POLICY,
+    RESOLVE_MINUTE_POLICY as _RESOLVE_MINUTE_POLICY,
     AGENT_TRIGGER_POLICY as _AGENT_TRIGGER_POLICY,
     META_TRIGGER_POLICY as _META_TRIGGER_POLICY,
     SETTINGS_MUTATION_POLICY as _SETTINGS_MUTATION_POLICY,
@@ -2287,9 +2288,8 @@ async def resolve_lookup_candidates(request: Request, body: Dict[str, Any]):
     if len(lookup_input) > 300:
         raise HTTPException(status_code=422, detail="lookup_input is too long")
     user_id = require_authenticated_user(request)
-    limited = _enforce_rate_limits(
-        f"user:{user_id}:lookup", [_LOOKUP_MINUTE_POLICY, _LOOKUP_DAY_POLICY]
-    )
+    # Own bucket: a cheap resolve must not consume the expensive queue's budget.
+    limited = _enforce_rate_limits(f"user:{user_id}:resolve", [_RESOLVE_MINUTE_POLICY])
     if limited is not None:
         return limited
 
