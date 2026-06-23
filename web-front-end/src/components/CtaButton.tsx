@@ -23,6 +23,22 @@ export function CtaLink({ children, className = '', ...props }: LinkProps & { cl
   );
 }
 
+/**
+ * Understated editorial CTA — a mono label on a single hairline that widens its
+ * arrow gap on hover. The quiet, high-end counterpart to the solid CtaLink.
+ */
+export function CtaTextLink({ children, className = '', ...props }: LinkProps & { className?: string }) {
+  return (
+    <Link
+      className={`group inline-flex items-center gap-3.5 border-b border-solid border-[var(--color-oxford)] pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--color-oxford)] transition-[gap] duration-300 ease-out hover:gap-6 ${className}`.trim()}
+      {...props}
+    >
+      <span>{children}</span>
+      <span aria-hidden>→</span>
+    </Link>
+  );
+}
+
 export function CtaSubmit({
   children,
   className = '',

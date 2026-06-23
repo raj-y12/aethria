@@ -1,5 +1,6 @@
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { ScrollReveal } from './ScrollReveal';
+import SectionKicker from './SectionKicker';
 import { SCROLL_EASE } from '../motionTokens';
 
 /**
@@ -8,8 +9,8 @@ import { SCROLL_EASE } from '../motionTokens';
  * Mirrors the real product: three reviewer personas (Default / Skeptical / Opportunist,
  * see backend/models.py SingleReview) score the same company against the active thesis and
  * genuinely diverge. The record preserves the disagreement instead of averaging it into a
- * single number, then the partner layer resolves it into a logged decision. Dark oxford
- * surface to break the page's beige temperature and give the proof a visual peak.
+ * single number, then the partner layer resolves it into a logged decision. Rendered on the
+ * continuous paper canvas (no dark band) so the page reads as one uninterrupted document.
  */
 
 type Verdict = 'STRONG' | 'MEDIUM' | 'WEAK';
@@ -73,12 +74,12 @@ function DivergenceTrack() {
   return (
     <div className="w-full">
       <div className="mb-3 flex items-baseline justify-between">
-        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(244,241,234,0.5)]">
+        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--label-muted)]">
           Where they split · {SPLIT_DIMENSION}
         </p>
-        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(244,241,234,0.34)]">1–10</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--text-subtle)]">1–10</p>
       </div>
-      <div className="relative mb-9 h-px w-full bg-[rgba(244,241,234,0.16)]">
+      <div className="relative mb-9 h-px w-full bg-[var(--section-divider)]">
         {REVIEWERS.map((r, i) => {
           const left = `${((r.splitScore - 1) / 9) * 100}%`;
           return (
@@ -92,10 +93,10 @@ function DivergenceTrack() {
               transition={{ duration: reduce ? 0 : 0.4, delay: reduce ? 0 : 0.15 + i * 0.08, ease: SCROLL_EASE }}
             >
               <span
-                className="h-2.5 w-2.5 rounded-full ring-2 ring-[var(--color-oxford)]"
+                className="h-2.5 w-2.5 rounded-full ring-2 ring-[var(--color-paper)]"
                 style={{ backgroundColor: VERDICT_STYLE[r.verdict].bg }}
               />
-              <span className="mt-2 font-mono text-[11px] font-bold leading-none text-[var(--color-paper)] tabular-nums">
+              <span className="mt-2 font-mono text-[11px] font-bold leading-none text-[var(--color-oxford)] tabular-nums">
                 {r.splitScore}
               </span>
             </motion.div>
@@ -110,7 +111,7 @@ function DivergenceTrack() {
               className="h-2 w-2 shrink-0 rounded-full"
               style={{ backgroundColor: VERDICT_STYLE[r.verdict].bg }}
             />
-            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[rgba(244,241,234,0.56)]">
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--label-muted)]">
               {r.persona}
             </span>
           </li>
@@ -136,22 +137,21 @@ export default function ReviewDisagreement() {
   return (
     <section
       id="disagreement"
-      className="w-full"
-      style={{ backgroundColor: 'var(--color-oxford)' }}
+      className="w-full border-t border-solid border-[var(--section-divider)]"
+      style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="disagreement-heading"
     >
-      <div className="page-margin-x py-16 md:py-28">
-        <ScrollReveal y={20} amount={0.2} className="max-w-[860px]">
-          <p className="accent-eyebrow accent-eyebrow--inverse mb-6">Review · without consensus theater</p>
+      <div className="page-margin-x py-[clamp(6rem,16vh,12rem)]">
+        <ScrollReveal y={20} amount={0.2} className="max-w-[900px]">
+          <SectionKicker folio="05" label="The review" className="mb-8" />
           <h2
             id="disagreement-heading"
-            className="editorial-display text-[clamp(2rem,5.5vw,3.5rem)] leading-[1.04] text-[var(--color-paper)]"
+            className="editorial-display font-normal text-[clamp(2.4rem,6vw,4.75rem)] leading-[0.98] tracking-[-0.02em] text-[var(--color-oxford)]"
           >
-            Three reviewers. One record.
-            <br />
-            The disagreement is the point.
+            Three reviewers, one record. The disagreement is the{' '}
+            <span className="italic text-[var(--color-accent)]">point</span>.
           </h2>
-          <p className="mt-6 max-w-[58ch] font-sans text-[16px] leading-[1.7] text-[rgba(244,235,230,0.66)]">
+          <p className="mt-8 max-w-[58ch] font-sans text-[16px] leading-[1.75] text-[var(--text-secondary)]">
             Every company is scored independently by three reviewer modes. Aethria does not average them into a
             comfortable number — it preserves the split, surfaces the dimension they fight over, and hands the partner
             layer the real picture.
@@ -159,7 +159,7 @@ export default function ReviewDisagreement() {
         </ScrollReveal>
 
         <motion.div
-          className="mt-12 grid grid-cols-1 gap-px overflow-hidden border border-[rgba(244,241,234,0.12)] bg-[rgba(244,241,234,0.12)] md:mt-16 md:grid-cols-3"
+          className="mt-16 grid grid-cols-1 gap-px overflow-hidden border border-solid border-[var(--section-divider)] bg-[var(--section-divider)] md:mt-24 md:grid-cols-3"
           variants={gridVariants}
           initial="hidden"
           whileInView="visible"
@@ -169,20 +169,20 @@ export default function ReviewDisagreement() {
             <motion.article
               key={r.persona}
               variants={cardVariants}
-              className="flex min-w-0 flex-col bg-[var(--color-oxford)] p-7 md:p-8"
+              className="flex min-w-0 flex-col bg-[var(--color-paper)] p-7 md:p-8"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--color-paper)]">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--color-oxford)]">
                     {r.persona}
                   </p>
-                  <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(244,241,234,0.4)]">
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
                     {r.mode}
                   </p>
                 </div>
                 <VerdictChip verdict={r.verdict} />
               </div>
-              <p className="mt-6 font-sans text-[15px] leading-[1.65] text-[rgba(244,235,230,0.74)]">{r.take}</p>
+              <p className="mt-6 font-sans text-[15px] leading-[1.65] text-[var(--text-secondary)]">{r.take}</p>
             </motion.article>
           ))}
         </motion.div>
@@ -191,7 +191,7 @@ export default function ReviewDisagreement() {
           y={18}
           delay={0.06}
           amount={0.3}
-          className="mt-12 flex flex-col gap-10 border-t border-[rgba(244,241,234,0.12)] pt-12 md:flex-row md:items-center md:justify-between md:gap-16"
+          className="mt-12 flex flex-col gap-10 border-t border-solid border-[var(--section-divider)] pt-12 md:flex-row md:items-center md:justify-between md:gap-16"
         >
           <div className="w-full md:max-w-[420px]">
             <DivergenceTrack />
@@ -204,13 +204,13 @@ export default function ReviewDisagreement() {
               aria-hidden
             />
             <div className="min-w-0">
-              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(244,241,234,0.46)]">
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--label-muted)]">
                 Partner layer · recorded decision
               </p>
-              <p className="mt-2 font-sans text-[clamp(1.25rem,3vw,1.6rem)] font-semibold leading-tight text-[var(--color-paper)]">
+              <p className="mt-2 font-sans text-[clamp(1.25rem,3vw,1.6rem)] font-semibold leading-tight text-[var(--color-oxford)]">
                 MONITOR
               </p>
-              <p className="mt-2 max-w-[42ch] font-sans text-[14px] leading-[1.6] text-[rgba(244,235,230,0.6)]">
+              <p className="mt-2 max-w-[42ch] font-sans text-[14px] leading-[1.6] text-[var(--text-secondary)]">
                 Versioned partner logic reconciles the split into a logged verdict — with every reviewer's dissent
                 attached to the record, not erased by it.
               </p>

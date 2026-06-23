@@ -350,6 +350,22 @@ hr.doc-section-separator::before {
   isolation: isolate;
 }
 
+/* Rotating broadsheet seal */
+@keyframes seal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.seal-spin {
+  transform-origin: center;
+  animation: seal-spin 48s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .seal-spin {
+    animation: none;
+  }
+}
+
 .hero-result-stage {
   position: relative;
   z-index: 1;

@@ -9,6 +9,8 @@ import '@fontsource/instrument-sans/700.css';
 import '@fontsource/playfair-display/400.css';
 import '@fontsource/playfair-display/500.css';
 import '@fontsource/playfair-display/600.css';
+import '@fontsource/playfair-display/400-italic.css';
+import '@fontsource/playfair-display/500-italic.css';
 import '@fontsource/space-mono/400.css';
 import '@fontsource/space-mono/700.css';
 import 'lenis/dist/lenis.css';

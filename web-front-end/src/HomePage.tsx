@@ -1,16 +1,23 @@
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
-import { CtaLink } from './components/CtaButton';
+import { CtaTextLink } from './components/CtaButton';
 import GrainOverlay from './components/GrainOverlay';
 import SiteHeader from './components/SiteHeader';
-import MarketTape from './components/MarketTape';
+import RotatingSeal from './components/RotatingSeal';
+import SectionKicker from './components/SectionKicker';
 import PipelineSection from './components/PipelineSection';
 import DashboardPreview from './components/DashboardPreview';
 import ReviewDisagreement from './components/ReviewDisagreement';
 import NewsletterBand from './components/NewsletterBand';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SCROLL_EASE } from './motionTokens';
-import { DEMO_LOOKUP_RESULT, DEMO_MANDATE_DARK, LookupResultSnapshot, MandateCard } from '@aethria/product-chrome';
+import {
+  DEMO_LOOKUP_QUERY,
+  DEMO_LOOKUP_RESULT,
+  LookupCommandBar,
+  LookupResultSnapshot,
+  MandateCard,
+} from '@aethria/product-chrome';
 
 const LINKEDIN_URL = 'https://www.linkedin.com/company/aethria';
 
@@ -29,8 +36,6 @@ export default function HomePage() {
         visible: { opacity: 1, y: 0, transition: { duration: 0.55, delay: 0.34, ease: SCROLL_EASE } },
       };
 
-  const heroViewport = { once: true as const, amount: 0.3 };
-
   return (
     <div
       className="relative flex min-h-[100dvh] w-full flex-col overflow-x-hidden"
@@ -41,102 +46,109 @@ export default function HomePage() {
       <SiteHeader />
 
       <main className="relative z-10 flex min-w-0 flex-1 flex-col overflow-x-hidden">
-        {/* Hero — copy only; product UI lives in Inside Aethria */}
+        {/* Hero — 白 / quiet luxury: the statement sits low, oceans of air above, seal alone in the void */}
         <section
-          className="home-hero-section paper-dot-grid relative w-full overflow-hidden"
+          className="home-hero-section relative flex min-h-[calc(82vh-64px)] w-full flex-col overflow-hidden"
           style={{ backgroundColor: 'var(--color-paper)' }}
         >
-          <div className="page-margin-x w-full max-w-[920px] pt-14 pb-0 md:pt-20">
-            <motion.p
-              className="accent-eyebrow mb-8 md:mb-10"
-              initial={reduce ? false : { opacity: 0, y: 8 }}
-              whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-              viewport={heroViewport}
-              transition={{ duration: reduce ? 0 : 0.45, ease: SCROLL_EASE }}
-            >
-              Aethria · Private markets intelligence
-            </motion.p>
-
-            <motion.h1
-              className="editorial-display max-w-[14ch] text-[clamp(2.75rem,6vw,4.25rem)] leading-[1.02] text-[var(--color-oxford)]"
-              initial={reduce ? false : { opacity: 0, y: 26 }}
-              whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-              viewport={heroViewport}
-              transition={{ duration: reduce ? 0 : 0.85, delay: reduce ? 0 : 0.08, ease: SCROLL_EASE }}
-            >
-              Private market judgment, made <span className="accent-underline">inspectable</span>.
-            </motion.h1>
-
-            <motion.p
-              className="mt-8 max-w-[56ch] font-sans text-[clamp(16px,1.6vw,19px)] font-medium leading-[1.55] text-[var(--color-oxford)]"
-              variants={subtextVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={heroViewport}
-            >
-              Scout real companies against your fund thesis. Run three independent reviews. Record the partner decision
-              — automatically.
-            </motion.p>
-
-            <motion.p
-              className="mt-5 max-w-[50ch] font-sans text-[15px] leading-[1.7] text-[var(--text-secondary)]"
-              variants={subtextVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={heroViewport}
-            >
-              Every recommendation ships with source trail, reviewer disagreement, dimension scores, and mandate fit in
-              one investment record.
-            </motion.p>
-
+          {/* Seal — alone in the open upper-right, the single mark in the void */}
+          <div
+            className="pointer-events-none absolute z-0 hidden lg:block"
+            style={{ right: 'var(--page-margin-x)', top: 'clamp(5rem, 13vh, 8.5rem)' }}
+          >
             <motion.div
-              className="mt-10 shrink-0"
-              variants={subtextVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={heroViewport}
+              initial={reduce ? false : { opacity: 0, scale: 0.9 }}
+              animate={reduce ? undefined : { opacity: 1, scale: 1 }}
+              transition={{ duration: 1.2, delay: 0.6, ease: SCROLL_EASE }}
             >
-              <CtaLink to="/request-access" className="w-full px-[72px] sm:w-fit">
-                Request access
-              </CtaLink>
+              <RotatingSeal className="h-[150px] w-[150px] xl:h-[184px] xl:w-[184px]" />
             </motion.div>
           </div>
 
-          <div className="relative z-10 mt-12 w-full shrink-0 md:mt-16">
-            <MarketTape />
+          {/* Lead — vertically centred, comfortable air without a cavernous top gap */}
+          <div className="page-margin-x relative z-10 flex w-full flex-1 flex-col justify-center pb-[7vh] pt-10">
+            <motion.div
+              className="mb-10 flex items-center gap-4"
+              initial={reduce ? false : { opacity: 0, y: 8 }}
+              animate={reduce ? undefined : { opacity: 1, y: 0 }}
+              transition={{ duration: reduce ? 0 : 0.5, delay: reduce ? 0 : 0.2, ease: SCROLL_EASE }}
+            >
+              <span className="font-mono text-[11px] tracking-[0.14em] text-[var(--label-muted)]">01</span>
+              <span className="h-px w-12 bg-[var(--section-divider)]" />
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--label-muted)]">
+                The thesis engine
+              </span>
+            </motion.div>
+
+            <motion.h1
+              className="editorial-display max-w-[17ch] font-normal text-[clamp(2.85rem,8.6vw,8rem)] leading-[0.96] tracking-[-0.025em] text-[var(--color-oxford)]"
+              initial={reduce ? false : { opacity: 0, y: 26 }}
+              animate={reduce ? undefined : { opacity: 1, y: 0 }}
+              transition={{ duration: reduce ? 0 : 1, delay: reduce ? 0 : 0.1, ease: SCROLL_EASE }}
+            >
+              Private market judgment, made{' '}
+              <span className="italic text-[var(--color-accent)]">inspectable</span>.
+            </motion.h1>
+
+            <motion.div
+              className="mt-12 flex flex-col gap-8 md:flex-row md:items-end md:justify-between md:gap-16"
+              variants={subtextVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              <p className="max-w-[42ch] font-sans text-[clamp(15px,1.4vw,18px)] leading-[1.7] text-[var(--text-secondary)]">
+                An autonomous analyst that sources, reviews, and decides on startups for venture funds — and shows its
+                work in one record you can open.
+              </p>
+              <div className="flex items-center gap-7">
+                <CtaTextLink to="/request-access">Request access</CtaTextLink>
+                <span className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--text-subtle)] sm:inline">
+                  By invitation
+                </span>
+              </div>
+            </motion.div>
           </div>
         </section>
 
         {/* Journey order: define the mandate → see what runs → see the record + disagreement → look up on demand. */}
 
         {/* 1 — Mandate: the constraint that drives everything */}
-        <section id="mandate" className="w-full bg-[var(--color-oxford)]" aria-labelledby="mandate-heading">
+        <section
+          id="mandate"
+          className="w-full border-t border-solid border-[var(--section-divider)]"
+          style={{ backgroundColor: 'var(--color-paper)' }}
+          aria-labelledby="mandate-heading"
+        >
           <ScrollReveal
-            className="page-margin-x flex flex-col gap-10 py-16 md:flex-row md:items-center md:gap-16 md:py-24"
+            className="page-margin-x grid items-end gap-14 py-[clamp(6rem,16vh,12rem)] md:grid-cols-[1fr_0.74fr] md:gap-20"
             y={20}
             amount={0.18}
           >
-            <div className="w-full max-w-xl shrink-0 md:w-[52%]">
-              <p className="accent-eyebrow accent-eyebrow--inverse mb-6">Mandate · the constraint</p>
+            <div className="max-w-xl">
+              <SectionKicker folio="02" label="The mandate" className="mb-8" />
               <h2
                 id="mandate-heading"
-                className="editorial-display text-[clamp(2rem,5vw,3.25rem)] text-[var(--color-paper)]"
+                className="editorial-display font-normal text-[clamp(2.4rem,6vw,4.75rem)] leading-[0.98] tracking-[-0.02em] text-[var(--color-oxford)]"
               >
-                Define your mandate.
-                <br />
-                The system narrows.
+                It only looks for what you{' '}
+                <span className="italic text-[var(--color-accent)]">tell it to</span>.
               </h2>
-              <p className="mt-6 max-w-[46ch] font-sans text-[16px] leading-[1.7] text-[rgba(244,235,230,0.66)]">
-                Upload or write the investment thesis once. Scouts, reviewers, and partner logic use the mandate as the
-                constraint, not a decorative preference.
+              <p className="mt-8 max-w-[46ch] font-sans text-[16px] leading-[1.75] text-[var(--text-secondary)]">
+                Write the investment thesis once. Scouts, reviewers, and partner logic treat the mandate as a hard
+                constraint — not a decorative preference. Change the thesis, and the whole system narrows with it.
               </p>
             </div>
 
-            <div className="w-full max-w-md shrink-0 md:flex-1">
-              <div aria-hidden>
-                <MandateCard {...DEMO_MANDATE_DARK} />
-              </div>
-              <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(244,241,234,0.38)]">
+            <div className="w-full max-w-[420px] md:justify-self-end">
+              <MandateCard
+                variant="paper"
+                title="Deep-Tech Infrastructure"
+                tags={['B2B Infrastructure', 'Series A–B', 'European Markets']}
+                excerpt="Backing infrastructure teams building the plumbing of the next compute cycle — capital-efficient, with a defensible wedge."
+                live
+                className="bg-transparent p-7 sm:p-8"
+              />
+              <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)]">
                 Active mandate
               </p>
             </div>
@@ -155,59 +167,60 @@ export default function HomePage() {
         {/* 5 — On-demand lookup: drive it yourself */}
         <section
           id="lookup"
-          className="paper-dot-grid w-full"
+          className="w-full border-t border-solid border-[var(--section-divider)]"
           style={{ backgroundColor: 'var(--color-paper)' }}
           aria-labelledby="lookup-heading"
         >
-          <ScrollReveal
-            className="page-margin-x flex flex-col gap-10 py-16 md:flex-row md:items-center md:gap-16 md:py-24"
-            y={20}
-            amount={0.18}
-          >
-            <div className="w-full max-w-[460px] shrink-0 md:w-[46%]">
-              <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--label-muted)]">
-                Lookup result · sample output
-              </p>
-              <div aria-hidden>
-                <LookupResultSnapshot {...DEMO_LOOKUP_RESULT} />
-              </div>
-            </div>
-
-            <div className="w-full max-w-xl shrink-0 md:flex-1">
-              <p className="accent-eyebrow mb-6">On-demand record</p>
+          <ScrollReveal className="page-margin-x py-[clamp(6rem,16vh,12rem)]" y={20} amount={0.16}>
+            <div className="max-w-[900px]">
+              <SectionKicker folio="06" label="On demand" className="mb-8" />
               <h2
                 id="lookup-heading"
-                className="editorial-display text-[clamp(2rem,5vw,3.25rem)] text-[var(--color-oxford)]"
+                className="editorial-display font-normal text-[clamp(2.4rem,6vw,4.75rem)] leading-[0.98] tracking-[-0.02em] text-[var(--color-oxford)]"
               >
-                Look up any company.
-                <br />
-                Get the record.
+                Look up any company.{' '}
+                <span className="italic text-[var(--color-accent)]">Get the record.</span>
               </h2>
-              <p className="mt-6 max-w-[46ch] font-sans text-[16px] leading-[1.7] text-[var(--text-secondary)]">
-                On-demand lookup turns a company name into a sourced investment record — no pipeline wait. Benchmarked
-                against your active thesis the moment results arrive.
+              <p className="mt-8 max-w-[52ch] font-sans text-[16px] leading-[1.75] text-[var(--text-secondary)]">
+                Type any company name. On-demand lookup turns it into a sourced investment record in seconds — no
+                pipeline wait — benchmarked against your active thesis the moment results arrive.
               </p>
+            </div>
+
+            {/* Input line → record below: the interaction as a vertical flow */}
+            <div className="mx-auto mt-14 w-full max-w-[760px]" aria-hidden>
+              <LookupCommandBar query={DEMO_LOOKUP_QUERY} trailing="run" />
+              <div className="mt-8 flex flex-col gap-3 md:flex-row md:gap-10">
+                <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)] md:w-[120px] md:pt-1.5">
+                  ↳ Record
+                </p>
+                <div className="w-full max-w-[520px]">
+                  <LookupResultSnapshot {...DEMO_LOOKUP_RESULT} />
+                </div>
+              </div>
             </div>
           </ScrollReveal>
         </section>
 
-        {/* Closing CTA */}
+        {/* Closing — the last word, set large with air */}
         <section
-          className="paper-dot-grid w-full"
+          className="w-full border-t border-solid border-[var(--section-divider)]"
           style={{ backgroundColor: 'var(--color-paper)' }}
         >
-          <div className="page-margin-x py-16 md:py-28">
-            <ScrollReveal y={22} amount={0.25} className="max-w-[820px]">
-              <h2 className="editorial-display max-w-[14ch] text-[clamp(2.4rem,6.5vw,4.5rem)] text-[var(--color-oxford)]">
-                For funds that need judgment with memory.
+          <div className="page-margin-x py-[clamp(8rem,22vh,16rem)]">
+            <ScrollReveal y={22} amount={0.25} className="max-w-[1100px]">
+              <SectionKicker folio="07" label="Access" className="mb-10" />
+              <h2 className="editorial-display max-w-[16ch] font-normal text-[clamp(2.85rem,8vw,7rem)] leading-[0.95] tracking-[-0.025em] text-[var(--color-oxford)]">
+                For funds that need judgment with{' '}
+                <span className="italic text-[var(--color-accent)]">memory</span>.
               </h2>
-              <p className="mt-6 max-w-[48ch] font-sans text-[16px] leading-[1.7] text-[var(--text-secondary)]">
-                Request access to see how Aethria turns sourcing, review, and partner decisions into one investment
-                record.
+              <p className="mt-10 max-w-[46ch] font-sans text-[16px] leading-[1.75] text-[var(--text-secondary)]">
+                Aethria turns sourcing, review, and partner decisions into one investment record — with the evidence
+                trail attached.
               </p>
-              <CtaLink to="/request-access" className="mt-10 w-full px-[72px] sm:w-fit">
-                Request access
-              </CtaLink>
+              <div className="mt-12">
+                <CtaTextLink to="/request-access">Request access</CtaTextLink>
+              </div>
             </ScrollReveal>
           </div>
         </section>
@@ -215,7 +228,8 @@ export default function HomePage() {
         <NewsletterBand />
 
         <motion.footer
-          className="home-footer paper-dot-grid relative z-20 w-full shrink-0"
+          className="home-footer relative z-20 w-full shrink-0 border-t border-solid border-[var(--section-divider)]"
+          style={{ backgroundColor: 'var(--color-paper)' }}
           initial={reduce ? false : { opacity: 0, y: 18 }}
           whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}

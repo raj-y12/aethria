@@ -1,5 +1,6 @@
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { DEMO_LOOKUP_MEMO_SAMPLE, LookupResultSnapshot } from '@aethria/product-chrome';
+import SectionKicker from './SectionKicker';
 import { SCROLL_EASE } from '../motionTokens';
 
 const FEATURES = [
@@ -48,74 +49,56 @@ export default function DashboardPreview() {
     },
   };
 
-  const stripVariants: Variants = {
-    hidden: reduce ? {} : { opacity: 0, scaleY: 0.92 },
-    visible: {
-      opacity: 1,
-      scaleY: 1,
-      transition: { duration: reduce ? 0 : 0.45, ease: SCROLL_EASE },
-    },
-  };
-
   return (
     <section
       id="product"
-      className="inside-aethria-section flex w-full overflow-hidden"
+      className="w-full border-t border-solid border-[var(--section-divider)]"
+      style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="inside-aethria-heading"
     >
       <motion.div
-        className="inside-aethria-strip w-2 shrink-0 self-stretch origin-top bg-[var(--color-oxford)] sm:w-6 md:w-12"
-        aria-hidden
+        className="page-margin-x py-[clamp(6rem,16vh,12rem)]"
+        variants={rowVariants}
         initial="hidden"
         whileInView="visible"
-        viewport={{ once: true, amount: 0.4 }}
-        variants={stripVariants}
-      />
-      <div className="paper-dot-grid min-w-0 flex-1 self-stretch" style={{ backgroundColor: 'var(--color-paper)' }}>
-        <motion.div
-          className="page-margin-x flex flex-col gap-10 pt-14 pb-12 sm:gap-12 sm:pt-20 sm:pb-14 md:flex-row md:items-start md:gap-16 md:pt-24 md:pb-16"
-          variants={rowVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.12, margin: '0px 0px -10% 0px' }}
-        >
-          <motion.div className="relative w-full max-w-xl shrink-0 md:w-[40%]" variants={leftColVariants}>
-            <p className="accent-eyebrow">Inside Aethria</p>
-            <h2
-              id="inside-aethria-heading"
-              className="editorial-display mt-4 text-[clamp(2.15rem,4.2vw,3rem)] text-[var(--color-oxford)]"
-            >
-              The system thinks
-              <br />
-              before you decide.
-            </h2>
+        viewport={{ once: true, amount: 0.12, margin: '0px 0px -10% 0px' }}
+      >
+        <motion.div className="max-w-[820px]" variants={leftColVariants}>
+          <SectionKicker folio="04" label="The record" className="mb-8" />
+          <h2
+            id="inside-aethria-heading"
+            className="editorial-display font-normal text-[clamp(2.4rem,6vw,4.75rem)] leading-[0.98] tracking-[-0.02em] text-[var(--color-oxford)]"
+          >
+            The system shows its <span className="italic text-[var(--color-accent)]">work</span>.
+          </h2>
+          <p className="mt-8 max-w-[52ch] font-sans text-[16px] leading-[1.75] text-[var(--text-secondary)]">
+            Every recommendation becomes one investment record — source trail, reviewer disagreement, dimension scores,
+            and mandate fit kept together and open to inspection.
+          </p>
+        </motion.div>
 
-            <div className="mt-10 flex flex-col gap-8">
-              {FEATURES.map((item) => (
-                <div key={item.label} className="inside-aethria-feature border-l border-solid border-[var(--section-divider)] pl-4">
-                  <p className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--color-oxford)]">
-                    {item.label}
-                  </p>
-                  <p className="font-sans text-[15px] leading-[1.7] text-[var(--text-secondary)]">{item.body}</p>
-                </div>
-              ))}
-            </div>
+        <div className="mt-16 grid gap-12 md:mt-24 md:grid-cols-[0.82fr_1.18fr] md:items-start md:gap-20">
+          <motion.div className="flex flex-col gap-10" variants={leftColVariants}>
+            {FEATURES.map((item) => (
+              <div key={item.label}>
+                <p className="mb-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--color-oxford)]">
+                  {item.label}
+                </p>
+                <p className="max-w-[40ch] font-sans text-[15px] leading-[1.7] text-[var(--text-secondary)]">
+                  {item.body}
+                </p>
+              </div>
+            ))}
           </motion.div>
 
-          <div className="flex w-full shrink-0 justify-center md:flex-1 md:justify-end md:pr-[min(4rem,5vw)]">
-            <motion.div
-              variants={memoCardVariants}
-              className="flex w-full max-w-[540px] shrink-0 flex-col md:w-[540px] md:max-w-[540px]"
-              aria-label="Investment memo sample output"
-            >
-              <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--label-muted)]">
-                Investment memo · sample output
-              </p>
-              <LookupResultSnapshot {...DEMO_LOOKUP_MEMO_SAMPLE} />
-            </motion.div>
-          </div>
-        </motion.div>
-      </div>
+          <motion.div variants={memoCardVariants} className="w-full" aria-label="Investment memo sample output">
+            <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)]">
+              Investment memo · sample output
+            </p>
+            <LookupResultSnapshot {...DEMO_LOOKUP_MEMO_SAMPLE} />
+          </motion.div>
+        </div>
+      </motion.div>
     </section>
   );
 }

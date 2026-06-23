@@ -18,10 +18,10 @@ export default function NewsletterBand() {
 
   return (
     <section
-      className="w-full bg-[var(--color-paper)]"
+      className="w-full border-t border-solid border-[var(--section-divider)] bg-[var(--color-paper)]"
       aria-labelledby="newsletter-heading"
     >
-      <div className="page-margin-x py-12 md:py-16">
+      <div className="page-margin-x py-16 md:py-20">
         <div className="mx-auto flex max-w-[1200px] flex-col gap-8 md:flex-row md:items-end md:justify-between md:gap-12">
           <div className="max-w-md">
             <h2
