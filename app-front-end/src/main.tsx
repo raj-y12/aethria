@@ -7,6 +7,7 @@ import '@fontsource-variable/figtree';
 import './index.css';
 import '@aethria/product-chrome';
 import App from './App.tsx';
+import ErrorBoundary from './components/ErrorBoundary';
 import { clerkAppearance } from './design-system/clerk-appearance';
 
 const queryClient = new QueryClient({
@@ -48,10 +49,12 @@ function ClerkProviderWithRouter() {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ClerkProviderWithRouter />
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ErrorBoundary label="root">
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <ClerkProviderWithRouter />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>,
 );

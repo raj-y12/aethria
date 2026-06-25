@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { setTokenGetter } from './api/auth';
 import { triggerAgents } from './api/agents';
 import AppFrame from './components/AppFrame';
+import ErrorBoundary from './components/ErrorBoundary';
 import HomePage from './pages/HomePage';
 import FlowPage from './pages/FlowPage';
 import PortfolioPage from './pages/PortfolioPage';
@@ -84,19 +85,21 @@ function AppShell() {
         // The front door is a centered Dispatch-style surface with its own keys.
         chrome={!isSettingsRoute && !isPortfolioRoute && !isFundRoute && !isFlowRoute ? 'bare' : 'full'}
       >
-        {isSettingsRoute ? (
-          <Suspense fallback={<LoadingAnimation />}>
-            <SettingsPage />
-          </Suspense>
-        ) : isPortfolioRoute ? (
-          <PortfolioPage data={systemData} />
-        ) : isFundRoute ? (
-          <FundPage data={systemData} />
-        ) : isFlowRoute ? (
-          <FlowPage data={systemData} />
-        ) : (
-          <HomePage data={systemData} />
-        )}
+        <ErrorBoundary key={pathname} label="workspace">
+          {isSettingsRoute ? (
+            <Suspense fallback={<LoadingAnimation />}>
+              <SettingsPage />
+            </Suspense>
+          ) : isPortfolioRoute ? (
+            <PortfolioPage data={systemData} />
+          ) : isFundRoute ? (
+            <FundPage data={systemData} />
+          ) : isFlowRoute ? (
+            <FlowPage data={systemData} />
+          ) : (
+            <HomePage data={systemData} />
+          )}
+        </ErrorBoundary>
       </AppFrame>
     </motion.div>
   );
@@ -174,11 +177,11 @@ function App() {
 
   if (isAdminRoute) {
     return (
-      <>
+      <ErrorBoundary label="admin">
         <Suspense fallback={<LoadingAnimation />}>
           <AdminDashboardPage />
         </Suspense>
-      </>
+      </ErrorBoundary>
     );
   }
 
