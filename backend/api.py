@@ -541,6 +541,24 @@ async def _lifespan(app: FastAPI):
     _lookup_worker_task = asyncio.create_task(_lookup_worker())
     _rss_sampler_task = asyncio.create_task(_rss_sampler())
     _logger_agents.info("Pipeline agent worker + on-demand lookup worker started")
+    # Surface unapplied migrations loudly at startup. The storage write path
+    # tolerates missing columns by dropping fields and retrying — convenient, but
+    # it hides drift. This makes it a single visible signal instead.
+    if os.getenv("USE_SUPABASE_STORAGE") == "1":
+        try:
+            from supabase_client import get_service_client
+            from supabase_storage import detect_schema_drift
+
+            drift = detect_schema_drift(get_service_client())
+            if drift:
+                _logger_agents.warning(
+                    "SCHEMA DRIFT: startups table missing column(s) %s — apply pending "
+                    "migrations in supabase/migrations/; affected fields are silently "
+                    "dropped on write until applied.",
+                    ", ".join(drift),
+                )
+        except Exception as e:  # pragma: no cover - never block startup
+            _logger_agents.warning("schema drift check skipped: %s", e)
     # Opt-in multi-instance SSE backplane (no-op unless EVENT_BUS_BACKPLANE=postgres).
     if event_bus.backplane_enabled():
         try:

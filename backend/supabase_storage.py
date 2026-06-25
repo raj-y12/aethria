@@ -200,6 +200,39 @@ def _is_missing_resolution_status_error(exc: Exception) -> bool:
     )
 
 
+# Columns added by later migrations that the write path tolerates (pops + retries)
+# when absent. Probing for them proactively turns silent, per-write data loss into
+# one loud startup signal that a migration is unapplied.
+_EXPECTED_OPTIONAL_COLUMNS: tuple[str, ...] = (
+    "agent_trace",
+    "unresolved_at",
+    *_QUEUE_AWARENESS_COLUMNS,
+)
+
+
+def detect_schema_drift(client, table: str = TABLE) -> List[str]:
+    """Return expected-but-missing columns on the startups table.
+
+    A proactive companion to the reactive pop-column fallbacks in this module:
+    those keep the app alive but silently drop data, so drift can persist
+    invisibly. This makes it legible. Never raises — probing failures (e.g. a
+    transient connection error) yield an empty list rather than blocking startup.
+    """
+    missing: List[str] = []
+    for column in _EXPECTED_OPTIONAL_COLUMNS:
+        try:
+            client.table(table).select(column).limit(1).execute()
+        except Exception as e:  # noqa: BLE001 - classify, never propagate
+            text = str(e).lower()
+            if column in text and (
+                "does not exist" in text or "schema cache" in text or "42703" in text
+            ):
+                missing.append(column)
+            # Non-"missing column" errors (network/permission) are ignored here;
+            # they surface through the normal request path.
+    return missing
+
+
 class SupabaseStartupsStorage:
     """
     Storage implementation for the startups table in Supabase.
