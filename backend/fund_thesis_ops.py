@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from openai import OpenAI
+from utils.openai_client import build_openai_client
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ def parse_fund_thesis_raw(raw_text: str, api_key: str, model: Optional[str] = No
             "risk_profile": "",
             "investment_rules": [],
         }
-    client = OpenAI(api_key=api_key)
+    client = build_openai_client(api_key)
     m = model or os.getenv("FUND_THESIS_PARSE_MODEL", "gpt-4o-mini")
     user = f"Fund thesis document:\n\n{text[:48000]}\n\nReturn JSON only."
     resp = client.chat.completions.create(
@@ -90,7 +91,7 @@ def _as_str_list(v: Any) -> List[str]:
 
 def embed_text_for_thesis(text: str, api_key: str, model: Optional[str] = None) -> List[float]:
     """Single text embedding as list of floats (stored JSONB)."""
-    client = OpenAI(api_key=api_key)
+    client = build_openai_client(api_key)
     m = model or os.getenv("FUND_THESIS_EMBED_MODEL", _DEFAULT_EMBED_MODEL)
     t = (text or "").strip()
     if not t:

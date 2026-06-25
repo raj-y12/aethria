@@ -18,6 +18,7 @@ from urllib.request import Request, urlopen
 from html import unescape
 import certifi
 from openai import OpenAI
+from utils.openai_client import build_openai_client
 
 from functools import partial
 
@@ -98,7 +99,7 @@ class Scout(ABC):
         self._tenant_user_id = require_user_id(tenant_user_id, context=f"Scout.{scout_type}")
         self.scout_type = scout_type
         self.system_prompt = system_prompt
-        self.client = OpenAI(api_key=api_key)
+        self.client = build_openai_client(api_key)
         self.logger = logging.getLogger(f"scout.{scout_type}")
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.model = model

@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI
+from utils.openai_client import build_openai_client
 
 from reviewer.schema import ReviewerOutput, validate_reviewer_output
 from utils.prompt_version import hash_prompt
@@ -489,7 +490,7 @@ class Reviewer(ABC):
                 scores and score_reasoning deterministically from structured_signals,
                 so the LLM is told to omit those fields (they would be overwritten).
         """
-        self.client = OpenAI(api_key=api_key)
+        self.client = build_openai_client(api_key)
         self.logger = logging.getLogger("reviewer")
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.model = model

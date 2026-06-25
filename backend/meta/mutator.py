@@ -166,8 +166,8 @@ class PromptMutator:
 
     def _get_client(self):
         if self._client is None and self.api_key:
-            from openai import OpenAI
-            self._client = OpenAI(api_key=self.api_key)
+            from utils.openai_client import build_openai_client
+            self._client = build_openai_client(self.api_key)
         return self._client
 
     def close(self) -> None:

@@ -11,6 +11,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from openai import OpenAI
+from utils.openai_client import build_openai_client
 from utils.prompt_version import hash_prompt
 from utils.scoring import compute_overall_score
 from utils.settings_loader import load_settings, recommendation_for_score_from_fund_config
@@ -249,7 +250,7 @@ class PartnerDecisionEngine:
         self.api_key = (api_key or os.getenv("OPENAI_API_KEY", "")).strip()
         self.model = model or os.getenv("PARTNER_MODEL", "gpt-5-nano")
         if self.api_key:
-            self.client = OpenAI(api_key=self.api_key)
+            self.client = build_openai_client(self.api_key)
         else:
             self.client = None
         self._last_token_usage: Optional[Dict[str, int]] = None
