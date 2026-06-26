@@ -47,16 +47,29 @@ function reviewerMean(rv: SingleReview): number | null {
 
 type StageTone = 'ink' | 'escalation' | 'muted';
 
-function stageState(startup: Startup): { word: string; tone: StageTone } {
+interface StageState {
+  word: string;
+  tone: StageTone;
+  /** Secondary line — e.g. the partner's standing verdict while a ruling is pending. */
+  detail?: string;
+}
+
+function stageState(startup: Startup): StageState {
   const ruled = startup.human_resolution?.decision;
   if (ruled && startup.human_resolution?.resolved_at) {
     const word = ruled === 'YES' ? 'RULED — INVEST' : ruled === 'NO' ? 'RULED — PASS' : 'RULED — MONITOR';
     return { word, tone: 'ink' };
   }
-  if (startup.partner?.human_review_required) {
-    return { word: 'NEEDS YOUR RULING', tone: 'escalation' };
-  }
   const rec = startup.partner?.recommendation;
+  if (startup.partner?.human_review_required) {
+    // Escalation is the headline state, but the partner still reached a call —
+    // surface it so the GP sees the recommendation they're being asked to rule on.
+    return {
+      word: 'NEEDS YOUR RULING',
+      tone: 'escalation',
+      detail: rec ? `Partner verdict — ${rec}` : undefined,
+    };
+  }
   if (rec) return { word: `PARTNER VERDICT — ${rec}`, tone: 'ink' };
   if (startup.review) return { word: 'AWAITING PARTNER', tone: 'muted' };
   return { word: 'IN REVIEW', tone: 'muted' };
@@ -209,6 +222,16 @@ export default function DecisionStage({ startup, fundConfiguration, action }: De
       >
         {state.word}
       </motion.p>
+
+      {/* The partner's standing call beneath an escalation — what you're ruling on. */}
+      {state.detail ? (
+        <motion.p
+          variants={STAGE_ITEM}
+          className="mt-phi-2 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-oxford/55"
+        >
+          {state.detail}
+        </motion.p>
+      ) : null}
 
       {/* The subject — sans matches the selected docket row; size stays stage scale. */}
       <motion.h2
