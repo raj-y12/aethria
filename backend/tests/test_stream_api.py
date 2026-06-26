@@ -40,13 +40,21 @@ def test_stream_rejected_when_connection_cap_reached(monkeypatch):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_event_source_emits_connected_then_data_then_keepalive():
+async def test_event_source_emits_connected_then_hello_then_data_then_keepalive():
     import api
 
     queue: asyncio.Queue = asyncio.Queue()
     gen = api._sse_event_source(queue, keepalive_seconds=0.05)
 
     assert await gen.__anext__() == ": connected\n\n"
+
+    # Immediate hello nudge so the client refetches the moment it connects,
+    # reconciling any write that landed before this subscription.
+    hello = await gen.__anext__()
+    assert json.loads(hello[len("data: "):].strip()) == {
+        "type": "startups_changed",
+        "reason": "stream_connected",
+    }
 
     payload = {"type": "startups_changed", "reason": "scout"}
     await queue.put(payload)
@@ -168,6 +176,13 @@ async def test_event_source_unsubscribes_via_on_close_integration():
             on_close=lambda: event_bus.unsubscribe("user_a", queue),
         )
         assert await gen.__anext__() == ": connected\n\n"
+
+        # The hello nudge is emitted on connect, before any published event.
+        hello = await gen.__anext__()
+        assert json.loads(hello[len("data: "):].strip()) == {
+            "type": "startups_changed",
+            "reason": "stream_connected",
+        }
 
         event_bus.publish("user_a", {"type": "startups_changed", "reason": "partner"})
         frame = await gen.__anext__()

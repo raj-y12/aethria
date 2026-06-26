@@ -1297,13 +1297,23 @@ async def _sse_event_source(queue, *, keepalive_seconds, on_close=None):
     """Yield SSE frames for one subscriber queue.
 
     Emits a ``: connected`` comment first (flushes headers / primes proxies),
-    then a ``data:`` frame per published event, with a ``: keepalive`` comment
-    whenever the connection sits idle longer than ``keepalive_seconds``. The
-    keepalive doubles as disconnect detection: once the client is gone the yield
-    raises, the generator is closed, and ``on_close`` (unsubscribe) runs.
+    then an immediate ``startups_changed`` "hello" nudge so the client refetches
+    the moment the stream goes healthy. The bus does not replay events published
+    before ``subscribe()``, and the client relaxes its poll to a slow backstop
+    once connected — so without this nudge any write that lands in the
+    connect-gap (e.g. the first pipeline batch right after login) wouldn't be
+    seen until that backstop fires. The hello nudge closes that race and also
+    covers every reconnect. After it, a ``data:`` frame is emitted per published
+    event, with a ``: keepalive`` comment whenever the connection sits idle
+    longer than ``keepalive_seconds``. The keepalive doubles as disconnect
+    detection: once the client is gone the yield raises, the generator is closed,
+    and ``on_close`` (unsubscribe) runs.
     """
     try:
         yield ": connected\n\n"
+        # Hello nudge: reconcile anything written before this subscription
+        # (the bus has no replay) and any missed event since the last connect.
+        yield f"data: {json.dumps({'type': 'startups_changed', 'reason': 'stream_connected'})}\n\n"
         while True:
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=keepalive_seconds)
