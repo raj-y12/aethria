@@ -201,7 +201,10 @@
   margin-top: 22px;
 }
 .memoPanel--embedded .memoDocSection {
-  margin-top: clamp(32px, 4.1vw, 48px);
+  /* First section sits directly under the Decision Stage; keep the break modest
+     so there isn't a yawning gap under the stage's last line ("What decides it").
+     Subsequent sections get their own (larger) rhythm via the + rule below. */
+  margin-top: clamp(16px, 2vw, 22px);
 }
 .memoPanel--embedded .memoDocSection + .memoDocSection {
   margin-top: clamp(28px, 3.4vw, 42px);
