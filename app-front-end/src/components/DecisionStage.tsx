@@ -181,7 +181,10 @@ export default function DecisionStage({ startup, fundConfiguration, action }: De
   return (
     <motion.section
       aria-label={startup.scout.name}
-      className="pt-phi-1 pb-phi-7"
+      // No heavy bottom padding: the memo section that follows brings its own
+      // generous top margin, so pb-phi-7 here just doubled the gap under the
+      // last stage element (e.g. "What decides it"). Let the section margin own it.
+      className="pt-phi-1 pb-phi-2"
       initial={reduceMotion ? false : 'hidden'}
       animate="visible"
       variants={reduceMotion ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
