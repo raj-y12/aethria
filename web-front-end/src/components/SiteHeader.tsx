@@ -5,8 +5,8 @@ import { Link } from 'react-router-dom';
 export const SITE_HEADER_SCROLL_OFFSET = 88;
 
 const NAV_LINKS = [
-  { label: 'Mandate', href: '#mandate' },
-  { label: 'Pipeline', href: '#pipeline' },
+  { label: 'The market', href: '#market' },
+  { label: 'Method', href: '#method' },
   { label: 'Product', href: '#product' },
 ];
 
@@ -52,18 +52,26 @@ export default function SiteHeader({ backTo }: SiteHeaderProps) {
             {backTo.label}
           </Link>
         ) : (
-          <nav aria-label="Section navigation" className="inst-site-header-nav">
-            {NAV_LINKS.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                onClick={(e) => scrollToAnchor(e, item.href)}
-                className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--label-muted)] transition-colors duration-200 hover:text-[var(--color-accent)]"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
+          <div className="flex items-center gap-7">
+            <nav aria-label="Section navigation" className="inst-site-header-nav">
+              {NAV_LINKS.map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  onClick={(e) => scrollToAnchor(e, item.href)}
+                  className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--label-muted)] transition-colors duration-200 hover:text-[var(--color-accent)]"
+                >
+                  {item.label}
+                </a>
+              ))}
+            </nav>
+            <Link
+              to="/request-access"
+              className="hidden min-h-[40px] items-center border border-[var(--section-divider)] px-4 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-secondary)] transition-colors duration-300 hover:border-[var(--color-oxford)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] sm:inline-flex"
+            >
+              Request access
+            </Link>
+          </div>
         )}
       </div>
     </header>

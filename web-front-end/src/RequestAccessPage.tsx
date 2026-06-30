@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import GrainOverlay from './components/GrainOverlay';
-import DeskClock from './components/DeskClock';
+import SiteHeader from './components/SiteHeader';
+import DottedMarketMap, { type MapHit } from './components/DottedMarketMap';
 
 const PROCESSING_DURATION_MS = 1200;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -9,6 +10,13 @@ const URL_REGEX = /^https?:\/\/.+/;
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 const WAITLIST_URL = API_BASE ? `${API_BASE.replace(/\/$/, '')}/api/waitlist` : '/api/waitlist';
 const APP_URL = import.meta.env.VITE_APP_URL ?? '';
+
+/** In-thesis companies plotted on the quiet field beside the form. */
+const REQ_HITS: MapHit[] = [
+  { lon: -122.4, lat: 37.8 },
+  { lon: -0.12, lat: 51.5 },
+  { lon: 13.4, lat: 52.5 },
+];
 
 const EASE_OUT_EXPO = 'cubic-bezier(0.16, 1, 0.3, 1)';
 const TRANSITION_PAGE_ENTER = `opacity 0.6s ${EASE_OUT_EXPO}, transform 0.6s ${EASE_OUT_EXPO}`;
@@ -136,29 +144,10 @@ export default function RequestAccessPage() {
     >
       <GrainOverlay opacity={0.022} variant="light" />
 
-      {/* Header */}
-      <header
-        className="sticky top-0 z-[100] w-full shrink-0 border-b border-[var(--section-divider)] bg-[rgba(244,241,234,0.92)] backdrop-blur-md"
-        style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
-      >
-        <div className="page-margin-x grid min-h-[44px] grid-cols-[1fr_1fr] items-center gap-2 py-5 sm:gap-4 md:grid-cols-[1fr_auto_1fr] md:py-[18px]">
-          <nav aria-label="Site navigation">
-            <Link
-              to="/"
-              className="font-wordmark inline-flex min-h-[44px] items-center text-[15px] font-medium leading-none tracking-normal text-[var(--text-primary)] transition-opacity hover:opacity-75 sm:text-[16px]"
-            >
-              Aethria<span className="wordmark-dot">.</span>
-            </Link>
-          </nav>
-          <p className="hidden justify-self-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)] md:block">
-            Deal flow operating system
-          </p>
-          <DeskClock className="min-w-0 justify-self-end text-right" />
-        </div>
-      </header>
+      <SiteHeader backTo={{ href: '/', label: '← Back to home' }} />
 
       {/* Body */}
-      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10 sm:py-20">
+      <main className="page-margin-x relative z-10 grid flex-1 grid-cols-1 items-center gap-16 py-16 md:grid-cols-2 md:gap-24 md:py-24">
         <div
           className="w-full max-w-[min(100%,30rem)]"
           style={{
@@ -281,6 +270,16 @@ export default function RequestAccessPage() {
             </div>
           )}
         </div>
+
+        <aside className="hidden md:flex md:flex-col md:justify-center">
+          <p className="mb-7 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--label-muted)]">
+            What you're joining
+          </p>
+          <DottedMarketMap hits={REQ_HITS} className="h-[300px] w-full" />
+          <p className="mt-8 max-w-[36ch] font-display text-[19px] italic leading-[1.5] text-[var(--text-secondary)]">
+            “Every decision arrives with the evidence already attached.”
+          </p>
+        </aside>
       </main>
 
       {/* Footer */}

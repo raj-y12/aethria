@@ -5,7 +5,8 @@ import GrainOverlay from './components/GrainOverlay';
 import SiteHeader from './components/SiteHeader';
 import RotatingSeal from './components/RotatingSeal';
 import SectionKicker from './components/SectionKicker';
-import PipelineSection from './components/PipelineSection';
+import MarketSection from './components/MarketSection';
+import MethodSection from './components/MethodSection';
 import DashboardPreview from './components/DashboardPreview';
 import ReviewDisagreement from './components/ReviewDisagreement';
 import NewsletterBand from './components/NewsletterBand';
@@ -155,8 +156,11 @@ export default function HomePage() {
           </ScrollReveal>
         </section>
 
-        {/* 2 — Pipeline: what actually runs */}
-        <PipelineSection />
+        {/* 2 — The market: the whole field scanned, the few that fit */}
+        <MarketSection />
+
+        {/* 3 — Method: how the judgment is formed */}
+        <MethodSection />
 
         {/* 3 — The record it produces */}
         <DashboardPreview />

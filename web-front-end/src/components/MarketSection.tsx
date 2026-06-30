@@ -1,0 +1,129 @@
+import { useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import SectionKicker from './SectionKicker';
+import DottedMarketMap, { type MapHit } from './DottedMarketMap';
+
+/** In-thesis companies plotted on the field (lon, lat). */
+const HITS: MapHit[] = [
+  { lon: -122.4, lat: 37.8 },
+  { lon: -0.12, lat: 51.5 },
+  { lon: 13.4, lat: 52.5 },
+];
+
+const SCANNING = [
+  'Orbital Systems · space infra',
+  'Lattice Health · clinical AI',
+  'Verge Robotics · automation',
+  'Quanta Grid · energy',
+  'Meridian Bio · longevity',
+  'Halcyon Labs · security',
+  'Drift Capital · fintech',
+];
+
+const SCANNED_TOTAL = 12408;
+const IN_THESIS = 3;
+
+/** The market, rendered as a live dotted world map: the whole field scanned, the few that fit lit. */
+export default function MarketSection() {
+  const reduce = useReducedMotion();
+  const [tick, setTick] = useState(0);
+  const scannedRef = useRef<HTMLSpanElement | null>(null);
+  const rootRef = useRef<HTMLElement | null>(null);
+
+  // cycle the "scanning" ticker
+  useEffect(() => {
+    if (reduce) return;
+    const id = window.setInterval(() => setTick((t) => (t + 1) % SCANNING.length), 2200);
+    return () => window.clearInterval(id);
+  }, [reduce]);
+
+  // count up the scanned total once, on first view
+  useEffect(() => {
+    const el = scannedRef.current;
+    const root = rootRef.current;
+    if (!el || !root) return;
+    if (reduce) {
+      el.textContent = SCANNED_TOTAL.toLocaleString();
+      return;
+    }
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0].isIntersecting) return;
+        obs.disconnect();
+        const counter = { v: 0 };
+        gsap.to(counter, {
+          v: SCANNED_TOTAL,
+          duration: 2.1,
+          ease: 'power2.out',
+          onUpdate: () => {
+            el.textContent = Math.round(counter.v).toLocaleString();
+          },
+        });
+      },
+      { threshold: 0.3 },
+    );
+    obs.observe(root);
+    return () => obs.disconnect();
+  }, [reduce]);
+
+  return (
+    <section
+      id="market"
+      ref={rootRef}
+      className="w-full border-t border-solid border-[var(--section-divider)]"
+      style={{ backgroundColor: 'var(--color-paper)' }}
+      aria-labelledby="market-heading"
+    >
+      <div className="page-margin-x py-[clamp(4rem,12vh,9rem)]">
+        <SectionKicker folio="03" label="The market" className="mb-10" />
+
+        <div className="flex flex-wrap items-end justify-between gap-8">
+          <h2
+            id="market-heading"
+            className="editorial-display max-w-[18ch] font-normal text-[clamp(1.9rem,4.4vw,3.6rem)] leading-[1.0] tracking-[-0.02em] text-[var(--color-oxford)]"
+          >
+            It watches the whole market. You only see what fits your{' '}
+            <span className="italic text-[var(--color-accent)]">thesis</span>.
+          </h2>
+          <p className="font-mono text-[12px] leading-[2] tracking-[0.04em] text-[var(--text-secondary)] sm:text-right">
+            <span ref={scannedRef} className="text-[var(--color-accent)]">
+              {SCANNED_TOTAL.toLocaleString()}
+            </span>{' '}
+            companies scanned
+            <br />
+            <span className="text-[var(--color-accent)]">{IN_THESIS}</span> inside your thesis today
+          </p>
+        </div>
+
+        <p className="mt-8 h-[1em] font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
+          Scanning ·{' '}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={tick}
+              initial={reduce ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={reduce ? undefined : { opacity: 0 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="text-[var(--color-accent)]"
+            >
+              {SCANNING[tick]}
+            </motion.span>
+          </AnimatePresence>
+        </p>
+
+        <DottedMarketMap hits={HITS} className="mt-10 h-[clamp(300px,48vw,580px)] w-full" />
+
+        <div className="mt-6 flex flex-wrap gap-7 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
+          <span className="inline-flex items-center gap-2">
+            <i className="inline-block h-[7px] w-[7px] rounded-full bg-[var(--label-muted)]" /> Scanned
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <i className="inline-block h-[7px] w-[7px] rounded-full bg-[var(--color-accent)]" /> Inside your thesis
+          </span>
+          <span className="ml-auto">Live field</span>
+        </div>
+      </div>
+    </section>
+  );
+}
