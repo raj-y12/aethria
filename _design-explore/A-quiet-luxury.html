@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aethria — A · Quiet Luxury</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Figtree:wght@400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4f1ea; --oxford:#001433; --accent:#3d6b5e;
+    --ink-70:rgba(0,20,51,.72); --ink-50:rgba(0,20,51,.5); --ink-35:rgba(0,20,51,.35);
+    --rule:rgba(0,20,51,.12);
+    --serif:'Playfair Display',Georgia,serif; --sans:'Figtree',system-ui,sans-serif; --mono:'Space Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{-webkit-font-smoothing:antialiased}
+  body{background:var(--paper);color:var(--oxford);font-family:var(--sans);line-height:1.6}
+  .wrap{max-width:1680px;margin:0 auto;padding:0 clamp(40px,7vw,140px)}
+  .mono{font-family:var(--mono);text-transform:uppercase;letter-spacing:.2em;font-size:11px;color:var(--ink-35)}
+  .rule{height:1px;background:var(--rule);border:0}
+
+  /* Masthead — barely there */
+  header{padding-top:46px}
+  .mast{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:22px}
+  .word{font-family:var(--serif);font-weight:500;font-size:22px;letter-spacing:-.01em}
+  .word .dot{color:var(--accent)}
+
+  /* Hero — vast emptiness, one statement low on the page */
+  .hero{min-height:92vh;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:9vh;position:relative}
+  .hero .kick{margin-bottom:42px}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(3rem,8.4vw,8.6rem);line-height:.98;letter-spacing:-.025em;max-width:18ch}
+  h1 em{font-style:italic;color:var(--accent)}
+  .stand{margin-top:46px;max-width:40ch;font-size:17px;line-height:1.7;color:var(--ink-70)}
+  .lede-row{margin-top:54px;display:flex;align-items:center;gap:38px}
+  .cta{display:inline-flex;align-items:center;gap:14px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.18em;font-size:11px;color:var(--oxford);text-decoration:none;border-bottom:1px solid var(--oxford);padding-bottom:7px;transition:gap .25s}
+  .cta:hover{gap:24px}
+
+  /* Seal */
+  .seal{position:absolute;top:8vh;right:0;width:148px;height:148px;opacity:.85}
+  .seal text{font-family:var(--mono)}
+  .seal-spin{transform-origin:center;animation:spin 50s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Statement section — one idea, oceans of air */
+  section{padding:18vh 0}
+  .statement{font-family:var(--serif);font-weight:400;font-size:clamp(2rem,4.6vw,4.4rem);line-height:1.04;letter-spacing:-.02em;max-width:20ch}
+  .statement .small{display:block;font-family:var(--sans);font-size:17px;line-height:1.7;color:var(--ink-50);max-width:46ch;margin-top:40px;letter-spacing:0}
+
+  /* Index — the four movements, hairline-separated, immense leading */
+  .index .ix{display:grid;grid-template-columns:90px 1fr;gap:40px;padding:54px 0;border-top:1px solid var(--rule);align-items:baseline}
+  .index .ix:last-child{border-bottom:1px solid var(--rule)}
+  .index .num{font-family:var(--serif);font-size:30px;color:var(--ink-35)}
+  .index h3{font-family:var(--serif);font-weight:400;font-size:clamp(1.6rem,3vw,2.6rem);letter-spacing:-.01em}
+  .index p{margin-top:14px;max-width:52ch;color:var(--ink-50);font-size:15px;line-height:1.7}
+
+  footer{padding:16vh 0 60px}
+  .close{font-family:var(--serif);font-size:clamp(2.2rem,5vw,5rem);font-weight:400;line-height:1;letter-spacing:-.02em;max-width:15ch}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="mast">
+      <span class="word">Aethria<span class="dot">.</span></span>
+      <span class="mono">Private market intelligence</span>
+    </div>
+    <hr class="rule" />
+  </header>
+
+  <div class="hero">
+    <svg class="seal" viewBox="0 0 200 200" aria-hidden="true">
+      <defs><path id="sp" d="M100 100 m -78,0 a 78,78 0 1,1 156,0 a 78,78 0 1,1 -156,0" /></defs>
+      <g class="seal-spin">
+        <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(0,20,51,.14)"/>
+        <text font-size="8.6" letter-spacing="3.2" fill="rgba(0,20,51,.55)"><textPath href="#sp">AETHRIA · PRIVATE MARKET JUDGMENT · MADE INSPECTABLE · </textPath></text>
+      </g>
+      <rect x="96" y="76" width="8" height="8" transform="rotate(45 100 80)" fill="var(--accent)"/>
+      <text x="100" y="113" text-anchor="middle" font-family="var(--serif)" font-size="30" fill="var(--oxford)">Æ</text>
+    </svg>
+
+    <span class="mono kick">01 — The thesis engine</span>
+    <h1>Private market judgment, made <em>inspectable</em>.</h1>
+    <p class="stand">An autonomous analyst that sources, reviews, and decides on startups for venture funds — and shows its work in one record you can open.</p>
+    <div class="lede-row">
+      <a class="cta" href="#">Request access →</a>
+      <span class="mono" style="letter-spacing:.14em">By invitation</span>
+    </div>
+  </div>
+
+  <hr class="rule" />
+
+  <section>
+    <span class="mono">02 — The mandate</span>
+    <p class="statement" style="margin-top:34px">It only looks for what you tell it to.
+      <span class="small">Write the investment thesis once. Scouts, reviewers, and partner logic treat it as a hard constraint. Change the thesis, and the whole system narrows with it.</span>
+    </p>
+  </section>
+
+  <section class="index">
+    <span class="mono" style="display:block;margin-bottom:30px">03 — The pipeline</span>
+    <div class="ix"><span class="num">01</span><div><h3>Scout</h3><p>Four lenses watch the market against your thesis. A name surfaces with its sourcing attached.</p></div></div>
+    <div class="ix"><span class="num">02</span><div><h3>Review</h3><p>Three independent reviewers score every company across six dimensions. Conviction and doubt stay on the record.</p></div></div>
+    <div class="ix"><span class="num">03</span><div><h3>Decide</h3><p>Versioned partner logic resolves the reviews into one verdict: invest, pass, or monitor.</p></div></div>
+    <div class="ix"><span class="num">04</span><div><h3>Portfolio</h3><p>Accepted companies are tracked for execution and follow-on. Decisions compound.</p></div></div>
+  </section>
+
+  <footer>
+    <hr class="rule" style="margin-bottom:14vh"/>
+    <p class="close">For funds that need judgment with memory.</p>
+    <div class="lede-row" style="margin-top:60px"><a class="cta" href="#">Request access →</a></div>
+  </footer>
+
+</div>
+</body>
+</html>

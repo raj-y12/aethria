@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aethria — loading animation redesign</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Space+Mono:wght@400&family=Figtree:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+  :root{--oxford:#001433;--paper:#F4F1EA;--accent:#5b9b8a;--mono:'Space Mono',monospace;--serif:'Playfair Display',serif}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0a0a;font-family:'Figtree',sans-serif;color:var(--paper)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:rgba(244,241,234,0.08);min-height:100dvh}
+  .cell{background:var(--oxford);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
+  .tag{position:absolute;top:1.4rem;left:1.4rem;font-family:var(--mono);font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:rgba(244,241,234,0.4)}
+  .word{font-family:var(--serif);font-size:1.5rem;font-weight:500;color:var(--paper);margin-top:2.4rem}
+  .word .d{color:var(--accent)}
+  .cap{font-family:var(--mono);font-size:0.62rem;letter-spacing:0.22em;text-transform:uppercase;color:rgba(244,241,234,0.42);margin-top:1rem}
+
+  /* A — hairline calibration */
+  .trackA{width:150px;height:1px;background:rgba(244,241,234,0.16);position:relative;overflow:hidden}
+  .fillA{position:absolute;inset:0;background:var(--accent);transform-origin:left;transform:scaleX(0)}
+  .tickA{position:absolute;top:-3px;width:1px;height:7px;background:var(--paper)}
+
+  /* C — typographic scan */
+  .scanWrap{position:relative;font-family:var(--serif);font-size:1.9rem;font-weight:500;color:rgba(244,241,234,0.16);letter-spacing:-0.01em}
+  .scanWrap .lit{position:absolute;inset:0;color:var(--paper);clip-path:inset(0 100% 0 0)}
+</style>
+</head>
+<body>
+<div class="grid">
+
+  <!-- Variant A: precision instrument calibrating -->
+  <div class="cell">
+    <span class="tag">A · instrument</span>
+    <svg width="120" height="120" viewBox="0 0 120 120" id="svgA">
+      <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(244,241,234,0.10)" stroke-width="1"/>
+      <circle cx="60" cy="60" r="30" fill="none" stroke="rgba(244,241,234,0.08)" stroke-width="1"/>
+      <g id="arcA1"><path d="M60 14 A46 46 0 0 1 99 44" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="arcA2"><path d="M60 90 A30 30 0 0 1 33 53" fill="none" stroke="rgba(244,241,234,0.5)" stroke-width="1.25" stroke-linecap="round"/></g>
+      <circle cx="60" cy="60" r="3.5" fill="var(--accent)" id="coreA"/>
+    </svg>
+    <span class="word">Aethria<span class="d">.</span></span>
+    <span class="cap">Calibrating workspace</span>
+  </div>
+
+  <!-- Variant B: hairline calibration -->
+  <div class="cell">
+    <span class="tag">B · hairline</span>
+    <span class="word" style="margin-top:0">Aethria<span class="d">.</span></span>
+    <div class="trackA" style="margin-top:2.2rem">
+      <div class="fillA" id="fillB"></div>
+      <div class="tickA" id="tickB" style="left:0"></div>
+    </div>
+    <span class="cap">Calibrating workspace</span>
+  </div>
+
+  <!-- Variant C: typographic clip scan -->
+  <div class="cell">
+    <span class="tag">C · typographic</span>
+    <div class="scanWrap" style="margin-top:2.4rem">Aethria<span class="d" style="color:rgba(91,155,138,0.3)">.</span>
+      <span class="lit" id="litC">Aethria<span style="color:var(--accent)">.</span></span>
+    </div>
+    <span class="cap" style="margin-top:1.6rem">Calibrating workspace</span>
+  </div>
+
+</div>
+<script>
+  const ease = 'power2.inOut';
+  // A — instrument: two arcs sweep at different speeds, core breathes
+  gsap.to('#arcA1', {rotation:360, transformOrigin:'60px 60px', duration:2.8, repeat:-1, ease:'none'});
+  gsap.to('#arcA2', {rotation:-360, transformOrigin:'60px 60px', duration:4.2, repeat:-1, ease:'none'});
+  gsap.to('#coreA', {opacity:0.4, scale:1.5, transformOrigin:'60px 60px', duration:1.1, repeat:-1, yoyo:true, ease});
+
+  // B — hairline fills with a calibrating ease, tick rides the edge
+  const tlB = gsap.timeline({repeat:-1, repeatDelay:0.15});
+  tlB.fromTo('#fillB',{scaleX:0},{scaleX:1,duration:1.3,ease})
+     .fromTo('#tickB',{left:0},{left:149,duration:1.3,ease},'<')
+     .to('#fillB',{opacity:0,duration:0.3,ease:'power1.out'})
+     .set('#fillB',{opacity:1,scaleX:0}).set('#tickB',{left:0});
+
+  // C — light wipes across the wordmark
+  gsap.timeline({repeat:-1,repeatDelay:0.4})
+     .fromTo('#litC',{clipPath:'inset(0 100% 0 0)'},{clipPath:'inset(0 0% 0 0)',duration:1.1,ease})
+     .to('#litC',{clipPath:'inset(0 0 0 100%)',duration:0.9,ease:'power2.in',delay:0.5});
+</script>
+</body>
+</html>

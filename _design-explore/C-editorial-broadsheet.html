@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aethria — C · Editorial Broadsheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Figtree:wght@400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4f1ea; --oxford:#001433; --accent:#3d6b5e;
+    --ink-70:rgba(0,20,51,.74); --ink-50:rgba(0,20,51,.5); --ink-35:rgba(0,20,51,.35);
+    --rule:rgba(0,20,51,.14); --rule-strong:rgba(0,20,51,.28);
+    --serif:'Playfair Display',Georgia,serif; --sans:'Figtree',system-ui,sans-serif; --mono:'Space Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--paper);color:var(--oxford);font-family:var(--sans);line-height:1.5}
+  .wrap{max-width:1500px;margin:0 auto;padding:0 56px}
+  .mono{font-family:var(--mono);text-transform:uppercase;letter-spacing:.18em;font-size:10px;color:var(--ink-50)}
+
+  /* Masthead nameplate */
+  .nameplate{padding:34px 0 16px;text-align:center;position:relative}
+  .nameplate .edition{position:absolute;left:0;top:40px}
+  .nameplate .date{position:absolute;right:0;top:40px}
+  .nameplate h1{font-family:var(--serif);font-weight:600;font-size:clamp(3rem,9vw,8rem);letter-spacing:-.02em;line-height:.9}
+  .nameplate h1 .dot{color:var(--accent)}
+  .nameplate .sub{margin-top:10px}
+  .dbl{border-top:3px solid var(--oxford);border-bottom:1px solid var(--oxford);height:5px;margin:14px 0 0}
+  .runhead{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--oxford)}
+
+  /* Lead — three column broadsheet front page */
+  .lead{display:grid;grid-template-columns:1.7fr 1fr;gap:0;border-bottom:1px solid var(--oxford)}
+  .lead .story{padding:48px 56px 56px 0;border-right:1px solid var(--rule)}
+  .lead .kick{margin-bottom:24px}
+  .lead h2{font-family:var(--serif);font-weight:500;font-size:clamp(2.4rem,5.4vw,5rem);line-height:.96;letter-spacing:-.02em}
+  .lead h2 em{font-style:italic;color:var(--accent)}
+  .lead .dek{margin-top:26px;font-family:var(--serif);font-style:italic;font-size:21px;line-height:1.5;color:var(--ink-70);max-width:40ch}
+  .lead .cols{margin-top:30px;column-count:2;column-gap:34px;font-size:14.5px;line-height:1.72;color:var(--ink-70);max-width:60ch}
+  .lead .cols p{margin-bottom:14px}
+  .lead .cols p:first-child::first-letter{font-family:var(--serif);font-size:58px;line-height:.8;float:left;padding:6px 10px 0 0;color:var(--oxford)}
+  .lead .cta{margin-top:30px;display:inline-block;background:var(--oxford);color:var(--paper);font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;padding:15px 38px;text-decoration:none}
+
+  /* Aside — the record as a document artifact */
+  .aside{padding:48px 0 48px 40px;display:flex;flex-direction:column;gap:24px}
+  .doc{border:1px solid var(--rule-strong);background:rgba(255,255,255,.4)}
+  .doc .dh{display:flex;justify-content:space-between;border-bottom:1px solid var(--rule);padding:12px 16px}
+  .doc .db{padding:18px 16px}
+  .doc .co{font-family:var(--serif);font-size:20px;font-weight:500}
+  .doc .meta{margin-top:4px}
+  .verdict{display:inline-block;margin-top:16px;background:#bfe3cc;color:#17442d;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.12em;padding:6px 12px}
+  .doc .scores{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--rule);border-top:1px solid var(--rule);margin-top:18px}
+  .doc .scores div{background:var(--paper);padding:12px 6px;text-align:center}
+  .doc .scores .v{font-family:var(--mono);font-weight:700;font-size:18px}
+  .doc .scores .k{font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:var(--ink-35);margin-top:4px}
+  .wire{border-top:1px solid var(--oxford);padding-top:14px}
+  .wire .l{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:7px 0;border-bottom:1px solid var(--rule);font-size:11.5px}
+  .wire .t{font-family:var(--mono);font-size:10px;color:var(--accent)}
+  .wire .tag{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em}
+
+  /* Section band */
+  .band{border-bottom:1px solid var(--oxford);padding:54px 0}
+  .band .bh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:34px}
+  .band h3{font-family:var(--serif);font-weight:400;font-size:clamp(1.8rem,4vw,3.4rem);letter-spacing:-.015em;max-width:18ch}
+  .stages{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+  .stage{padding:0 28px;border-left:1px solid var(--rule)}
+  .stage:first-child{padding-left:0;border-left:0}
+  .stage .n{font-family:var(--serif);font-size:40px;color:var(--ink-35)}
+  .stage h4{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin:16px 0 10px}
+  .stage p{font-size:13px;line-height:1.6;color:var(--ink-50)}
+
+  footer{padding:90px 0 70px;text-align:center}
+  footer h3{font-family:var(--serif);font-size:clamp(2.2rem,5vw,4.6rem);font-weight:500;line-height:1;letter-spacing:-.02em;max-width:16ch;margin:0 auto}
+  footer .cta{margin-top:34px;display:inline-block;background:var(--oxford);color:var(--paper);font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;padding:16px 44px;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="nameplate">
+    <span class="edition mono">Vol. II · Est. MMXXVI</span>
+    <span class="date mono">Private markets</span>
+    <h1>Aethria<span class="dot">.</span></h1>
+    <p class="sub mono" style="letter-spacing:.34em">Deal intelligence · by invitation</p>
+  </div>
+  <div class="dbl"></div>
+  <div class="runhead">
+    <span class="mono">Scout · Review · Decide · Portfolio</span>
+    <span class="mono">The system that shows its work</span>
+  </div>
+
+  <div class="lead">
+    <div class="story">
+      <span class="kick mono" style="display:block;color:var(--accent)">01 — The thesis engine</span>
+      <h2>Private market judgment, made <em>inspectable</em>.</h2>
+      <p class="dek">An autonomous analyst that sources, reviews, and decides on startups for venture funds — and shows its work.</p>
+      <div class="cols">
+        <p>Aethria runs a real investment pipeline against your fund thesis: it discovers companies, scores each with three independent reviewers, and records an invest, pass, or monitor decision.</p>
+        <p>Nothing is averaged into a comfortable number. Every recommendation keeps its source trail, the reviewers' disagreement, dimension scores, and mandate fit — in one record you can open and audit.</p>
+      </div>
+      <a class="cta" href="#">Request access →</a>
+    </div>
+
+    <div class="aside">
+      <span class="mono">The record · sample output</span>
+      <div class="doc">
+        <div class="dh"><span class="mono">Investment memo</span><span class="mono">Closed</span></div>
+        <div class="db">
+          <div class="co">European infrastructure co.</div>
+          <div class="meta mono" style="letter-spacing:.08em">B2B Infrastructure · Series A · London</div>
+          <span class="verdict">MONITOR</span>
+          <div class="scores">
+            <div><div class="v">9</div><div class="k">MKT</div></div>
+            <div><div class="v">8</div><div class="k">EXEC</div></div>
+            <div><div class="v">8</div><div class="k">PROD</div></div>
+            <div><div class="v">9</div><div class="k">TECH</div></div>
+            <div><div class="v">7</div><div class="k">DEF</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="wire">
+        <div class="l"><span class="t">02:41</span><span><span class="tag">Scout</span> — Surfaced Hop Aero against thesis</span></div>
+        <div class="l"><span class="t">04:15</span><span><span class="tag">Mandate</span> — Flagged 2 valuation anomalies</span></div>
+        <div class="l"><span class="t">05:50</span><span><span class="tag">Partner</span> — Recorded MONITOR, dissent kept</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="band">
+    <div class="bh">
+      <h3>One company moves through four stages.</h3>
+      <span class="mono">03 — The pipeline</span>
+    </div>
+    <div class="stages">
+      <div class="stage"><div class="n">01</div><h4>Scout</h4><p>Four lenses watch the market against your thesis.</p></div>
+      <div class="stage"><div class="n">02</div><h4>Review</h4><p>Three reviewers score across six dimensions; doubt stays explicit.</p></div>
+      <div class="stage"><div class="n">03</div><h4>Decide</h4><p>Versioned partner logic resolves to one verdict.</p></div>
+      <div class="stage"><div class="n">04</div><h4>Portfolio</h4><p>Accepted companies tracked for execution and follow-on.</p></div>
+    </div>
+  </div>
+
+  <footer>
+    <h3>For funds that need judgment with memory.</h3>
+    <a class="cta" href="#">Request access →</a>
+  </footer>
+
+</div>
+</body>
+</html>

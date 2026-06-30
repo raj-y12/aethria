@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aethria — B · Swiss Grid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600&family=Figtree:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4f1ea; --oxford:#001433; --accent:#3d6b5e;
+    --ink-70:rgba(0,20,51,.72); --ink-50:rgba(0,20,51,.5); --ink-35:rgba(0,20,51,.35);
+    --rule:rgba(0,20,51,.16); --rule-soft:rgba(0,20,51,.09);
+    --serif:'Playfair Display',Georgia,serif; --sans:'Figtree',system-ui,sans-serif; --mono:'Space Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--paper);color:var(--oxford);font-family:var(--sans);line-height:1.55}
+  .wrap{max-width:1640px;margin:0 auto;padding:0 48px;position:relative}
+  /* visible column grid lines */
+  .grid12{display:grid;grid-template-columns:repeat(12,1fr);column-gap:24px}
+  .mono{font-family:var(--mono);text-transform:uppercase;letter-spacing:.16em;font-size:10px;color:var(--ink-50)}
+  .tag{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+
+  /* top register bar */
+  .reg{border-bottom:1px solid var(--oxford);padding:18px 0;display:grid;grid-template-columns:repeat(12,1fr);column-gap:24px;align-items:center}
+  .reg .word{grid-column:1/4;font-family:var(--serif);font-weight:500;font-size:20px}
+  .reg .word .dot{color:var(--accent)}
+  .reg .m1{grid-column:6/9}.reg .m2{grid-column:9/11}.reg .m3{grid-column:11/13;text-align:right}
+
+  /* hero: grid-locked headline + right data column */
+  .hero{border-bottom:1px solid var(--oxford);padding:0}
+  .hero .inner{display:grid;grid-template-columns:repeat(12,1fr);column-gap:24px;min-height:78vh}
+  .hcol-main{grid-column:1/9;border-right:1px solid var(--rule-soft);padding:56px 48px 56px 0;display:flex;flex-direction:column;justify-content:space-between}
+  .hcol-side{grid-column:9/13;padding:56px 0 56px 0;display:flex;flex-direction:column;gap:0}
+  .idx{display:flex;align-items:baseline;gap:16px;margin-bottom:auto}
+  .idx b{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.1em}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(2.6rem,6.6vw,6.6rem);line-height:.94;letter-spacing:-.02em;margin:48px 0 0}
+  h1 .u{border-bottom:3px solid var(--accent);padding-bottom:.02em}
+  .hmeta{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:0 24px;max-width:680px}
+  .hmeta p{font-size:15px;line-height:1.65;color:var(--ink-70);padding-right:20px}
+  /* side data stack */
+  .dstat{border-top:1px solid var(--rule);padding:22px 0}
+  .dstat:first-child{border-top:0}
+  .dstat .n{font-family:var(--mono);font-weight:700;font-size:46px;line-height:.85;letter-spacing:-.04em}
+  .dstat .l{margin-top:12px}
+  .dstat .s{margin-top:6px;font-size:12px;color:var(--ink-50)}
+  .cta{margin-top:40px;display:inline-block;background:var(--oxford);color:var(--paper);font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;padding:16px 40px;text-decoration:none}
+
+  /* content rows, grid-locked */
+  .row{display:grid;grid-template-columns:repeat(12,1fr);column-gap:24px;border-bottom:1px solid var(--oxford);padding:64px 0}
+  .row .lab{grid-column:1/3}
+  .row .head{grid-column:3/8}
+  .row .head h2{font-family:var(--serif);font-weight:400;font-size:clamp(1.8rem,3.6vw,3.2rem);line-height:1;letter-spacing:-.01em}
+  .row .body{grid-column:8/13;font-size:15px;line-height:1.7;color:var(--ink-70);padding-top:8px}
+
+  /* pipeline as grid cells */
+  .cells{grid-column:1/13;display:grid;grid-template-columns:repeat(4,1fr);column-gap:24px;margin-top:40px}
+  .cell{border-top:2px solid var(--oxford);padding-top:18px}
+  .cell .cn{font-family:var(--mono);font-weight:700;font-size:34px;letter-spacing:-.03em}
+  .cell h4{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin:14px 0 10px}
+  .cell p{font-size:13px;line-height:1.6;color:var(--ink-50)}
+
+  footer{padding:90px 0;display:grid;grid-template-columns:repeat(12,1fr);column-gap:24px;align-items:end}
+  footer h2{grid-column:1/9;font-family:var(--serif);font-size:clamp(2rem,4.4vw,4rem);font-weight:400;line-height:1;letter-spacing:-.02em}
+  footer .f{grid-column:10/13;text-align:right}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="reg">
+    <span class="word">Aethria<span class="dot">.</span></span>
+    <span class="m1 mono">Private market intelligence</span>
+    <span class="m2 mono">Vol. II</span>
+    <span class="m3 mono">By invitation</span>
+  </div>
+
+  <div class="hero">
+    <div class="inner">
+      <div class="hcol-main">
+        <div class="idx"><b>01</b><span class="mono">The thesis engine</span></div>
+        <div>
+          <h1>Private market judgment,<br>made <span class="u">inspectable</span>.</h1>
+          <div class="hmeta">
+            <p>An autonomous analyst that sources, reviews, and decides on startups for venture funds — and shows its work.</p>
+            <p>Every decision keeps its evidence: source trail, reviewer disagreement, dimension scores, and mandate fit.</p>
+          </div>
+          <a class="cta" href="#">Request access →</a>
+        </div>
+      </div>
+      <div class="hcol-side">
+        <div class="dstat"><div class="n">4</div><div class="l mono" style="color:var(--oxford)">Scout lenses</div><div class="s">Market · builder · pain-point · contrarian</div></div>
+        <div class="dstat"><div class="n">3</div><div class="l mono" style="color:var(--oxford)">Reviewer modes</div><div class="s">Default · skeptical · opportunist</div></div>
+        <div class="dstat"><div class="n">6</div><div class="l mono" style="color:var(--oxford)">Dimensions</div><div class="s">Market → defensibility → fit</div></div>
+        <div class="dstat"><div class="n">1</div><div class="l mono" style="color:var(--oxford)">Record</div><div class="s">Source · review · decision · follow-up</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <span class="lab tag">02 / Mandate</span>
+    <div class="head"><h2>It only looks for what you tell it to.</h2></div>
+    <div class="body">Write the investment thesis once. Scouts, reviewers, and partner logic treat the mandate as a hard constraint — not a decorative preference. Change the thesis, and the whole system narrows with it.</div>
+  </div>
+
+  <div class="row">
+    <span class="lab tag">03 / Pipeline</span>
+    <div class="head"><h2>One company, four locked stages.</h2></div>
+    <div class="body">Source, review, decide, track. Every hand-off stays inside one record — nothing lost to email or a forgotten tab.</div>
+    <div class="cells">
+      <div class="cell"><div class="cn">01</div><h4>Scout</h4><p>Four lenses watch the market against your thesis.</p></div>
+      <div class="cell"><div class="cn">02</div><h4>Review</h4><p>Three reviewers score across six dimensions.</p></div>
+      <div class="cell"><div class="cn">03</div><h4>Decide</h4><p>Partner logic resolves to one recorded verdict.</p></div>
+      <div class="cell"><div class="cn">04</div><h4>Portfolio</h4><p>Accepted companies tracked for follow-on.</p></div>
+    </div>
+  </div>
+
+  <footer>
+    <h2>For funds that need judgment with memory.</h2>
+    <div class="f"><a class="cta" href="#" style="margin:0">Request access →</a></div>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aethria — loader concepts, round 2</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500&family=Space+Mono&family=Figtree&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+  :root{--oxford:#001433;--paper:#F4F1EA;--accent:#5b9b8a}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0a0a;font-family:'Figtree',sans-serif}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:rgba(244,241,234,0.08);min-height:100dvh}
+  .cell{background:var(--oxford);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative}
+  .tag{position:absolute;top:1.4rem;left:1.4rem;font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(244,241,234,.4)}
+  .word{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:500;color:var(--paper);margin-top:2.6rem}.word .d{color:var(--accent)}
+  .cap{font-family:'Space Mono',monospace;font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;color:rgba(244,241,234,.42);margin-top:1rem}
+</style>
+</head>
+<body>
+<div class="grid">
+
+  <!-- D — the market, in miniature: a field resolves, one locks green -->
+  <div class="cell">
+    <span class="tag">D · field resolve</span>
+    <svg width="180" height="120" viewBox="0 0 180 120" id="svgD"></svg>
+    <span class="word">Aethria<span class="d">.</span></span>
+    <span class="cap">Calibrating workspace</span>
+  </div>
+
+  <!-- E — the pipeline forms, then a verdict travels it -->
+  <div class="cell">
+    <span class="tag">E · pipeline forms</span>
+    <svg width="220" height="120" viewBox="0 0 220 120">
+      <g stroke="rgba(244,241,234,0.28)" stroke-width="1" fill="none">
+        <path class="ed" d="M24 25 L100 60"/><path class="ed" d="M24 48 L100 60"/><path class="ed" d="M24 72 L100 60"/><path class="ed" d="M24 95 L100 60"/>
+        <path class="ed" d="M100 60 L152 60"/><path class="ed" d="M152 60 L198 60"/>
+      </g>
+      <g fill="rgba(244,241,234,0.5)"><circle cx="24" cy="25" r="3"/><circle cx="24" cy="48" r="3"/><circle cx="24" cy="72" r="3"/><circle cx="24" cy="95" r="3"/><circle cx="100" cy="60" r="4.5"/><circle cx="152" cy="60" r="4.5"/></g>
+      <circle cx="198" cy="60" r="6.5" fill="var(--paper)"/>
+      <circle id="pulseE" r="3.5" fill="var(--accent)" opacity="0"/>
+    </svg>
+    <span class="word">Aethria<span class="d">.</span></span>
+    <span class="cap">Calibrating workspace</span>
+  </div>
+
+  <!-- G — the record assembles, then the stamp lands -->
+  <div class="cell">
+    <span class="tag">G · the record</span>
+    <svg width="130" height="150" viewBox="0 0 130 150">
+      <rect class="rd" x="30" y="14" width="70" height="118" fill="none" stroke="rgba(244,241,234,0.22)"/>
+      <g stroke="rgba(244,241,234,0.4)" stroke-width="1.4" stroke-linecap="round">
+        <line class="ln" x1="44" y1="40" x2="86" y2="40"/><line class="ln" x1="44" y1="58" x2="86" y2="58"/>
+        <line class="ln" x1="44" y1="76" x2="72" y2="76"/><line class="ln" x1="44" y1="94" x2="80" y2="94"/>
+      </g>
+      <g id="stampG" opacity="0"><circle cx="86" cy="112" r="15" fill="none" stroke="var(--accent)" stroke-width="1.5"/><text x="86" y="115" text-anchor="middle" font-family="Space Mono" font-size="7" letter-spacing="1" fill="var(--accent)">KEPT</text></g>
+    </svg>
+    <span class="word">Aethria<span class="d">.</span></span>
+    <span class="cap">Calibrating workspace</span>
+  </div>
+
+</div>
+<script>
+  // D — build a small dot field; scan line sweeps; chosen dot locks green + pings
+  const svgD=document.getElementById('svgD'), NS='http://www.w3.org/2000/svg';
+  const cols=9, rows=5, gx=16, gy=22, ox=18, oy=16; let chosen;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const dot=document.createElementNS(NS,'circle');
+    dot.setAttribute('cx',ox+c*gx); dot.setAttribute('cy',oy+r*gy); dot.setAttribute('r',1.5);
+    dot.setAttribute('fill','rgba(244,241,234,0.22)'); svgD.appendChild(dot);
+    if(c===5&&r===2){chosen=dot;}
+  }
+  const scan=document.createElementNS(NS,'rect');
+  scan.setAttribute('y',0);scan.setAttribute('width',2);scan.setAttribute('height',120);scan.setAttribute('fill','rgba(91,155,138,0.5)');svgD.appendChild(scan);
+  const ping=document.createElementNS(NS,'circle');
+  ping.setAttribute('cx',chosen.getAttribute('cx'));ping.setAttribute('cy',chosen.getAttribute('cy'));ping.setAttribute('r',2);ping.setAttribute('fill','none');ping.setAttribute('stroke','var(--accent)');ping.setAttribute('opacity','0');svgD.appendChild(ping);
+  const tlD=gsap.timeline({repeat:-1,repeatDelay:0.5});
+  tlD.fromTo(scan,{attr:{x:-4}},{attr:{x:180},duration:1.8,ease:'power1.inOut'})
+     .to(chosen,{attr:{fill:'#5b9b8a',r:3},duration:0.3,ease:'power2.out'},0.95)
+     .fromTo(ping,{attr:{r:2},opacity:0.7},{attr:{r:14},opacity:0,duration:0.9,ease:'power2.out'},0.95)
+     .to(chosen,{attr:{fill:'rgba(244,241,234,0.22)',r:1.5},duration:0.4},'+=0.4');
+
+  // E — edges draw in, then a green verdict travels scouts->reviewer->partner->record
+  gsap.set('.ed',{strokeDasharray:140,strokeDashoffset:140});
+  const p=document.getElementById('pulseE');
+  const tlE=gsap.timeline({repeat:-1,repeatDelay:0.6});
+  tlE.to('.ed',{strokeDashoffset:0,duration:0.7,stagger:0.08,ease:'power2.out'})
+     .set(p,{attr:{cx:24,cy:72},opacity:1})
+     .to(p,{attr:{cx:100,cy:60},duration:0.5,ease:'power1.inOut'})
+     .to(p,{attr:{cx:152,cy:60},duration:0.4,ease:'power1.inOut'})
+     .to(p,{attr:{cx:198,cy:60},duration:0.4,ease:'power1.in'})
+     .to('#svgD',{},'+=0.2')
+     .to(p,{opacity:0,duration:0.3});
+
+  // G — record lines draw, stamp lands with a slight overshoot
+  gsap.set('.ln',{strokeDasharray:60,strokeDashoffset:60});
+  gsap.set('.rd',{strokeDasharray:380,strokeDashoffset:380});
+  const tlG=gsap.timeline({repeat:-1,repeatDelay:0.7});
+  tlG.to('.rd',{strokeDashoffset:0,duration:0.7,ease:'power2.inOut'})
+     .to('.ln',{strokeDashoffset:0,duration:0.5,stagger:0.1,ease:'power2.out'},'-=0.2')
+     .fromTo('#stampG',{opacity:0,scale:0.4,rotation:-12,transformOrigin:'86px 112px'},{opacity:1,scale:1,rotation:0,duration:0.5,ease:'back.out(2)'})
+     .to('#stampG',{opacity:0,duration:0.4},'+=0.5');
+</script>
+</body>
+</html>
