@@ -75,13 +75,13 @@ export default function DottedMarketMap({ hits = [], echo = false, className }: 
           geoPath(proj as any, octx)(land as any);
           octx.fill();
           const data = octx.getImageData(0, 0, W, H).data;
-          const gap = Math.max(6, Math.round(W / 150));
+          const gap = Math.max(5, Math.round(W / 190));
           const landPts: Pt[] = [];
           for (let y = 0; y < H; y += gap) {
             for (let x = 0; x < W; x += gap) {
               if (data[(y * W + x) * 4 + 3] > 130) {
                 ctx.beginPath();
-                ctx.arc(x, y, 1.1, 0, 6.283);
+                ctx.arc(x, y, 1, 0, 6.283);
                 ctx.fillStyle = `rgba(${INK_RGB},${opacity})`;
                 ctx.fill();
                 landPts.push([x, y]);
