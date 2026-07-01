@@ -30,8 +30,10 @@
   --font-display: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
   --font-wordmark: 'Playfair Display', 'Georgia', serif;
 
-  --page-margin-x: 64px;
+  --page-margin-x: 84px;
   --page-margin-x-mobile: 24px;
+  /* Broadsheet cap — without this, content stretches edge-to-edge on wide monitors. */
+  --page-content-width: 1360px;
 
   --section-padding-y: 96px;
   --section-padding-y-mobile: 56px;
@@ -72,8 +74,16 @@
 }
 
 .page-margin-x {
+  /* Explicit width (not just max-width) — .page-margin-x is often a direct child of a
+     display:flex; flex-direction:column ancestor (page shells), where auto margins on
+     the cross axis suppress stretch and shrink the element to content width instead of
+     filling the container. An explicit width sidesteps that regardless of parent layout. */
+  width: 100%;
   padding-left: var(--page-margin-x);
   padding-right: var(--page-margin-x);
+  max-width: var(--page-content-width);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Sticky-header offset for in-page nav anchors — matches .inst-site-header height */

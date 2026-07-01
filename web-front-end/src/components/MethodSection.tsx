@@ -167,7 +167,7 @@ export default function MethodSection() {
     >
       <div className="page-margin-x py-[clamp(5rem,13vh,10rem)]">
         <p className="mb-16 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">
-          How the judgment is formed
+          A4 — How the judgment is formed
         </p>
 
         {/* drawn spine (desktop only) */}

@@ -7,16 +7,20 @@ import SiteHeader from './components/SiteHeader';
 import MarketTape from './components/MarketTape';
 import MarketSection from './components/MarketSection';
 import MethodSection from './components/MethodSection';
+import MetaAgentSection from './components/MetaAgentSection';
 import DashboardPreview from './components/DashboardPreview';
 import ReviewDisagreement from './components/ReviewDisagreement';
+import PortfolioSection from './components/PortfolioSection';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SCROLL_EASE } from './motionTokens';
 
+/** Matches the real reviewer scoring dimensions (see backend/models.py SingleReview). */
 const RECORD_SCORES = [
   { label: 'Market', to: 9 },
   { label: 'Product', to: 8 },
-  { label: 'Team', to: 9 },
-  { label: 'Moat', to: 7 },
+  { label: 'Technical', to: 9 },
+  { label: 'Execution', to: 8 },
+  { label: 'Defensibility', to: 7 },
 ] as const;
 
 /** Counts a single number up on first view; settles instantly under reduced motion. */
@@ -240,7 +244,7 @@ export default function HomePage() {
             amount={0.18}
           >
             <div className="max-w-md md:sticky md:top-32">
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">Mandate</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A2 — Mandate</p>
               <p
                 id="mandate-heading"
                 className="mt-6 font-sans text-[clamp(1.15rem,2.1vw,1.5rem)] font-light leading-[1.5] text-[var(--color-oxford)]"
@@ -277,19 +281,25 @@ export default function HomePage() {
           </ScrollReveal>
         </section>
 
-        {/* 2 — The market: the whole field scanned, the few that fit */}
+        {/* A3 — The market: the whole field scanned, the few that fit */}
         <MarketSection />
 
-        {/* 3 — Method: how the judgment is formed */}
+        {/* A4 — Method: how the judgment is formed */}
         <MethodSection />
 
-        {/* 3 — The record it produces */}
+        {/* A5 — The meta-agent: the system rewires itself */}
+        <MetaAgentSection />
+
+        {/* A6 — The record it produces */}
         <DashboardPreview />
 
-        {/* 4 — The disagreement preserved inside the record */}
+        {/* A7 — The disagreement preserved inside the record */}
         <ReviewDisagreement />
 
-        {/* 5 — On-demand lookup: drive it yourself */}
+        {/* A8 — The portfolio: what happens after invest */}
+        <PortfolioSection />
+
+        {/* A9 — On-demand lookup: drive it yourself */}
         <section
           id="lookup"
           className="w-full border-t border-solid border-[var(--section-divider)]"
@@ -300,7 +310,7 @@ export default function HomePage() {
               caption underneath, not a headline above. Inverts the title→content order
               used by the other sections so the page doesn't read as one repeated template. */}
           <ScrollReveal className="page-margin-x py-[clamp(6rem,16vh,12rem)]" y={20} amount={0.16}>
-            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">On demand</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A9 — On demand</p>
 
             <div className="mx-auto mt-8 w-full max-w-[760px]" aria-hidden>
               <LookupCommandBar query={DEMO_LOOKUP_QUERY} trailing="run" />
@@ -332,7 +342,7 @@ export default function HomePage() {
         >
           <div className="page-margin-x py-[clamp(8rem,22vh,16rem)]">
             <ScrollReveal y={22} amount={0.25} className="max-w-[1100px]">
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">Access</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A10 — Access</p>
               <h2 className="editorial-display mt-3 max-w-[16ch] font-normal text-[clamp(2.85rem,8vw,7rem)] leading-[0.95] tracking-[-0.025em] text-[var(--color-oxford)]">
                 For funds that need judgment with{' '}
                 <span className="italic text-[var(--color-accent)]">memory</span>.

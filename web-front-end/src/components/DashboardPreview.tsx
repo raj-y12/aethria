@@ -61,7 +61,7 @@ export default function DashboardPreview() {
           id="record-heading"
           className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]"
         >
-          The record — the system shows its work
+          A6 — The record, the system shows its work
         </p>
 
         <div className="mt-14 grid gap-14 md:grid-cols-[0.72fr_1.28fr] md:items-start md:gap-20">

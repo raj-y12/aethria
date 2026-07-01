@@ -60,7 +60,7 @@ export default function ReviewDisagreement() {
       aria-labelledby="disagreement-heading"
     >
       <div className="page-margin-x py-[clamp(7rem,18vh,13rem)]">
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">The Review</p>
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A7 — The Review</p>
 
         {/* Split statement — headline and gloss run side by side, not stacked, so this
             doesn't repeat the kicker→title→paragraph cadence used elsewhere on the page. */}
@@ -82,35 +82,37 @@ export default function ReviewDisagreement() {
           </p>
         </ScrollReveal>
 
-        {/* Reviewer rows — hairline-divided, no boxes */}
-        <div className="mt-20 md:mt-28">
+        {/* Op-ed spread — three reviewer opinions run as real newspaper columns, split
+            by a single hairline column rule (never a box), each with its own byline. */}
+        <p className="mt-20 font-mono text-[9.5px] uppercase tracking-[0.14em] text-[var(--text-subtle)] md:mt-28">
+          Today — three opinions on one company
+        </p>
+        <div className="mt-6 grid grid-cols-1 border-t border-solid border-[var(--section-divider)] md:grid-cols-3">
           {REVIEWERS.map((r, i) => (
             <motion.div
               key={r.persona}
-              className="grid grid-cols-1 gap-5 border-t border-solid border-[var(--section-divider)] py-10 md:grid-cols-[minmax(0,0.5fr)_minmax(0,1fr)_auto] md:items-baseline md:gap-12 md:py-12"
+              className={`py-9 pr-0 md:py-11 md:pr-9 ${i > 0 ? 'border-t border-solid border-[var(--section-divider)] md:border-l md:border-t-0 md:pl-9' : ''}`}
               initial={reduce ? false : { opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.4 }}
-              transition={{ duration: reduce ? 0 : 0.7, ease: SCROLL_EASE, delay: reduce ? 0 : i * 0.06 }}
+              transition={{ duration: reduce ? 0 : 0.7, ease: SCROLL_EASE, delay: reduce ? 0 : i * 0.08 }}
             >
-              <div>
-                <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-[var(--color-oxford)]">
-                  {r.persona}
-                </p>
-                <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
-                  {r.mode}
-                </p>
-              </div>
-              <p className="max-w-[46ch] font-sans text-[clamp(1.05rem,1.5vw,1.25rem)] font-light leading-[1.6] text-[var(--text-secondary)]">
-                {r.take}
+              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--color-oxford)]">
+                {r.persona}
               </p>
-              <div className="flex items-center gap-3 md:justify-end md:self-start">
+              <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-[var(--text-subtle)]">
+                {r.mode}
+              </p>
+              <p className="mt-5 font-display text-[15px] italic leading-[1.6] text-[var(--text-secondary)]">
+                "{r.take}"
+              </p>
+              <div className="mt-6 flex items-center gap-3">
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
                   style={{ backgroundColor: VERDICT_DOT[r.verdict] }}
                   aria-hidden
                 />
-                <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
+                <span className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
                   {r.verdict} · {r.splitScore}/10
                 </span>
               </div>
