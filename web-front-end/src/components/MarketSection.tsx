@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import SectionKicker from './SectionKicker';
 import DottedMarketMap, { type MapHit } from './DottedMarketMap';
 
 /** In-thesis companies plotted on the field (lon, lat). */
@@ -76,25 +75,27 @@ export default function MarketSection() {
       aria-labelledby="market-heading"
     >
       <div className="page-margin-x py-[clamp(6rem,16vh,12rem)]">
-        <SectionKicker folio="03" label="The market" className="mb-10" />
-
-        <div className="flex flex-wrap items-end justify-between gap-8">
-          <h2
-            id="market-heading"
-            className="editorial-display max-w-[18ch] font-normal text-[clamp(1.9rem,4.4vw,3.6rem)] leading-[1.0] tracking-[-0.02em] text-[var(--color-oxford)]"
-          >
-            It watches the whole market. You only see what fits your{' '}
-            <span className="italic text-[var(--color-accent)]">thesis</span>.
-          </h2>
-          <p className="font-mono text-[12px] leading-[2] tracking-[0.04em] text-[var(--text-secondary)] sm:text-right">
+        {/* Raw field header — a terminal readout, not a title block. Typography stays
+            small so the map (the actual graphic) carries the section, not a headline. */}
+        <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4 border-b border-solid border-[var(--section-divider)] pb-6">
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--label-muted)]">
+            [ Field reading // 03 ]
+          </p>
+          <p className="font-mono text-[12px] leading-[1.6] tracking-[0.04em] text-[var(--text-secondary)] sm:text-right">
             <span ref={scannedRef} className="text-[var(--color-accent)]">
               {SCANNED_TOTAL.toLocaleString()}
             </span>{' '}
-            companies scanned
-            <br />
+            companies scanned ·{' '}
             <span className="text-[var(--color-accent)]">{IN_THESIS}</span> inside your thesis today
           </p>
         </div>
+
+        <p
+          id="market-heading"
+          className="mt-8 max-w-[46ch] font-sans text-[clamp(1.1rem,2vw,1.4rem)] font-light leading-[1.55] text-[var(--color-oxford)]"
+        >
+          It watches the whole market. You only see what fits your thesis.
+        </p>
 
         <p className="mt-8 h-[1em] font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
           Scanning ·{' '}
@@ -112,7 +113,7 @@ export default function MarketSection() {
           </AnimatePresence>
         </p>
 
-        <DottedMarketMap hits={HITS} className="mt-10 h-[clamp(300px,48vw,580px)] w-full" />
+        <DottedMarketMap hits={HITS} className="mt-10 h-[clamp(320px,52vw,640px)] w-full" />
 
         <div className="mt-6 flex flex-wrap gap-7 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
           <span className="inline-flex items-center gap-2">

@@ -3,7 +3,6 @@ import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { CtaTextLink } from './components/CtaButton';
 import GrainOverlay from './components/GrainOverlay';
 import SiteHeader from './components/SiteHeader';
-import SectionKicker from './components/SectionKicker';
 import MarketSection from './components/MarketSection';
 import MethodSection from './components/MethodSection';
 import DashboardPreview from './components/DashboardPreview';
@@ -121,27 +120,26 @@ export default function HomePage() {
           style={{ backgroundColor: 'var(--color-paper)' }}
           aria-labelledby="mandate-heading"
         >
+          {/* Reversed hierarchy — the panel is the artifact this section is about, so it
+              gets the larger column; the statement runs small and plain beside it, not as
+              a display headline. Breaks from the kicker→title→paragraph shape used elsewhere. */}
           <ScrollReveal
-            className="page-margin-x grid items-end gap-14 py-[clamp(6rem,16vh,12rem)] md:grid-cols-[1fr_0.74fr] md:gap-20"
+            className="page-margin-x grid items-start gap-14 py-[clamp(6rem,16vh,12rem)] md:grid-cols-[0.8fr_1fr] md:gap-16"
             y={20}
             amount={0.18}
           >
-            <div className="max-w-xl">
-              <SectionKicker folio="02" label="The mandate" className="mb-8" />
-              <h2
+            <div className="max-w-md md:sticky md:top-32">
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--label-muted)]">02 — Mandate</p>
+              <p
                 id="mandate-heading"
-                className="editorial-display font-normal text-[clamp(2.4rem,6vw,4.75rem)] leading-[0.98] tracking-[-0.02em] text-[var(--color-oxford)]"
+                className="mt-6 font-sans text-[clamp(1.15rem,2.1vw,1.5rem)] font-light leading-[1.5] text-[var(--color-oxford)]"
               >
-                It only looks for what you{' '}
-                <span className="italic text-[var(--color-accent)]">tell it to</span>.
-              </h2>
-              <p className="mt-8 max-w-[46ch] font-sans text-[16px] leading-[1.75] text-[var(--text-secondary)]">
-                Write the investment thesis once. Scouts, reviewers, and partner logic treat the mandate as a hard
-                constraint — not a decorative preference. Change the thesis, and the whole system narrows with it.
+                It only looks for what you tell it to. Write the investment thesis once — scouts, reviewers, and
+                partner logic treat it as a hard constraint, not a decorative preference.
               </p>
             </div>
 
-            <div className="w-full max-w-[440px] md:justify-self-end">
+            <div className="w-full max-w-[480px] md:justify-self-end">
               <div className="border border-solid border-[var(--section-divider)] bg-[var(--color-paper-deep)] p-8 sm:p-10">
                 <div className="flex items-center justify-between">
                   <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)]">
@@ -189,24 +187,13 @@ export default function HomePage() {
           style={{ backgroundColor: 'var(--color-paper)' }}
           aria-labelledby="lookup-heading"
         >
+          {/* Interaction-first — the command line and record lead; the explanation is a
+              caption underneath, not a headline above. Inverts the title→content order
+              used by the other sections so the page doesn't read as one repeated template. */}
           <ScrollReveal className="page-margin-x py-[clamp(6rem,16vh,12rem)]" y={20} amount={0.16}>
-            <div className="max-w-[900px]">
-              <SectionKicker folio="06" label="On demand" className="mb-8" />
-              <h2
-                id="lookup-heading"
-                className="editorial-display font-normal text-[clamp(2.4rem,6vw,4.75rem)] leading-[0.98] tracking-[-0.02em] text-[var(--color-oxford)]"
-              >
-                Look up any company.{' '}
-                <span className="italic text-[var(--color-accent)]">Get the record.</span>
-              </h2>
-              <p className="mt-8 max-w-[52ch] font-sans text-[16px] leading-[1.75] text-[var(--text-secondary)]">
-                Type any company name. On-demand lookup turns it into a sourced investment record in seconds — no
-                pipeline wait — benchmarked against your active thesis the moment results arrive.
-              </p>
-            </div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--label-muted)]">06 — On demand</p>
 
-            {/* Input line → record below: the interaction as a vertical flow */}
-            <div className="mx-auto mt-16 w-full max-w-[760px] md:mt-20" aria-hidden>
+            <div className="mx-auto mt-8 w-full max-w-[760px]" aria-hidden>
               <LookupCommandBar query={DEMO_LOOKUP_QUERY} trailing="run" />
               <div className="mt-10 flex flex-col gap-4 md:flex-row md:gap-10">
                 <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)] md:w-[120px] md:pt-2">
@@ -217,6 +204,15 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
+
+            <p
+              id="lookup-heading"
+              className="mx-auto mt-12 max-w-[52ch] font-sans text-[15px] leading-[1.7] text-[var(--text-secondary)]"
+            >
+              <span className="text-[var(--color-oxford)]">Look up any company, get the record.</span> Type any
+              company name — on-demand lookup turns it into a sourced investment record in seconds, benchmarked
+              against your active thesis the moment results arrive.
+            </p>
           </ScrollReveal>
         </section>
 
@@ -227,7 +223,6 @@ export default function HomePage() {
         >
           <div className="page-margin-x py-[clamp(8rem,22vh,16rem)]">
             <ScrollReveal y={22} amount={0.25} className="max-w-[1100px]">
-              <SectionKicker folio="07" label="Access" className="mb-10" />
               <h2 className="editorial-display max-w-[16ch] font-normal text-[clamp(2.85rem,8vw,7rem)] leading-[0.95] tracking-[-0.025em] text-[var(--color-oxford)]">
                 For funds that need judgment with{' '}
                 <span className="italic text-[var(--color-accent)]">memory</span>.

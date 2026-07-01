@@ -1,6 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { ScrollReveal } from './ScrollReveal';
-import SectionKicker from './SectionKicker';
 import { SCROLL_EASE } from '../motionTokens';
 
 /**
@@ -61,16 +60,21 @@ export default function ReviewDisagreement() {
       aria-labelledby="disagreement-heading"
     >
       <div className="page-margin-x py-[clamp(7rem,18vh,13rem)]">
-        <ScrollReveal y={20} amount={0.2} className="max-w-[900px]">
-          <SectionKicker folio="05" label="The review" className="mb-8" />
+        {/* Split statement — headline and gloss run side by side, not stacked, so this
+            doesn't repeat the kicker→title→paragraph cadence used elsewhere on the page. */}
+        <ScrollReveal
+          y={20}
+          amount={0.2}
+          className="grid grid-cols-1 items-end gap-10 md:grid-cols-[1.35fr_1fr] md:gap-16"
+        >
           <h2
             id="disagreement-heading"
-            className="editorial-display font-normal text-[clamp(2.4rem,6vw,4.75rem)] leading-[0.98] tracking-[-0.02em] text-[var(--color-oxford)]"
+            className="editorial-display font-normal text-[clamp(2.2rem,5.6vw,4.4rem)] leading-[0.98] tracking-[-0.02em] text-[var(--color-oxford)]"
           >
             Three reviewers, one record. The disagreement is the{' '}
             <span className="italic text-[var(--color-accent)]">point</span>.
           </h2>
-          <p className="mt-8 max-w-[56ch] font-sans text-[17px] leading-[1.75] text-[var(--text-secondary)]">
+          <p className="font-sans text-[17px] leading-[1.75] text-[var(--text-secondary)] md:pb-1">
             Every company is scored independently by three reviewer modes. Aethria does not average them into a
             comfortable number — it preserves the split and hands the partner layer the real picture.
           </p>
