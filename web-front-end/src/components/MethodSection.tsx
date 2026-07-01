@@ -205,11 +205,13 @@ export default function MethodSection() {
                 {step.viz}
               </motion.div>
             );
+            {/* On mobile the number is a plain left-aligned label (no spine to anchor a
+                circular node); the circle + connector ticks only appear on md+. */}
             const nodeEl = (
-              <div className="relative flex items-center justify-center">
+              <div className="relative flex items-center justify-start md:justify-center">
                 <span className="absolute right-full mr-1 hidden h-px w-[1.6rem] bg-[var(--section-divider)] md:block" />
                 <span className="absolute left-full ml-1 hidden h-px w-[1.6rem] bg-[var(--section-divider)] md:block" />
-                <span className="z-[3] flex h-[2.6rem] w-[2.6rem] items-center justify-center rounded-full border border-[var(--section-divider)] bg-[var(--color-paper)] font-mono text-[11px] tracking-[0.1em] text-[var(--color-accent)]">
+                <span className="z-[3] flex items-center justify-center font-mono text-[11px] tracking-[0.14em] text-[var(--color-accent)] md:h-[2.6rem] md:w-[2.6rem] md:rounded-full md:border md:border-[var(--section-divider)] md:bg-[var(--color-paper)] md:tracking-[0.1em]">
                   {step.n}
                 </span>
               </div>
@@ -218,18 +220,20 @@ export default function MethodSection() {
             return (
               <div
                 key={step.n}
-                className="relative grid grid-cols-1 gap-6 py-8 md:grid-cols-[1fr_7rem_1fr] md:items-center md:gap-0 md:py-10"
+                className="relative grid grid-cols-1 gap-3 border-t border-solid border-[var(--section-divider)] py-7 first:border-t-0 md:grid-cols-[1fr_7rem_1fr] md:items-center md:gap-0 md:border-t-0 md:py-10 md:first:border-t-0"
               >
-                {/* left cell (col 1) — content pushed toward the spine */}
-                <div className="order-2 flex md:order-none md:col-start-1 md:row-start-1 md:justify-end">
+                {/* left cell — desktop col 1. Mobile order: copy=2 / viz=3 (consistent across steps). */}
+                <div
+                  className={`flex md:col-start-1 md:row-start-1 md:justify-end ${copyRight ? 'order-3' : 'order-2'}`}
+                >
                   {copyRight ? vizEl : copyEl}
                 </div>
-                {/* node (col 2) — centered on the spine */}
-                <div className="order-1 flex justify-center md:order-none md:col-start-2 md:row-start-1">
+                {/* node — desktop centered on the spine; mobile a plain number, first in order. */}
+                <div className="order-1 flex justify-start md:order-none md:col-start-2 md:row-start-1 md:justify-center">
                   {nodeEl}
                 </div>
-                {/* right cell (col 3) — content pushed toward the spine */}
-                <div className="order-3 md:order-none md:col-start-3 md:row-start-1">
+                {/* right cell — desktop col 3. Mobile order: copy=2 / viz=3. */}
+                <div className={`md:col-start-3 md:row-start-1 ${copyRight ? 'order-2' : 'order-3'}`}>
                   {copyRight ? copyEl : vizEl}
                 </div>
               </div>

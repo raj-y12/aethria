@@ -31,11 +31,23 @@ export default function SiteHeader() {
 
   return (
     <header
-      className={`inst-site-header sticky top-0 z-[100] w-full shrink-0 bg-[rgba(244,241,234,0.92)] backdrop-blur-md ${scrolled ? 'inst-site-header--compact' : ''}`}
+      className={`inst-site-header sticky top-0 z-[100] w-full shrink-0 transition-colors duration-300 ${
+        scrolled
+          ? 'bg-[rgba(244,241,234,0.92)] backdrop-blur-md'
+          : 'bg-transparent sm:bg-[rgba(244,241,234,0.92)] sm:backdrop-blur-md'
+      } ${scrolled ? 'inst-site-header--compact' : ''}`}
       style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
     >
       <div className="inst-site-header-inner page-margin-x">
-        <Link to="/home" aria-label="Aethria — home" className="inst-site-header-wordmark shrink-0">
+        {/* On mobile the big masthead nameplate below is the identity, so the sticky
+            wordmark stays hidden until you scroll past it (avoids two stacked wordmarks). */}
+        <Link
+          to="/home"
+          aria-label="Aethria — home"
+          className={`inst-site-header-wordmark shrink-0 transition-opacity duration-300 sm:opacity-100 ${
+            scrolled ? 'opacity-100' : 'opacity-0 pointer-events-none sm:pointer-events-auto'
+          }`}
+        >
           Aethria<span className="wordmark-dot">.</span>
         </Link>
 
