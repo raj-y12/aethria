@@ -30,20 +30,29 @@ const STEPS: Step[] = [
     ),
     desc: 'Market, builder, pain-point, and contrarian scouts search the live web for real companies — never a static list.',
     viz: (
-      <svg viewBox="0 0 190 120">
+      <svg viewBox="0 0 260 130">
+        <g fontFamily="Space Mono, monospace" fontSize="9" letterSpacing="0.5" fill="rgba(0,20,51,0.55)" textAnchor="end">
+          <text x="98" y="25">MARKET</text>
+          <text x="98" y="55">BUILDER</text>
+          <text x="98" y="85">PAIN-POINT</text>
+          <text x="98" y="115">CONTRARIAN</text>
+        </g>
         <g stroke={INK} strokeWidth={1}>
-          <line x1="20" y1="20" x2="150" y2="60" />
-          <line x1="20" y1="50" x2="150" y2="60" />
-          <line x1="20" y1="80" x2="150" y2="60" />
-          <line x1="20" y1="105" x2="150" y2="60" />
+          <line x1="112" y1="22" x2="212" y2="65" />
+          <line x1="112" y1="52" x2="212" y2="65" />
+          <line x1="112" y1="82" x2="212" y2="65" />
+          <line x1="112" y1="112" x2="212" y2="65" />
         </g>
         <g fill={INK_DOT}>
-          <circle cx="20" cy="20" r="4" />
-          <circle cx="20" cy="50" r="4" />
-          <circle cx="20" cy="80" r="4" />
-          <circle cx="20" cy="105" r="4" />
+          <circle cx="112" cy="22" r="3.5" />
+          <circle cx="112" cy="52" r="3.5" />
+          <circle cx="112" cy="82" r="3.5" />
+          <circle cx="112" cy="112" r="3.5" />
         </g>
-        <circle cx="150" cy="60" r="6" fill={ACCENT} />
+        <circle cx="212" cy="65" r="7" fill={ACCENT} />
+        <text x="212" y="90" textAnchor="middle" fontFamily="Space Mono, monospace" fontSize="8" letterSpacing="1" fill="rgba(0,20,51,0.5)">
+          COMPANY
+        </text>
       </svg>
     ),
   },
@@ -157,7 +166,7 @@ export default function MethodSection() {
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="method-heading"
     >
-      <div className="page-margin-x py-[clamp(4rem,10vh,8rem)]">
+      <div className="page-margin-x py-[clamp(5rem,13vh,10rem)]">
         <SectionKicker folio="04" label="How the judgment is formed" className="mb-16 justify-center" />
 
         {/* drawn spine (desktop only) */}
@@ -168,9 +177,9 @@ export default function MethodSection() {
         <div className="relative">
           {STEPS.map((step, i) => {
             const copyRight = i % 2 === 0; // 01,03 → copy right; 02,04 → copy left
-            const copy = (
+            const copyEl = (
               <motion.div
-                className={`max-w-[34ch] ${copyRight ? 'md:col-start-3 md:text-left' : 'md:col-start-1 md:justify-self-end md:text-right'}`}
+                className={`max-w-[34ch] ${copyRight ? 'md:text-left' : 'md:text-right'}`}
                 initial={reduce ? false : { opacity: 0, y: 22, filter: 'blur(6px)' }}
                 whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 viewport={{ once: true, amount: 0.4 }}
@@ -184,9 +193,9 @@ export default function MethodSection() {
                 </p>
               </motion.div>
             );
-            const viz = (
+            const vizEl = (
               <motion.div
-                className={`w-[clamp(120px,16vw,190px)] text-[var(--color-oxford)] ${copyRight ? 'md:col-start-1 md:justify-self-end' : 'md:col-start-3'}`}
+                className="w-[clamp(150px,20vw,260px)] text-[var(--color-oxford)]"
                 initial={reduce ? false : { opacity: 0, y: 22, filter: 'blur(6px)' }}
                 whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 viewport={{ once: true, amount: 0.4 }}
@@ -195,24 +204,33 @@ export default function MethodSection() {
                 {step.viz}
               </motion.div>
             );
+            const nodeEl = (
+              <div className="relative flex items-center justify-center">
+                <span className="absolute right-full mr-1 hidden h-px w-[1.6rem] bg-[var(--section-divider)] md:block" />
+                <span className="absolute left-full ml-1 hidden h-px w-[1.6rem] bg-[var(--section-divider)] md:block" />
+                <span className="z-[3] flex h-[2.6rem] w-[2.6rem] items-center justify-center rounded-full border border-[var(--section-divider)] bg-[var(--color-paper)] font-mono text-[11px] tracking-[0.1em] text-[var(--color-accent)]">
+                  {step.n}
+                </span>
+              </div>
+            );
 
             return (
               <div
                 key={step.n}
-                className="relative grid grid-cols-1 items-center gap-4 py-12 md:min-h-[38vh] md:grid-cols-[1fr_7rem_1fr] md:gap-0 md:py-0"
+                className="relative grid grid-cols-1 gap-6 py-12 md:min-h-[40vh] md:grid-cols-[1fr_7rem_1fr] md:items-center md:gap-0 md:py-0"
               >
-                {/* mobile: number then copy then viz, in order. desktop: explicit columns. */}
-                <div className="order-1 md:order-none md:col-start-2 md:flex md:items-center md:justify-center">
-                  <div className="relative flex items-center justify-center">
-                    <span className="absolute right-full mr-1 hidden h-px w-[1.6rem] bg-[var(--section-divider)] md:block" />
-                    <span className="absolute left-full ml-1 hidden h-px w-[1.6rem] bg-[var(--section-divider)] md:block" />
-                    <span className="z-[3] flex h-[2.6rem] w-[2.6rem] items-center justify-center rounded-full border border-[var(--section-divider)] bg-[var(--color-paper)] font-mono text-[11px] tracking-[0.1em] text-[var(--color-accent)]">
-                      {step.n}
-                    </span>
-                  </div>
+                {/* left cell (col 1) — content pushed toward the spine */}
+                <div className="order-2 flex md:order-none md:col-start-1 md:row-start-1 md:justify-end">
+                  {copyRight ? vizEl : copyEl}
                 </div>
-                <div className="order-2 md:contents">{copy}</div>
-                <div className="order-3 md:contents">{viz}</div>
+                {/* node (col 2) — centered on the spine */}
+                <div className="order-1 flex justify-center md:order-none md:col-start-2 md:row-start-1">
+                  {nodeEl}
+                </div>
+                {/* right cell (col 3) — content pushed toward the spine */}
+                <div className="order-3 md:order-none md:col-start-3 md:row-start-1">
+                  {copyRight ? copyEl : vizEl}
+                </div>
               </div>
             );
           })}

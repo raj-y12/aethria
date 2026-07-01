@@ -75,7 +75,7 @@ export default function MarketSection() {
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="market-heading"
     >
-      <div className="page-margin-x py-[clamp(4rem,12vh,9rem)]">
+      <div className="page-margin-x py-[clamp(6rem,16vh,12rem)]">
         <SectionKicker folio="03" label="The market" className="mb-10" />
 
         <div className="flex flex-wrap items-end justify-between gap-8">

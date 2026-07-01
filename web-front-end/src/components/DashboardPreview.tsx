@@ -92,10 +92,12 @@ export default function DashboardPreview() {
           </motion.div>
 
           <motion.div variants={memoCardVariants} className="w-full" aria-label="Investment memo sample output">
-            <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)]">
+            <p className="mb-5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)]">
               Investment memo · sample output
             </p>
-            <LookupResultSnapshot {...DEMO_LOOKUP_MEMO_SAMPLE} />
+            <div className="border border-solid border-[var(--section-divider)] bg-[var(--color-paper-deep)] p-4 sm:p-6">
+              <LookupResultSnapshot {...DEMO_LOOKUP_MEMO_SAMPLE} />
+            </div>
           </motion.div>
         </div>
       </motion.div>

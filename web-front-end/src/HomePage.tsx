@@ -3,7 +3,6 @@ import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { CtaTextLink } from './components/CtaButton';
 import GrainOverlay from './components/GrainOverlay';
 import SiteHeader from './components/SiteHeader';
-import RotatingSeal from './components/RotatingSeal';
 import SectionKicker from './components/SectionKicker';
 import MarketSection from './components/MarketSection';
 import MethodSection from './components/MethodSection';
@@ -17,7 +16,6 @@ import {
   DEMO_LOOKUP_RESULT,
   LookupCommandBar,
   LookupResultSnapshot,
-  MandateCard,
 } from '@aethria/product-chrome';
 
 const LINKEDIN_URL = 'https://www.linkedin.com/company/aethria';
@@ -47,23 +45,26 @@ export default function HomePage() {
       <SiteHeader />
 
       <main className="relative z-10 flex min-w-0 flex-1 flex-col overflow-x-hidden">
-        {/* Hero — 白 / quiet luxury: the statement sits low, oceans of air above, seal alone in the void */}
+        {/* Hero — 白 / quiet luxury: the statement sits low, oceans of air above */}
         <section
           className="home-hero-section relative flex min-h-[calc(82vh-64px)] w-full flex-col overflow-hidden"
           style={{ backgroundColor: 'var(--color-paper)' }}
         >
-          {/* Seal — alone in the open upper-right, the single mark in the void */}
+          {/* Provenance — a quiet institutional mark in the void, no motion */}
           <div
-            className="pointer-events-none absolute z-0 hidden lg:block"
+            className="pointer-events-none absolute z-0 hidden text-right lg:block"
             style={{ right: 'var(--page-margin-x)', top: 'clamp(5rem, 13vh, 8.5rem)' }}
           >
-            <motion.div
-              initial={reduce ? false : { opacity: 0, scale: 0.9 }}
-              animate={reduce ? undefined : { opacity: 1, scale: 1 }}
+            <motion.p
+              className="font-mono text-[10px] uppercase leading-[1.9] tracking-[0.16em] text-[var(--text-subtle)]"
+              initial={reduce ? false : { opacity: 0 }}
+              animate={reduce ? undefined : { opacity: 1 }}
               transition={{ duration: 1.2, delay: 0.6, ease: SCROLL_EASE }}
             >
-              <RotatingSeal className="h-[150px] w-[150px] xl:h-[184px] xl:w-[184px]" />
-            </motion.div>
+              AETHRIA_CORE // OPERATIONAL
+              <br />
+              Fund intelligence · v2
+            </motion.p>
           </div>
 
           {/* Lead — vertically centred, comfortable air without a cavernous top gap */}
@@ -140,18 +141,31 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="w-full max-w-[420px] md:justify-self-end">
-              <MandateCard
-                variant="paper"
-                title="Deep-Tech Infrastructure"
-                tags={['B2B Infrastructure', 'Series A–B', 'European Markets']}
-                excerpt="Backing infrastructure teams building the plumbing of the next compute cycle — capital-efficient, with a defensible wedge."
-                live
-                className="bg-transparent p-7 sm:p-8"
-              />
-              <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)]">
-                Active mandate
-              </p>
+            <div className="w-full max-w-[440px] md:justify-self-end">
+              <div className="border border-solid border-[var(--section-divider)] bg-[var(--color-paper-deep)] p-8 sm:p-10">
+                <div className="flex items-center justify-between">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)]">
+                    Active mandate
+                  </p>
+                  <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-accent)]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" aria-hidden /> Live
+                  </span>
+                </div>
+                <h3 className="mt-7 editorial-display text-[clamp(1.5rem,2.6vw,2.1rem)] font-normal leading-[1.1] tracking-[-0.01em] text-[var(--color-oxford)]">
+                  Deep-Tech Infrastructure
+                </h3>
+                <p className="mt-4 font-sans text-[15px] leading-[1.7] text-[var(--text-secondary)]">
+                  Backing infrastructure teams building the plumbing of the next compute cycle — capital-efficient, with a
+                  defensible wedge.
+                </p>
+                <div className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-solid border-[var(--section-divider)] pt-6 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
+                  <span>B2B Infrastructure</span>
+                  <span className="text-[var(--text-subtle)]">/</span>
+                  <span>Series A–B</span>
+                  <span className="text-[var(--text-subtle)]">/</span>
+                  <span>European Markets</span>
+                </div>
+              </div>
             </div>
           </ScrollReveal>
         </section>
@@ -192,13 +206,13 @@ export default function HomePage() {
             </div>
 
             {/* Input line → record below: the interaction as a vertical flow */}
-            <div className="mx-auto mt-14 w-full max-w-[760px]" aria-hidden>
+            <div className="mx-auto mt-16 w-full max-w-[760px] md:mt-20" aria-hidden>
               <LookupCommandBar query={DEMO_LOOKUP_QUERY} trailing="run" />
-              <div className="mt-8 flex flex-col gap-3 md:flex-row md:gap-10">
-                <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)] md:w-[120px] md:pt-1.5">
+              <div className="mt-10 flex flex-col gap-4 md:flex-row md:gap-10">
+                <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)] md:w-[120px] md:pt-2">
                   ↳ Record
                 </p>
-                <div className="w-full max-w-[520px]">
+                <div className="w-full max-w-[520px] border border-solid border-[var(--section-divider)] bg-[var(--color-paper-deep)] p-4 sm:p-6">
                   <LookupResultSnapshot {...DEMO_LOOKUP_RESULT} />
                 </div>
               </div>
@@ -239,8 +253,11 @@ export default function HomePage() {
           viewport={{ once: true, amount: 0.2 }}
           transition={{ duration: reduce ? 0 : 0.52, ease: SCROLL_EASE }}
         >
+          {/* Colophon — one flattened strip, no columns. The wordmark and the one-line
+              descriptor read like a book's closing imprint; the nav collapses into a single
+              slash-separated run of micro-links beneath it. */}
           <div className="page-margin-x mx-auto flex w-full max-w-[1200px] flex-col pt-16 pb-10 md:pt-24 md:pb-14">
-            <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr_1fr] md:gap-12">
+            <div className="flex flex-col gap-6 border-b border-solid border-[var(--section-divider)] pb-10 md:flex-row md:items-end md:justify-between md:gap-12">
               <div className="min-w-0">
                 <Link
                   to="/home"
@@ -248,67 +265,61 @@ export default function HomePage() {
                 >
                   Aethria<span className="wordmark-dot">.</span>
                 </Link>
-                <p className="mt-4 max-w-[34ch] font-sans text-[14px] leading-[1.7] text-[var(--text-secondary)]">
+                <p className="mt-4 max-w-[46ch] font-sans text-[14px] leading-[1.7] text-[var(--text-secondary)]">
                   Private markets intelligence for funds that need the evidence trail, not another beautiful spreadsheet.
                 </p>
               </div>
+              <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)] md:text-right">
+                AETHRIA_CORE // OPERATIONAL
+                <br />
+                Build {new Date().getFullYear()}.{String(new Date().getMonth() + 1).padStart(2, '0')}
+              </p>
+            </div>
 
-              {FOOTER_COLUMNS.map((col) => (
-                <div key={col.heading} className="min-w-0">
-                  <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)]">
-                    {col.heading}
-                  </p>
-                  <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-                    {col.items.map((item) => (
-                      <li key={item} className="font-sans text-[14px] leading-[1.5] text-[var(--text-muted)]">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-
-              <div className="min-w-0">
-                <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)]">Access</p>
-                <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-                  <li>
-                    <Link to="/request-access" className="accent-link">
-                      <span>Request access</span>
-                      <span aria-hidden>→</span>
+            <nav
+              aria-label="Footer navigation"
+              className="flex flex-wrap items-center gap-x-3 gap-y-3 pt-8 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--label-muted)]"
+            >
+              {FOOTER_COLUMNS.flatMap((col) => col.items)
+                .concat(['Request access', 'LinkedIn'])
+                .map((item, i, arr) => {
+                  const isLast = i === arr.length - 1;
+                  const isAccess = item === 'Request access';
+                  const isLinkedIn = item === 'LinkedIn';
+                  const node = isAccess ? (
+                    <Link key={item} to="/request-access" className="transition-colors hover:text-[var(--color-accent)]">
+                      {item}
                     </Link>
-                  </li>
-                  <li>
+                  ) : isLinkedIn ? (
                     <a
+                      key={item}
                       href={LINKEDIN_URL}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="accent-link"
+                      className="transition-colors hover:text-[var(--color-accent)]"
                     >
-                      <span>LinkedIn</span>
-                      <span aria-hidden>→</span>
+                      {item}
                     </a>
-                  </li>
-                  <li className="font-sans text-[14px] leading-[1.5] text-[var(--text-muted)]">
-                    Confidential · qualified recipients
-                  </li>
-                </ul>
-              </div>
-            </div>
+                  ) : (
+                    <span key={item}>{item}</span>
+                  );
+                  return (
+                    <span key={`${item}-wrap`} className="inline-flex items-center gap-3">
+                      {node}
+                      {!isLast && <span aria-hidden className="text-[var(--text-subtle)]">/</span>}
+                    </span>
+                  );
+                })}
+            </nav>
 
-            <div className="my-12 h-px w-full shrink-0 bg-[var(--section-divider)]" aria-hidden />
-
-            <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-12">
-              <div className="flex flex-col gap-4 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)] md:flex-row md:flex-wrap md:items-center md:gap-x-10 md:gap-y-3">
-                <span className="text-[var(--label-muted)]">© {new Date().getFullYear()} Aethria</span>
-                <span className="break-words">Confidential · For qualified recipients</span>
-                <span>Investment intelligence</span>
-              </div>
-              <Link
-                to="/request-access"
-                className="home-footer-tag btn-interaction inline-flex min-h-[44px] shrink-0 items-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--label-muted)] transition-opacity hover:opacity-70"
-              >
-                Request access
-              </Link>
+            <div className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-solid border-[var(--section-divider)] pt-6 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
+              <span>© {new Date().getFullYear()} Aethria</span>
+              <span aria-hidden className="text-[var(--text-subtle)]">/</span>
+              <span>Confidential</span>
+              <span aria-hidden className="text-[var(--text-subtle)]">/</span>
+              <span>For qualified recipients</span>
+              <span aria-hidden className="text-[var(--text-subtle)]">/</span>
+              <span>Investment intelligence</span>
             </div>
           </div>
         </motion.footer>
