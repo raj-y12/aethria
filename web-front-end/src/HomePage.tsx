@@ -1,15 +1,42 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion, useReducedMotion, type Variants } from 'framer-motion';
+import { motion, useInView, useReducedMotion, type Variants } from 'framer-motion';
 import { CtaTextLink } from './components/CtaButton';
 import GrainOverlay from './components/GrainOverlay';
 import SiteHeader from './components/SiteHeader';
+import MarketTape from './components/MarketTape';
 import MarketSection from './components/MarketSection';
 import MethodSection from './components/MethodSection';
 import DashboardPreview from './components/DashboardPreview';
 import ReviewDisagreement from './components/ReviewDisagreement';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SCROLL_EASE } from './motionTokens';
+
+const RECORD_SCORES = [
+  { label: 'Market', to: 9 },
+  { label: 'Product', to: 8 },
+  { label: 'Team', to: 9 },
+  { label: 'Moat', to: 7 },
+] as const;
+
+/** Counts a single number up on first view; settles instantly under reduced motion. */
+function CountUp({ to, active, reduce }: { to: number; active: boolean; reduce: boolean }) {
+  const [n, setN] = useState(reduce ? to : 0);
+  useEffect(() => {
+    if (reduce || !active) return;
+    let raf = 0;
+    const start = performance.now();
+    const dur = 850;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / dur);
+      setN(Math.round(to * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [active, to, reduce]);
+  return <>{n}</>;
+}
 import {
   DEMO_LOOKUP_QUERY,
   DEMO_LOOKUP_RESULT,
@@ -28,6 +55,8 @@ export default function HomePage() {
   const reduce = useReducedMotion();
   const navigate = useNavigate();
   const [footerEmail, setFooterEmail] = useState('');
+  const sidebarRef = useRef<HTMLDivElement | null>(null);
+  const sidebarInView = useInView(sidebarRef, { once: true, amount: 0.5 });
 
   const handleFooterSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -52,69 +81,143 @@ export default function HomePage() {
       <SiteHeader />
 
       <main className="relative z-10 flex min-w-0 flex-1 flex-col overflow-x-hidden">
-        {/* Hero — 白 / quiet luxury: the statement sits low, oceans of air above */}
+        {/* Front page — masthead, lede, and a live record sit above the fold together,
+            so a first-time visitor reads what it does before the philosophy of how. */}
         <section
-          className="home-hero-section relative flex min-h-[calc(82vh-64px)] w-full flex-col overflow-hidden"
+          className="home-hero-section relative w-full overflow-hidden"
           style={{ backgroundColor: 'var(--color-paper)' }}
         >
-          {/* Provenance — a quiet institutional mark in the void, no motion */}
-          <div
-            className="pointer-events-none absolute z-0 hidden text-right lg:block"
-            style={{ right: 'var(--page-margin-x)', top: 'clamp(5rem, 13vh, 8.5rem)' }}
-          >
-            <motion.p
-              className="font-mono text-[10px] uppercase leading-[1.9] tracking-[0.16em] text-[var(--text-subtle)]"
-              initial={reduce ? false : { opacity: 0 }}
-              animate={reduce ? undefined : { opacity: 1 }}
-              transition={{ duration: 1.2, delay: 0.6, ease: SCROLL_EASE }}
-            >
-              AETHRIA_CORE // OPERATIONAL
-              <br />
-              Fund intelligence · v2
-            </motion.p>
+          <div className="page-margin-x flex items-center justify-between pt-7 font-mono text-[9.5px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+            <span>Vol. I · No. 1</span>
+            <span className="hidden sm:inline">Fund Intelligence Edition</span>
+            <span>By invitation</span>
           </div>
 
-          {/* Lead — vertically centred, comfortable air without a cavernous top gap */}
-          <div className="page-margin-x relative z-10 flex w-full flex-1 flex-col justify-center pb-[7vh] pt-10">
-            <motion.div
-              className="mb-10 flex items-center gap-4"
-              initial={reduce ? false : { opacity: 0, y: 8 }}
-              animate={reduce ? undefined : { opacity: 1, y: 0 }}
-              transition={{ duration: reduce ? 0 : 0.5, delay: reduce ? 0 : 0.2, ease: SCROLL_EASE }}
-            >
-              <span className="font-mono text-[11px] tracking-[0.14em] text-[var(--label-muted)]">01</span>
-              <span className="h-px w-12 bg-[var(--section-divider)]" />
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--label-muted)]">
-                The thesis engine
-              </span>
-            </motion.div>
+          <motion.div
+            className="mt-3 text-center"
+            initial={reduce ? false : { opacity: 0, y: 10 }}
+            animate={reduce ? undefined : { opacity: 1, y: 0 }}
+            transition={{ duration: reduce ? 0 : 0.8, ease: SCROLL_EASE }}
+          >
+            <p className="font-wordmark text-[clamp(2.1rem,5vw,3.1rem)] font-medium leading-none tracking-[-0.01em] text-[var(--color-oxford)]">
+              Aethria<span className="wordmark-dot">.</span>
+            </p>
+            <p className="mt-2 font-mono text-[9.5px] uppercase tracking-[0.24em] text-[var(--text-subtle)]">
+              — Private market judgment, recorded —
+            </p>
+          </motion.div>
 
-            <motion.h1
-              className="editorial-display max-w-[17ch] font-normal text-[clamp(2.85rem,8.6vw,8rem)] leading-[0.96] tracking-[-0.025em] text-[var(--color-oxford)]"
-              initial={reduce ? false : { opacity: 0, y: 26 }}
-              animate={reduce ? undefined : { opacity: 1, y: 0 }}
-              transition={{ duration: reduce ? 0 : 1, delay: reduce ? 0 : 0.1, ease: SCROLL_EASE }}
-            >
-              Private market judgment, made{' '}
-              <span className="italic text-[var(--color-accent)]">inspectable</span>.
-            </motion.h1>
+          <div className="mt-5">
+            <MarketTape />
+          </div>
 
+          <div className="page-margin-x grid grid-cols-1 gap-x-14 gap-y-14 py-[clamp(3rem,7vh,5rem)] lg:grid-cols-[1.85fr_1fr]">
+            {/* Lede */}
+            <div>
+              <motion.p
+                className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={reduce ? undefined : { opacity: 1, y: 0 }}
+                transition={{ duration: reduce ? 0 : 0.6, delay: reduce ? 0 : 0.15, ease: SCROLL_EASE }}
+              >
+                Lede — The Thesis Engine
+              </motion.p>
+
+              <motion.h1
+                className="editorial-display mt-3 max-w-[17ch] font-normal text-[clamp(2.5rem,6vw,5.2rem)] leading-[1.0] tracking-[-0.02em] text-[var(--color-oxford)]"
+                initial={reduce ? false : { opacity: 0, y: 20 }}
+                animate={reduce ? undefined : { opacity: 1, y: 0 }}
+                transition={{ duration: reduce ? 0 : 0.9, delay: reduce ? 0 : 0.25, ease: SCROLL_EASE }}
+              >
+                Private market judgment, made{' '}
+                <span className="italic text-[var(--color-accent)]">inspectable</span>.
+              </motion.h1>
+
+              <motion.p
+                className="mt-6 max-w-[54ch] border-t border-solid border-[var(--section-divider)] pt-5 font-display text-[clamp(1.05rem,1.6vw,1.25rem)] italic leading-[1.55] text-[var(--text-secondary)]"
+                variants={subtextVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                Continuously discovers companies, reviews them against your fund thesis, records disagreement, and
+                produces investment-ready records — every decision traceable to its evidence.
+              </motion.p>
+
+              <motion.p
+                className="mt-4 font-mono text-[9.5px] uppercase tracking-[0.12em] text-[var(--text-subtle)]"
+                initial={reduce ? false : { opacity: 0 }}
+                animate={reduce ? undefined : { opacity: 1 }}
+                transition={{ duration: reduce ? 0 : 0.6, delay: reduce ? 0 : 0.55 }}
+              >
+                By the partner engine · updated continuously
+              </motion.p>
+
+              <motion.div
+                className="mt-6 max-w-[640px] font-sans text-[14px] leading-[1.68] text-[var(--text-secondary)] sm:columns-2 sm:gap-9"
+                initial={reduce ? false : { opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{ duration: reduce ? 0 : 0.7, ease: SCROLL_EASE }}
+              >
+                <p className="mb-3">
+                  <span className="editorial-display float-left mr-1 text-[3rem] font-medium leading-[0.76] text-[var(--color-oxford)]">
+                    F
+                  </span>
+                  our independent scouts search the live web for real companies — market-driven, technical,
+                  pain-point, and contrarian — never a static list. Each candidate is scored by three reviewer modes
+                  built to disagree.
+                </p>
+                <p>
+                  Where a rule-based partner engine finds consensus, it rules automatically. Where reviewers split,
+                  the disagreement is preserved on the record rather than averaged away.
+                </p>
+              </motion.div>
+
+              <CtaTextLink to="/request-access" className="mt-7">
+                See today's full record
+              </CtaTextLink>
+            </div>
+
+            {/* Sidebar — today's record, above the fold */}
             <motion.div
-              className="mt-12 flex flex-col gap-8 md:flex-row md:items-end md:justify-between md:gap-16"
-              variants={subtextVariants}
-              initial="hidden"
-              animate="visible"
+              ref={sidebarRef}
+              initial={reduce ? false : { opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: reduce ? 0 : 0.8, ease: SCROLL_EASE }}
             >
-              <p className="max-w-[42ch] font-sans text-[clamp(15px,1.4vw,18px)] leading-[1.7] text-[var(--text-secondary)]">
-                An autonomous analyst that sources, reviews, and decides on startups for venture funds — and shows its
-                work in one record you can open.
+              <p className="flex items-center gap-2 border-t border-solid border-[var(--section-divider)] pt-4 font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--text-subtle)]">
+                <motion.span
+                  className="h-[5px] w-[5px] shrink-0 rounded-full bg-[var(--color-accent)]"
+                  animate={reduce ? undefined : { opacity: [1, 0.3, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                />
+                Today's record · live
               </p>
-              <div className="flex items-center gap-7">
-                <CtaTextLink to="/request-access">Request access</CtaTextLink>
-                <span className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--text-subtle)] sm:inline">
-                  By invitation
-                </span>
+              <p className="mt-5 editorial-display text-[1.4rem] font-medium leading-[1.15] text-[var(--color-oxford)]">
+                European Infrastructure Co.
+              </p>
+              <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.08em] text-[var(--text-subtle)]">
+                B2B Infrastructure · Series A · London
+              </p>
+              <span className="mt-4 inline-block border border-solid border-[var(--color-accent)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-accent)]">
+                Invest
+              </span>
+              <div className="mt-5 flex gap-6 font-mono text-[10.5px]">
+                {RECORD_SCORES.map((s) => (
+                  <div key={s.label}>
+                    <p className="text-[15px] text-[var(--color-oxford)]">
+                      <CountUp to={s.to} active={sidebarInView} reduce={!!reduce} />
+                    </p>
+                    <p className="mt-0.5 text-[8.5px] uppercase tracking-[0.05em] text-[var(--text-subtle)]">
+                      {s.label}
+                    </p>
+                  </div>
+                ))}
               </div>
+              <p className="mt-5 font-display text-[12.5px] italic leading-[1.55] text-[var(--text-secondary)]">
+                "Reviewer disagreement surfaced. Mandate fit recorded." — the actual output, not a mockup.
+              </p>
             </motion.div>
           </div>
         </section>
@@ -137,7 +240,7 @@ export default function HomePage() {
             amount={0.18}
           >
             <div className="max-w-md md:sticky md:top-32">
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--label-muted)]">02 — Mandate</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">Mandate</p>
               <p
                 id="mandate-heading"
                 className="mt-6 font-sans text-[clamp(1.15rem,2.1vw,1.5rem)] font-light leading-[1.5] text-[var(--color-oxford)]"
@@ -148,29 +251,27 @@ export default function HomePage() {
             </div>
 
             <div className="w-full max-w-[480px] md:justify-self-end">
-              <div className="border border-solid border-[var(--section-divider)] bg-[var(--color-paper-deep)] p-8 sm:p-10">
-                <div className="flex items-center justify-between">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)]">
-                    Active mandate
-                  </p>
-                  <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-accent)]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" aria-hidden /> Live
-                  </span>
-                </div>
-                <h3 className="mt-7 editorial-display text-[clamp(1.5rem,2.6vw,2.1rem)] font-normal leading-[1.1] tracking-[-0.01em] text-[var(--color-oxford)]">
-                  Deep-Tech Infrastructure
-                </h3>
-                <p className="mt-4 font-sans text-[15px] leading-[1.7] text-[var(--text-secondary)]">
-                  Backing infrastructure teams building the plumbing of the next compute cycle — capital-efficient, with a
-                  defensible wedge.
+              <div className="flex items-center justify-between border-t border-solid border-[var(--section-divider)] pt-5">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+                  Active mandate
                 </p>
-                <div className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-solid border-[var(--section-divider)] pt-6 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
-                  <span>B2B Infrastructure</span>
-                  <span className="text-[var(--text-subtle)]">/</span>
-                  <span>Series A–B</span>
-                  <span className="text-[var(--text-subtle)]">/</span>
-                  <span>European Markets</span>
-                </div>
+                <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-accent)]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" aria-hidden /> Live
+                </span>
+              </div>
+              <h3 className="mt-6 editorial-display text-[clamp(1.5rem,2.6vw,2.1rem)] font-normal leading-[1.1] tracking-[-0.01em] text-[var(--color-oxford)]">
+                Deep-Tech Infrastructure
+              </h3>
+              <p className="mt-4 font-sans text-[15px] leading-[1.7] text-[var(--text-secondary)]">
+                Backing infrastructure teams building the plumbing of the next compute cycle — capital-efficient, with a
+                defensible wedge.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-subtle)]">
+                <span>B2B Infrastructure</span>
+                <span className="text-[var(--text-subtle)]">/</span>
+                <span>Series A–B</span>
+                <span className="text-[var(--text-subtle)]">/</span>
+                <span>European Markets</span>
               </div>
             </div>
           </ScrollReveal>
@@ -199,15 +300,15 @@ export default function HomePage() {
               caption underneath, not a headline above. Inverts the title→content order
               used by the other sections so the page doesn't read as one repeated template. */}
           <ScrollReveal className="page-margin-x py-[clamp(6rem,16vh,12rem)]" y={20} amount={0.16}>
-            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--label-muted)]">06 — On demand</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">On demand</p>
 
             <div className="mx-auto mt-8 w-full max-w-[760px]" aria-hidden>
               <LookupCommandBar query={DEMO_LOOKUP_QUERY} trailing="run" />
-              <div className="mt-10 flex flex-col gap-4 md:flex-row md:gap-10">
-                <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)] md:w-[120px] md:pt-2">
+              <div className="mt-10 flex flex-col gap-4 border-t border-solid border-[var(--section-divider)] pt-8 md:flex-row md:gap-10">
+                <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)] md:w-[120px]">
                   ↳ Record
                 </p>
-                <div className="w-full max-w-[520px] border border-solid border-[var(--section-divider)] bg-[var(--color-paper-deep)] p-4 sm:p-6">
+                <div className="w-full max-w-[520px]">
                   <LookupResultSnapshot {...DEMO_LOOKUP_RESULT} />
                 </div>
               </div>
@@ -231,7 +332,8 @@ export default function HomePage() {
         >
           <div className="page-margin-x py-[clamp(8rem,22vh,16rem)]">
             <ScrollReveal y={22} amount={0.25} className="max-w-[1100px]">
-              <h2 className="editorial-display max-w-[16ch] font-normal text-[clamp(2.85rem,8vw,7rem)] leading-[0.95] tracking-[-0.025em] text-[var(--color-oxford)]">
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">Access</p>
+              <h2 className="editorial-display mt-3 max-w-[16ch] font-normal text-[clamp(2.85rem,8vw,7rem)] leading-[0.95] tracking-[-0.025em] text-[var(--color-oxford)]">
                 For funds that need judgment with{' '}
                 <span className="italic text-[var(--color-accent)]">memory</span>.
               </h2>
@@ -242,6 +344,9 @@ export default function HomePage() {
               <div className="mt-12">
                 <CtaTextLink to="/request-access">Request access</CtaTextLink>
               </div>
+              <p className="mt-16 font-mono text-[9.5px] uppercase tracking-[0.2em] text-[var(--text-subtle)]">
+                — End of record —
+              </p>
             </ScrollReveal>
           </div>
         </section>

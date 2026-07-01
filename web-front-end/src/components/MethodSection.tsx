@@ -2,7 +2,6 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { motion, useReducedMotion } from 'framer-motion';
-import SectionKicker from './SectionKicker';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -167,7 +166,9 @@ export default function MethodSection() {
       aria-labelledby="method-heading"
     >
       <div className="page-margin-x py-[clamp(5rem,13vh,10rem)]">
-        <SectionKicker folio="04" label="How the judgment is formed" className="mb-16 justify-center" />
+        <p className="mb-16 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">
+          How the judgment is formed
+        </p>
 
         {/* drawn spine (desktop only) */}
         <div className="pointer-events-none absolute left-1/2 top-0 hidden h-full w-px -translate-x-1/2 overflow-hidden bg-[var(--section-divider)] md:block">

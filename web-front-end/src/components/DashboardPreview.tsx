@@ -59,9 +59,9 @@ export default function DashboardPreview() {
       >
         <p
           id="record-heading"
-          className="border-b border-solid border-[var(--section-divider)] pb-6 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--label-muted)]"
+          className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]"
         >
-          [ 04 // The record — the system shows its work ]
+          The record — the system shows its work
         </p>
 
         <div className="mt-14 grid gap-14 md:grid-cols-[0.72fr_1.28fr] md:items-start md:gap-20">
@@ -86,12 +86,10 @@ export default function DashboardPreview() {
           </div>
 
           <motion.div variants={memoVariants} className="w-full" aria-label="Investment memo sample output">
-            <p className="mb-5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)]">
+            <p className="mb-5 border-t border-solid border-[var(--section-divider)] pt-5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
               Investment memo · sample output
             </p>
-            <div className="border border-solid border-[var(--section-divider)] bg-[var(--color-paper-deep)] p-4 sm:p-6">
-              <LookupResultSnapshot {...DEMO_LOOKUP_MEMO_SAMPLE} />
-            </div>
+            <LookupResultSnapshot {...DEMO_LOOKUP_MEMO_SAMPLE} />
           </motion.div>
         </div>
       </motion.div>

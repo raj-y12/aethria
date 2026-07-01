@@ -77,10 +77,8 @@ export default function MarketSection() {
       <div className="page-margin-x py-[clamp(6rem,16vh,12rem)]">
         {/* Raw field header — a terminal readout, not a title block. Typography stays
             small so the map (the actual graphic) carries the section, not a headline. */}
-        <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4 border-b border-solid border-[var(--section-divider)] pb-6">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--label-muted)]">
-            [ Field reading // 03 ]
-          </p>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4">
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">Markets</p>
           <p className="font-mono text-[12px] leading-[1.6] tracking-[0.04em] text-[var(--text-secondary)] sm:text-right">
             <span ref={scannedRef} className="text-[var(--color-accent)]">
               {SCANNED_TOTAL.toLocaleString()}

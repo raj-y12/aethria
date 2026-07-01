@@ -60,12 +60,14 @@ export default function ReviewDisagreement() {
       aria-labelledby="disagreement-heading"
     >
       <div className="page-margin-x py-[clamp(7rem,18vh,13rem)]">
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">The Review</p>
+
         {/* Split statement — headline and gloss run side by side, not stacked, so this
             doesn't repeat the kicker→title→paragraph cadence used elsewhere on the page. */}
         <ScrollReveal
           y={20}
           amount={0.2}
-          className="grid grid-cols-1 items-end gap-10 md:grid-cols-[1.35fr_1fr] md:gap-16"
+          className="mt-6 grid grid-cols-1 items-end gap-10 md:grid-cols-[1.35fr_1fr] md:gap-16"
         >
           <h2
             id="disagreement-heading"
@@ -114,20 +116,16 @@ export default function ReviewDisagreement() {
               </div>
             </motion.div>
           ))}
-          <div className="border-t border-solid border-[var(--section-divider)]" />
         </div>
 
-        {/* Partner resolution — one quiet line, generous air */}
-        <ScrollReveal y={18} amount={0.4} className="mt-20 max-w-[820px] md:mt-28">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--label-muted)]">
-            Partner layer · recorded decision
+        {/* Partner resolution — a real pull-quote, centered, no rule */}
+        <ScrollReveal y={18} amount={0.4} className="mt-24 text-center md:mt-32">
+          <p className="editorial-display mx-auto max-w-[26ch] text-[clamp(1.6rem,3.6vw,2.6rem)] italic leading-[1.32] text-[var(--color-oxford)]">
+            "Aethria does not average reviewers into a comfortable number — it preserves the split, and hands the
+            partner layer the real picture."
           </p>
-          <p className="mt-6 editorial-display text-[clamp(2rem,5vw,3.6rem)] font-normal leading-[1.0] tracking-[-0.02em] text-[var(--color-oxford)]">
-            The split resolves to <span className="italic text-[var(--color-accent)]">Monitor</span>.
-          </p>
-          <p className="mt-6 max-w-[52ch] font-sans text-[16px] leading-[1.7] text-[var(--text-secondary)]">
-            Versioned partner logic reconciles the disagreement into one logged verdict — with every reviewer's dissent
-            kept on the record, not erased by it.
+          <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+            — The split resolves to <span className="text-[var(--color-accent)]">Monitor</span>
           </p>
         </ScrollReveal>
       </div>
