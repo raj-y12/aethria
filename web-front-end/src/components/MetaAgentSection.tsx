@@ -34,7 +34,7 @@ export default function MetaAgentSection() {
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="meta-heading"
     >
-      <div className="page-margin-x py-[clamp(6rem,16vh,12rem)]">
+      <div className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]">
         <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4">
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">
             A5 — The Meta-Agent
@@ -60,11 +60,11 @@ export default function MetaAgentSection() {
           looks and judges — never the thesis itself, and never without a record of the change.
         </p>
 
-        <div className="mt-16 grid grid-cols-1 border-t border-solid border-[var(--section-divider)] md:grid-cols-3">
+        <div className="mt-8 grid grid-cols-1 border-t border-solid border-[var(--section-divider)] md:grid-cols-3">
           {PROCESSES.map((p, i) => (
             <motion.div
               key={p.label}
-              className={`py-9 md:py-11 md:pr-9 ${i > 0 ? 'border-t border-solid border-[var(--section-divider)] md:border-l md:border-t-0 md:pl-9' : ''}`}
+              className={`py-6 md:py-7 md:pr-9 ${i > 0 ? 'border-t border-solid border-[var(--section-divider)] md:border-l md:border-t-0 md:pl-9' : ''}`}
               initial={reduce ? false : { opacity: 0, y: 18 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.4 }}

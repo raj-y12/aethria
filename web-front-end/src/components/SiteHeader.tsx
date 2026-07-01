@@ -19,12 +19,7 @@ function scrollToAnchor(e: MouseEvent<HTMLAnchorElement>, href: string) {
   else el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-export interface SiteHeaderProps {
-  /** When set, show a back link instead of section nav (secondary pages). */
-  backTo?: { href: string; label: string };
-}
-
-export default function SiteHeader({ backTo }: SiteHeaderProps) {
+export default function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -44,35 +39,27 @@ export default function SiteHeader({ backTo }: SiteHeaderProps) {
           Aethria<span className="wordmark-dot">.</span>
         </Link>
 
-        {backTo ? (
-          <Link
-            to={backTo.href}
-            className="inline-flex min-h-[44px] items-center px-1 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--label-muted)] transition-colors duration-200 hover:text-[var(--color-accent)]"
+        <div className="flex items-center gap-7">
+          <nav aria-label="Section navigation" className="inst-site-header-nav">
+            {NAV_LINKS.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={(e) => scrollToAnchor(e, item.href)}
+                className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--label-muted)] transition-colors duration-200 hover:text-[var(--color-accent)]"
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
+          <a
+            href="#access"
+            onClick={(e) => scrollToAnchor(e, '#access')}
+            className="hidden min-h-[40px] items-center border border-[var(--section-divider)] px-4 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-secondary)] transition-colors duration-300 hover:border-[var(--color-oxford)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] sm:inline-flex"
           >
-            {backTo.label}
-          </Link>
-        ) : (
-          <div className="flex items-center gap-7">
-            <nav aria-label="Section navigation" className="inst-site-header-nav">
-              {NAV_LINKS.map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  onClick={(e) => scrollToAnchor(e, item.href)}
-                  className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--label-muted)] transition-colors duration-200 hover:text-[var(--color-accent)]"
-                >
-                  {item.label}
-                </a>
-              ))}
-            </nav>
-            <Link
-              to="/request-access"
-              className="hidden min-h-[40px] items-center border border-[var(--section-divider)] px-4 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-secondary)] transition-colors duration-300 hover:border-[var(--color-oxford)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] sm:inline-flex"
-            >
-              Request access
-            </Link>
-          </div>
-        )}
+            Request access
+          </a>
+        </div>
       </div>
     </header>
   );

@@ -17,7 +17,7 @@ export default function PortfolioSection() {
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="portfolio-heading"
     >
-      <div className="page-margin-x py-[clamp(6rem,16vh,12rem)]">
+      <div className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]">
         <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A8 — The Portfolio</p>
 
         <motion.div

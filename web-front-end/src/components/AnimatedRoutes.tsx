@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import SystemAccessPage from './SystemAccessPage';
 import HomePage from '../HomePage';
-import RequestAccessPage from '../RequestAccessPage';
 
 const DURATION = 0.3;
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -29,10 +28,18 @@ export default function AnimatedRoutes() {
   const navigate = useNavigate();
 
   const pathname = location.pathname;
+
+  // The application form now lives at the bottom of /home (#access) instead of its
+  // own route. Redirect any old bookmarked/shared /request-access links there.
+  useEffect(() => {
+    if (pathname !== '/request-access') return;
+    navigate(`/home${location.search}#access`, { replace: true });
+  }, [pathname, location.search, navigate]);
+
   let element: React.ReactNode = null;
   if (pathname === '/') element = <SystemAccessPage />;
   else if (pathname === '/home') element = <HomePage />;
-  else if (pathname === '/request-access') element = <RequestAccessPage />;
+  else if (pathname === '/request-access') element = null; // mid-redirect, see effect above
   else if (privateRoutes[pathname]) {
     const PrivateComponent = privateRoutes[pathname];
     element = (

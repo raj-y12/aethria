@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, useInView, useReducedMotion, type Variants } from 'framer-motion';
-import { CtaTextLink } from './components/CtaButton';
 import GrainOverlay from './components/GrainOverlay';
 import SiteHeader from './components/SiteHeader';
 import MarketTape from './components/MarketTape';
@@ -11,6 +10,7 @@ import MetaAgentSection from './components/MetaAgentSection';
 import DashboardPreview from './components/DashboardPreview';
 import ReviewDisagreement from './components/ReviewDisagreement';
 import PortfolioSection from './components/PortfolioSection';
+import AccessForm from './components/AccessForm';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SCROLL_EASE } from './motionTokens';
 
@@ -50,6 +50,20 @@ import {
 
 const LINKEDIN_URL = 'https://www.linkedin.com/company/aethria';
 
+/** Matches CtaTextLink's rendered classes (see components/CtaButton.tsx) for plain <a> anchor-scroll CTAs. */
+const CTA_TEXT_LINK_CLASS =
+  'group inline-flex items-center gap-3.5 border-b border-solid border-[var(--color-oxford)] pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--color-oxford)] transition-[gap] duration-300 ease-out hover:gap-6';
+
+/** Smooth-scrolls to an in-page anchor via Lenis when present, matching SiteHeader's nav links. */
+function scrollToAnchor(e: MouseEvent<HTMLAnchorElement>, href: string) {
+  const el = document.querySelector(href);
+  if (!el) return;
+  e.preventDefault();
+  const lenis = (window as unknown as { __lenis?: { scrollTo: (t: Element, o?: { offset?: number }) => void } }).__lenis;
+  if (lenis) lenis.scrollTo(el, { offset: -88 });
+  else el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 const FOOTER_COLUMNS: { heading: string; items: string[] }[] = [
   { heading: 'Product', items: ['Fund thesis', 'On-demand lookup', 'Investment memos', 'Portfolio signals'] },
   { heading: 'Pipeline', items: ['Scout', 'Review', 'Decide', 'Portfolio'] },
@@ -57,16 +71,18 @@ const FOOTER_COLUMNS: { heading: string; items: string[] }[] = [
 
 export default function HomePage() {
   const reduce = useReducedMotion();
-  const navigate = useNavigate();
-  const [footerEmail, setFooterEmail] = useState('');
   const sidebarRef = useRef<HTMLDivElement | null>(null);
   const sidebarInView = useInView(sidebarRef, { once: true, amount: 0.5 });
 
-  const handleFooterSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    const trimmed = footerEmail.trim();
-    navigate(trimmed ? `/request-access?email=${encodeURIComponent(trimmed)}` : '/request-access');
-  };
+  // The application form lives at the bottom of this page now (no separate
+  // /request-access route); honour old bookmarked/shared #access links.
+  useEffect(() => {
+    if (window.location.hash !== '#access') return;
+    const el = document.getElementById('access');
+    if (!el) return;
+    const t = setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+    return () => clearTimeout(t);
+  }, []);
 
   const subtextVariants: Variants = reduce
     ? { hidden: { opacity: 1, y: 0 }, visible: { opacity: 1, y: 0 } }
@@ -177,9 +193,10 @@ export default function HomePage() {
                 </p>
               </motion.div>
 
-              <CtaTextLink to="/request-access" className="mt-7">
-                See today's full record
-              </CtaTextLink>
+              <a href="#market" onClick={(e) => scrollToAnchor(e, '#market')} className={`${CTA_TEXT_LINK_CLASS} mt-7`}>
+                <span>See today's full record</span>
+                <span aria-hidden>→</span>
+              </a>
             </div>
 
             {/* Sidebar — today's record, above the fold */}
@@ -239,7 +256,7 @@ export default function HomePage() {
               gets the larger column; the statement runs small and plain beside it, not as
               a display headline. Breaks from the kicker→title→paragraph shape used elsewhere. */}
           <ScrollReveal
-            className="page-margin-x grid items-start gap-14 py-[clamp(6rem,16vh,12rem)] md:grid-cols-[0.8fr_1fr] md:gap-16"
+            className="page-margin-x grid items-start gap-10 py-[clamp(2.5rem,6vh,4rem)] md:grid-cols-[0.8fr_1fr] md:gap-16"
             y={20}
             amount={0.18}
           >
@@ -309,7 +326,7 @@ export default function HomePage() {
           {/* Interaction-first — the command line and record lead; the explanation is a
               caption underneath, not a headline above. Inverts the title→content order
               used by the other sections so the page doesn't read as one repeated template. */}
-          <ScrollReveal className="page-margin-x py-[clamp(6rem,16vh,12rem)]" y={20} amount={0.16}>
+          <ScrollReveal className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]" y={20} amount={0.16}>
             <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A9 — On demand</p>
 
             <div className="mx-auto mt-8 w-full max-w-[760px]" aria-hidden>
@@ -340,7 +357,7 @@ export default function HomePage() {
           className="w-full border-t border-solid border-[var(--section-divider)]"
           style={{ backgroundColor: 'var(--color-paper)' }}
         >
-          <div className="page-margin-x py-[clamp(8rem,22vh,16rem)]">
+          <div className="page-margin-x py-[clamp(3.5rem,8vh,5.5rem)]">
             <ScrollReveal y={22} amount={0.25} className="max-w-[1100px]">
               <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A10 — Access</p>
               <h2 className="editorial-display mt-3 max-w-[16ch] font-normal text-[clamp(2.85rem,8vw,7rem)] leading-[0.95] tracking-[-0.025em] text-[var(--color-oxford)]">
@@ -352,9 +369,12 @@ export default function HomePage() {
                 trail attached.
               </p>
               <div className="mt-12">
-                <CtaTextLink to="/request-access">Request access</CtaTextLink>
+                <a href="#access" onClick={(e) => scrollToAnchor(e, '#access')} className={CTA_TEXT_LINK_CLASS}>
+                  <span>Request access</span>
+                  <span aria-hidden>→</span>
+                </a>
               </div>
-              <p className="mt-16 font-mono text-[9.5px] uppercase tracking-[0.2em] text-[var(--text-subtle)]">
+              <p className="mt-8 font-mono text-[9.5px] uppercase tracking-[0.2em] text-[var(--text-subtle)]">
                 — End of record —
               </p>
             </ScrollReveal>
@@ -372,44 +392,23 @@ export default function HomePage() {
         >
           <GrainOverlay opacity={0.03} variant="dark" />
 
-          <div className="page-margin-x relative z-10 mx-auto flex w-full max-w-[1200px] flex-col pt-20 pb-12 md:pt-28 md:pb-16">
-            {/* Lead-in — the access capture, folded into the footer's header */}
-            <div className="flex flex-col gap-8 border-b border-solid border-[rgba(244,241,234,0.14)] pb-14 md:flex-row md:items-end md:justify-between md:gap-12 md:pb-16">
+          <div id="access" className="page-margin-x relative z-10 mx-auto flex w-full max-w-[1200px] flex-col pt-12 pb-8 md:pt-16 md:pb-10">
+            {/* The coupon — the access capture, folded into the footer's header */}
+            <div className="grid grid-cols-1 gap-10 border-b border-solid border-[rgba(244,241,234,0.14)] pb-14 md:grid-cols-[0.8fr_1fr] md:gap-16 md:pb-16">
               <div className="max-w-md">
-                <h2 className="font-display text-[clamp(1.7rem,3.4vw,2.4rem)] font-medium leading-[1.12] tracking-[-0.02em] text-[var(--text-inverse)]">
-                  Private updates from the build.
+                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-brand-mark-inverse)]">
+                  Notice of subscriber access
+                </p>
+                <h2 className="mt-4 editorial-display text-[clamp(1.9rem,3.8vw,2.7rem)] font-normal leading-[1.08] tracking-[-0.02em] text-[var(--text-inverse)]">
+                  Request access.
                 </h2>
-                <p className="mt-3 font-sans text-[14px] leading-[1.65] text-[var(--text-inverse-secondary)]">
-                  Occasional notes on investment intelligence, product progress, and access.
+                <p className="mt-4 font-sans text-[14px] leading-[1.65] text-[var(--text-inverse-secondary)]">
+                  Complete the coupon. Seats open in small batches — we'll write when yours is ready. Occasional
+                  notes on investment intelligence and product progress along the way.
                 </p>
               </div>
 
-              <form onSubmit={handleFooterSubmit} className="flex w-full max-w-md flex-col gap-4 sm:flex-row sm:items-end">
-                <label className="min-w-0 flex-1">
-                  <span className="sr-only">Email address</span>
-                  <input
-                    type="email"
-                    name="email"
-                    value={footerEmail}
-                    onChange={(e) => setFooterEmail(e.target.value)}
-                    placeholder="you@firm.com"
-                    autoComplete="email"
-                    className="w-full border-0 border-b border-solid border-[rgba(244,241,234,0.28)] bg-transparent pb-3 font-sans text-[15px] text-[var(--text-inverse)] outline-none transition-colors duration-300 placeholder:text-[rgba(244,241,234,0.4)] focus:border-[var(--color-brand-mark-inverse)]"
-                  />
-                </label>
-                <button
-                  type="submit"
-                  className="group inline-flex h-9 shrink-0 cursor-pointer items-center justify-center bg-[var(--color-paper)] px-8 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--color-oxford)] transition-colors duration-300 hover:bg-[var(--text-inverse)]"
-                >
-                  <span>Request access</span>
-                  <span
-                    className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-200 group-hover:w-4"
-                    aria-hidden
-                  >
-                    {' →'}
-                  </span>
-                </button>
-              </form>
+              <AccessForm />
             </div>
 
             {/* Colophon — one flattened strip, no columns */}
@@ -443,13 +442,14 @@ export default function HomePage() {
                   const isAccess = item === 'Request access';
                   const isLinkedIn = item === 'LinkedIn';
                   const node = isAccess ? (
-                    <Link
+                    <a
                       key={item}
-                      to="/request-access"
+                      href="#access"
+                      onClick={(e) => scrollToAnchor(e, '#access')}
                       className="transition-colors hover:text-[var(--color-brand-mark-inverse)]"
                     >
                       {item}
-                    </Link>
+                    </a>
                   ) : isLinkedIn ? (
                     <a
                       key={item}

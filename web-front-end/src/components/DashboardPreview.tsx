@@ -51,7 +51,7 @@ export default function DashboardPreview() {
       aria-labelledby="record-heading"
     >
       <motion.div
-        className="page-margin-x py-[clamp(6rem,16vh,12rem)]"
+        className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]"
         variants={rowVariants}
         initial="hidden"
         whileInView="visible"
@@ -64,7 +64,7 @@ export default function DashboardPreview() {
           A6 — The record, the system shows its work
         </p>
 
-        <div className="mt-14 grid gap-14 md:grid-cols-[0.72fr_1.28fr] md:items-start md:gap-20">
+        <div className="mt-8 grid gap-10 md:grid-cols-[0.72fr_1.28fr] md:items-start md:gap-16">
           <div className="flex flex-col">
             {FEATURES.map((item) => (
               <motion.div

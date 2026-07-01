@@ -1,8 +1,8 @@
 import AnimatedRoutes from './components/AnimatedRoutes';
 
 /**
- * / = gate; /home = home; /request-access = form. All other paths → /.
- * Home and request-access use a subtle slide + fade transition (Framer Motion).
+ * / = gate; /home = home (the application form lives at /home#access).
+ * /request-access redirects to /home#access for old links. All other paths → /.
  */
 function App() {
   return <AnimatedRoutes />;

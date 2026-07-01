@@ -165,8 +165,8 @@ export default function MethodSection() {
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="method-heading"
     >
-      <div className="page-margin-x py-[clamp(5rem,13vh,10rem)]">
-        <p className="mb-16 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">
+      <div className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]">
+        <p className="mb-8 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">
           A4 — How the judgment is formed
         </p>
 
@@ -218,7 +218,7 @@ export default function MethodSection() {
             return (
               <div
                 key={step.n}
-                className="relative grid grid-cols-1 gap-6 py-12 md:min-h-[40vh] md:grid-cols-[1fr_7rem_1fr] md:items-center md:gap-0 md:py-0"
+                className="relative grid grid-cols-1 gap-6 py-8 md:grid-cols-[1fr_7rem_1fr] md:items-center md:gap-0 md:py-10"
               >
                 {/* left cell (col 1) — content pushed toward the spine */}
                 <div className="order-2 flex md:order-none md:col-start-1 md:row-start-1 md:justify-end">

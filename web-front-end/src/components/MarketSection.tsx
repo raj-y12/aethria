@@ -74,7 +74,7 @@ export default function MarketSection() {
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="market-heading"
     >
-      <div className="page-margin-x py-[clamp(6rem,16vh,12rem)]">
+      <div className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]">
         {/* Raw field header — a terminal readout, not a title block. Typography stays
             small so the map (the actual graphic) carries the section, not a headline. */}
         <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4">

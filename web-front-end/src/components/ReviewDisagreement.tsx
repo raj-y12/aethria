@@ -59,7 +59,7 @@ export default function ReviewDisagreement() {
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="disagreement-heading"
     >
-      <div className="page-margin-x py-[clamp(7rem,18vh,13rem)]">
+      <div className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]">
         <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A7 — The Review</p>
 
         {/* Split statement — headline and gloss run side by side, not stacked, so this
@@ -84,14 +84,14 @@ export default function ReviewDisagreement() {
 
         {/* Op-ed spread — three reviewer opinions run as real newspaper columns, split
             by a single hairline column rule (never a box), each with its own byline. */}
-        <p className="mt-20 font-mono text-[9.5px] uppercase tracking-[0.14em] text-[var(--text-subtle)] md:mt-28">
+        <p className="mt-10 font-mono text-[9.5px] uppercase tracking-[0.14em] text-[var(--text-subtle)] md:mt-14">
           Today — three opinions on one company
         </p>
-        <div className="mt-6 grid grid-cols-1 border-t border-solid border-[var(--section-divider)] md:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 border-t border-solid border-[var(--section-divider)] md:grid-cols-3">
           {REVIEWERS.map((r, i) => (
             <motion.div
               key={r.persona}
-              className={`py-9 pr-0 md:py-11 md:pr-9 ${i > 0 ? 'border-t border-solid border-[var(--section-divider)] md:border-l md:border-t-0 md:pl-9' : ''}`}
+              className={`py-6 pr-0 md:py-7 md:pr-9 ${i > 0 ? 'border-t border-solid border-[var(--section-divider)] md:border-l md:border-t-0 md:pl-9' : ''}`}
               initial={reduce ? false : { opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.4 }}
@@ -103,10 +103,10 @@ export default function ReviewDisagreement() {
               <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-[var(--text-subtle)]">
                 {r.mode}
               </p>
-              <p className="mt-5 font-display text-[15px] italic leading-[1.6] text-[var(--text-secondary)]">
+              <p className="mt-3 font-display text-[15px] italic leading-[1.55] text-[var(--text-secondary)]">
                 "{r.take}"
               </p>
-              <div className="mt-6 flex items-center gap-3">
+              <div className="mt-4 flex items-center gap-3">
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
                   style={{ backgroundColor: VERDICT_DOT[r.verdict] }}
@@ -121,7 +121,7 @@ export default function ReviewDisagreement() {
         </div>
 
         {/* Partner resolution — a real pull-quote, centered, no rule */}
-        <ScrollReveal y={18} amount={0.4} className="mt-24 text-center md:mt-32">
+        <ScrollReveal y={18} amount={0.4} className="mt-14 text-center md:mt-16">
           <p className="editorial-display mx-auto max-w-[26ch] text-[clamp(1.6rem,3.6vw,2.6rem)] italic leading-[1.32] text-[var(--color-oxford)]">
             "Aethria does not average reviewers into a comfortable number — it preserves the split, and hands the
             partner layer the real picture."
