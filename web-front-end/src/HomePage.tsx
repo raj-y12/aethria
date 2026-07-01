@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { CtaTextLink } from './components/CtaButton';
 import GrainOverlay from './components/GrainOverlay';
@@ -7,7 +8,6 @@ import MarketSection from './components/MarketSection';
 import MethodSection from './components/MethodSection';
 import DashboardPreview from './components/DashboardPreview';
 import ReviewDisagreement from './components/ReviewDisagreement';
-import NewsletterBand from './components/NewsletterBand';
 import { ScrollReveal } from './components/ScrollReveal';
 import { SCROLL_EASE } from './motionTokens';
 import {
@@ -26,6 +26,14 @@ const FOOTER_COLUMNS: { heading: string; items: string[] }[] = [
 
 export default function HomePage() {
   const reduce = useReducedMotion();
+  const navigate = useNavigate();
+  const [footerEmail, setFooterEmail] = useState('');
+
+  const handleFooterSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = footerEmail.trim();
+    navigate(trimmed ? `/request-access?email=${encodeURIComponent(trimmed)}` : '/request-access');
+  };
 
   const subtextVariants: Variants = reduce
     ? { hidden: { opacity: 1, y: 0 }, visible: { opacity: 1, y: 0 } }
@@ -238,33 +246,71 @@ export default function HomePage() {
           </div>
         </section>
 
-        <NewsletterBand />
-
+        {/* Footer — a real bg-colour break (oxford), the one dark moment on the page.
+            The "request access" capture is its lead-in, not a separate section above it. */}
         <motion.footer
-          className="home-footer relative z-20 w-full shrink-0 border-t border-solid border-[var(--section-divider)]"
-          style={{ backgroundColor: 'var(--color-paper)' }}
+          className="home-footer relative z-20 w-full shrink-0 overflow-hidden bg-[var(--color-oxford)]"
           initial={reduce ? false : { opacity: 0, y: 18 }}
           whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
+          viewport={{ once: true, amount: 0.15 }}
           transition={{ duration: reduce ? 0 : 0.52, ease: SCROLL_EASE }}
         >
-          {/* Colophon — one flattened strip, no columns. The wordmark and the one-line
-              descriptor read like a book's closing imprint; the nav collapses into a single
-              slash-separated run of micro-links beneath it. */}
-          <div className="page-margin-x mx-auto flex w-full max-w-[1200px] flex-col pt-16 pb-10 md:pt-24 md:pb-14">
-            <div className="flex flex-col gap-6 border-b border-solid border-[var(--section-divider)] pb-10 md:flex-row md:items-end md:justify-between md:gap-12">
+          <GrainOverlay opacity={0.03} variant="dark" />
+
+          <div className="page-margin-x relative z-10 mx-auto flex w-full max-w-[1200px] flex-col pt-20 pb-12 md:pt-28 md:pb-16">
+            {/* Lead-in — the access capture, folded into the footer's header */}
+            <div className="flex flex-col gap-8 border-b border-solid border-[rgba(244,241,234,0.14)] pb-14 md:flex-row md:items-end md:justify-between md:gap-12 md:pb-16">
+              <div className="max-w-md">
+                <h2 className="font-display text-[clamp(1.7rem,3.4vw,2.4rem)] font-medium leading-[1.12] tracking-[-0.02em] text-[var(--text-inverse)]">
+                  Private updates from the build.
+                </h2>
+                <p className="mt-3 font-sans text-[14px] leading-[1.65] text-[var(--text-inverse-secondary)]">
+                  Occasional notes on investment intelligence, product progress, and access.
+                </p>
+              </div>
+
+              <form onSubmit={handleFooterSubmit} className="flex w-full max-w-md flex-col gap-4 sm:flex-row sm:items-end">
+                <label className="min-w-0 flex-1">
+                  <span className="sr-only">Email address</span>
+                  <input
+                    type="email"
+                    name="email"
+                    value={footerEmail}
+                    onChange={(e) => setFooterEmail(e.target.value)}
+                    placeholder="you@firm.com"
+                    autoComplete="email"
+                    className="w-full border-0 border-b border-solid border-[rgba(244,241,234,0.28)] bg-transparent pb-3 font-sans text-[15px] text-[var(--text-inverse)] outline-none transition-colors duration-300 placeholder:text-[rgba(244,241,234,0.4)] focus:border-[var(--color-brand-mark-inverse)]"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="group inline-flex h-9 shrink-0 cursor-pointer items-center justify-center bg-[var(--color-paper)] px-8 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--color-oxford)] transition-colors duration-300 hover:bg-[var(--text-inverse)]"
+                >
+                  <span>Request access</span>
+                  <span
+                    className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-200 group-hover:w-4"
+                    aria-hidden
+                  >
+                    {' →'}
+                  </span>
+                </button>
+              </form>
+            </div>
+
+            {/* Colophon — one flattened strip, no columns */}
+            <div className="flex flex-col gap-6 pt-12 md:flex-row md:items-end md:justify-between md:gap-12">
               <div className="min-w-0">
                 <Link
                   to="/home"
-                  className="font-wordmark text-[22px] font-medium leading-none text-[var(--color-oxford)] transition-opacity hover:opacity-80"
+                  className="font-wordmark text-[22px] font-medium leading-none text-[var(--text-inverse)] transition-opacity hover:opacity-80"
                 >
-                  Aethria<span className="wordmark-dot">.</span>
+                  Aethria<span className="wordmark-dot" style={{ color: 'var(--color-brand-mark-inverse)' }}>.</span>
                 </Link>
-                <p className="mt-4 max-w-[46ch] font-sans text-[14px] leading-[1.7] text-[var(--text-secondary)]">
+                <p className="mt-4 max-w-[46ch] font-sans text-[14px] leading-[1.7] text-[var(--text-inverse-secondary)]">
                   Private markets intelligence for funds that need the evidence trail, not another beautiful spreadsheet.
                 </p>
               </div>
-              <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)] md:text-right">
+              <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-[rgba(244,241,234,0.4)] md:text-right">
                 AETHRIA_CORE // OPERATIONAL
                 <br />
                 Build {new Date().getFullYear()}.{String(new Date().getMonth() + 1).padStart(2, '0')}
@@ -273,7 +319,7 @@ export default function HomePage() {
 
             <nav
               aria-label="Footer navigation"
-              className="flex flex-wrap items-center gap-x-3 gap-y-3 pt-8 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--label-muted)]"
+              className="flex flex-wrap items-center gap-x-3 gap-y-3 pt-8 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--text-inverse-muted)]"
             >
               {FOOTER_COLUMNS.flatMap((col) => col.items)
                 .concat(['Request access', 'LinkedIn'])
@@ -282,7 +328,11 @@ export default function HomePage() {
                   const isAccess = item === 'Request access';
                   const isLinkedIn = item === 'LinkedIn';
                   const node = isAccess ? (
-                    <Link key={item} to="/request-access" className="transition-colors hover:text-[var(--color-accent)]">
+                    <Link
+                      key={item}
+                      to="/request-access"
+                      className="transition-colors hover:text-[var(--color-brand-mark-inverse)]"
+                    >
                       {item}
                     </Link>
                   ) : isLinkedIn ? (
@@ -291,7 +341,7 @@ export default function HomePage() {
                       href={LINKEDIN_URL}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="transition-colors hover:text-[var(--color-accent)]"
+                      className="transition-colors hover:text-[var(--color-brand-mark-inverse)]"
                     >
                       {item}
                     </a>
@@ -301,19 +351,19 @@ export default function HomePage() {
                   return (
                     <span key={`${item}-wrap`} className="inline-flex items-center gap-3">
                       {node}
-                      {!isLast && <span aria-hidden className="text-[var(--text-subtle)]">/</span>}
+                      {!isLast && <span aria-hidden className="text-[rgba(244,241,234,0.25)]">/</span>}
                     </span>
                   );
                 })}
             </nav>
 
-            <div className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-solid border-[var(--section-divider)] pt-6 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
+            <div className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-solid border-[rgba(244,241,234,0.14)] pt-6 font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(244,241,234,0.5)]">
               <span>© {new Date().getFullYear()} Aethria</span>
-              <span aria-hidden className="text-[var(--text-subtle)]">/</span>
+              <span aria-hidden className="text-[rgba(244,241,234,0.25)]">/</span>
               <span>Confidential</span>
-              <span aria-hidden className="text-[var(--text-subtle)]">/</span>
+              <span aria-hidden className="text-[rgba(244,241,234,0.25)]">/</span>
               <span>For qualified recipients</span>
-              <span aria-hidden className="text-[var(--text-subtle)]">/</span>
+              <span aria-hidden className="text-[rgba(244,241,234,0.25)]">/</span>
               <span>Investment intelligence</span>
             </div>
           </div>
