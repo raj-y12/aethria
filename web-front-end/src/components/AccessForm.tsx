@@ -134,13 +134,6 @@ export default function AccessForm() {
   return (
     <div style={{ opacity: formOut ? 0 : 1, transform: formOut ? 'translateY(-8px)' : 'translateY(0)', transition: TRANSITION_FORM_OUT }}>
       <div className="relative border border-dashed border-[rgba(244,241,234,0.3)] p-6 sm:p-8">
-        <span
-          aria-hidden
-          className="absolute -top-[9px] left-6 bg-[var(--color-oxford)] px-2 font-mono text-[9px] uppercase tracking-[0.14em] text-[rgba(244,241,234,0.45)]"
-        >
-          ✂ Cut along dotted line
-        </span>
-
         <form onSubmit={handleSubmit} className="flex flex-col gap-6" noValidate>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <InverseField id="af-name" label="Name" type="text" value={name} onChange={setName} error={ne} autoComplete="name" maxLength={100} />

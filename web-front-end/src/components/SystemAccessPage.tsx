@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import GrainOverlay from './GrainOverlay';
 
 export interface SystemAccessPageProps {
   hero?: string;
@@ -78,8 +77,6 @@ export default function SystemAccessPage({
       }}
       onTransitionEnd={handleTransitionEnd}
     >
-      <GrainOverlay opacity={0.032} variant="dark" />
-
       <div className="relative z-10 flex flex-col items-center">
         <h1 className={`font-wordmark text-[clamp(2rem,5vw,3rem)] font-medium normal-case leading-none tracking-normal text-[var(--text-inverse)] ${reduce ? '' : 'system-access-hero'}`}>
           {hero === 'Aethria' ? (

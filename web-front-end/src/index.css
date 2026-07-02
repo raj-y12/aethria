@@ -29,6 +29,8 @@
   --font-mono: 'Space Mono', ui-monospace, monospace;
   --font-display: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
   --font-wordmark: 'Playfair Display', 'Georgia', serif;
+  /* Newsprint body — a text serif for running copy (Playfair stays display-only). */
+  --font-serif-text: 'Source Serif 4', 'Georgia', 'Times New Roman', serif;
 
   --page-margin-x: 84px;
   --page-margin-x-mobile: 24px;
@@ -360,6 +362,45 @@ hr.doc-section-separator::before {
   isolation: isolate;
 }
 
+/* ───────────────────────────────────────────────────────────────
+   Broadsheet system — the repeated print moves that make the page
+   read as one newspaper rather than sections with paper colours.
+   ─────────────────────────────────────────────────────────────── */
+
+/* Running body copy — text serif, newsprint measure */
+.np-serif {
+  font-family: var(--font-serif-text);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* Section slug — label only; the section's own hairline is the sole rule per break. */
+.np-head {
+  padding-top: 2px;
+}
+
+.np-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-oxford);
+}
+
+/* Newspaper column setting — justified with a hairline column rule */
+.np-cols {
+  column-rule: 1px solid var(--section-divider);
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+/* Masthead section-nav strip — hairlines only */
+.np-masthead-nav {
+  border-top: 1px solid var(--section-divider);
+  border-bottom: 1px solid var(--section-divider);
+}
+
 /* Rotating broadsheet seal */
 @keyframes seal-spin {
   to {
@@ -622,25 +663,6 @@ hr.doc-section-separator::before {
 }
 @media (hover: none) {
   .btn-interaction:hover:not(:active) {
-    transform: none;
-  }
-}
-
-/* Institutional tape (homepage) */
-.market-tape-marquee {
-  animation: market-tape-marquee 96s linear infinite;
-  will-change: transform;
-}
-
-@keyframes market-tape-marquee {
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .market-tape-marquee {
-    animation: none;
     transform: none;
   }
 }
@@ -999,12 +1021,6 @@ hr.doc-section-separator::before {
   pointer-events: none;
   z-index: 2;
   opacity: 0.85;
-}
-
-/* Market tape — edge fade, terminal calm */
-.market-tape-shell {
-  -webkit-mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
-  mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
 }
 
 /* Metrics ledger strip (JPM / Lazard annual-report rhythm) */

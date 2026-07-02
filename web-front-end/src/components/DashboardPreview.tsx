@@ -51,18 +51,20 @@ export default function DashboardPreview() {
       aria-labelledby="record-heading"
     >
       <motion.div
-        className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]"
+        className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]"
         variants={rowVariants}
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.12, margin: '0px 0px -10% 0px' }}
       >
-        <p
+        <p className="np-head np-label">A6 — The record</p>
+
+        <h2
           id="record-heading"
-          className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]"
+          className="editorial-display mt-6 max-w-[24ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
         >
-          A6 — The record, the system shows its work
-        </p>
+          The system shows its <span className="italic text-[var(--color-accent)]">work</span>.
+        </h2>
 
         <div className="mt-8 grid gap-10 md:grid-cols-[0.72fr_1.28fr] md:items-start md:gap-16">
           <div className="flex flex-col">
@@ -74,10 +76,10 @@ export default function DashboardPreview() {
               >
                 <p className="font-mono text-[11px] text-[var(--color-accent)]">{item.n}</p>
                 <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--color-oxford)]">
+                  <h3 className="editorial-display text-[1.15rem] font-normal leading-[1.15] tracking-[-0.01em] text-[var(--color-oxford)]">
                     {item.label}
-                  </p>
-                  <p className="mt-2 max-w-[38ch] font-sans text-[14px] leading-[1.65] text-[var(--text-secondary)]">
+                  </h3>
+                  <p className="np-serif mt-2 max-w-[38ch] text-[14.5px] leading-[1.65] text-[var(--text-secondary)]">
                     {item.body}
                   </p>
                 </div>
@@ -86,7 +88,7 @@ export default function DashboardPreview() {
           </div>
 
           <motion.div variants={memoVariants} className="w-full" aria-label="Investment memo sample output">
-            <p className="mb-5 border-t border-solid border-[var(--section-divider)] pt-5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+            <p className="mb-5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
               Investment memo · sample output
             </p>
             <LookupResultSnapshot {...DEMO_LOOKUP_MEMO_SAMPLE} />

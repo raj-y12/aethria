@@ -1,9 +1,6 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import type { ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-
-gsap.registerPlugin(ScrollTrigger);
+import { SCROLL_EASE } from '../motionTokens';
 
 const ACCENT = '#3d6b5e';
 const INK = 'rgba(0,20,51,0.25)';
@@ -12,7 +9,7 @@ const INK_DOT = 'rgba(0,20,51,0.4)';
 
 interface Step {
   n: string;
-  title: ReactNode;
+  title: string;
   desc: string;
   viz: ReactNode;
 }
@@ -20,13 +17,7 @@ interface Step {
 const STEPS: Step[] = [
   {
     n: '01',
-    title: (
-      <>
-        Four scouts
-        <br />
-        source it
-      </>
-    ),
+    title: 'Four scouts source it',
     desc: 'Market, builder, pain-point, and contrarian scouts search the live web for real companies — never a static list.',
     viz: (
       <svg viewBox="0 0 260 130">
@@ -57,13 +48,7 @@ const STEPS: Step[] = [
   },
   {
     n: '02',
-    title: (
-      <>
-        Three reviewers
-        <br />
-        argue it
-      </>
-    ),
+    title: 'Three reviewers argue it',
     desc: 'Independent reviewers score each company against your thesis and disagree on purpose. The dissent is kept.',
     viz: (
       <svg viewBox="0 0 190 120">
@@ -83,13 +68,7 @@ const STEPS: Step[] = [
   },
   {
     n: '03',
-    title: (
-      <>
-        One partner
-        <br />
-        rules
-      </>
-    ),
+    title: 'One partner rules',
     desc: 'A versioned, rule-based partner engine records an invest, pass, or monitor decision — only the edge cases reach an LLM.',
     viz: (
       <svg viewBox="0 0 190 120">
@@ -116,13 +95,7 @@ const STEPS: Step[] = [
   },
   {
     n: '04',
-    title: (
-      <>
-        The record
-        <br />
-        is kept
-      </>
-    ),
+    title: 'The record is kept',
     desc: 'Every decision is bound into one investment record with the evidence trail attached, ready to open.',
     viz: (
       <svg viewBox="0 0 190 120">
@@ -138,107 +111,45 @@ const STEPS: Step[] = [
   },
 ];
 
+/** Method — a ruled four-column newspaper explainer: numbered figure above, serif copy below. */
 export default function MethodSection() {
   const reduce = useReducedMotion();
-  const rootRef = useRef<HTMLElement | null>(null);
-  const fillRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const root = rootRef.current;
-    const fill = fillRef.current;
-    if (!root || !fill || reduce) return;
-    const ctx = gsap.context(() => {
-      gsap.to(fill, {
-        scaleY: 1,
-        ease: 'none',
-        scrollTrigger: { trigger: root, start: 'top 65%', end: 'bottom 80%', scrub: 0.9 },
-      });
-    }, root);
-    return () => ctx.revert();
-  }, [reduce]);
 
   return (
     <section
       id="method"
-      ref={rootRef}
-      className="relative w-full border-t border-solid border-[var(--section-divider)]"
+      className="w-full border-t border-solid border-[var(--section-divider)]"
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="method-heading"
     >
-      <div className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]">
-        <p className="mb-8 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">
-          A4 — How the judgment is formed
-        </p>
+      <div className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]">
+        <p className="np-head np-label">A4 — Method</p>
 
-        {/* drawn spine (desktop only) */}
-        <div className="pointer-events-none absolute left-1/2 top-0 hidden h-full w-px -translate-x-1/2 overflow-hidden bg-[var(--section-divider)] md:block">
-          <div ref={fillRef} className="absolute inset-0 origin-top scale-y-0 bg-[var(--color-accent)]" />
-        </div>
+        <h2
+          id="method-heading"
+          className="editorial-display mt-6 max-w-[22ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
+        >
+          How the judgment is <span className="italic text-[var(--color-accent)]">formed</span>.
+        </h2>
 
-        <div className="relative">
-          {STEPS.map((step, i) => {
-            const copyRight = i % 2 === 0; // 01,03 → copy right; 02,04 → copy left
-            const copyEl = (
-              <motion.div
-                className={`max-w-[34ch] ${copyRight ? 'md:text-left' : 'md:text-right'}`}
-                initial={reduce ? false : { opacity: 0, y: 22, filter: 'blur(6px)' }}
-                whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                viewport={{ once: true, amount: 0.4 }}
-                transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <h3 className="editorial-display font-normal text-[clamp(1.6rem,3.4vw,2.8rem)] leading-[1.02] tracking-[-0.015em] text-[var(--color-oxford)]">
-                  {step.title}
-                </h3>
-                <p className="mt-4 font-sans text-[15px] font-light leading-[1.65] text-[var(--text-secondary)]">
-                  {step.desc}
-                </p>
-              </motion.div>
-            );
-            const vizEl = (
-              <motion.div
-                className="w-[clamp(150px,20vw,260px)] text-[var(--color-oxford)]"
-                initial={reduce ? false : { opacity: 0, y: 22, filter: 'blur(6px)' }}
-                whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                viewport={{ once: true, amount: 0.4 }}
-                transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
-              >
-                {step.viz}
-              </motion.div>
-            );
-            {/* On mobile the number is a plain left-aligned label (no spine to anchor a
-                circular node); the circle + connector ticks only appear on md+. */}
-            const nodeEl = (
-              <div className="relative flex items-center justify-start md:justify-center">
-                <span className="absolute right-full mr-1 hidden h-px w-[1.6rem] bg-[var(--section-divider)] md:block" />
-                <span className="absolute left-full ml-1 hidden h-px w-[1.6rem] bg-[var(--section-divider)] md:block" />
-                <span className="z-[3] flex items-center justify-center font-mono text-[11px] tracking-[0.14em] text-[var(--color-accent)] md:h-[2.6rem] md:w-[2.6rem] md:rounded-full md:border md:border-[var(--section-divider)] md:bg-[var(--color-paper)] md:tracking-[0.1em]">
-                  {step.n}
-                </span>
-              </div>
-            );
-
-            return (
-              <div
-                key={step.n}
-                className="relative grid grid-cols-1 gap-3 border-t border-solid border-[var(--section-divider)] py-7 first:border-t-0 md:grid-cols-[1fr_7rem_1fr] md:items-center md:gap-0 md:border-t-0 md:py-10 md:first:border-t-0"
-              >
-                {/* left cell — desktop col 1. Mobile order: copy=2 / viz=3 (consistent across steps). */}
-                <div
-                  className={`flex md:col-start-1 md:row-start-1 md:justify-end ${copyRight ? 'order-3' : 'order-2'}`}
-                >
-                  {copyRight ? vizEl : copyEl}
-                </div>
-                {/* node — desktop centered on the spine; mobile a plain number, first in order. */}
-                <div className="order-1 flex justify-start md:order-none md:col-start-2 md:row-start-1 md:justify-center">
-                  {nodeEl}
-                </div>
-                {/* right cell — desktop col 3. Mobile order: copy=2 / viz=3. */}
-                <div className={`md:col-start-3 md:row-start-1 ${copyRight ? 'order-2' : 'order-3'}`}>
-                  {copyRight ? copyEl : vizEl}
-                </div>
-              </div>
-            );
-          })}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-4">
+          {STEPS.map((step, i) => (
+            <motion.div
+              key={step.n}
+              className={`py-6 md:py-2 md:pr-7 ${i > 0 ? 'border-t border-solid border-[var(--section-divider)] md:border-l md:border-t-0 md:pl-7' : ''}`}
+              initial={reduce ? false : { opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: reduce ? 0 : 0.6, ease: SCROLL_EASE, delay: reduce ? 0 : i * 0.07 }}
+            >
+              <p className="font-mono text-[11px] text-[var(--color-accent)]">{step.n}</p>
+              <div className="mt-3 w-full max-w-[220px] text-[var(--color-oxford)]">{step.viz}</div>
+              <h3 className="editorial-display mt-4 text-[1.25rem] font-normal leading-[1.15] tracking-[-0.01em] text-[var(--color-oxford)]">
+                {step.title}
+              </h3>
+              <p className="np-serif mt-3 text-[14.5px] leading-[1.65] text-[var(--text-secondary)]">{step.desc}</p>
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>

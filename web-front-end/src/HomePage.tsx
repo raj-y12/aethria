@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useInView, useReducedMotion, type Variants } from 'framer-motion';
-import GrainOverlay from './components/GrainOverlay';
+import { motion, useInView, useReducedMotion } from 'framer-motion';
 import SiteHeader from './components/SiteHeader';
-import MarketTape from './components/MarketTape';
+import EditionLoader from './components/EditionLoader';
 import MarketSection from './components/MarketSection';
 import MethodSection from './components/MethodSection';
 import MetaAgentSection from './components/MetaAgentSection';
@@ -52,7 +51,7 @@ const LINKEDIN_URL = 'https://www.linkedin.com/company/aethria';
 
 /** Matches CtaTextLink's rendered classes (see components/CtaButton.tsx) for plain <a> anchor-scroll CTAs. */
 const CTA_TEXT_LINK_CLASS =
-  'group inline-flex items-center gap-3.5 border-b border-solid border-[var(--color-oxford)] pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--color-oxford)] transition-[gap] duration-300 ease-out hover:gap-6';
+  'group inline-flex items-center gap-3.5 border-b border-solid border-[rgba(0,20,51,0.3)] pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--color-oxford)] transition-[gap] duration-300 ease-out hover:gap-6 hover:border-[var(--color-oxford)]';
 
 /** Smooth-scrolls to an in-page anchor via Lenis when present, matching SiteHeader's nav links. */
 function scrollToAnchor(e: MouseEvent<HTMLAnchorElement>, href: string) {
@@ -64,15 +63,11 @@ function scrollToAnchor(e: MouseEvent<HTMLAnchorElement>, href: string) {
   else el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-const FOOTER_COLUMNS: { heading: string; items: string[] }[] = [
-  { heading: 'Product', items: ['Fund thesis', 'On-demand lookup', 'Investment memos', 'Portfolio signals'] },
-  { heading: 'Pipeline', items: ['Scout', 'Review', 'Decide', 'Portfolio'] },
-];
-
 export default function HomePage() {
   const reduce = useReducedMotion();
   const sidebarRef = useRef<HTMLDivElement | null>(null);
   const sidebarInView = useInView(sidebarRef, { once: true, amount: 0.5 });
+  const [introDone, setIntroDone] = useState(false);
 
   // The application form lives at the bottom of this page now (no separate
   // /request-access route); honour old bookmarked/shared #access links.
@@ -84,19 +79,12 @@ export default function HomePage() {
     return () => clearTimeout(t);
   }, []);
 
-  const subtextVariants: Variants = reduce
-    ? { hidden: { opacity: 1, y: 0 }, visible: { opacity: 1, y: 0 } }
-    : {
-        hidden: { opacity: 0, y: 18 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.55, delay: 0.34, ease: SCROLL_EASE } },
-      };
-
   return (
     <div
       className="relative flex min-h-[100dvh] w-full flex-col overflow-x-hidden"
       style={{ backgroundColor: 'var(--surface-base)', color: 'var(--text-primary)' }}
     >
-      <GrainOverlay opacity={0.028} variant="light" />
+      {!introDone && <EditionLoader onDone={() => setIntroDone(true)} />}
 
       <SiteHeader />
 
@@ -107,78 +95,54 @@ export default function HomePage() {
           className="home-hero-section relative w-full overflow-hidden"
           style={{ backgroundColor: 'var(--color-paper)' }}
         >
-          <div className="page-margin-x flex items-center justify-between pt-7 font-mono text-[9.5px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
-            <span>Vol. I · No. 1</span>
-            <span className="hidden sm:inline">Fund Intelligence Edition</span>
-            <span>By invitation</span>
+          <div className="page-margin-x pt-7 text-center font-mono text-[9.5px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </div>
 
-          <motion.div
-            className="mt-3 text-center"
-            initial={reduce ? false : { opacity: 0, y: 10 }}
-            animate={reduce ? undefined : { opacity: 1, y: 0 }}
-            transition={{ duration: reduce ? 0 : 0.8, ease: SCROLL_EASE }}
-          >
+          <div className="mt-3 text-center">
             <p className="font-wordmark text-[clamp(2.1rem,5vw,3.1rem)] font-medium leading-none tracking-[-0.01em] text-[var(--color-oxford)]">
               Aethria<span className="wordmark-dot">.</span>
             </p>
-            <p className="mt-2 font-mono text-[9.5px] uppercase tracking-[0.24em] text-[var(--text-subtle)]">
-              — Private market judgment, recorded —
-            </p>
-          </motion.div>
-
-          <div className="mt-5">
-            <MarketTape />
           </div>
 
-          <div className="page-margin-x grid grid-cols-1 gap-x-14 gap-y-14 py-[clamp(3rem,7vh,5rem)] lg:grid-cols-[1.85fr_1fr]">
+          {/* Section-nav strip — the paper's real navigation, ruled under the nameplate
+              (the sticky compact bar only overlays once this scrolls away). */}
+          <nav aria-label="Section navigation" className="page-margin-x mt-5">
+            <div className="np-masthead-nav flex flex-wrap items-center justify-center gap-x-8 gap-y-1 py-2.5">
+              {[
+                { label: 'The market', href: '#market' },
+                { label: 'Method', href: '#method' },
+                { label: 'Product', href: '#product' },
+                { label: 'Request access', href: '#access' },
+              ].map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  onClick={(e) => scrollToAnchor(e, item.href)}
+                  className="inline-flex min-h-[36px] items-center font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-oxford)] transition-colors duration-200 hover:text-[var(--color-accent)]"
+                >
+                  {item.label}
+                </a>
+              ))}
+            </div>
+          </nav>
+
+          <div className="page-margin-x grid grid-cols-1 gap-x-14 gap-y-14 py-[clamp(2.25rem,5vh,3.5rem)] lg:grid-cols-[1.85fr_1fr]">
             {/* Lede */}
             <div>
-              <motion.p
-                className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]"
-                initial={reduce ? false : { opacity: 0, y: 8 }}
-                animate={reduce ? undefined : { opacity: 1, y: 0 }}
-                transition={{ duration: reduce ? 0 : 0.6, delay: reduce ? 0 : 0.15, ease: SCROLL_EASE }}
-              >
-                Lede — The Thesis Engine
-              </motion.p>
+              <p className="np-head np-label">Lede — The Thesis Engine</p>
 
-              <motion.h1
-                className="editorial-display mt-3 max-w-[17ch] font-normal text-[clamp(2.5rem,6vw,5.2rem)] leading-[1.0] tracking-[-0.02em] text-[var(--color-oxford)]"
-                initial={reduce ? false : { opacity: 0, y: 20 }}
-                animate={reduce ? undefined : { opacity: 1, y: 0 }}
-                transition={{ duration: reduce ? 0 : 0.9, delay: reduce ? 0 : 0.25, ease: SCROLL_EASE }}
-              >
+              <h1 className="editorial-display mt-3 max-w-[17ch] font-normal text-[clamp(2.5rem,6vw,5.2rem)] leading-[1.0] tracking-[-0.02em] text-[var(--color-oxford)]">
                 Private market judgment, made{' '}
                 <span className="italic text-[var(--color-accent)]">inspectable</span>.
-              </motion.h1>
+              </h1>
 
-              <motion.p
-                className="mt-6 max-w-[54ch] border-t border-solid border-[var(--section-divider)] pt-5 font-display text-[clamp(1.05rem,1.6vw,1.25rem)] italic leading-[1.55] text-[var(--text-secondary)]"
-                variants={subtextVariants}
-                initial="hidden"
-                animate="visible"
-              >
+              <p className="mt-6 max-w-[54ch] font-display text-[clamp(1.05rem,1.6vw,1.25rem)] italic leading-[1.55] text-[var(--text-secondary)]">
                 Continuously discovers companies, reviews them against your fund thesis, records disagreement, and
                 produces investment-ready records — every decision traceable to its evidence.
-              </motion.p>
+              </p>
 
-              <motion.p
-                className="mt-4 font-mono text-[9.5px] uppercase tracking-[0.12em] text-[var(--text-subtle)]"
-                initial={reduce ? false : { opacity: 0 }}
-                animate={reduce ? undefined : { opacity: 1 }}
-                transition={{ duration: reduce ? 0 : 0.6, delay: reduce ? 0 : 0.55 }}
-              >
-                By the partner engine · updated continuously
-              </motion.p>
-
-              <motion.div
-                className="mt-6 max-w-[640px] font-sans text-[14px] leading-[1.68] text-[var(--text-secondary)] sm:columns-2 sm:gap-9"
-                initial={reduce ? false : { opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true, amount: 0.4 }}
-                transition={{ duration: reduce ? 0 : 0.7, ease: SCROLL_EASE }}
-              >
+              <div className="np-serif np-cols mt-6 max-w-[640px] text-[15px] leading-[1.68] text-[var(--text-secondary)] sm:columns-2 sm:gap-9">
                 <p className="mb-3">
                   <span className="editorial-display float-left mr-1 text-[3rem] font-medium leading-[0.76] text-[var(--color-oxford)]">
                     F
@@ -191,7 +155,7 @@ export default function HomePage() {
                   Where a rule-based partner engine finds consensus, it rules automatically. Where reviewers split,
                   the disagreement is preserved on the record rather than averaged away.
                 </p>
-              </motion.div>
+              </div>
 
               <a href="#market" onClick={(e) => scrollToAnchor(e, '#market')} className={`${CTA_TEXT_LINK_CLASS} mt-7`}>
                 <span>See today's full record</span>
@@ -199,15 +163,9 @@ export default function HomePage() {
               </a>
             </div>
 
-            {/* Sidebar — today's record, above the fold */}
-            <motion.div
-              ref={sidebarRef}
-              initial={reduce ? false : { opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: reduce ? 0 : 0.8, ease: SCROLL_EASE }}
-            >
-              <p className="flex items-center gap-2 border-t border-solid border-[var(--section-divider)] pt-4 font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--text-subtle)]">
+            {/* Sidebar — today's record, above the fold, split off by a column rule */}
+            <div ref={sidebarRef} className="lg:border-l lg:border-solid lg:border-[var(--section-divider)] lg:pl-10">
+              <p className="flex items-center gap-2 font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--text-subtle)]">
                 <motion.span
                   className="h-[5px] w-[5px] shrink-0 rounded-full bg-[var(--color-accent)]"
                   animate={reduce ? undefined : { opacity: [1, 0.3, 1] }}
@@ -236,10 +194,36 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
-              <p className="mt-5 font-display text-[12.5px] italic leading-[1.55] text-[var(--text-secondary)]">
-                "Reviewer disagreement surfaced. Mandate fit recorded." — the actual output, not a mockup.
-              </p>
-            </motion.div>
+
+              {/* Inside this edition — front-page index into the sections below */}
+              <nav aria-label="Inside this edition" className="mt-9">
+                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--text-subtle)]">Inside</p>
+                <ul className="mt-2">
+                  {[
+                    { folio: 'A3', label: 'The market', href: '#market' },
+                    { folio: 'A4', label: 'Method', href: '#method' },
+                    { folio: 'A6', label: 'The record', href: '#product' },
+                    { folio: 'A7', label: 'The review', href: '#disagreement' },
+                    { folio: 'A9', label: 'On-demand lookup', href: '#lookup' },
+                  ].map((item) => (
+                    <li key={item.href} className="border-t border-solid border-[var(--section-divider)] first:border-t-0">
+                      <a
+                        href={item.href}
+                        onClick={(e) => scrollToAnchor(e, item.href)}
+                        className="group flex min-h-[38px] items-center justify-between gap-4 py-1.5"
+                      >
+                        <span className="font-display text-[14px] leading-tight text-[var(--color-oxford)] transition-colors group-hover:text-[var(--color-accent)]">
+                          {item.label}
+                        </span>
+                        <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-[var(--text-subtle)]">
+                          {item.folio}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            </div>
           </div>
         </section>
 
@@ -256,38 +240,40 @@ export default function HomePage() {
               gets the larger column; the statement runs small and plain beside it, not as
               a display headline. Breaks from the kicker→title→paragraph shape used elsewhere. */}
           <ScrollReveal
-            className="page-margin-x grid items-start gap-10 py-[clamp(2.5rem,6vh,4rem)] md:grid-cols-[0.8fr_1fr] md:gap-16"
+            className="page-margin-x grid items-start gap-10 py-[clamp(2rem,4.5vh,3rem)] md:grid-cols-[0.8fr_1fr] md:gap-16"
             y={20}
             amount={0.18}
           >
             <div className="max-w-md md:sticky md:top-32">
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A2 — Mandate</p>
+              <p className="np-head np-label">A2 — Mandate</p>
               <p
                 id="mandate-heading"
-                className="mt-6 font-sans text-[clamp(1.15rem,2.1vw,1.5rem)] font-light leading-[1.5] text-[var(--color-oxford)]"
+                className="np-serif mt-6 text-[clamp(1.15rem,2.1vw,1.45rem)] leading-[1.5] text-[var(--color-oxford)]"
               >
                 It only looks for what you tell it to. Write the investment thesis once — scouts, reviewers, and
                 partner logic treat it as a hard constraint, not a decorative preference.
               </p>
             </div>
 
-            <div className="w-full max-w-[480px] md:justify-self-end">
-              <div className="flex items-center justify-between border-t border-solid border-[var(--section-divider)] pt-5">
-                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
-                  Active mandate
+            {/* The mandate set as a boxed public notice — the one ruled box on the page
+                besides the coupon, because a notice IS a box in a paper. */}
+            <div className="w-full max-w-[480px] border border-solid border-[var(--section-divider)] p-6 sm:p-7 md:justify-self-end">
+              <div className="flex items-center justify-between border-b border-solid border-[var(--section-divider)] pb-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-oxford)]">
+                  Notice · Active mandate
                 </p>
                 <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-accent)]">
                   <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" aria-hidden /> Live
                 </span>
               </div>
-              <h3 className="mt-6 editorial-display text-[clamp(1.5rem,2.6vw,2.1rem)] font-normal leading-[1.1] tracking-[-0.01em] text-[var(--color-oxford)]">
+              <h3 className="mt-5 editorial-display text-[clamp(1.5rem,2.6vw,2.1rem)] font-normal leading-[1.1] tracking-[-0.01em] text-[var(--color-oxford)]">
                 Deep-Tech Infrastructure
               </h3>
-              <p className="mt-4 font-sans text-[15px] leading-[1.7] text-[var(--text-secondary)]">
+              <p className="np-serif mt-4 text-[15.5px] leading-[1.7] text-[var(--text-secondary)]">
                 Backing infrastructure teams building the plumbing of the next compute cycle — capital-efficient, with a
                 defensible wedge.
               </p>
-              <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-subtle)]">
+              <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-subtle)]">
                 <span>B2B Infrastructure</span>
                 <span className="text-[var(--text-subtle)]">/</span>
                 <span>Series A–B</span>
@@ -323,15 +309,20 @@ export default function HomePage() {
           style={{ backgroundColor: 'var(--color-paper)' }}
           aria-labelledby="lookup-heading"
         >
-          {/* Interaction-first — the command line and record lead; the explanation is a
-              caption underneath, not a headline above. Inverts the title→content order
-              used by the other sections so the page doesn't read as one repeated template. */}
-          <ScrollReveal className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]" y={20} amount={0.16}>
-            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A9 — On demand</p>
+          {/* The command line and record are the artifact; the explanation runs as a caption. */}
+          <ScrollReveal className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]" y={20} amount={0.16}>
+            <p className="np-head np-label">A9 — On demand</p>
+
+            <h2
+              id="lookup-heading"
+              className="editorial-display mt-6 max-w-[24ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
+            >
+              Look up any company, get the <span className="italic text-[var(--color-accent)]">record</span>.
+            </h2>
 
             <div className="mx-auto mt-8 w-full max-w-[760px]" aria-hidden>
               <LookupCommandBar query={DEMO_LOOKUP_QUERY} trailing="run" />
-              <div className="mt-10 flex flex-col gap-4 border-t border-solid border-[var(--section-divider)] pt-8 md:flex-row md:gap-10">
+              <div className="mt-10 flex flex-col gap-4 md:flex-row md:gap-10">
                 <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)] md:w-[120px]">
                   ↳ Record
                 </p>
@@ -341,13 +332,9 @@ export default function HomePage() {
               </div>
             </div>
 
-            <p
-              id="lookup-heading"
-              className="mx-auto mt-12 max-w-[52ch] font-sans text-[15px] leading-[1.7] text-[var(--text-secondary)]"
-            >
-              <span className="text-[var(--color-oxford)]">Look up any company, get the record.</span> Type any
-              company name — on-demand lookup turns it into a sourced investment record in seconds, benchmarked
-              against your active thesis the moment results arrive.
+            <p className="np-serif mx-auto mt-10 max-w-[62ch] text-[13.5px] italic leading-[1.6] text-[var(--text-tertiary)]">
+              Type any company name — on-demand lookup turns it into a sourced investment record in seconds,
+              benchmarked against your active thesis the moment results arrive.
             </p>
           </ScrollReveal>
         </section>
@@ -357,14 +344,14 @@ export default function HomePage() {
           className="w-full border-t border-solid border-[var(--section-divider)]"
           style={{ backgroundColor: 'var(--color-paper)' }}
         >
-          <div className="page-margin-x py-[clamp(3.5rem,8vh,5.5rem)]">
+          <div className="page-margin-x py-[clamp(3rem,6vh,4.5rem)]">
             <ScrollReveal y={22} amount={0.25} className="max-w-[1100px]">
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A10 — Access</p>
+              <p className="np-head np-label">A10 — Access</p>
               <h2 className="editorial-display mt-3 max-w-[16ch] font-normal text-[clamp(2.85rem,8vw,7rem)] leading-[0.95] tracking-[-0.025em] text-[var(--color-oxford)]">
                 For funds that need judgment with{' '}
                 <span className="italic text-[var(--color-accent)]">memory</span>.
               </h2>
-              <p className="mt-10 max-w-[46ch] font-sans text-[16px] leading-[1.75] text-[var(--text-secondary)]">
+              <p className="np-serif mt-10 max-w-[46ch] text-[16.5px] leading-[1.75] text-[var(--text-secondary)]">
                 Aethria turns sourcing, review, and partner decisions into one investment record — with the evidence
                 trail attached.
               </p>
@@ -374,9 +361,6 @@ export default function HomePage() {
                   <span aria-hidden>→</span>
                 </a>
               </div>
-              <p className="mt-8 font-mono text-[9.5px] uppercase tracking-[0.2em] text-[var(--text-subtle)]">
-                — End of record —
-              </p>
             </ScrollReveal>
           </div>
         </section>
@@ -390,19 +374,14 @@ export default function HomePage() {
           viewport={{ once: true, amount: 0.15 }}
           transition={{ duration: reduce ? 0 : 0.52, ease: SCROLL_EASE }}
         >
-          <GrainOverlay opacity={0.03} variant="dark" />
-
           <div id="access" className="page-margin-x relative z-10 mx-auto flex w-full max-w-[1200px] flex-col pt-12 pb-8 md:pt-16 md:pb-10">
             {/* The coupon — the access capture, folded into the footer's header */}
             <div className="grid grid-cols-1 gap-10 border-b border-solid border-[rgba(244,241,234,0.14)] pb-14 md:grid-cols-[0.8fr_1fr] md:gap-16 md:pb-16">
               <div className="max-w-md">
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-brand-mark-inverse)]">
-                  Notice of subscriber access
-                </p>
-                <h2 className="mt-4 editorial-display text-[clamp(1.9rem,3.8vw,2.7rem)] font-normal leading-[1.08] tracking-[-0.02em] text-[var(--text-inverse)]">
+                <h2 className="editorial-display text-[clamp(1.9rem,3.8vw,2.7rem)] font-normal leading-[1.08] tracking-[-0.02em] text-[var(--text-inverse)]">
                   Request access.
                 </h2>
-                <p className="mt-4 font-sans text-[14px] leading-[1.65] text-[var(--text-inverse-secondary)]">
+                <p className="np-serif mt-4 text-[14.5px] leading-[1.65] text-[var(--text-inverse-secondary)]">
                   Complete the coupon. Seats open in small batches — we'll write when yours is ready. Occasional
                   notes on investment intelligence and product progress along the way.
                 </p>
@@ -420,66 +399,34 @@ export default function HomePage() {
                 >
                   Aethria<span className="wordmark-dot" style={{ color: 'var(--color-brand-mark-inverse)' }}>.</span>
                 </Link>
-                <p className="mt-4 max-w-[46ch] font-sans text-[14px] leading-[1.7] text-[var(--text-inverse-secondary)]">
+                <p className="np-serif mt-4 max-w-[46ch] text-[14.5px] leading-[1.7] text-[var(--text-inverse-secondary)]">
                   Private markets intelligence for funds that need the evidence trail, not another beautiful spreadsheet.
                 </p>
               </div>
-              <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-[rgba(244,241,234,0.4)] md:text-right">
-                AETHRIA_CORE // OPERATIONAL
-                <br />
-                Build {new Date().getFullYear()}.{String(new Date().getMonth() + 1).padStart(2, '0')}
-              </p>
+              <nav
+                aria-label="Footer navigation"
+                className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--text-inverse-muted)]"
+              >
+                <a
+                  href="#access"
+                  onClick={(e) => scrollToAnchor(e, '#access')}
+                  className="transition-colors hover:text-[var(--color-brand-mark-inverse)]"
+                >
+                  Request access
+                </a>
+                <a
+                  href={LINKEDIN_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-colors hover:text-[var(--color-brand-mark-inverse)]"
+                >
+                  LinkedIn
+                </a>
+              </nav>
             </div>
 
-            <nav
-              aria-label="Footer navigation"
-              className="flex flex-wrap items-center gap-x-3 gap-y-3 pt-8 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--text-inverse-muted)]"
-            >
-              {FOOTER_COLUMNS.flatMap((col) => col.items)
-                .concat(['Request access', 'LinkedIn'])
-                .map((item, i, arr) => {
-                  const isLast = i === arr.length - 1;
-                  const isAccess = item === 'Request access';
-                  const isLinkedIn = item === 'LinkedIn';
-                  const node = isAccess ? (
-                    <a
-                      key={item}
-                      href="#access"
-                      onClick={(e) => scrollToAnchor(e, '#access')}
-                      className="transition-colors hover:text-[var(--color-brand-mark-inverse)]"
-                    >
-                      {item}
-                    </a>
-                  ) : isLinkedIn ? (
-                    <a
-                      key={item}
-                      href={LINKEDIN_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="transition-colors hover:text-[var(--color-brand-mark-inverse)]"
-                    >
-                      {item}
-                    </a>
-                  ) : (
-                    <span key={item}>{item}</span>
-                  );
-                  return (
-                    <span key={`${item}-wrap`} className="inline-flex items-center gap-3">
-                      {node}
-                      {!isLast && <span aria-hidden className="text-[rgba(244,241,234,0.25)]">/</span>}
-                    </span>
-                  );
-                })}
-            </nav>
-
-            <div className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-solid border-[rgba(244,241,234,0.14)] pt-6 font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(244,241,234,0.5)]">
+            <div className="mt-10 border-t border-solid border-[rgba(244,241,234,0.14)] pt-6 font-mono text-[10px] uppercase tracking-[0.1em] text-[rgba(244,241,234,0.5)]">
               <span>© {new Date().getFullYear()} Aethria</span>
-              <span aria-hidden className="text-[rgba(244,241,234,0.25)]">/</span>
-              <span>Confidential</span>
-              <span aria-hidden className="text-[rgba(244,241,234,0.25)]">/</span>
-              <span>For qualified recipients</span>
-              <span aria-hidden className="text-[rgba(244,241,234,0.25)]">/</span>
-              <span>Investment intelligence</span>
             </div>
           </div>
         </motion.footer>

@@ -19,35 +19,33 @@ function scrollToAnchor(e: MouseEvent<HTMLAnchorElement>, href: string) {
   else el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+/** Scroll depth (px) past which the compact bar fades in — roughly the masthead's height. */
+const MASTHEAD_SCROLL_PAST = 420;
+
 export default function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 32);
+    const onScroll = () => setScrolled(window.scrollY > MASTHEAD_SCROLL_PAST);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // The masthead below (nameplate + ruled section nav) is the page's real header;
+  // this compact bar overlays only once the reader has scrolled past it.
   return (
     <header
-      className={`inst-site-header sticky top-0 z-[100] w-full shrink-0 transition-colors duration-300 ${
+      className={`inst-site-header inst-site-header--compact fixed inset-x-0 top-0 z-[100] w-full transition-all duration-300 ${
         scrolled
-          ? 'bg-[rgba(244,241,234,0.92)] backdrop-blur-md'
-          : 'bg-transparent sm:bg-[rgba(244,241,234,0.92)] sm:backdrop-blur-md'
-      } ${scrolled ? 'inst-site-header--compact' : ''}`}
+          ? 'translate-y-0 opacity-100 bg-[var(--color-paper)] border-b border-solid border-[var(--section-divider)]'
+          : 'pointer-events-none -translate-y-2 opacity-0'
+      }`}
       style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
+      aria-hidden={!scrolled}
     >
       <div className="inst-site-header-inner page-margin-x">
-        {/* On mobile the big masthead nameplate below is the identity, so the sticky
-            wordmark stays hidden until you scroll past it (avoids two stacked wordmarks). */}
-        <Link
-          to="/home"
-          aria-label="Aethria — home"
-          className={`inst-site-header-wordmark shrink-0 transition-opacity duration-300 sm:opacity-100 ${
-            scrolled ? 'opacity-100' : 'opacity-0 pointer-events-none sm:pointer-events-auto'
-          }`}
-        >
+        <Link to="/home" aria-label="Aethria — home" className="inst-site-header-wordmark shrink-0" tabIndex={scrolled ? 0 : -1}>
           Aethria<span className="wordmark-dot">.</span>
         </Link>
 
@@ -58,6 +56,7 @@ export default function SiteHeader() {
                 key={item.href}
                 href={item.href}
                 onClick={(e) => scrollToAnchor(e, item.href)}
+                tabIndex={scrolled ? 0 : -1}
                 className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--label-muted)] transition-colors duration-200 hover:text-[var(--color-accent)]"
               >
                 {item.label}
@@ -67,6 +66,7 @@ export default function SiteHeader() {
           <a
             href="#access"
             onClick={(e) => scrollToAnchor(e, '#access')}
+            tabIndex={scrolled ? 0 : -1}
             className="hidden min-h-[40px] items-center border border-[var(--section-divider)] px-4 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-secondary)] transition-colors duration-300 hover:border-[var(--color-oxford)] hover:bg-[var(--color-oxford)] hover:text-[var(--color-paper)] sm:inline-flex"
           >
             Request access

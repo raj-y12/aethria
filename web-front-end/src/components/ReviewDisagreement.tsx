@@ -59,8 +59,8 @@ export default function ReviewDisagreement() {
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="disagreement-heading"
     >
-      <div className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]">
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A7 — The Review</p>
+      <div className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]">
+        <p className="np-head np-label">A7 — The Review</p>
 
         {/* Split statement — headline and gloss run side by side, not stacked, so this
             doesn't repeat the kicker→title→paragraph cadence used elsewhere on the page. */}
@@ -76,7 +76,7 @@ export default function ReviewDisagreement() {
             Three reviewers, one record. The disagreement is the{' '}
             <span className="italic text-[var(--color-accent)]">point</span>.
           </h2>
-          <p className="font-sans text-[17px] leading-[1.75] text-[var(--text-secondary)] md:pb-1">
+          <p className="np-serif text-[16.5px] leading-[1.75] text-[var(--text-secondary)] md:pb-1">
             Every company is scored independently by three reviewer modes. Aethria does not average them into a
             comfortable number — it preserves the split and hands the partner layer the real picture.
           </p>
@@ -87,7 +87,7 @@ export default function ReviewDisagreement() {
         <p className="mt-10 font-mono text-[9.5px] uppercase tracking-[0.14em] text-[var(--text-subtle)] md:mt-14">
           Today — three opinions on one company
         </p>
-        <div className="mt-4 grid grid-cols-1 border-t border-solid border-[var(--section-divider)] md:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3">
           {REVIEWERS.map((r, i) => (
             <motion.div
               key={r.persona}
@@ -97,13 +97,13 @@ export default function ReviewDisagreement() {
               viewport={{ once: true, amount: 0.4 }}
               transition={{ duration: reduce ? 0 : 0.7, ease: SCROLL_EASE, delay: reduce ? 0 : i * 0.08 }}
             >
-              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--color-oxford)]">
-                {r.persona}
-              </p>
-              <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.1em] text-[var(--text-subtle)]">
+              <h3 className="editorial-display text-[1.2rem] font-normal leading-[1.15] tracking-[-0.01em] text-[var(--color-oxford)]">
                 {r.mode}
+              </h3>
+              <p className="mt-2 font-mono text-[9.5px] uppercase tracking-[0.12em] text-[var(--text-subtle)]">
+                By the {r.persona} reviewer
               </p>
-              <p className="mt-3 font-display text-[15px] italic leading-[1.55] text-[var(--text-secondary)]">
+              <p className="np-serif mt-3 text-[15px] italic leading-[1.6] text-[var(--text-secondary)]">
                 "{r.take}"
               </p>
               <div className="mt-4 flex items-center gap-3">
@@ -120,14 +120,10 @@ export default function ReviewDisagreement() {
           ))}
         </div>
 
-        {/* Partner resolution — a real pull-quote, centered, no rule */}
-        <ScrollReveal y={18} amount={0.4} className="mt-14 text-center md:mt-16">
-          <p className="editorial-display mx-auto max-w-[26ch] text-[clamp(1.6rem,3.6vw,2.6rem)] italic leading-[1.32] text-[var(--color-oxford)]">
-            "Aethria does not average reviewers into a comfortable number — it preserves the split, and hands the
-            partner layer the real picture."
-          </p>
-          <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
-            — The split resolves to <span className="text-[var(--color-accent)]">Monitor</span>
+        {/* Partner resolution */}
+        <ScrollReveal y={12} amount={0.4} className="mt-10">
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+            The split resolves to <span className="text-[var(--color-accent)]">Monitor</span>
           </p>
         </ScrollReveal>
       </div>

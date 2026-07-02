@@ -5,9 +5,13 @@ import DottedMarketMap, { type MapHit } from './DottedMarketMap';
 
 /** In-thesis companies plotted on the field (lon, lat). */
 const HITS: MapHit[] = [
-  { lon: -122.4, lat: 37.8 },
-  { lon: -0.12, lat: 51.5 },
-  { lon: 13.4, lat: 52.5 },
+  { lon: 103.82, lat: 1.35 }, // Singapore
+  { lon: 77.59, lat: 12.97 }, // Bangalore
+  { lon: -74.01, lat: 40.71 }, // New York
+  { lon: 151.21, lat: -33.87 }, // Sydney
+  { lon: -79.38, lat: 43.65 }, // Toronto
+  { lon: -0.12, lat: 51.5 }, // London
+  { lon: -122.42, lat: 37.77 }, // San Francisco
 ];
 
 const SCANNING = [
@@ -21,7 +25,7 @@ const SCANNING = [
 ];
 
 const SCANNED_TOTAL = 12408;
-const IN_THESIS = 3;
+const IN_THESIS = HITS.length;
 
 /** The market, rendered as a live dotted world map: the whole field scanned, the few that fit lit. */
 export default function MarketSection() {
@@ -74,11 +78,11 @@ export default function MarketSection() {
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="market-heading"
     >
-      <div className="page-margin-x py-[clamp(2.5rem,6vh,4rem)]">
+      <div className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]">
         {/* Raw field header — a terminal readout, not a title block. Typography stays
             small so the map (the actual graphic) carries the section, not a headline. */}
-        <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-accent)]">A3 — Markets</p>
+        <div className="np-head flex flex-wrap items-baseline justify-between gap-x-8 gap-y-4">
+          <p className="np-label">A3 — Markets</p>
           <p className="font-mono text-[12px] leading-[1.6] tracking-[0.04em] text-[var(--text-secondary)] sm:text-right">
             <span ref={scannedRef} className="text-[var(--color-accent)]">
               {SCANNED_TOTAL.toLocaleString()}
@@ -88,12 +92,12 @@ export default function MarketSection() {
           </p>
         </div>
 
-        <p
+        <h2
           id="market-heading"
-          className="mt-8 max-w-[46ch] font-sans text-[clamp(1.1rem,2vw,1.4rem)] font-light leading-[1.55] text-[var(--color-oxford)]"
+          className="editorial-display mt-6 max-w-[24ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
         >
-          It watches the whole market. You only see what fits your thesis.
-        </p>
+          It watches the whole market. You only see what <span className="italic text-[var(--color-accent)]">fits</span>.
+        </h2>
 
         <p className="mt-8 h-[1em] font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
           Scanning ·{' '}
@@ -113,7 +117,13 @@ export default function MarketSection() {
 
         <DottedMarketMap hits={HITS} className="mt-10 h-[clamp(320px,52vw,640px)] w-full" />
 
-        <div className="mt-6 flex flex-wrap gap-7 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
+        {/* Figure caption — set like a newspaper photo caption */}
+        <p className="np-serif mt-5 max-w-[64ch] text-[13.5px] italic leading-[1.6] text-[var(--text-tertiary)]">
+          The field at press time — {SCANNED_TOTAL.toLocaleString()} companies scanned across every market the scouts
+          reach; {IN_THESIS} currently inside the active thesis, from San Francisco to Singapore.
+        </p>
+
+        <div className="mt-5 flex flex-wrap gap-7 border-t border-solid border-[var(--section-divider)] pt-4 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
           <span className="inline-flex items-center gap-2">
             <i className="inline-block h-[7px] w-[7px] rounded-full bg-[var(--label-muted)]" /> Scanned
           </span>

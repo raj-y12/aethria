@@ -30,7 +30,7 @@ export function CtaLink({ children, className = '', ...props }: LinkProps & { cl
 export function CtaTextLink({ children, className = '', ...props }: LinkProps & { className?: string }) {
   return (
     <Link
-      className={`group inline-flex items-center gap-3.5 border-b border-solid border-[var(--color-oxford)] pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--color-oxford)] transition-[gap] duration-300 ease-out hover:gap-6 ${className}`.trim()}
+      className={`group inline-flex items-center gap-3.5 border-b border-solid border-[rgba(0,20,51,0.3)] pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--color-oxford)] transition-[gap] duration-300 ease-out hover:gap-6 hover:border-[var(--color-oxford)] ${className}`.trim()}
       {...props}
     >
       <span>{children}</span>
