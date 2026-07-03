@@ -58,13 +58,16 @@ function AppShell() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [agentsEnabled]);
 
+  // Wait for the first startups fetch to settle (instant when the cache is
+  // warm-hydrated) before kicking off a pipeline cycle: the trigger's backend
+  // work otherwise competes with the login burst of reads and delays first paint.
   useEffect(() => {
-    if (!agentsEnabled || isSettingsRoute || triggeredAgentsRef.current) return;
+    if (!agentsEnabled || isSettingsRoute || !systemData.startupsReady || triggeredAgentsRef.current) return;
     triggeredAgentsRef.current = true;
     void triggerAgents().catch(() => {
       triggeredAgentsRef.current = false;
     });
-  }, [agentsEnabled, isSettingsRoute]);
+  }, [agentsEnabled, isSettingsRoute, systemData.startupsReady]);
 
   return (
     <motion.div

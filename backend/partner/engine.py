@@ -301,7 +301,8 @@ class PartnerEngine:
         partner_info.partner_agent_id = self.agent_id
 
         try:
-            success = self.storage.add_partner_decision(
+            success = await asyncio.to_thread(
+                self.storage.add_partner_decision,
                 entry_id,
                 partner_info,
                 pipeline_run_id=pr,
@@ -340,7 +341,9 @@ class PartnerEngine:
             return 0
 
         # Ramp: process up to batch_max per cycle so we make progress without one huge cycle
-        undecided_count = self.storage.count_undecided()
+        # Sync Supabase I/O off the serving event loop: a blocked loop stalls
+        # every in-flight API response and SSE stream.
+        undecided_count = await asyncio.to_thread(self.storage.count_undecided)
         try:
             cycle_limit = int(get_runtime_limits(self.tenant_user_id).get("max_agents_per_run", self.batch_max))
         except Exception as e:
@@ -348,7 +351,7 @@ class PartnerEngine:
             cycle_limit = self.batch_max
         effective_batch_max = min(self.batch_max, max(1, cycle_limit))
         limit = min(effective_batch_max, undecided_count) if undecided_count else None
-        undecided = self._get_undecided_entries(limit=limit)
+        undecided = await asyncio.to_thread(self._get_undecided_entries, limit=limit)
         
         if not undecided:
             self.logger.info("No undecided entries found")
@@ -440,7 +443,7 @@ class PartnerEngine:
         bypass_agent_enabled_gate: when True, run even if partners are disabled in settings
         (used for occasional on-demand company lookup only).
         """
-        startup = self.storage.get_startup(startup_id)
+        startup = await asyncio.to_thread(self.storage.get_startup, startup_id)
         if startup is None:
             self.logger.warning("Startup not found for partner decision: %s", startup_id)
             return False

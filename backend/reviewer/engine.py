@@ -593,8 +593,10 @@ class ReviewerEngine:
                 }
                 return 0
         
-        # Ramp-up: process more per cycle when unreviewed backlog is high
-        unreviewed_count = self.storage.count_unreviewed()
+        # Ramp-up: process more per cycle when unreviewed backlog is high.
+        # Sync Supabase I/O off the serving event loop: a blocked loop stalls
+        # every in-flight API response and SSE stream.
+        unreviewed_count = await asyncio.to_thread(self.storage.count_unreviewed)
         if unreviewed_count > self.ramp_threshold:
             effective_batch = min(self.ramp_batch_max, unreviewed_count)
             self.logger.info(
@@ -648,7 +650,7 @@ class ReviewerEngine:
             max(unreviewed_count, effective_batch),
             500,
         )
-        unreviewed_startups = self.storage.get_unreviewed(limit=lookahead_limit)
+        unreviewed_startups = await asyncio.to_thread(self.storage.get_unreviewed, limit=lookahead_limit)
 
         if not unreviewed_startups:
             self.logger.info("No unreviewed entries found")
@@ -809,7 +811,8 @@ class ReviewerEngine:
                     for u in (scout_for_llm.get("_reviewer_gap_reference_urls") or [])
                     if isinstance(u, str) and str(u).strip()
                 ]
-                success = self.storage.add_review(
+                success = await asyncio.to_thread(
+                    self.storage.add_review,
                     entry_id,
                     review_info,
                     pipeline_run_id=pipeline_run_id,
@@ -893,7 +896,7 @@ class ReviewerEngine:
         bypass_agent_enabled_gate: when True, run even if reviewers are disabled in settings
         (used for occasional on-demand company lookup only).
         """
-        startup = self.storage.get_startup(startup_id)
+        startup = await asyncio.to_thread(self.storage.get_startup, startup_id)
         if startup is None:
             self.logger.warning("Startup not found for review: %s", startup_id)
             return False
@@ -1019,7 +1022,8 @@ class ReviewerEngine:
                 if isinstance(u, str) and str(u).strip()
             ]
             return bool(
-                self.storage.add_review(
+                await asyncio.to_thread(
+                    self.storage.add_review,
                     startup_id,
                     review_info,
                     pipeline_run_id=pipeline_run_id,

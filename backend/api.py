@@ -1924,7 +1924,9 @@ async def trigger_agents(request: Request):
             content={"status": "skipped", "reason": "supabase_required"},
         )
     try:
-        settings = load_settings(user_id)
+        # This endpoint fires on every login: keep its sync Supabase reads off
+        # the event loop so they can't stall concurrent first-paint fetches.
+        settings = await asyncio.to_thread(load_settings, user_id)
     except Exception as e:
         _logger_agents.warning(
             "trigger_agents skipped user=%s reason=settings_unavailable error=%s",
@@ -1977,11 +1979,11 @@ async def trigger_agents(request: Request):
         _release_security_lock(lock_key)
         return limited
     try:
-        svc = get_service_client()
-        thesis = get_active_thesis(svc, user_id)
+        svc = await asyncio.to_thread(get_service_client)
+        thesis = await asyncio.to_thread(get_active_thesis, svc, user_id)
         if thesis is None:
-            _bootstrap_default_thesis_or_raise(svc, user_id)
-            thesis = get_active_thesis(svc, user_id)
+            await asyncio.to_thread(_bootstrap_default_thesis_or_raise, svc, user_id)
+            thesis = await asyncio.to_thread(get_active_thesis, svc, user_id)
         if thesis is None:
             _logger_agents.info(
                 "trigger_agents skipped user=%s reason=thesis_required",

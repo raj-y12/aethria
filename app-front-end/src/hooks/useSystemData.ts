@@ -22,6 +22,7 @@ import { fetchSettings } from '../api/settings';
 import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { useQueryLiveGate } from './useQueryLiveGate';
 import { useStartupsStream } from './useStartupsStream';
+import { useWarmStart } from '../lib/warmStart';
 import type {
   Startup, EscalationItem, SignalItem,
   RejectionAnalytics, WatchlistAnalytics, ConcentrationAnalytics,
@@ -66,6 +67,8 @@ export interface SystemData {
   settings: Settings | null;
   pendingEscalationCount: number;
   startupsError: string | null;
+  /** First startups fetch has settled (or cache was warm-hydrated) — safe to kick off background work. */
+  startupsReady: boolean;
   /** Shared tab + idle gate for child components (e.g. agents status). */
   liveGate: QueryLiveGate;
 }
@@ -76,6 +79,9 @@ export interface UseSystemDataOptions {
 
 export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
   const { systemPanelOpen = false } = options;
+  // Must run before the useQuery calls below: primes the cache synchronously
+  // from the per-user localStorage snapshot so first paint has data.
+  useWarmStart();
   const queryClient = useQueryClient();
   const { tabVisible: isTabVisible, userActive } = useQueryLiveGate();
   const liveGate: QueryLiveGate = { tabVisible: isTabVisible, userActive };
@@ -126,6 +132,11 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 15_000 }),
     refetchInterval: startupsPollMs,
     placeholderData: (prev) => prev ?? [],
+    // Primary first-paint surface: a transient 503 (backend returns these
+    // deliberately under load) must recover in seconds, not wait for the next
+    // poll tick. Exponential backoff: ~1s, 2s, 4s, 8s.
+    retry: 4,
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 8_000),
   });
 
   const escalationsQuery = useQuery({
@@ -272,6 +283,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     settings: settingsQuery.data ?? null,
     pendingEscalationCount,
     startupsError: startupsQuery.isError ? 'Could not load startups' : null,
+    startupsReady: !startupsQuery.isPending,
     liveGate,
   };
 }

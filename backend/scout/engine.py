@@ -174,7 +174,9 @@ class ScoutEngine:
         unreviewed: Optional[int] = None
         if self.storage is not None:
             try:
-                unreviewed = self.storage.count_unreviewed()
+                # Sync Supabase I/O off the serving event loop: a blocked loop
+                # stalls every in-flight API response and SSE stream.
+                unreviewed = await asyncio.to_thread(self.storage.count_unreviewed)
             except Exception as e:
                 self.logger.debug("Could not get unreviewed count: %s", e)
 
@@ -262,7 +264,9 @@ class ScoutEngine:
 
                     if self.storage:
                         try:
-                            self.storage.add_discovery(result, pipeline_run_id=pipeline_run_id)
+                            await asyncio.to_thread(
+                                self.storage.add_discovery, result, pipeline_run_id=pipeline_run_id
+                            )
                         except Exception as e:
                             self.logger.error(
                                 f"Failed to persist discovery {result.get('id')}: {e}"
@@ -434,7 +438,7 @@ class ScoutEngine:
                         pr, startup_id=sid, user_id=uid, stage="ingesting", phase="DONE"
                     )
             if self.storage:
-                self.storage.add_discovery(payload, pipeline_run_id=pr)
+                await asyncio.to_thread(self.storage.add_discovery, payload, pipeline_run_id=pr)
             self.last_lookup_outcome = {
                 "status": payload.get("resolution_status") or "FOUND",
                 "startup_id": payload.get("id"),
