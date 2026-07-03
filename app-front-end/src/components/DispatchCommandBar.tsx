@@ -33,6 +33,9 @@ interface DispatchCommandBarProps {
   onClose: () => void;
   input: string;
   setInput: (v: string) => void;
+  /** Optional operator-supplied background sent with the lookup (fills missing-evidence gaps). */
+  additionalContext: string;
+  setAdditionalContext: (v: string) => void;
   onSubmit: () => void;
   onCancel?: () => void;
   isBusy: boolean;
@@ -137,6 +140,8 @@ export default function DispatchCommandBar({
   onClose,
   input,
   setInput,
+  additionalContext,
+  setAdditionalContext,
   onSubmit,
   onCancel,
   isBusy,
@@ -388,6 +393,24 @@ export default function DispatchCommandBar({
                     message={null}
                     lookupPhase={null}
                     displayMode="embedded"
+                  />
+                </div>
+                <div className="w-full">
+                  <label
+                    htmlFor="dispatch-additional-context"
+                    className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40"
+                  >
+                    Additional context <span className="text-oxford/25">· Optional</span>
+                  </label>
+                  <textarea
+                    id="dispatch-additional-context"
+                    value={additionalContext}
+                    onChange={(e) => setAdditionalContext(e.target.value)}
+                    rows={2}
+                    maxLength={2000}
+                    disabled={isBusy}
+                    placeholder="Private traction or team facts the public record won't show — passed to the analysts."
+                    className="mt-phi-1 w-full resize-none border-0 border-b border-solid border-oxford/[0.12] bg-transparent px-0 py-phi-2 font-sans text-[13px] leading-[1.5] text-oxford outline-none transition-colors placeholder:text-oxford/[0.28] focus:border-oxford/45 disabled:cursor-not-allowed"
                   />
                 </div>
               </Reveal>

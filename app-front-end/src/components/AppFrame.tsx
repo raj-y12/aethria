@@ -404,6 +404,8 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                 onClose={dispatch.closeCommandBar}
                 input={dispatch.input}
                 setInput={dispatch.setInput}
+                additionalContext={dispatch.additionalContext}
+                setAdditionalContext={dispatch.setAdditionalContext}
                 onSubmit={() => void dispatch.submit()}
                 onCancel={dispatch.cancel}
                 isBusy={dispatch.busy}

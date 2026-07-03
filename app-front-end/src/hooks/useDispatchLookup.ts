@@ -55,6 +55,10 @@ export function useDispatchLookup({
 
   const [commandBarOpen, setCommandBarOpen] = useState(false);
   const [input, setInput] = useState('');
+  // Optional operator-supplied background (private traction/team facts) that
+  // fills missing-evidence gaps. Held in the hook (not the compose surface) so
+  // it survives disambiguation — pick-candidate and website-refine also queue.
+  const [additionalContext, setAdditionalContext] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<LookupCandidate[]>([]);
@@ -85,7 +89,7 @@ export function useDispatchLookup({
   const queueLookup = useCallback(
     async (value: string, requestSeq: number) => {
       const lookupId = crypto.randomUUID();
-      const queued = await queueOnDemandLookup(value, lookupId);
+      const queued = await queueOnDemandLookup(value, lookupId, additionalContext.trim() || undefined);
       if (requestSeqRef.current !== requestSeq) return;
       const current = pendingLookup;
       if (current && !current.autoOpened && current.lookupId !== queued.lookupId) {
@@ -99,8 +103,9 @@ export function useDispatchLookup({
         `Lookup queued for ${queued.companyName}. We are now finding and validating the company profile.`,
       );
       setInput('');
+      setAdditionalContext('');
     },
-    [pendingLookup],
+    [pendingLookup, additionalContext],
   );
 
   const submit = useCallback(async () => {
@@ -218,6 +223,7 @@ export function useDispatchLookup({
     setFailure(null);
     setMessage(null);
     setInput('');
+    setAdditionalContext('');
     setCandidates([]);
     setRefining(false);
     setCommandBarOpen(false);
@@ -478,6 +484,8 @@ export function useDispatchLookup({
     closeCommandBar,
     input,
     setInput,
+    additionalContext,
+    setAdditionalContext,
     submit,
     cancel,
     busy,
