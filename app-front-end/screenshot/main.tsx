@@ -12,6 +12,7 @@ import FlowPage from '../src/pages/FlowPage';
 import PortfolioPage from '../src/pages/PortfolioPage';
 import FundPage from '../src/pages/FundPage';
 import SettingsPage from '../src/settings/SettingsPage';
+import LoginPage from '../src/components/LoginPage';
 import { MOCK_SYSTEM_DATA, installMockApi } from './mock';
 import type { SystemData } from '../src/hooks/useSystemData';
 
@@ -35,6 +36,9 @@ const queryClient = new QueryClient({
 
 function Harness({ data }: { data: SystemData }) {
   const { pathname } = useLocation();
+  if (pathname.startsWith('/sign-in')) {
+    return <LoginPage />;
+  }
   const isSettings = pathname.startsWith('/v1/settings');
   const isFund = pathname.startsWith('/v1/fund');
   const isPortfolio = pathname.startsWith('/v1/portfolio');

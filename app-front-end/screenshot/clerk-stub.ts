@@ -31,3 +31,13 @@ export function useUser() {
 export function ClerkProvider({ children }: { children: React.ReactNode }) {
   return children;
 }
+
+/** LoginPage: renders the form; submit always fails with a stub error. */
+export function useSignIn() {
+  return {
+    signIn: {
+      status: 'needs_first_factor',
+      password: async () => ({ error: { message: 'Invalid username or password.' } }),
+    },
+  };
+}

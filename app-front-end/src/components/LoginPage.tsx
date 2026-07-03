@@ -213,8 +213,12 @@ export default function LoginPage() {
   const enterDelay = stats ? 0.22 + stats.length * 0.07 + 0.1 : 0.2;
   const entryTransition = getLoginEntryTransition(reduceMotion);
 
+  const dateline = new Date()
+    .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    .toUpperCase();
+
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
+    <div className="paper-dot-grid flex h-[100dvh] flex-col overflow-hidden bg-paper">
       <div
         className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-hidden"
         style={{ padding: 'clamp(24px, 5vw, 56px)' }}
@@ -301,12 +305,16 @@ export default function LoginPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8, transition: { duration: 0.25, ease: EASE } }}
               transition={{ duration: 0.5, ease: EASE, delay: 0.3 }}
-              className="flex flex-col items-center mb-phi-9"
+              className="flex w-full flex-col items-center mb-phi-8"
             >
+              {/* Same voice as the home page: mono eyebrow, then the mark. */}
+              <p className="m-0 mb-phi-5 text-center font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-oxford/40">
+                {dateline}
+              </p>
               <h1 className="font-wordmark text-center text-[clamp(48px,8vw,80px)] font-medium text-oxford leading-[0.9] m-0 tracking-normal">
                 Aethria<span className="wordmark-dot">.</span>
               </h1>
-              <p className="type-meta uppercase tracking-[0.14em] text-oxford/35 mt-phi-4">
+              <p className="type-meta uppercase tracking-[0.24em] text-oxford/40 mt-phi-4">
                 Deal flow operating system
               </p>
             </motion.div>
@@ -392,25 +400,31 @@ export default function LoginPage() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12, transition: { duration: 0.28, ease: EASE } }}
-              transition={{ duration: 0.6, ease: EASE, delay: 0.5 }}
-              className="w-full max-w-[360px]"
+              transition={{ duration: 0.6, ease: EASE, delay: 0.2 }}
+              className="w-full max-w-[400px]"
             >
               <form
                 onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
                 className="flex flex-col"
                 noValidate
               >
-                {/* Inputs — shake ref wraps both so both move on error */}
-                <div ref={formShakeRef} className="flex flex-col gap-phi-5 mb-phi-8">
+                {/* Inputs live in a hairline band — the same construction as the
+                    home page's doors band. No boxes; the rules do the framing. */}
+                <div
+                  ref={formShakeRef}
+                  className="mb-phi-7 flex w-full flex-col gap-phi-6 border-y border-oxford/[0.12] py-phi-6"
+                >
                   <div className="flex flex-col">
-                    <label htmlFor="login-identifier" className="sr-only">
+                    <label
+                      htmlFor="login-identifier"
+                      className="type-meta mb-phi-2 uppercase tracking-[0.14em] text-oxford/45"
+                    >
                       Email or username
                     </label>
                     <AnimatedInput
                       id="login-identifier"
                       type="text"
                       autoComplete="username"
-                      placeholder="Email or username"
                       value={username}
                       focused={usernameFocused}
                       onChange={(e) => setUsername(e.target.value)}
@@ -422,7 +436,10 @@ export default function LoginPage() {
                     />
                   </div>
                   <div className="flex flex-col">
-                    <label htmlFor="login-password" className="sr-only">
+                    <label
+                      htmlFor="login-password"
+                      className="type-meta mb-phi-2 uppercase tracking-[0.14em] text-oxford/45"
+                    >
                       Password
                     </label>
                     <AnimatedInput
@@ -430,7 +447,6 @@ export default function LoginPage() {
                       id="login-password"
                       type="password"
                       autoComplete="current-password"
-                      placeholder="Password"
                       value={password}
                       focused={passwordFocused}
                       onChange={(e) => setPassword(e.target.value)}
