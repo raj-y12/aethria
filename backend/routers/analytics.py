@@ -54,7 +54,7 @@ def _aggregate_activity_totals(
     return totals
 
 @router.get("/api/signals")
-async def get_signals(request: Request):
+def get_signals(request: Request):
     """
     Return the last 50 portfolio signals sorted by detected_at descending.
     Startup names come from request-scoped storage (Supabase) so they are user-correct.
@@ -73,7 +73,7 @@ async def get_signals(request: Request):
 
 
 @router.get("/api/analytics/rejections")
-async def get_rejection_analytics(request: Request):
+def get_rejection_analytics(request: Request):
     """
     Return rejection analytics summarising red flags, sectors, and scores (tenant-scoped).
     """
@@ -133,7 +133,7 @@ async def get_rejection_analytics(request: Request):
 
 
 @router.get("/api/analytics/watchlist")
-async def get_watchlist_analytics(request: Request):
+def get_watchlist_analytics(request: Request):
     """
     Return watchlist health analytics: total, stale, average days, and per-entry stats.
     Startup names come from request-scoped storage so they are user-correct.
@@ -199,7 +199,7 @@ async def get_watchlist_analytics(request: Request):
 
 
 @router.get("/api/analytics/concentration")
-async def get_concentration_analytics(request: Request):
+def get_concentration_analytics(request: Request):
     """
     Return sector concentration analytics from data/analytics/sector_concentration.json.
     """
@@ -218,7 +218,7 @@ async def get_concentration_analytics(request: Request):
 
 
 @router.get("/api/analytics/system-health")
-async def get_system_health(request: Request):
+def get_system_health(request: Request):
     """
     Aggregate system health metrics (calibration, queues, budgets, escalations).
     """
@@ -326,7 +326,7 @@ def _activity_summary_totals_sync(user_id: str):
 
 
 @router.post("/api/activity/seen")
-async def mark_activity_seen(request: Request):
+def mark_activity_seen(request: Request):
     """Mark the current time as last_seen_at. Called when the user dismisses the summary modal."""
     user_id = require_authenticated_user(request)
     limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])

@@ -293,7 +293,9 @@ async def api_post_fund_thesis_version(request: Request):
         )
     uid = request.state.user_id
     try:
-        out = create_fund_thesis_version_for_user(
+        # Sync Supabase writes + optional OpenAI embedding call: off the event loop.
+        out = await asyncio.to_thread(
+            create_fund_thesis_version_for_user,
             get_service_client(),
             user_id=uid,
             raw_text=raw_text,
@@ -322,7 +324,8 @@ async def api_patch_fund_thesis_active(request: Request):
     pipeline_run_id = str(body.get("pipeline_run_id") or "").strip() or None
     uid = request.state.user_id
     try:
-        activate_fund_thesis_version(
+        await asyncio.to_thread(
+            activate_fund_thesis_version,
             get_service_client(),
             user_id=uid,
             version_id=version_id,
@@ -348,7 +351,7 @@ async def api_post_fund_thesis_reprocess_missing(
 
     if not dry_run:
         try:
-            thesis = get_active_thesis(client, uid)
+            thesis = await asyncio.to_thread(get_active_thesis, client, uid)
             if thesis is None:
                 raise HTTPException(status_code=400, detail="No active thesis")
         except FundThesisIncompleteError as e:

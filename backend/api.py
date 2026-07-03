@@ -1371,7 +1371,7 @@ async def event_stream(request: Request):
 
 
 @app.get("/api/startups/lookup-status")
-async def lookup_job_status(request: Request, lookup_id: str = ""):
+def lookup_job_status(request: Request, lookup_id: str = ""):
     """
     Poll after POST /api/startups/lookup: if the worker recorded a failure, returns failed=true and message.
     """
@@ -1409,6 +1409,11 @@ def get_startup_detail(request: Request, startup_id: str):
 async def acknowledge_startup(request: Request, startup_id: str):
     """Mark a startup as seen by the current user when they open the memo."""
     validate_route_id(startup_id, field_name="startup_id")
+    # Several sequential sync Supabase round trips: keep them off the event loop.
+    return await asyncio.to_thread(_acknowledge_startup_sync, request, startup_id)
+
+
+def _acknowledge_startup_sync(request: Request, startup_id: str):
     storage = _get_storage(request)
     existing = storage.get_by_id(startup_id)
     if not existing:
@@ -1708,6 +1713,27 @@ async def patch_settings(request: Request, body: dict):
     errors = _validate_settings(body)
     if errors:
         raise HTTPException(status_code=422, detail={"message": "Validation failed", "errors": errors})
+    # Sync Supabase reads/writes (+ optional OpenAI thesis sync) off the event loop.
+    current = await asyncio.to_thread(_patch_settings_sync, user_id, body)
+
+    # If any agents are enabled after the patch, ensure the persistent background loop is running.
+    # This covers the case where the user toggles agents in the UI and clicks "Save".
+    ac = current.get("agent_config") or {}
+    if ac.get("scouts_enabled") or ac.get("reviewers_enabled") or ac.get("partners_enabled"):
+        await _ensure_user_loop(user_id)
+    else:
+        # If all agents were just turned off, make sure the loop is stopped.
+        await _stop_user_loop(user_id)
+
+    # Meta-Agent settings are derived from environment; PATCH does not
+    # persist or validate them, but we still include the live view.
+    meta_agent = get_meta_agent_settings()
+    meta_agent["model"] = os.getenv("META_AGENT_MODEL", "gpt-5-nano")
+    current["meta_agent"] = meta_agent
+    return current
+
+
+def _patch_settings_sync(user_id: str, body: dict) -> dict:
     current = load_settings(user_id)
     for section in ("fund_config", "user_preferences", "fund_memory", "fund_identity", "cost_budget", "agent_config", "portfolio"):
         if section in body and isinstance(body[section], dict):
@@ -1762,20 +1788,6 @@ async def patch_settings(request: Request, body: dict):
             except Exception as e:
                 _logger_agents.warning("[%s] fund_config thesis sync failed: %s", user_id[:12], e)
 
-    # If any agents are enabled after the patch, ensure the persistent background loop is running.
-    # This covers the case where the user toggles agents in the UI and clicks "Save".
-    ac = current.get("agent_config") or {}
-    if ac.get("scouts_enabled") or ac.get("reviewers_enabled") or ac.get("partners_enabled"):
-        await _ensure_user_loop(user_id)
-    else:
-        # If all agents were just turned off, make sure the loop is stopped.
-        await _stop_user_loop(user_id)
-
-    # Meta-Agent settings are derived from environment; PATCH does not
-    # persist or validate them, but we still include the live view.
-    meta_agent = get_meta_agent_settings()
-    meta_agent["model"] = os.getenv("META_AGENT_MODEL", "gpt-5-nano")
-    current["meta_agent"] = meta_agent
     return current
 
 
@@ -1847,38 +1859,15 @@ async def agents_status(request: Request):
         and os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     )
     openai_configured = bool(os.getenv("OPENAI_API_KEY", "").strip())
-    thesis_ready = False
-    mandate_published = False
-    active_thesis_version_id: Optional[str] = None
-    thesis_error: Optional[str] = None
-    if supabase_configured:
-        try:
-            t = get_active_thesis(get_service_client(), request.state.user_id)
-            if t is None:
-                thesis_error = "missing"
-            else:
-                thesis_ready = True
-                active_thesis_version_id = t.version_id
-                # The bootstrap default mandate carries is_default=True. A fund has
-                # only "published" once it has deliberately replaced that default.
-                mandate_published = not bool((t.parsed_json or {}).get("is_default"))
-        except FundThesisIncompleteError:
-            thesis_error = "incomplete"
-        except Exception as e:
-            thesis_error = type(e).__name__
-    # Check user-level agent toggles so the status field reflects actual intent.
+    # Sync Supabase reads (thesis + settings) off the event loop.
     user_id = request.state.user_id
-    user_agents_enabled = False
-    try:
-        user_settings = load_settings(user_id)
-        ac = user_settings.get("agent_config") or {}
-        user_agents_enabled = bool(
-            ac.get("scouts_enabled", False)
-            or ac.get("reviewers_enabled", False)
-            or ac.get("partners_enabled", False)
-        )
-    except Exception as e:
-        _logger_agents.debug("Could not compute user_agents_enabled: %s", e)
+    (
+        thesis_ready,
+        mandate_published,
+        active_thesis_version_id,
+        thesis_error,
+        user_agents_enabled,
+    ) = await asyncio.to_thread(_agents_status_reads_sync, user_id, supabase_configured)
     return {
         "worker_ready": _agent_queue is not None,
         "lookup_worker_ready": _lookup_queue is not None,
@@ -1904,6 +1893,41 @@ async def agents_status(request: Request):
         "active_thesis_version_id": active_thesis_version_id,
         "thesis_error": thesis_error,
     }
+
+
+def _agents_status_reads_sync(user_id: str, supabase_configured: bool):
+    thesis_ready = False
+    mandate_published = False
+    active_thesis_version_id: Optional[str] = None
+    thesis_error: Optional[str] = None
+    if supabase_configured:
+        try:
+            t = get_active_thesis(get_service_client(), user_id)
+            if t is None:
+                thesis_error = "missing"
+            else:
+                thesis_ready = True
+                active_thesis_version_id = t.version_id
+                # The bootstrap default mandate carries is_default=True. A fund has
+                # only "published" once it has deliberately replaced that default.
+                mandate_published = not bool((t.parsed_json or {}).get("is_default"))
+        except FundThesisIncompleteError:
+            thesis_error = "incomplete"
+        except Exception as e:
+            thesis_error = type(e).__name__
+    # Check user-level agent toggles so the status field reflects actual intent.
+    user_agents_enabled = False
+    try:
+        user_settings = load_settings(user_id)
+        ac = user_settings.get("agent_config") or {}
+        user_agents_enabled = bool(
+            ac.get("scouts_enabled", False)
+            or ac.get("reviewers_enabled", False)
+            or ac.get("partners_enabled", False)
+        )
+    except Exception as e:
+        _logger_agents.debug("Could not compute user_agents_enabled: %s", e)
+    return thesis_ready, mandate_published, active_thesis_version_id, thesis_error, user_agents_enabled
 
 
 @app.post("/api/agents/trigger")
@@ -2063,7 +2087,7 @@ async def toggle_agents(request: Request):
     enabled = bool(body.get("enabled", False))
 
     try:
-        s = load_settings(user_id)
+        s = await asyncio.to_thread(load_settings, user_id)
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Could not load settings: {e}") from e
 
@@ -2080,7 +2104,7 @@ async def toggle_agents(request: Request):
         ac["agents_status"] = "stopped"
 
     try:
-        save_settings(s, user_id)
+        await asyncio.to_thread(save_settings, s, user_id)
     except Exception as e:
         _logger_agents.warning("toggle_agents: could not save settings for user %s: %s", user_id[:12], e)
 
@@ -2097,7 +2121,7 @@ async def toggle_agents(request: Request):
 
 
 @app.get("/api/agents/loop-status")
-async def get_loop_status(request: Request):
+def get_loop_status(request: Request):
     """
     Return the live persistent-loop state for the current user.
     Used by the frontend to show accurate 'agents running' state.
@@ -2325,7 +2349,7 @@ async def trigger_meta_cycle(request: Request):
 
 
 @app.get("/api/escalations")
-async def get_escalations(request: Request):
+def get_escalations(request: Request):
     """
     Returns all startups where human_review_required=True and human_resolution is None.
     Shapes each result as EscalationItem (frontend type) with nested scout/review/partner.
@@ -2352,7 +2376,7 @@ async def get_escalations(request: Request):
 
 
 @app.post("/api/escalations/{startup_id}/resolve")
-async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, Any]):
+def resolve_escalation(request: Request, startup_id: str, body: Dict[str, Any]):
     """
     Resolve an escalation by writing human_resolution to the startup record.
     Body: {decision: "YES"|"NO"|"MAYBE", notes: str}

@@ -4,6 +4,7 @@ promote/reset/evaluate, eval-set, scout weights, calibration.
 Split out of api.py. Stateless reads + prompt-library mutations; the
 queue-coupled POST /api/meta/trigger stays in api.py.
 """
+import asyncio
 import logging
 import os
 from datetime import datetime, timezone
@@ -208,6 +209,11 @@ async def post_meta_prompt_promote(request: Request):
     if not library_key.startswith(f"{agent_target}:"):
         raise HTTPException(status_code=400, detail="library_key does not match agent_target")
 
+    # Sync Supabase reads/writes off the event loop.
+    return await asyncio.to_thread(_promote_prompt_sync, uid, agent_target, library_key)
+
+
+def _promote_prompt_sync(uid: str, agent_target: str, library_key: str):
     library = load_prompt_library(uid)
     if not isinstance(library, dict) or library_key not in library:
         raise HTTPException(status_code=404, detail="library_key not found")
@@ -280,6 +286,11 @@ async def post_meta_prompt_reset(request: Request):
     if not agent_target or agent_target not in VALID_PROMOTE_AGENT_TARGETS:
         raise HTTPException(status_code=400, detail="invalid agent_target")
 
+    # Sync Supabase reads/writes off the event loop.
+    return await asyncio.to_thread(_reset_prompt_sync, uid, agent_target)
+
+
+def _reset_prompt_sync(uid: str, agent_target: str):
     active = load_prompt_active(uid)
     prev_key = active.get(agent_target)
     if not prev_key:
@@ -342,7 +353,12 @@ async def put_meta_eval_set(request: Request):
         max_n = int(os.getenv("META_PROMPT_EVAL_SET_MAX", "50"))
     except ValueError:
         max_n = 50
+    # Up to max_n sync Supabase point reads + a write: off the event loop.
     storage = _get_storage(request)
+    return await asyncio.to_thread(_put_eval_set_sync, uid, raw, max_n, storage)
+
+
+def _put_eval_set_sync(uid: str, raw: List[Any], max_n: int, storage):
     validated: List[str] = []
     missing: List[str] = []
     seen: set[str] = set()
@@ -386,13 +402,9 @@ async def post_meta_prompt_evaluate(request: Request):
         raise HTTPException(status_code=503, detail="OPENAI_API_KEY required for evaluation")
 
     storage = _get_storage(request)
-    client = get_service_client()
     try:
-        active = get_active_thesis(client, uid)
-        if active is None:
-            _bootstrap_default_thesis_or_raise(client, uid)
-            active = get_active_thesis(client, uid)
-        thesis_ctx = active.as_engine_context() if active else None
+        # Sync Supabase thesis reads (and possible bootstrap write) off the event loop.
+        thesis_ctx = await asyncio.to_thread(_load_thesis_ctx_sync, uid)
     except FundThesisIncompleteError as e:
         raise HTTPException(status_code=400, detail=str(e) or "fund thesis incomplete")
 
@@ -418,6 +430,15 @@ async def post_meta_prompt_evaluate(request: Request):
         startup_ids=sid_list,
     )
     return result
+
+
+def _load_thesis_ctx_sync(uid: str):
+    client = get_service_client()
+    active = get_active_thesis(client, uid)
+    if active is None:
+        _bootstrap_default_thesis_or_raise(client, uid)
+        active = get_active_thesis(client, uid)
+    return active.as_engine_context() if active else None
 
 
 @router.get("/api/meta/weights")
