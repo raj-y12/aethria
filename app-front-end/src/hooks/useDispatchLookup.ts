@@ -290,10 +290,15 @@ export function useDispatchLookup({
     setCommandBarOpen(true);
   }, [pendingLookup, pendingLookupMatch, lookupFailureQuery.data]);
 
-  // Keep the startups list fresh while a lookup is in-flight so the new row
-  // appears promptly instead of waiting for the normal list refresh interval.
+  // Keep the startups list fresh for the WHOLE in-flight lookup — not just until
+  // the scout row first appears. Stopping at row-appearance left review→decide to
+  // SSE + the idle-gated global poll alone; with the analyst idle on the takeover
+  // (and SSE unreliable behind a buffering proxy) the row froze at Review, so it
+  // never reached Decide and the result snapshot never rendered. Poll until a
+  // partner recommendation lands (lookup decided), then stop.
+  const lookupDecided = !!pendingLookupMatch?.partner?.recommendation;
   useEffect(() => {
-    if (!pendingLookup || pendingLookupMatch) return;
+    if (!pendingLookup || pendingLookup.autoOpened || lookupDecided) return;
     // Stay live through idle: the analyst watching the takeover isn't "active"
     // (mousemove doesn't reset the idle gate), so gating on userActive here would
     // stall the in-flight progress poll right when they're staring at it.
@@ -305,7 +310,7 @@ export function useDispatchLookup({
     }, 3_000);
 
     return () => window.clearInterval(intervalId);
-  }, [pendingLookup, pendingLookupMatch, liveGate.tabVisible, queryClient]);
+  }, [pendingLookup, lookupDecided, liveGate.tabVisible, queryClient]);
 
   useEffect(() => {
     if (!pendingLookup) return;

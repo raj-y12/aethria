@@ -262,10 +262,10 @@ export default function FlowPage({ data }: { data: SystemData }) {
             <button
               type="button"
               onClick={openDispatch}
-              className="mt-phi-6 inline-flex min-h-[40px] items-center gap-phi-2 rounded-none border border-oxford/[0.14] px-phi-5 font-mono text-[11px] uppercase tracking-[0.14em] text-oxford/70 transition-colors hover:border-oxford/45 hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
+              className={`mt-phi-6 gap-phi-2 ${productInteraction.rulingChoiceIdle}`}
             >
               Dispatch a lookup
-              <span className="text-oxford/35" aria-hidden>⌘K</span>
+              <span className="font-normal text-oxford/45" aria-hidden>⌘K</span>
             </button>
           </div>
         ) : (

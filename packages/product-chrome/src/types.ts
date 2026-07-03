@@ -21,6 +21,8 @@ export type LookupCommandBarProps = {
 export type LookupDimensionScore = {
   key: string;
   label: string;
+  /** Abbreviated label used below the sm breakpoint, where full labels overlap. */
+  labelShort?: string;
   score: number | null;
 };
 

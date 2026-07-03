@@ -145,8 +145,9 @@ export default function LookupResultSnapshot({
                 <div className="grid w-full grid-cols-5 gap-x-0.5 gap-y-1 sm:gap-x-2 sm:gap-y-2 md:gap-x-3">
                   {dimensions.map((d) => (
                     <div key={`label-${d.key}`} className="flex min-w-0 items-end justify-center text-center">
-                      <p className="m-0 font-mono text-[12px] leading-[1.25] tracking-[0.03em] text-oxford/55">
-                        {d.label}
+                      <p className="m-0 font-mono text-[11px] leading-[1.25] tracking-[0.03em] text-oxford/55 sm:text-[12px]">
+                        {/* five full labels overlap at this column width — prefer the abbreviation */}
+                        {d.labelShort ?? d.label}
                       </p>
                     </div>
                   ))}

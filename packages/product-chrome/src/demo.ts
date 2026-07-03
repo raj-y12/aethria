@@ -47,11 +47,11 @@ export const DEMO_LOOKUP_MEMO_SAMPLE: LookupResultSnapshotProps = {
     'Clear market timing, credible founding team, and defensible infrastructure play. Reviewer disagreement remains visible beside the partner recommendation.',
   thesisLine: 'Policy-backed recommendation',
   dimensions: [
-    { key: 'market', label: 'MARKET', score: 9 },
-    { key: 'execution', label: 'EXECUTION', score: 8 },
-    { key: 'product', label: 'PRODUCT', score: 8 },
-    { key: 'technical', label: 'TECHNICAL', score: 9 },
-    { key: 'defensibility', label: 'DEFENSIBILITY', score: 7 },
+    { key: 'market', label: 'MARKET', labelShort: 'MKT', score: 9 },
+    { key: 'execution', label: 'EXECUTION', labelShort: 'EXEC', score: 8 },
+    { key: 'product', label: 'PRODUCT', labelShort: 'PROD', score: 8 },
+    { key: 'technical', label: 'TECHNICAL', labelShort: 'TECH', score: 9 },
+    { key: 'defensibility', label: 'DEFENSIBILITY', labelShort: 'DEF', score: 7 },
   ],
 };
 

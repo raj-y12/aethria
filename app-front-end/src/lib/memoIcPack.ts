@@ -12,12 +12,35 @@ import {
   SCORE_DIMENSIONS,
 } from '../design-system/semantics';
 
-const PDF_MARGIN = 20;
+const PDF_MARGIN = 18;
 const PDF_LINE_HEIGHT = 5;
-const PDF_FONT_SIZE_TITLE = 18;
-const PDF_FONT_SIZE_HEADING = 11;
+const PDF_FONT_SIZE_TITLE = 21;
+const PDF_FONT_SIZE_HEADING = 10;
 const PDF_FONT_SIZE_BODY = 10;
-const PDF_FONT_SIZE_SMALL = 9;
+const PDF_FONT_SIZE_SMALL = 8;
+
+// Editorial palette (matches the app's paper/oxford ink language).
+type RGB = [number, number, number];
+const INK: RGB = [13, 27, 53];
+const MUTED: RGB = [110, 116, 130];
+const RULE: RGB = [212, 215, 222];
+const TRACK: RGB = [232, 234, 239];
+
+// Score-band ramp, keyed by getScoreBand().label.
+const BAND_COLOR: Record<string, RGB> = {
+  Weak: [178, 58, 47],
+  Concerning: [183, 121, 31],
+  Promising: [47, 96, 140],
+  Strong: [46, 110, 78],
+};
+
+function decisionColor(rec?: string | null): RGB {
+  const r = (rec ?? '').toUpperCase();
+  if (r.includes('INVEST') || r.includes('YES')) return BAND_COLOR.Strong;
+  if (r.includes('MONITOR') || r.includes('MAYBE')) return BAND_COLOR.Concerning;
+  if (r.includes('PASS') || r.includes('NO')) return BAND_COLOR.Weak;
+  return MUTED;
+}
 
 export interface IcSection {
   title: string;
@@ -291,65 +314,209 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
   return sections;
 }
 
-function addPDFSection(
-  doc: jsPDF,
-  opts: { title?: string; lines: string[]; startY: number }
-): number {
-  let y = opts.startY;
-  const pageH = doc.internal.pageSize.getHeight();
-  const maxW = doc.internal.pageSize.getWidth() - PDF_MARGIN * 2;
-  if (opts.title) {
-    doc.setFontSize(PDF_FONT_SIZE_HEADING);
-    doc.setTextColor(80, 80, 100);
-    doc.text(opts.title.toUpperCase(), PDF_MARGIN, y);
-    y += PDF_LINE_HEIGHT + 1;
+function contentWidth(doc: jsPDF): number {
+  return doc.internal.pageSize.getWidth() - PDF_MARGIN * 2;
+}
+
+/** Start a new page if `need` mm won't fit; returns the (possibly reset) y. */
+function ensureSpace(doc: jsPDF, y: number, need: number): number {
+  const bottom = doc.internal.pageSize.getHeight() - PDF_MARGIN - 8; // leave room for footer
+  if (y + need > bottom) {
+    doc.addPage();
+    return PDF_MARGIN;
   }
+  return y;
+}
+
+function setColor(doc: jsPDF, c: RGB): void {
+  doc.setTextColor(c[0], c[1], c[2]);
+}
+
+/** Section heading: uppercase label with a hairline rule beneath. */
+function drawHeading(doc: jsPDF, title: string, y: number): number {
+  y = ensureSpace(doc, y, 16); // keep heading with at least one body line
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(PDF_FONT_SIZE_HEADING);
+  setColor(doc, INK);
+  doc.text(title.toUpperCase(), PDF_MARGIN, y);
+  y += 2.5;
+  doc.setDrawColor(RULE[0], RULE[1], RULE[2]);
+  doc.setLineWidth(0.2);
+  doc.line(PDF_MARGIN, y, PDF_MARGIN + contentWidth(doc), y);
+  return y + 5;
+}
+
+/** Body line; bolds a leading "Label: " prefix and hang-indents bullets. */
+function drawBodyLine(doc: jsPDF, line: string, y: number): number {
+  const maxW = contentWidth(doc);
+  const isBullet = line.startsWith('• ');
+  const indent = isBullet ? 4 : 0;
+  const text = isBullet ? line.slice(2) : line;
+
+  // Split "Label: rest" so the label can be emphasised.
+  const colon = text.indexOf(': ');
+  const label = colon > 0 && colon < 32 ? text.slice(0, colon + 1) : '';
+  const rest = label ? text.slice(colon + 2) : text;
+
   doc.setFontSize(PDF_FONT_SIZE_BODY);
-  doc.setTextColor(0, 20, 51);
-  for (const line of opts.lines) {
-    const split = doc.splitTextToSize(line, maxW);
-    for (const s of split) {
-      if (y > pageH - 20) {
-        doc.addPage();
-        y = PDF_MARGIN;
-      }
-      doc.text(s, PDF_MARGIN, y);
-      y += PDF_LINE_HEIGHT;
+  const wrapped = doc.splitTextToSize((label ? `${label} ` : '') + rest, maxW - indent) as string[];
+
+  wrapped.forEach((seg, i) => {
+    y = ensureSpace(doc, y, PDF_LINE_HEIGHT);
+    const x = PDF_MARGIN + indent;
+    if (isBullet && i === 0) {
+      setColor(doc, MUTED);
+      doc.setFont('helvetica', 'normal');
+      doc.text('•', PDF_MARGIN, y);
     }
+    if (label && i === 0) {
+      doc.setFont('helvetica', 'bold');
+      setColor(doc, INK);
+      doc.text(label, x, y);
+      const lw = doc.getTextWidth(label) + 1.6;
+      doc.setFont('helvetica', 'normal');
+      setColor(doc, INK);
+      // remainder of first line after the label
+      const firstRest = seg.slice(label.length).trimStart();
+      if (firstRest) doc.text(firstRest, x + lw, y);
+    } else {
+      doc.setFont('helvetica', 'normal');
+      setColor(doc, INK);
+      doc.text(seg, x, y);
+    }
+    y += PDF_LINE_HEIGHT;
+  });
+  return y;
+}
+
+/** Score dimensions rendered as labelled rows with a proportional band bar. */
+function drawScoreBars(doc: jsPDF, startup: Startup, y: number): number {
+  const barX = PDF_MARGIN + 42;
+  const barW = contentWidth(doc) - 42 - 30;
+  for (const { id, name } of SCORE_DIMENSIONS) {
+    const score = startup.review?.[id as keyof typeof startup.review];
+    if (typeof score !== 'number') continue;
+    const band = getScoreBand(score);
+    const color = BAND_COLOR[band.label] ?? MUTED;
+    y = ensureSpace(doc, y, 8);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(PDF_FONT_SIZE_BODY);
+    setColor(doc, INK);
+    doc.text(name, PDF_MARGIN, y);
+
+    doc.setFillColor(TRACK[0], TRACK[1], TRACK[2]);
+    doc.roundedRect(barX, y - 3, barW, 2.4, 1.2, 1.2, 'F');
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.roundedRect(barX, y - 3, Math.max(2.4, (barW * score) / 10), 2.4, 1.2, 1.2, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    setColor(doc, color);
+    doc.text(`${score}/10`, barX + barW + 4, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(PDF_FONT_SIZE_SMALL);
+    setColor(doc, MUTED);
+    doc.text(band.label, PDF_MARGIN, y + 3.4);
+    y += 8;
   }
-  return y + PDF_LINE_HEIGHT;
+  return y + 2;
+}
+
+/** Cover verdict strip: decision + confidence + reviewer band, accented. */
+function drawVerdictStrip(doc: jsPDF, startup: Startup, y: number): number {
+  const p = startup.partner;
+  if (!p) return y;
+  const color = decisionColor(p.recommendation);
+  const w = contentWidth(doc);
+  const h = 14;
+  doc.setFillColor(color[0], color[1], color[2]);
+  doc.rect(PDF_MARGIN, y, 1.6, h, 'F'); // accent spine
+  doc.setDrawColor(RULE[0], RULE[1], RULE[2]);
+  doc.setLineWidth(0.2);
+  doc.rect(PDF_MARGIN + 1.6, y, w - 1.6, h, 'S');
+
+  const tx = PDF_MARGIN + 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  setColor(doc, color);
+  const label = DECISION_LABELS[p.recommendation] ?? p.recommendation;
+  doc.text(label, tx, y + 6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(PDF_FONT_SIZE_SMALL);
+  setColor(doc, MUTED);
+  const meta: string[] = [];
+  if (p.confidence != null) meta.push(`Partner confidence ${Math.round(p.confidence * 100)}%`);
+  const band = getReviewerQualityBand(startup.review);
+  if (band != null) meta.push(`Dossier ${QUALITY_LABELS[band] ?? band}`);
+  if (p.human_review_required) meta.push('Human review required');
+  if (meta.length) doc.text(meta.join('   ·   '), tx, y + 11);
+  return y + h + 6;
+}
+
+/** Footer with confidential mark + page numbers, drawn across all pages. */
+function drawFooters(doc: jsPDF, companyName: string): void {
+  const pages = doc.getNumberOfPages();
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const fy = pageH - 10;
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(RULE[0], RULE[1], RULE[2]);
+    doc.setLineWidth(0.2);
+    doc.line(PDF_MARGIN, fy - 3, pageW - PDF_MARGIN, fy - 3);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    setColor(doc, MUTED);
+    doc.text('Aethria · Confidential', PDF_MARGIN, fy);
+    if (companyName) doc.text(companyName, pageW / 2, fy, { align: 'center' });
+    doc.text(`${i} / ${pages}`, pageW - PDF_MARGIN, fy, { align: 'right' });
+  }
 }
 
 export async function buildMemoPDF(startup: Startup): Promise<jsPDF> {
   const { jsPDF: JsPDF } = await import('jspdf');
   const doc = new JsPDF({ unit: 'mm', format: 'a4' });
-  let y = PDF_MARGIN;
+  let y = PDF_MARGIN + 2;
 
+  // Masthead.
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(PDF_FONT_SIZE_SMALL);
-  doc.setTextColor(100, 100, 120);
-  doc.text('CONFIDENTIAL — FOR INVESTMENT COMMITTEE USE ONLY', PDF_MARGIN, y);
-  y += PDF_LINE_HEIGHT + 2;
+  setColor(doc, MUTED);
+  doc.text('CONFIDENTIAL · INVESTMENT COMMITTEE', PDF_MARGIN, y);
+  y += 8;
   doc.setFontSize(PDF_FONT_SIZE_TITLE);
-  doc.setTextColor(0, 20, 51);
-  doc.text('Investment committee memorandum', PDF_MARGIN, y);
-  y += PDF_LINE_HEIGHT + 4;
-  doc.setFontSize(14);
-  doc.text(startup.scout.name ?? '—', PDF_MARGIN, y);
-  y += PDF_LINE_HEIGHT + 2;
-  doc.setFontSize(PDF_FONT_SIZE_SMALL);
-  doc.setTextColor(80, 80, 100);
+  setColor(doc, INK);
+  doc.text(startup.scout.name ?? 'Investment memorandum', PDF_MARGIN, y);
+  y += 7;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(PDF_FONT_SIZE_BODY);
+  setColor(doc, MUTED);
   const sector = startup.scout.sector?.trim() || '—';
   const stage = startup.scout.funding_stage?.trim() || '';
-  doc.text(stage ? `${sector} · ${stage}` : sector, PDF_MARGIN, y);
-  y += PDF_LINE_HEIGHT;
-  doc.text(`Prepared: ${fmtDate(new Date().toISOString())}`, PDF_MARGIN, y);
-  y += PDF_LINE_HEIGHT * 2;
+  doc.text(stage ? `${sector}  ·  ${stage}` : sector, PDF_MARGIN, y);
+  y += 4.5;
+  doc.setFontSize(PDF_FONT_SIZE_SMALL);
+  doc.text(`Prepared ${fmtDate(new Date().toISOString())}`, PDF_MARGIN, y);
+  y += 6;
+  doc.setDrawColor(INK[0], INK[1], INK[2]);
+  doc.setLineWidth(0.5);
+  doc.line(PDF_MARGIN, y, PDF_MARGIN + contentWidth(doc), y);
+  y += 7;
 
-  const sections = buildIcPackSections(startup);
-  for (const sec of sections) {
-    y = addPDFSection(doc, { title: sec.title, lines: sec.lines, startY: y });
+  y = drawVerdictStrip(doc, startup, y);
+
+  for (const sec of buildIcPackSections(startup)) {
+    y = drawHeading(doc, sec.title, y);
+    if (sec.title === 'Dimension scores') {
+      y = drawScoreBars(doc, startup, y);
+    } else {
+      for (const line of sec.lines) y = drawBodyLine(doc, line, y);
+    }
+    y += 4; // section gap
   }
 
+  drawFooters(doc, startup.scout.name ?? '');
   return doc;
 }
 
