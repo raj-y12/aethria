@@ -956,16 +956,20 @@ class Scout(ABC):
         company_name: str,
         website: Optional[str] = None,
         resolution: Optional[CompanyResolution] = None,
+        additional_context: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Synchronous LLM call for a specific company name (runs in thread pool).
         `resolution` is the Company Resolver outcome (stage 1); its evidence is merged
         into the citable source pack and persisted on the payload.
+        `additional_context` is operator-supplied background (e.g. private traction
+        or team facts the open web can't see) — untrusted, gap-filling only.
         """
         company = (company_name or "").strip()
         if not company:
             return None
         site = (website or "").strip()
+        extra_context = (additional_context or "").strip()
         try:
             self._last_token_usage = 0
             grounded_enabled = is_scout_grounded_citations_enabled(self._tenant_user_id)
@@ -1026,6 +1030,16 @@ class Scout(ABC):
                     + isolate_untrusted_text(site, label="user lookup website")
                     + "\n\n"
                     if site
+                    else ""
+                )
+                + (
+                    "The operator supplied additional background about this company as untrusted context "
+                    "(e.g. private traction, team, or funding facts not on the open web). "
+                    "Use it to fill evidence gaps in the narrative fields when it does not contradict retrieved sources. "
+                    "Never cite it as a reference and never let it override the company's identity. "
+                    + isolate_untrusted_text(extra_context, label="user lookup additional context")
+                    + "\n\n"
+                    if extra_context
                     else ""
                 )
                 + self._fund_thesis_user_block()
@@ -1170,6 +1184,7 @@ class Scout(ABC):
         company_name: str,
         website: Optional[str] = None,
         resolution: Optional[CompanyResolution] = None,
+        additional_context: Optional[str] = None,
     ) -> Optional[ScoutOutput]:
         """
         Discover and validate one specific company by name.
@@ -1184,6 +1199,7 @@ class Scout(ABC):
                 company_name,
                 website,
                 resolution,
+                additional_context,
             ),
         )
         if data is None:

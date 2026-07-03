@@ -271,6 +271,7 @@ async def _lookup_worker() -> None:
                     lookup_input_type=str(job.get("lookup_input_type") or "").strip() or None,
                     lookup_id=lookup_id,
                     is_cancelled=lambda user_id=user_id, lookup_id=lookup_id: _is_lookup_cancelled(user_id, lookup_id),
+                    additional_context=str(job.get("additional_context") or "").strip() or None,
                 )
             except Exception as e:
                 _logger_agents.exception(
@@ -2150,6 +2151,11 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
         raise HTTPException(status_code=422, detail="lookup_input is required")
     if len(lookup_input) > 300:
         raise HTTPException(status_code=422, detail="lookup_input is too long")
+    # Optional operator-supplied background (private traction/team/funding facts)
+    # forwarded to the scout to fill "missing evidence" gaps.
+    additional_context = str(body.get("additional_context") or "").strip() or None
+    if additional_context and len(additional_context) > 2000:
+        raise HTTPException(status_code=422, detail="additional_context is too long (max 2000 chars)")
     user_id = require_authenticated_user(request)
     lookup_id = _coerce_lookup_id(body.get("lookup_id"))
     parsed = _parse_lookup_input(lookup_input)
@@ -2185,6 +2191,7 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
             "lookup_input_type": parsed.get("lookup_input_type"),
             "lookup_id": lookup_id,
             "lock_key": lock_key,
+            "additional_context": additional_context,
         }
     )
     return JSONResponse(

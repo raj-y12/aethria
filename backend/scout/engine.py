@@ -300,6 +300,7 @@ class ScoutEngine:
         lookup_id: Optional[str] = None,
         pipeline_run_id: Optional[str] = None,
         resolution: Optional[CompanyResolution] = None,
+        additional_context: Optional[str] = None,
     ) -> Optional[str]:
         """
         On-demand lookup, staged:
@@ -378,7 +379,10 @@ class ScoutEngine:
 
         # ── Stage 2: enrich via scout LLM (seeded with resolver evidence) ────
         result = await selected.discover_company(
-            company, website=effective_website, resolution=resolution
+            company,
+            website=effective_website,
+            resolution=resolution,
+            additional_context=additional_context,
         )
         if result is None and resolution is not None:
             # Demo-safe fallback: the resolver found real evidence but profile

@@ -129,7 +129,9 @@ export async function fetchLookupJobStatus(lookupId: string): Promise<LookupJobS
 
 export async function queueOnDemandLookup(
   lookupInput: string,
-  lookupId: string
+  lookupId: string,
+  /** Optional operator-supplied background (private traction/team facts) to fill missing-evidence gaps. */
+  additionalContext?: string
 ): Promise<{ status: string; companyName: string; lookupId: string; lookupInputType?: string }> {
   const input = lookupInput.trim();
   const id = lookupId.trim();
@@ -139,6 +141,7 @@ export async function queueOnDemandLookup(
   if (!id) {
     throw new Error('lookupId is required');
   }
+  const context = additionalContext?.trim().slice(0, 2000);
   const res = await authedFetch(`${API_BASE}/api/startups/lookup`, {
     method: 'POST',
     headers: {
@@ -148,6 +151,7 @@ export async function queueOnDemandLookup(
     body: JSON.stringify({
       lookup_input: input,
       lookup_id: id,
+      ...(context ? { additional_context: context } : {}),
     }),
   });
   if (!res.ok) {
