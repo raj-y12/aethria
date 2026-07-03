@@ -29,13 +29,33 @@ export async function markActivitySeen(): Promise<void> {
 /**
  * After password sign-in, the global Clerk token getter may not be wired yet.
  * Call with the session token from Clerk so the welcome screen can load activity.
+ *
+ * Time-boxed: the welcome screen's CTA waits on this call, so a slow or
+ * cold backend must degrade to "no stats" after `timeoutMs`, never hang.
  */
-export async function fetchActivitySummaryWithToken(token: string): Promise<ActivitySummary | null> {
+export async function fetchActivitySummaryWithToken(
+  token: string,
+  timeoutMs = 8_000,
+): Promise<ActivitySummary | null> {
   const t = token.trim();
   if (!t) return null;
-  const res = await fetch(`${API_BASE}/api/activity/summary`, {
-    headers: { Accept: 'application/json', Authorization: `Bearer ${t}` },
-  });
-  if (!res.ok) return null;
-  return (await res.json()) as ActivitySummary;
+  try {
+    const res = await fetch(`${API_BASE}/api/activity/summary`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${t}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as ActivitySummary;
+  } catch {
+    return null; // timeout or network error — welcome screen proceeds without stats
+  }
+}
+
+/**
+ * Fire-and-forget backend wake-up: hit the public /health endpoint so a cold
+ * or sleeping instance starts warming while the user is still typing their
+ * credentials. One cheap unauthenticated GET per login-page visit.
+ */
+export function pingBackendWarmup(): void {
+  void fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(30_000) }).catch(() => undefined);
 }

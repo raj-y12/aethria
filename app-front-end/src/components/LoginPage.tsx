@@ -5,7 +5,7 @@ import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { usePrefersReducedMotion } from '../hooks';
 import AuthInstitutionalFooter from './AuthInstitutionalFooter';
 import ActivityStatsRow, { activityStatsFromSummary } from './ActivityStatsRow';
-import { fetchActivitySummaryWithToken, type ActivitySummary } from '../api/activity';
+import { fetchActivitySummaryWithToken, pingBackendWarmup, type ActivitySummary } from '../api/activity';
 import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from '../lib/loginEntryTransition';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -60,6 +60,12 @@ export default function LoginPage() {
   const hasRedirectedRef = useRef(false);
   const formShakeRef = useRef<HTMLDivElement>(null);
   const enterTimeoutRef = useRef<number | null>(null);
+
+  // Wake a cold backend while the user types credentials, so the first
+  // authenticated call (the welcome screen's activity summary) lands warm.
+  useEffect(() => {
+    pingBackendWarmup();
+  }, []);
 
   useEffect(() => {
     return () => {

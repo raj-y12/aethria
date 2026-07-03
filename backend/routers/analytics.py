@@ -3,6 +3,7 @@
 Split out of api.py. Read-only aggregations plus the activity-seen marker. The
 shared read/system-health helpers live in routers/deps.py.
 """
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -235,6 +236,26 @@ async def get_activity_summary(request: Request):
     user_id: str = getattr(request.state, "user_id", None)
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    # Four sequential sync Supabase round trips: run them off the event loop.
+    # This is the first authenticated call after sign-in (the welcome screen
+    # waits on it), so it must never stall — or be stalled by — other requests.
+    totals, last_seen_at = await asyncio.to_thread(_activity_summary_totals_sync, user_id)
+
+    logging.getLogger("api").info(
+        "activity_summary user_id=%s since=%s agent_decided=%s human_reviewed=%s open_in_progress=%s",
+        user_id[:24],
+        last_seen_at,
+        totals["agent_decided"],
+        totals["human_reviewed"],
+        totals["open_in_progress"],
+    )
+
+    # last_seen_at is NOT updated here — only updated when the user explicitly
+    # dismisses the modal via POST /api/activity/seen
+    return JSONResponse(content=totals)
+
+
+def _activity_summary_totals_sync(user_id: str):
     svc = get_service_client()
 
     # 1. Read last_seen_at
@@ -301,19 +322,7 @@ async def get_activity_summary(request: Request):
         human_reviewed=human_reviewed,
         open_in_progress=open_in_progress,
     )
-
-    logging.getLogger("api").info(
-        "activity_summary user_id=%s since=%s agent_decided=%s human_reviewed=%s open_in_progress=%s",
-        user_id[:24],
-        last_seen_at,
-        totals["agent_decided"],
-        totals["human_reviewed"],
-        totals["open_in_progress"],
-    )
-
-    # last_seen_at is NOT updated here — only updated when the user explicitly
-    # dismisses the modal via POST /api/activity/seen
-    return JSONResponse(content=totals)
+    return totals, last_seen_at
 
 
 @router.post("/api/activity/seen")
