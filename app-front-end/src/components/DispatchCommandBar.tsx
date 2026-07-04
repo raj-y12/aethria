@@ -33,9 +33,6 @@ interface DispatchCommandBarProps {
   onClose: () => void;
   input: string;
   setInput: (v: string) => void;
-  /** Optional operator-supplied background sent with the lookup (fills missing-evidence gaps). */
-  additionalContext: string;
-  setAdditionalContext: (v: string) => void;
   onSubmit: () => void;
   onCancel?: () => void;
   isBusy: boolean;
@@ -58,6 +55,9 @@ interface DispatchCommandBarProps {
   needsWebsite?: boolean;
   onPickCandidate?: (candidate: LookupCandidate) => void;
   onRefineWebsite?: (websiteHint: string) => void;
+  /** Re-review of an existing memo: company is fixed, only private context is asked for. */
+  rerun?: { name: string; sector?: string | null } | null;
+  onSubmitRerun?: (context: string) => void;
 }
 
 type StepState = 'done' | 'active' | 'pending';
@@ -140,8 +140,6 @@ export default function DispatchCommandBar({
   onClose,
   input,
   setInput,
-  additionalContext,
-  setAdditionalContext,
   onSubmit,
   onCancel,
   isBusy,
@@ -156,23 +154,32 @@ export default function DispatchCommandBar({
   needsWebsite = false,
   onPickCandidate,
   onRefineWebsite,
+  rerun,
+  onSubmitRerun,
 }: DispatchCommandBarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(open, containerRef);
   const [compose, setCompose] = useState(false);
+  // Context being typed for a re-review; transient per takeover open.
+  const [rerunContext, setRerunContext] = useState('');
   useEffect(() => {
-    if (!open) setCompose(false);
+    if (!open) {
+      setCompose(false);
+      setRerunContext('');
+    }
   }, [open]);
 
-  const view: 'result' | 'failure' | 'progress' | 'compose' = compose
+  const view: 'result' | 'failure' | 'progress' | 'compose' | 'rerun' = compose
     ? 'compose'
-    : result
-      ? 'result'
-      : failure
-        ? 'failure'
-        : progress
-          ? 'progress'
-          : 'compose';
+    : rerun
+      ? 'rerun'
+      : result
+        ? 'result'
+        : failure
+          ? 'failure'
+          : progress
+            ? 'progress'
+            : 'compose';
 
   useEffect(() => {
     if (!open) return;
@@ -187,9 +194,11 @@ export default function DispatchCommandBar({
   }, [open, onClose]);
 
   useEffect(() => {
-    if (!open || view !== 'compose') return;
+    if (!open || (view !== 'compose' && view !== 'rerun')) return;
     const id = window.setTimeout(() => {
-      containerRef.current?.querySelector('input')?.focus();
+      containerRef.current
+        ?.querySelector<HTMLElement>(view === 'rerun' ? 'textarea' : 'input')
+        ?.focus();
     }, 550);
     return () => window.clearTimeout(id);
   }, [open, view]);
@@ -197,6 +206,13 @@ export default function DispatchCommandBar({
   const handleSubmit = () => {
     onSubmit();
     setCompose(false);
+  };
+
+  const handleSubmitRerun = () => {
+    const value = rerunContext.trim();
+    if (!value) return;
+    onSubmitRerun?.(value);
+    setRerunContext('');
   };
 
   // "Try again" from the failure view: clear the failure and reopen compose.
@@ -209,26 +225,32 @@ export default function DispatchCommandBar({
   // the stages screen leads with "Confirm Company" rather than "Analyzing".
   const confirming = view === 'progress' && progress != null && !progress.resolved;
   const eyebrow =
-    view === 'result'
-      ? 'Dispatch Complete'
-      : view === 'failure'
-        ? 'Not Found'
-        : view === 'progress'
-          ? confirming
-            ? 'Confirm Company'
-            : 'Analyzing'
-          : 'Dispatch';
+    view === 'rerun'
+      ? 'Re-review'
+      : view === 'result'
+        ? 'Dispatch Complete'
+        : view === 'failure'
+          ? 'Not Found'
+          : view === 'progress'
+            ? confirming
+              ? 'Confirm Company'
+              : 'Analyzing'
+            : 'Dispatch';
   const title =
-    view === 'result'
-      ? 'Here’s what we found'
-      : view === 'failure'
-        ? failure!.query
-        : view === 'progress'
-          ? progress!.name || progress!.query
-          : 'Look up a company';
+    view === 'rerun'
+      ? rerun!.name
+      : view === 'result'
+        ? 'Here’s what we found'
+        : view === 'failure'
+          ? failure!.query
+          : view === 'progress'
+            ? progress!.name || progress!.query
+            : 'Look up a company';
   const lookupRunning = isBusy || Boolean(progress);
   const footerActions: DispatchFooterAction[] =
-    view === 'result'
+    view === 'rerun'
+      ? [{ label: 'Exit', onClick: onClose }]
+      : view === 'result'
       ? [
           { label: 'Back', onClick: () => setCompose(true) },
           { label: 'Exit', onClick: onClose },
@@ -313,7 +335,52 @@ export default function DispatchCommandBar({
             </h1>
           </Reveal>
 
-          {view === 'result' ? (
+          {view === 'rerun' ? (
+            <Reveal delay={0.24} className="mt-phi-3 flex w-full max-w-md flex-col items-center gap-phi-5">
+              {rerun!.sector ? (
+                <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
+                  {rerun!.sector}
+                </p>
+              ) : null}
+              <p className="type-body max-w-[38ch] text-center text-oxford/50">
+                Add private context — traction, team, funding — and the analysts run the
+                full review again with it.
+              </p>
+              <div className="w-full">
+                <label
+                  htmlFor="dispatch-rerun-context"
+                  className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40"
+                >
+                  Additional context
+                </label>
+                <textarea
+                  id="dispatch-rerun-context"
+                  value={rerunContext}
+                  onChange={(e) => setRerunContext(e.target.value)}
+                  rows={3}
+                  maxLength={2000}
+                  disabled={isBusy}
+                  placeholder="e.g. Raised $2.1M pre-seed (unannounced); pilot live with two enterprise design partners."
+                  className="mt-phi-1 w-full resize-none border-0 border-b border-solid border-oxford/[0.12] bg-transparent px-0 py-phi-2 font-sans text-[13px] leading-[1.5] text-oxford outline-none transition-colors placeholder:text-oxford/[0.28] focus:border-oxford/45 disabled:cursor-not-allowed"
+                />
+                <div className="mt-phi-4 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSubmitRerun}
+                    disabled={isBusy || !rerunContext.trim()}
+                    className="border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    Run re-review →
+                  </button>
+                </div>
+              </div>
+              {message ? (
+                <p className="type-body max-w-[40ch] text-center text-oxford/45" aria-live="polite">
+                  {message}
+                </p>
+              ) : null}
+            </Reveal>
+          ) : view === 'result' ? (
             <Reveal delay={0.24} className="mt-phi-6 flex w-full max-w-xl flex-col items-center">
               {result}
             </Reveal>
@@ -393,24 +460,6 @@ export default function DispatchCommandBar({
                     message={null}
                     lookupPhase={null}
                     displayMode="embedded"
-                  />
-                </div>
-                <div className="w-full">
-                  <label
-                    htmlFor="dispatch-additional-context"
-                    className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40"
-                  >
-                    Additional context <span className="text-oxford/25">· Optional</span>
-                  </label>
-                  <textarea
-                    id="dispatch-additional-context"
-                    value={additionalContext}
-                    onChange={(e) => setAdditionalContext(e.target.value)}
-                    rows={2}
-                    maxLength={2000}
-                    disabled={isBusy}
-                    placeholder="Private traction or team facts the public record won't show — passed to the analysts."
-                    className="mt-phi-1 w-full resize-none border-0 border-b border-solid border-oxford/[0.12] bg-transparent px-0 py-phi-2 font-sans text-[13px] leading-[1.5] text-oxford outline-none transition-colors placeholder:text-oxford/[0.28] focus:border-oxford/45 disabled:cursor-not-allowed"
                   />
                 </div>
               </Reveal>

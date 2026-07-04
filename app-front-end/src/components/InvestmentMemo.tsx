@@ -12,6 +12,7 @@ import InvestmentMemoContent from './InvestmentMemoContent';
 interface InvestmentMemoProps {
   startup: Startup | null;
   onClose: () => void;
+  onAddContext?: () => void;
   onMemoPipelineReady?: () => void;
   onDecisionResolved?: (startup: Startup) => void;
   fundConfiguration?: FundConfiguration;
@@ -22,7 +23,7 @@ interface InvestmentMemoProps {
 /**
  * Full-screen modal wrapper for the investment memo. Used on small viewports.
  */
-export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady, onDecisionResolved, fundConfiguration, peerStartups, portfolioSignals }: InvestmentMemoProps) {
+export default function InvestmentMemo({ startup, onClose, onAddContext, onMemoPipelineReady, onDecisionResolved, fundConfiguration, peerStartups, portfolioSignals }: InvestmentMemoProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion = usePrefersReducedMotion();
   useFocusTrap(true, containerRef);
@@ -79,6 +80,7 @@ export default function InvestmentMemo({ startup, onClose, onMemoPipelineReady, 
         <InvestmentMemoContent
           startup={startup}
           onClose={onClose}
+          onAddContext={onAddContext}
           onMemoPipelineReady={onMemoPipelineReady}
           onDecisionResolved={onDecisionResolved}
           fundConfiguration={fundConfiguration}

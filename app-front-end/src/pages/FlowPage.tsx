@@ -84,7 +84,7 @@ function ReadoutKey({
  */
 export default function FlowPage({ data }: { data: SystemData }) {
   const { startups, signals, watchlistAnalytics } = data;
-  const { inlineDispatch, setPageOverlayOpen, openDispatch } = useAppFrame();
+  const { inlineDispatch, setPageOverlayOpen, openDispatch, openRerun } = useAppFrame();
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const reduceMotion = usePrefersReducedMotion();
@@ -307,14 +307,24 @@ export default function FlowPage({ data }: { data: SystemData }) {
                           startup={memoStartup}
                           fundConfiguration={fundConfiguration}
                           action={
-                            <button
-                              type="button"
-                              onClick={() => memoContentRef.current?.downloadPDF()}
-                              className={PANEL_ACTION_CLASS}
-                              aria-label="Download IC pack as PDF"
-                            >
-                              IC pack (PDF)
-                            </button>
+                            <span className="inline-flex items-center gap-phi-4">
+                              <button
+                                type="button"
+                                onClick={() => openRerun(memoStartup)}
+                                className={PANEL_ACTION_CLASS}
+                                aria-label={`Add context and re-review ${memoStartup.scout.name}`}
+                              >
+                                Add context
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => memoContentRef.current?.downloadPDF()}
+                                className={PANEL_ACTION_CLASS}
+                                aria-label="Download IC pack as PDF"
+                              >
+                                IC pack (PDF)
+                              </button>
+                            </span>
                           }
                         />
                       }
@@ -338,6 +348,11 @@ export default function FlowPage({ data }: { data: SystemData }) {
             key={`memo-${memoStartup.id}`}
             startup={memoStartup}
             onClose={handleCloseMemo}
+            onAddContext={() => {
+              // Takeover lives inside AppFrame (z-20) below this body portal — close first.
+              handleCloseMemo();
+              openRerun(memoStartup);
+            }}
             onMemoPipelineReady={handleMemoPipelineReady}
             onDecisionResolved={handleDecisionResolved}
             fundConfiguration={fundConfiguration}

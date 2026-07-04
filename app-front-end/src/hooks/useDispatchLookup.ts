@@ -4,6 +4,7 @@ import { useAuth } from '@clerk/react-router';
 import {
   cancelOnDemandLookups,
   queueOnDemandLookup,
+  queueLookupRerun,
   fetchStartupDetail,
   fetchLookupJobStatus,
   resolveLookupCandidates,
@@ -55,10 +56,10 @@ export function useDispatchLookup({
 
   const [commandBarOpen, setCommandBarOpen] = useState(false);
   const [input, setInput] = useState('');
-  // Optional operator-supplied background (private traction/team facts) that
-  // fills missing-evidence gaps. Held in the hook (not the compose surface) so
-  // it survives disambiguation — pick-candidate and website-refine also queue.
-  const [additionalContext, setAdditionalContext] = useState('');
+  // Re-review target: an existing memo the analyst is adding private context to.
+  // Non-null drives the takeover's re-review compose view (company fixed, only
+  // the context is asked for); cleared once the re-run is queued.
+  const [rerunTarget, setRerunTarget] = useState<Startup | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<LookupCandidate[]>([]);
@@ -89,7 +90,7 @@ export function useDispatchLookup({
   const queueLookup = useCallback(
     async (value: string, requestSeq: number) => {
       const lookupId = crypto.randomUUID();
-      const queued = await queueOnDemandLookup(value, lookupId, additionalContext.trim() || undefined);
+      const queued = await queueOnDemandLookup(value, lookupId);
       if (requestSeqRef.current !== requestSeq) return;
       const current = pendingLookup;
       if (current && !current.autoOpened && current.lookupId !== queued.lookupId) {
@@ -103,9 +104,8 @@ export function useDispatchLookup({
         `Lookup queued for ${queued.companyName}. We are now finding and validating the company profile.`,
       );
       setInput('');
-      setAdditionalContext('');
     },
-    [pendingLookup, additionalContext],
+    [pendingLookup],
   );
 
   const submit = useCallback(async () => {
@@ -208,6 +208,48 @@ export function useDispatchLookup({
     [input, queueLookup],
   );
 
+  // Post-hoc re-review: open the takeover on an existing memo's company and ask
+  // only for the private context — identity is known, so no resolver step.
+  const openRerun = useCallback((startup: Startup) => {
+    setFailure(null);
+    setRerunTarget(startup);
+    setCommandBarOpen(true);
+  }, []);
+
+  const submitRerun = useCallback(
+    async (context: string) => {
+      const target = rerunTarget;
+      const value = context.trim();
+      if (!target || !value || busy) return;
+      const requestSeq = requestSeqRef.current + 1;
+      requestSeqRef.current = requestSeq;
+      setFailure(null);
+      setDispatching(true);
+      setActiveQuery(target.scout.name);
+      setBusy(true);
+      setMessage('Queuing the re-review...');
+      try {
+        const lookupId = crypto.randomUUID();
+        const queued = await queueLookupRerun(target.id, lookupId, value);
+        if (requestSeqRef.current !== requestSeq) return;
+        const current = pendingLookup;
+        if (current && !current.autoOpened && current.lookupId !== queued.lookupId) {
+          setBackgroundLookups((bg) => [current, ...bg.filter((l) => l.lookupId !== current.lookupId)]);
+        }
+        setPendingLookup({ lookupId: queued.lookupId, queryLabel: target.scout.name, autoOpened: false });
+        setRerunTarget(null);
+        setMessage(
+          `Re-review queued for ${target.scout.name}. The added context is being folded into the evidence.`,
+        );
+      } catch {
+        setMessage('Could not queue the re-review. Please retry in a few seconds.');
+      } finally {
+        if (requestSeqRef.current === requestSeq) setBusy(false);
+      }
+    },
+    [rerunTarget, busy, pendingLookup],
+  );
+
   const cancel = useCallback(() => {
     const lookupIds = [
       pendingLookup?.lookupId,
@@ -223,7 +265,7 @@ export function useDispatchLookup({
     setFailure(null);
     setMessage(null);
     setInput('');
-    setAdditionalContext('');
+    setRerunTarget(null);
     setCandidates([]);
     setRefining(false);
     setCommandBarOpen(false);
@@ -462,6 +504,7 @@ export function useDispatchLookup({
       const target = backgroundLookups.find((l) => l.lookupId === id);
       if (!target) return;
       setFailure(null);
+      setRerunTarget(null);
       const demoted = pendingLookup && !pendingLookup.autoOpened ? pendingLookup : null;
       setBackgroundLookups((bg) => {
         const without = bg.filter((l) => l.lookupId !== id);
@@ -472,7 +515,11 @@ export function useDispatchLookup({
     [pendingLookup, backgroundLookups],
   );
 
-  const openCommandBar = useCallback(() => setCommandBarOpen(true), []);
+  // Plain ⌘K dispatch always lands on the normal surface, never a stale re-review.
+  const openCommandBar = useCallback(() => {
+    setRerunTarget(null);
+    setCommandBarOpen(true);
+  }, []);
   // Closing keeps the tracked lookup intact so reopening returns to its live
   // state (progress or result). It clears only when the analyst opens its memo
   // or dismisses the ready toast (both set autoOpened).
@@ -484,9 +531,10 @@ export function useDispatchLookup({
     closeCommandBar,
     input,
     setInput,
-    additionalContext,
-    setAdditionalContext,
     submit,
+    rerunTarget,
+    openRerun,
+    submitRerun,
     cancel,
     busy,
     message,

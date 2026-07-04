@@ -167,6 +167,36 @@ export async function queueOnDemandLookup(
   };
 }
 
+/** Re-review an existing startup with operator-supplied context — re-runs scout→review→decide in place on the same row. */
+export async function queueLookupRerun(
+  startupId: string,
+  lookupId: string,
+  additionalContext: string
+): Promise<{ status: string; companyName: string; lookupId: string }> {
+  const id = lookupId.trim();
+  const context = additionalContext.trim().slice(0, 2000);
+  if (!startupId.trim()) throw new Error('startupId is required');
+  if (!id) throw new Error('lookupId is required');
+  if (!context) throw new Error('additionalContext is required');
+  const res = await authedFetch(`${API_BASE}/api/startups/${encodeURIComponent(startupId)}/rerun`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ additional_context: context, lookup_id: id }),
+  });
+  if (!res.ok) {
+    throw new Error(`Rerun API error: ${res.status}`);
+  }
+  const data = await res.json();
+  return {
+    status: typeof data?.status === 'string' ? data.status : 'queued',
+    companyName: typeof data?.company_name === 'string' ? data.company_name : '',
+    lookupId: typeof data?.lookup_id === 'string' ? data.lookup_id : id,
+  };
+}
+
 export async function cancelOnDemandLookups(lookupIds: string[]): Promise<void> {
   const ids = Array.from(
     new Set(lookupIds.map((id) => id.trim()).filter(Boolean))

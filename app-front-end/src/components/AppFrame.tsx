@@ -54,6 +54,8 @@ export interface InlineDispatchProps {
 
 interface AppFrameContextValue {
   openDispatch: () => void;
+  /** Open the takeover on an existing memo's company to add context and re-run the review. */
+  openRerun: (startup: Startup) => void;
   dispatchActive: boolean;
   inlineDispatch: InlineDispatchProps;
   /** Pages report full-screen overlays (e.g. the mobile memo) so body scroll locking stays single-owner. */
@@ -268,6 +270,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
 
   const contextValue: AppFrameContextValue = {
     openDispatch: dispatch.openCommandBar,
+    openRerun: dispatch.openRerun,
     dispatchActive: dispatch.lookupWorking,
     inlineDispatch,
     setPageOverlayOpen,
@@ -404,8 +407,6 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                 onClose={dispatch.closeCommandBar}
                 input={dispatch.input}
                 setInput={dispatch.setInput}
-                additionalContext={dispatch.additionalContext}
-                setAdditionalContext={dispatch.setAdditionalContext}
                 onSubmit={() => void dispatch.submit()}
                 onCancel={dispatch.cancel}
                 isBusy={dispatch.busy}
@@ -421,6 +422,15 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                 needsWebsite={dispatch.needsWebsite}
                 onPickCandidate={dispatch.pickCandidate}
                 onRefineWebsite={dispatch.refineWithWebsite}
+                rerun={
+                  dispatch.rerunTarget
+                    ? {
+                        name: dispatch.rerunTarget.scout.name,
+                        sector: dispatch.rerunTarget.scout.sector ?? null,
+                      }
+                    : null
+                }
+                onSubmitRerun={(context) => void dispatch.submitRerun(context)}
                 result={
                   dispatch.pendingLookupMatch?.partner?.recommendation && dispatch.snapshotProps ? (
                     <LookupResultSnapshot

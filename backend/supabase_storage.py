@@ -622,6 +622,71 @@ class SupabaseStartupsStorage:
             out.append(raw)
         return out
 
+    def rescout_startup(
+        self, scout_output: dict, *, pipeline_run_id: Optional[str] = None
+    ) -> Optional[str]:
+        """Re-run persistence for an EXISTING row (post-hoc re-review with added context).
+
+        Overwrites the scout stage in place and clears review/partner/memo/human
+        ruling so the pipeline re-runs cleanly, while preserving queue-awareness
+        timestamps. Full-row upsert on purpose: it also refreshes every derived
+        list_* projection column, which a partial patch would leave stale.
+        """
+        from utils.adapters import scout_output_to_scout_info, financials_from_scout_output
+
+        startup_id = str(scout_output.get("id") or "").strip()
+        existing = self.get_startup(startup_id) if startup_id else None
+        if existing is None:
+            self.logger.warning("rescout_startup: no existing row for %s; skipping", startup_id)
+            return None
+        pr = (pipeline_run_id or "").strip() or None
+        startup = Startup(
+            startup_id=startup_id,
+            scout_info=scout_output_to_scout_info(scout_output),
+            financials=financials_from_scout_output(scout_output),
+        )
+        startup.created_at = existing.created_at
+        startup.first_seen_at = existing.first_seen_at
+        startup.last_seen_by_user_at = existing.last_seen_by_user_at
+        startup.acknowledged_at = existing.acknowledged_at
+        startup.unresolved_at = startup.updated_at
+        startup.agent_trace = merge_stage_trace(
+            startup.agent_trace,
+            "scout",
+            build_scout_trace(
+                startup.scout_info.model_dump(mode="json"),
+                pipeline_run_id=pr,
+                active_thesis=None,
+                settings=self._settings_for_trace(),
+            ),
+        )
+        startup.queue_reason, startup.priority_reason = _queue_reasons_for_startup(startup)
+        if pr:
+            pipeline_stage_log(
+                pr, startup_id=startup_id, user_id=self._user_id, stage="scouting", phase="STARTED"
+            )
+            upsert_pipeline_state(
+                self._client,
+                user_id=self._user_id,
+                startup_id=startup_id,
+                pipeline_run_id=pr,
+                status="scouting",
+            )
+        self.upsert_startup_dict(startup.to_dict())
+        if pr:
+            pipeline_stage_log(
+                pr, startup_id=startup_id, user_id=self._user_id, stage="scouting", phase="DONE"
+            )
+            upsert_pipeline_state(
+                self._client,
+                user_id=self._user_id,
+                startup_id=startup_id,
+                pipeline_run_id=pr,
+                status="pending",
+            )
+        self.logger.info("Re-scouted startup in place: %s (%s)", startup.scout_info.name, startup_id)
+        return startup_id
+
     def add_startup(
         self,
         scout_info: ScoutInfo,

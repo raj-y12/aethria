@@ -95,6 +95,8 @@ const RESOLUTION_MISSING_FIELD_LABELS: Record<string, string> = {
 export interface InvestmentMemoContentProps {
   startup: Startup | null;
   onClose?: () => void;
+  /** Mobile/modal entry point for the add-context re-review takeover. */
+  onAddContext?: () => void;
   embedded?: boolean;
   /** Replaces the executive cover (e.g. the Flow Decision Stage owns the opening). */
   coverOverride?: ReactNode;
@@ -202,6 +204,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   {
     startup,
     onClose,
+    onAddContext,
     embedded = false,
     coverOverride,
     readOnly = false,
@@ -613,6 +616,18 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         >
           {onClose && (
             <div className="memoHeaderActions">
+              {onAddContext ? (
+                <div className="mr-auto basis-full sm:basis-auto">
+                  <button
+                    type="button"
+                    onClick={onAddContext}
+                    className="border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90"
+                    aria-label={`Add context and re-review ${companyName || 'this company'}`}
+                  >
+                    Add context →
+                  </button>
+                </div>
+              ) : null}
               <button type="button" onClick={handleDownloadPDF} className={actionBtnCls}>IC Pack (PDF)</button>
               <button type="button" onClick={onClose} className={actionBtnCls}>Close</button>
             </div>

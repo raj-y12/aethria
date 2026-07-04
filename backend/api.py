@@ -272,6 +272,7 @@ async def _lookup_worker() -> None:
                     lookup_id=lookup_id,
                     is_cancelled=lambda user_id=user_id, lookup_id=lookup_id: _is_lookup_cancelled(user_id, lookup_id),
                     additional_context=str(job.get("additional_context") or "").strip() or None,
+                    replace_startup_id=str(job.get("replace_startup_id") or "").strip() or None,
                 )
             except Exception as e:
                 _logger_agents.exception(
@@ -2247,6 +2248,82 @@ def _resolve_status_for(resolution, website_hint: Optional[str]) -> str:
     if strong >= 2:
         return "ambiguous"
     return "resolved"
+
+
+@app.post("/api/startups/{startup_id}/rerun")
+async def rerun_startup_lookup(request: Request, startup_id: str, body: Dict[str, Any]):
+    """
+    Re-review an EXISTING startup with operator-supplied context (post-hoc
+    "missing evidence" fill). Re-runs scout → reviewer → partner in place on the
+    same startup row via the lookup worker.
+    Body: {"additional_context": "...", "lookup_id": optional stable id}.
+    """
+    validate_route_id(startup_id, field_name="startup_id")
+    additional_context = str(body.get("additional_context") or "").strip()
+    if not additional_context:
+        raise HTTPException(status_code=422, detail="additional_context is required for a re-review")
+    if len(additional_context) > 2000:
+        raise HTTPException(status_code=422, detail="additional_context is too long (max 2000 chars)")
+    user_id = require_authenticated_user(request)
+    lookup_id = _coerce_lookup_id(body.get("lookup_id"))
+    storage = _get_storage(request)
+    # Sync Supabase round trip — keep it off the event loop (async handler).
+    raw = await asyncio.to_thread(storage.get_by_id, startup_id)
+    if not raw:
+        raise HTTPException(status_code=404, detail="Startup not found")
+    scout_info = raw.get("scout_info") or {}
+    company_name = str(scout_info.get("name") or "").strip()
+    if not company_name:
+        raise HTTPException(status_code=422, detail="Startup has no company name to re-run")
+    website = (
+        str(scout_info.get("lookup_website") or "").strip()
+        or str((scout_info.get("company_resolution") or {}).get("website") or "").strip()
+        or None
+    )
+    if _lookup_queue is None:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unavailable", "reason": "lookup_worker_not_ready"},
+        )
+    lock_key = f"user:{user_id}:lookup:{lookup_id}"
+    if not _acquire_security_lock(lock_key, ttl_seconds=_LOOKUP_LOCK_TTL_SECONDS):
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "already_queued",
+                "user_id": user_id,
+                "lookup_id": lookup_id,
+                "mode": "on_demand_rerun",
+            },
+        )
+    limited = _enforce_rate_limits(f"user:{user_id}:lookup", [_LOOKUP_MINUTE_POLICY, _LOOKUP_DAY_POLICY])
+    if limited is not None:
+        _release_security_lock(lock_key)
+        return limited
+    await _lookup_queue.put(
+        {
+            "user_id": user_id,
+            "company_name": company_name,
+            "website": website,
+            "lookup_query": company_name,
+            "lookup_input_type": "company_name",
+            "lookup_id": lookup_id,
+            "lock_key": lock_key,
+            "additional_context": additional_context,
+            "replace_startup_id": startup_id,
+        }
+    )
+    return JSONResponse(
+        status_code=202,
+        content={
+            "status": "queued",
+            "user_id": user_id,
+            "lookup_id": lookup_id,
+            "startup_id": startup_id,
+            "company_name": company_name,
+            "mode": "on_demand_rerun",
+        },
+    )
 
 
 @app.post("/api/startups/lookup/resolve")

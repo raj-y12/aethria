@@ -493,11 +493,14 @@ async def run_on_demand_lookup(
     lookup_id: Optional[str] = None,
     is_cancelled: Optional[Callable[[], bool]] = None,
     additional_context: Optional[str] = None,
+    replace_startup_id: Optional[str] = None,
 ) -> Optional[str]:
     """
     Run scout -> reviewer -> partner for one explicit company name.
     `additional_context` is optional operator-supplied background passed to the
     scout so private facts can fill "missing evidence" gaps.
+    `replace_startup_id` re-runs an EXISTING row in place (post-hoc re-review):
+    the scout overwrites its profile and review/partner are produced fresh.
     """
     if not user_id or not user_id.strip():
         logger.warning("run_on_demand_lookup: skipped (empty user_id)")
@@ -519,6 +522,7 @@ async def run_on_demand_lookup(
             lookup_id=lookup_id,
             is_cancelled=is_cancelled,
             additional_context=additional_context,
+            replace_startup_id=replace_startup_id,
         )
 
 
@@ -532,6 +536,7 @@ async def _run_on_demand_lookup_inner(
     lookup_id: Optional[str] = None,
     is_cancelled: Optional[Callable[[], bool]] = None,
     additional_context: Optional[str] = None,
+    replace_startup_id: Optional[str] = None,
 ) -> Optional[str]:
     tenant = TenantContext(user_id=user_id)
     logger.info(
@@ -644,6 +649,7 @@ async def _run_on_demand_lookup_inner(
             lookup_id=lookup_id,
             pipeline_run_id=lookup_run_id,
             additional_context=additional_context,
+            replace_startup_id=replace_startup_id,
         )
         if not startup_id:
             # The resolver/scout records WHY it failed (status, queries used, missing
