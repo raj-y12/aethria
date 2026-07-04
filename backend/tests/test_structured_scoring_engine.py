@@ -32,6 +32,7 @@ def test_scoring_output_shape_snapshot():
         "stage_cohort",
         "stage_cohort_label",
         "sector_tam_benchmark",
+        "calibration",
     }
     assert 0.0 <= result["market"]["score"] <= 10.0
     assert "components" in result["market"]

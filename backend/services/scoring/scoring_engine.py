@@ -11,13 +11,15 @@ from config.scoring_config import (
     DEBUG_SCORING,
     DEFAULT_SCORE,
     DIMENSION_WEIGHTS,
+    EVIDENCE_CALIBRATION_ENABLED,
     OVERALL_DRIVER_WEIGHTS,
     OVERALL_SCORE_DIMENSIONS,
     QUALITATIVE_COMPONENTS,
     resolve_stage_cohort,
     resolve_tam_benchmark,
 )
-from services.scoring.aggregation_layer import aggregate_all_dimensions
+from services.scoring.aggregation_layer import _has_concrete_evidence, aggregate_all_dimensions
+from services.scoring.confidence_discount import apply_evidence_gate, confidence_discounted_score
 from services.scoring.extraction_layer import extract_structured_signals
 from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.scoring.normalization_layer import (
@@ -61,11 +63,18 @@ class DeterministicScoringEngine:
         weights: Dict[str, Dict[str, float]] | None = None,
         dimension_weights: Dict[str, float] | None = None,
         policy: Dict[str, Any] | None = None,
+        evidence_calibration: bool | None = None,
     ):
         self.weights = weights or DIMENSION_WEIGHTS
         self.dimension_weights = dimension_weights or OVERALL_DRIVER_WEIGHTS
         self.policy = policy or compile_policy_from_fund_config({})
         self.debug = os.getenv("DEBUG_SCORING", str(DEBUG_SCORING)).lower() in ("1", "true", "yes")
+        # Issue-1 calibration (confidence discount + evidence gate). When None, follow the
+        # global config flag; default OFF so scores publish exactly as today and the
+        # calibrated values are emitted only in shadow until the flag is flipped.
+        self.evidence_calibration = (
+            EVIDENCE_CALIBRATION_ENABLED if evidence_calibration is None else bool(evidence_calibration)
+        )
 
     def _normalize_market(
         self, signals: Dict[str, Dict[str, Any]], tam_thresholds: Dict[str, Any] | None = None
@@ -306,6 +315,97 @@ class DeterministicScoringEngine:
             return None
         return round(weighted_sum / weight_total, 2)
 
+    def _compute_calibration(
+        self, output: Dict[str, Any]
+    ) -> tuple[Dict[str, Dict[str, Any]], float | None]:
+        """Issue-1 calibration pass over the aggregated dimensions.
+
+        For each evidenced component, the normalized score is regressed toward the
+        baseline by its confidence (1A); the dimension is then re-aggregated over the
+        discounted component scores and capped if its evidence is insufficient (1B).
+        Pure: returns calibrated per-dimension {score, evidence_capped, component_scores}
+        plus the recomputed overall. Does not mutate `output`.
+        """
+        calibrated_dims: Dict[str, Dict[str, Any]] = {}
+        agg_for_overall: Dict[str, Dict[str, Any]] = {}
+        for dim in ("market", "product", "technical", "execution", "defensibility"):
+            details = output.get(dim)
+            if not isinstance(details, dict):
+                continue
+            comps = details.get("components") if isinstance(details.get("components"), dict) else {}
+            weights = self.weights.get(dim, {})
+            weighted_sum = 0.0
+            weight_total = 0.0
+            confidences: list[float] = []
+            present = 0
+            total = len(comps)
+            component_scores: Dict[str, float] = {}
+            for name, comp in comps.items():
+                if not isinstance(comp, dict):
+                    continue
+                discounted = confidence_discounted_score(
+                    comp.get("score", DEFAULT_SCORE), comp.get("confidence", 0.0)
+                )
+                component_scores[name] = round(discounted, 2)
+                if _has_concrete_evidence(comp):
+                    present += 1
+                    try:
+                        confidences.append(max(0.0, min(1.0, float(comp.get("confidence", 0.0)))))
+                    except (TypeError, ValueError):
+                        confidences.append(0.0)
+                    weight = float(weights.get(name, 0.0))
+                    weighted_sum += discounted * weight
+                    weight_total += weight
+            completeness = present / total if total else 0.0
+            avg_conf = sum(confidences) / len(confidences) if confidences else 0.0
+            capped = False
+            if weight_total > 0 and not details.get("unscored"):
+                gated, capped = apply_evidence_gate(
+                    weighted_sum / weight_total, completeness, avg_conf
+                )
+                score = round(max(0.0, min(10.0, gated)), 2)
+            else:
+                score = details.get("score")
+            calibrated_dims[dim] = {
+                "score": score,
+                "evidence_capped": capped,
+                "component_scores": component_scores,
+                "unscored": bool(details.get("unscored")),
+            }
+            agg_for_overall[dim] = {
+                "score": score,
+                "unscored": bool(details.get("unscored")),
+                "confidence": details.get("confidence", 0.0),
+            }
+        overall = self._compute_overall_score(agg_for_overall)
+        return calibrated_dims, overall
+
+    def _attach_calibration(self, output: Dict[str, Any]) -> None:
+        """Always emit the calibrated values as a shadow block; when calibration is
+        enabled, also swap them into the published per-dimension scores and overall."""
+        calibrated_dims, calibrated_overall = self._compute_calibration(output)
+        output["calibration"] = {
+            "enabled": self.evidence_calibration,
+            "overall_score": calibrated_overall,
+            "dimensions": {
+                dim: {"score": v["score"], "evidence_capped": v["evidence_capped"]}
+                for dim, v in calibrated_dims.items()
+            },
+        }
+        if not self.evidence_calibration:
+            return
+        for dim, v in calibrated_dims.items():
+            details = output.get(dim)
+            if not isinstance(details, dict):
+                continue
+            details["score"] = v["score"]
+            details["evidence_capped"] = v["evidence_capped"]
+            comps = details.get("components") if isinstance(details.get("components"), dict) else {}
+            for name, sc in v["component_scores"].items():
+                if isinstance(comps.get(name), dict):
+                    comps[name]["score"] = sc
+        output["overall_score"] = calibrated_overall
+
     def _compute_overall_dispersion(self, aggregated: Dict[str, Dict[str, Any]]) -> Dict[str, Any] | None:
         """Spread of the evidenced driver scores (audit: a blended 7 from flat 7s and one
         from [9,9,3,9] are very different bets). Returns the standard deviation plus the
@@ -540,6 +640,12 @@ class DeterministicScoringEngine:
                     missing_in_dim.append(name)
             if missing_in_dim:
                 missing_components[dim] = missing_in_dim
+        # Issue-1 calibration: discount low-confidence sub-scores and cap thinly-evidenced
+        # dimensions. Always emits a `calibration` shadow block; publishes the calibrated
+        # values only when enabled. Runs after qualitative flags so the shadow reflects the
+        # final component set.
+        self._attach_calibration(output)
+
         if self.debug:
             logger.info("scoring_trace scout_input=%s", scout_output)
             logger.info("scoring_trace reviewer_input=%s", reviewer_output)

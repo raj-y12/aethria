@@ -137,8 +137,13 @@ GOLDEN = {
         "dims": {"market": 5.00, "product": 5.00, "technical": 5.00, "execution": 5.00, "defensibility": 5.00},
     },
     "structured_signals": {
-        "overall_score": 6.96,
-        "dims": {"market": 7.60, "product": 5.00, "technical": 5.00, "execution": 6.33, "defensibility": 5.00},
+        # Issue-1 root-cause fix: _sanitize_component no longer destroys LLM value-only /
+        # label-only signals (previously it preserved neither the value nor the provided
+        # confidence). The fixture's LLM-supplied market values now count, lifting market
+        # 7.60→7.75 and overall 6.96→7.04. Calibration is OFF here, so this is purely the
+        # confidence/value-preservation fix, not the discount/gate.
+        "overall_score": 7.04,
+        "dims": {"market": 7.75, "product": 5.00, "technical": 5.00, "execution": 6.33, "defensibility": 5.00},
     },
 }
 

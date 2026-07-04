@@ -526,13 +526,23 @@ def _sanitize_component(component: Any) -> Dict[str, Any]:
     cleaned = copy.deepcopy(component)
     label = cleaned.get("label")
     value = cleaned.get("value")
-    if _is_missing_token(label):
+    # A signal is EITHER label-only OR value-only (base._normalize_structured_signals_contract).
+    # `label is None` / `value is None` on the unused side is normal, not a missing-evidence
+    # marker — only an explicit placeholder ("[MISSING]", empty string) is. Force the low-
+    # confidence placeholder ONLY when the component has no usable evidence on either side;
+    # otherwise preserve the provided value/label AND its confidence (the input to the
+    # Issue-1 confidence discount).
+    has_label = label is not None and not _is_missing_token(label)
+    has_value = value is not None and not _is_missing_token(value)
+    if not has_label and not has_value:
         cleaned.pop("label", None)
         cleaned["value"] = None
         cleaned["confidence"] = 0.2
-    elif _is_missing_token(value):
-        cleaned["value"] = None
-        cleaned["confidence"] = 0.2
+    else:
+        if not has_label:
+            cleaned.pop("label", None)
+        if not has_value and "value" in cleaned:
+            cleaned["value"] = None
     if "confidence" not in cleaned:
         cleaned["confidence"] = 0.2 if cleaned.get("value") is None and cleaned.get("label") is None else 0.5
     return cleaned

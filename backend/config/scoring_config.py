@@ -8,6 +8,25 @@ from typing import Dict
 DEFAULT_SCORE = 5.0
 DEBUG_SCORING = True
 
+# ── Evidence-confidence calibration (Issue 1: thin-evidence inflation) ────────────
+#
+# 1A — confidence discount: a component's normalized score regresses toward
+# DEFAULT_SCORE as its evidence confidence falls. At/below `floor_conf` the score
+# collapses to the baseline; at/above `full_conf` it is taken at face value. Tunable
+# here (and later sweepable by a validation harness) rather than hardcoded.
+EVIDENCE_DISCOUNT: Dict[str, float] = {"floor_conf": 0.2, "full_conf": 0.8}
+
+# 1B — evidence-sufficiency gate: a dimension cannot exceed `cap` unless enough of its
+# components are actually evidenced (`min_completeness`) at a high enough average
+# confidence (`min_avg_conf`). Stops a handful of weak signals from aggregating into a
+# "Strong" dimension score; the dimension is flagged `evidence_capped` for the memo.
+EVIDENCE_GATE: Dict[str, float] = {"min_completeness": 0.4, "min_avg_conf": 0.35, "cap": 6.0}
+
+# Master switch for the Issue-1 calibration. When False (default), scores are published
+# exactly as today and the new values are emitted only in shadow for comparison; flip to
+# True to publish the discounted/gated scores after validating the shadow diffs.
+EVIDENCE_CALIBRATION_ENABLED = False
+
 DIMENSION_WEIGHTS: Dict[str, Dict[str, float]] = {
     "market": {
         "tam": 0.30,
