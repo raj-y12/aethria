@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aethria — newspaper front page</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Space+Mono:wght@400;700&family=Figtree:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F4F1EA;--paper-deep:#E7E0D4;--oxford:#001433;
+    --ink:rgba(0,20,51,0.92);--ink-2:rgba(0,20,51,0.66);--ink-3:rgba(0,20,51,0.45);
+    --line:rgba(0,20,51,0.55);--line-soft:rgba(0,20,51,0.14);--accent:#3d6b5e;
+    --serif:'Playfair Display',Georgia,serif;--mono:'Space Mono',monospace;--sans:'Figtree',system-ui,sans-serif;
+    --mx:clamp(1.25rem,4vw,3.5rem);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans)}
+
+  /* masthead */
+  .masthead-strip{display:flex;justify-content:space-between;align-items:center;padding:.6rem var(--mx);font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);border-bottom:1px solid var(--line-soft)}
+  .nameplate{text-align:center;padding:1.6rem var(--mx) 1rem;border-bottom:3px double var(--line)}
+  .nameplate .name{font-family:var(--serif);font-weight:600;font-size:clamp(2.6rem,6vw,4.2rem);letter-spacing:-.01em;line-height:1}
+  .nameplate .name .dot{color:var(--accent)}
+  .nameplate .tag{margin-top:.5rem;font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3)}
+  .nav-strip{display:flex;justify-content:center;gap:2rem;padding:.6rem var(--mx);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+  .nav-strip span{opacity:.55}
+
+  /* front page grid: lead story (wide) + sidebar (narrow) */
+  .frontpage{display:grid;grid-template-columns:1.9fr 1fr;gap:0;border-bottom:1px solid var(--line-soft)}
+  .lead{padding:2.4rem var(--mx) 2.6rem;border-right:1px solid var(--line-soft)}
+  .kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:.9rem}
+  .headline{font-family:var(--serif);font-weight:600;font-size:clamp(2.3rem,4.6vw,3.6rem);line-height:1.02;letter-spacing:-.02em;color:var(--oxford)}
+  .headline em{font-style:italic;color:var(--accent)}
+  .dek{margin-top:1.1rem;font-family:var(--serif);font-style:italic;font-size:clamp(1.05rem,1.6vw,1.25rem);line-height:1.5;color:var(--ink-2);max-width:52ch;border-top:1px solid var(--line-soft);padding-top:1rem}
+  .byline{margin-top:1.4rem;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+  .lead-body{margin-top:1.6rem;columns:2;column-gap:2rem;font-size:14px;line-height:1.65;color:var(--ink-2);max-width:640px}
+  .lead-body p{margin-bottom:.9rem}
+  .drop{float:left;font-family:var(--serif);font-size:3.2rem;line-height:.78;font-weight:600;padding:.1rem .35rem 0 0;color:var(--oxford)}
+  .cta-line{margin-top:1.4rem;display:inline-flex;align-items:center;gap:.6rem;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--oxford);border-bottom:1px solid var(--oxford);padding-bottom:.35rem}
+
+  /* sidebar: today's record — the product proof, up top */
+  .sidebar{padding:2.4rem var(--mx) 2rem;background:var(--paper-deep)}
+  .sidebar .rubric{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);border-bottom:1px solid var(--line);padding-bottom:.7rem;margin-bottom:1.2rem}
+  .box{border:1px solid var(--line-soft);padding:1.2rem}
+  .box .co{font-family:var(--serif);font-weight:600;font-size:1.25rem;color:var(--oxford)}
+  .box .meta{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-top:.3rem}
+  .box .verdict{margin-top:.9rem;display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:var(--accent);color:#eef4f1;padding:.3rem .6rem}
+  .box .scores{display:flex;gap:.9rem;margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--line-soft);font-family:var(--mono);font-size:10.5px}
+  .box .scores b{display:block;color:var(--oxford);font-size:13px}
+  .box .scores span{color:var(--ink-3);font-size:8.5px;letter-spacing:.05em;text-transform:uppercase}
+  .sidebar-note{margin-top:1.2rem;font-family:var(--serif);font-style:italic;font-size:13px;line-height:1.55;color:var(--ink-2)}
+
+  /* below-fold: columned stories */
+  .stories{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--line-soft)}
+  .story{padding:2rem var(--mx);border-right:1px solid var(--line-soft)}
+  .story:last-child{border-right:none}
+  .story .rubric{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+  .story h3{font-family:var(--serif);font-weight:600;font-size:1.25rem;line-height:1.15;color:var(--oxford)}
+  .story p{margin-top:.6rem;font-size:12.5px;line-height:1.6;color:var(--ink-2)}
+
+  /* pull quote */
+  .pullquote{padding:3rem var(--mx);text-align:center;border-bottom:1px solid var(--line-soft)}
+  .pullquote blockquote{font-family:var(--serif);font-style:italic;font-size:clamp(1.4rem,3vw,2.1rem);line-height:1.3;color:var(--oxford);max-width:34ch;margin:0 auto;position:relative}
+  .pullquote cite{display:block;margin-top:1rem;font-family:var(--mono);font-style:normal;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+</style>
+</head>
+<body>
+
+<div class="masthead-strip">
+  <span>Vol. I · No. 1</span>
+  <span>Fund Intelligence Edition</span>
+  <span>By Invitation</span>
+</div>
+
+<div class="nameplate">
+  <div class="name">Aethria<span class="dot">.</span></div>
+  <div class="tag">— Private Market Judgment, Recorded —</div>
+</div>
+
+<nav class="nav-strip">
+  <span>The Market</span><span>Method</span><span>Product</span><span style="color:var(--oxford);opacity:1">Request Access</span>
+</nav>
+
+<div class="frontpage">
+  <div class="lead">
+    <div class="kicker">Lede — The Thesis Engine</div>
+    <h1 class="headline">Private market judgment, made <em>inspectable</em>.</h1>
+    <p class="dek">Continuously discovers companies, reviews them against your fund thesis, records disagreement, and produces investment-ready records — every decision traceable to its evidence.</p>
+    <p class="byline">By the Partner Engine · Updated continuously</p>
+    <div class="lead-body">
+      <p><span class="drop">F</span>our independent scouts search the live web for real companies — market-driven, technical, pain-point, and contrarian — never a static list. Each candidate is scored by three reviewer modes that are built to disagree.</p>
+      <p>Where a rule-based partner engine finds consensus, it rules automatically. Where reviewers split, the disagreement is preserved on the record rather than averaged away — a permanent account of how the fund actually thought.</p>
+    </div>
+    <a class="cta-line" href="#">See today's full record →</a>
+  </div>
+
+  <div class="sidebar">
+    <div class="rubric">Today's Record</div>
+    <div class="box">
+      <div class="co">European Infrastructure Co.</div>
+      <div class="meta">B2B Infrastructure · Series A · London</div>
+      <span class="verdict">Invest</span>
+      <div class="scores">
+        <div><b>9</b><span>Market</span></div>
+        <div><b>8</b><span>Product</span></div>
+        <div><b>9</b><span>Team</span></div>
+        <div><b>7</b><span>Moat</span></div>
+      </div>
+    </div>
+    <p class="sidebar-note">"Reviewer disagreement surfaced. Mandate fit recorded." — the actual output, not a mockup.</p>
+  </div>
+</div>
+
+<div class="stories">
+  <div class="story">
+    <div class="rubric">Markets</div>
+    <h3>It watches the whole market.</h3>
+    <p>12,408 companies scanned. Three inside your thesis today. A live dotted field of everything evaluated.</p>
+  </div>
+  <div class="story">
+    <div class="rubric">Method</div>
+    <h3>Four scouts. Three reviewers. One partner.</h3>
+    <p>A versioned, rule-based decision engine — only the genuine edge cases reach an LLM.</p>
+  </div>
+  <div class="story">
+    <div class="rubric">Governance</div>
+    <h3>The dissent is kept, not erased.</h3>
+    <p>Every reviewer's disagreement stays attached to the record — institutional memory, not a single score.</p>
+  </div>
+</div>
+
+<div class="pullquote">
+  <blockquote>"Aethria does not average reviewers into a comfortable number — it preserves the split, and hands the partner layer the real picture."<cite>— The Review, Folio 05</cite></blockquote>
+</div>
+
+</body>
+</html>
