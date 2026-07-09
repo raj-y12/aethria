@@ -103,6 +103,8 @@ REGISTRY: List[EnvVar] = [
            "Resume every user's agent loop at boot (disable on tiny instances)."),
     EnvVar("MAX_RESUMED_AGENT_LOOPS", "int", "0", "Concurrency / loops", "Cap resumed loops after restart (0=no cap)."),
     EnvVar("RSS_SAMPLER_INTERVAL_SECONDS", "int", "60", "Concurrency / loops", "Process RSS sampler cadence (0=off)."),
+    EnvVar("LOOP_LAG_SAMPLER_INTERVAL_SECONDS", "int", "5", "Concurrency / loops", "Event-loop lag sampler cadence (0=off)."),
+    EnvVar("LOOP_LAG_WARN_SECONDS", "float", "0.25", "Concurrency / loops", "Log a warning when sampled event-loop lag exceeds this."),
     EnvVar("MALLOC_ARENA_MAX", "int", "2", "Concurrency / loops", "glibc malloc arena cap (RSS control)."),
     EnvVar("AGENT_TRIGGER_LOCK_TTL_SECONDS", "int", "900", "Concurrency / loops", "Distributed lock TTL for agent trigger."),
     EnvVar("LOOKUP_LOCK_TTL_SECONDS", "int", "900", "Concurrency / loops", "Distributed lock TTL for lookups."),

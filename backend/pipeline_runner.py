@@ -146,6 +146,39 @@ def _close_pipeline_engines(*engines: object) -> None:
             logger.debug("Engine close failed (%s): %s", type(engine).__name__, exc)
 
 
+def _build_storage_sync(user_id: str) -> SupabaseStartupsStorage:
+    """Blocking client/storage construction; call via asyncio.to_thread."""
+    return SupabaseStartupsStorage(get_service_client(), user_id)
+
+
+def _load_active_thesis_sync(user_id: str, *, tolerate_bootstrap_failure: bool = False):
+    """Read (bootstrapping if absent) the active thesis. Blocking Supabase I/O;
+    call via asyncio.to_thread. May raise FundThesisIncompleteError."""
+    svc = get_service_client()
+    active = get_active_thesis(svc, user_id)
+    if active is None:
+        try:
+            _bootstrap_default_thesis_or_raise(svc, user_id)
+            active = get_active_thesis(svc, user_id)
+        except Exception as e:
+            if not tolerate_bootstrap_failure:
+                raise
+            logger.info("[%s] Lookup: default thesis bootstrap skipped: %s", user_id[:12], e)
+    return active
+
+
+def _count_startups_sync(user_id: str) -> int:
+    """Blocking Supabase count; call via asyncio.to_thread."""
+    r = (
+        get_service_client()
+        .table("startups")
+        .select("startup_id", count="exact")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return int(getattr(r, "count", None) or 0)
+
+
 def _safe_stage_count(storage: SupabaseStartupsStorage, method_name: str, user_id: str) -> Optional[int]:
     """Best-effort counter for stage logging; never raise."""
     try:
@@ -199,7 +232,7 @@ def _notify_startups_changed(user_id: str, reason: str) -> None:
         logger.debug("[%s] startups_changed notify failed: %s", user_id[:12], e)
 
 
-def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str) -> None:
+async def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str) -> None:
     lid = (lookup_id or "").strip()
     if not lid or not user_id or not str(user_id).strip():
         return
@@ -209,7 +242,8 @@ def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str)
     uid = user_id.strip()
     text = (message or "Lookup failed.").strip()[:500]
     try:
-        list_upsert(
+        await asyncio.to_thread(
+            list_upsert,
             "lookup_job_outcomes",
             {
                 "id": lid,
@@ -253,7 +287,8 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
 
     try:
         # Read fresh settings at cycle boundaries so stage toggles apply immediately.
-        settings = load_settings(user_id, use_cache=False)
+        # Blocking Supabase read — keep it off the serving event loop.
+        settings = await asyncio.to_thread(load_settings, user_id, use_cache=False)
     except Exception as e:
         logger.warning("[%s] Pipeline skipped (settings unavailable): %s", user_id[:12], e)
         return
@@ -279,7 +314,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
     )
 
     try:
-        storage = SupabaseStartupsStorage(get_service_client(), user_id)
+        storage = await asyncio.to_thread(_build_storage_sync, user_id)
     except Exception as e:
         logger.warning("[%s] Failed to create storage: %s", user_id[:12], e)
         return
@@ -291,11 +326,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
         return
 
     try:
-        svc = get_service_client()
-        active = get_active_thesis(svc, user_id)
-        if active is None:
-            _bootstrap_default_thesis_or_raise(svc, user_id)
-            active = get_active_thesis(svc, user_id)
+        active = await asyncio.to_thread(_load_active_thesis_sync, user_id)
         if active is None:
             logger.warning("[%s] Pipeline skipped (fund thesis): missing", user_id[:12])
             _visible_logger.warning("[%s] Pipeline skipped: fund thesis missing — create one in Settings", user_id[:12])
@@ -309,14 +340,20 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
         if api_key and not (getattr(active, "embedding", None) or []):
             from fund_thesis_ops import ensure_active_thesis_embedding
 
-            if await asyncio.to_thread(ensure_active_thesis_embedding, svc, user_id, api_key):
+            if await asyncio.to_thread(
+                lambda: ensure_active_thesis_embedding(get_service_client(), user_id, api_key)
+            ):
                 logger.info("[%s] Backfilled active thesis embedding", user_id[:12])
     except FundThesisIncompleteError as e:
         logger.warning("[%s] Pipeline skipped (fund thesis): %s", user_id[:12], e)
         _visible_logger.warning("[%s] Pipeline skipped: fund thesis incomplete — %s", user_id[:12], e)
         return
 
-    engines = _build_pipeline_engines(
+    # Engine constructors do blocking I/O (DealMemory doc-store read,
+    # ReviewerEngine settings/policy load, CostController budget state) —
+    # one thread hop for the whole build.
+    engines = await asyncio.to_thread(
+        _build_pipeline_engines,
         user_id=user_id,
         storage=storage,
         api_key=api_key,
@@ -343,8 +380,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
         _activity_startups_before = 0
         _activity_startups_found = 0
         try:
-            _r = get_service_client().table("startups").select("startup_id", count="exact").eq("user_id", user_id).execute()
-            total_startups_before = int(getattr(_r, "count", None) or 0)
+            total_startups_before = await asyncio.to_thread(_count_startups_sync, user_id)
             _activity_startups_before = total_startups_before
         except Exception as e:
             logger.debug("[%s] startups_before count unavailable: %s", user_id[:12], e)
@@ -360,7 +396,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
         _activity_escalations_count = 0
         if reviewers_enabled:
             agents_executed += 3
-            unreviewed_before = _safe_stage_count(storage, "count_unreviewed", user_id)
+            unreviewed_before = await asyncio.to_thread(_safe_stage_count, storage, "count_unreviewed", user_id)
             if (unreviewed_before or 0) > 0:
                 _visible_info(
                     "[%s] Reviewer stage start: unreviewed_before=%s",
@@ -372,7 +408,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
             if _activity_reviewed_count > 0:
                 _notify_startups_changed(user_id, "reviewer")
             reviewer_stats = getattr(reviewer_engine, "last_cycle_stats", {}) or {}
-            unreviewed_after = _safe_stage_count(storage, "count_unreviewed", user_id)
+            unreviewed_after = await asyncio.to_thread(_safe_stage_count, storage, "count_unreviewed", user_id)
             if reviewed_count > 0 or (unreviewed_before or 0) > 0 or (unreviewed_after or 0) > 0:
                 _visible_info(
                     "[%s] Reviewer stage done: reviewed=%s unreviewed_after=%s threshold=%s candidates_seen=%s skipped_low_confidence=%s reason=%s",
@@ -389,7 +425,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
 
         if partners_enabled:
             agents_executed += 1
-            undecided_before = _safe_stage_count(storage, "count_undecided", user_id)
+            undecided_before = await asyncio.to_thread(_safe_stage_count, storage, "count_undecided", user_id)
             if (undecided_before or 0) > 0:
                 _visible_info(
                     "[%s] Partner stage start: undecided_before=%s",
@@ -401,7 +437,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
             _activity_escalations_count = getattr(partner_engine, "last_cycle_escalations", 0)
             if _activity_decided_count > 0 or _activity_escalations_count > 0:
                 _notify_startups_changed(user_id, "partner")
-            undecided_after = _safe_stage_count(storage, "count_undecided", user_id)
+            undecided_after = await asyncio.to_thread(_safe_stage_count, storage, "count_undecided", user_id)
             if decided_count > 0 or (undecided_before or 0) > 0 or (undecided_after or 0) > 0:
                 _visible_info(
                     "[%s] Partner stage done: decided=%s undecided_after=%s",
@@ -441,18 +477,21 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
         # Persist activity metrics for the "While you were away" summary
         try:
             _startups_after = 0
-            _r2 = get_service_client().table("startups").select("startup_id", count="exact").eq("user_id", user_id).execute()
-            total_startups_after = int(getattr(_r2, "count", None) or 0)
+            total_startups_after = await asyncio.to_thread(_count_startups_sync, user_id)
             if scouts_enabled:
                 _startups_after = total_startups_after
             _activity_startups_found = max(0, _startups_after - _activity_startups_before)
-            get_service_client().table("pipeline_activity").insert({
-                "user_id": user_id,
-                "startups_found": _activity_startups_found,
-                "reviewed_count": _activity_reviewed_count,
-                "decisions_made": _activity_decided_count,
-                "escalations_count": _activity_escalations_count,
-            }).execute()
+
+            def _insert_activity_sync() -> None:
+                get_service_client().table("pipeline_activity").insert({
+                    "user_id": user_id,
+                    "startups_found": _activity_startups_found,
+                    "reviewed_count": _activity_reviewed_count,
+                    "decisions_made": _activity_decided_count,
+                    "escalations_count": _activity_escalations_count,
+                }).execute()
+
+            await asyncio.to_thread(_insert_activity_sync)
         except Exception as _act_err:
             logger.warning("[%s] Could not persist pipeline_activity: %s", user_id[:12], _act_err)
 
@@ -583,7 +622,7 @@ async def _run_on_demand_lookup_inner(
     use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
         logger.info("[%s] Skipping lookup (USE_SUPABASE_STORAGE not set)", user_id[:12])
-        _record_lookup_failure(
+        await _record_lookup_failure(
             user_id,
             lid,
             "On-demand lookup requires Supabase storage (USE_SUPABASE_STORAGE).",
@@ -593,7 +632,7 @@ async def _run_on_demand_lookup_inner(
     if not api_key:
         logger.warning("[%s] OPENAI_API_KEY missing, skipping lookup", user_id[:12])
         _visible_logger.warning("[%s] Lookup skipped: OPENAI_API_KEY not set", user_id[:12])
-        _record_lookup_failure(
+        await _record_lookup_failure(
             user_id,
             lid,
             "OpenAI API key is not configured; lookup was not run.",
@@ -601,10 +640,10 @@ async def _run_on_demand_lookup_inner(
         return None
 
     try:
-        storage = SupabaseStartupsStorage(get_service_client(), user_id)
+        storage = await asyncio.to_thread(_build_storage_sync, user_id)
     except Exception as e:
         logger.warning("[%s] Failed to create storage for lookup: %s", user_id[:12], e)
-        _record_lookup_failure(
+        await _record_lookup_failure(
             user_id,
             lid,
             "Could not connect to storage for this lookup.",
@@ -619,14 +658,9 @@ async def _run_on_demand_lookup_inner(
     # lookup — it just runs thesis-blind and we log that the fund lens is unavailable.
     thesis_ctx = None
     try:
-        svc = get_service_client()
-        active = get_active_thesis(svc, user_id)
-        if active is None:
-            try:
-                _bootstrap_default_thesis_or_raise(svc, user_id)
-                active = get_active_thesis(svc, user_id)
-            except Exception as e:
-                logger.info("[%s] Lookup: default thesis bootstrap skipped: %s", user_id[:12], e)
+        active = await asyncio.to_thread(
+            _load_active_thesis_sync, user_id, tolerate_bootstrap_failure=True
+        )
         if active is not None:
             thesis_ctx = active.as_engine_context()
             logger.info("[%s] Lookup will evaluate against active thesis", user_id[:12])
@@ -638,11 +672,13 @@ async def _run_on_demand_lookup_inner(
         logger.warning("[%s] Lookup: failed to load active thesis, running thesis-blind: %s", user_id[:12], e)
 
     try:
-        settings = load_settings(user_id)
+        settings = await asyncio.to_thread(load_settings, user_id)
     except Exception as e:
         logger.warning("[%s] settings load failed during lookup; using defaults: %s", user_id[:12], e)
         settings = {"cost_budget": {}}
-    engines = _build_pipeline_engines(
+    # Same blocking-constructor offload as the periodic cycle path.
+    engines = await asyncio.to_thread(
+        _build_pipeline_engines,
         user_id=user_id,
         storage=storage,
         api_key=api_key,
@@ -681,7 +717,7 @@ async def _run_on_demand_lookup_inner(
                 pipeline_run_id=lookup_run_id,
             )
             if not startup_id:
-                _record_lookup_failure(
+                await _record_lookup_failure(
                     user_id,
                     lid,
                     "Re-review could not find the original record. It may have been "
@@ -713,7 +749,7 @@ async def _run_on_demand_lookup_inner(
                 company,
                 outcome.get("status") or "unknown",
             )
-            _record_lookup_failure(user_id, lid, message)
+            await _record_lookup_failure(user_id, lid, message)
             metrics.inc_lookup("not_found")
             return None
         # The scout persisted a row — nudge the UI so the card appears at once.
@@ -781,7 +817,7 @@ async def _run_on_demand_lookup_inner(
     except Exception as e:
         metrics.inc_lookup("error")
         logger.exception("[%s] On-demand lookup error (%s): %s", user_id[:12], company, e)
-        _record_lookup_failure(
+        await _record_lookup_failure(
             user_id,
             lid,
             "Lookup failed with an unexpected error. Try again or check server logs.",
@@ -811,11 +847,11 @@ async def reprocess_startups_missing_fund_thesis(
         return {"dry_run": True, "eligible": 0} if dry_run else {"processed": 0, "skipped": 0, "failed": 0}
 
     limit = max(1, min(int(limit), 1000))
-    storage = SupabaseStartupsStorage(get_service_client(), uid)
-    ids = storage.get_startups_missing_thesis(limit=limit)
+    storage = await asyncio.to_thread(_build_storage_sync, uid)
+    ids = await asyncio.to_thread(storage.get_startups_missing_thesis, limit=limit)
 
     if dry_run:
-        if not is_thesis_reprocess_agents_enabled(uid):
+        if not await asyncio.to_thread(is_thesis_reprocess_agents_enabled, uid):
             raise RuntimeError(
                 "Thesis reprocessing requires Reviewers and Partners to be enabled in Settings (Pipeline)."
             )
@@ -825,13 +861,15 @@ async def reprocess_startups_missing_fund_thesis(
     if not api_key.strip():
         raise RuntimeError("OPENAI_API_KEY required for thesis reprocessing")
 
-    if not is_thesis_reprocess_agents_enabled(uid):
+    if not await asyncio.to_thread(is_thesis_reprocess_agents_enabled, uid):
         raise RuntimeError(
             "Thesis reprocessing requires Reviewers and Partners to be enabled in Settings (Pipeline)."
         )
 
     try:
-        active = get_active_thesis(get_service_client(), uid)
+        active = await asyncio.to_thread(
+            lambda: get_active_thesis(get_service_client(), uid)
+        )
         if active is None:
             raise RuntimeError("No active thesis")
         thesis_ctx = active.as_engine_context()
@@ -839,39 +877,44 @@ async def reprocess_startups_missing_fund_thesis(
         raise RuntimeError(str(e)) from e
 
     try:
-        settings = load_settings(uid)
+        settings = await asyncio.to_thread(load_settings, uid)
     except Exception:
         settings = {"cost_budget": {}}
-    cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
-    cost_controller = CostController(user_id=uid) if cost_budget_enabled else None
-    deal_memory = DealMemory(user_id=uid)
-    reviewer_model = os.getenv("REVIEWER_MODEL", DEFAULT_REVIEWER_MODEL)
-    use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
-    reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
+    def _build_reprocess_engines_sync():
+        """Blocking engine construction (DealMemory/CostController/policy reads)."""
+        cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
+        cost_controller = CostController(user_id=uid) if cost_budget_enabled else None
+        deal_memory = DealMemory(user_id=uid)
+        reviewer_model = os.getenv("REVIEWER_MODEL", DEFAULT_REVIEWER_MODEL)
+        use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
+        reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
 
-    reviewer_engine = ReviewerEngine(
-        api_key=api_key,
-        storage=storage,
-        interval_seconds=60,
-        model=reviewer_model,
-        batch_size=reviewer_batch_size,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        tenant_user_id=uid,
-        active_thesis=thesis_ctx,
-    )
-    portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
-    portfolio_store = PortfolioStore(data_dir=portfolio_dir, user_id=uid)
-    partner_engine = PartnerEngine(
-        storage=storage,
-        interval_seconds=30,
-        use_llm_fallback=use_llm_fallback,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        portfolio_store=portfolio_store,
-        tenant_user_id=uid,
-        fund_thesis=thesis_ctx,
-    )
+        reviewer = ReviewerEngine(
+            api_key=api_key,
+            storage=storage,
+            interval_seconds=60,
+            model=reviewer_model,
+            batch_size=reviewer_batch_size,
+            cost_controller=cost_controller,
+            deal_memory=deal_memory,
+            tenant_user_id=uid,
+            active_thesis=thesis_ctx,
+        )
+        portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
+        portfolio_store = PortfolioStore(data_dir=portfolio_dir, user_id=uid)
+        partner = PartnerEngine(
+            storage=storage,
+            interval_seconds=30,
+            use_llm_fallback=use_llm_fallback,
+            cost_controller=cost_controller,
+            deal_memory=deal_memory,
+            portfolio_store=portfolio_store,
+            tenant_user_id=uid,
+            fund_thesis=thesis_ctx,
+        )
+        return reviewer, partner
+
+    reviewer_engine, partner_engine = await asyncio.to_thread(_build_reprocess_engines_sync)
 
     processed = 0
     skipped = 0
@@ -879,7 +922,7 @@ async def reprocess_startups_missing_fund_thesis(
 
     try:
         for sid in ids:
-            st = storage.get_startup(sid)
+            st = await asyncio.to_thread(storage.get_startup, sid)
             if st is None:
                 failed += 1
                 continue

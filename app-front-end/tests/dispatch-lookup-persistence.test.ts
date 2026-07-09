@@ -38,17 +38,17 @@ describe('dispatch lookup persistence', () => {
     assert.equal(key, 'aethria.dispatch.lookups.v1:user_123');
 
     saveDispatchLookupSnapshot(storage, key, {
-      pendingLookup: { lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false },
+      pendingLookup: { lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false, isRerun: true },
       backgroundLookups: [
-        { lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false },
-        { lookupId: 'lookup-active-1', queryLabel: 'Duplicate', autoOpened: false },
+        { lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false, isRerun: false },
+        { lookupId: 'lookup-active-1', queryLabel: 'Duplicate', autoOpened: false, isRerun: false },
       ],
     }, now);
 
     assert.deepEqual(loadDispatchLookupSnapshot(storage, key, now + 5_000), {
-      pendingLookup: { lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false },
+      pendingLookup: { lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false, isRerun: true },
       backgroundLookups: [
-        { lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false },
+        { lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false, isRerun: false },
       ],
     });
 
@@ -80,5 +80,23 @@ describe('dispatch lookup persistence', () => {
       backgroundLookups: [],
     }, now);
     assert.equal(storage.getItem(key), null);
+  });
+
+  it('migrates legacy stored payloads without isRerun to isRerun: false', () => {
+    const storage = new MemoryStorage();
+    const key = getDispatchLookupStorageKey('user_123')!;
+    const now = Date.parse('2026-06-02T12:00:00.000Z');
+
+    storage.setItem(key, JSON.stringify({
+      version: DISPATCH_LOOKUP_STORAGE_VERSION,
+      updatedAt: now,
+      pendingLookup: { lookupId: 'legacy-lookup-1', queryLabel: 'Legacy Co', autoOpened: false },
+      backgroundLookups: [],
+    }));
+
+    assert.deepEqual(loadDispatchLookupSnapshot(storage, key, now + 1_000), {
+      pendingLookup: { lookupId: 'legacy-lookup-1', queryLabel: 'Legacy Co', autoOpened: false, isRerun: false },
+      backgroundLookups: [],
+    });
   });
 });

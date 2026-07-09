@@ -8,8 +8,11 @@ export type PersistedDispatchLookup = {
   lookupId: string;
   queryLabel: string;
   autoOpened: boolean;
-  /** Post-hoc re-review: identity already resolved, only review + decide run. */
-  isRerun?: boolean;
+  /**
+   * Post-hoc re-review: identity already resolved, only review + decide run.
+   * Required in the normalized shape; legacy stored payloads without it load as false.
+   */
+  isRerun: boolean;
 };
 
 export type DispatchLookupSnapshot = {

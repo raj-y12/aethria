@@ -6,18 +6,20 @@ import { openStartupsStream } from '../api/stream';
  * Subscribe to the backend SSE stream and refetch deal-flow the moment the
  * pipeline writes new data, instead of waiting for a poll tick.
  *
- * Returns whether the stream is currently connected so callers can relax their
- * polling to a slow backstop while push is healthy, and fall back to brisk
- * polling when it is not. The stream is only opened while `enabled` (e.g. the
- * tab is visible) to bound open connections and avoid pushing to hidden tabs.
+ * Returns whether the stream is currently HEALTHY — meaning the server's hello
+ * frame has actually been parsed, not merely that an HTTP 200 arrived (a proxy
+ * can hold a 200 open while buffering frames). Callers relax polling to a slow
+ * backstop only while push is proven healthy, and fall back to brisk polling
+ * when it is connecting, stale, or closed. The stream is only opened while
+ * `enabled` (e.g. the tab is visible) to bound open connections.
  */
 export function useStartupsStream(enabled: boolean): boolean {
   const queryClient = useQueryClient();
-  const [connected, setConnected] = useState(false);
+  const [healthy, setHealthy] = useState(false);
 
   useEffect(() => {
     if (!enabled) {
-      setConnected(false);
+      setHealthy(false);
       return;
     }
 
@@ -29,14 +31,14 @@ export function useStartupsStream(enabled: boolean): boolean {
         void queryClient.invalidateQueries({ queryKey: ['startups', 'list'] });
         void queryClient.invalidateQueries({ queryKey: ['escalations'] });
       },
-      (status) => setConnected(status === 'open'),
+      (status) => setHealthy(status === 'healthy'),
     );
 
     return () => {
       handle.close();
-      setConnected(false);
+      setHealthy(false);
     };
   }, [enabled, queryClient]);
 
-  return connected;
+  return healthy;
 }

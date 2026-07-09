@@ -201,6 +201,11 @@ MAX_RESUMED_AGENT_LOOPS = max(0, int(os.getenv("MAX_RESUMED_AGENT_LOOPS", "0")))
 # steadily climbing RSS => leak in the request path. 0 disables.
 RSS_SAMPLER_INTERVAL_SECONDS = max(0, int(os.getenv("RSS_SAMPLER_INTERVAL_SECONDS", "60")))
 _rss_sampler_task: Optional[asyncio.Task] = None
+# Event-loop lag sampler: measures asyncio scheduling delay so a blocked serving
+# loop (sync I/O on the pipeline path) is visible in /metrics and logs. 0 disables.
+LOOP_LAG_SAMPLER_INTERVAL_SECONDS = max(0, int(os.getenv("LOOP_LAG_SAMPLER_INTERVAL_SECONDS", "5")))
+LOOP_LAG_WARN_SECONDS = float(os.getenv("LOOP_LAG_WARN_SECONDS", "0.25"))
+_loop_lag_sampler_task: Optional[asyncio.Task] = None
 
 # Cap glibc malloc arenas before the request threadpool grows, so freed JSON buffers
 # aren't retained per-thread (primary driver of climb-and-plateau RSS). No-op off glibc.
@@ -475,6 +480,30 @@ async def _rss_sampler() -> None:
         raise
 
 
+async def _event_loop_lag_sampler() -> None:
+    """
+    Samples asyncio scheduling delay: sleep(interval) should wake ~interval later;
+    any excess is time the loop spent blocked (sync I/O, long computation). Exported
+    as aethria_event_loop_lag_seconds and logged loudly above LOOP_LAG_WARN_SECONDS.
+    """
+    interval = LOOP_LAG_SAMPLER_INTERVAL_SECONDS
+    if interval <= 0:
+        return
+    try:
+        while True:
+            expected = asyncio.get_running_loop().time() + interval
+            await asyncio.sleep(interval)
+            lag = asyncio.get_running_loop().time() - expected
+            metrics.set_event_loop_lag(lag)
+            if lag >= LOOP_LAG_WARN_SECONDS:
+                _logger_visible.warning(
+                    "[LOOP] event-loop lag %.3fs — sync I/O is blocking the serving loop",
+                    lag,
+                )
+    except asyncio.CancelledError:
+        raise
+
+
 async def _resume_all_user_loops() -> None:
     """
     Called once at server startup.
@@ -532,6 +561,8 @@ async def _lifespan(app: FastAPI):
     _agent_worker_task = asyncio.create_task(_agent_worker())
     _lookup_worker_task = asyncio.create_task(_lookup_worker())
     _rss_sampler_task = asyncio.create_task(_rss_sampler())
+    global _loop_lag_sampler_task
+    _loop_lag_sampler_task = asyncio.create_task(_event_loop_lag_sampler())
     _logger_agents.info("Pipeline agent worker + on-demand lookup worker started")
     # Surface unapplied migrations loudly at startup. The storage write path
     # tolerates missing columns by dropping fields and retrying — convenient, but
@@ -570,8 +601,8 @@ async def _lifespan(app: FastAPI):
             await t
         except asyncio.CancelledError:
             pass
-    # Cancel queue workers + memory sampler
-    for t in (_lookup_worker_task, _agent_worker_task, _rss_sampler_task):
+    # Cancel queue workers + memory/loop-lag samplers
+    for t in (_lookup_worker_task, _agent_worker_task, _rss_sampler_task, _loop_lag_sampler_task):
         if t:
             t.cancel()
             try:
@@ -646,7 +677,9 @@ async def clerk_auth_middleware(request: Request, call_next):
     token = None
     if auth and auth.startswith("Bearer "):
         token = auth[7:].strip()
-    user_id = verify_clerk_token(token) if token else None
+    # verify_clerk_token can do a blocking JWKS HTTP fetch on a cold key
+    # cache — keep it off the serving event loop.
+    user_id = await asyncio.to_thread(verify_clerk_token, token) if token else None
     if not user_id:
         import logging
         log = logging.getLogger("auth")

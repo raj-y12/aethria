@@ -80,6 +80,12 @@ if ENABLED:
         "Active per-user persistent agent loops.",
         registry=REGISTRY,
     )
+    EVENT_LOOP_LAG = Gauge(
+        "aethria_event_loop_lag_seconds",
+        "Most recent sampled asyncio event-loop lag (scheduling delay). Sustained "
+        "values above ~0.1s mean sync I/O is blocking the serving loop.",
+        registry=REGISTRY,
+    )
 else:  # no-op placeholders
     REGISTRY = None
 
@@ -105,6 +111,15 @@ def inc_stage(stage: str, amount: int) -> None:
         PIPELINE_STAGE_ITEMS.labels(stage=stage).inc(amount)
     except Exception as e:  # pragma: no cover
         logger.debug("inc_stage failed: %s", e)
+
+
+def set_event_loop_lag(seconds: float) -> None:
+    if not ENABLED:
+        return
+    try:
+        EVENT_LOOP_LAG.set(max(0.0, seconds))
+    except Exception as e:  # pragma: no cover
+        logger.debug("set_event_loop_lag failed: %s", e)
 
 
 def inc_lookup(outcome: str) -> None:

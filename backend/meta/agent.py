@@ -2,6 +2,7 @@
 MetaAgent — the main orchestrator for self-optimisation cycles.
 Backed by Supabase meta_cycle_counters and meta_reports (explicit user_id per tenant).
 """
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -48,7 +49,11 @@ class MetaAgent:
         if not self.enabled:
             self.logger.info("[MetaAgent] Disabled via META_AGENT_ENABLED=false")
             return None
+        # The whole cycle is blocking doc-store/analysis I/O — one hop off the
+        # serving event loop rather than dozens of per-call thread hops.
+        return await asyncio.to_thread(self._run_cycle_sync)
 
+    def _run_cycle_sync(self) -> Optional[Dict]:
         self.logger.info(
             "event=tenant_context user_id=%s module=meta_agent",
             self.user_id[:24],

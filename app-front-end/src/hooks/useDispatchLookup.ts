@@ -99,7 +99,7 @@ export function useDispatchLookup({
       setCandidates([]);
       setRefining(false);
       setNeedsWebsite(false);
-      setPendingLookup({ lookupId: queued.lookupId, queryLabel: value, autoOpened: false });
+      setPendingLookup({ lookupId: queued.lookupId, queryLabel: value, autoOpened: false, isRerun: false });
       setMessage(
         `Lookup queued for ${queued.companyName}. We are now finding and validating the company profile.`,
       );

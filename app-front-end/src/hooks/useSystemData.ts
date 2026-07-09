@@ -77,6 +77,22 @@ export interface UseSystemDataOptions {
   systemPanelOpen?: boolean;
 }
 
+/**
+ * Poll cadence for the deal-flow grid, the primary surface users watch update.
+ * Only a PROVEN-healthy push stream (hello frame parsed) may relax polling to
+ * the 30s safety net. Any other stream state — connecting, stale, closed —
+ * keeps brisk 15s polling regardless of user idleness: an analyst waiting
+ * without moving the mouse must not experience minute-scale freshness.
+ * Hidden tabs never poll.
+ */
+export function startupsPollInterval(
+  tabVisible: boolean,
+  streamHealthy: boolean,
+): number | false {
+  if (!tabVisible) return false;
+  return streamHealthy ? 30_000 : 15_000;
+}
+
 export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
   const { systemPanelOpen = false } = options;
   // Must run before the useQuery calls below: primes the cache synchronously
@@ -112,20 +128,10 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
   // Push-based freshness: an SSE stream nudges us to refetch the moment the
   // pipeline writes new data. Only run it while the tab is visible (bounds open
   // connections; the tab-focus invalidation above covers the return trip).
-  const streamConnected = useStartupsStream(isTabVisible);
+  // "Healthy" means the hello frame was parsed — not just an open HTTP 200.
+  const streamHealthy = useStartupsStream(isTabVisible);
 
-  // The deal-flow grid is the primary surface users watch update. When the push
-  // stream is healthy, polling is just a slow safety net (90s) since updates
-  // arrive instantly. If the stream is down (or the tab is hidden), fall back to
-  // the brisk activity-aware cadence so the grid still stays fresh — while
-  // keeping backend egress conservative when nobody's watching.
-  const startupsPollMs = !isTabVisible
-    ? false
-    : streamConnected
-      ? 90_000
-      : userActive
-        ? 15_000
-        : 60_000;
+  const startupsPollMs = startupsPollInterval(isTabVisible, streamHealthy);
   const startupsQuery = useQuery({
     queryKey: ['startups', 'list'],
     queryFn: fetchStartups,

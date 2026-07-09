@@ -144,6 +144,10 @@ class PortfolioEngine:
     
     async def _run_execution(self):
         """Run Execution Agent to process new decisions."""
+        # Stage body is blocking store I/O; one hop off the event loop.
+        await asyncio.to_thread(self._run_execution_sync)
+
+    def _run_execution_sync(self):
         try:
             all_entries = self._get_execution_entries()
             existing_decision_startup_ids = {
@@ -255,6 +259,10 @@ class PortfolioEngine:
     
     async def _run_signals(self):
         """Run Signal Tracker to check watchlist."""
+        # Stage body is blocking store I/O; one hop off the event loop.
+        await asyncio.to_thread(self._run_signals_sync)
+
+    def _run_signals_sync(self):
         try:
             signal_ids = self.signal_tracker.check_watchlist_entries()
             if signal_ids:
@@ -264,6 +272,10 @@ class PortfolioEngine:
     
     async def _run_watchlist_review(self):
         """Review watchlist entries for staleness and decay."""
+        # Stage body is blocking store I/O; one hop off the event loop.
+        await asyncio.to_thread(self._run_watchlist_review_sync)
+
+    def _run_watchlist_review_sync(self):
         try:
             watchlist = self.portfolio_store.get_all_watchlist()
             if not watchlist:
@@ -313,6 +325,10 @@ class PortfolioEngine:
 
     async def _run_feedback(self):
         """Run Feedback Loop to calculate metrics."""
+        # Stage body is blocking store I/O; one hop off the event loop.
+        await asyncio.to_thread(self._run_feedback_sync)
+
+    def _run_feedback_sync(self):
         try:
             metric_ids = self.feedback_loop.calculate_all_metrics(period_days=30)
             if metric_ids:
@@ -322,6 +338,10 @@ class PortfolioEngine:
     
     async def _run_health(self):
         """Run Health Monitor and cluster analysis."""
+        # Stage body is blocking store I/O; one hop off the event loop.
+        await asyncio.to_thread(self._run_health_sync)
+
+    def _run_health_sync(self):
         try:
             health_ids = self.health_monitor.check_health()
             if health_ids:
