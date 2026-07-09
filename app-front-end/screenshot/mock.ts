@@ -354,7 +354,7 @@ export function installMockApi() {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     if (url.includes('/api/agents/status')) {
-      return json({ worker_ready: true, supabase_configured: true, openai_configured: true, agents_will_run: true, thesis_ready: true });
+      return json({ worker_ready: true, supabase_configured: true, openai_configured: true, agents_will_run: true, thesis_ready: true, mandate_published: true });
     }
     if (url.includes('/api/agents/loop-status')) return json({ loop_alive: true, agents_enabled: true });
     if (url.includes('/api/fund-thesis/summary') || url.includes('/api/fund-thesis/active')) {

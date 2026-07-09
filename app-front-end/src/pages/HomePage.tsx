@@ -10,7 +10,7 @@ import { usePrefersReducedMotion } from '../hooks';
 import { useFundReadiness } from '../hooks/useFundReadiness';
 import { transitionOrReduced } from '../design-system/motion';
 import { tokens } from '../design-system/tokens';
-import { isDealUnresolved } from '../lib/dealState';
+import { getDealAttentionReason, getDeskAttention, isDealUnresolved } from '../lib/dealState';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
 
@@ -97,16 +97,18 @@ function HomeDoor({
 }
 
 /**
- * Home — the front door. One centered column on paper: the mark, the situation
- * spoken in serif, and a single editorial band of four doors into the
- * workspaces. Sleek and quiet; the type and the hairlines do the work.
+ * Home — the front door as a briefing. One centered column on paper: the mark,
+ * the situation spoken in serif with a since-you-left digest, the few deals on
+ * the desk (the door to Flow), and two quiet doors to Portfolio and Fund.
+ * Content doubles as navigation; the type and the hairlines do the work.
  */
 export default function HomePage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { openDispatch, dispatchActive } = useAppFrame();
-  // Marks the away report seen — the login screen is where it is presented.
-  useSinceAwaySummary();
+  // What the agents did since the last visit (marks the report seen; null when
+  // the login screen already presented it or nothing happened).
+  const sinceAway = useSinceAwaySummary();
   const {
     displayName,
     agentActionPending,
@@ -154,6 +156,30 @@ export default function HomePage({ data }: { data: SystemData }) {
   ]
     .filter(Boolean)
     .join('  ·  ');
+
+  // ── The briefing ───────────────────────────────────────────────────────────
+  const attention = useMemo(() => getDeskAttention(startups), [startups]);
+  const attentionOverflow = Math.max(0, openCount - attention.length);
+
+  const digest = useMemo(() => {
+    if (!sinceAway) return null;
+    const parts = [
+      sinceAway.found > 0 ? `${sinceAway.found} scouted` : null,
+      sinceAway.reviewed > 0 ? `${sinceAway.reviewed} reviewed` : null,
+      (sinceAway.agent_decided ?? sinceAway.decided) > 0
+        ? `${sinceAway.agent_decided ?? sinceAway.decided} decided`
+        : null,
+      sinceAway.escalations > 0 ? `${sinceAway.escalations} escalated` : null,
+    ].filter(Boolean);
+    return parts.length > 0 ? `Since you left · ${parts.join(' · ')}` : null;
+  }, [sinceAway]);
+
+  const mandateAmended = data.fundThesisRuntime?.fund_thesis_updated_at
+    ? new Date(data.fundThesisRuntime.fund_thesis_updated_at).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+      })
+    : null;
 
   const eyebrow = `${now
     .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -219,41 +245,91 @@ export default function HomePage({ data }: { data: SystemData }) {
               </p>
             </Reveal>
 
-            {/* ── The doors — one editorial band ── */}
-            <div className="mt-phi-8 w-full max-w-[46rem] border-y border-oxford/[0.12]">
+            {digest && (
+              <Reveal delay={0.3} className="mt-phi-3">
+                <p className="text-center font-mono text-[10px] tracking-[0.1em] tabular-nums text-oxford/35">
+                  {digest}
+                </p>
+              </Reveal>
+            )}
+
+            {/* ── On the desk — the door to Flow, carrying its scent ── */}
+            {attention.length > 0 && (
+              <Reveal delay={0.34} className="mt-phi-7 w-full max-w-[46rem]">
+                <button
+                  type="button"
+                  onClick={() => navigate('/v1/flow')}
+                  aria-label={`On the desk: ${attention.map((s) => s.scout.name).join(', ')}. Open Flow.`}
+                  className={`group relative block w-full overflow-hidden border-y border-oxford/[0.12] px-phi-5 py-phi-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-oxford/30`}
+                >
+                  {/* The same whisper of oxford tint as the doors. */}
+                  <span
+                    aria-hidden
+                    className={`pointer-events-none absolute inset-0 bg-oxford opacity-0 transition-opacity duration-[420ms] ${EASE} group-hover:opacity-[0.04]`}
+                  />
+                  <span className="relative flex items-baseline justify-between">
+                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-oxford/40">
+                      On the desk
+                    </span>
+                    <span
+                      className={`font-mono text-[10px] uppercase tracking-[0.18em] text-oxford/45 transition-[transform,color] duration-300 ${EASE} group-hover:translate-x-[2px] group-hover:text-oxford/80`}
+                    >
+                      Flow →
+                    </span>
+                  </span>
+                  <span className="relative mt-phi-4 block divide-y divide-oxford/[0.06]">
+                    {attention.map((s) => {
+                      const reason = getDealAttentionReason(s);
+                      const urgent = Boolean(s.partner?.human_review_required);
+                      return (
+                        <span key={s.id} className="flex flex-col gap-phi-1 py-phi-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-phi-4">
+                          <span className="type-display truncate text-[15px] font-medium leading-snug text-oxford">
+                            {s.scout.name}
+                          </span>
+                          <span
+                            className={`font-mono text-[9.5px] tracking-[0.08em] tabular-nums sm:shrink-0 ${
+                              urgent ? 'text-escalation/90' : 'text-oxford/45'
+                            }`}
+                          >
+                            {reason}
+                          </span>
+                        </span>
+                      );
+                    })}
+                  </span>
+                  {attentionOverflow > 0 && (
+                    <span className="relative mt-phi-2 block font-mono text-[9.5px] tracking-[0.1em] tabular-nums text-oxford/30">
+                      + {attentionOverflow} more
+                    </span>
+                  )}
+                </button>
+              </Reveal>
+            )}
+
+            {/* ── Two quiet doors ── */}
+            <div className="mt-phi-6 w-full max-w-[46rem] border-y border-oxford/[0.12]">
               <div
-                className="grid grid-cols-4 divide-x divide-oxford/[0.08]"
+                className="grid grid-cols-2 divide-x divide-oxford/[0.08]"
                 role="navigation"
                 aria-label="Workspaces"
               >
                 <HomeDoor
-                  numeral="II"
-                  label="Flow"
-                  detail={needRuling > 0 ? `${needRuling} need ruling` : `${openCount} open`}
-                  tone={needRuling > 0 ? 'escalation' : 'default'}
-                  index={0}
-                  onClick={() => navigate('/v1/flow')}
-                />
-                <HomeDoor
                   numeral="III"
                   label="Portfolio"
-                  detail={`${convictionCount} conviction · ${watchTotal} watch`}
-                  index={1}
+                  detail={`${convictionCount} conviction · ${watchTotal} watching`}
+                  index={0}
                   onClick={() => navigate('/v1/portfolio')}
                 />
                 <HomeDoor
                   numeral="IV"
                   label="Fund"
-                  detail={mandateVersion != null ? `Mandate v${mandateVersion}` : 'No mandate'}
-                  index={2}
+                  detail={
+                    mandateVersion != null
+                      ? `Mandate v${mandateVersion}${mandateAmended ? ` · amended ${mandateAmended}` : ''}`
+                      : 'No mandate'
+                  }
+                  index={1}
                   onClick={() => navigate('/v1/fund')}
-                />
-                <HomeDoor
-                  numeral="⌘K"
-                  label="Dispatch"
-                  detail={dispatchActive ? 'Lookup running' : 'Look up a company'}
-                  index={3}
-                  onClick={openDispatch}
                 />
               </div>
             </div>
@@ -261,7 +337,7 @@ export default function HomePage({ data }: { data: SystemData }) {
         )}
 
         {/* ── The footer bar — Dispatch's micro-action language ── */}
-        <Reveal delay={0.36} className="mt-phi-8">
+        <Reveal delay={0.36} className="mt-phi-7">
           <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
             <span className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/40">
               {displayName}
@@ -277,6 +353,14 @@ export default function HomePage({ data }: { data: SystemData }) {
                 </Link>
               </>
             ) : null}
+            <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
+            <button
+              type="button"
+              onClick={openDispatch}
+              className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
+            >
+              {dispatchActive ? 'Lookup running' : 'Dispatch ⌘K'}
+            </button>
             <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
             <Link
               to="/v1/settings"

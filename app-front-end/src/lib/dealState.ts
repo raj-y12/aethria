@@ -125,6 +125,35 @@ export function queueAttentionRank(startup: Startup, now = Date.now()): number {
   return 3;
 }
 
+/**
+ * One short clause saying why a deal sits on the desk — front-door scent,
+ * mirrors the queueAttentionRank ordering.
+ */
+export function getDealAttentionReason(startup: Startup, now = Date.now()): string {
+  const adverse = extractAdverseRegister(startup);
+  if (startup.partner?.human_review_required) return 'Escalated — awaiting your ruling';
+  if (adverse.some((item) => item.severity === 'high')) return 'Adverse signal on record';
+  if (isDealStale(startup, now)) {
+    const age = getDealAgeDays(startup, now);
+    return age != null ? `Waiting ${age} days` : 'Waiting';
+  }
+  const score = startup.review?.overall_score ?? startup.review?.aggregate_score;
+  if (typeof score === 'number') return `Reviewed at ${score.toFixed(1)}`;
+  return 'New — awaiting review';
+}
+
+/** The few unresolved deals most worth attention, most urgent (then oldest) first. */
+export function getDeskAttention(startups: Startup[], limit = 3, now = Date.now()): Startup[] {
+  return startups
+    .filter(isDealUnresolved)
+    .sort(
+      (a, b) =>
+        queueAttentionRank(a, now) - queueAttentionRank(b, now) ||
+        (getDealAgeDays(b, now) ?? -1) - (getDealAgeDays(a, now) ?? -1)
+    )
+    .slice(0, limit);
+}
+
 export function buildOptimisticResolution(
   startup: Startup,
   decision: RulingDecision,
