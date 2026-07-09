@@ -174,6 +174,10 @@ class ScoutInfo(BaseModel):
     lookup_website: Optional[str] = None
     # Stable id for on-demand lookups: same value from POST /api/startups/lookup → scout row → UI pending match.
     lookup_id: Optional[str] = None
+    # Operator-supplied private background from a post-hoc re-review (raw text plus
+    # fetched content of any links it named). Untrusted; surfaced to the reviewer
+    # prompt as unverified evidence — never merged into the scout narrative fields.
+    operator_context: Optional[str] = None
     # Company Resolver outcome (stage 1 of on-demand lookups).
     # resolution_status: FOUND | PARTIAL | LOW_CONFIDENCE | NEEDS_REVIEW | NOT_FOUND.
     # Weak evidence is surfaced (PARTIAL/NEEDS_REVIEW) instead of dropping the company.

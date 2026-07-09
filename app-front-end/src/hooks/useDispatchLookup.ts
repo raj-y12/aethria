@@ -236,7 +236,7 @@ export function useDispatchLookup({
         if (current && !current.autoOpened && current.lookupId !== queued.lookupId) {
           setBackgroundLookups((bg) => [current, ...bg.filter((l) => l.lookupId !== current.lookupId)]);
         }
-        setPendingLookup({ lookupId: queued.lookupId, queryLabel: target.scout.name, autoOpened: false });
+        setPendingLookup({ lookupId: queued.lookupId, queryLabel: target.scout.name, autoOpened: false, isRerun: true });
         setRerunTarget(null);
         setMessage(
           `Re-review queued for ${target.scout.name}. The added context is being folded into the evidence.`,
@@ -365,7 +365,9 @@ export function useDispatchLookup({
     const matched = pendingLookupMatch;
     if (!matched) {
       setMessage(
-        `Searching sources for ${pendingLookup.queryLabel} and confirming the exact company identity...`,
+        pendingLookup.isRerun
+          ? `Reading your context for ${pendingLookup.queryLabel} and re-running the analysts on the existing record...`
+          : `Searching sources for ${pendingLookup.queryLabel} and confirming the exact company identity...`,
       );
       return;
     }

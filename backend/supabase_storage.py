@@ -622,70 +622,60 @@ class SupabaseStartupsStorage:
             out.append(raw)
         return out
 
-    def rescout_startup(
-        self, scout_output: dict, *, pipeline_run_id: Optional[str] = None
+    def prepare_rerun_startup(
+        self,
+        startup_id: str,
+        *,
+        operator_context: str,
+        lookup_id: Optional[str] = None,
+        pipeline_run_id: Optional[str] = None,
     ) -> Optional[str]:
-        """Re-run persistence for an EXISTING row (post-hoc re-review with added context).
+        """Prepare an EXISTING row for a post-hoc re-review with operator context.
 
-        Overwrites the scout stage in place and clears review/partner/memo/human
-        ruling so the pipeline re-runs cleanly, while preserving queue-awareness
-        timestamps. Full-row upsert on purpose: it also refreshes every derived
-        list_* projection column, which a partial patch would leave stale.
+        The scout profile, company resolution, and sources are kept EXACTLY as-is —
+        no re-discovery. The operator context (private facts + fetched link content)
+        is stamped on scout_info where the reviewer prompt reads it, and
+        review/partner/memo/human ruling are cleared so those stages re-run.
+        Full-row upsert on purpose: it also refreshes every derived list_*
+        projection column, which a partial patch would leave stale.
         """
-        from utils.adapters import scout_output_to_scout_info, financials_from_scout_output
-
-        startup_id = str(scout_output.get("id") or "").strip()
-        existing = self.get_startup(startup_id) if startup_id else None
+        sid = (startup_id or "").strip()
+        existing = self.get_startup(sid) if sid else None
         if existing is None:
-            self.logger.warning("rescout_startup: no existing row for %s; skipping", startup_id)
+            self.logger.warning("prepare_rerun_startup: no existing row for %s; skipping", sid)
             return None
         pr = (pipeline_run_id or "").strip() or None
+        scout_info = existing.scout_info
+        scout_info.operator_context = operator_context
+        if lookup_id:
+            # New lookup correlation id so the UI's pending-match keys on the re-run.
+            scout_info.lookup_id = lookup_id
         startup = Startup(
-            startup_id=startup_id,
-            scout_info=scout_output_to_scout_info(scout_output),
-            financials=financials_from_scout_output(scout_output),
+            startup_id=sid,
+            scout_info=scout_info,
+            financials=existing.financials,
         )
         startup.created_at = existing.created_at
         startup.first_seen_at = existing.first_seen_at
         startup.last_seen_by_user_at = existing.last_seen_by_user_at
         startup.acknowledged_at = existing.acknowledged_at
         startup.unresolved_at = startup.updated_at
-        startup.agent_trace = merge_stage_trace(
-            startup.agent_trace,
-            "scout",
-            build_scout_trace(
-                startup.scout_info.model_dump(mode="json"),
-                pipeline_run_id=pr,
-                active_thesis=None,
-                settings=self._settings_for_trace(),
-            ),
-        )
+        # Scout stage did not run — keep its original trace for provenance.
+        startup.agent_trace = existing.agent_trace
         startup.queue_reason, startup.priority_reason = _queue_reasons_for_startup(startup)
         if pr:
-            pipeline_stage_log(
-                pr, startup_id=startup_id, user_id=self._user_id, stage="scouting", phase="STARTED"
-            )
             upsert_pipeline_state(
                 self._client,
                 user_id=self._user_id,
-                startup_id=startup_id,
-                pipeline_run_id=pr,
-                status="scouting",
-            )
-        self.upsert_startup_dict(startup.to_dict())
-        if pr:
-            pipeline_stage_log(
-                pr, startup_id=startup_id, user_id=self._user_id, stage="scouting", phase="DONE"
-            )
-            upsert_pipeline_state(
-                self._client,
-                user_id=self._user_id,
-                startup_id=startup_id,
+                startup_id=sid,
                 pipeline_run_id=pr,
                 status="pending",
             )
-        self.logger.info("Re-scouted startup in place: %s (%s)", startup.scout_info.name, startup_id)
-        return startup_id
+        self.upsert_startup_dict(startup.to_dict())
+        self.logger.info(
+            "Prepared re-review in place (scout kept): %s (%s)", scout_info.name, sid
+        )
+        return sid
 
     def add_startup(
         self,

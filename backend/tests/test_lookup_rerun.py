@@ -1,13 +1,15 @@
 """Post-hoc re-review (POST /api/startups/{id}/rerun) persistence path.
 
-rescout_startup must overwrite the scout stage IN PLACE on the existing row —
-clearing review/partner/memo/human ruling so the pipeline re-runs cleanly —
-while preserving queue-awareness timestamps. It intentionally uses a full-row
-upsert so the derived list_* projection columns are refreshed too.
+prepare_rerun_startup must keep the existing scout profile EXACTLY as-is (no
+re-discovery), stamp the operator context where the reviewer prompt reads it,
+and clear review/partner/memo/human ruling so those stages re-run — while
+preserving queue-awareness timestamps. It intentionally uses a full-row upsert
+so the derived list_* projection columns are refreshed too.
 """
 from types import SimpleNamespace
 
 from models import Financials, ReviewInfo, ScoutInfo, Startup
+from pipeline_runner import _OPERATOR_URL_RE
 from supabase_storage import SupabaseStartupsStorage, _dict_to_row
 
 
@@ -70,6 +72,7 @@ def _scout():
         scout_type="market_driven",
         confidence_score=0.7,
         lookup_id="old-lookup",
+        references=["https://acme.example"],
     )
 
 
@@ -92,41 +95,34 @@ def _existing_startup():
     return st
 
 
-def _rescout_payload():
-    return {
-        "id": "s1",
-        "name": "Acme",
-        "one_line": "one, now with private context",
-        "sector": "B2B SaaS",
-        "problem": "p",
-        "solution": "s",
-        "target_users": "u",
-        "why_now": "now",
-        "scout_type": "market_driven",
-        "confidence_score": 0.8,
-        "origin_type": "on_demand_lookup",
-        "lookup_id": "new-lookup",
-    }
-
-
-def test_rescout_overwrites_in_place_and_clears_downstream_stages():
+def test_prepare_rerun_keeps_scout_and_clears_downstream_stages():
     st = _existing_startup()
     store = {"rows": [_dict_to_row(st.to_dict(), "user-1")], "updates": [], "upserts": []}
     storage = SupabaseStartupsStorage(_Client(store), "user-1")
 
-    sid = storage.rescout_startup(_rescout_payload(), pipeline_run_id=None)
+    sid = storage.prepare_rerun_startup(
+        "s1",
+        operator_context="Raised $2.1M pre-seed (unannounced).",
+        lookup_id="new-lookup",
+    )
 
     assert sid == "s1"
     # Full-row upsert (refreshes derived list_* projections), not a partial patch.
     assert len(store["upserts"]) == 1
     row = store["upserts"][0]
     assert row["startup_id"] == "s1"
+    scout = row.get("scout_info") or {}
+    # Scout profile survives untouched — NO re-discovery.
+    assert scout.get("one_line") == "one"
+    assert scout.get("references") == ["https://acme.example"]
+    # Operator context lands where the reviewer prompt reads it.
+    assert scout.get("operator_context") == "Raised $2.1M pre-seed (unannounced)."
+    # New lookup correlation id so the UI's pending-match keys on the re-run.
+    assert scout.get("lookup_id") == "new-lookup"
     # Downstream stages cleared so reviewer/partner re-run cleanly.
     assert not row.get("review_info")
     assert not row.get("partner_info")
     assert not row.get("human_resolution")
-    # New lookup correlation id lands so the UI's pending-match keys on the re-run.
-    assert (row.get("scout_info") or {}).get("lookup_id") == "new-lookup"
     # Queue-awareness timestamps survive the overwrite (row serializer may use Z suffix).
     def _iso(v):
         from datetime import datetime
@@ -137,9 +133,21 @@ def test_rescout_overwrites_in_place_and_clears_downstream_stages():
     assert _iso(row.get("first_seen_at")) == st.first_seen_at
 
 
-def test_rescout_refuses_when_row_is_missing():
+def test_prepare_rerun_refuses_when_row_is_missing():
     store = {"rows": [], "updates": [], "upserts": []}
     storage = SupabaseStartupsStorage(_Client(store), "user-1")
 
-    assert storage.rescout_startup(_rescout_payload(), pipeline_run_id=None) is None
+    sid = storage.prepare_rerun_startup("s1", operator_context="ctx", lookup_id=None)
+    assert sid is None
     assert store["upserts"] == []
+
+
+def test_operator_url_regex_finds_links_in_context():
+    text = (
+        "Pilot live with two design partners, see https://acme.example/case-study "
+        "and (https://news.example/acme-raise). No other links."
+    )
+    assert _OPERATOR_URL_RE.findall(text)[:3] == [
+        "https://acme.example/case-study",
+        "https://news.example/acme-raise",
+    ]

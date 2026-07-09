@@ -206,7 +206,7 @@ class ReviewerEngine:
             "key_assumptions": getattr(si, "key_assumptions", None),
             "biggest_unknown": getattr(si, "biggest_unknown", None),
         }
-        for opt in ("lookup_id", "lookup_query", "lookup_website", "origin_type"):
+        for opt in ("lookup_id", "lookup_query", "lookup_website", "origin_type", "operator_context"):
             v = getattr(si, opt, None)
             if v is not None and v != "":
                 out[opt] = v

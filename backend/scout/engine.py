@@ -301,7 +301,6 @@ class ScoutEngine:
         pipeline_run_id: Optional[str] = None,
         resolution: Optional[CompanyResolution] = None,
         additional_context: Optional[str] = None,
-        replace_startup_id: Optional[str] = None,
     ) -> Optional[str]:
         """
         On-demand lookup, staged:
@@ -411,10 +410,6 @@ class ScoutEngine:
 
         try:
             payload = dict(result)
-            if replace_startup_id and replace_startup_id.strip():
-                # Re-review of an existing row: keep its id so review/partner and the
-                # UI's memo stay attached to the same startup.
-                payload["id"] = replace_startup_id.strip()
             if resolution is not None and not payload.get("company_resolution"):
                 payload["resolution_status"] = resolution.resolution_status
                 payload["company_resolution"] = resolution.model_dump(mode="json")
@@ -447,21 +442,7 @@ class ScoutEngine:
                         pr, startup_id=sid, user_id=uid, stage="ingesting", phase="DONE"
                     )
             if self.storage:
-                if replace_startup_id and replace_startup_id.strip():
-                    persisted = await asyncio.to_thread(
-                        self.storage.rescout_startup, payload, pipeline_run_id=pr
-                    )
-                    if not persisted:
-                        self.last_lookup_outcome = {
-                            "status": "FAILED",
-                            "message": (
-                                f'Re-review for "{company}" could not find the original '
-                                "record. It may have been removed — run a fresh lookup."
-                            ),
-                        }
-                        return None
-                else:
-                    await asyncio.to_thread(self.storage.add_discovery, payload, pipeline_run_id=pr)
+                await asyncio.to_thread(self.storage.add_discovery, payload, pipeline_run_id=pr)
             self.last_lookup_outcome = {
                 "status": payload.get("resolution_status") or "FOUND",
                 "startup_id": payload.get("id"),

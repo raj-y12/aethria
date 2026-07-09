@@ -8,6 +8,8 @@ export type PersistedDispatchLookup = {
   lookupId: string;
   queryLabel: string;
   autoOpened: boolean;
+  /** Post-hoc re-review: identity already resolved, only review + decide run. */
+  isRerun?: boolean;
 };
 
 export type DispatchLookupSnapshot = {
@@ -38,6 +40,7 @@ function normalizeLookup(value: unknown): PersistedDispatchLookup | null {
     lookupId,
     queryLabel,
     autoOpened: Boolean(value.autoOpened),
+    isRerun: Boolean(value.isRerun),
   };
 }
 

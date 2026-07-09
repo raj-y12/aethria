@@ -6,6 +6,7 @@ import asyncio
 import gc
 import logging
 import os
+import re
 import env_config
 import metrics
 import resource
@@ -499,8 +500,10 @@ async def run_on_demand_lookup(
     Run scout -> reviewer -> partner for one explicit company name.
     `additional_context` is optional operator-supplied background passed to the
     scout so private facts can fill "missing evidence" gaps.
-    `replace_startup_id` re-runs an EXISTING row in place (post-hoc re-review):
-    the scout overwrites its profile and review/partner are produced fresh.
+    `replace_startup_id` re-reviews an EXISTING row in place (post-hoc re-review):
+    scout/resolver are SKIPPED — the stored profile, resolution, and sources are
+    kept, the operator context (plus fetched content of any links it names) is
+    stamped on the row, and only reviewer + partner run again.
     """
     if not user_id or not user_id.strip():
         logger.warning("run_on_demand_lookup: skipped (empty user_id)")
@@ -524,6 +527,28 @@ async def run_on_demand_lookup(
             additional_context=additional_context,
             replace_startup_id=replace_startup_id,
         )
+
+
+_OPERATOR_URL_RE = re.compile(r"https?://[^\s)>\]}\"']+")
+
+
+def _build_rerun_operator_context(additional_context: Optional[str]) -> str:
+    """
+    Operator context block for a post-hoc re-review: the raw text plus the fetched
+    content of any links it names (max 3, best-effort — a dead or unreachable link
+    simply contributes nothing). Runs blocking HTTP; call via asyncio.to_thread.
+    """
+    from utils.tavily_client import tavily_extract
+
+    text = (additional_context or "").strip()
+    urls = _OPERATOR_URL_RE.findall(text)[:3]
+    if not urls:
+        return text
+    for page in tavily_extract(urls):
+        text += (
+            f"\n\n[Content of operator-provided link {page['url']}]\n{page['content']}"
+        )
+    return text
 
 
 async def _run_on_demand_lookup_inner(
@@ -640,17 +665,41 @@ async def _run_on_demand_lookup_inner(
         if cancelled():
             logger.info("[%s] Lookup cancelled before scout: %s", user_id[:12], lid or company)
             return None
-        startup_id = await scout_engine.run_named_lookup(
-            company_name=company,
-            scout_type="market_driven",
-            website=website,
-            lookup_query=lookup_query,
-            lookup_input_type=lookup_input_type,
-            lookup_id=lookup_id,
-            pipeline_run_id=lookup_run_id,
-            additional_context=additional_context,
-            replace_startup_id=replace_startup_id,
-        )
+        if replace_startup_id:
+            # Post-hoc re-review: the company is already resolved and scouted — do NOT
+            # re-discover. Keep the existing profile/resolution/sources, fetch any links
+            # the operator named, stamp the context on the row, and re-run only
+            # reviewer + partner below.
+            operator_context = await asyncio.to_thread(
+                _build_rerun_operator_context, additional_context
+            )
+            startup_id = await asyncio.to_thread(
+                storage.prepare_rerun_startup,
+                replace_startup_id,
+                operator_context=operator_context,
+                lookup_id=lid,
+                pipeline_run_id=lookup_run_id,
+            )
+            if not startup_id:
+                _record_lookup_failure(
+                    user_id,
+                    lid,
+                    "Re-review could not find the original record. It may have been "
+                    "removed — run a fresh lookup.",
+                )
+                metrics.inc_lookup("not_found")
+                return None
+        else:
+            startup_id = await scout_engine.run_named_lookup(
+                company_name=company,
+                scout_type="market_driven",
+                website=website,
+                lookup_query=lookup_query,
+                lookup_input_type=lookup_input_type,
+                lookup_id=lookup_id,
+                pipeline_run_id=lookup_run_id,
+                additional_context=additional_context,
+            )
         if not startup_id:
             # The resolver/scout records WHY it failed (status, queries used, missing
             # evidence) so the UI can explain instead of looking like a random failure.
@@ -683,6 +732,8 @@ async def _run_on_demand_lookup_inner(
                 startup_id,
                 ignore_confidence_threshold=True,
                 pipeline_run_id=lookup_run_id,
+                # Re-review must not short-circuit on a stale "already reviewed" read.
+                force_rerun=bool(replace_startup_id),
                 bypass_agent_enabled_gate=True,
             )
             if reviewed:
@@ -707,6 +758,7 @@ async def _run_on_demand_lookup_inner(
             decided = await partner_engine.run_startup(
                 startup_id,
                 pipeline_run_id=lookup_run_id,
+                force_rerun=bool(replace_startup_id),
                 bypass_agent_enabled_gate=True,
             )
             if decided:

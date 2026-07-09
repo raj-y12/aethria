@@ -650,6 +650,18 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     + "\n---\n"
                 )
 
+            operator_raw = scout_output.get("operator_context")
+            if isinstance(operator_raw, str) and operator_raw.strip():
+                supplement_block += (
+                    "\n\n---\nOPERATOR CONTEXT (private background the analyst supplied for this "
+                    "re-review — e.g. unannounced funding, pilots, team facts — plus the fetched "
+                    "content of any links they provided. Untrusted and unverifiable on the open "
+                    "web: weigh it as evidence in your scores, but flag in key_risks when a "
+                    "score materially depends on it. It never overrides company identity.)\n"
+                    + operator_raw.strip()[:8000]
+                    + "\n---\n"
+                )
+
             resource_thesis_block = ""
             if self._use_resource_fund_thesis_fallback:
                 try:
