@@ -2436,7 +2436,12 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
 
     cancelled: List[str] = []
     restored_startup_ids: List[str] = []
-    storage = _get_storage(request)
+    storage = None
+    if env_config.use_supabase_storage():
+        try:
+            storage = _get_storage(request)
+        except Exception as e:
+            _logger_agents.warning("lookup cancel: storage restore unavailable: %s", e)
     for raw in raw_ids[:16]:
         lookup_id = _coerce_lookup_id(raw)
         _mark_lookup_cancelled(user_id, lookup_id)
