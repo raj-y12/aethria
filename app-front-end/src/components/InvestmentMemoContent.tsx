@@ -1171,17 +1171,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 <p className="memoDocProse">{renderWithMonoNumbers(displayStartup.partner.llm_fallback_reason)}</p>
               </MemoDisclosureSection>
             )}
-            </div>
-
-            {/* ── Footer detail ── */}
-            <div className="memoDiscGroup">
             {/* ── Company resolution (lookup stage 1) ── */}
             {(companyResolution || resolutionStatus) && (
               <MemoDisclosureSection
                 id={`${contentKey}-resolution`}
                 title="Company resolution"
                 summary={RESOLUTION_SECTION_LABELS[resolutionStatus] ?? resolutionStatus ?? 'Resolved'}
-                initialOpen={resolutionStatus !== '' && resolutionStatus !== 'FOUND'}
+                initialOpen={false}
               >
                 <ul className="memoList">
                   <li className="memoListItem">
