@@ -1019,6 +1019,7 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
             "est_tam": scout.get("est_tam"),
             "references": scout.get("references") or [],
             "source_evidence": scout.get("source_evidence") or [],
+            "operator_context": scout.get("operator_context"),
             "origin_type": scout.get("origin_type"),
             "lookup_input_type": scout.get("lookup_input_type"),
             "lookup_query": scout.get("lookup_query"),
@@ -2287,8 +2288,8 @@ def _resolve_status_for(resolution, website_hint: Optional[str]) -> str:
 async def rerun_startup_lookup(request: Request, startup_id: str, body: Dict[str, Any]):
     """
     Re-review an EXISTING startup with operator-supplied context (post-hoc
-    "missing evidence" fill). Re-runs scout → reviewer → partner in place on the
-    same startup row via the lookup worker.
+    "missing evidence" fill). Fetches any operator-supplied links, then re-runs
+    reviewer → partner in place on the same startup row via the lookup worker.
     Body: {"additional_context": "...", "lookup_id": optional stable id}.
     """
     validate_route_id(startup_id, field_name="startup_id")

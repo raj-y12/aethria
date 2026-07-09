@@ -167,7 +167,7 @@ export async function queueOnDemandLookup(
   };
 }
 
-/** Re-review an existing startup with operator-supplied context — re-runs scout→review→decide in place on the same row. */
+/** Re-review an existing startup with operator-supplied context — fetches supplied links, then re-runs review→decide in place. */
 export async function queueLookupRerun(
   startupId: string,
   lookupId: string,

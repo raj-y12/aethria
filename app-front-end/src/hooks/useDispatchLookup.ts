@@ -232,6 +232,8 @@ export function useDispatchLookup({
         const lookupId = crypto.randomUUID();
         const queued = await queueLookupRerun(target.id, lookupId, value);
         if (requestSeqRef.current !== requestSeq) return;
+        void queryClient.invalidateQueries({ queryKey: ['startup', 'detail', target.id] });
+        void queryClient.invalidateQueries({ queryKey: ['startups', 'list'] });
         const current = pendingLookup;
         if (current && !current.autoOpened && current.lookupId !== queued.lookupId) {
           setBackgroundLookups((bg) => [current, ...bg.filter((l) => l.lookupId !== current.lookupId)]);
@@ -247,7 +249,7 @@ export function useDispatchLookup({
         if (requestSeqRef.current === requestSeq) setBusy(false);
       }
     },
-    [rerunTarget, busy, pendingLookup],
+    [rerunTarget, busy, pendingLookup, queryClient],
   );
 
   const cancel = useCallback(() => {
@@ -346,6 +348,11 @@ export function useDispatchLookup({
   // partner recommendation lands (lookup decided), then stop.
   const lookupDecided = !!pendingLookupMatch?.partner?.recommendation;
   useEffect(() => {
+    if (!lookupDecided || !pendingLookupMatch?.id) return;
+    void queryClient.invalidateQueries({ queryKey: ['startup', 'detail', pendingLookupMatch.id] });
+  }, [lookupDecided, pendingLookupMatch?.id, queryClient]);
+
+  useEffect(() => {
     if (!pendingLookup || pendingLookup.autoOpened || lookupDecided) return;
     // Stay live through idle: the analyst watching the takeover isn't "active"
     // (mousemove doesn't reset the idle gate), so gating on userActive here would
@@ -401,6 +408,10 @@ export function useDispatchLookup({
 
   const phaseLabel: LookupPhaseLabel = !lookupWorking
     ? null
+    : pendingLookup?.isRerun
+      ? pendingLookupMatch?.review
+        ? 'Deciding'
+        : 'Reviewing'
     : !pendingLookupMatch
       ? 'Scouting'
       : pendingLookupMatch.review
@@ -434,10 +445,11 @@ export function useDispatchLookup({
       query: activeQuery || pendingLookup?.queryLabel || '',
       name: pendingLookupMatch?.scout?.name ?? null,
       sector: pendingLookupMatch?.scout?.sector ?? null,
+      mode: pendingLookup?.isRerun ? 'rerun' : 'lookup',
       // Identity confirmed once a lookup has actually been queued; until then the
       // analyst is still on the Identify stage (resolving / picking a candidate).
-      resolved: pendingLookup != null,
-      found: !!pendingLookupMatch,
+      resolved: pendingLookup?.isRerun ? true : pendingLookup != null,
+      found: pendingLookup?.isRerun ? true : !!pendingLookupMatch,
       reviewed: !!pendingLookupMatch?.review,
     };
   }, [dispatching, activeQuery, pendingLookup, pendingLookupMatch]);
@@ -474,10 +486,13 @@ export function useDispatchLookup({
     (id: string) =>
       startups.find(
         (s) =>
-          (s.scout.origin_type ?? '').toLowerCase() === 'on_demand_lookup' &&
-          (s.scout.lookup_id ?? '').trim() === id.trim(),
+          (s.scout.lookup_id ?? '').trim() === id.trim() &&
+          (
+            pendingLookup?.isRerun ||
+            (s.scout.origin_type ?? '').toLowerCase() === 'on_demand_lookup'
+          ),
       ) ?? null,
-    [startups],
+    [pendingLookup?.isRerun, startups],
   );
 
   // Chips for the takeover: active lookup first, then backgrounded ones.
@@ -489,6 +504,8 @@ export function useDispatchLookup({
         ? 'decided'
         : m?.review
           ? 'reviewing'
+          : l.isRerun
+            ? 'reviewing'
           : 'scouting';
       return {
         id: l.lookupId,

@@ -10,6 +10,7 @@ export interface LookupProgress {
   query: string;
   name: string | null;
   sector: string | null;
+  mode?: 'lookup' | 'rerun';
   /** Company identity confirmed (single match / candidate picked / lookup queued). */
   resolved: boolean;
   found: boolean;
@@ -63,15 +64,21 @@ interface DispatchCommandBarProps {
 type StepState = 'done' | 'active' | 'pending';
 
 function ProgressSteps({ progress }: { progress: LookupProgress }) {
-  const steps: { label: string; state: StepState }[] = [
-    { label: 'Identify', state: progress.resolved ? 'done' : 'active' },
-    {
-      label: 'Discover',
-      state: progress.found ? 'done' : progress.resolved ? 'active' : 'pending',
-    },
-    { label: 'Review', state: progress.reviewed ? 'done' : progress.found ? 'active' : 'pending' },
-    { label: 'Decide', state: progress.reviewed ? 'active' : 'pending' },
-  ];
+  const steps: { label: string; state: StepState }[] =
+    progress.mode === 'rerun'
+      ? [
+          { label: 'Review', state: progress.reviewed ? 'done' : 'active' },
+          { label: 'Decide', state: progress.reviewed ? 'active' : 'pending' },
+        ]
+      : [
+          { label: 'Identify', state: progress.resolved ? 'done' : 'active' },
+          {
+            label: 'Discover',
+            state: progress.found ? 'done' : progress.resolved ? 'active' : 'pending',
+          },
+          { label: 'Review', state: progress.reviewed ? 'done' : progress.found ? 'active' : 'pending' },
+          { label: 'Decide', state: progress.reviewed ? 'active' : 'pending' },
+        ];
   return (
     <div className="flex items-center justify-center gap-phi-2" aria-label="Analysis progress">
       {steps.map((step, i) => (
@@ -343,8 +350,8 @@ export default function DispatchCommandBar({
                 </p>
               ) : null}
               <p className="type-body max-w-[38ch] text-center text-oxford/50">
-                Add private context — traction, team, funding — and the analysts run the
-                full review again with it.
+                Add private context or a source link. The reviewer will fold it into the
+                existing memo and send the case back through decision.
               </p>
               <div className="w-full">
                 <label
@@ -367,10 +374,10 @@ export default function DispatchCommandBar({
                   <button
                     type="button"
                     onClick={handleSubmitRerun}
-                    disabled={isBusy || !rerunContext.trim()}
-                    className="border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    Run re-review →
+                  disabled={isBusy || !rerunContext.trim()}
+                  className="border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                    Review again →
                   </button>
                 </div>
               </div>

@@ -537,8 +537,9 @@ async def run_on_demand_lookup(
 ) -> Optional[str]:
     """
     Run scout -> reviewer -> partner for one explicit company name.
-    `additional_context` is optional operator-supplied background passed to the
-    scout so private facts can fill "missing evidence" gaps.
+    `additional_context` is optional operator-supplied background. Fresh lookups
+    pass it to Scout; in-place re-reviews fetch named links and pass it directly
+    to Reviewer via the stored scout context.
     `replace_startup_id` re-reviews an EXISTING row in place (post-hoc re-review):
     scout/resolver are SKIPPED — the stored profile, resolution, and sources are
     kept, the operator context (plus fetched content of any links it names) is

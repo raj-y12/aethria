@@ -72,6 +72,8 @@ export interface Scout {
     url?: string;
     supports?: string;
   }>;
+  /** Analyst-supplied context used for an Add Context re-review, including fetched link excerpts when available. */
+  operator_context?: string | null;
   origin_type?: string;
   lookup_input_type?: string;
   /** Stable id from POST /api/startups/lookup for on-demand rows (matches pending UI state). */

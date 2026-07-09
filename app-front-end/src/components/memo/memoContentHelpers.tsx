@@ -64,6 +64,43 @@ export function memoSourceRows(startup: Startup) {
     }));
 }
 
+export function analystContextSections(startup: Startup | null | undefined): Array<{ title: string; body: string }> {
+  const raw = startup?.scout.operator_context?.trim();
+  if (!raw) return [];
+  const marker = /\n\n\[Content of operator-provided link ([^\]]+)\]\n/g;
+  const sections: Array<{ title: string; body: string }> = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = marker.exec(raw)) !== null) {
+    const previous = raw.slice(lastIndex, match.index).trim();
+    if (previous) {
+      sections.push({
+        title: sections.length === 0 ? 'Submitted context' : 'Context note',
+        body: previous,
+      });
+    }
+    const url = match[1]?.trim() || 'Operator-provided link';
+    const bodyStart = marker.lastIndex;
+    const next = marker.exec(raw);
+    const bodyEnd = next ? next.index : raw.length;
+    marker.lastIndex = bodyEnd;
+    const body = raw.slice(bodyStart, bodyEnd).trim();
+    if (body) sections.push({ title: url, body });
+    lastIndex = bodyEnd;
+  }
+
+  const tail = raw.slice(lastIndex).trim();
+  if (tail) {
+    sections.push({
+      title: sections.length === 0 ? 'Submitted context' : 'Context note',
+      body: tail,
+    });
+  }
+
+  return sections;
+}
+
 export function reviewHasThesisAlignment(r: Review | null | undefined): boolean {
   if (!r) return false;
   return (

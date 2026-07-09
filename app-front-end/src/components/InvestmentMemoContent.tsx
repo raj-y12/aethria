@@ -47,6 +47,7 @@ const SCORING_DIMENSIONS: Array<{ key: ScoringDimensionKey; label: string; id: s
 
 import {
   mergeMemoPartial,
+  analystContextSections,
   memoGeneratingDetailForVariant,
   memoSourceRows,
   reviewHasThesisAlignment,
@@ -354,6 +355,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   );
   const memoSources = useMemo(
     () => (displayStartup ? memoSourceRows(displayStartup) : []),
+    [displayStartup]
+  );
+  const analystContext = useMemo(
+    () => analystContextSections(displayStartup),
     [displayStartup]
   );
   const companyResolution = displayStartup?.scout.company_resolution ?? null;
@@ -1169,6 +1174,35 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 initialOpen={false}
               >
                 <p className="memoDocProse">{renderWithMonoNumbers(displayStartup.partner.llm_fallback_reason)}</p>
+              </MemoDisclosureSection>
+            )}
+            {analystContext.length > 0 && (
+              <MemoDisclosureSection
+                id={`${contentKey}-analyst-context`}
+                title="Analyst context"
+                summary={`${analystContext.length} added item${analystContext.length === 1 ? '' : 's'}`}
+                initialOpen
+              >
+                <ol className="memoAnalystContextList">
+                  {analystContext.map((section, i) => {
+                    const isUrl = /^https?:\/\//i.test(section.title);
+                    const clipped = clipText(collapseWhitespace(section.body), 900);
+                    return (
+                      <li key={`${section.title}-${i}`} className="memoAnalystContextItem">
+                        <p className="memoReplayKicker">
+                          {isUrl ? (
+                            <a className="memoLink" href={section.title} target="_blank" rel="noreferrer">
+                              {renderWithMonoNumbers(section.title)}
+                            </a>
+                          ) : (
+                            <span>{section.title}</span>
+                          )}
+                        </p>
+                        <p className="memoReplayDetail">{renderWithMonoNumbers(clipped)}</p>
+                      </li>
+                    );
+                  })}
+                </ol>
               </MemoDisclosureSection>
             )}
             {/* ── Company resolution (lookup stage 1) ── */}
