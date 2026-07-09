@@ -73,6 +73,9 @@ jobs:
       - name: Dependency audit
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         env:
           VITE_API_URL: http://127.0.0.1:8000

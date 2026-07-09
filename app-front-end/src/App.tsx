@@ -46,18 +46,6 @@ function AppShell() {
     sessionStorage.removeItem(LOGIN_ENTRY_SESSION_KEY);
   }, []);
 
-  // Warn the user before closing the tab if agents are actively running.
-  useEffect(() => {
-    if (!agentsEnabled) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      // Modern browsers show a generic message; setting returnValue is required for the dialog to appear.
-      e.returnValue = 'Agents are currently running. Are you sure you want to leave?';
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [agentsEnabled]);
-
   // Wait for the first startups fetch to settle (instant when the cache is
   // warm-hydrated) before kicking off a pipeline cycle: the trigger's backend
   // work otherwise competes with the login burst of reads and delays first paint.

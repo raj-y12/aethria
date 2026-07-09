@@ -13,11 +13,13 @@ import { clerkAppearance } from './design-system/clerk-appearance';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: Number.POSITIVE_INFINITY,
+      // Operational data should refresh by default. Immutable queries opt into
+      // infinity explicitly through getQueryConfig('STATIC').
+      staleTime: 90_000,
       gcTime: 30 * 60_000,
       refetchOnWindowFocus: false,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
       refetchInterval: false,
       retry: 1,
     },

@@ -242,16 +242,16 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
 
   const fundThesisRuntimeQuery = useQuery({
     queryKey: ['fund-thesis', 'runtime'],
-    queryFn: () => fetchFundThesisRuntime().catch(() => null),
+    queryFn: fetchFundThesisRuntime,
     ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 120_000 }),
     refetchInterval: isTabVisible ? 120_000 : false,
   });
 
   const settingsQuery = useQuery({
     queryKey: ['settings'],
-    queryFn: () => fetchSettings().catch(() => null),
+    queryFn: fetchSettings,
     ...getQueryConfig('STATIC'),
-    placeholderData: (prev) => prev ?? null,
+    placeholderData: (prev) => prev,
   });
 
   const startups = startupsQuery.data ?? [];

@@ -221,7 +221,8 @@ export default function DottedMarketMap({ hits = [], echo = false, className }: 
             const tail = Math.max(0, a.p - 0.18);
             for (let t = tail; t <= a.p; t += 0.02) {
               const q = bez(t);
-              t === tail ? fxctx!.moveTo(q[0], q[1]) : fxctx!.lineTo(q[0], q[1]);
+              if (t === tail) fxctx!.moveTo(q[0], q[1]);
+              else fxctx!.lineTo(q[0], q[1]);
             }
             fxctx!.strokeStyle = `rgba(${ACCENT_RGB},0.55)`;
             fxctx!.lineWidth = 1.1;

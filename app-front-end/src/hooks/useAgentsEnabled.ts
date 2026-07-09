@@ -11,9 +11,9 @@ import { fetchSettings } from '../api/settings';
 export function useAgentsEnabled(): boolean {
   const { data: settings } = useQuery({
     queryKey: ['settings'],
-    queryFn: () => fetchSettings().catch(() => null),
+    queryFn: fetchSettings,
     staleTime: 30_000,
-    placeholderData: (prev) => prev ?? null,
+    placeholderData: (prev) => prev,
   });
   const ac = settings?.agent_config;
   return !!(ac?.scouts_enabled || ac?.reviewers_enabled || ac?.partners_enabled);

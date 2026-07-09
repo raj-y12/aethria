@@ -6,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
  * `npx playwright install chromium` and a Clerk publishable key), so it runs on
  * demand via `npm run test:e2e`.
  */
-const PORT = 3000;
+const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 4173);
 
 export default defineConfig({
   testDir: './e2e',
@@ -23,7 +23,8 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
+    // Never attach tests to an unrelated process that happens to own the port.
+    reuseExistingServer: false,
     timeout: 60_000,
     env: {
       // A test-format Clerk key so ClerkProvider initializes without a real instance.

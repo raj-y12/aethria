@@ -42,6 +42,29 @@ Current result after the second review pass: **4 complete · 0 partial · 0 unfi
 for local code/test acceptance. Production timing verification remains a release
 check, not a local-code blocker.
 
+### Follow-up pass — 2026-07-09
+
+The dispatch follow-up found and fixed a lifecycle gap: once Scout created a
+startup row, Dispatch stopped polling the failure/status path. Review or Partner
+failures could therefore leave the takeover stuck in progress. Matched lookups
+now poll memo pipeline status and surface failed runs.
+
+The following contained P2 items were also completed and verified locally:
+
+- P2-1: Playwright now uses an isolated default port and never reuses an
+  unrelated existing server.
+- P2-2: Marketing ESLint flat config is present, its existing lint errors are
+  fixed, and CI runs the lint job.
+- P2-4: The misleading `beforeunload` warning tied to enabled agents is removed.
+- P2-6: Query defaults now use finite freshness and reconnect/mount refresh;
+  immutable query paths still opt into static behavior explicitly.
+- P2-9: Root-level `python3 -m pytest` now discovers backend tests through the
+  repository `pytest.ini`.
+
+The larger P1/P2 architecture items remain open: shared durable queue/SSE
+ownership, retrieval-provider fallback, localStorage threat-model changes,
+observability, and domain-level file splits.
+
 - [x] **P0-1 — remove pipeline event-loop blocking**
   - [x] Settings, storage creation, thesis reads, stage counts, activity writes,
     lookup-failure writes, reprocessing reads, portfolio stages, MetaAgent cycles,

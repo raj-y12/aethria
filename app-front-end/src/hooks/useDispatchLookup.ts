@@ -308,10 +308,13 @@ export function useDispatchLookup({
     );
   }, [startups, pendingLookup]);
 
-  const rerunMemoStatusQuery = useQuery({
+  // Poll the pipeline status for every matched lookup. A row can be created by
+  // Scout and then fail during Review/Partner; stopping the failure poll as soon
+  // as the row appears leaves Dispatch stuck on the progress screen forever.
+  const memoStatusQuery = useQuery({
     queryKey: ['startup', 'memo-status', pendingLookupMatch?.id, pendingLookup?.lookupId],
     queryFn: () => fetchMemo(pendingLookupMatch!.id),
-    enabled: Boolean(pendingLookup?.isRerun && pendingLookupMatch?.id && !pendingLookup.autoOpened),
+    enabled: Boolean(pendingLookupMatch?.id && !pendingLookup?.autoOpened),
     staleTime: 0,
     refetchInterval: () => {
       if (!liveGate.tabVisible) return false;
@@ -340,11 +343,20 @@ export function useDispatchLookup({
   });
 
   useEffect(() => {
-    if (!pendingLookup || pendingLookupMatch) return;
-    const row = lookupFailureQuery.data;
-    if (!row?.failed) return;
+    if (!pendingLookup || pendingLookup.autoOpened) return;
+    const statusMessage = pendingLookupMatch
+      ? memoStatusQuery.data?.status === 'failed'
+        ? memoStatusQuery.data.error
+        : undefined
+      : lookupFailureQuery.data?.failed
+        ? lookupFailureQuery.data.message
+        : undefined;
+    const failed = pendingLookupMatch
+      ? memoStatusQuery.data?.status === 'failed'
+      : lookupFailureQuery.data?.failed === true;
+    if (!failed) return;
     const reason =
-      row.message ??
+      statusMessage ??
       `We couldn't confirm a company matching "${pendingLookup.queryLabel}". Try the exact name or add the website to disambiguate (example: "Aethria aethria.com").`;
     setFailure({ query: pendingLookup.queryLabel, message: reason });
     setMessage(null);
@@ -353,7 +365,7 @@ export function useDispatchLookup({
     setPendingLookup(null);
     // Surface the fail page even if the analyst had closed the takeover.
     setCommandBarOpen(true);
-  }, [pendingLookup, pendingLookupMatch, lookupFailureQuery.data]);
+  }, [pendingLookup, pendingLookupMatch, lookupFailureQuery.data, memoStatusQuery.data]);
 
   // Keep the startups list fresh for the WHOLE in-flight lookup — not just until
   // the scout row first appears. Stopping at row-appearance left review→decide to
@@ -362,10 +374,10 @@ export function useDispatchLookup({
   // never reached Decide and the result snapshot never rendered. Poll until a
   // partner recommendation lands (lookup decided), then stop.
   const lookupDecided = pendingLookup?.isRerun
-    ? rerunMemoStatusQuery.data?.status === 'ready'
-    : !!pendingLookupMatch?.partner?.recommendation;
+    ? memoStatusQuery.data?.status === 'ready'
+    : !!pendingLookupMatch?.partner?.recommendation || memoStatusQuery.data?.status === 'ready';
   const rerunReviewComplete = pendingLookup?.isRerun
-    ? rerunMemoStatusQuery.data?.pipeline_status === 'pending' || lookupDecided
+    ? memoStatusQuery.data?.pipeline_status === 'pending' || lookupDecided
     : false;
   useEffect(() => {
     if (!lookupDecided || !pendingLookupMatch?.id) return;
