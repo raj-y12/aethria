@@ -58,6 +58,7 @@ export type MemoApiResponse = {
   memo: string | null;
   partial: MemoPartialPayload | null;
   pipeline_run_id?: string | null;
+  pipeline_status?: string | null;
   error?: string | null;
 };
 
@@ -91,6 +92,10 @@ export async function fetchMemo(startupId: string): Promise<MemoApiResponse | nu
     pipeline_run_id:
       data?.pipeline_run_id != null && data.pipeline_run_id !== ''
         ? String(data.pipeline_run_id)
+        : null,
+    pipeline_status:
+      data?.pipeline_status != null && data.pipeline_status !== ''
+        ? String(data.pipeline_status)
         : null,
     error: typeof data?.error === 'string' ? data.error : data?.error ?? null,
   };

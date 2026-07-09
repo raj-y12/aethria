@@ -432,7 +432,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                 }
                 onSubmitRerun={(context) => void dispatch.submitRerun(context)}
                 result={
-                  dispatch.pendingLookupMatch?.partner?.recommendation && dispatch.snapshotProps ? (
+                  dispatch.lookupDecided && dispatch.snapshotProps ? (
                     <LookupResultSnapshot
                       {...dispatch.snapshotProps}
                       onOpenMemo={dispatch.openLookupMemo}

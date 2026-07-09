@@ -14,7 +14,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from models import Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
-from pipeline_state import pipeline_stage_log, upsert_pipeline_state
+from pipeline_state import get_pipeline_state_row, pipeline_stage_log, upsert_pipeline_state
 from agent_trace import (
     build_partner_trace,
     build_review_trace,
@@ -634,8 +634,10 @@ class SupabaseStartupsStorage:
 
         The scout profile, company resolution, and sources are kept EXACTLY as-is —
         no re-discovery. The operator context (private facts + fetched link content)
-        is stamped on scout_info where the reviewer prompt reads it, and
-        review/partner/memo/human ruling are cleared so those stages re-run.
+        is stamped on scout_info where the reviewer prompt reads it. Existing
+        review/partner/memo/human ruling are deliberately preserved until the
+        replacement stages finish; `force_rerun=True` bypasses the old downstream
+        data without making cancel/retry hide the startup from the queue.
         Full-row upsert on purpose: it also refreshes every derived list_*
         projection column, which a partial patch would leave stale.
         """
@@ -650,16 +652,9 @@ class SupabaseStartupsStorage:
         if lookup_id:
             # New lookup correlation id so the UI's pending-match keys on the re-run.
             scout_info.lookup_id = lookup_id
-        startup = Startup(
-            startup_id=sid,
-            scout_info=scout_info,
-            financials=existing.financials,
-        )
-        startup.created_at = existing.created_at
-        startup.first_seen_at = existing.first_seen_at
-        startup.last_seen_by_user_at = existing.last_seen_by_user_at
-        startup.acknowledged_at = existing.acknowledged_at
-        startup.unresolved_at = startup.updated_at
+        startup = existing
+        startup.scout_info = scout_info
+        startup.update_timestamp()
         # Scout stage did not run — keep its original trace for provenance.
         startup.agent_trace = existing.agent_trace
         startup.queue_reason, startup.priority_reason = _queue_reasons_for_startup(startup)
@@ -669,12 +664,58 @@ class SupabaseStartupsStorage:
                 user_id=self._user_id,
                 startup_id=sid,
                 pipeline_run_id=pr,
-                status="pending",
+                status="ingesting",
             )
         self.upsert_startup_dict(startup.to_dict())
         self.logger.info(
             "Prepared re-review in place (scout kept): %s (%s)", scout_info.name, sid
         )
+        return sid
+
+    def mark_existing_rerun_cancelled(self, lookup_id: str) -> Optional[str]:
+        """Restore memo readiness for a cancelled in-place re-review.
+
+        Re-reviews preserve the previous partner/memo while a replacement run is
+        pending. If the user cancels after `prepare_rerun_startup`, mark the
+        pipeline state ready again so the memo endpoint serves the preserved memo
+        instead of reporting an endless generating state.
+        """
+        lid = (lookup_id or "").strip()
+        if not lid:
+            return None
+        try:
+            r = (
+                self._client.table(TABLE)
+                .select("startup_id, partner_info, investment_memo_markdown")
+                .eq("user_id", self._user_id)
+                .eq("list_lookup_id", lid)
+                .limit(1)
+                .execute()
+            )
+        except Exception as e:
+            self.logger.warning("mark_existing_rerun_cancelled select failed: %s", e)
+            return None
+        rows = (r.data or []) if hasattr(r, "data") else []
+        if not rows:
+            return None
+        row = rows[0]
+        sid = str(row.get("startup_id") or "").strip()
+        if not sid:
+            return None
+        # Only restore readiness for existing decided/memo-bearing rows. Fresh
+        # on-demand lookups can legitimately be cancelled before any decision.
+        if not row.get("partner_info") and not row.get("investment_memo_markdown"):
+            return None
+        state = get_pipeline_state_row(self._client, user_id=self._user_id, startup_id=sid)
+        pr = str((state or {}).get("pipeline_run_id") or "").strip()
+        if pr:
+            upsert_pipeline_state(
+                self._client,
+                user_id=self._user_id,
+                startup_id=sid,
+                pipeline_run_id=pr,
+                status="ready",
+            )
         return sid
 
     def add_startup(

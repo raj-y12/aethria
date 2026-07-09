@@ -2,13 +2,13 @@
 
 prepare_rerun_startup must keep the existing scout profile EXACTLY as-is (no
 re-discovery), stamp the operator context where the reviewer prompt reads it,
-and clear review/partner/memo/human ruling so those stages re-run — while
-preserving queue-awareness timestamps. It intentionally uses a full-row upsert
-so the derived list_* projection columns are refreshed too.
+and preserve existing review/partner/memo/human ruling until replacement stages
+finish so canceling a re-review does not hide the startup. It intentionally uses
+a full-row upsert so the derived list_* projection columns are refreshed too.
 """
 from types import SimpleNamespace
 
-from models import Financials, ReviewInfo, ScoutInfo, Startup
+from models import Financials, PartnerInfo, PartnerSnapshot, ReviewInfo, ScoutInfo, Startup
 from pipeline_runner import _OPERATOR_URL_RE
 from supabase_storage import SupabaseStartupsStorage, _dict_to_row
 
@@ -88,14 +88,36 @@ def _review():
     )
 
 
+def _partner():
+    return PartnerInfo(
+        thesis="t",
+        why_this_matters="w",
+        snapshot=PartnerSnapshot(one_liner="ol"),
+        market_insight="mi",
+        product_edge="pe",
+        risks=["r"],
+        recommendation="MONITOR",
+        decision_rationale="old decision",
+        confidence=0.7,
+        next_action="track",
+    )
+
+
 def _existing_startup():
-    st = Startup(startup_id="s1", scout_info=_scout(), review_info=_review(), financials=Financials())
+    st = Startup(
+        startup_id="s1",
+        scout_info=_scout(),
+        review_info=_review(),
+        partner_info=_partner(),
+        financials=Financials(),
+    )
     st.human_resolution = {"resolved_at": "2026-06-01T00:00:00+00:00", "decision": "PASS"}
+    st.investment_memo_markdown = "# Old memo"
     st.first_seen_at = st.created_at
     return st
 
 
-def test_prepare_rerun_keeps_scout_and_clears_downstream_stages():
+def test_prepare_rerun_keeps_scout_and_preserves_downstream_until_replacement():
     st = _existing_startup()
     store = {"rows": [_dict_to_row(st.to_dict(), "user-1")], "updates": [], "upserts": []}
     storage = SupabaseStartupsStorage(_Client(store), "user-1")
@@ -119,10 +141,12 @@ def test_prepare_rerun_keeps_scout_and_clears_downstream_stages():
     assert scout.get("operator_context") == "Raised $2.1M pre-seed (unannounced)."
     # New lookup correlation id so the UI's pending-match keys on the re-run.
     assert scout.get("lookup_id") == "new-lookup"
-    # Downstream stages cleared so reviewer/partner re-run cleanly.
-    assert not row.get("review_info")
-    assert not row.get("partner_info")
-    assert not row.get("human_resolution")
+    # Downstream stages are preserved until replacements are written. Reviewer
+    # and partner use force_rerun=True, so this does not block re-processing.
+    assert row.get("review_info", {}).get("overall_summary") == "reviewed"
+    assert row.get("partner_info", {}).get("decision_rationale") == "old decision"
+    assert row.get("human_resolution", {}).get("decision") == "PASS"
+    assert row.get("investment_memo_markdown") == "# Old memo"
     # Queue-awareness timestamps survive the overwrite (row serializer may use Z suffix).
     def _iso(v):
         from datetime import datetime

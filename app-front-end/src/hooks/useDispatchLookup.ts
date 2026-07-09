@@ -6,6 +6,7 @@ import {
   queueOnDemandLookup,
   queueLookupRerun,
   fetchStartupDetail,
+  fetchMemo,
   fetchLookupJobStatus,
   resolveLookupCandidates,
   type LookupCandidate,
@@ -299,11 +300,25 @@ export function useDispatchLookup({
     if (!id) return null;
     return (
       startups.find((s) => {
-        if ((s.scout.origin_type ?? '').toLowerCase() !== 'on_demand_lookup') return false;
+        if (!pendingLookup.isRerun && (s.scout.origin_type ?? '').toLowerCase() !== 'on_demand_lookup') {
+          return false;
+        }
         return (s.scout.lookup_id ?? '').trim() === id;
       }) ?? null
     );
   }, [startups, pendingLookup]);
+
+  const rerunMemoStatusQuery = useQuery({
+    queryKey: ['startup', 'memo-status', pendingLookupMatch?.id, pendingLookup?.lookupId],
+    queryFn: () => fetchMemo(pendingLookupMatch!.id),
+    enabled: Boolean(pendingLookup?.isRerun && pendingLookupMatch?.id && !pendingLookup.autoOpened),
+    staleTime: 0,
+    refetchInterval: () => {
+      if (!liveGate.tabVisible) return false;
+      return 3_000;
+    },
+    retry: 1,
+  });
 
   const lookupFailureQuery = useQuery({
     queryKey: ['startups', 'lookup-status', pendingLookup?.lookupId ?? ''],
@@ -346,7 +361,12 @@ export function useDispatchLookup({
   // (and SSE unreliable behind a buffering proxy) the row froze at Review, so it
   // never reached Decide and the result snapshot never rendered. Poll until a
   // partner recommendation lands (lookup decided), then stop.
-  const lookupDecided = !!pendingLookupMatch?.partner?.recommendation;
+  const lookupDecided = pendingLookup?.isRerun
+    ? rerunMemoStatusQuery.data?.status === 'ready'
+    : !!pendingLookupMatch?.partner?.recommendation;
+  const rerunReviewComplete = pendingLookup?.isRerun
+    ? rerunMemoStatusQuery.data?.pipeline_status === 'pending' || lookupDecided
+    : false;
   useEffect(() => {
     if (!lookupDecided || !pendingLookupMatch?.id) return;
     void queryClient.invalidateQueries({ queryKey: ['startup', 'detail', pendingLookupMatch.id] });
@@ -389,20 +409,24 @@ export function useDispatchLookup({
             ? ' Identity needs your confirmation — see alternatives in the memo.'
             : '';
     const hasDecision = !!matched.partner?.recommendation;
-    if (hasDecision) {
+    if (hasDecision && (!pendingLookup.isRerun || lookupDecided)) {
       setMessage(
-        `Lookup complete: ${matched.scout.name} analyzed.${resolutionNote} Review the result and open the memo.`,
+        pendingLookup.isRerun
+          ? `Re-review complete: ${matched.scout.name} updated.${resolutionNote} Review the result and open the memo.`
+          : `Lookup complete: ${matched.scout.name} analyzed.${resolutionNote} Review the result and open the memo.`,
       );
     } else if (matched.review) {
       setMessage(
-        `Found ${matched.scout.name}.${resolutionNote} Review is complete and the partner decision is now running...`,
+        pendingLookup.isRerun
+          ? `${matched.scout.name} is being re-reviewed with your added context...`
+          : `Found ${matched.scout.name}.${resolutionNote} Review is complete and the partner decision is now running...`,
       );
     } else {
       setMessage(`Found ${matched.scout.name}.${resolutionNote} Running analyst review and scoring...`);
     }
     // No silent auto-navigation: the takeover surfaces the result overview with an
     // "Open memo" action (openLookupMemo) so the user advances deliberately.
-  }, [pendingLookup, pendingLookupMatch]);
+  }, [lookupDecided, pendingLookup, pendingLookupMatch]);
 
   const lookupWorking = busy || (pendingLookup != null && !pendingLookup.autoOpened);
 
@@ -450,14 +474,14 @@ export function useDispatchLookup({
       // analyst is still on the Identify stage (resolving / picking a candidate).
       resolved: pendingLookup?.isRerun ? true : pendingLookup != null,
       found: pendingLookup?.isRerun ? true : !!pendingLookupMatch,
-      reviewed: !!pendingLookupMatch?.review,
+      reviewed: pendingLookup?.isRerun ? rerunReviewComplete : !!pendingLookupMatch?.review,
     };
-  }, [dispatching, activeQuery, pendingLookup, pendingLookupMatch]);
+  }, [dispatching, activeQuery, lookupDecided, pendingLookup, pendingLookupMatch, rerunReviewComplete]);
 
   // A finished lookup the analyst hasn't opened yet → "ready" toast.
   const lookupReady =
     !commandBarOpen && pendingLookup != null && !pendingLookup.autoOpened
-      ? pendingLookupMatch?.partner?.recommendation
+      ? lookupDecided
         ? pendingLookupMatch
         : null
       : null;
@@ -563,6 +587,7 @@ export function useDispatchLookup({
     chips,
     focusChip,
     snapshotProps,
+    lookupDecided,
     pendingLookupMatch,
     openLookupMemo,
     lookupReady,

@@ -1507,7 +1507,18 @@ def get_startup_memo(request: Request, startup_id: str):
                 "memo": None,
                 "partial": partial,
                 "pipeline_run_id": pr_str,
+                "pipeline_status": state_status,
                 "error": err_from_row,
+            }
+
+        if state_status and state_status != "ready":
+            return {
+                "status": "generating",
+                "memo": None,
+                "partial": _memo_partial_payload(startup) if startup.scout_info else None,
+                "pipeline_run_id": pr_str,
+                "pipeline_status": state_status,
+                "error": None,
             }
 
         if md:
@@ -1516,6 +1527,7 @@ def get_startup_memo(request: Request, startup_id: str):
                 "memo": md,
                 "partial": None,
                 "pipeline_run_id": pr_str,
+                "pipeline_status": state_status,
                 "error": None,
             }
 
@@ -1527,6 +1539,7 @@ def get_startup_memo(request: Request, startup_id: str):
                 "memo": None,
                 "partial": partial,
                 "pipeline_run_id": pr_str,
+                "pipeline_status": state_status,
                 "error": None,
             }
 
@@ -1535,6 +1548,7 @@ def get_startup_memo(request: Request, startup_id: str):
             "memo": None,
             "partial": _memo_partial_payload(startup) if startup.scout_info else None,
             "pipeline_run_id": pr_str,
+            "pipeline_status": state_status,
             "error": None,
         }
 
@@ -1548,6 +1562,7 @@ def get_startup_memo(request: Request, startup_id: str):
         "memo": memo,
         "partial": None,
         "pipeline_run_id": None,
+        "pipeline_status": None,
         "error": None,
     }
 
@@ -2420,14 +2435,21 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
         raise HTTPException(status_code=422, detail="lookup_ids is required")
 
     cancelled: List[str] = []
+    restored_startup_ids: List[str] = []
+    storage = _get_storage(request)
     for raw in raw_ids[:16]:
         lookup_id = _coerce_lookup_id(raw)
         _mark_lookup_cancelled(user_id, lookup_id)
         cancelled.append(lookup_id)
+        if isinstance(storage, SupabaseStartupsStorage):
+            restored = await asyncio.to_thread(storage.mark_existing_rerun_cancelled, lookup_id)
+            if restored:
+                restored_startup_ids.append(restored)
+                _notify_startups_changed(user_id, "lookup_cancelled")
 
     return JSONResponse(
         status_code=202,
-        content={"status": "cancelled", "cancelled": cancelled},
+        content={"status": "cancelled", "cancelled": cancelled, "restored_startup_ids": restored_startup_ids},
     )
 
 
