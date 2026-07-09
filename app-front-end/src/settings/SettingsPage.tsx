@@ -37,9 +37,9 @@ type SectionId =
   | 'mandate'
   | 'memo'
   | 'risk'
-  | 'system';
-
-type SettingsSectionId = SectionId | 'budget' | 'weights' | 'thresholds';
+  | 'thresholds'
+  | 'budget'
+  | 'weights';
 
 const SELECT_CHEVRON =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%231a2b48' fill-opacity='0.45' d='M0 3h10L5 8z'/%3E%3C/svg%3E\")";
@@ -50,7 +50,9 @@ const sections: Array<{ id: SectionId; label: string; short: string }> = [
   { id: 'mandate', label: 'Fund Mandate', short: 'Mandate' },
   { id: 'memo', label: 'Memo Output', short: 'Memo' },
   { id: 'risk', label: 'Ruling', short: 'Ruling' },
-  { id: 'system', label: 'System tuning', short: 'System' },
+  { id: 'thresholds', label: 'Decision Thresholds', short: 'Thresholds' },
+  { id: 'budget', label: 'Operations', short: 'Operations' },
+  { id: 'weights', label: 'Scoring Weights', short: 'Weights' },
 ];
 
 const stageOptions = ['Pre-seed', 'Seed', 'Series A', 'Series B+'];
@@ -301,7 +303,7 @@ function SettingsSection({
   children,
   className,
 }: {
-  id: SettingsSectionId;
+  id: SectionId;
   title: string;
   kicker: string;
   children: React.ReactNode;
@@ -409,7 +411,6 @@ export default function SettingsPage() {
   const [policyPreviewHash, setPolicyPreviewHash] = useState<string | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState('');
   const [savedOperationsSnapshot, setSavedOperationsSnapshot] = useState('');
-  const [systemTuningExpanded, setSystemTuningExpanded] = useState(false);
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
 
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
@@ -574,7 +575,6 @@ export default function SettingsPage() {
   useEffect(() => {
     const scrollToSection = (id: SectionId) => {
       setActiveSection(id);
-      if (id === 'system') setSystemTuningExpanded(true);
       const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${id}`);
       target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
@@ -845,28 +845,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <div id="system" className="order-4">
-                  <div className="border-t border-oxford/[0.075] py-phi-7">
-                    <button
-                      type="button"
-                      onClick={() => setSystemTuningExpanded((expanded) => !expanded)}
-                      aria-expanded={systemTuningExpanded}
-                      className="flex w-full items-start justify-between gap-phi-5 text-left"
-                    >
-                      <span>
-                        <span className={sectionLabelCls}>System tuning</span>
-                        <span className="mt-phi-3 block max-w-[34rem] type-body-sm leading-relaxed text-oxford/45">
-                          Engine internals: scoring weights, decision thresholds, and runtime limits. Defaults are sensible.
-                        </span>
-                      </span>
-                      <span aria-hidden className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
-                        {systemTuningExpanded ? 'Hide' : 'Show'}
-                      </span>
-                    </button>
-                  </div>
-                  {systemTuningExpanded && (
-                    <div className="flex flex-col">
-                <SettingsSection id="budget" title="Operations" kicker="Runtime gates for background pipeline cycles. Company limits cap scout, reviewer, and partner batch size; budget settings drive CostController when enabled." className="order-3">
+                <SettingsSection id="budget" title="Operations" kicker="Control which agents run and how often the pipeline checks for new work. No hidden runtime limits." className="order-5">
                   <div className="grid gap-phi-5 md:grid-cols-2">
                     <div className="flex flex-col gap-phi-2">
                       <label htmlFor="risk-sensitivity" className={labelCls}>Escalation sensitivity</label>
@@ -880,14 +859,10 @@ export default function SettingsPage() {
                     <ToggleRow id="reviewers-enabled" checked={settings.agent_config.reviewers_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, reviewers_enabled: value } } : current)} label="Reviewers enabled" />
                     <ToggleRow id="partners-enabled" checked={settings.agent_config.partners_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, partners_enabled: value } } : current)} label="Partners enabled" />
                     <ToggleRow id="budget-enabled" checked={settings.cost_budget.enabled} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, enabled: value } } : current)} label="Cost budget enabled" />
-                    <TextField id="max-agents" label="Companies per cycle" type="number" value={settings.agent_config.max_agents_per_run} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, max_agents_per_run: Number(value) } } : current)} min={1} />
-                    <TextField id="max-tokens" label="Token cap per day" type="number" value={settings.cost_budget.max_tokens_per_run} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, max_tokens_per_run: Number(value) } } : current)} min={0} />
-                    <TextField id="daily-cost" label="Daily cap (USD)" type="number" value={settings.cost_budget.daily_cost_ceiling} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, daily_cost_ceiling: Number(value) } } : current)} min={0} />
-                    <TextField id="cooldown-seconds" label="Agent cooldown seconds" type="number" value={settings.cost_budget.cooldown_seconds} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, cooldown_seconds: Number(value) } } : current)} min={0} />
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="weights" title="Scoring Weights" kicker="Weights match the five reviewer dimensions used by deterministic backend scoring. Traction and timing remain sub-signals inside Execution and Market." className="order-1">
+                <SettingsSection id="weights" title="Scoring Weights" kicker="Set how much each reviewer dimension contributes to the overall score. The total stays balanced at 100%." className="order-6">
                   <div className="flex flex-col gap-phi-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-phi-4 border-b border-oxford/[0.06] pb-phi-4">
                       <div className="flex items-baseline gap-phi-3">
@@ -951,15 +926,11 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                <SettingsSection id="thresholds" title="Decision Thresholds" kicker="Pass, Monitor, and Invest cutoffs — synced with Partner scoring and badge ranges." className="order-2">
+                <SettingsSection id="thresholds" title="Decision Thresholds" kicker="Set the score bands that turn analysis into PASS, MONITOR, or INVEST. The bar below shows the live ranges." className="order-4">
                   <DecisionThresholdsPanel draft={draft} updateDraft={updateDraft} updateThreshold={updateThreshold} />
                 </SettingsSection>
 
-                    </div>
-                  )}
-                </div>
-
-                <SettingsSection id="risk" title="Ruling" kicker="Controls the risk acknowledgement experience before a decision is recorded." className="order-3">
+                <SettingsSection id="risk" title="Ruling" kicker="Choose what needs acknowledgement before a decision is recorded." className="order-3">
                   <div className="grid gap-phi-5">
                     <div className="border-y border-oxford/[0.06]">
                       <ToggleRow id="risk-ack" checked={draft.risk.requireAcknowledgement} onChange={(value) => updateRisk('requireAcknowledgement', value)} label="Require acknowledgement before ruling" hint="High-risk pending deals need a reviewed-risk step before Commit." />
@@ -968,7 +939,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="memo" title="Memo Output" kicker="Controls app memo presentation and saved memo verbosity. Existing generated memo content is not rewritten retroactively." className="order-2">
+                <SettingsSection id="memo" title="Memo Output" kicker="Choose how much context and reasoning appears in new investment memos." className="order-2">
                   <div className="grid gap-phi-5">
                     <div className="grid gap-phi-5 md:grid-cols-2">
                       <div className="flex flex-col gap-phi-2">
