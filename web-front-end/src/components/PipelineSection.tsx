@@ -1,7 +1,9 @@
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { ScrollReveal } from './ScrollReveal';
 import SectionKicker from './SectionKicker';
-import IntelligenceMap from './IntelligenceMap';
+import { lazy, Suspense } from 'react';
+
+const IntelligenceMap = lazy(() => import('./IntelligenceMap'));
 import { SCROLL_EASE } from '../motionTokens';
 
 /**
@@ -118,7 +120,9 @@ export default function PipelineSection() {
             </p>
           </div>
           <div className="mt-10 h-[clamp(300px,40vh,440px)] w-full">
-            <IntelligenceMap variant="light" />
+            <Suspense fallback={<div className="h-full w-full" aria-hidden />}>
+              <IntelligenceMap variant="light" />
+            </Suspense>
           </div>
         </ScrollReveal>
 

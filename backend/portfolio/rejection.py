@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Optional
 from uuid import uuid4
 
 from supabase_client import get_service_client
+import env_config
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,8 @@ class RejectionAnalyzer:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.patterns_file = self.data_dir / "rejection_patterns.json"
         self.user_id = (user_id or "").strip() or None
+        if env_config.use_supabase_storage() and not self.user_id:
+            raise RuntimeError("RejectionAnalyzer requires explicit user_id when Supabase storage is enabled")
         self.logger = logging.getLogger("rejection.analyzer")
 
     def _using_supabase(self) -> bool:

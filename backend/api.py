@@ -582,11 +582,24 @@ async def _lifespan(app: FastAPI):
                 )
         except Exception as e:  # pragma: no cover - never block startup
             _logger_agents.warning("schema drift check skipped: %s", e)
-    # Opt-in multi-instance SSE backplane (no-op unless EVENT_BUS_BACKPLANE=postgres).
+    # Multi-instance safety: production must explicitly choose a shared event
+    # backplane, or explicitly acknowledge a single-instance deployment.
+    production = _is_production_env()
+    allow_process_local = os.getenv("ALLOW_PROCESS_LOCAL_STATE", "false").lower() in ("1", "true", "yes")
+    if production and not event_bus.backplane_enabled() and not allow_process_local:
+        raise RuntimeError(
+            "Production requires EVENT_BUS_BACKPLANE=postgres with a database DSN, "
+            "or ALLOW_PROCESS_LOCAL_STATE=true for a documented single-instance deployment"
+        )
+    # Opt-in multi-instance SSE backplane.
     if event_bus.backplane_enabled():
         try:
-            await event_bus.start_backplane()
+            active = await event_bus.start_backplane()
+            if production and not active and not allow_process_local:
+                raise RuntimeError("Postgres event backplane could not start in production")
         except Exception as e:  # pragma: no cover - never block startup
+            if production and not allow_process_local:
+                raise
             _logger_agents.warning("event_bus backplane failed to start: %s", e)
     # Resume persistent per-user loops for users that had agents enabled before restart
     await _resume_all_user_loops()
@@ -613,6 +626,27 @@ async def _lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Aethria API", lifespan=_lifespan)
+
+
+@app.middleware("http")
+async def request_metrics_middleware(request: Request, call_next):
+    started = time.perf_counter()
+    status = 500
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        # Route templates are available after routing; fall back to a bounded
+        # endpoint family so startup IDs do not create unbounded metric labels.
+        path = request.scope.get("route").path if request.scope.get("route") else request.url.path
+        path = re.sub(r"/[0-9a-fA-F-]{16,}", "/:id", str(path))
+        metrics.observe_api_request(
+            request.method,
+            path,
+            status,
+            time.perf_counter() - started,
+        )
 
 # Routers split out of this module (see routers/). The Clerk auth middleware
 # below is app-level and applies to these routes too.

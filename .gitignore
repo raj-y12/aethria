@@ -1,6 +1,9 @@
 # macOS / editor noise
 .DS_Store
 .cursorignore
+.cursor/
+.playwright-mcp/
+/*.jpg
 
 # Local environment files. Keep examples committed.
 .env
@@ -41,3 +44,9 @@ unused_components/
 
 # Local portfolio JSON fallback store (Supabase is the source of truth in prod)
 data/portfolio/
+
+# Checked-in maintenance scripts
+!app-front-end/scripts/
+!app-front-end/scripts/**
+!web-front-end/scripts/
+!web-front-end/scripts/**

@@ -75,6 +75,7 @@ def test_retrieve_source_pack_empty_when_no_results(monkeypatch):
         "utils.retrieval_grounding.tavily_search",
         lambda query, max_results, time_range=None, topic=None, days=None: [],
     )
+    monkeypatch.setattr("utils.retrieval_grounding._fallback_search", lambda query, max_results: [])
     pack = retrieve_source_pack(query="unknown", user_id="u1", max_results=3)
     assert pack["sources"] == []
     assert pack["url_allowlist"] == set()

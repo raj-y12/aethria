@@ -16,6 +16,7 @@ import fcntl
 import os
 
 from tenant_context import require_user_id
+import env_config
 from supabase_doc_store import list_get_all, list_get_by_id, list_upsert
 from supabase_client import get_service_client
 from portfolio.schemas import (
@@ -59,9 +60,9 @@ class PortfolioStore:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("portfolio.store")
         explicit_uid = user_id.strip() if user_id and user_id.strip() else None
-        env_uid = os.getenv("AETHRIA_AGENT_USER_ID", "").strip() or None
-        # Prefer explicit user_id; fall back to process-level tenant id for agent workers.
-        self._tenant_user_id = explicit_uid or env_uid
+        if env_config.use_supabase_storage() and not explicit_uid:
+            raise RuntimeError("PortfolioStore requires explicit user_id when Supabase storage is enabled")
+        self._tenant_user_id = explicit_uid
         
         # File paths (fallback mode only)
         self.files = {

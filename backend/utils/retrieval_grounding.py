@@ -5,13 +5,52 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import ssl
+from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+from urllib.request import Request, urlopen
 from typing import Any, Dict, List, Set
+
+import certifi
 
 from utils.reference_verify import extract_http_urls, normalize_url_for_match
 from utils.tavily_client import tavily_search
 from security.prompt_safety import flag_prompt_injection, isolate_untrusted_text, prompt_safety_instruction
 
 logger = logging.getLogger("retrieval_grounding")
+
+
+def _fallback_search(query: str, max_results: int) -> List[Dict[str, str]]:
+    """Small no-key fallback for provider outages; results stay reference-validated."""
+    if os.getenv("RETRIEVAL_FALLBACK_ENABLED", "1").strip().lower() in {"0", "false", "no"}:
+        return []
+    url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
+    request = Request(url, headers={"User-Agent": "AethriaResearch/1.0"})
+    try:
+        with urlopen(request, timeout=8.0, context=ssl.create_default_context(cafile=certifi.where())) as response:
+            html = response.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        logger.warning("retrieval fallback failed: %s", exc)
+        return []
+    rows: List[Dict[str, str]] = []
+    pattern = re.compile(
+        r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for href, title_html in pattern.findall(html):
+        clean_url = href.strip()
+        if clean_url.startswith("//"):
+            clean_url = f"https:{clean_url}"
+        parsed = urlparse(clean_url)
+        if "duckduckgo.com" in parsed.netloc and parsed.path.startswith("/l/"):
+            clean_url = unquote(parse_qs(parsed.query).get("uddg", [""])[0]).strip()
+        title = re.sub(r"<[^>]+>", "", title_html).strip()
+        if not clean_url.startswith(("http://", "https://")) or not title:
+            continue
+        rows.append({"title": title, "url": clean_url, "snippet": ""})
+        if len(rows) >= max_results:
+            break
+    return rows
 
 
 def _snippet_char_cap() -> int:
@@ -79,6 +118,10 @@ def retrieve_source_pack(
     raw: List[Dict[str, str]] = tavily_search(
         query=query, max_results=max_results, time_range=time_range, topic=topic, days=days
     )
+    if not raw:
+        raw = _fallback_search(query, max_results)
+        if raw:
+            used_provider = "duckduckgo_html_fallback"
 
     sources = _normalize_sources(raw)
     allowlist: Set[str] = {s["url"] for s in sources if s.get("url")}
@@ -195,6 +238,8 @@ def retrieve_source_pack_merged(
         if len(merged_rows) >= max_total_sources:
             break
         pack = retrieve_source_pack(query=q, user_id=user_id, max_results=max_per_query)
+        if pack.get("provider") != "tavily":
+            used_provider = str(pack.get("provider") or used_provider)
         _ingest(pack.get("sources"), limit=None)
 
     cleaned_queries = ([rq] if rq else []) + general_queries

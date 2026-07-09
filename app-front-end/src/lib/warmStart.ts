@@ -15,6 +15,7 @@ import { useAuth } from '@clerk/react-router';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 const VERSION = 1;
+const STORAGE_PREFIX = `aethria:warm:v${VERSION}:`;
 /** Snapshots older than this trigger a background refresh of STATIC queries. */
 const FRESH_MS = 90_000;
 const WRITE_DEBOUNCE_MS = 2_000;
@@ -29,13 +30,24 @@ const WARM_KEYS: readonly (readonly string[])[] = [
   ['settings'],
 ];
 
-const storageKey = (userId: string) => `aethria:warm:v${VERSION}:${userId}`;
+const storageKey = (userId: string) => `${STORAGE_PREFIX}${userId}`;
+
+export function clearWarmStartSnapshots(): void {
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith(STORAGE_PREFIX)) sessionStorage.removeItem(key);
+    }
+  } catch {
+    // Session storage may be unavailable in hardened/private browser modes.
+  }
+}
 
 type Snapshot = { at: number; entries: [readonly string[], unknown][] };
 
 export function hydrateWarmStart(queryClient: QueryClient, userId: string): void {
   try {
-    const raw = localStorage.getItem(storageKey(userId));
+    const raw = sessionStorage.getItem(storageKey(userId));
     if (!raw) return;
     const snapshot = JSON.parse(raw) as Snapshot;
     if (!snapshot || !Array.isArray(snapshot.entries)) return;
@@ -57,7 +69,7 @@ export function persistWarmSnapshot(queryClient: QueryClient, userId: string): v
       if (data !== undefined) entries.push([key, data]);
     }
     if (entries.length === 0) return;
-    localStorage.setItem(storageKey(userId), JSON.stringify({ at: Date.now(), entries }));
+    sessionStorage.setItem(storageKey(userId), JSON.stringify({ at: Date.now(), entries }));
   } catch {
     // Quota exceeded / private mode — skip; warm start is best-effort.
   }
@@ -66,7 +78,7 @@ export function persistWarmSnapshot(queryClient: QueryClient, userId: string): v
 /** Age of the stored snapshot in ms, or null when absent/corrupt. */
 function snapshotAge(userId: string): number | null {
   try {
-    const raw = localStorage.getItem(storageKey(userId));
+    const raw = sessionStorage.getItem(storageKey(userId));
     if (!raw) return null;
     const at = (JSON.parse(raw) as Snapshot)?.at;
     return typeof at === 'number' ? Date.now() - at : null;

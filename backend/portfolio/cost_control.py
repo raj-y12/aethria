@@ -16,6 +16,7 @@ import os
 
 from supabase_doc_store import doc_get, doc_set
 from utils.settings_loader import load_settings, runtime_limits_from_settings
+import env_config
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,8 @@ class CostController:
         self.budget_file.parent.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("cost.controller")
         self.user_id = (user_id or "").strip() or None
+        if env_config.use_supabase_storage() and not self.user_id:
+            raise RuntimeError("CostController requires explicit user_id when Supabase storage is enabled")
         self.default_budgets = {
             "scout": {"calls": 100, "tokens": 100000},
             "reviewer": {"calls": 200, "tokens": 200000},

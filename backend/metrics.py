@@ -86,6 +86,19 @@ if ENABLED:
         "values above ~0.1s mean sync I/O is blocking the serving loop.",
         registry=REGISTRY,
     )
+    API_REQUESTS = Counter(
+        "aethria_api_requests_total",
+        "HTTP requests by method, path, and status.",
+        ["method", "path", "status"],
+        registry=REGISTRY,
+    )
+    API_REQUEST_DURATION = Histogram(
+        "aethria_api_request_duration_seconds",
+        "HTTP request duration by method and path.",
+        ["method", "path"],
+        buckets=(0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30),
+        registry=REGISTRY,
+    )
 else:  # no-op placeholders
     REGISTRY = None
 
@@ -129,6 +142,17 @@ def inc_lookup(outcome: str) -> None:
         LOOKUPS.labels(outcome=outcome).inc()
     except Exception as e:  # pragma: no cover
         logger.debug("inc_lookup failed: %s", e)
+
+
+def observe_api_request(method: str, path: str, status: int, duration_seconds: float) -> None:
+    if not ENABLED:
+        return
+    try:
+        # Keep metrics bounded: IDs are normalized by the caller before this point.
+        API_REQUESTS.labels(method=method, path=path, status=str(status)).inc()
+        API_REQUEST_DURATION.labels(method=method, path=path).observe(max(0.0, duration_seconds))
+    except Exception as e:  # pragma: no cover
+        logger.debug("observe_api_request failed: %s", e)
 
 
 def render(

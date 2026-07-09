@@ -65,6 +65,42 @@ The larger P1/P2 architecture items remain open: shared durable queue/SSE
 ownership, retrieval-provider fallback, localStorage threat-model changes,
 observability, and domain-level file splits.
 
+### P1-P3 completion pass — 2026-07-09
+
+Repository changes from the completion pass:
+
+- P1-1: production startup now refuses process-local queue/SSE state unless the
+  deployment explicitly sets `ALLOW_PROCESS_LOCAL_STATE=true`; multi-instance
+  deployments must use the Postgres event backplane.
+- P1-2: secondary analytics/meta queries are route-gated instead of mounting on
+  every authenticated route.
+- P1-4, P1-5, P1-7, P1-8: Clerk validation fails closed on configured issuer or
+  audience mismatch; warm snapshots use session storage and clear on sign-out;
+  logout modal focus/name/reduced-motion behavior is hardened; Supabase-backed
+  portfolio services require explicit tenants.
+- P1-9: Tavily-empty retrieval now has a bounded DuckDuckGo HTML fallback with
+  provider metadata and the same source validation path.
+- P2-3, P2-5, P2-8, P2-10, P2-11, P2-12: frontend coverage remains green at
+  64 tests; cancellation waits for API acknowledgement; request metrics are
+  exported; `backend/requirements.lock` is used by CI/Docker; map assets are
+  lazy-loaded with 500 KB bundle budgets; login entry no longer waits for the
+  optional activity summary.
+- P3: Browserslist data was refreshed, direct Playwright duplication removed,
+  transient design/tool artifacts are ignored, and bundle checks are enforced.
+
+Still requiring a deliberate follow-up rather than a misleading checkbox:
+
+- P1-1 cancellation/job ownership is still process-local; the production guard
+  prevents unsafe horizontal scaling but durable shared job state is a separate
+  schema/worker project.
+- P1-6 low-contrast text and P2-7 god-file decomposition need a broad visual and
+  structural refactor, respectively; neither is safely closed by a one-line
+  token or file move.
+- P2-3 still needs component-level memo and dispatch interaction tests beyond
+  the current unit suite, and production SSE/proxy timing remains a deployment
+  measurement.
+- P3 documentation consolidation remains editorial work, not code behavior.
+
 - [x] **P0-1 — remove pipeline event-loop blocking**
   - [x] Settings, storage creation, thesis reads, stage counts, activity writes,
     lookup-failure writes, reprocessing reads, portfolio stages, MetaAgent cycles,

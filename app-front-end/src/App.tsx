@@ -19,6 +19,7 @@ import { useAgentsEnabled } from './hooks/useAgentsEnabled';
 import { usePrefersReducedMotion } from './hooks';
 import LoginPage from './components/LoginPage';
 import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from './lib/loginEntryTransition';
+import { clearWarmStartSnapshots } from './lib/warmStart';
 
 const APP_ROOT = '/v1';
 const SETTINGS_ROOT = `${APP_ROOT}/settings`;
@@ -37,6 +38,8 @@ function AppShell() {
   const systemData = useSystemData({
     // The Fund workspace surfaces meta/analytics — refresh them when it opens.
     systemPanelOpen: !isSettingsRoute && isFundRoute,
+    flowPanelOpen: isFlowRoute,
+    portfolioPanelOpen: isPortfolioRoute,
   });
   const agentsEnabled = useAgentsEnabled();
 
@@ -127,6 +130,7 @@ function App() {
       loginEntryHandoffRef.current = false;
       setTokenGetter(null);
       setTokenReady(false);
+      clearWarmStartSnapshots();
       return;
     }
     setTokenGetter(getToken);

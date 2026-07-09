@@ -202,19 +202,20 @@ export async function queueLookupRerun(
   };
 }
 
-export async function cancelOnDemandLookups(lookupIds: string[]): Promise<void> {
+export async function cancelOnDemandLookups(lookupIds: string[]): Promise<boolean> {
   const ids = Array.from(
     new Set(lookupIds.map((id) => id.trim()).filter(Boolean))
   );
-  if (ids.length === 0) return;
-  await authedFetch(`${API_BASE}/api/startups/lookup/cancel`, {
+  if (ids.length === 0) return true;
+  const response = await authedFetch(`${API_BASE}/api/startups/lookup/cancel`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
     body: JSON.stringify({ lookup_ids: ids }),
-  }).catch(() => undefined);
+  }).catch(() => null);
+  return Boolean(response?.ok);
 }
 
 export interface LookupCandidate {

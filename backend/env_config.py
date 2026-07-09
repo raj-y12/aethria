@@ -75,7 +75,8 @@ REGISTRY: List[EnvVar] = [
     EnvVar("CLERK_JWKS_URL", "str", None, "Auth (Clerk)",
            "Clerk JWKS endpoint for RS256 JWT verification.", required=True,
            example="https://your-app.clerk.accounts.dev/.well-known/jwks.json"),
-    EnvVar("CLERK_ISSUER", "str", None, "Auth (Clerk)", "Optional expected JWT issuer."),
+    EnvVar("CLERK_ISSUER", "str", None, "Auth (Clerk)", "Expected JWT issuer; mismatches fail closed."),
+    EnvVar("CLERK_AUDIENCE", "str", None, "Auth (Clerk)", "Optional expected JWT audience."),
     EnvVar("CLERK_SECRET_KEY", "secret", "", "Auth (Clerk)", "Clerk backend API secret (optional)."),
     EnvVar("CLERK_JWT_LEEWAY_SECONDS", "int", "60", "Auth (Clerk)", "Clock-skew leeway for JWT validation."),
 
@@ -208,6 +209,8 @@ REGISTRY: List[EnvVar] = [
     EnvVar("EVENT_BUS_BACKPLANE", "str", "memory", "Event bus",
            "SSE event fan-out: 'memory' (single instance) or 'postgres' "
            "(LISTEN/NOTIFY for multi-instance delivery)."),
+    EnvVar("ALLOW_PROCESS_LOCAL_STATE", "bool", "false", "Event bus",
+           "Explicitly acknowledge single-instance process-local queues/cancellation state."),
     EnvVar("DATABASE_URL", "secret", "", "Event bus",
            "Direct Postgres connection string for the LISTEN/NOTIFY backplane "
            "(Supabase exposes one). Required when EVENT_BUS_BACKPLANE=postgres."),
@@ -220,6 +223,7 @@ REGISTRY: List[EnvVar] = [
     EnvVar("SKIP_READ_ENRICH_SCORES", "bool", "", "Scoring / misc", "Skip score enrichment on read (perf)."),
     EnvVar("DEBUG_SCORING", "bool", "false", "Scoring / misc", "Verbose scoring debug logs."),
     EnvVar("RETRIEVAL_SNIPPET_MAX_CHARS", "int", "2800", "Scoring / misc", "Max chars per retrieval snippet."),
+    EnvVar("RETRIEVAL_FALLBACK_ENABLED", "bool", "1", "Scoring / misc", "Enable the no-key retrieval fallback when Tavily returns no sources."),
     EnvVar("RECENCY_WINDOW_MONTHS", "int", "12", "Scoring / misc", "Recency window for breaking-news weighting."),
     EnvVar("LOOKUP_WEBSITE_FETCH_TIMEOUT", "float", "5.0", "Scoring / misc", "Timeout fetching a looked-up website."),
     EnvVar("DEAL_CONTEXT_LOG_PIPELINE", "bool", "", "Scoring / misc", "Log deal-context assembly during pipeline."),

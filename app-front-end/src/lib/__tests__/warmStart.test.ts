@@ -5,9 +5,12 @@ import { hydrateWarmStart, persistWarmSnapshot } from '../warmStart';
 const USER = 'user_abc';
 
 describe('warmStart', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
 
-  it('round-trips warm keys through localStorage and preserves snapshot age', () => {
+  it('round-trips warm keys through sessionStorage and preserves snapshot age', () => {
     const writer = new QueryClient();
     const startups = [{ id: 's1', name: 'Acme' }];
     writer.setQueryData(['startups', 'list'], startups);
@@ -37,7 +40,7 @@ describe('warmStart', () => {
   });
 
   it('ignores corrupt snapshots', () => {
-    localStorage.setItem(`aethria:warm:v1:${USER}`, '{not json');
+    sessionStorage.setItem(`aethria:warm:v1:${USER}`, '{not json');
     const reader = new QueryClient();
     expect(() => hydrateWarmStart(reader, USER)).not.toThrow();
     expect(reader.getQueryData(['startups', 'list'])).toBeUndefined();

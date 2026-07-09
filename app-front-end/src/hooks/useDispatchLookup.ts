@@ -62,6 +62,7 @@ export function useDispatchLookup({
   // the context is asked for); cleared once the re-run is queued.
   const [rerunTarget, setRerunTarget] = useState<Startup | null>(null);
   const [busy, setBusy] = useState(false);
+  const [cancelPending, setCancelPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<LookupCandidate[]>([]);
   const [refining, setRefining] = useState(false);
@@ -120,6 +121,7 @@ export function useDispatchLookup({
     setNeedsWebsite(false);
     setCandidates([]);
     setBusy(true);
+    setCancelPending(false);
     setMessage('Confirming the company identity...');
     try {
       let resolved;
@@ -160,6 +162,7 @@ export function useDispatchLookup({
       requestSeqRef.current = requestSeq;
       setNeedsWebsite(false);
       setBusy(true);
+      setCancelPending(false);
       try {
         await queueLookup(`${candidate.name} ${candidate.website}`, requestSeq);
       } catch {
@@ -178,6 +181,7 @@ export function useDispatchLookup({
       requestSeqRef.current = requestSeq;
       setRefining(true);
       setBusy(true);
+      setCancelPending(false);
       try {
         const resolved = await resolveLookupCandidates(value, websiteHint);
         if (requestSeqRef.current !== requestSeq) return;
@@ -228,6 +232,7 @@ export function useDispatchLookup({
       setDispatching(true);
       setActiveQuery(target.scout.name);
       setBusy(true);
+      setCancelPending(false);
       setMessage('Queuing the re-review...');
       try {
         const lookupId = crypto.randomUUID();
@@ -253,13 +258,23 @@ export function useDispatchLookup({
     [rerunTarget, busy, pendingLookup, queryClient],
   );
 
-  const cancel = useCallback(() => {
+  const cancel = useCallback(async () => {
+    if (cancelPending) return;
     const lookupIds = [
       pendingLookup?.lookupId,
       ...backgroundLookups.map((lookup) => lookup.lookupId),
     ].filter((id): id is string => Boolean(id?.trim()));
+    setCancelPending(true);
+    setMessage('Cancellation requested. Waiting for the worker to acknowledge it...');
+    const acknowledged = await cancelOnDemandLookups(lookupIds);
+    if (!acknowledged) {
+      setCancelPending(false);
+      setMessage('Cancellation could not be confirmed. The lookup remains visible until it is safe to clear.');
+      return;
+    }
     requestSeqRef.current += 1;
     setBusy(false);
+    setCancelPending(false);
     setDispatching(false);
     setNeedsWebsite(false);
     setActiveQuery('');
@@ -272,11 +287,8 @@ export function useDispatchLookup({
     setCandidates([]);
     setRefining(false);
     setCommandBarOpen(false);
-    if (storageKey && typeof window !== 'undefined') {
-      window.localStorage.removeItem(storageKey);
-    }
-    void cancelOnDemandLookups(lookupIds);
-  }, [backgroundLookups, storageKey, pendingLookup]);
+    if (storageKey && typeof window !== 'undefined') window.localStorage.removeItem(storageKey);
+  }, [backgroundLookups, cancelPending, storageKey, pendingLookup]);
 
   useEffect(() => {
     if (!storageKey || hydratedStorageKey === storageKey) return;
@@ -440,7 +452,7 @@ export function useDispatchLookup({
     // "Open memo" action (openLookupMemo) so the user advances deliberately.
   }, [lookupDecided, pendingLookup, pendingLookupMatch]);
 
-  const lookupWorking = busy || (pendingLookup != null && !pendingLookup.autoOpened);
+  const lookupWorking = cancelPending || busy || (pendingLookup != null && !pendingLookup.autoOpened);
 
   const phaseLabel: LookupPhaseLabel = !lookupWorking
     ? null

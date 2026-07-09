@@ -12,9 +12,10 @@
  *   2. Turn on agents → enable agents via API, then logout
  *   3. Cancel → close modal
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useFocusTrap, usePrefersReducedMotion } from '../hooks';
 
 interface AgentLogoutModalProps {
   open: boolean;
@@ -38,6 +39,18 @@ export default function AgentLogoutModal({
 }: AgentLogoutModalProps) {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const reduceMotion = usePrefersReducedMotion();
+  useFocusTrap(open, containerRef);
+
+  useEffect(() => {
+    if (open) {
+      restoreFocusRef.current = document.activeElement as HTMLElement | null;
+      return;
+    }
+    restoreFocusRef.current?.focus?.();
+  }, [open]);
 
   const handleTurnOff = async () => {
     setBusy(true);
@@ -76,14 +89,16 @@ export default function AgentLogoutModal({
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={containerRef}
           key="agent-logout-takeover"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: reduceMotion ? 0 : 0.4, ease: [0.16, 1, 0.3, 1] }}
           className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-phi-6 bg-paper"
           role="dialog"
           aria-modal="true"
+          aria-labelledby="agent-logout-title"
         >
           {/* Eyebrow */}
           <motion.p
@@ -97,6 +112,7 @@ export default function AgentLogoutModal({
 
           {/* Title */}
           <motion.h1
+            id="agent-logout-title"
             initial={{ opacity: 0, transform: 'translateY(12px)' }}
             animate={{ opacity: 1, transform: 'translateY(0px)' }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}

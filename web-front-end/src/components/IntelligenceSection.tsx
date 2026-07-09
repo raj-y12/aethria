@@ -1,6 +1,6 @@
-import { useRef } from 'react';
+import { lazy, Suspense, useRef } from 'react';
 import { motion, useInView, useReducedMotion } from 'framer-motion';
-import IntelligenceMap from './IntelligenceMap';
+const IntelligenceMap = lazy(() => import('./IntelligenceMap'));
 import { ScrollReveal } from './ScrollReveal';
 import { SCROLL_EASE } from '../motionTokens';
 
@@ -95,7 +95,9 @@ export default function IntelligenceSection() {
         <ScrollReveal className="mx-auto mt-12 w-full max-w-[1180px] md:mt-16" y={16} delay={0.06} amount={0.12}>
           <div className="intelligence-proof-grid">
             <div className="flex h-[min(360px,64vw)] min-h-[260px] flex-col lg:h-[430px]">
-              <IntelligenceMap variant="light" />
+              <Suspense fallback={<div className="h-full w-full" aria-hidden />}>
+                <IntelligenceMap variant="light" />
+              </Suspense>
             </div>
             <MetricsPanel metrics={METRICS} />
           </div>

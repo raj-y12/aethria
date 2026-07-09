@@ -52,6 +52,9 @@ jobs:
           VITE_API_URL: http://127.0.0.1:8000
         run: npm run build
 
+      - name: Bundle budget
+        run: npm run check:bundle
+
   web-frontend:
     name: Web frontend build
     runs-on: ubuntu-latest
@@ -82,6 +85,33 @@ jobs:
           VITE_APP_URL: http://127.0.0.1:3000
         run: npm run build
 
+      - name: Bundle budget
+        run: npm run check:bundle
+
+  app-frontend-e2e:
+    name: App frontend smoke E2E
+    needs: app-frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app-front-end
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app-front-end/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run smoke E2E
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: pk_test_ci_placeholder
+          VITE_API_URL: http://127.0.0.1:8000
+        run: npm run test:e2e
+
   backend-deps:
     name: Backend dependencies
     runs-on: ubuntu-latest
@@ -95,19 +125,19 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('backend/requirements.txt') }}
+          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('backend/requirements.lock') }}
           restore-keys: |
             pip-${{ runner.os }}-py3.12-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt pytest pytest-asyncio
+          pip install -r backend/requirements.lock pytest pytest-asyncio
 
       - name: Dependency audit
         run: |
           pip install pip-audit
-          pip-audit -r backend/requirements.txt
+          pip-audit -r backend/requirements.lock
 
   backend-import:
     name: Backend import check
@@ -126,14 +156,14 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('backend/requirements.txt') }}
+          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('backend/requirements.lock') }}
           restore-keys: |
             pip-${{ runner.os }}-py3.12-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.lock
 
       - name: Verify imports
         run: python -c "import api"
@@ -155,14 +185,14 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('backend/requirements.txt') }}
+          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('backend/requirements.lock') }}
           restore-keys: |
             pip-${{ runner.os }}-py3.12-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest pytest-asyncio
+          pip install -r requirements.lock pytest pytest-asyncio
 
       - name: Run tests
         run: python -m pytest tests/ -v -o asyncio_mode=auto

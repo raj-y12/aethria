@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import DottedMarketMap, { type MapHit } from './DottedMarketMap';
+import type { MapHit } from './DottedMarketMap';
+
+const DottedMarketMap = lazy(() => import('./DottedMarketMap'));
 
 /** In-thesis companies plotted on the field (lon, lat). */
 const HITS: MapHit[] = [
@@ -115,7 +117,9 @@ export default function MarketSection() {
           </AnimatePresence>
         </p>
 
-        <DottedMarketMap hits={HITS} className="mt-10 h-[clamp(320px,52vw,640px)] w-full" />
+        <Suspense fallback={<div className="mt-10 h-[clamp(320px,52vw,640px)] w-full" aria-hidden />}>
+          <DottedMarketMap hits={HITS} className="mt-10 h-[clamp(320px,52vw,640px)] w-full" />
+        </Suspense>
 
         {/* Figure caption — set like a newspaper photo caption */}
         <p className="np-serif mt-5 max-w-[64ch] text-[13.5px] italic leading-[1.6] text-[var(--text-tertiary)]">

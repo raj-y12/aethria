@@ -75,6 +75,8 @@ export interface SystemData {
 
 export interface UseSystemDataOptions {
   systemPanelOpen?: boolean;
+  flowPanelOpen?: boolean;
+  portfolioPanelOpen?: boolean;
 }
 
 /**
@@ -95,6 +97,7 @@ export function startupsPollInterval(
 
 export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
   const { systemPanelOpen = false } = options;
+  const { flowPanelOpen = false, portfolioPanelOpen = false } = options;
   // Must run before the useQuery calls below: primes the cache synchronously
   // from the per-user localStorage snapshot so first paint has data.
   useWarmStart();
@@ -150,6 +153,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     queryFn: fetchEscalations,
     ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 120_000 }),
     placeholderData: (prev) => prev ?? [],
+    enabled: flowPanelOpen,
   });
 
   const signalsQuery = useQuery({
@@ -157,6 +161,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     queryFn: fetchSignals,
     ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 120_000 }),
     placeholderData: (prev) => prev ?? [],
+    enabled: portfolioPanelOpen,
   });
 
   const metaReportsQuery = useQuery({
@@ -164,6 +169,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     queryFn: fetchMetaReports,
     ...getQueryConfig('STATIC'),
     placeholderData: (prev) => prev ?? [],
+    enabled: systemPanelOpen,
   });
 
   const rejectionAnalyticsQuery = useQuery({
@@ -171,6 +177,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     queryFn: fetchRejectionAnalytics,
     ...getQueryConfig('STATIC'),
     placeholderData: (prev) => prev ?? emptyRejection,
+    enabled: systemPanelOpen,
   });
 
   const watchlistAnalyticsQuery = useQuery({
@@ -178,6 +185,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     queryFn: fetchWatchlistAnalytics,
     ...getQueryConfig('STATIC'),
     placeholderData: (prev) => prev ?? { total: 0, stale: 0, avg_days: 0 },
+    enabled: portfolioPanelOpen,
   });
 
   const concentrationAnalyticsQuery = useQuery({
@@ -191,6 +199,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
         most_concentrated_theme: '',
         last_updated: '',
       },
+    enabled: portfolioPanelOpen,
   });
 
   const scoutWeightsQuery = useQuery({
@@ -204,6 +213,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
         PainPointScout: 0.25,
         ContrarianScout: 0.25,
       },
+    enabled: systemPanelOpen,
   });
 
   const calibrationQuery = useQuery({
@@ -211,6 +221,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     queryFn: fetchCalibrationState,
     ...getQueryConfig('STATIC'),
     placeholderData: (prev) => prev ?? defaultCalibration,
+    enabled: systemPanelOpen,
   });
 
   const metaPromptStateQuery = useQuery({
@@ -219,6 +230,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     ...getQueryConfig('STATIC'),
     placeholderData: (prev) =>
       prev ?? { active: {}, active_detail: {}, pending: [] },
+    enabled: systemPanelOpen,
   });
 
   const metaEvalSetQuery = useQuery({
@@ -226,18 +238,21 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     queryFn: fetchMetaEvalSet,
     ...getQueryConfig('STATIC'),
     placeholderData: (prev) => prev ?? { startup_ids: [], count: 0, max: 50 },
+    enabled: systemPanelOpen,
   });
 
   const systemHealthQuery = useQuery({
     queryKey: ['analytics', 'system-health'],
     queryFn: fetchSystemHealth,
     ...getQueryConfig('STATIC'),
+    enabled: systemPanelOpen,
   });
 
   const metaInsightsQuery = useQuery({
     queryKey: ['meta', 'insights'],
     queryFn: fetchMetaInsights,
     ...getQueryConfig('STATIC'),
+    enabled: systemPanelOpen,
   });
 
   const fundThesisRuntimeQuery = useQuery({

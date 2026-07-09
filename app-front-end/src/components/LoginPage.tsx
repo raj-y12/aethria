@@ -376,9 +376,8 @@ export default function LoginPage() {
                 </p>
               )}
 
-              {/* CTA */}
-              {!activityLoading && (
-                <motion.button
+              {/* The optional activity request must never gate entry. */}
+              <motion.button
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.4, ease: EASE, delay: enterDelay }}
@@ -397,8 +396,7 @@ export default function LoginPage() {
                       {' →'}
                     </span>
                   </span>
-                </motion.button>
-              )}
+              </motion.button>
             </motion.div>
           ) : (
             <motion.div
