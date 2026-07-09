@@ -18,10 +18,6 @@ import { useFundConfiguration } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
-  CANONICAL_DIMENSIONS,
-  CANONICAL_DIMENSION_KEYS,
-  DIMENSION_SCORE_BANDS,
-  UNIVERSAL_SCORE_BANDS,
   applyThesisVersionMetadata,
   buildFundConfigThesisPayload,
   clearFundConfiguration,
@@ -31,7 +27,6 @@ import {
   rebalanceWeights,
   validateScoreBands,
   validateWeights,
-  type CoreDimensionKey,
   type FundConfiguration,
   type MemoStyle,
   type MemoTone,
@@ -40,13 +35,11 @@ import {
 
 type SectionId =
   | 'mandate'
-  | 'weights'
-  | 'bands'
-  | 'thresholds'
-  | 'risk'
   | 'memo'
-  | 'rubric'
-  | 'budget';
+  | 'risk'
+  | 'system';
+
+type SettingsSectionId = SectionId | 'budget' | 'weights' | 'thresholds';
 
 const SELECT_CHEVRON =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%231a2b48' fill-opacity='0.45' d='M0 3h10L5 8z'/%3E%3C/svg%3E\")";
@@ -55,12 +48,9 @@ const selectStyle: CSSProperties = { backgroundImage: SELECT_CHEVRON };
 
 const sections: Array<{ id: SectionId; label: string; short: string }> = [
   { id: 'mandate', label: 'Fund Mandate', short: 'Mandate' },
-  { id: 'budget', label: 'Operations', short: 'Ops' },
-  { id: 'weights', label: 'Scoring Weights', short: 'Weights' },
-  { id: 'thresholds', label: 'Decision Thresholds', short: 'Thresholds' },
-  { id: 'risk', label: 'Adverse / Risk', short: 'Risk' },
   { id: 'memo', label: 'Memo Output', short: 'Memo' },
-  { id: 'rubric', label: 'Rubric Criteria', short: 'Rubric' },
+  { id: 'risk', label: 'Ruling', short: 'Ruling' },
+  { id: 'system', label: 'System tuning', short: 'System' },
 ];
 
 const stageOptions = ['Pre-seed', 'Seed', 'Series A', 'Series B+'];
@@ -309,14 +299,16 @@ function SettingsSection({
   title,
   kicker,
   children,
+  className,
 }: {
-  id: SectionId;
+  id: SettingsSectionId;
   title: string;
   kicker: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <section id={id} className="border-t border-oxford/[0.075] py-phi-7 first:border-t-0 first:pt-0">
+    <section id={id} className={`border-t border-oxford/[0.075] py-phi-7 first:border-t-0 first:pt-0 ${className ?? ''}`}>
       <div className="grid gap-phi-6 xl:grid-cols-[minmax(180px,24%)_minmax(0,1fr)]">
         <div>
           <p className={sectionLabelCls}>{title}</p>
@@ -417,6 +409,7 @@ export default function SettingsPage() {
   const [policyPreviewHash, setPolicyPreviewHash] = useState<string | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState('');
   const [savedOperationsSnapshot, setSavedOperationsSnapshot] = useState('');
+  const [systemTuningExpanded, setSystemTuningExpanded] = useState(false);
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
 
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
@@ -581,6 +574,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const scrollToSection = (id: SectionId) => {
       setActiveSection(id);
+      if (id === 'system') setSystemTuningExpanded(true);
       const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${id}`);
       target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
@@ -794,7 +788,7 @@ export default function SettingsPage() {
 
               <div ref={contentScrollRef} className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
             <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]">
-              <div className="min-w-0 px-phi-5 py-phi-6 lg:px-phi-7">
+              <div className="flex min-w-0 flex-col px-phi-5 py-phi-6 lg:px-phi-7">
                 <header className="mb-phi-7 max-w-[54rem]">
                   <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-oxford/40">
                     Configuration · {draft.versionLabel}
@@ -803,7 +797,7 @@ export default function SettingsPage() {
                     How this fund thinks<span className="wordmark-dot">.</span>
                   </h1>
                   <p className="mt-phi-3 max-w-[42rem] type-body-sm leading-relaxed text-oxford/55">
-                    Configure mandate, backend core scoring weights, runtime limits, and the app-level ruling and memo experience. Controls marked as display-only are saved for the interface but do not override reviewer or partner policy files.
+                    Configure the mandate, memo output, ruling experience, and the engine settings that sit behind them.
                   </p>
                   {(status || errors.length > 0) && (
                     <div className="mt-phi-5 border-t border-oxford/[0.08] pt-phi-3" role={errors.length ? 'alert' : 'status'}>
@@ -851,8 +845,37 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="budget" title="Operations" kicker="Runtime gates for background pipeline cycles. Company limits cap scout, reviewer, and partner batch size; budget settings drive CostController when enabled.">
+                <div id="system" className="order-4">
+                  <div className="border-t border-oxford/[0.075] py-phi-7">
+                    <button
+                      type="button"
+                      onClick={() => setSystemTuningExpanded((expanded) => !expanded)}
+                      aria-expanded={systemTuningExpanded}
+                      className="flex w-full items-start justify-between gap-phi-5 text-left"
+                    >
+                      <span>
+                        <span className={sectionLabelCls}>System tuning</span>
+                        <span className="mt-phi-3 block max-w-[34rem] type-body-sm leading-relaxed text-oxford/45">
+                          Engine internals: scoring weights, decision thresholds, and runtime limits. Defaults are sensible.
+                        </span>
+                      </span>
+                      <span aria-hidden className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
+                        {systemTuningExpanded ? 'Hide' : 'Show'}
+                      </span>
+                    </button>
+                  </div>
+                  {systemTuningExpanded && (
+                    <div className="flex flex-col">
+                <SettingsSection id="budget" title="Operations" kicker="Runtime gates for background pipeline cycles. Company limits cap scout, reviewer, and partner batch size; budget settings drive CostController when enabled." className="order-3">
                   <div className="grid gap-phi-5 md:grid-cols-2">
+                    <div className="flex flex-col gap-phi-2">
+                      <label htmlFor="risk-sensitivity" className={labelCls}>Escalation sensitivity</label>
+                      <select id="risk-sensitivity" value={draft.risk.sensitivity} onChange={(event) => updateRisk('sensitivity', event.target.value as RiskSensitivity)} className={selectCls} style={selectStyle}>
+                        <option value="conservative">Conservative</option>
+                        <option value="balanced">Balanced</option>
+                        <option value="aggressive">Aggressive</option>
+                      </select>
+                    </div>
                     <ToggleRow id="scouts-enabled" checked={settings.agent_config.scouts_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, scouts_enabled: value } } : current)} label="Scouts enabled" />
                     <ToggleRow id="reviewers-enabled" checked={settings.agent_config.reviewers_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, reviewers_enabled: value } } : current)} label="Reviewers enabled" />
                     <ToggleRow id="partners-enabled" checked={settings.agent_config.partners_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, partners_enabled: value } } : current)} label="Partners enabled" />
@@ -864,7 +887,7 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="weights" title="Scoring Weights" kicker="Weights match the five reviewer dimensions used by deterministic backend scoring. Traction and timing remain sub-signals inside Execution and Market.">
+                <SettingsSection id="weights" title="Scoring Weights" kicker="Weights match the five reviewer dimensions used by deterministic backend scoring. Traction and timing remain sub-signals inside Execution and Market." className="order-1">
                   <div className="flex flex-col gap-phi-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-phi-4 border-b border-oxford/[0.06] pb-phi-4">
                       <div className="flex items-baseline gap-phi-3">
@@ -928,43 +951,24 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                <SettingsSection id="thresholds" title="Decision Thresholds" kicker="Pass, Monitor, and Invest cutoffs — synced with Partner scoring and badge ranges.">
+                <SettingsSection id="thresholds" title="Decision Thresholds" kicker="Pass, Monitor, and Invest cutoffs — synced with Partner scoring and badge ranges." className="order-2">
                   <DecisionThresholdsPanel draft={draft} updateDraft={updateDraft} updateThreshold={updateThreshold} />
                 </SettingsSection>
 
-                <SettingsSection id="risk" title="Adverse / Risk Sensitivity" kicker="Controls app-level risk acknowledgement and ruling UX. Reviewer scoring and partner policy still use backend evidence and policy rules.">
-                  <div className="grid gap-phi-5">
-                    <div className="grid gap-phi-5 md:grid-cols-3">
-                      <div className="flex flex-col gap-phi-2">
-                        <label htmlFor="risk-sensitivity" className={labelCls}>Risk sensitivity</label>
-                        <select id="risk-sensitivity" value={draft.risk.sensitivity} onChange={(event) => updateRisk('sensitivity', event.target.value as RiskSensitivity)} className={selectCls} style={selectStyle}>
-                          <option value="conservative">Conservative</option>
-                          <option value="balanced">Balanced</option>
-                          <option value="aggressive">Aggressive</option>
-                        </select>
-                      </div>
                     </div>
+                  )}
+                </div>
+
+                <SettingsSection id="risk" title="Ruling" kicker="Controls the risk acknowledgement experience before a decision is recorded." className="order-3">
+                  <div className="grid gap-phi-5">
                     <div className="border-y border-oxford/[0.06]">
                       <ToggleRow id="risk-ack" checked={draft.risk.requireAcknowledgement} onChange={(value) => updateRisk('requireAcknowledgement', value)} label="Require acknowledgement before ruling" hint="High-risk pending deals need a reviewed-risk step before Commit." />
                       <ToggleRow id="risk-high-only" checked={draft.risk.onlyGateHighSeverity} onChange={(value) => updateRisk('onlyGateHighSeverity', value)} label="Only gate high severity risks" hint="Leaves medium adverse items visible without slowing the ruling." />
                     </div>
-                    <div className="border-b border-oxford/[0.06] pb-phi-5">
-                      <div className="flex items-center justify-between gap-phi-3">
-                        <p className={labelCls}>Penalty weights</p>
-                        <span className="inline-flex items-center border border-oxford/[0.12] px-phi-2 py-px font-mono text-[0.625rem] uppercase tracking-wide text-oxford/45">Display only</span>
-                      </div>
-                      <div className="mt-phi-4 grid gap-phi-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <TextField id="founder-penalty" label="Founder data" type="number" value={draft.risk.missingFounderPenalty} onChange={(value) => updateRisk('missingFounderPenalty', Number(value))} min={0} max={100} disabled />
-                        <TextField id="traction-penalty" label="Traction data" type="number" value={draft.risk.missingTractionPenalty} onChange={(value) => updateRisk('missingTractionPenalty', Number(value))} min={0} max={100} disabled />
-                        <TextField id="contradiction-penalty" label="Contradiction" type="number" value={draft.risk.contradictionPenalty} onChange={(value) => updateRisk('contradictionPenalty', Number(value))} min={0} max={100} disabled />
-                        <TextField id="weak-source-penalty" label="Weak source" type="number" value={draft.risk.weakSourcePenalty} onChange={(value) => updateRisk('weakSourcePenalty', Number(value))} min={0} max={100} disabled />
-                      </div>
-                      <p className={`mt-phi-3 ${metaCls}`}>Saved for policy display only (0–100). Backend reviewers do not apply these penalties.</p>
-                    </div>
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="memo" title="Memo Output" kicker="Controls app memo presentation and saved memo verbosity. Existing generated memo content is not rewritten retroactively.">
+                <SettingsSection id="memo" title="Memo Output" kicker="Controls app memo presentation and saved memo verbosity. Existing generated memo content is not rewritten retroactively." className="order-2">
                   <div className="grid gap-phi-5">
                     <div className="grid gap-phi-5 md:grid-cols-2">
                       <div className="flex flex-col gap-phi-2">
@@ -993,46 +997,6 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSection>
 
-                <SettingsSection id="rubric" title="Evaluation Framework" kicker="Aethria's institutional scoring framework. Dimensions are fixed to ensure score consistency across all evaluations — this is read-only reference. Adjust and publish weights in Scoring Weights.">
-                  <div className="flex flex-col gap-phi-5">
-                    <div className="border-b border-oxford/[0.06] pb-phi-4">
-                      <p className="type-body-sm leading-relaxed text-oxford/[0.52]">
-                        Every startup is evaluated across five institutional dimensions. Score definitions are fixed to ensure a 7 in Market always means the same thing regardless of fund configuration. You can adjust dimension weights to reflect your fund's investment priorities.
-                      </p>
-                    </div>
-
-                    <div className="border-b border-oxford/[0.06] pb-phi-5">
-                      <p className={sectionLabelCls}>Score scale</p>
-                      <div className="mt-phi-4 flex flex-col gap-phi-3">
-                        {UNIVERSAL_SCORE_BANDS.map((band) => (
-                          <div key={band.label} className="grid gap-phi-3 md:grid-cols-[100px_minmax(0,1fr)]">
-                            <p className="font-mono text-[1rem] tabular-nums text-oxford/60">{band.range[0]}-{band.range[1]}</p>
-                            <div>
-                              <p className="type-body-emphasis text-oxford">{band.label}</p>
-                              <p className="mt-phi-1 type-meta leading-snug text-oxford/45">{band.description}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {CANONICAL_DIMENSION_KEYS.map((dimKey) => {
-                      const dim = CANONICAL_DIMENSIONS[dimKey];
-                      const bands = DIMENSION_SCORE_BANDS[dimKey];
-                      return (
-                        <DimensionFrameworkCard
-                          key={dimKey}
-                          dimensionKey={dimKey}
-                          label={dim.label}
-                          description={dim.description}
-                          bands={bands}
-                          labelCls={labelCls}
-                          metaCls={metaCls}
-                        />
-                      );
-                    })}
-                  </div>
-                </SettingsSection>
               </div>
 
               <PreviewPanel
@@ -1049,56 +1013,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </main>
-    </div>
-  );
-}
-
-function DimensionFrameworkCard({
-  dimensionKey,
-  label,
-  description,
-  bands,
-  labelCls,
-  metaCls,
-}: {
-  dimensionKey: CoreDimensionKey;
-  label: string;
-  description: string;
-  bands: Record<number, string>;
-  labelCls: string;
-  metaCls: string;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const anchorScores = [3, 5, 7, 9] as const;
-  return (
-    <div className="border-t border-oxford/[0.06] pt-phi-5 first:border-t-0 first:pt-0">
-      <div className="flex items-start justify-between gap-phi-4">
-        <div className="min-w-0">
-          <p className="type-body-emphasis text-oxford">{label}</p>
-          <p className="mt-phi-1 type-body-sm leading-relaxed text-oxford/50">{description}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setExpanded((prev) => !prev)}
-          className="type-meta shrink-0 text-oxford/40 transition-colors hover:text-oxford/65"
-          aria-expanded={expanded}
-        >
-          {expanded ? 'Hide scale' : 'Show scale'}
-        </button>
-      </div>
-      {expanded && (
-        <div className="mt-phi-4 flex flex-col gap-phi-3 border-t border-oxford/[0.04] pt-phi-4">
-          {anchorScores.map((score) => (
-            <div key={`${dimensionKey}-${score}`} className="grid gap-phi-2 md:grid-cols-[48px_minmax(0,1fr)]">
-              <p className="font-mono text-[0.85rem] tabular-nums text-oxford/55">{score}/10</p>
-              <p className={metaCls}>{bands[score]}</p>
-            </div>
-          ))}
-          <p className={`${labelCls} mt-phi-2`}>
-            These definitions are institutional and cannot be modified per fund.
-          </p>
-        </div>
-      )}
     </div>
   );
 }
