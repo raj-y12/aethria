@@ -21,7 +21,7 @@ export default function DocketMarginColumn({ variant, score }: DocketMarginColum
     <div className="flex w-[96px] max-w-[96px] shrink-0 flex-col items-end gap-1.5 overflow-hidden rounded-none pl-3.5 text-right">
       <DecisionBadge variant={variant} label={MARGIN_CHIP_LABEL[variant]} />
       <span
-        className="font-mono text-[15px] tabular-nums leading-none text-oxford/60"
+        className="type-data text-[15px] leading-none text-oxford/60"
         aria-hidden={!hasScore}
       >
         {hasScore ? Math.round(score) : '—'}

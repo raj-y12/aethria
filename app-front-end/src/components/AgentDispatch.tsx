@@ -130,7 +130,7 @@ function DispatchPanelBody({
             <button
               type="button"
               onClick={onClearMessage}
-              className="shrink-0 type-meta text-oxford/60 hover:text-oxford bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
+              className="type-action shrink-0 hover:text-oxford bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
               aria-label="Dismiss message"
             >
               ×
@@ -140,7 +140,7 @@ function DispatchPanelBody({
       );
     }
     if (!isBusy) return null;
-    return <p className={embedded ? `${railEditorial.meta} text-oxford/60` : 'type-meta text-oxford/60'}>Dispatch active.</p>;
+    return <p className={embedded ? railEditorial.statusLabel : 'type-status'}>Dispatch active.</p>;
   })();
 
   return (
@@ -245,7 +245,7 @@ export default function AgentDispatch({
                 <button
                   type="button"
                   onClick={onClearMessage}
-                  className="shrink-0 type-meta text-oxford/60 hover:text-oxford bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
+                  className="type-action shrink-0 hover:text-oxford bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
                   aria-label="Dismiss message"
                 >
                   ×
@@ -308,7 +308,7 @@ export default function AgentDispatch({
               <button
                 type="button"
                 onClick={() => setExpanded(false)}
-                className="type-meta text-oxford/60 hover:text-oxford bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
+                className="type-action hover:text-oxford bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
               >
                 Hide
               </button>

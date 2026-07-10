@@ -476,7 +476,7 @@ const WorkGrid = ({
                       <button
                         type="button"
                         onClick={resetFilters}
-                        className={`${productInteraction.action} btn-interaction btn-interaction--no-press uppercase tracking-[0.12em] text-oxford`}
+                        className={`${productInteraction.action} type-action-strong btn-interaction btn-interaction--no-press`}
                       >
                         Clear filters
                       </button>
@@ -487,7 +487,7 @@ const WorkGrid = ({
                           type="button"
                           onClick={() => onQueueViewChange('PRIORITY')}
                           aria-label="Switch to priority queue view"
-                          className={`${productInteraction.action} btn-interaction btn-interaction--no-press uppercase tracking-[0.12em] text-oxford font-semibold`}
+                          className={`${productInteraction.action} type-action-strong btn-interaction btn-interaction--no-press`}
                         >
                           Show priority queue
                         </button>
@@ -495,7 +495,7 @@ const WorkGrid = ({
                           type="button"
                           onClick={() => onQueueViewChange('ALL')}
                           aria-label="Switch to all deals view"
-                          className={`${productInteraction.action} btn-interaction btn-interaction--no-press uppercase tracking-[0.12em] text-oxford/60`}
+                          className={`${productInteraction.action} btn-interaction btn-interaction--no-press`}
                         >
                           Show all deals
                         </button>

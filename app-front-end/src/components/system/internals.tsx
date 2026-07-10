@@ -182,7 +182,7 @@ export function DecisionsTab({
           isSelected={selectedStartupId === item.id}
           ariaLabel={`Open memo for ${item.name}, ${DECISION_BADGE_LABEL[item.badgeVariant]}, resolved ${resolvedLabel}`}
         >
-          <span className="font-mono type-meta text-oxford/60 group-hover:text-oxford transition-colors tabular-nums pt-px">
+          <span className="type-data text-oxford/60 group-hover:text-oxford transition-colors pt-px">
             {(i + 1).toString().padStart(2, '0')}
           </span>
 
@@ -201,7 +201,7 @@ export function DecisionsTab({
           </div>
 
           <div className="min-w-0 lg:text-right shrink-0">
-            <span className="font-mono type-meta text-oxford/60 tabular-nums">
+            <span className="type-data text-oxford/60">
               {formatDate(item.resolvedAt)}
             </span>
           </div>
@@ -234,8 +234,8 @@ export function CalibrationTab({ startups, fundConfiguration }: { startups: Star
         <div className="flex flex-wrap gap-phi-6">
           {snapshot.observations.map((item) => (
             <div key={item.label} className="flex flex-col gap-phi-1">
-              <span className="font-mono font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-0 tabular-nums text-oxford">{item.value}</span>
-              <span className="type-meta text-oxford/60 uppercase tracking-[0.1em]">{item.label}</span>
+              <span className="type-data text-[clamp(22px,2vw,30px)] leading-none text-oxford">{item.value}</span>
+              <span className="type-label-section">{item.label}</span>
               {item.detail ? <span className="type-meta text-oxford/60">{item.detail}</span> : null}
             </div>
           ))}
@@ -249,8 +249,8 @@ export function CalibrationTab({ startups, fundConfiguration }: { startups: Star
             ['Pass', snapshot.decisionsByOutcome.NO],
           ].map(([label, value]) => (
             <div key={label} className="border-t border-oxford/[0.08] pt-phi-3">
-              <span className="font-mono type-meta text-oxford/65 tabular-nums">{value}</span>
-              <span className="block mt-phi-1 type-meta uppercase tracking-[0.12em] text-oxford/60">{label}</span>
+              <span className="type-data text-oxford/65">{value}</span>
+              <span className="type-label-section mt-phi-1 block">{label}</span>
             </div>
           ))}
         </div>
@@ -261,7 +261,7 @@ export function CalibrationTab({ startups, fundConfiguration }: { startups: Star
             {snapshot.commonRiskThemes.map((item) => (
               <li key={item.theme} className="flex items-baseline justify-between gap-phi-4 border-t border-oxford/[0.06] py-phi-3 first:border-t-0">
                 <span className="type-note text-oxford/[0.68]">{item.theme}</span>
-                <span className="font-mono type-meta text-oxford/60 tabular-nums">{item.count}</span>
+                <span className="type-data text-oxford/60">{item.count}</span>
               </li>
             ))}
           </ul>
@@ -280,8 +280,8 @@ export function TabSection({ title, label, children, className = '' }: { title: 
   const reduceMotion = usePrefersReducedMotion();
   const header = (
     <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
-      <h3 className="type-meta uppercase tracking-[0.12em] text-oxford/60">{title}</h3>
-      {label ? <span className="type-meta uppercase tracking-[0.12em] text-oxford/60">{label}</span> : null}
+      <h3 className="type-label-section">{title}</h3>
+      {label ? <span className="type-label-section">{label}</span> : null}
     </div>
   );
   const sectionClass = `flex flex-col gap-phi-3 px-phi-4 pt-phi-5 pb-phi-5 first:pt-phi-3 ${className}`.trim();
@@ -319,13 +319,13 @@ export function PipelineStation({
   return (
     <div className="flex flex-col gap-phi-1">
       <span
-        className={`font-mono font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.03em] tabular-nums ${
+        className={`type-data text-[clamp(22px,2vw,30px)] leading-none ${
           tone === 'escalation' ? 'text-escalation' : 'text-oxford'
         }`}
       >
         {value}
       </span>
-      <span className="type-meta text-oxford/60 uppercase tracking-[0.1em]">{label}</span>
+      <span className="type-label-section">{label}</span>
     </div>
   );
 }
@@ -372,14 +372,14 @@ export function AnalyticsTab({ rejection, watchlist, concentration, systemHealth
       )}
       <TabSection title="Rejection Patterns" label="Historical">
         {rejection.most_common_red_flags.length === 0 ? (
-          <p className="type-meta text-oxford/60 uppercase tracking-[0.12em]">No rejection data yet</p>
+          <p className="type-status">No rejection data yet</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-phi-5 gap-y-phi-4">
             {rejection.most_common_red_flags.slice(0, 6).map((rf, i) => (
               <div key={rf.flag} className="flex flex-col gap-phi-2">
                 <div className="flex justify-between items-baseline">
-                  <span className="type-meta text-oxford/60 uppercase tracking-[0.12em]">{rf.flag.replace(/_/g, ' ')}</span>
-                  <span className="font-mono type-meta text-oxford/60 tabular-nums">{rf.count}</span>
+                  <span className="type-label-section">{rf.flag.replace(/_/g, ' ')}</span>
+                  <span className="type-data text-oxford/60">{rf.count}</span>
                 </div>
                 <TacticalBar pct={(rf.count / maxRedFlag) * 100} delay={i * 0.05} />
               </div>
@@ -396,21 +396,21 @@ export function AnalyticsTab({ rejection, watchlist, concentration, systemHealth
             { label: 'Avg Days', value: Math.round(watchlist.avg_days) },
           ].map((s) => (
             <div key={s.label} className="flex flex-col gap-phi-1">
-              <span className="font-mono font-semibold text-[clamp(22px,2vw,30px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">{s.value}</span>
-              <span className="type-meta text-oxford/60 uppercase tracking-[0.1em]">{s.label}</span>
+              <span className="type-data text-[clamp(22px,2vw,30px)] leading-none text-oxford">{s.value}</span>
+              <span className="type-label-section">{s.label}</span>
             </div>
           ))}
         </div>
         {watchlist.entries && watchlist.entries.length > 0 && (
           <div className="mt-phi-6 flex flex-col gap-phi-3 pt-phi-2">
-            <span className="type-meta uppercase tracking-[0.12em] text-oxford/60">Companies</span>
+            <span className="type-label-section">Companies</span>
             <ul className="flex flex-col">
               {watchlist.entries.slice(0, 10).map((e, i) => (
                 <li key={e.startup_id ?? `wl-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1 py-phi-3 first:pt-0">
                   <span className="type-note text-oxford/70 truncate min-w-0 max-w-[min(100%,20rem)]">
                     {e.startup_name?.trim() || e.startup_id?.slice(0, 8) || 'Unknown'}
                   </span>
-                  <span className="font-mono type-meta text-oxford/60 tabular-nums shrink-0">
+                  <span className="type-data shrink-0 text-oxford/60">
                     {e.days_on_watchlist != null ? `${e.days_on_watchlist}d` : '—'}
                     {e.stale_warning ? ' · stale' : ''}
                     {e.signal_count != null && e.signal_count > 0 ? ` · ${e.signal_count} sig` : ''}
@@ -425,7 +425,7 @@ export function AnalyticsTab({ rejection, watchlist, concentration, systemHealth
       <TabSection title="Sector Concentration" label="Distribution">
         {sectors.length === 0 ? (
           <div className="flex flex-col gap-phi-2">
-            <p className="type-meta text-oxford/60 uppercase tracking-[0.18em]">No concentration data yet</p>
+            <p className="type-status">No concentration data yet</p>
             <p className="type-note text-oxford/60 leading-relaxed max-w-xl">
               Distribution refreshes when the pipeline runs portfolio health and cluster analysis over your deal set.
             </p>
@@ -434,9 +434,9 @@ export function AnalyticsTab({ rejection, watchlist, concentration, systemHealth
           <div className="flex flex-col gap-phi-4">
             {sectors.map(([sector, data], i) => (
               <div key={sector} className="grid grid-cols-[100px_1fr_44px] gap-phi-4 items-center">
-                <span className="type-meta text-oxford/60 uppercase tracking-[0.12em] truncate">{sector}</span>
+                <span className="type-label-section truncate">{sector}</span>
                 <TacticalBar pct={(data.count / maxSector) * 100} delay={i * 0.05} />
-                <span className="font-mono type-meta text-oxford/60 tabular-nums text-right">{data.pct_of_total}%</span>
+                <span className="type-data text-right text-oxford/60">{data.pct_of_total}%</span>
               </div>
             ))}
           </div>
@@ -450,7 +450,7 @@ export function AnalyticsTab({ rejection, watchlist, concentration, systemHealth
 export function MandateSpecRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="grid grid-cols-[clamp(110px,18%,160px)_minmax(0,1fr)] items-baseline gap-phi-4 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
-      <span className="type-meta uppercase tracking-[0.12em] text-oxford/60">{label}</span>
+      <span className="type-label-section">{label}</span>
       {value ? (
         <p className="type-body-sm leading-relaxed text-oxford/[0.78]">{value}</p>
       ) : (
@@ -492,7 +492,7 @@ export function InstitutionalMandateTab({
   if (loading && !data) {
     return (
       <AnimatedTabBlock className="px-phi-4 py-phi-4">
-        <p className="type-meta text-oxford/60 uppercase tracking-[0.12em]">Loading...</p>
+        <p className="type-status">Loading…</p>
       </AnimatedTabBlock>
     );
   }
@@ -590,10 +590,10 @@ export function InstitutionalMandateTab({
 export function MetaReadout({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex flex-col gap-phi-1">
-      <span className="font-mono font-semibold text-[clamp(18px,1.6vw,24px)] leading-none tracking-[-0.03em] tabular-nums text-oxford">
+      <span className="type-data text-[clamp(18px,1.6vw,24px)] leading-none text-oxford">
         {value}
       </span>
-      <span className="type-meta text-oxford/60 uppercase tracking-[0.1em]">{label}</span>
+      <span className="type-label-section">{label}</span>
     </div>
   );
 }
@@ -604,7 +604,7 @@ export function RunCycleButton({ triggering, onTrigger }: { triggering: boolean;
       type="button"
       onClick={onTrigger}
       disabled={triggering}
-      className="type-meta border border-oxford/20 px-phi-5 py-phi-3 text-oxford/60 hover:text-oxford hover:border-oxford/60 transition-colors uppercase tracking-[0.14em] btn-interaction"
+      className="type-action border border-oxford/20 px-phi-5 py-phi-3 hover:text-oxford hover:border-oxford/60 transition-colors btn-interaction"
     >
       {triggering ? 'Running…' : 'Run correction cycle'}
     </button>
@@ -692,7 +692,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           drifts toward how you actually decide.
         </p>
         {humanFbLine && (
-          <p className="type-meta text-oxford/60 leading-relaxed max-w-2xl mt-phi-3">{humanFbLine}</p>
+          <p className="type-note max-w-2xl mt-phi-3 text-oxford/60">{humanFbLine}</p>
         )}
       </AnimatedTabBlock>
       {/* One cycle section — readouts, what changed, why. The old page rendered
@@ -708,18 +708,18 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           {useInsight && whatChangedTotal > 0 && (
             <div className="mt-phi-3 flex max-w-[44rem] flex-col">
               {insightMutations.map((m, i) => (
-                <p key={`mut-${m.agent_target}-${i}`} className="type-meta text-oxford/60 leading-relaxed border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
+                <p key={`mut-${m.agent_target}-${i}`} className="type-note text-oxford/60 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
                   <span className="text-oxford/70">{m.agent_target}</span>
                   {m.reasoning ? ` — ${m.reasoning}` : ''}
                 </p>
               ))}
               {insightWeights.map((w, i) => (
-                <p key={`wt-${w.agent_target}-${i}`} className="type-meta text-oxford/60 leading-relaxed border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0 font-mono tabular-nums">
+                <p key={`wt-${w.agent_target}-${i}`} className="type-note text-oxford/60 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0 tabular-nums">
                   {w.agent_target}: {Math.round((w.previous_weight ?? 0) * 100)}% → {Math.round((w.new_weight ?? 0) * 100)}%
                 </p>
               ))}
               {insightCalibrations.map((c, i) => (
-                <p key={`cal-${c.parameter}-${i}`} className="type-meta text-oxford/60 leading-relaxed border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
+                <p key={`cal-${c.parameter}-${i}`} className="type-note text-oxford/60 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
                   <span className="text-oxford/70">{c.parameter.replace(/_/g, ' ')}</span>
                   {c.direction ? ` (${c.direction})` : ''}
                   {c.reasoning ? ` — ${c.reasoning}` : ''}
@@ -729,9 +729,9 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           )}
           {whyLines.length > 0 && (
             <div className="mt-phi-4 flex max-w-[44rem] flex-col gap-phi-2 border-l border-oxford/20 pl-phi-4">
-              <span className="type-meta uppercase tracking-[0.12em] text-oxford/60">Why no further action</span>
+              <span className="type-label-section">Why no further action</span>
               {whyLines.map((line, i) => (
-                <p key={i} className="type-meta text-oxford/60 leading-relaxed">{line}</p>
+                <p key={i} className="type-note text-oxford/60">{line}</p>
               ))}
             </div>
           )}
@@ -741,7 +741,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
         </TabSection>
       ) : (
         <TabSection title="Correction cycle">
-          <p className="type-meta text-oxford/60 uppercase tracking-[0.18em]">No cycles run yet</p>
+          <p className="type-status">No cycles run yet</p>
           <div className="mt-phi-4">
             <RunCycleButton triggering={triggering} onTrigger={handleTrigger} />
           </div>
@@ -750,10 +750,10 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
 
       <AnimatedTabBlock>
       <details className="group border-b border-oxford/[0.06]">
-        <summary className="cursor-pointer list-none px-phi-4 py-phi-4 type-meta uppercase tracking-[0.12em] text-oxford/60 hover:text-oxford/70 marker:content-none flex items-center justify-between gap-phi-3">
+        <summary className="type-action cursor-pointer list-none px-phi-4 py-phi-4 hover:text-oxford/70 marker:content-none flex items-center justify-between gap-phi-3">
           <span>Advanced — prompt checks (optional)</span>
-          <span className="type-meta text-oxford/60 group-open:hidden">Show</span>
-          <span className="type-meta text-oxford/60 hidden group-open:inline">Hide</span>
+          <span className="type-action group-open:hidden">Show</span>
+          <span className="type-action hidden group-open:inline">Hide</span>
         </summary>
         <div className="flex flex-col pb-phi-2">
         <p className="type-body text-oxford/60 leading-relaxed px-phi-4 pt-phi-3 max-w-2xl">
@@ -761,7 +761,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           Day-to-day deal work and your Invest / Pass / Monitor confirmations do not depend on anything here—the product runs on built-in prompts until you explicitly promote a draft.
         </p>
       <TabSection title="Bench list" label="For Evaluate only">
-        <p className="type-meta text-oxford/60 leading-relaxed mb-phi-3 max-w-2xl">
+        <p className="type-note mb-phi-3 max-w-2xl text-oxford/60">
           Paste internal startup IDs from your pipeline (one per line, up to {metaEvalSet.max}). When you press <span className="text-oxford/65">Evaluate</span> on a pending <em>reviewer</em> prompt, the system re-runs that reviewer on these deals with the proposed instructions and compares to saved scores—cheap guardrail before going live. Each ID is one extra model call.
         </p>
         <textarea
@@ -790,7 +790,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                 setEvalSaveNote(e instanceof Error ? e.message : 'Save failed');
               }
             }}
-            className="type-meta border border-oxford/15 px-phi-4 py-phi-2 text-oxford/60 hover:text-oxford hover:border-oxford/40 btn-interaction"
+            className="type-action border border-oxford/15 px-phi-4 py-phi-2 hover:text-oxford hover:border-oxford/40 btn-interaction"
           >
             Save bench list
           </button>
@@ -800,17 +800,17 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
       </TabSection>
 
       <TabSection title="Prompt drafts" label="Active vs pending">
-        <p className="type-meta text-oxford/60 leading-relaxed mb-phi-3 max-w-2xl">
+        <p className="type-note mb-phi-3 max-w-2xl text-oxford/60">
           The meta cycle can propose new instructions for scouts/reviewers. <span className="text-oxford/65">Active</span> is what runs today (empty = product defaults).
           <span className="text-oxford/65"> Pending</span> is queued proposals—use <span className="text-oxford/65">Promote</span> to make one live, or <span className="text-oxford/65">Reset</span> to drop back to defaults.
           Your org may require a passing <span className="text-oxford/65">Evaluate</span> before Promote for reviewers.
         </p>
         {promptState.restart_note && (
-          <p className="type-meta text-oxford/60 leading-relaxed mb-phi-3 max-w-2xl">{promptState.restart_note}</p>
+          <p className="type-note mb-phi-3 max-w-2xl text-oxford/60">{promptState.restart_note}</p>
         )}
         <div className="flex flex-col gap-phi-4">
           <div>
-            <span className="type-meta text-oxford/60 uppercase tracking-[0.12em] block mb-phi-2">Active (live)</span>
+            <span className="type-status mb-phi-2 block">Active (live)</span>
             {Object.keys(promptState.active).length === 0 ? (
               <p className="type-meta text-oxford/60">None—using built-in prompts.</p>
             ) : (
@@ -835,7 +835,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                           setPromptBusy(null);
                         }
                       }}
-                      className="type-meta border border-oxford/15 px-phi-3 py-phi-2 text-oxford/60 hover:text-oxford hover:border-oxford/40 btn-interaction shrink-0"
+                      className="type-action border border-oxford/15 px-phi-3 py-phi-2 hover:text-oxford hover:border-oxford/40 btn-interaction shrink-0"
                     >
                       {promptBusy === agent ? '…' : 'Use built-in default'}
                     </button>
@@ -845,7 +845,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
             )}
           </div>
           <div>
-            <span className="type-meta text-oxford/60 uppercase tracking-[0.12em] block mb-phi-2">Pending (not live yet)</span>
+            <span className="type-status mb-phi-2 block">Pending (not live yet)</span>
             {promptState.pending.length === 0 ? (
               <p className="type-meta text-oxford/60">Nothing queued—defaults or only active prompts.</p>
             ) : (
@@ -885,7 +885,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                                 setEvalBusy(null);
                               }
                             }}
-                            className="type-meta border border-oxford/15 px-phi-3 py-phi-2 text-oxford/60 hover:text-oxford hover:border-oxford/40 btn-interaction"
+                            className="type-action border border-oxford/15 px-phi-3 py-phi-2 hover:text-oxford hover:border-oxford/40 btn-interaction"
                           >
                             {evalBusy === p.library_key ? '…' : 'Evaluate'}
                           </button>
@@ -904,7 +904,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                               setPromptBusy(null);
                             }
                           }}
-                          className="type-meta border border-oxford/15 px-phi-3 py-phi-2 text-oxford/60 hover:text-oxford hover:border-oxford/40 btn-interaction"
+                          className="type-action border border-oxford/15 px-phi-3 py-phi-2 hover:text-oxford hover:border-oxford/40 btn-interaction"
                         >
                           {promptBusy === p.library_key ? '…' : 'Promote'}
                         </button>
@@ -918,7 +918,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
         </div>
         {evalResult && (
           <div className="mt-phi-4 max-w-3xl border-t border-oxford/[0.08] pt-phi-3">
-            <span className="type-meta uppercase tracking-[0.12em] text-oxford/60 block mb-phi-2">Last evaluation</span>
+            <span className="type-label-section mb-phi-2 block">Last evaluation</span>
             {!evalResult.ok && evalResult.error && (
               <p className="type-meta text-oxford/60">{evalResult.error}</p>
             )}
@@ -972,8 +972,8 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           ] as [string, number][]).map(([name, w], i) => (
             <div key={name} className="flex flex-col gap-phi-2">
               <div className="flex justify-between items-baseline">
-                <span className="type-meta text-oxford/60 uppercase tracking-[0.12em]">{name}</span>
-                <span className="font-mono type-meta text-oxford/60 tabular-nums">{Math.round(w * 100)}%</span>
+                <span className="type-label-section">{name}</span>
+                <span className="type-data text-oxford/60">{Math.round(w * 100)}%</span>
               </div>
               <TacticalBar pct={w * 100} delay={i * 0.1} />
             </div>
@@ -983,13 +983,13 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
 
       <TabSection title="Calibration Log">
         {calibration.calibration_history.length === 0 ? (
-          <p className="type-meta text-oxford/60 uppercase tracking-[0.18em]">No calibration history yet</p>
+          <p className="type-status">No calibration history yet</p>
         ) : (
           <div className="flex flex-col">
             {calibration.calibration_history.slice(-5).reverse().map((h, i) => (
               <div key={i} className="grid grid-cols-[110px_1fr] items-start gap-phi-4 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
                 <span
-                  className={`font-mono text-[12px] font-semibold uppercase tracking-[0.1em] ${
+                  className={`type-status ${
                     h.direction === 'tightened' ? 'text-escalation/85' : 'text-oxford/60'
                   }`}
                 >

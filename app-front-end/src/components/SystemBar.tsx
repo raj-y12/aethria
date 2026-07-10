@@ -76,7 +76,7 @@ export function SpineNavButton({
       type="button"
       onClick={onClick}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`group w-full flex items-center justify-between gap-phi-3 font-mono text-[11px] uppercase tracking-[0.1em] cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
+      className={`type-action type-action-inverse group w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
         active ? `${textActive} ${bgActive}` : `${textIdle} ${bgHover}`
       } ${compact ? 'min-h-[32px] px-phi-4 py-phi-1' : 'min-h-[44px] px-2 py-1'}`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
@@ -281,21 +281,21 @@ export default function SystemBar({
 
           {/* Time + date */}
           <div className="shrink-0 px-3 flex flex-col gap-2" aria-live="polite">
-            <span className="type-meta tabular-nums leading-none text-white/60">{timeShort}</span>
-            <span className="type-label-section text-white/60">{dateShort}</span>
+            <span className="type-meta type-meta-inverse tabular-nums leading-none">{timeShort}</span>
+            <span className="type-label-section type-label-inverse">{dateShort}</span>
           </div>
 
           <SpineRule />
 
           {/* Account */}
           <div className="w-full flex flex-col gap-3 shrink-0 px-3">
-            <span className="type-meta truncate max-w-full text-white/70" title={displayName}>
+            <span className="type-meta type-meta-inverse truncate max-w-full" title={displayName}>
               {displayName}
             </span>
             {navLink ? (
               <Link
                 to={navLink.href}
-                className="type-meta inline-flex min-h-[44px] items-center text-white/65 hover:text-white btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                className="type-action type-action-inverse inline-flex min-h-[44px] items-center hover:text-white btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
               >
                 {navLink.label}
               </Link>
@@ -305,7 +305,7 @@ export default function SystemBar({
           {/* Log out */}
           <div className="mt-auto flex flex-col gap-3 pt-2 shrink-0 px-3">
             {agentActionError ? (
-              <p className="type-meta text-white/75" role="status" aria-live="polite">
+              <p className="type-status type-status-inverse" role="status" aria-live="polite">
                 {agentActionError}
               </p>
             ) : null}
@@ -313,7 +313,7 @@ export default function SystemBar({
               type="button"
               onClick={requestLogout}
               disabled={agentActionPending}
-              className="type-label-tab text-white/60 hover:text-white inline-flex min-h-[44px] items-center bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
+              className="type-action type-action-inverse hover:text-white inline-flex min-h-[44px] items-center bg-transparent border-0 p-0 cursor-pointer btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
             >
               {agentActionPending ? 'Updating...' : 'Log out'}
             </button>

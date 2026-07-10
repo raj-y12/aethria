@@ -109,8 +109,8 @@ function Instrument({
   return (
     <div className="flex min-w-0 flex-col gap-phi-2">
       <div className="flex items-baseline justify-between gap-phi-3">
-        <span className="font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60">{label}</span>
-        <span className="whitespace-nowrap font-mono text-[12px] font-semibold tabular-nums tracking-[0.04em] text-oxford/75">
+        <span className="type-label-section">{label}</span>
+        <span className="type-data whitespace-nowrap">
           {reading}
         </span>
       </div>
@@ -190,7 +190,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       {kicker ? (
         <motion.p
           variants={STAGE_ITEM}
-          className="min-w-0 truncate font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60"
+          className="type-label-section min-w-0 truncate"
         >
           {kicker}
         </motion.p>
@@ -199,7 +199,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       {/* The state of the call leads the brief — not the machine's number. */}
       <motion.p
         variants={STAGE_ITEM}
-        className={`mt-phi-6 font-mono text-[15px] font-bold uppercase tracking-[0.18em] ${stateToneClass}`}
+        className={`type-status mt-phi-6 text-[15px] ${stateToneClass}`}
       >
         {state.word}
       </motion.p>
@@ -208,7 +208,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       {state.detail ? (
         <motion.p
           variants={STAGE_ITEM}
-          className="mt-phi-2 font-mono text-[12px] font-semibold uppercase tracking-[0.14em] text-oxford/60"
+          className="type-status mt-phi-2"
         >
           {state.detail}
         </motion.p>
@@ -235,7 +235,7 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       {/* What decides it — the decisive uncertainty, ahead of the machine readouts. */}
       {focalQuestion ? (
         <motion.div variants={STAGE_ITEM} className="mt-phi-5 border-l border-oxford/25 pl-phi-4">
-          <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60">What decides it</p>
+          <p className="type-label-section">What decides it</p>
           <p className="mt-phi-1 max-w-[34rem] font-sans text-[14px] leading-[1.5] text-oxford/80">
             {focalQuestion}
           </p>

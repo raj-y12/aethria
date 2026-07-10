@@ -83,11 +83,11 @@ function SpineReadout({
   const body = (
     <>
       <span
-        className={`font-mono text-[clamp(17px,1.35vw,21px)] font-semibold leading-none tracking-[-0.03em] tabular-nums ${valueTone}`}
+        className={`type-data text-[clamp(17px,1.35vw,21px)] leading-none ${valueTone}`}
       >
         {value}
       </span>
-      <span className="mt-phi-1 font-mono text-[10px] uppercase tracking-[0.1em] text-white/60">{label}</span>
+      <span className="type-label-section type-label-inverse mt-phi-1 leading-none">{label}</span>
     </>
   );
 
@@ -160,7 +160,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
             >
               Aethria<span className="wordmark-dot wordmark-dot--inverse">.</span>
             </Link>
-            <p className="mt-phi-2 font-mono text-[10px] tabular-nums tracking-[0.08em] text-white/60" aria-hidden>
+            <p className="type-meta type-meta-inverse mt-phi-2 tabular-nums" aria-hidden>
               {timeShort} · {dateShort}
             </p>
           </div>
@@ -213,9 +213,9 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                 className="bg-white/[0.04] px-phi-3 py-phi-4"
               >
                 <div className="flex items-baseline justify-between gap-phi-2">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/60">Pipeline</span>
+                  <span className="type-label-section type-label-inverse">Pipeline</span>
                   <span
-                    className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[10px] uppercase tracking-[0.1em] ${pipelineTone.text}`}
+                    className={`type-status inline-flex shrink-0 items-center gap-phi-2 ${pipelineTone.text}`}
                   >
                     <span className={`h-1.5 w-1.5 shrink-0 rounded-none ${pipelineTone.dot}`} aria-hidden />
                     {telemetry.pipelineState}
@@ -225,7 +225,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                 {telemetry.pipelineState === 'Issue' ? (
                   <Link
                     to="/v1/settings"
-                    className="mt-phi-2 block font-mono text-[10px] uppercase tracking-[0.1em] text-escalation-bright/85 transition-colors hover:text-escalation-bright btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                    className="type-action mt-phi-2 block text-escalation-bright/85 transition-colors hover:text-escalation-bright btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
                   >
                     Needs attention →
                   </Link>
@@ -243,7 +243,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                       hasEscalations ? () => navigate('/v1/flow?queue=escalated') : () => navigate('/v1/flow')
                     }
                   />
-                  <p className="mt-phi-2 font-mono text-[10px] tracking-[0.06em] tabular-nums text-white/60">
+                  <p className="type-meta type-meta-inverse mt-phi-2 tabular-nums">
                     {hasEscalations
                       ? `${telemetry.openInProgressCount.toLocaleString()} open`
                       : `${telemetry.totalCount.toLocaleString()} in pipeline`}
@@ -262,7 +262,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                   }
                   className="group mt-phi-4 w-full min-w-0 border-l border-white/20 py-phi-1 pl-phi-3 text-left transition-colors hover:border-white/35 btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
                 >
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/60">
+                  <span className="type-label-section type-label-inverse">
                     Mandate
                     {mandate.hasThesis && mandate.versionNumber != null ? ` · v${mandate.versionNumber}` : ''}
                     {!mandate.hasThesis ? ' · set up' : ''}
@@ -271,7 +271,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                     {mandate.hasThesis ? mandate.fundName || 'Active mandate' : 'No active thesis'}
                   </span>
                   {mandate.hasThesis && mandate.summaryLine ? (
-                    <span className="mt-0.5 block min-w-0 truncate font-mono text-[10px] tracking-[0.04em] text-white/60 transition-colors group-hover:text-white">
+                    <span className="type-meta type-meta-inverse mt-0.5 block min-w-0 truncate transition-colors group-hover:text-white">
                       {mandate.summaryLine}
                     </span>
                   ) : null}
@@ -284,7 +284,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
           <footer aria-label="Operator" className="min-w-0 px-1">
             <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
               <span
-                className="type-meta max-w-full truncate border-b border-white/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-white/60"
+                className="type-action type-action-inverse max-w-full truncate border-b border-white/10 px-1 pb-0.5"
                 title={displayName}
               >
                 {displayName}
@@ -292,7 +292,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
               <span className="type-meta px-1 text-white/20" aria-hidden>·</span>
               <Link
                 to="/v1/settings"
-                className="type-meta border-b border-white/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-white/60 transition-colors hover:text-white btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                className="type-action type-action-inverse border-b border-white/10 px-1 pb-0.5 transition-colors hover:text-white btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
               >
                 Settings
               </Link>
@@ -301,13 +301,13 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                 type="button"
                 onClick={requestLogout}
                 disabled={agentActionPending}
-                className="type-meta border-b border-white/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-white/60 transition-colors hover:text-white disabled:opacity-50 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                className="type-action type-action-inverse border-b border-white/10 px-1 pb-0.5 transition-colors hover:text-white disabled:opacity-50 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
               >
                 {agentActionPending ? 'Updating…' : 'Log out'}
               </button>
             </div>
             {agentActionError ? (
-              <p className="mt-phi-2 font-mono text-[12px] tracking-[0.06em] text-escalation-bright" role="status" aria-live="polite">
+              <p className="type-meta mt-phi-2 text-escalation-bright" role="status" aria-live="polite">
                 {agentActionError}
               </p>
             ) : null}

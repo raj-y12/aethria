@@ -8,7 +8,7 @@ interface AccountRailPanelProps {
 }
 
 const RAIL_ACTION_CLASS =
-  `${railEditorial.meta} uppercase text-oxford/60 hover:text-oxford transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 py-phi-1`;
+  'type-action hover:text-oxford transition-colors btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 py-phi-1';
 
 export default function AccountRailPanel({ settingsPath }: AccountRailPanelProps) {
   const {
@@ -33,7 +33,7 @@ export default function AccountRailPanel({ settingsPath }: AccountRailPanelProps
             <Link to={settingsPath} className={RAIL_ACTION_CLASS}>
               Settings
             </Link>
-            <span className="font-mono text-[12px] text-oxford/[0.22] px-phi-1" aria-hidden>
+            <span className="type-meta px-phi-1 text-oxford/[0.22]" aria-hidden>
               ·
             </span>
             <button
