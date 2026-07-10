@@ -49,7 +49,7 @@ Content renders immediately. Motion is limited to selection, disclosure, continu
 
 ### Typography
 
-- Operational labels have a practical minimum of 12px.
+- Operational labels generally use 11–12px according to density and available space; compact navigation may remain 11px when contrast is sufficient.
 - Body copy and meaningful metadata use 13–14px by default.
 - Meaningful text on paper uses at least the contrast produced by Oxford at 60% opacity.
 - Meaningful text on Oxford uses at least white at 50% opacity; 60% is preferred for small text.
@@ -88,6 +88,8 @@ The spine contains four regions:
 3. Human attention action and compact pipeline health
 4. Account disclosure
 
+The spine retains its established `clamp(204px, 15vw, 248px)` width and the pre-audit single-line workspace button rhythm. The action-center redesign is confined to the lower rail; it must not compress or restyle the primary workspace navigation.
+
 ### Attention action
 
 When rulings are required:
@@ -123,17 +125,9 @@ Fund name, mandate version, sectors, stages, and geography are removed from the 
 - Scattered underlined fragments and decorative separators are removed.
 - The disclosure supports keyboard navigation, Escape, outside-click dismissal, focus restoration, and appropriate ARIA state.
 
-### Navigation labels
+### Navigation labels and buttons
 
-The user-facing workspace labels become:
-
-- Today
-- Deals
-- Portfolio
-- Fund strategy
-- Search company
-
-Routes remain unchanged. Keyboard shortcuts remain visible in a secondary position.
+The familiar primary labels remain Home, Flow, Portfolio, Fund, and Dispatch. Buttons remain single-line, retain their original height and padding, and do not add descriptive sublabels. Routes and keyboard shortcuts remain unchanged. Plain-language clarification belongs in room headers and supporting content rather than being stacked inside the narrow spine.
 
 ## Today
 
@@ -145,7 +139,7 @@ Today remains a centered command brief and continues to use the editorial produc
 
 - The desk list becomes an unmistakable interactive region with a stable action label.
 - Deals becomes the primary path when attention or open work exists.
-- Roman numerals are removed from workspace doors.
+- Roman numerals are removed from Today workspace doors but the established spine shortcut treatment remains unchanged.
 - Supporting metadata meets the global contrast and size floors.
 - Footer actions reduce to Search, Settings, and Account.
 - Date and activity digest remain secondary and do not compete with the main situation statement.
@@ -298,7 +292,7 @@ The existing full-screen Dispatch experience remains structurally intact but ado
 
 ### Desktop
 
-- The spine remains fixed and compact.
+- The spine remains fixed at its established width and preserves the pre-audit workspace button density.
 - Workspace layouts use available width for evidence, comparison, and exceptions.
 - Maximum widths are applied to prose, not to data layouts that benefit from space.
 

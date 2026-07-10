@@ -13,7 +13,7 @@
 - Every storage read and API call remains user-scoped through existing authenticated clients.
 - No direct `fetch` calls outside `src/api/`.
 - Preserve `/v1`, `/v1/flow`, `/v1/portfolio`, `/v1/fund`, `/v1/settings`, deep links, and keyboard shortcuts.
-- Meaningful text on paper must meet WCAG AA and use at least Oxford at 60% opacity; operational labels are at least 12px.
+- Meaningful text on paper must meet WCAG AA and use at least Oxford at 60% opacity; operational labels generally use 11–12px, with compact 11px navigation permitted at sufficient contrast.
 - Structural rules use Oxford 12–16% on paper and white 12–18% on Oxford.
 - Primary touch targets are at least 44px where practical.
 - Product interaction transitions target 150–200ms and respect reduced motion.
@@ -155,7 +155,7 @@ git add app-front-end/src/lib/appChrome.ts app-front-end/src/lib/__tests__/appCh
 git commit -m "fix(front): derive reliable action center state"
 ```
 
-### Task 2: Action-center spine, navigation vocabulary, and account disclosure
+### Task 2: Action-center spine, preserved navigation rhythm, and account disclosure
 
 **Files:**
 - Create: `app-front-end/src/components/SpineAttentionAction.tsx`
@@ -170,7 +170,7 @@ git commit -m "fix(front): derive reliable action center state"
 
 **Interfaces:**
 - Consumes: `ActionCenterModel`, `PipelineState`, React Router navigation, `useAgentLogoutFlow`.
-- Produces: `SpineAttentionAction`, `SpinePipelineStatus`, `AccountDisclosure` and updated `SPINE_WORKSPACES` labels.
+- Produces: `SpineAttentionAction`, `SpinePipelineStatus`, `AccountDisclosure`, and restored pre-audit workspace navigation styling.
 
 - [ ] **Step 1: Write failing component tests**
 
@@ -216,13 +216,13 @@ export interface AccountDisclosureProps {
 }
 ```
 
-- [ ] **Step 4: Replace the spine slab and update vocabulary**
+- [ ] **Step 4: Replace only the lower spine slab and restore the old workspace buttons**
 
-Set workspace display labels to Today, Deals, Portfolio, Fund strategy; render Search company for Dispatch. Keep routes and shortcut values `1`–`4` and `⌘K`. Remove `SpineMandate`, `SpineReadout`, mandate props, total/new counts, Roman numeral conversion, scattered Settings/Log out fragments, and decorative separators.
+Keep the familiar Home, Flow, Portfolio, Fund, and Dispatch labels. Remove every `sublabel` prop and restore the original single-line `SpineNavButton` markup, height, padding, and shortcut presentation. Restore `.aethria-spine` to `width: clamp(204px, 15vw, 248px)`. Keep routes and shortcut values `1`–`4` and `⌘K`. Remove `SpineMandate`, `SpineReadout`, mandate props, total/new counts, scattered Settings/Log out fragments, and decorative separators. Do not alter the top navigation's established visual rhythm while rebuilding the lower action center.
 
 - [ ] **Step 5: Update mobile menu semantics**
 
-Add `menuOpen`, `aria-expanded`, and an attention action to `MobileHeader`. Keep every menu row at least 44px high and use the same workspace labels as desktop.
+Add `menuOpen`, `aria-expanded`, and an attention action to `MobileHeader`. Keep every menu row at least 44px high and use Home, Flow, Portfolio, Fund, and Dispatch consistently.
 
 - [ ] **Step 6: Run tests and commit**
 
@@ -273,9 +273,9 @@ it('keeps the desk-clear state calm', () => {
 
 Remove `HomeDoor.numeral`, Roman numerals, per-item motion delays, fund/operator footer fragments, and mandate metadata. Make the desk band explicitly say Review deals and deep-link to the escalated queue when necessary. Footer contains Search company, Settings, and `AccountDisclosure`.
 
-- [ ] **Step 3: Raise canonical type and border floors**
+- [ ] **Step 3: Correct contrast and borders without globally inflating density**
 
-Set `labelSection`, `labelTab`, and `meta` to 12px in TypeScript tokens and Tailwind. Raise semantic hairline to 12% and strong hairline to 16%. Update shared product text to `/60` or stronger for meaningful content. Do not globally replace decorative opacity values.
+Keep compact navigation and short metadata at the established 11px scale where they fit and meet contrast; use 12–14px for operational descriptions and body content. Raise semantic hairline to 12% and strong hairline to 16%. Update shared product text to `/60` or stronger for meaningful content. Audit components by role rather than replacing every 10–11px token globally. Verify that denser labels still have adequate line-height and spacing before increasing their size.
 
 - [ ] **Step 4: Remove repeated workspace choreography and sanitize shell errors**
 
