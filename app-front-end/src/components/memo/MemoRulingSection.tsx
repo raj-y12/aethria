@@ -27,23 +27,13 @@ export default function MemoRulingSection({
   onAcknowledgeRisks,
   onSubmit,
 }: Props) {
-  const decisionLabel = {
-    YES: 'Invest',
-    MAYBE: 'Monitor',
-    NO: 'Pass',
-  };
-
   return (
-    <section className="memoDocSection memoDecisionRecord" aria-labelledby="memo-decision-record">
-      <div className="memoDecisionRuleTop" />
-
-      <div className="memoDecisionContent">
-        <h2 className="memoDecisionHeading" id="memo-decision-record">
-          Decision Record
-        </h2>
-
-        {/* Decision choices — framed as prominent options */}
-        <div className="memoDecisionChoicesFrame" role="group" aria-label="Record your ruling">
+    <section className="memoDocSection memoRulingControls" aria-labelledby="memo-final-ruling">
+      <h2 className="memoDocSectionHead" id="memo-final-ruling">
+        Your ruling
+      </h2>
+      <div className="memoRulingPanel">
+        <div className="memoDecisionChoices" role="group" aria-label="Choose final ruling">
           {(
             [
               ['YES', 'Invest'],
@@ -57,71 +47,46 @@ export default function MemoRulingSection({
               onClick={() => onSelectDecision(decision)}
               aria-pressed={rulingDecision === decision}
               disabled={rulingSaving}
-              className={`memoDecisionOption memoDecisionOption--${decision.toLowerCase()}${
-                rulingDecision === decision ? ' memoDecisionOption--active' : ''
-              }`}
+              className={`memoDecisionChoice memoDecisionChoice--${decision.toLowerCase()}`}
             >
-              <span className="memoDecisionLabel">{label}</span>
-              <span className="memoDecisionCode" aria-hidden>{decision}</span>
+              {label}
             </button>
           ))}
         </div>
-
-        {/* Rationale section */}
-        <div className="memoDecisionSection">
-          <label htmlFor="memo-rationale" className="memoDecisionSectionLabel">
-            Rationale
-          </label>
-          <textarea
-            id="memo-rationale"
-            value={rulingNotes}
-            onChange={(e) => onNotesChange(e.target.value)}
-            disabled={rulingSaving}
-            rows={3}
-            className="memoDecisionTextarea"
-            placeholder="Explain your reasoning (minimum 5 characters)"
-            aria-label="Ruling rationale"
-          />
-        </div>
-
-        {/* Risk acknowledgement — gated step */}
+        <textarea
+          value={rulingNotes}
+          onChange={(e) => onNotesChange(e.target.value)}
+          disabled={rulingSaving}
+          rows={2}
+          className="memoRulingTextarea"
+          placeholder="Rationale"
+          aria-label="Ruling rationale"
+        />
         {needsRiskAcknowledgement && !risksReviewed ? (
-          <div className="memoDecisionSection memoDecisionRiskGate">
-            <button
-              type="button"
-              onClick={onAcknowledgeRisks}
-              className="memoRiskAckButton"
-              disabled={rulingSaving}
-              aria-label="Acknowledge that you have reviewed high-severity risks"
-            >
-              <span className="memoRiskAckCheckbox" />
-              <span>I have reviewed high-severity risks</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onAcknowledgeRisks}
+            className="memoRiskAckButton"
+            disabled={rulingSaving}
+          >
+            Acknowledge high-severity risks
+          </button>
         ) : null}
-
-        {/* Submit */}
-        <div className="memoDecisionSubmit">
+        <div className="memoRulingSubmitRow">
           <button
             type="button"
             onClick={onSubmit}
             disabled={
               !rulingDecision || rulingNotes.trim().length < 5 || rulingSaving || riskReviewOutstanding
             }
-            className="memoDecisionSubmitButton"
+            className="memoRulingSubmit"
             title={riskReviewOutstanding ? 'Acknowledge risks to commit' : undefined}
           >
             {rulingSaving ? 'Recording…' : 'Commit ruling'}
           </button>
-          {rulingError ? (
-            <span className="memoDecisionError" role="alert">
-              {rulingError}
-            </span>
-          ) : null}
+          {rulingError ? <span className="memoRulingError">{rulingError}</span> : null}
         </div>
       </div>
-
-      <div className="memoDecisionRuleBottom" />
     </section>
   );
 }

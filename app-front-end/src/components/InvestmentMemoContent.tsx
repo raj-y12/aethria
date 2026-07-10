@@ -614,7 +614,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const mandateFit = displayStartup?.review?.thesis_matches_fund == null
     ? thesisAlignmentBrief || undefined
     : displayStartup.review.thesis_matches_fund
-      ? 'Strong'
+      ? 'Strong mandate fit'
       : 'Outside mandate';
   return (
     <article className={wrapperCls} aria-labelledby="memo-title">

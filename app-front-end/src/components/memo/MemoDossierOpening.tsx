@@ -11,15 +11,6 @@ interface MemoDossierOpeningProps {
   nextMove?: string | null;
 }
 
-function DecisionMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="memoDossierMetric">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
-  );
-}
-
 export default function MemoDossierOpening({
   recommendation,
   recommendationTone,
@@ -45,12 +36,10 @@ export default function MemoDossierOpening({
 
         <aside className="memoDossierRecord" aria-label="Decision record">
           <p className="memoDossierKicker">Decision record</p>
-          <dl className="memoDossierMetrics">
-            <DecisionMetric label="Conviction" value={conviction} />
-            <DecisionMetric label="Review panel" value={reviewerState} />
-            {mandateFit ? <DecisionMetric label="Mandate fit" value={mandateFit} /> : null}
-            {status ? <DecisionMetric label="Status" value={status} /> : null}
-          </dl>
+          <p className="memoDossierStat">{conviction}</p>
+          <p className="memoDossierMetaLine">
+            {[`Panel ${reviewerState}`, mandateFit, status].filter(Boolean).join('  ·  ')}
+          </p>
           {blocker ? (
             <div className="memoDossierCallout">
               <p className="memoDossierCalloutLabel">Blocker</p>
