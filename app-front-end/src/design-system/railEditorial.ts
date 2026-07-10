@@ -11,7 +11,7 @@ export const railEditorial = {
    * Bottom margin shrinks on smaller desktop viewports to keep sections compact.
    */
   label:
-    'mt-0 mr-0 ml-0 mb-[clamp(7px,1.1vw,16px)] flex items-center gap-2 font-mono text-[12px] font-normal uppercase tracking-[0.12em] text-oxford/60',
+    'type-label-section mt-0 mr-0 ml-0 mb-[clamp(7px,1.1vw,16px)] flex items-center gap-2',
 
   /** Standard rail body text. */
   body: `${bodyMetrics} text-oxford/65`,
@@ -24,16 +24,16 @@ export const railEditorial = {
    * Scales down to 20px on tight rail columns (≈1024px viewport) and up to 38px on wide ones.
    */
   statValue:
-    'font-mono font-semibold tabular-nums leading-none tracking-[-0.02em] text-[clamp(20px,2.4vw,38px)]',
+    'type-data leading-none text-[clamp(20px,2.4vw,38px)]',
 
   /** Label beside a stat number. */
-  statLabel: 'font-mono text-[12px] leading-none uppercase tracking-[0.10em] text-oxford/60',
+  statLabel: 'type-label-section leading-none',
 
   /** Sub-captions, timestamps, link text. */
-  meta: 'font-mono text-[12px] leading-[1.4] text-oxford/60 tracking-[0.06em]',
+  meta: 'type-meta',
 
   /** Small stage/status labels inside rail rows. */
-  statusLabel: 'font-mono text-[12px] leading-none uppercase tracking-[0.10em]',
+  statusLabel: 'type-status leading-none',
 
   /** Unstyled size+leading only — apply text color separately. */
   bodyMetrics,

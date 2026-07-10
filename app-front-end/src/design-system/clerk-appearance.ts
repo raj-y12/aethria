@@ -63,10 +63,12 @@ export const userButtonAppearance = {
     },
     userButtonPopoverActionButton: {
       fontFamily: tokens.font.mono,
-      fontSize: tokens.type.labelTab.size,
-      letterSpacing: tokens.type.labelTab.letterSpacing,
+      fontSize: tokens.type.action.size,
+      fontWeight: tokens.type.action.fontWeight,
+      lineHeight: tokens.type.action.lineHeight,
+      letterSpacing: tokens.type.action.letterSpacing,
       textTransform: 'uppercase',
-      color: oxfordAlpha(0.8),
+      color: oxfordAlpha(0.72),
     },
     userButtonPopoverActionButtonIcon: {
       color: oxfordAlpha(0.4),

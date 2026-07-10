@@ -3,10 +3,10 @@ import type { DecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 
 /**
  * Compact verdict chip — shared with memo precedent badges.
- * 9px mono, semibold, fixed min-width, tight padding.
+ * Memo-calibrated status type, fixed min-width, tight padding.
  */
 export const VERDICT_CHIP_CLASS =
-  'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none font-mono font-semibold uppercase leading-none min-w-[4.25rem] px-2 py-1 text-[12px] tracking-[0.1em]';
+  'type-status inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none leading-none min-w-[4.25rem] px-2 py-1';
 
 /**
  * Centralized badge semantics to keep decision and quality systems aligned.

@@ -13,15 +13,15 @@ export const UI_JUDGEMENTS_SUBTITLE =
 
 /** Toolbar / filter row: 11px mono uppercase (tracking matches WorkGrid segments). */
 export const UI_DENSE_MONO_UPPER =
-  'font-mono text-[12px] font-normal uppercase tracking-[0.1em]' as const;
+  'type-action' as const;
 
 /** Muted label beside Source, Sort, etc. */
-export const UI_FILTER_TOOLBAR_LABEL = `${UI_DENSE_MONO_UPPER} text-oxford/60` as const;
+export const UI_FILTER_TOOLBAR_LABEL = 'type-label-section' as const;
 
 /** Panel chrome (SYSTEM / MEMO actions) — same rhythm as filter labels, fixed tracking. */
 export const UI_PANEL_CHROME_LABEL =
-  'font-mono text-[12px] font-normal uppercase tracking-[0.1em] text-oxford/60' as const;
+  'type-label-section' as const;
 
 /** Segment buttons inside filter row (slightly tighter tracking than kicker labels). */
 export const UI_FILTER_SEGMENT_INACTIVE =
-  'font-mono text-[12px] font-normal uppercase tracking-[0.08em]' as const;
+  'type-action' as const;
