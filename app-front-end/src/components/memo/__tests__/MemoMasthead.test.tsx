@@ -51,13 +51,12 @@ describe('MemoMasthead', () => {
     expect(screen.getByRole('button', { name: 'Download IC pack as PDF' })).toBeInTheDocument();
   });
 
-  it('omits close when no handler is given and location when compact', () => {
-    const { rerender } = render(<MemoMasthead startup={startup} onDownloadPDF={vi.fn()} />);
+  it('renders the complete dossier identity when embedded or standalone', () => {
+    render(<MemoMasthead startup={startup} onDownloadPDF={vi.fn()} />);
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.getByText('Berlin')).toBeInTheDocument();
-    rerender(<MemoMasthead startup={startup} onDownloadPDF={vi.fn()} compact />);
-    expect(screen.queryByText('Berlin')).not.toBeInTheDocument();
-    // Tags stay in both variants.
+    expect(screen.getByText('Fixture one-liner')).toBeInTheDocument();
+    expect(screen.getByText('IC dossier')).toBeInTheDocument();
     expect(screen.getByText('INDUSTRIAL AI')).toBeInTheDocument();
   });
 });

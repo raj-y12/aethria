@@ -18,6 +18,7 @@ import MemoRulingSection from './memo/MemoRulingSection';
 import MemoPrecedentStrip from './memo/MemoPrecedentStrip';
 import MemoPortfolioContext from './memo/MemoPortfolioContext';
 import MemoSectionTitle from './memo/MemoSectionTitle';
+import MemoDossierOpening from './memo/MemoDossierOpening';
 import { DECISION_BADGE_LABEL } from './DecisionBadge';
 import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 import { resolveEscalation } from '../api/escalations';
@@ -99,8 +100,6 @@ export interface InvestmentMemoContentProps {
   /** Mobile/modal entry point for the add-context re-review takeover. */
   onAddContext?: () => void;
   embedded?: boolean;
-  /** Replaces the executive cover (e.g. the Flow Decision Stage owns the opening). */
-  coverOverride?: ReactNode;
   /** Share link / co-GP view: memo readable, ruling controls hidden. */
   readOnly?: boolean;
   onMemoPipelineReady?: () => void;
@@ -205,7 +204,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     onClose,
     onAddContext,
     embedded = false,
-    coverOverride,
     readOnly = false,
     onMemoPipelineReady,
     onDecisionResolved,
@@ -391,7 +389,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         : !showJudgment
           ? 'Pipeline assembling recommendation'
           : null;
-  const showCoverPipelineDetail = memoPipeline === 'generating' && !showJudgment && !!coverStatusText;
   const riskReviewOutstanding = needsRiskAcknowledgement && !risksReviewed;
   const convictionHistory = displayStartup?.conviction_state?.decision_history ?? [];
   const precedentCandidates = useMemo(
@@ -503,8 +500,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [displayStartup, coverStandfirst]
   );
   const snapshotRows = useMemo(
-    () => (displayStartup ? buildSnapshotRows(displayStartup, coverBlocker, coverOverride != null) : []),
-    [displayStartup, coverBlocker, coverOverride]
+    () => (displayStartup ? buildSnapshotRows(displayStartup, coverBlocker, false) : []),
+    [displayStartup, coverBlocker]
   );
   // Decision confidence — surfaced on the verdict so the recommendation is honest
   // about how sure it is, not just what it concludes.
@@ -533,17 +530,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const vitalsStrip = useMemo(
     () =>
       [
-        // Under a Decision Stage cover, the kicker already says location/stage.
-        ...(coverOverride == null
-          ? [
-              { label: 'Location', value: cleanFactValue(displayStartup?.scout?.location) },
-              { label: 'Stage', value: cleanFactValue(displayStartup?.scout?.funding_stage) },
-            ]
-          : []),
+        { label: 'Location', value: cleanFactValue(displayStartup?.scout?.location) },
+        { label: 'Stage', value: cleanFactValue(displayStartup?.scout?.funding_stage) },
         { label: 'Market (TAM)', value: cleanFactValue(displayStartup?.scout?.est_tam) },
         { label: 'Valuation', value: cleanFactValue(fin?.valuation_est) },
       ].filter((v): v is { label: string; value: string } => !!v.value),
-    [coverOverride, displayStartup?.scout?.location, displayStartup?.scout?.funding_stage, displayStartup?.scout?.est_tam, fin?.valuation_est]
+    [displayStartup?.scout?.location, displayStartup?.scout?.funding_stage, displayStartup?.scout?.est_tam, fin?.valuation_est]
   );
   const fundingLine = cleanFactValue(fin?.funding_history);
   // Prefer the source-verified traction metric; fall back to the partner's narrative signal.
@@ -595,6 +587,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     displayStartup?.review?.consensus_verdict,
     displayStartup?.review?.derived_verdict,
   ]);
+  const reviewerState = reviewerConsensusRows.length > 0
+    ? `${reviewerConsensusRows.length} · ${reviewerConsensus.split ? 'Split' : 'Aligned'}`
+    : 'Pending';
+  const mandateFit = displayStartup?.review?.thesis_matches_fund == null
+    ? thesisAlignmentBrief || undefined
+    : displayStartup.review.thesis_matches_fund
+      ? 'Strong'
+      : 'Outside mandate';
   return (
     <article className={wrapperCls} aria-labelledby="memo-title">
       {/* Styles extracted to InvestmentMemoContent.css */}
@@ -618,7 +618,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             onDownloadPDF={handleDownloadPDF}
             onClose={onClose}
             readOnly={readOnly}
-            compact={coverOverride != null}
           />
 
           {memoPipeline === 'failed' && (
@@ -650,84 +649,36 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.23, 1, 0.32, 1] })}
           >
 
-            {/* ── Executive cover (or the workspace's Decision Stage) ── */}
-            {coverOverride ?? (
-            <header className="memoCover">
-              {readOnly ? (
-                <p className="memoShareBanner" role="status">
-                  Read-only view — share this link with a co-GP. Rulings and edits are disabled.
-                </p>
-              ) : null}
+            {readOnly ? (
+              <p className="memoShareBanner" role="status">
+                Read-only view — share this link with a co-GP. Rulings and edits are disabled.
+              </p>
+            ) : null}
 
-              {showJudgment && precedentCandidates.length > 0 ? (
-                <MemoPrecedentStrip
-                  candidates={precedentCandidates}
-                  renderWithMonoNumbers={renderWithMonoNumbers}
-                />
-              ) : null}
+            <MemoDossierOpening
+              recommendation={coverRulingHeadline}
+              recommendationTone={coverRulingVariantClass}
+              standfirst={coverStandfirst}
+              conviction={convictionLine}
+              reviewerState={reviewerState}
+              mandateFit={mandateFit}
+              status={coverStatusText}
+              focalQuestion={focalQuestion}
+              blocker={coverBlocker}
+              nextMove={coverAction}
+            />
 
-              <MemoPortfolioContext startupId={displayStartup.id} signals={portfolioSignals} />
-
-              <div className="memoCoverRuling">
-                <p className="memoCoverRulingLabel">Recommendation</p>
-                {/* Static verdict set in plain ink — the word itself carries the call, no
-                    colour-coding. Pending states stay faint (and pulse) to read as "still
-                    working"; decided verdicts are perfectly static. */}
-                <p
-                  className={`memoCoverRulingWord memoCoverRulingWord--${coverRulingVariantClass}`}
-                  {...(showCoverPipelineDetail ? { 'aria-live': 'polite' as const } : {})}
-                >
-                  {renderWithMonoNumbers(coverRulingHeadline)}
-                </p>
-                {coverStandfirst ? (
-                  <p className="memoCoverStandfirst">{renderWithMonoNumbers(coverStandfirst)}</p>
+            {(showJudgment && precedentCandidates.length > 0) || portfolioSignals.length > 0 ? (
+              <div className="memoDossierContext">
+                {showJudgment && precedentCandidates.length > 0 ? (
+                  <MemoPrecedentStrip
+                    candidates={precedentCandidates}
+                    renderWithMonoNumbers={renderWithMonoNumbers}
+                  />
                 ) : null}
-                <div className="memoCoverRulingSupport">
-                  <span className="memoCoverRulingConviction">
-                    {renderWithMonoNumbers(convictionLine)}
-                  </span>
-                  {/* Only flag the exception. "Aligned" is the expected state — badging it is noise. */}
-                  {reviewerConsensus.split ? (
-                    <span className="memoCoverRulingConsensus">Reviewers split</span>
-                  ) : null}
-                </div>
-                {coverStatusText ? (
-                  <p
-                    className={`memoCoverStatus${
-                      showEscalationBadge && !isAlreadyDecided ? ' memoCoverStatus--escalation' : ''
-                    }${showCoverPipelineDetail ? ' memoCoverStatus--detail' : ''}`}
-                    {...(showCoverPipelineDetail ? { 'aria-live': 'polite' as const } : {})}
-                  >
-                    {renderWithMonoNumbers(coverStatusText)}
-                  </p>
-                ) : null}
+                <MemoPortfolioContext startupId={displayStartup.id} signals={portfolioSignals} />
               </div>
-
-              {focalQuestion ? (
-                <div className="memoCoverDecider">
-                  <p className="memoCoverDeciderLabel">What decides it</p>
-                  <p className="memoCoverDeciderText">{renderWithMonoNumbers(focalQuestion)}</p>
-                </div>
-              ) : null}
-
-              {!embedded && (coverBlocker || coverAction) ? (
-                <dl className="memoCoverBrief">
-                  {coverBlocker ? (
-                    <div className="memoCoverBriefItem">
-                      <dt>Blocker</dt>
-                      <dd>{renderWithMonoNumbers(coverBlocker)}</dd>
-                    </div>
-                  ) : null}
-                  {coverAction ? (
-                    <div className="memoCoverBriefItem">
-                      <dt>Next move</dt>
-                      <dd>{renderWithMonoNumbers(coverAction)}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-              ) : null}
-            </header>
-            )}
+            ) : null}
 
             {/* ── Company snapshot — one definition grid: verified vitals first, then narrative rows ── */}
             {(snapshotRows.length > 0 || hasVitals) && (
@@ -750,13 +701,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </dl>
               </section>
             )}
-
-            {embedded && coverAction && !(showEscalationBadge && !isAlreadyDecided) ? (
-              <div className="memoCoverNextMove" aria-label="Next move">
-                <p className="memoCoverNextMoveLabel">Next move</p>
-                <p className="memoCoverNextMoveText">{renderWithMonoNumbers(coverAction)}</p>
-              </div>
-            ) : null}
 
             {/* ── Investment case ── */}
             {investmentCasePoints.length > 0 && (
@@ -804,9 +748,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               const thesisFitCount =
                 (displayStartup.review?.thesis_fit_points?.filter((x) => String(x ?? '').trim()).length ?? 0) +
                 (displayStartup.review?.thesis_deviation_points?.filter((x) => String(x ?? '').trim()).length ?? 0);
-              const hasThesis =
-                reviewHasThesisAlignment(displayStartup.review) &&
-                (coverOverride == null || thesisFitCount > 0);
+              const hasThesis = reviewHasThesisAlignment(displayStartup.review) && thesisFitCount > 0;
               const hasScorecard = showScores && !!structuredScoring;
               const hasPanel = reviewerConsensusRows.length > 0;
               const hasDeepDive = improvements.length > 0 || assessmentReadouts.length > 0 || hasThesis;

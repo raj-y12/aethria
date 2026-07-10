@@ -3786,6 +3786,336 @@
     border-top: 1px solid var(--memo-rule);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Complete IC dossier composition.
+   This is structural, not a skin: one identity header and one
+   recommendation/decision-record opening across Flow and modal.
+   ═══════════════════════════════════════════════════════════════ */
+
+.memoPanel,
+.memoPanel--embedded {
+  background: var(--color-paper);
+}
+
+.memoMasthead {
+  width: 100%;
+  max-width: min(100%, var(--memo-editorial-measure, 44rem));
+  margin: 0 0 clamp(34px, 4vw, 46px);
+}
+
+.memoMastheadBand {
+  min-height: 46px;
+  align-items: center;
+  padding: 9px 14px;
+  background: var(--color-oxford);
+}
+
+.memoMastheadKicker {
+  color: rgba(var(--color-paper-rgb), 0.72);
+}
+
+.memoMastheadActions {
+  gap: 7px;
+}
+
+.memoMasthead .memoAction,
+.memoMasthead .memoMastheadPrimary {
+  min-height: 28px;
+  padding: 6px 9px;
+  border: 1px solid rgba(var(--color-paper-rgb), 0.22);
+  background: transparent;
+  color: rgba(var(--color-paper-rgb), 0.82);
+}
+
+.memoMasthead .memoMastheadPrimary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-oxford);
+}
+
+.memoMasthead .memoAction:hover,
+.memoMasthead .memoAction:focus-visible {
+  border-color: rgba(var(--color-paper-rgb), 0.5);
+  color: var(--color-paper);
+}
+
+.memoMastheadIdentity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: start;
+  padding-top: clamp(22px, 2.8vw, 30px);
+}
+
+.memoMastheadSubject {
+  min-width: 0;
+}
+
+.memoMastheadCompany {
+  font-size: clamp(1.65rem, 3vw, 2.15rem);
+  line-height: 1.03;
+  letter-spacing: -0.035em;
+}
+
+.memoMastheadDescriptor {
+  margin: 8px 0 0;
+  max-width: 38rem;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.5;
+  color: rgba(var(--color-oxford-rgb), 0.62);
+}
+
+.memoMastheadLocation {
+  margin-top: 7px;
+}
+
+.memoMastheadIssue {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-end;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  line-height: 1.35;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.46);
+  white-space: nowrap;
+}
+
+.memoMasthead .memoTags {
+  margin-top: 16px;
+}
+
+.memoMasthead .memoTag {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(var(--color-oxford-rgb), 0.52);
+}
+
+.memoMasthead .memoTag + .memoTag::before {
+  content: "·";
+  margin-right: 8px;
+  color: rgba(var(--color-oxford-rgb), 0.22);
+}
+
+.memoBody,
+.memoPanel--embedded .memoBody {
+  width: 100%;
+  max-width: min(100%, var(--memo-editorial-measure, 44rem));
+}
+
+.memoDossierOpening {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.4fr);
+  gap: clamp(30px, 4.4vw, 52px);
+  align-items: start;
+}
+
+.memoDossierLede,
+.memoDossierRecord {
+  min-width: 0;
+}
+
+.memoDossierKicker,
+.memoDossierQuestionLabel,
+.memoDossierCalloutLabel {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  line-height: 1.35;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.46);
+}
+
+.memoDossierVerdict {
+  margin: 8px 0 0;
+  font-family: var(--memo-font-ui);
+  font-size: clamp(2.2rem, 5vw, 3.5rem);
+  font-weight: 620;
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+  text-transform: none;
+  color: var(--color-oxford);
+  text-wrap: balance;
+}
+
+.memoDossierVerdict--invest,
+.memoDossierVerdict--yes,
+.memoDossierVerdict--escalation {
+  color: var(--color-accent);
+}
+
+.memoDossierVerdict--pending,
+.memoDossierVerdict--undecided,
+.memoDossierVerdict--awaiting {
+  color: rgba(var(--color-oxford-rgb), 0.48);
+}
+
+.memoDossierStandfirst {
+  margin: 15px 0 0;
+  max-width: 39rem;
+  font-family: var(--memo-font-ui);
+  font-size: 1rem;
+  line-height: 1.58;
+  color: rgba(var(--color-oxford-rgb), 0.74);
+  text-wrap: pretty;
+}
+
+.memoDossierQuestion {
+  margin-top: clamp(24px, 3vw, 32px);
+  max-width: 38rem;
+}
+
+.memoDossierQuestionLabel {
+  color: color-mix(in srgb, var(--color-accent) 74%, var(--color-oxford));
+}
+
+.memoDossierQuestionText {
+  margin: 7px 0 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-body);
+  line-height: 1.58;
+  color: rgba(var(--color-oxford-rgb), 0.82);
+}
+
+.memoDossierRecord {
+  padding-left: 20px;
+  border-left: 1px solid rgba(var(--color-oxford-rgb), 0.16);
+}
+
+.memoDossierMetrics {
+  margin: 8px 0 0;
+}
+
+.memoDossierMetric {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 0;
+}
+
+.memoDossierMetric + .memoDossierMetric {
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.07);
+}
+
+.memoDossierMetric dt,
+.memoDossierMetric dd {
+  margin: 0;
+}
+
+.memoDossierMetric dt {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  line-height: 1.4;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.44);
+}
+
+.memoDossierMetric dd {
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.4;
+  font-weight: 600;
+  color: rgba(var(--color-oxford-rgb), 0.84);
+  text-align: right;
+}
+
+.memoDossierCallout {
+  margin-top: 16px;
+  padding: 13px 14px;
+  background: rgba(var(--color-oxford-rgb), 0.035);
+}
+
+.memoDossierCallout + .memoDossierCallout {
+  margin-top: 1px;
+}
+
+.memoDossierCallout p:last-child {
+  margin: 6px 0 0;
+  font-family: var(--memo-font-ui);
+  font-size: var(--memo-size-secondary);
+  line-height: 1.48;
+  font-weight: 560;
+  color: rgba(var(--color-oxford-rgb), 0.84);
+}
+
+.memoDossierCallout--action {
+  background: rgba(var(--color-accent-rgb, 209, 123, 101), 0.11);
+}
+
+.memoDossierContext {
+  margin-top: clamp(30px, 4vw, 46px);
+  padding-top: 16px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.09);
+}
+
+.memoDossierContext > * + * {
+  margin-top: 14px;
+}
+
+.memoDocSection:not(.memoDisclosureSection),
+.memoDocSection:not(.memoDisclosureSection) + .memoDocSection:not(.memoDisclosureSection) {
+  margin-top: clamp(36px, 4.5vw, 52px);
+}
+
+.memoDocSectionTitle {
+  margin-bottom: clamp(15px, 2vw, 22px);
+}
+
+.memoRulingControls {
+  margin-top: clamp(44px, 5vw, 62px);
+}
+
+@container memoPanel (max-width: 620px) {
+  .memoDossierOpening {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .memoDossierRecord {
+    padding-left: 0;
+    padding-top: 20px;
+    border-left: 0;
+    border-top: 1px solid rgba(var(--color-oxford-rgb), 0.12);
+  }
+
+  .memoMastheadIdentity {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .memoMastheadIssue {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+}
+
+@container memoPanel (max-width: 440px) {
+  .memoMastheadBand {
+    align-items: flex-start;
+  }
+
+  .memoMastheadActions {
+    width: 100%;
+  }
+
+  .memoMasthead .memoAction,
+  .memoMasthead .memoMastheadPrimary {
+    flex: 1 1 auto;
+  }
+
+  .memoDossierVerdict {
+    font-size: clamp(2rem, 12vw, 2.75rem);
+  }
+}
 @media (max-width: 560px) {
   .memoScoreDimensionStack,
   .memoAssessmentReadouts { grid-template-columns: 1fr; }

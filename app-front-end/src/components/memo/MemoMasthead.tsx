@@ -9,9 +9,6 @@ interface MemoMastheadProps {
   onClose?: () => void;
   /** Share link / co-GP view: keeps the PDF, hides Add context. */
   readOnly?: boolean;
-  /** Under a Decision Stage cover the stage owns name/location — the masthead
-   *  keeps only the action band and classification tags. */
-  compact?: boolean;
 }
 
 /**
@@ -26,10 +23,14 @@ export default function MemoMasthead({
   onDownloadPDF,
   onClose,
   readOnly = false,
-  compact = false,
 }: MemoMastheadProps) {
   const companyName = startup.scout.name?.trim() || '';
   const location = startup.scout.location?.trim() || '';
+  const descriptor = startup.scout.one_line?.trim() || '';
+  const discoveredAt = startup.timestamps?.discovered_at;
+  const issueDate = discoveredAt
+    ? new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(discoveredAt))
+    : '';
   return (
     <header className="memoMasthead">
       <div className="memoMastheadBand">
@@ -60,16 +61,21 @@ export default function MemoMasthead({
           ) : null}
         </div>
       </div>
-      {!compact ? (
-        <>
+      <div className="memoMastheadIdentity">
+        <div className="memoMastheadSubject">
           <h1 className="memoCoverCompany memoMastheadCompany" id="memo-title">
             {companyName || '—'}
           </h1>
+          {descriptor ? <p className="memoMastheadDescriptor">{descriptor}</p> : null}
           {location ? (
             <p className="memoMeta memoMastheadLocation">{renderWithMonoNumbers(location)}</p>
           ) : null}
-        </>
-      ) : null}
+        </div>
+        <div className="memoMastheadIssue" aria-label="Memo issue">
+          <span>IC dossier</span>
+          {issueDate ? <time dateTime={discoveredAt}>{issueDate}</time> : null}
+        </div>
+      </div>
       <MemoTags startup={startup} />
     </header>
   );

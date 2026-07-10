@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import WorkGrid from '../components/WorkGrid';
-import DecisionStage from '../components/DecisionStage';
 import type { QueueView } from '../components/queue/DecisionQueueHeader';
 import InvestmentMemo from '../components/InvestmentMemo';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from '../components/InvestmentMemoContent';
@@ -291,12 +290,6 @@ export default function FlowPage({ data }: { data: SystemData }) {
                       startup={memoStartup}
                       embedded
                       onAddContext={() => openRerun(memoStartup)}
-                      coverOverride={
-                        <DecisionStage
-                          startup={memoStartup}
-                          fundConfiguration={fundConfiguration}
-                        />
-                      }
                       onMemoPipelineReady={handleMemoPipelineReady}
                       onDecisionResolved={handleDecisionResolved}
                       fundConfiguration={fundConfiguration}
