@@ -9,9 +9,10 @@
     },
     {
       "name": "app-front-end",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "app-front-end", "run", "dev", "--", "--port", "3200", "--strictPort"],
-      "port": 3200
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd app-front-end && npm run dev -- --port ${PORT:-3200}"],
+      "port": 3200,
+      "autoPort": true
     },
     {
       "name": "app-screenshot-harness",
