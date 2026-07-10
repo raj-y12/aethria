@@ -456,6 +456,27 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     if (review.thesis_matches_fund != null) return review.thesis_matches_fund ? 'Mandate aligned' : 'Mandate conflict';
     return firstNonEmpty(review.aethria_view?.thesis_fit_line, review.thesis_fit_points?.[0], review.thesis_deviation_points?.[0]);
   }, [displayStartup?.review]);
+  const thesisSection = useMemo(() => {
+    const review = displayStartup?.review;
+    if (!review) {
+      return { visible: false, score: null, headlineTag: '', fitPoints: [], gapPoints: [] };
+    }
+    const rawScore = review.thesis_alignment_score;
+    const score = rawScore != null ? (rawScore <= 1 ? rawScore * 10 : rawScore) : null;
+    const confidence = review.thesis_alignment_confidence;
+    const headlineTag = [
+      review.thesis_matches_fund != null
+        ? (review.thesis_matches_fund ? 'Mandate aligned' : 'Mandate misaligned')
+        : null,
+      confidence != null ? `${(confidence * 100).toFixed(0)}% confidence` : null,
+    ].filter(Boolean).join('  ·  ');
+    const fitPoints = (review.thesis_fit_points ?? []).filter((item) => String(item ?? '').trim());
+    const gapPoints = (review.thesis_deviation_points ?? []).filter((item) => String(item ?? '').trim());
+    const visible = reviewHasThesisAlignment(review) && (
+      score != null || Boolean(headlineTag) || fitPoints.length > 0 || gapPoints.length > 0
+    );
+    return { visible, score, headlineTag, fitPoints, gapPoints };
+  }, [displayStartup?.review]);
   const openingRiskItems = useMemo(() => {
     const items = [
       ...adverseRegister.map((item) => item.whyItMatters || item.title),
@@ -745,28 +766,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 { label: 'Competitive Landscape', items: compItems },
                 { label: 'Business Model', items: bizItems },
               ].filter((section) => section.items.length > 0);
-              const thesisFitCount =
-                (displayStartup.review?.thesis_fit_points?.filter((x) => String(x ?? '').trim()).length ?? 0) +
-                (displayStartup.review?.thesis_deviation_points?.filter((x) => String(x ?? '').trim()).length ?? 0);
-              const hasThesis = reviewHasThesisAlignment(displayStartup.review) && thesisFitCount > 0;
               const hasScorecard = showScores && !!structuredScoring;
               const hasPanel = reviewerConsensusRows.length > 0;
-              const hasDeepDive = improvements.length > 0 || assessmentReadouts.length > 0 || hasThesis;
+              const hasDeepDive = improvements.length > 0 || assessmentReadouts.length > 0;
               if (!hasScorecard && !hasPanel && !hasDeepDive) {
                 return null;
               }
-              const r = displayStartup.review;
-              const rawAlign = r?.thesis_alignment_score;
-              const ten = rawAlign != null ? (rawAlign <= 1 ? rawAlign * 10 : rawAlign) : null;
-              const fund = r?.thesis_matches_fund;
-              const confRaw = r?.thesis_alignment_confidence;
-              const confPct = confRaw != null ? `${(confRaw * 100).toFixed(0)}%` : null;
-              const thesisHeadlineTag = [
-                fund != null ? (fund ? 'Mandate aligned' : 'Mandate misaligned') : null,
-                confPct != null ? `${confPct} confidence` : null,
-              ].filter(Boolean).join('  ·  ');
-              const fitPoints = (r?.thesis_fit_points ?? []).filter((s) => String(s ?? '').trim());
-              const gapPoints = (r?.thesis_deviation_points ?? []).filter((s) => String(s ?? '').trim());
               return (
                 <section className="memoDocSection memoScoringSection" aria-labelledby="memo-scoring">
                   <MemoSectionTitle number="04" id="memo-scoring">Assessment</MemoSectionTitle>
@@ -837,54 +842,62 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                             />
                           </div>
                         ))}
-                        {hasThesis && (
-                          <div className="memoDocSubsection">
-                            <h3 className="memoDocSectionHead">Thesis alignment</h3>
-                            {(ten != null || thesisHeadlineTag) && (
-                              <p className="memoScoreHeadline">
-                                {ten != null && (
-                                  <>
-                                    <span className="memoScoreHeadlineValue">{renderWithMonoNumbers(ten.toFixed(0))}</span>
-                                    <span className="memoScoreHeadlineMax">/ 10</span>
-                                  </>
-                                )}
-                                {thesisHeadlineTag && (
-                                  <span className="memoScoreHeadlineTag">{renderWithMonoNumbers(thesisHeadlineTag)}</span>
-                                )}
-                              </p>
-                            )}
-                            {fitPoints.length > 0 && (
-                              <ul className="memoList">
-                                {fitPoints.map((item, i) => (
-                                  <li key={`fit-${i}`} className="memoListItem">
-                                    <span className="memoBullet" aria-hidden>+</span>
-                                    <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                            {gapPoints.length > 0 && (
-                              <ul className="memoList">
-                                {gapPoints.map((item, i) => (
-                                  <li key={`gap-${i}`} className="memoListItem">
-                                    <span className="memoBullet" aria-hidden>·</span>
-                                    <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        )}
                     </div>
                   )}
                 </section>
               );
             })()}
 
+            {/* ── Fund thesis alignment ── */}
+            {thesisSection.visible && (
+              <section className="memoDocSection memoThesisSection" aria-labelledby="memo-thesis-alignment">
+                <MemoSectionTitle number="05" id="memo-thesis-alignment">Thesis alignment</MemoSectionTitle>
+                <div className="memoThesisBody">
+                  {(thesisSection.score != null || thesisSection.headlineTag) && (
+                    <p className="memoScoreHeadline">
+                      {thesisSection.score != null && (
+                        <>
+                          <span className="memoScoreHeadlineValue">
+                            {renderWithMonoNumbers(thesisSection.score.toFixed(0))}
+                          </span>
+                          <span className="memoScoreHeadlineMax">/ 10</span>
+                        </>
+                      )}
+                      {thesisSection.headlineTag && (
+                        <span className="memoScoreHeadlineTag">
+                          {renderWithMonoNumbers(thesisSection.headlineTag)}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                  {thesisSection.fitPoints.length > 0 && (
+                    <ul className="memoList">
+                      {thesisSection.fitPoints.map((item, i) => (
+                        <li key={`fit-${i}`} className="memoListItem">
+                          <span className="memoBullet" aria-hidden>+</span>
+                          <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {thesisSection.gapPoints.length > 0 && (
+                    <ul className="memoList memoThesisGapList">
+                      {thesisSection.gapPoints.map((item, i) => (
+                        <li key={`gap-${i}`} className="memoListItem">
+                          <span className="memoBullet" aria-hidden>·</span>
+                          <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </section>
+            )}
+
             {/* ── Risk register ── */}
             {(adverseRegister.length > 0 || riskFactors.risks.length > 0 || riskFactors.mitigation.length > 0 || missingEvidenceItems.length > 0) && (
               <section className="memoDocSection memoRiskRegisterSection" aria-labelledby="memo-risk-register">
-                <MemoSectionTitle number="05" id="memo-risk-register">Risks</MemoSectionTitle>
+                <MemoSectionTitle number="06" id="memo-risk-register">Risks</MemoSectionTitle>
                 {adverseRegister.length > 0 && (
                   <p className="memoEvStatLine">
                     {renderWithMonoNumbers(`${highAdverseCount} high · ${adverseRegister.length} material`)}

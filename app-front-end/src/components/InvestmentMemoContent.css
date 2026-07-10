@@ -643,8 +643,22 @@
 .memoCaseSection > .memoCaseList,
 .memoKillerSection > .memoKillerList,
 .memoScoringSection > :not(.memoDocSectionTitle),
+.memoThesisSection > :not(.memoDocSectionTitle),
 .memoRiskRegisterSection > :not(.memoDocSectionTitle) {
   margin-left: 78px;
+}
+
+.memoThesisBody {
+  max-width: 48rem;
+}
+
+.memoThesisBody .memoList {
+  margin-top: 24px;
+}
+
+.memoThesisGapList {
+  padding-top: 14px;
+  border-top: 1px solid var(--memo-rule);
 }
 
 .memoDocProse {
@@ -1560,6 +1574,7 @@
   .memoCaseSection > .memoCaseList,
   .memoKillerSection > .memoKillerList,
   .memoScoringSection > :not(.memoDocSectionTitle),
+  .memoThesisSection > :not(.memoDocSectionTitle),
   .memoRiskRegisterSection > :not(.memoDocSectionTitle) {
     margin-left: 40px;
   }
