@@ -197,6 +197,12 @@ def enrich_scout_for_reviewer_llm(scout_output: Dict[str, Any], user_id: str) ->
     from utils.retrieval_grounding import render_sources_for_prompt
 
     out = dict(scout_output)
+    # An add-context re-review already has a deliberate evidence delta (including
+    # fetched link content). Extra broad searches add latency and can dilute the
+    # analyst-supplied evidence with unrelated same-name company results.
+    operator_context = scout_output.get("operator_context")
+    if isinstance(operator_context, str) and operator_context.strip():
+        return out
     pack = fetch_reviewer_gap_pack(scout_output, user_id)
     if not pack:
         return out

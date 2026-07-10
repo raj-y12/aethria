@@ -201,7 +201,7 @@ const WorkGrid = ({
   const [autoSelectReady, setAutoSelectReady] = useState(reduceMotion);
   useEffect(() => {
     if (reduceMotion) return;
-    const timer = window.setTimeout(() => setAutoSelectReady(true), 460);
+    const timer = window.setTimeout(() => setAutoSelectReady(true), 150);
     return () => window.clearTimeout(timer);
   }, [reduceMotion]);
   // Let the chrome (spine slide + page-enter) land before the docket staggers
@@ -210,7 +210,7 @@ const WorkGrid = ({
   const [chromeSettled, setChromeSettled] = useState(reduceMotion);
   useEffect(() => {
     if (reduceMotion) return;
-    const timer = window.setTimeout(() => setChromeSettled(true), 900);
+    const timer = window.setTimeout(() => setChromeSettled(true), 200);
     return () => window.clearTimeout(timer);
   }, [reduceMotion]);
   const hasActiveFilters =
@@ -250,7 +250,7 @@ const WorkGrid = ({
       ? undefined
       : {
           hidden: {},
-          visible: { transition: { staggerChildren: 0.04, delayChildren: chromeSettled ? 0.04 : 0.35 } },
+          visible: { transition: { staggerChildren: 0.04, delayChildren: chromeSettled ? 0.04 : 0.1 } },
         },
     [reduceMotion, chromeSettled]
   );
@@ -452,7 +452,7 @@ const WorkGrid = ({
                 animate="visible"
                 variants={emptyStateContainerVariants}
               >
-                <motion.p className="type-label-tab text-oxford/35" variants={emptyStateItemVariants}>
+                <motion.p className="type-label-tab text-oxford/60" variants={emptyStateItemVariants}>
                   Queue view
                 </motion.p>
                 <motion.p
@@ -461,7 +461,7 @@ const WorkGrid = ({
                 >
                   No deals match this view.
                 </motion.p>
-                <motion.p className="mt-phi-2 type-body text-oxford/55" variants={emptyStateItemVariants}>
+                <motion.p className="mt-phi-2 type-body text-oxford/60" variants={emptyStateItemVariants}>
                   Clear filters or switch to a broader queue view. Stale work is classified after{' '}
                   {config.thresholds.staleAfterHours} hours.
                 </motion.p>
@@ -495,7 +495,7 @@ const WorkGrid = ({
                           type="button"
                           onClick={() => onQueueViewChange('ALL')}
                           aria-label="Switch to all deals view"
-                          className={`${productInteraction.action} btn-interaction btn-interaction--no-press uppercase tracking-[0.12em] text-oxford/55`}
+                          className={`${productInteraction.action} btn-interaction btn-interaction--no-press uppercase tracking-[0.12em] text-oxford/60`}
                         >
                           Show all deals
                         </button>

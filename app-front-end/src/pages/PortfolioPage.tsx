@@ -25,7 +25,7 @@ function Readout({ label, value, tone }: { label: string; value: string; tone?: 
       >
         {value}
       </span>
-      <span className="type-meta uppercase tracking-[0.1em] text-oxford/40">{label}</span>
+      <span className="type-meta uppercase tracking-[0.1em] text-oxford/60">{label}</span>
     </div>
   );
 }
@@ -34,18 +34,23 @@ function SectionHead({ title, detail }: { title: string; detail?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-phi-4 border-t border-oxford/[0.075] pt-phi-4">
       <h2 className="type-label-section text-oxford/[0.72]">{title}</h2>
-      {detail ? <span className="type-meta tabular-nums text-oxford/35">{detail}</span> : null}
+      {detail ? <span className="type-meta tabular-nums text-oxford/60">{detail}</span> : null}
     </div>
   );
 }
 
 function QuietEmpty({ children }: { children: React.ReactNode }) {
-  return <p className="mt-phi-4 type-body-sm text-oxford/45">{children}</p>;
+  return <p className="mt-phi-4 type-body-sm text-oxford/60">{children}</p>;
 }
 
 function signalWhen(sig: SignalItem): string {
   return formatDateTime(sig.detected_at);
 }
+
+/* Conviction book columns (lg+): Company | Sector | Stage | Score | Ruling.
+ * Aligned cells make the book comparable down the page; below lg the row
+ * falls back to the stacked name + meta line. */
+const BOOK_GRID = 'lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_64px_72px] lg:items-baseline lg:gap-phi-4';
 
 /**
  * Portfolio — conviction monitoring. The book the system has built, the
@@ -88,11 +93,11 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
   const maxSectorCount = Math.max(...sectorRows.map((r) => r.count), 1);
 
   const watchlistEntries = data.watchlistAnalytics.entries ?? [];
-  const recentSignals = (data.signals ?? []).slice(0, 12);
+  const recentSignals = (data.signals ?? []).slice(0, 20);
 
   return (
     <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <div className="mx-auto w-full max-w-[1180px] px-phi-5 pt-phi-6 pb-phi-8">
+      <div className="mx-auto w-full max-w-[var(--room-max-portfolio)] px-phi-5 pt-phi-6 pb-phi-8">
         {/* ── Header: place + book composition in one line of sight ── */}
         <RoomHeader
           className="pb-phi-6"
@@ -121,34 +126,50 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
               {convictionBook.length === 0 ? (
                 <QuietEmpty>No conviction positions yet. INVEST decisions land here as the pipeline rules.</QuietEmpty>
               ) : (
-                <ul className="mt-phi-2 flex flex-col">
-                  {convictionBook.map((s) => (
-                    <li key={s.id}>
-                      <button
-                        type="button"
-                        onClick={() => openDeal(s.id)}
-                        className="flex w-full items-center justify-between gap-phi-4 border-b border-oxford/[0.06] py-phi-3 text-left transition-colors hover:bg-registerTint btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate type-body-emphasis text-oxford">{s.scout.name}</span>
-                          <span className="block truncate type-meta text-oxford/45">
-                            {[s.scout.sector, s.scout.funding_stage].filter(Boolean).join(' · ') || '—'}
-                          </span>
-                        </span>
-                        <span className="flex shrink-0 items-center gap-phi-4">
-                          {isDealHumanResolved(s) ? (
-                            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">Ruled</span>
-                          ) : null}
-                          {s.review?.overall_score != null ? (
-                            <span className="font-mono text-[13px] tabular-nums text-oxford/70">
-                              {Number(s.review.overall_score).toFixed(1)}
+                <>
+                  <div
+                    className={`mt-phi-2 hidden border-b border-oxford/[0.06] pb-phi-2 ${BOOK_GRID}`}
+                    aria-hidden
+                  >
+                    <span className="type-meta uppercase tracking-[0.1em] text-oxford/60">Company</span>
+                    <span className="type-meta uppercase tracking-[0.1em] text-oxford/60">Sector</span>
+                    <span className="type-meta uppercase tracking-[0.1em] text-oxford/60">Stage</span>
+                    <span className="text-right type-meta uppercase tracking-[0.1em] text-oxford/60">Score</span>
+                    <span className="text-right type-meta uppercase tracking-[0.1em] text-oxford/60">Ruling</span>
+                  </div>
+                  <ul className="flex flex-col lg:mt-0 mt-phi-2">
+                    {convictionBook.map((s) => (
+                      <li key={s.id}>
+                        <button
+                          type="button"
+                          onClick={() => openDeal(s.id)}
+                          className={`flex w-full items-center gap-phi-4 border-b border-oxford/[0.06] py-phi-3 text-left transition-colors hover:bg-registerTint btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${BOOK_GRID}`}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate type-body-emphasis text-oxford">{s.scout.name}</span>
+                            <span className="block truncate type-meta text-oxford/60 lg:hidden">
+                              {[s.scout.sector, s.scout.funding_stage, isDealHumanResolved(s) ? 'Ruled' : null]
+                                .filter(Boolean)
+                                .join(' · ') || '—'}
                             </span>
-                          ) : null}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                          </span>
+                          <span className="hidden min-w-0 truncate type-meta text-oxford/60 lg:block">
+                            {s.scout.sector || '—'}
+                          </span>
+                          <span className="hidden min-w-0 truncate type-meta text-oxford/60 lg:block">
+                            {s.scout.funding_stage || '—'}
+                          </span>
+                          <span className="shrink-0 text-right font-mono text-[13px] tabular-nums text-oxford/70">
+                            {s.review?.overall_score != null ? Number(s.review.overall_score).toFixed(1) : '—'}
+                          </span>
+                          <span className="hidden shrink-0 text-right font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60 lg:block">
+                            {isDealHumanResolved(s) ? 'Ruled' : '—'}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </section>
 
@@ -164,7 +185,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                 <ul className="mt-phi-4 flex flex-col gap-phi-3">
                   {sectorRows.map((row, i) => (
                     <li key={row.sector} className="grid grid-cols-[minmax(90px,140px)_1fr_64px] items-center gap-phi-4">
-                      <span className="truncate type-meta uppercase tracking-[0.1em] text-oxford/55">{row.sector}</span>
+                      <span className="truncate type-meta uppercase tracking-[0.1em] text-oxford/60">{row.sector}</span>
                       <span className="relative block h-px bg-oxford/10">
                         <motion.span
                           className="absolute inset-y-0 left-0 origin-left bg-oxford/45"
@@ -174,7 +195,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           transition={{ duration: 0.9, delay: reduceMotion ? 0 : 0.1 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                         />
                       </span>
-                      <span className="text-right font-mono text-[11px] tabular-nums text-oxford/50">
+                      <span className="text-right font-mono text-[12px] tabular-nums text-oxford/60">
                         {row.count} · {row.pct.toFixed(0)}%
                       </span>
                     </li>
@@ -195,7 +216,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                 <QuietEmpty>Nothing held under observation.</QuietEmpty>
               ) : (
                 <ul className="mt-phi-2 flex flex-col">
-                  {watchlistEntries.slice(0, 12).map((e, i) => (
+                  {watchlistEntries.slice(0, 20).map((e, i) => (
                     <li key={e.startup_id ?? i}>
                       <button
                         type="button"
@@ -207,8 +228,8 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           {e.startup_name ?? (e.startup_id ? startupNameById.get(e.startup_id) : null) ?? 'Unknown'}
                         </span>
                         <span
-                          className={`shrink-0 font-mono text-[11px] tabular-nums ${
-                            e.stale_warning ? 'text-escalation' : 'text-oxford/45'
+                          className={`shrink-0 font-mono text-[12px] tabular-nums ${
+                            e.stale_warning ? 'text-escalation' : 'text-oxford/60'
                           }`}
                         >
                           {e.days_on_watchlist != null ? `${e.days_on_watchlist}d` : '—'}
@@ -231,10 +252,10 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                     const body = (
                       <>
                         <span className="flex items-baseline justify-between gap-phi-3">
-                          <span className="min-w-0 truncate type-meta uppercase tracking-[0.08em] text-oxford/55">
+                          <span className="min-w-0 truncate type-meta uppercase tracking-[0.08em] text-oxford/60">
                             {companyName ?? sig.signal_type.replace(/_/g, ' ')}
                           </span>
-                          <span className="shrink-0 font-mono text-[10px] tabular-nums tracking-[0.04em] text-oxford/35">
+                          <span className="shrink-0 font-mono text-[12px] tabular-nums tracking-[0.04em] text-oxford/60">
                             {signalWhen(sig)}
                           </span>
                         </span>

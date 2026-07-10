@@ -650,6 +650,17 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     + "\n---\n"
                 )
 
+            prior_review = scout_output.get("_prior_review")
+            if isinstance(prior_review, dict) and prior_review:
+                supplement_block += (
+                    "\n\n---\nPRIOR EVALUATION (the current stored review before this re-review). "
+                    "Use it as the comparison baseline, not as an authority. Re-evaluate the case "
+                    "using the new operator context, and state what changed, what did not change, "
+                    "and why any score, risk, or thesis conclusion moved.\n"
+                    + json.dumps(prior_review, ensure_ascii=False)[:8000]
+                    + "\n---\n"
+                )
+
             operator_raw = scout_output.get("operator_context")
             if isinstance(operator_raw, str) and operator_raw.strip():
                 supplement_block += (

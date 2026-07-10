@@ -71,7 +71,7 @@ function HomeDoor({
       />
 
       <span
-        className={`relative z-10 font-mono text-[10px] tracking-[0.2em] transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[2px] text-oxford/30 group-hover:text-oxford/70`}
+        className={`relative z-10 font-mono text-[12px] tracking-[0.2em] transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[2px] text-oxford/60 group-hover:text-oxford/70`}
         aria-hidden
       >
         {numeral}
@@ -87,7 +87,7 @@ function HomeDoor({
         className={`relative z-10 text-center font-mono text-[9.5px] leading-snug tracking-[0.06em] tabular-nums transition-colors duration-300 ${EASE} ${
           tone === 'escalation'
             ? 'text-escalation/90 group-hover:text-escalation-bright'
-            : 'text-oxford/45 group-hover:text-oxford/70'
+            : 'text-oxford/60 group-hover:text-oxford/70'
         }`}
       >
         {detail}
@@ -203,7 +203,7 @@ export default function HomePage({ data }: { data: SystemData }) {
 
         {/* ── The situation, spoken ── */}
         <Reveal delay={0.1} className="mt-phi-7">
-          <p className="text-center font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-oxford/40">
+          <p className="text-center font-mono text-[12px] uppercase tracking-[0.22em] tabular-nums text-oxford/60">
             {eyebrow}
           </p>
         </Reveal>
@@ -217,7 +217,7 @@ export default function HomePage({ data }: { data: SystemData }) {
             </Reveal>
 
             <Reveal delay={0.24} className="mt-phi-5">
-              <p className="text-center font-mono text-[10.5px] tracking-[0.1em] text-oxford/45">
+              <p className="text-center font-mono text-[10.5px] tracking-[0.1em] text-oxford/60">
                 Aethria won't scout or evaluate until a fund mandate is published.
               </p>
             </Reveal>
@@ -240,14 +240,14 @@ export default function HomePage({ data }: { data: SystemData }) {
             </Reveal>
 
             <Reveal delay={0.24} className="mt-phi-5">
-              <p className="text-center font-mono text-[10.5px] tracking-[0.1em] tabular-nums text-oxford/45">
+              <p className="text-center font-mono text-[10.5px] tracking-[0.1em] tabular-nums text-oxford/60">
                 {subline}
               </p>
             </Reveal>
 
             {digest && (
               <Reveal delay={0.3} className="mt-phi-3">
-                <p className="text-center font-mono text-[10px] tracking-[0.1em] tabular-nums text-oxford/35">
+                <p className="text-center font-mono text-[12px] tracking-[0.1em] tabular-nums text-oxford/60">
                   {digest}
                 </p>
               </Reveal>
@@ -268,11 +268,11 @@ export default function HomePage({ data }: { data: SystemData }) {
                     className={`pointer-events-none absolute inset-0 bg-oxford opacity-0 transition-opacity duration-[420ms] ${EASE} group-hover:opacity-[0.04]`}
                   />
                   <span className="relative flex items-baseline justify-between">
-                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-oxford/40">
+                    <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.2em] text-oxford/60">
                       On the desk
                     </span>
                     <span
-                      className={`font-mono text-[10px] uppercase tracking-[0.18em] text-oxford/45 transition-[transform,color] duration-300 ${EASE} group-hover:translate-x-[2px] group-hover:text-oxford/80`}
+                      className={`font-mono text-[12px] uppercase tracking-[0.18em] text-oxford/60 transition-[transform,color] duration-300 ${EASE} group-hover:translate-x-[2px] group-hover:text-oxford/80`}
                     >
                       Flow →
                     </span>
@@ -288,7 +288,7 @@ export default function HomePage({ data }: { data: SystemData }) {
                           </span>
                           <span
                             className={`font-mono text-[9.5px] tracking-[0.08em] tabular-nums sm:shrink-0 ${
-                              urgent ? 'text-escalation/90' : 'text-oxford/45'
+                              urgent ? 'text-escalation/90' : 'text-oxford/60'
                             }`}
                           >
                             {reason}
@@ -298,7 +298,7 @@ export default function HomePage({ data }: { data: SystemData }) {
                     })}
                   </span>
                   {attentionOverflow > 0 && (
-                    <span className="relative mt-phi-2 block font-mono text-[9.5px] tracking-[0.1em] tabular-nums text-oxford/30">
+                    <span className="relative mt-phi-2 block font-mono text-[9.5px] tracking-[0.1em] tabular-nums text-oxford/60">
                       + {attentionOverflow} more
                     </span>
                   )}
@@ -339,7 +339,7 @@ export default function HomePage({ data }: { data: SystemData }) {
         {/* ── The footer bar — Dispatch's micro-action language ── */}
         <Reveal delay={0.36} className="mt-phi-7">
           <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
-            <span className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/40">
+            <span className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/60">
               {displayName}
             </span>
             {fundName || mandateVersion != null ? (
@@ -347,7 +347,7 @@ export default function HomePage({ data }: { data: SystemData }) {
                 <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
                 <Link
                   to="/v1/fund"
-                  className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
+                  className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/60 transition-colors hover:text-oxford btn-interaction"
                 >
                   {fundName || `Mandate v${mandateVersion}`}
                 </Link>
@@ -357,14 +357,14 @@ export default function HomePage({ data }: { data: SystemData }) {
             <button
               type="button"
               onClick={openDispatch}
-              className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
+              className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/60 transition-colors hover:text-oxford btn-interaction"
             >
               {dispatchActive ? 'Lookup running' : 'Dispatch ⌘K'}
             </button>
             <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
             <Link
               to="/v1/settings"
-              className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction"
+              className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/60 transition-colors hover:text-oxford btn-interaction"
             >
               Settings
             </Link>
@@ -373,7 +373,7 @@ export default function HomePage({ data }: { data: SystemData }) {
               type="button"
               onClick={requestLogout}
               disabled={agentActionPending}
-              className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 disabled:opacity-50 btn-interaction"
+              className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/60 transition-colors hover:text-oxford disabled:opacity-50 btn-interaction"
             >
               {agentActionPending ? 'Updating…' : 'Log out'}
             </button>

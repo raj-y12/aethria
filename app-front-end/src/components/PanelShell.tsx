@@ -9,7 +9,7 @@ export const PANEL_TAB_BUTTON_CLASS =
   `py-phi-3 px-phi-3 type-label-tab btn-interaction rounded-none ${productInteraction.quiet}`;
 export const PANEL_TAB_ACTIVE_CLASS = productInteraction.selected;
 export const PANEL_TAB_INACTIVE_CLASS =
-  'text-oxford/[0.42] hover:text-oxford/75 hover:bg-registerTint';
+  'text-oxford/60 hover:text-oxford/75 hover:bg-registerTint';
 export const PANEL_CONTENT_CLASS =
   'flex-1 min-h-0 overflow-y-auto p-phi-6';
 

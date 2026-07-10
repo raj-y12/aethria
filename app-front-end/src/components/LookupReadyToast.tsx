@@ -34,7 +34,7 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
           <div className="pointer-events-auto flex max-w-[min(92vw,30rem)] items-center gap-phi-4 border border-oxford/25 bg-paper-bright px-phi-5 py-phi-3">
             <span className="h-1.5 w-1.5 shrink-0 rounded-none bg-oxford signal-dot-breathe" aria-hidden />
             <span className="min-w-0 flex-1">
-              <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-oxford/40">
+              <span className="block font-mono text-[12px] uppercase tracking-[0.14em] text-oxford/60">
                 Lookup ready{recommendation ? ` · ${recommendation}` : ''}
               </span>
               <span className="block truncate type-body-sm font-medium text-oxford">{name}</span>
@@ -42,7 +42,7 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
             <button
               type="button"
               onClick={onOpen}
-              className="inline-flex h-[34px] shrink-0 items-center justify-center bg-oxford px-phi-4 font-mono text-[10px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
+              className="inline-flex h-[34px] shrink-0 items-center justify-center bg-oxford px-phi-4 font-mono text-[12px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
             >
               Open memo
             </button>
@@ -50,7 +50,7 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
               type="button"
               onClick={onDismiss}
               aria-label="Dismiss"
-              className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-base leading-none text-oxford/30 transition-colors hover:text-oxford/60 btn-interaction"
+              className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-base leading-none text-oxford/60 transition-colors hover:text-oxford btn-interaction"
             >
               ×
             </button>

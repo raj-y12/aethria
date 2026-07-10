@@ -37,7 +37,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
       className="mt-phi-3 grid gap-phi-2"
       aria-label="Select the company you meant"
     >
-      <p className="type-meta text-oxford/[0.45]">
+      <p className="type-meta text-oxford/60">
         {heading ?? 'More than one company matches — select the one you meant.'}
       </p>
 
@@ -52,17 +52,17 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
         >
           <div className="flex items-baseline justify-between gap-phi-2">
             <span className="min-w-0 truncate font-sans font-medium text-[13px] text-oxford">{c.name}</span>
-            <span className="type-meta shrink-0 max-w-[45%] truncate text-oxford/[0.50]">{domainLabel(c.website)}</span>
+            <span className="type-meta shrink-0 max-w-[45%] truncate text-oxford/60">{domainLabel(c.website)}</span>
           </div>
           {c.description ? (
-            <p className="mt-phi-1 type-meta text-oxford/[0.55] line-clamp-2">{c.description}</p>
+            <p className="mt-phi-1 type-meta text-oxford/60 line-clamp-2">{c.description}</p>
           ) : null}
           {c.source_badges.length ? (
             <div className="mt-phi-2 flex flex-wrap gap-phi-1">
               {c.source_badges.map((b, i) => (
                 <span
                   key={`${b}-${i}`}
-                  className="type-meta text-oxford/[0.40] border border-oxford/[0.10] px-phi-1 leading-[1.6]"
+                  className="type-meta text-oxford/60 border border-oxford/[0.10] px-phi-1 leading-[1.6]"
                 >
                   {b}
                 </span>
@@ -83,7 +83,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
             placeholder="Company website (e.g. example.ie)"
             autoComplete="off"
             disabled={busy}
-            className="min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-sans text-[13px] text-oxford placeholder:text-oxford/[0.28] outline-none"
+            className="min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-sans text-[13px] text-oxford placeholder:text-oxford/60 outline-none"
           />
           <button type="button" onClick={submitRefine} disabled={busy || !website.trim()} className={productInteraction.action}>
             Resolve →
@@ -94,7 +94,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
           type="button"
           onClick={() => setRefineOpen(true)}
           disabled={busy}
-          className="justify-self-start type-meta text-oxford/[0.40] hover:text-oxford/[0.70] bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
+          className="justify-self-start type-meta text-oxford/60 hover:text-oxford/[0.70] bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
         >
           {candidates.length ? 'None of these — add a website' : 'Add a website'}
         </button>

@@ -118,6 +118,16 @@
   --queue-content-measure: 42rem;
   --memo-editorial-measure: 44rem;
 
+  /* Per-room canvas widths — density targets (UI/UX audit 2026-07-10, P1
+     "data placement"). One cap per room, set by what the room does:
+     Flow    — working room: queue + active memo side by side, wants the screen.
+     Portfolio — monitoring room: comparative lists earn moderate width.
+     Fund    — reading room: the mandate is prose; hold the measure and fill
+               the adjacent column instead of stretching empty paper. */
+  --room-max-flow: 1560px;
+  --room-max-portfolio: 1400px;
+  --room-max-fund: 1180px;
+
   /* Semantic surfaces — mirror tokens.surface + Tailwind bg-surface-* */
   --surface-canvas: var(--color-paper);
   --surface-raised: var(--color-paper-bright);
@@ -141,9 +151,11 @@
   }
 }
 
-/* The spine — full-height oxford rail, constant across workspaces. */
+/* The spine — full-height oxford rail, constant across workspaces.
+ * Narrowed (was 204–248px): it carries nav + one readout, the rooms carry
+ * the data — reclaimed width goes to the room canvases above. */
 .aethria-spine {
-  width: clamp(204px, 15vw, 248px);
+  width: clamp(180px, 12vw, 216px);
 }
 
 /* Flow workspace — queue | active decision (lg+). The queue is compressed
@@ -413,27 +425,27 @@
   }
   .type-note {
     font-family: var(--font-sans);
-    font-size: 10px;  /* clearly below 11px mono labels — fine print only */
+    font-size: 12px;  /* fine print — 12px readability floor */
     line-height: 1.6;
     letter-spacing: 0;
   }
   .type-label-section {
     font-family: "Space Mono", ui-monospace, monospace;
-    font-size: 11px;
+    font-size: 12px;
     line-height: var(--type-meta-leading, 1.45);
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
   .type-label-tab {
     font-family: "Space Mono", ui-monospace, monospace;
-    font-size: 11px;
+    font-size: 12px;
     line-height: var(--type-meta-leading, 1.45);
     letter-spacing: 0.10em;
     text-transform: uppercase;
   }
   .type-meta {
     font-family: "Space Mono", ui-monospace, monospace;
-    font-size: 11px;
+    font-size: 12px;
     line-height: var(--type-meta-leading, 1.45);
     letter-spacing: 0.06em;
   }
@@ -645,10 +657,10 @@
   display: inline-flex;
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(var(--color-oxford-rgb), 0.50);
+  color: rgba(var(--color-oxford-rgb), 0.62);
   padding: 0.35rem 0.55rem;
   border: 1px solid rgba(var(--color-oxford-rgb), 0.08);
   background-color: transparent;

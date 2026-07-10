@@ -10,7 +10,7 @@ import {
 import type { FundConfiguration } from '../lib/fundConfiguration';
 import { DEFAULT_VERDICT_BADGES } from '../lib/fundConfiguration';
 
-const labelCls = 'type-label-section text-oxford/45';
+const labelCls = 'type-label-section text-oxford/60';
 const inputCls =
   'w-full max-w-[5.5rem] rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 type-body-sm font-mono tabular-nums text-oxford outline-none transition-colors focus:border-oxford/45';
 
@@ -49,7 +49,7 @@ function ThresholdBar({ boundaries }: { boundaries: DecisionThresholdBoundaries 
           Invest
         </div>
       </div>
-      <p className="mt-phi-2 font-mono text-[11px] tabular-nums text-oxford/[0.42]">
+      <p className="mt-phi-2 font-mono text-[12px] tabular-nums text-oxford/60">
         0–{passMax} · {boundaries.passMonitorBoundary}–{monitorMax} · {boundaries.monitorInvestBoundary}–100
       </p>
     </div>
@@ -108,7 +108,7 @@ function ScoreInput({
           aria-describedby={suffix ? `${id}-suffix` : undefined}
         />
         {suffix && (
-          <span id={`${id}-suffix`} className="type-meta text-oxford/40">{suffix}</span>
+          <span id={`${id}-suffix`} className="type-meta text-oxford/60">{suffix}</span>
         )}
       </div>
     </div>

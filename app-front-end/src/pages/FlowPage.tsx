@@ -59,12 +59,12 @@ function ReadoutKey({
             ? 'text-escalation'
             : active
               ? 'text-oxford'
-              : 'text-oxford/[0.42] group-hover:text-oxford/70'
+              : 'text-oxford/60 group-hover:text-oxford/70'
         }`}
       >
         {value}
       </span>
-      <span className="relative type-meta uppercase tracking-[0.1em] text-oxford/40 transition-colors group-hover:text-oxford/60">
+      <span className="relative type-meta uppercase tracking-[0.1em] text-oxford/60 transition-colors group-hover:text-oxford">
         {label}
         <span
           aria-hidden
@@ -185,7 +185,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
   }, [watchlistAnalytics]);
 
   const headerSub = (
-    <p className="type-body-sm text-oxford/45">
+    <p className="type-body-sm text-oxford/60">
       {selectedStartup
         ? memoStartup?.scout?.name ?? selectedStartup.scout.name
         : openCount > 0
@@ -196,7 +196,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
 
   return (
     <div className="page-transition-enter flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1180px] flex-col px-phi-5 pt-phi-6 pb-phi-5">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[var(--room-max-flow)] flex-col px-phi-5 pt-phi-6 pb-phi-5">
         <div className="flex-none pb-phi-4 lg:hidden">
           <AgentDispatch
             input={inlineDispatch.input}
@@ -256,7 +256,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
             <h2 className="type-display mt-phi-5 text-[clamp(26px,3vw,40px)] leading-[1.1] text-oxford">
               The pipeline is filling.
             </h2>
-            <p className="mt-phi-3 max-w-[36ch] font-mono text-[11px] tracking-[0.06em] text-oxford/45">
+            <p className="mt-phi-3 max-w-[36ch] font-mono text-[12px] tracking-[0.06em] text-oxford/60">
               Scouts are searching against your mandate. New matters appear here as they land.
             </p>
             <button
@@ -265,7 +265,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
               className={`mt-phi-6 gap-phi-2 ${productInteraction.rulingChoiceIdle}`}
             >
               Dispatch a lookup
-              <span className="font-normal text-oxford/45" aria-hidden>⌘K</span>
+              <span className="font-normal text-oxford/60" aria-hidden>⌘K</span>
             </button>
           </div>
         ) : (

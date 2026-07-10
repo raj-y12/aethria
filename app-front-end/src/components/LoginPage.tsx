@@ -27,8 +27,9 @@ const AnimatedInput = React.forwardRef<
     <input ref={ref} className={className} {...props} />
     <div className="absolute bottom-0 left-0 right-0 h-px bg-oxford/10" />
     <motion.div
-      className="absolute bottom-0 left-1/2 h-px -translate-x-1/2 bg-oxford/40"
-      animate={{ width: focused ? '100%' : '0%' }}
+      className="absolute bottom-0 left-0 right-0 h-px origin-center bg-oxford/40"
+      initial={{ scaleX: 0 }}
+      animate={{ scaleX: focused ? 1 : 0 }}
       transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
     />
   </div>
@@ -314,13 +315,13 @@ export default function LoginPage() {
               className="flex w-full flex-col items-center mb-phi-8"
             >
               {/* Same voice as the home page: mono eyebrow, then the mark. */}
-              <p className="m-0 mb-phi-5 text-center font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-oxford/40">
+              <p className="m-0 mb-phi-5 text-center font-mono text-[12px] uppercase tracking-[0.22em] tabular-nums text-oxford/60">
                 {dateline}
               </p>
               <h1 className="font-wordmark text-center text-[clamp(48px,8vw,80px)] font-medium text-oxford leading-[0.9] m-0 tracking-normal">
                 Aethria<span className="wordmark-dot">.</span>
               </h1>
-              <p className="type-meta uppercase tracking-[0.24em] text-oxford/40 mt-phi-4">
+              <p className="type-meta uppercase tracking-[0.24em] text-oxford/60 mt-phi-4">
                 Deal flow operating system
               </p>
             </motion.div>
@@ -390,10 +391,10 @@ export default function LoginPage() {
                   <span className="flex items-center justify-center">
                     <span>Enter Aethria</span>
                     <span
-                      className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
+                      className="inline-block w-6 shrink-0 overflow-hidden whitespace-nowrap"
                       aria-hidden
                     >
-                      {' →'}
+                      <span className="inline-block -translate-x-2 opacity-0 transition-[transform,opacity] duration-[250ms] ease group-hover:translate-x-0 group-hover:opacity-100">{' →'}</span>
                     </span>
                   </span>
               </motion.button>
@@ -421,7 +422,7 @@ export default function LoginPage() {
                   <div className="flex flex-col">
                     <label
                       htmlFor="login-identifier"
-                      className="type-meta mb-phi-2 uppercase tracking-[0.14em] text-oxford/45"
+                      className="type-meta mb-phi-2 uppercase tracking-[0.14em] text-oxford/60"
                     >
                       Email or username
                     </label>
@@ -436,13 +437,13 @@ export default function LoginPage() {
                       onFocus={() => setUsernameFocused(true)}
                       onBlur={() => setUsernameFocused(false)}
                       aria-describedby={error ? 'login-error' : undefined}
-                      className="w-full bg-transparent border-0 py-phi-3 font-sans text-sm text-oxford outline-none placeholder:text-oxford/35 tracking-0"
+                      className="w-full bg-transparent border-0 py-phi-3 font-sans text-sm text-oxford outline-none placeholder:text-oxford/60 tracking-0"
                     />
                   </div>
                   <div className="flex flex-col">
                     <label
                       htmlFor="login-password"
-                      className="type-meta mb-phi-2 uppercase tracking-[0.14em] text-oxford/45"
+                      className="type-meta mb-phi-2 uppercase tracking-[0.14em] text-oxford/60"
                     >
                       Password
                     </label>
@@ -458,7 +459,7 @@ export default function LoginPage() {
                       onFocus={() => setPasswordFocused(true)}
                       onBlur={() => setPasswordFocused(false)}
                       aria-describedby={error ? 'login-error' : undefined}
-                      className="w-full bg-transparent border-0 py-phi-3 font-sans text-sm text-oxford outline-none placeholder:text-oxford/35 tracking-0"
+                      className="w-full bg-transparent border-0 py-phi-3 font-sans text-sm text-oxford outline-none placeholder:text-oxford/60 tracking-0"
                     />
                   </div>
                 </div>
@@ -473,7 +474,7 @@ export default function LoginPage() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.2, ease: EASE }}
-                      className="type-meta text-[11px] text-escalation text-center mb-phi-6 tracking-[0.06em]"
+                      className="type-meta text-[12px] text-escalation text-center mb-phi-6 tracking-[0.06em]"
                     >
                       {error}
                     </motion.p>
@@ -500,10 +501,10 @@ export default function LoginPage() {
                       <>
                         <span>Enter Aethria</span>
                         <span
-                          className="inline-block w-2 shrink-0 overflow-hidden whitespace-nowrap transition-[width] duration-[250ms] ease group-hover:w-6"
+                          className="inline-block w-6 shrink-0 overflow-hidden whitespace-nowrap"
                           aria-hidden
                         >
-                          {' →'}
+                          <span className="inline-block -translate-x-2 opacity-0 transition-[transform,opacity] duration-[250ms] ease group-hover:translate-x-0 group-hover:opacity-100">{' →'}</span>
                         </span>
                       </>
                     )}

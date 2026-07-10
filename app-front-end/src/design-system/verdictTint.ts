@@ -12,7 +12,7 @@ export function verdictTextClass(decision: PartnerDecision, onDark = false): str
   if (onDark) {
     switch (decision) {
       case 'PASS':
-        return 'text-white/50';
+        return 'text-white/60';
       case 'MONITOR':
         return 'text-white/70';
       case 'INVEST':

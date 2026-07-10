@@ -78,6 +78,29 @@ def test_enrich_skips_when_disabled(monkeypatch):
     assert "_reviewer_web_supplement" not in out
 
 
+def test_enrich_skips_broad_gap_search_when_operator_context_is_present(monkeypatch):
+    """Add-context already supplies the deliberate evidence delta; do not add
+    several unrelated Tavily searches before the re-review."""
+    monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL", "1")
+
+    def unexpected_pack(*args, **kwargs):
+        raise AssertionError("broad gap retrieval should be skipped for add-context")
+
+    monkeypatch.setattr("utils.reviewer_gap_retrieval.fetch_reviewer_gap_pack", unexpected_pack)
+    out = enrich_scout_for_reviewer_llm(
+        {
+            "name": "Acme",
+            "est_tam": None,
+            "funding_stage": "Unknown",
+            "references": [],
+            "operator_context": "[Content of operator-provided link https://acme.example/news]\nNew pilot data",
+        },
+        "user-1",
+    )
+
+    assert "_reviewer_web_supplement" not in out
+
+
 def test_reviewer_gap_retrieval_filters_to_lookup_website(monkeypatch):
     monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL", "1")
     monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL_ONLY_WHEN_GAPS", "1")

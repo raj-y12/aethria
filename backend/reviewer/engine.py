@@ -938,6 +938,8 @@ class ReviewerEngine:
             return False
 
         scout_output = self._build_scout_output_payload(startup)
+        if force_rerun and startup.review_info is not None:
+            scout_output["_prior_review"] = startup.review_info.model_dump(mode="json")
         scout_for_llm = enrich_scout_for_reviewer_llm(scout_output, self.tenant_user_id)
 
         try:

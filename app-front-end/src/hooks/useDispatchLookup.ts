@@ -14,6 +14,7 @@ import {
 import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 import { resolveLookupFailure } from '../lib/lookupFailure';
+import { lookupChipStatus } from '../lib/lookupTracking';
 import {
   getDispatchLookupStorageKey,
   loadDispatchLookupSnapshot,
@@ -384,8 +385,11 @@ export function useDispatchLookup({
   const lookupDecided = pendingLookup?.isRerun
     ? memoStatusQuery.data?.status === 'ready'
     : !!pendingLookupMatch?.partner?.recommendation || memoStatusQuery.data?.status === 'ready';
+  const rerunDecisionComplete = pendingLookup?.isRerun
+    ? memoStatusQuery.data?.pipeline_status === 'writing_memo' || lookupDecided
+    : false;
   const rerunReviewComplete = pendingLookup?.isRerun
-    ? memoStatusQuery.data?.pipeline_status === 'pending' || lookupDecided
+    ? memoStatusQuery.data?.pipeline_status === 'pending' || rerunDecisionComplete
     : false;
   useEffect(() => {
     if (!lookupDecided || !pendingLookupMatch?.id) return;
@@ -429,7 +433,9 @@ export function useDispatchLookup({
             ? ' Identity needs your confirmation — see alternatives in the memo.'
             : '';
     const hasDecision = !!matched.partner?.recommendation;
-    if (hasDecision && (!pendingLookup.isRerun || lookupDecided)) {
+    if (pendingLookup.isRerun && rerunDecisionComplete && !lookupDecided) {
+      setMessage(`Decision complete for ${matched.scout.name}. Regenerating the memo with your new evidence...`);
+    } else if (hasDecision && (!pendingLookup.isRerun || lookupDecided)) {
       setMessage(
         pendingLookup.isRerun
           ? `Re-review complete: ${matched.scout.name} updated.${resolutionNote} Review the result and open the memo.`
@@ -446,7 +452,7 @@ export function useDispatchLookup({
     }
     // No silent auto-navigation: the takeover surfaces the result overview with an
     // "Open memo" action (openLookupMemo) so the user advances deliberately.
-  }, [lookupDecided, pendingLookup, pendingLookupMatch]);
+  }, [lookupDecided, pendingLookup, pendingLookupMatch, rerunDecisionComplete]);
 
   const lookupWorking = cancelPending || busy || (pendingLookup != null && !pendingLookup.autoOpened);
 
@@ -495,8 +501,9 @@ export function useDispatchLookup({
       resolved: pendingLookup?.isRerun ? true : pendingLookup != null,
       found: pendingLookup?.isRerun ? true : !!pendingLookupMatch,
       reviewed: pendingLookup?.isRerun ? rerunReviewComplete : !!pendingLookupMatch?.review,
+      decisionComplete: pendingLookup?.isRerun ? rerunDecisionComplete : undefined,
     };
-  }, [dispatching, activeQuery, lookupDecided, pendingLookup, pendingLookupMatch, rerunReviewComplete]);
+  }, [dispatching, activeQuery, lookupDecided, pendingLookup, pendingLookupMatch, rerunDecisionComplete, rerunReviewComplete]);
 
   // A finished lookup the analyst hasn't opened yet → "ready" toast.
   const lookupReady =
@@ -544,21 +551,22 @@ export function useDispatchLookup({
     const all = [pendingLookup, ...backgroundLookups].filter(Boolean) as TrackedLookup[];
     return all.map((l) => {
       const m = findLookupMatch(l.lookupId);
-      const status: 'scouting' | 'reviewing' | 'decided' = m?.partner?.recommendation
-        ? 'decided'
-        : m?.review
-          ? 'reviewing'
-          : l.isRerun
-            ? 'reviewing'
-          : 'scouting';
+      const isActive = l.lookupId === pendingLookup?.lookupId;
+      const status = lookupChipStatus({
+        isRerun: l.isRerun,
+        isActive,
+        lookupDecided: isActive && lookupDecided,
+        hasPartner: Boolean(m?.partner?.recommendation),
+        hasReview: Boolean(m?.review),
+      });
       return {
         id: l.lookupId,
         label: m?.scout?.name || l.queryLabel,
         status,
-        active: l.lookupId === pendingLookup?.lookupId,
+        active: isActive,
       };
     });
-  }, [pendingLookup, backgroundLookups, findLookupMatch]);
+  }, [pendingLookup, backgroundLookups, findLookupMatch, lookupDecided]);
 
   // Focus a backgrounded lookup: swap it into active, demote the current one.
   const focusChip = useCallback(

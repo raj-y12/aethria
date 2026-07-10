@@ -49,6 +49,7 @@ export function SpineNavButton({
   compact,
   surface = 'oxford',
   running = false,
+  sublabel,
 }: {
   label: string;
   active: boolean;
@@ -59,23 +60,25 @@ export function SpineNavButton({
   surface?: 'oxford' | 'paper';
   /** Shows a breathing dot before the label (e.g. a lookup running in the background). */
   running?: boolean;
+  /** Plain-language subtitle under the brand label (e.g. Flow → "Deals"). */
+  sublabel?: string;
 }) {
   const onPaper = surface === 'paper';
   const textActive = onPaper ? 'text-oxford' : 'text-white';
-  const textIdle = onPaper ? 'text-oxford/50 hover:text-oxford/80' : 'text-white/55 hover:text-white/[0.88]';
+  const textIdle = onPaper ? 'text-oxford/60 hover:text-oxford/80' : 'text-white/60 hover:text-white/[0.88]';
   const ring = onPaper ? 'focus-visible:ring-oxford/35' : 'focus-visible:ring-white/35';
   const bgActive = onPaper ? 'bg-surface-selected' : 'bg-white/[0.08]';
   const bgHover = onPaper ? 'hover:bg-oxford/[0.04]' : 'hover:bg-white/[0.05]';
   const shortcutActive = onPaper ? 'text-oxford/60' : 'text-white/75';
   const shortcutIdle = onPaper
-    ? 'text-oxford/25 group-hover:text-oxford/45'
-    : 'text-white/30 group-hover:text-white/[0.52]';
+    ? 'text-oxford/60 group-hover:text-oxford'
+    : 'text-white/60 group-hover:text-white';
 
   return (
     <button
       type="button"
       onClick={onClick}
-      title={shortcut ? `${label} (${shortcut})` : label}
+      title={shortcut ? `${sublabel ?? label} (${shortcut})` : sublabel ?? label}
       className={`group type-label-tab w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
         active ? `${textActive} ${bgActive}` : `${textIdle} ${bgHover}`
       } ${compact ? 'min-h-[32px] px-phi-4 py-phi-1' : 'min-h-[44px] px-2 py-1'}`}
@@ -90,7 +93,14 @@ export function SpineNavButton({
             aria-hidden
           />
         ) : null}
-        <span className="truncate">{label}</span>
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate">{label}</span>
+          {sublabel ? (
+            <span className="truncate font-sans text-[12px] font-normal normal-case leading-snug tracking-normal opacity-80">
+              {sublabel}
+            </span>
+          ) : null}
+        </span>
       </span>
       {shortcut ? (
         <span
@@ -281,8 +291,8 @@ export default function SystemBar({
 
           {/* Time + date */}
           <div className="shrink-0 px-3 flex flex-col gap-2" aria-live="polite">
-            <span className="type-meta tabular-nums leading-none text-white/55">{timeShort}</span>
-            <span className="type-label-section text-white/30">{dateShort}</span>
+            <span className="type-meta tabular-nums leading-none text-white/60">{timeShort}</span>
+            <span className="type-label-section text-white/60">{dateShort}</span>
           </div>
 
           <SpineRule />

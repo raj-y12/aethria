@@ -28,7 +28,7 @@ export default function SignalEventRow({
   className = '',
 }: SignalEventRowProps) {
   const borderCls = showDivider ? 'border-b border-hairline' : '';
-  const tsCls = 'shrink-0 tabular-nums type-meta text-oxford/40';
+  const tsCls = 'shrink-0 tabular-nums type-meta text-oxford/60';
   const bodyCls = 'type-body-sm text-oxford/60 leading-phi';
 
   if (layout === 'compact') {
@@ -52,7 +52,7 @@ export default function SignalEventRow({
       </div>
       <div className={bodyCls}>{body}</div>
       {meta != null && meta !== '' && (
-        <p className="type-meta text-oxford/40 mt-phi-1">{meta}</p>
+        <p className="type-meta text-oxford/60 mt-phi-1">{meta}</p>
       )}
     </div>
   );

@@ -2,30 +2,30 @@ import type { ReactNode } from 'react';
 
 export const productText = {
   sectionLabel: 'type-label-section text-oxford/[0.72]',
-  mutedLabel: 'type-label-section text-oxford/45',
-  micro: 'type-meta text-oxford/[0.42]',
-  body: 'type-body-sm leading-relaxed text-oxford/55',
+  mutedLabel: 'type-label-section text-oxford/60',
+  micro: 'type-meta text-oxford/60',
+  body: 'type-body-sm leading-relaxed text-oxford/60',
   bodyStrong: 'type-body-emphasis text-oxford',
   numeric: 'font-mono tabular-nums text-oxford',
 };
 
 export const productInteraction = {
   action:
-    'type-label-section min-h-[44px] rounded-none border-0 bg-transparent p-0 text-oxford/55 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 focus-visible:ring-offset-0',
+    'type-label-section min-h-[44px] rounded-none border-0 bg-transparent p-0 text-oxford/60 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 focus-visible:ring-offset-0',
   /** Panel header actions (memo exports, close) — same scale as WorkGrid queue tabs. */
   panelAction:
-    'type-label-section min-h-[36px] rounded-none border-0 bg-transparent px-phi-3 text-oxford/45 transition-colors hover:text-oxford/[0.72] disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset',
+    'type-label-section min-h-[36px] rounded-none border-0 bg-transparent px-phi-3 text-oxford/60 transition-colors hover:text-oxford/[0.72] disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset',
   /** Inline kicker row — matches DecisionStage sector line (10px mono, 0.12em tracking). */
   panelActionInline:
-    'inline-flex min-h-0 items-center rounded-none border-0 bg-transparent p-0 font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/[0.38] transition-colors hover:text-oxford/[0.55] disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset',
+    'inline-flex min-h-0 items-center rounded-none border-0 bg-transparent p-0 font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset',
   /** Subtle hover-fill interaction (panel tabs) — no text-color shift. */
   quiet:
     'transition-colors duration-150 hover:bg-oxford/[0.035] focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 focus-visible:ring-inset',
   /** Unselected memo ruling chip — Invest / Monitor / Pass at rest. */
   rulingChoiceIdle:
-    'inline-flex h-10 min-h-[40px] items-center justify-center rounded-none border-0 bg-oxford/[0.025] px-2.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-oxford/[0.78] transition-colors hover:bg-oxford/[0.04] hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset',
+    'inline-flex h-10 min-h-[40px] items-center justify-center rounded-none border-0 bg-oxford/[0.025] px-2.5 font-mono text-[12px] font-semibold uppercase tracking-[0.12em] text-oxford/[0.78] transition-colors hover:bg-oxford/[0.04] hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset',
   selected: 'bg-surface-selected text-oxford',
-  idle: 'text-oxford/[0.42] hover:text-oxford/[0.72]',
+  idle: 'text-oxford/60 hover:text-oxford/[0.72]',
 };
 
 export const productPanel = {

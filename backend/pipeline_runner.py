@@ -47,6 +47,7 @@ from portfolio.engine import PortfolioEngine
 from portfolio.cost_control import CostController
 from memory import DealMemory
 from meta.agent import MetaAgent
+from memo_generator import MemoGenerator
 from fund_thesis import (
     FundThesisIncompleteError,
     FundThesisMissingError,
@@ -837,6 +838,39 @@ async def _run_on_demand_lookup_inner(
             metrics.inc_lookup("error")
             return startup_id
         else:
+            if replace_startup_id:
+                await asyncio.to_thread(
+                    upsert_pipeline_state,
+                    getattr(storage, "_client", None),
+                    user_id=user_id,
+                    startup_id=startup_id,
+                    pipeline_run_id=lookup_run_id,
+                    status="writing_memo",
+                )
+                updated_startup = await asyncio.to_thread(storage.get_startup, startup_id)
+                if updated_startup is None:
+                    raise RuntimeError("Re-reviewed startup disappeared before memo regeneration")
+                regenerated_memo = await asyncio.to_thread(
+                    MemoGenerator().generate_memo,
+                    updated_startup,
+                    tenant_user_id=user_id,
+                    fund_thesis=thesis_ctx,
+                )
+                memo_saved = await asyncio.to_thread(
+                    storage.update_startup_partial,
+                    startup_id,
+                    {"investment_memo_markdown": regenerated_memo},
+                )
+                if not memo_saved:
+                    raise RuntimeError("Regenerated memo could not be persisted")
+                await asyncio.to_thread(
+                    upsert_pipeline_state,
+                    getattr(storage, "_client", None),
+                    user_id=user_id,
+                    startup_id=startup_id,
+                    pipeline_run_id=lookup_run_id,
+                    status="ready",
+                )
             _notify_startups_changed(user_id, "lookup_partner")
         logger.info(
             "[%s] On-demand lookup completed for %s (%s) rss_mb_end=%.1f",

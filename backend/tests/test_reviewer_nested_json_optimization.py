@@ -130,6 +130,32 @@ def test_prompt_requests_scores_when_structured_scoring_disabled():
     assert data["market_score"] == 7  # LLM-provided score preserved
 
 
+def test_rerun_prompt_compares_operator_delta_with_prior_evaluation():
+    reviewer = _make_reviewer(structured_scoring_enabled=True)
+    cap = _patch_client(reviewer, _full_signals_payload(include_scores=False))
+
+    data = reviewer._call_llm_sync(
+        {
+            "name": "Acme",
+            "one_line": "x",
+            "sector": "AI",
+            "operator_context": "New enterprise pilot announced.",
+            "_prior_review": {
+                "overall_summary": "Previously pre-traction.",
+                "execution_score": 4,
+                "key_risks": ["No customer evidence"],
+            },
+        }
+    )
+
+    assert data is not None
+    prompt = cap.captured_user_content
+    assert "PRIOR EVALUATION" in prompt
+    assert "Previously pre-traction." in prompt
+    assert "New enterprise pilot announced." in prompt
+    assert "state what changed" in prompt.lower()
+
+
 def _persona_result(reviewer_type: str) -> dict:
     return {
         "reviewer_type": reviewer_type,

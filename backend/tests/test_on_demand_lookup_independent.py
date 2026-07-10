@@ -207,3 +207,47 @@ async def test_on_demand_lookup_records_terminal_failure_when_partner_exhausts_r
     assert "decision" in recorded[0][2].lower()
     assert states[-1]["startup_id"] == "startup-1"
     assert states[-1]["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_add_context_rerun_regenerates_and_persists_memo(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+    patches = []
+    prepared = []
+    startup = SimpleNamespace(startup_id="startup-1")
+    storage = SimpleNamespace(
+        _client=SimpleNamespace(),
+        _user_id="user_123",
+        prepare_rerun_startup=lambda startup_id, **kwargs: prepared.append((startup_id, kwargs)) or startup_id,
+        get_startup=lambda startup_id: startup,
+        update_startup_partial=lambda startup_id, patch: patches.append((startup_id, patch)) or True,
+    )
+    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id: storage)
+
+    class _MemoGenerator:
+        def generate_memo(self, current, **kwargs):
+            assert current is startup
+            assert kwargs["tenant_user_id"] == "user_123"
+            return "# Regenerated memo\n\nNew pilot evidence incorporated."
+
+    monkeypatch.setattr("pipeline_runner.MemoGenerator", _MemoGenerator)
+    monkeypatch.setattr("pipeline_runner._build_rerun_operator_context", lambda context: context)
+
+    startup_id = await run_on_demand_lookup(
+        "user_123",
+        "Acme",
+        lookup_id="lookup-rerun-1",
+        additional_context="https://acme.example/news",
+        replace_startup_id="startup-1",
+    )
+
+    assert startup_id == "startup-1"
+    assert _FakeScoutEngine.calls == 0
+    assert prepared[0][0] == "startup-1"
+    assert patches == [
+        (
+            "startup-1",
+            {"investment_memo_markdown": "# Regenerated memo\n\nNew pilot evidence incorporated."},
+        )
+    ]

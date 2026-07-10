@@ -15,6 +15,8 @@ export interface LookupProgress {
   resolved: boolean;
   found: boolean;
   reviewed: boolean;
+  /** Rerun partner decision is complete and the replacement memo is being written. */
+  decisionComplete?: boolean;
 }
 
 export interface LookupChip {
@@ -68,7 +70,11 @@ function ProgressSteps({ progress }: { progress: LookupProgress }) {
     progress.mode === 'rerun'
       ? [
           { label: 'Review', state: progress.reviewed ? 'done' : 'active' },
-          { label: 'Decide', state: progress.reviewed ? 'active' : 'pending' },
+          {
+            label: 'Decide',
+            state: progress.decisionComplete ? 'done' : progress.reviewed ? 'active' : 'pending',
+          },
+          { label: 'Memo', state: progress.decisionComplete ? 'active' : 'pending' },
         ]
       : [
           { label: 'Identify', state: progress.resolved ? 'done' : 'active' },
@@ -96,12 +102,12 @@ function ProgressSteps({ progress }: { progress: LookupProgress }) {
               aria-hidden
             />
             <span
-              className={`font-mono text-[11px] uppercase tracking-[0.12em] ${
+              className={`font-mono text-[12px] uppercase tracking-[0.12em] ${
                 step.state === 'done'
                   ? 'text-oxford/70'
                   : step.state === 'active'
                     ? 'text-oxford'
-                    : 'text-oxford/30'
+                    : 'text-oxford/60'
               }`}
             >
               {step.label}
@@ -128,7 +134,7 @@ function DispatchFooterBar({ actions }: { actions: DispatchFooterAction[] }) {
           <button
             type="button"
             onClick={action.onClick}
-            className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/30 transition-colors hover:text-oxford/50 btn-interaction cursor-pointer"
+            className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/60 transition-colors hover:text-oxford btn-interaction cursor-pointer"
           >
             {action.label}
           </button>
@@ -303,11 +309,12 @@ export default function DispatchCommandBar({
                   onFocusChip?.(c.id);
                   setCompose(false);
                 }}
+                aria-label={c.active ? `Resume active analysis for ${c.label}` : `Open analysis for ${c.label}`}
                 aria-pressed={c.active}
-                className={`inline-flex items-center gap-phi-2 border px-phi-3 py-phi-1 font-mono text-[10px] uppercase tracking-[0.1em] transition-colors btn-interaction ${
+                className={`inline-flex min-h-9 items-center gap-phi-2 border px-phi-4 py-phi-2 font-mono text-[12px] uppercase tracking-[0.1em] transition-colors btn-interaction ${
                   c.active
                     ? 'border-oxford/30 bg-oxford/[0.06] text-oxford'
-                    : 'border-oxford/[0.12] text-oxford/45 hover:border-oxford/25 hover:text-oxford/70'
+                    : 'border-oxford/[0.12] text-oxford/60 hover:border-oxford/25 hover:text-oxford/70'
                 }`}
               >
                 <span
@@ -321,7 +328,7 @@ export default function DispatchCommandBar({
                   aria-hidden
                 />
                 <span className="max-w-[14ch] truncate">{c.label}</span>
-                {c.status === 'decided' ? <span className="text-oxford/40" aria-hidden>✓</span> : null}
+                {c.status === 'decided' ? <span className="text-oxford/60" aria-hidden>✓</span> : null}
               </button>
             ))}
           </Reveal>
@@ -329,7 +336,7 @@ export default function DispatchCommandBar({
 
         <div key={view} className="flex w-full flex-col items-center">
           <Reveal delay={0.1}>
-            <p className="type-meta mb-phi-3 uppercase tracking-[0.16em] text-oxford/40">{eyebrow}</p>
+            <p className="type-meta mb-phi-3 uppercase tracking-[0.16em] text-oxford/60">{eyebrow}</p>
           </Reveal>
 
           <Reveal delay={0.16} y={12}>
@@ -345,18 +352,18 @@ export default function DispatchCommandBar({
           {view === 'rerun' ? (
             <Reveal delay={0.24} className="mt-phi-3 flex w-full max-w-md flex-col items-center gap-phi-5">
               {rerun!.sector ? (
-                <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
+                <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60">
                   {rerun!.sector}
                 </p>
               ) : null}
-              <p className="type-body max-w-[38ch] text-center text-oxford/50">
+              <p className="type-body max-w-[38ch] text-center text-oxford/60">
                 Add private context or a source link. The reviewer will fold it into the
                 existing memo and send the case back through decision.
               </p>
               <div className="w-full">
                 <label
                   htmlFor="dispatch-rerun-context"
-                  className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40"
+                  className="font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60"
                 >
                   Additional context
                 </label>
@@ -368,21 +375,21 @@ export default function DispatchCommandBar({
                   maxLength={2000}
                   disabled={isBusy}
                   placeholder="e.g. Raised $2.1M pre-seed (unannounced); pilot live with two enterprise design partners."
-                  className="mt-phi-1 w-full resize-none border-0 border-b border-solid border-oxford/[0.12] bg-transparent px-0 py-phi-2 font-sans text-[13px] leading-[1.5] text-oxford outline-none transition-colors placeholder:text-oxford/[0.28] focus:border-oxford/45 disabled:cursor-not-allowed"
+                  className="mt-phi-1 w-full resize-none border-0 border-b border-solid border-oxford/[0.12] bg-transparent px-0 py-phi-2 font-sans text-[13px] leading-[1.5] text-oxford outline-none transition-colors placeholder:text-oxford/60 focus:border-oxford/45 disabled:cursor-not-allowed"
                 />
                 <div className="mt-phi-4 flex items-center justify-end">
                   <button
                     type="button"
                     onClick={handleSubmitRerun}
                   disabled={isBusy || !rerunContext.trim()}
-                  className="border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 font-mono text-[12px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
                 >
                     Review again →
                   </button>
                 </div>
               </div>
               {message ? (
-                <p className="type-body max-w-[40ch] text-center text-oxford/45" aria-live="polite">
+                <p className="type-body max-w-[40ch] text-center text-oxford/60" aria-live="polite">
                   {message}
                 </p>
               ) : null}
@@ -398,21 +405,21 @@ export default function DispatchCommandBar({
                 aria-label={`Lookup could not resolve ${failure!.query}`}
               >
                 <div className="mb-phi-3 flex items-baseline justify-between gap-phi-3">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-oxford/40">Result</p>
-                  <p className="text-right font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/35">
+                  <p className="font-mono text-[12px] uppercase tracking-[0.11em] text-oxford/60">Result</p>
+                  <p className="text-right font-mono text-[12px] uppercase tracking-[0.1em] text-oxford/60">
                     Unresolved
                   </p>
                 </div>
                 <h3 className="font-sans text-xl font-semibold leading-tight tracking-tight text-oxford sm:text-2xl">
                   No confirmed match
                 </h3>
-                <p className="mt-phi-3 font-sans text-[15px] leading-[1.6] text-oxford/58">
+                <p className="mt-phi-3 font-sans text-[15px] leading-[1.6] text-oxford/60">
                   {failure!.message}
                 </p>
                 <button
                   type="button"
                   onClick={handleRetry}
-                  className="mt-phi-4 w-full border border-solid border-oxford/12 bg-oxford px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90"
+                  className="mt-phi-4 w-full border border-solid border-oxford/12 bg-oxford px-4 py-2.5 font-mono text-[12px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90"
                 >
                   Try another lookup
                 </button>
@@ -421,13 +428,13 @@ export default function DispatchCommandBar({
           ) : view === 'progress' ? (
             <Reveal delay={0.24} className="mt-phi-3 flex flex-col items-center gap-phi-5">
               {progress!.sector ? (
-                <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-oxford/40">
+                <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60">
                   {progress!.sector}
                 </p>
               ) : null}
               <ProgressSteps progress={progress!} />
               {message ? (
-                <p className="type-body max-w-[40ch] text-center text-oxford/45" aria-live="polite">
+                <p className="type-body max-w-[40ch] text-center text-oxford/60" aria-live="polite">
                   {message}
                 </p>
               ) : null}
@@ -452,7 +459,7 @@ export default function DispatchCommandBar({
           ) : (
             <>
               <Reveal delay={0.24} className="mt-phi-3">
-                <p className="type-body mb-phi-8 max-w-[34ch] text-center text-oxford/50">
+                <p className="type-body mb-phi-8 max-w-[34ch] text-center text-oxford/60">
                   Search any company against your active mandate and it lands in the queue.
                 </p>
               </Reveal>

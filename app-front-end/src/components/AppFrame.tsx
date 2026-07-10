@@ -335,6 +335,11 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                           className="type-label-tab flex min-h-[44px] items-center px-1 text-white/60 hover:text-white btn-interaction"
                         >
                           {item.label}
+                          {item.sublabel ? (
+                            <span className="ml-phi-2 font-sans font-normal normal-case tracking-normal opacity-80">
+                              {item.sublabel}
+                            </span>
+                          ) : null}
                         </button>
                       ))}
                       <button
@@ -368,8 +373,19 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
         </AnimatePresence>
 
         {startupsError && (
-          <div className="flex-none border-b border-oxford/25 bg-warning px-6 py-2 type-label-tab text-oxford">
-            {startupsError} — Check API URL (VITE_API_URL) and backend CORS (ALLOWED_ORIGINS).
+          <div
+            role="status"
+            title={startupsError}
+            className="flex flex-none items-center justify-between gap-phi-4 border-b border-oxford/25 bg-warning px-6 py-2 type-label-tab text-oxford"
+          >
+            <span>Can't reach the Aethria service — the deal flow shown may be out of date.</span>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="shrink-0 border-b border-oxford/60 uppercase text-oxford hover:border-oxford btn-interaction"
+            >
+              Retry
+            </button>
           </div>
         )}
 

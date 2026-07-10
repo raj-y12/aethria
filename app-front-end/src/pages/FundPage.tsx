@@ -12,7 +12,7 @@ function HeaderReadout({ label, value }: { label: string; value: string }) {
       <span className="font-mono text-[clamp(22px,2vw,30px)] font-semibold leading-none tracking-[-0.03em] tabular-nums text-oxford">
         {value}
       </span>
-      <span className="type-meta uppercase tracking-[0.1em] text-oxford/40">{label}</span>
+      <span className="type-meta uppercase tracking-[0.1em] text-oxford/60">{label}</span>
     </div>
   );
 }
@@ -53,7 +53,7 @@ export default function FundPage({ data }: { data: SystemData }) {
   return (
     <div className="page-transition-enter flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex-none bg-paper">
-        <div className="mx-auto w-full max-w-[1180px] px-phi-5 pt-phi-6">
+        <div className="mx-auto w-full max-w-[var(--room-max-fund)] px-phi-5 pt-phi-6">
           <RoomHeader
             className="pb-phi-5"
             eyebrow={`The instrument${
@@ -63,7 +63,7 @@ export default function FundPage({ data }: { data: SystemData }) {
             sub={
               <Link
                 to="/v1/settings"
-                className="inline-block type-meta uppercase tracking-[0.1em] text-oxford/40 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                className="inline-block type-meta uppercase tracking-[0.1em] text-oxford/60 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
               >
                 Edit mandate →
               </Link>
@@ -88,7 +88,7 @@ export default function FundPage({ data }: { data: SystemData }) {
         ref={bodyScrollRef}
         className="scrollbar-gutter-stable min-h-0 flex-1 overflow-y-auto overscroll-contain bg-paper"
       >
-        <div className="mx-auto w-full max-w-[1180px] px-phi-5 pb-phi-5 pt-phi-3">
+        <div className="mx-auto w-full max-w-[var(--room-max-fund)] px-phi-5 pb-phi-5 pt-phi-3">
           <SystemIntelligence
             activeTab={activeTab}
             onTabChange={setActiveTab}

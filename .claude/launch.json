@@ -16,8 +16,9 @@
     {
       "name": "app-screenshot-harness",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd app-front-end && npx vite --config vite.screenshot.config.ts"],
-      "port": 5181
+      "runtimeArgs": ["-c", "cd app-front-end && npx vite --config vite.screenshot.config.ts --port ${PORT:-5181}"],
+      "port": 5181,
+      "autoPort": true
     },
     {
       "name": "brand-assets",

@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { motion, type Variants } from 'framer-motion';
-import CountUp from './CountUp';
 import { usePrefersReducedMotion } from '../hooks';
 import { tokens } from '../design-system/tokens';
 import {
@@ -13,11 +12,12 @@ import type { Startup, SingleReview } from '../types/startup';
 /**
  * The Decision Stage — the dominant object of the Flow workspace.
  *
- * The whole product funnels into one act: make a judgment. The stage gives
- * that act its gravity: one huge conviction number, the state of the call,
- * the company's name at display scale, and the three instruments that say
- * how the machine arrived here (thesis fit, reviewer agreement, partner
- * confidence). Everything else lives in the memo below it.
+ * The whole product funnels into one act: make a judgment. The stage leads
+ * with the decision brief: the state of the call, the company at display
+ * scale, the decisive evidence, and the question the deal hinges on. The
+ * machine's readouts (conviction, thesis fit, reviewer agreement, partner
+ * confidence) are compact instruments below — the score never visually
+ * outranks the evidence or the human decision.
  */
 
 interface DecisionStageProps {
@@ -111,8 +111,8 @@ function Instrument({
   return (
     <div className="flex min-w-0 flex-col gap-phi-2">
       <div className="flex items-baseline justify-between gap-phi-3">
-        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/40">{label}</span>
-        <span className="whitespace-nowrap font-mono text-[11px] font-semibold tabular-nums tracking-[0.04em] text-oxford/75">
+        <span className="font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60">{label}</span>
+        <span className="whitespace-nowrap font-mono text-[12px] font-semibold tabular-nums tracking-[0.04em] text-oxford/75">
           {reading}
         </span>
       </div>
@@ -167,13 +167,13 @@ export default function DecisionStage({ startup, fundConfiguration, action }: De
       ? Math.round(Math.max(0, Math.min(1, startup.partner.confidence)) * 100)
       : null;
 
-  const hasInstruments = thesisTen != null || reviewerMeans.length > 0 || confidencePct != null;
+  const hasInstruments = score != null || thesisTen != null || reviewerMeans.length > 0 || confidencePct != null;
 
   const stateToneClass =
     state.tone === 'escalation'
       ? 'text-escalation'
       : state.tone === 'muted'
-        ? 'text-oxford/40'
+        ? 'text-oxford/60'
         : 'text-oxford/80';
 
   const focalQuestion = (startup.review?.aethria_view?.focal_question ?? '').toString().trim();
@@ -195,33 +195,17 @@ export default function DecisionStage({ startup, fundConfiguration, action }: De
           variants={STAGE_ITEM}
           className="flex min-w-0 items-baseline justify-between gap-phi-4"
         >
-          <p className="min-w-0 truncate font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/[0.38]">
+          <p className="min-w-0 truncate font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60">
             {kicker}
           </p>
           {action ? <div className="shrink-0">{action}</div> : null}
         </motion.div>
       ) : null}
 
-      {/* Release: the number owns the canvas. */}
-      <motion.div variants={STAGE_ITEM} className="mt-phi-6 flex items-end gap-phi-4">
-        <span
-          className="font-mono font-bold leading-[0.85] tracking-[-0.05em] tabular-nums text-oxford"
-          style={{ fontSize: 'clamp(72px, 9.5vw, 148px)' }}
-          aria-label={score != null ? `Conviction ${score} of 100` : 'Conviction forming'}
-        >
-          {score != null ? <CountUp to={score} delay={0.15} reduceMotion={reduceMotion} /> : '—'}
-        </span>
-        <span className="pb-[6px] font-mono text-[10px] uppercase leading-[1.5] tracking-[0.12em] text-oxford/[0.38]">
-          /100
-          <br />
-          conviction
-        </span>
-      </motion.div>
-
-      {/* The state of the call — the moment of tension. */}
+      {/* The state of the call leads the brief — not the machine's number. */}
       <motion.p
         variants={STAGE_ITEM}
-        className={`mt-phi-5 font-mono text-[13px] font-bold uppercase tracking-[0.18em] ${stateToneClass}`}
+        className={`mt-phi-6 font-mono text-[15px] font-bold uppercase tracking-[0.18em] ${stateToneClass}`}
       >
         {state.word}
       </motion.p>
@@ -230,7 +214,7 @@ export default function DecisionStage({ startup, fundConfiguration, action }: De
       {state.detail ? (
         <motion.p
           variants={STAGE_ITEM}
-          className="mt-phi-2 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-oxford/55"
+          className="mt-phi-2 font-mono text-[12px] font-semibold uppercase tracking-[0.14em] text-oxford/60"
         >
           {state.detail}
         </motion.p>
@@ -254,12 +238,28 @@ export default function DecisionStage({ startup, fundConfiguration, action }: De
         </motion.p>
       ) : null}
 
-      {/* The instruments: how the machine got here. */}
+      {/* What decides it — the decisive uncertainty, ahead of the machine readouts. */}
+      {focalQuestion ? (
+        <motion.div variants={STAGE_ITEM} className="mt-phi-5 border-l border-oxford/25 pl-phi-4">
+          <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60">What decides it</p>
+          <p className="mt-phi-1 max-w-[34rem] font-sans text-[14px] leading-[1.5] text-oxford/80">
+            {focalQuestion}
+          </p>
+        </motion.div>
+      ) : null}
+
+      {/* The instruments: how the machine got here. Conviction sits here, secondary. */}
       {hasInstruments ? (
         <motion.div
           variants={STAGE_ITEM}
-          className="mt-phi-7 grid grid-cols-1 gap-x-phi-6 gap-y-phi-4 border-t border-oxford/[0.08] pt-phi-5 sm:grid-cols-3"
+          className="mt-phi-7 grid grid-cols-1 gap-x-phi-6 gap-y-phi-4 border-t border-oxford/[0.08] pt-phi-5 sm:grid-cols-2 lg:grid-cols-4"
         >
+          {score != null ? (
+            <Instrument label="Conviction" reading={`${score} /100`}>
+              <Track pct={score} delay={0.15} />
+            </Instrument>
+          ) : null}
+
           {thesisTen != null ? (
             <Instrument label="Thesis fit" reading={`${thesisTen.toFixed(1)} /10`}>
               <Track pct={thesisTen * 10} delay={0.25} />
@@ -292,16 +292,6 @@ export default function DecisionStage({ startup, fundConfiguration, action }: De
               <Track pct={confidencePct} delay={0.35} />
             </Instrument>
           ) : null}
-        </motion.div>
-      ) : null}
-
-      {/* What decides it — the single question the deal hinges on. */}
-      {focalQuestion ? (
-        <motion.div variants={STAGE_ITEM} className="mt-phi-5 border-l border-oxford/25 pl-phi-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-oxford/[0.38]">What decides it</p>
-          <p className="mt-phi-1 max-w-[34rem] font-sans text-[14px] leading-[1.5] text-oxford/80">
-            {focalQuestion}
-          </p>
         </motion.div>
       ) : null}
     </motion.section>

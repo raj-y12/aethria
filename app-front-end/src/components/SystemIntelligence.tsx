@@ -57,7 +57,7 @@ export function FundFacetNav({
             className={`relative -mb-px shrink-0 border-b pb-phi-3 pt-phi-1 type-label-tab transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
               isActive
                 ? 'border-oxford font-semibold text-oxford'
-                : 'border-transparent font-normal text-oxford/40 hover:text-oxford/70'
+                : 'border-transparent font-normal text-oxford/60 hover:text-oxford/70'
             }`}
           >
             {tab.label}

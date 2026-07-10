@@ -128,7 +128,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
           >
             <div className="min-w-0 flex-1">
               {isSelected && startup.scout.location?.trim() ? (
-                <p className="mb-1.5 type-meta uppercase tracking-[0.12em] text-oxford/45">
+                <p className="mb-1.5 type-meta uppercase tracking-[0.12em] text-oxford/60">
                   {startup.scout.location.trim()}
                 </p>
               ) : null}
@@ -137,7 +137,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
                 className={`min-w-0 break-words font-sans transition-[color,font-weight] ${
                   isSelected
                     ? 'text-[clamp(15px,1.3vw,18px)] font-semibold leading-[1.15] tracking-[-0.01em] text-oxford'
-                    : 'text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.15] tracking-[-0.01em] text-oxford/55'
+                    : 'text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.15] tracking-[-0.01em] text-oxford/60'
                 }`}
                 style={{
                   transitionDuration: `${selectTransition.duration}s`,
@@ -167,12 +167,12 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
               transition={selectTransition}
             >
               {sectorStage ? (
-                <p className="type-meta uppercase tracking-[0.06em] text-oxford/42">{sectorStage}</p>
+                <p className="type-meta uppercase tracking-[0.06em] text-oxford/60">{sectorStage}</p>
               ) : null}
               {showDateMeta ? (
                 <>
                   {metaSep(Boolean(sectorStage))}
-                  <span className="type-meta tracking-[0.06em] text-oxford/42">
+                  <span className="type-meta tracking-[0.06em] text-oxford/60">
                     {formatRowDate(sortKeyValue)}
                   </span>
                 </>
@@ -187,7 +187,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
                 <>
                   {metaSep(Boolean(sectorStage || showDateMeta || showAttentionBadge))}
                   <span
-                    className="type-meta uppercase tracking-[0.08em] text-oxford/55"
+                    className="type-meta uppercase tracking-[0.08em] text-oxford/60"
                     title="Company Resolver: identity evidence is incomplete — open the memo to see what was found and what's missing."
                   >
                     {resolutionBadge}

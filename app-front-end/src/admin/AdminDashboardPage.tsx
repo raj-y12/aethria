@@ -39,9 +39,9 @@ function matchesQuery(row: AdminUserRow, query: string): boolean {
 function StatCard({ label, value, hint }: { label: string; value: number | string; hint: string }) {
   return (
     <div className="border border-oxford/[0.08] bg-paper/70 p-5">
-      <p className="type-meta uppercase tracking-[0.14em] text-oxford/35">{label}</p>
+      <p className="type-meta uppercase tracking-[0.14em] text-oxford/60">{label}</p>
       <p className="mt-3 font-display text-[34px] leading-none text-oxford">{value}</p>
-      <p className="mt-2 type-meta text-oxford/40">{hint}</p>
+      <p className="mt-2 type-meta text-oxford/60">{hint}</p>
     </div>
   );
 }
@@ -52,7 +52,7 @@ function StatusPill({ active, label }: { active: boolean; label: string }) {
       className={`inline-flex items-center border px-2 py-1 type-meta uppercase tracking-[0.12em] ${
         active
           ? 'border-oxford/20 bg-oxford text-paper'
-          : 'border-oxford/[0.08] bg-transparent text-oxford/35'
+          : 'border-oxford/[0.08] bg-transparent text-oxford/60'
       }`}
     >
       {label}
@@ -111,11 +111,11 @@ export default function AdminDashboardPage() {
     <main className="min-h-[100dvh] bg-paper text-oxford px-5 py-6 lg:px-12 lg:py-10">
       <header className="flex flex-col gap-6 border-b border-oxford/[0.08] pb-8 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="type-meta uppercase tracking-[0.18em] text-oxford/35">Aethria Admin</p>
+          <p className="type-meta uppercase tracking-[0.18em] text-oxford/60">Aethria Admin</p>
           <h1 className="mt-3 font-display text-[44px] leading-none text-oxford lg:text-[58px]">
             Master Log
           </h1>
-          <p className="mt-4 max-w-[720px] type-body text-oxford/55">
+          <p className="mt-4 max-w-[720px] type-body text-oxford/60">
             Global session, agent, startup, and pipeline visibility across every known user.
           </p>
         </div>
@@ -123,7 +123,7 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             onClick={() => void loadOverview()}
-            className="type-meta uppercase tracking-[0.14em] text-oxford/50 hover:text-oxford transition-colors"
+            className="type-meta uppercase tracking-[0.14em] text-oxford/60 hover:text-oxford transition-colors"
           >
             Refresh
           </button>
@@ -134,7 +134,7 @@ export default function AdminDashboardPage() {
               setOverview(null);
               setAuthenticated(false);
             }}
-            className="type-meta uppercase tracking-[0.14em] text-oxford/50 hover:text-oxford transition-colors"
+            className="type-meta uppercase tracking-[0.14em] text-oxford/60 hover:text-oxford transition-colors"
           >
             Exit Admin
           </button>
@@ -160,7 +160,7 @@ export default function AdminDashboardPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search users, email, status"
-              className="min-w-0 flex-1 bg-transparent border-0 border-b border-oxford/10 rounded-none outline-none focus:border-oxford/40 transition-colors type-body text-oxford py-2 placeholder:text-oxford/25"
+              className="min-w-0 flex-1 bg-transparent border-0 border-b border-oxford/10 rounded-none outline-none focus:border-oxford/40 transition-colors type-body text-oxford py-2 placeholder:text-oxford/45"
             />
             <div className="flex flex-wrap gap-2">
               {(['all', 'online', 'agents'] as UserFilter[]).map((option) => (
@@ -171,7 +171,7 @@ export default function AdminDashboardPage() {
                   className={`border px-3 py-2 type-meta uppercase tracking-[0.12em] transition-colors ${
                     filter === option
                       ? 'border-oxford bg-oxford text-paper'
-                      : 'border-oxford/[0.08] text-oxford/45 hover:text-oxford'
+                      : 'border-oxford/[0.08] text-oxford/60 hover:text-oxford'
                   }`}
                 >
                   {option}
@@ -189,7 +189,7 @@ export default function AdminDashboardPage() {
           <div className="overflow-x-auto border border-oxford/[0.08]">
             <table className="min-w-[1080px] w-full border-collapse">
               <thead className="bg-oxford/[0.03]">
-                <tr className="type-meta uppercase tracking-[0.14em] text-oxford/35">
+                <tr className="type-meta uppercase tracking-[0.14em] text-oxford/60">
                   <th className="px-4 py-3 text-left font-normal">User</th>
                   <th className="px-4 py-3 text-left font-normal">Session</th>
                   <th className="px-4 py-3 text-left font-normal">Agents</th>
@@ -202,11 +202,11 @@ export default function AdminDashboardPage() {
                   <tr key={row.user_id} className="border-t border-oxford/[0.06] align-top">
                     <td className="px-4 py-4">
                       <p className="type-body-sm text-oxford">{row.display_name}</p>
-                      <p className="mt-1 type-meta text-oxford/45">{row.email ?? row.user_id}</p>
+                      <p className="mt-1 type-meta text-oxford/60">{row.email ?? row.user_id}</p>
                     </td>
                     <td className="px-4 py-4">
                       <StatusPill active={row.is_logged_in} label={row.is_logged_in ? 'Online' : 'Offline'} />
-                      <p className="mt-2 type-meta text-oxford/45">
+                      <p className="mt-2 type-meta text-oxford/60">
                         {row.active_sessions_count} active / last {formatDate(row.last_active_at)}
                       </p>
                     </td>
@@ -216,20 +216,20 @@ export default function AdminDashboardPage() {
                         <StatusPill active={row.agent_config.reviewers_enabled} label="Review" />
                         <StatusPill active={row.agent_config.partners_enabled} label="Partner" />
                       </div>
-                      <p className="mt-2 type-meta text-oxford/45">
+                      <p className="mt-2 type-meta text-oxford/60">
                         {row.agent_config.agents_status} / loop {row.loop_alive ? 'alive' : 'idle'}
                       </p>
                     </td>
                     <td className="px-4 py-4">
                       <p className="type-body-sm text-oxford">{row.startup_stats.total} total</p>
-                      <p className="mt-1 type-meta text-oxford/45">{decisionSummary(row)}</p>
+                      <p className="mt-1 type-meta text-oxford/60">{decisionSummary(row)}</p>
                     </td>
                     <td className="px-4 py-4">
                       <p className="type-body-sm text-oxford">{row.pipeline_stats.runs_24h} runs in 24h</p>
-                      <p className="mt-1 type-meta text-oxford/45">
+                      <p className="mt-1 type-meta text-oxford/60">
                         Latest {formatDate(row.pipeline_stats.latest_activity_at)}
                       </p>
-                      <p className="mt-1 type-meta text-oxford/45">
+                      <p className="mt-1 type-meta text-oxford/60">
                         {row.pipeline_stats.startups_found_24h} found / {row.pipeline_stats.decisions_24h} decisions
                       </p>
                     </td>
@@ -237,7 +237,7 @@ export default function AdminDashboardPage() {
                 ))}
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center type-body text-oxford/45">
+                    <td colSpan={5} className="px-4 py-10 text-center type-body text-oxford/60">
                       No users match this view.
                     </td>
                   </tr>
@@ -247,7 +247,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {overview && (
-            <p className="type-meta text-oxford/35">
+            <p className="type-meta text-oxford/60">
               Generated {formatDate(overview.generated_at)}. Clerk session data is cached briefly by the backend.
             </p>
           )}

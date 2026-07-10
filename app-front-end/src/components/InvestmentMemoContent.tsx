@@ -626,7 +626,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <button
                     type="button"
                     onClick={onAddContext}
-                    className="border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90"
+                    className="border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 font-mono text-[12px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90"
                     aria-label={`Add context and re-review ${companyName || 'this company'}`}
                   >
                     Add context →
@@ -768,7 +768,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       <dl className="flex flex-wrap gap-x-8 gap-y-1.5">
                         {vitalsStrip.map((v) => (
                           <div key={v.label} className="flex items-baseline gap-2">
-                            <dt className="type-label uppercase tracking-[0.06em] text-oxford/45">{v.label}</dt>
+                            <dt className="type-label uppercase tracking-[0.06em] text-oxford/60">{v.label}</dt>
                             <dd className="type-data text-oxford/[0.82] tabular-nums">{renderWithMonoNumbers(v.value)}</dd>
                           </div>
                         ))}
@@ -778,25 +778,25 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       <div className={`${vitalsStrip.length > 0 ? 'mt-2.5 ' : ''}space-y-1.5`}>
                         {fundingLine && (
                           <p className="type-body-sm leading-snug text-oxford/75">
-                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Funding</span>
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/60 mr-2">Funding</span>
                             {renderWithMonoNumbers(fundingLine)}
                           </p>
                         )}
                         {tractionLine && (
                           <p className="type-body-sm leading-snug text-oxford/75">
-                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Traction</span>
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/60 mr-2">Traction</span>
                             {renderWithMonoNumbers(tractionLine)}
                           </p>
                         )}
                         {modelLine && (
                           <p className="type-body-sm leading-snug text-oxford/70">
-                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">Model</span>
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/60 mr-2">Model</span>
                             {renderWithMonoNumbers(modelLine)}
                           </p>
                         )}
                         {ipLine && (
                           <p className="type-body-sm leading-snug text-oxford/70">
-                            <span className="type-label uppercase tracking-[0.06em] text-oxford/45 mr-2">IP</span>
+                            <span className="type-label uppercase tracking-[0.06em] text-oxford/60 mr-2">IP</span>
                             {renderWithMonoNumbers(ipLine)}
                           </p>
                         )}

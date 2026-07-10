@@ -20,7 +20,7 @@ export default function QueueAttentionSignal({
   return (
     <p
       className={`font-mono normal-case tracking-[0.04em] ${
-        prominent ? 'text-[11px] text-escalation' : 'text-[10px] text-escalation/80'
+        prominent ? 'text-[12px] text-escalation' : 'text-[12px] text-escalation/80'
       }`}
     >
       {label}

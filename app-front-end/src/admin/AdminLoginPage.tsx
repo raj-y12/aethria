@@ -28,20 +28,20 @@ export default function AdminLoginPage({ onAuthenticated }: AdminLoginPageProps)
   return (
     <main className="min-h-[100dvh] bg-paper text-oxford flex items-center justify-center px-6">
       <section className="w-full max-w-[460px] border border-oxford/[0.08] bg-paper/80 px-8 py-10">
-        <p className="type-meta uppercase tracking-[0.18em] text-oxford/35">Aethria Admin</p>
+        <p className="type-meta uppercase tracking-[0.18em] text-oxford/60">Aethria Admin</p>
         <h1 className="mt-4 font-display text-[40px] leading-none text-oxford">Master Access</h1>
-        <p className="mt-5 type-body text-oxford/55">
+        <p className="mt-5 type-body text-oxford/60">
           Enter the backend admin secret to view global user, session, and agent telemetry.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
           <label className="flex flex-col gap-2">
-            <span className="type-meta uppercase tracking-[0.14em] text-oxford/40">Admin Secret</span>
+            <span className="type-meta uppercase tracking-[0.14em] text-oxford/60">Admin Secret</span>
             <input
               type="password"
               value={secret}
               onChange={(event) => setSecret(event.target.value)}
-              className="bg-transparent border-0 border-b border-oxford/15 rounded-none outline-none focus:border-oxford/45 transition-colors duration-300 type-body text-oxford py-3 placeholder:text-oxford/25"
+              className="bg-transparent border-0 border-b border-oxford/15 rounded-none outline-none focus:border-oxford/45 transition-colors duration-300 type-body text-oxford py-3 placeholder:text-oxford/45"
               placeholder="Enter master secret"
               autoComplete="current-password"
               autoFocus
