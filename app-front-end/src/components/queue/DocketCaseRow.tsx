@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { usePrefersReducedMotion } from '../../hooks';
 import type { VerdictBadgeConfig } from '../../lib/fundConfiguration';
 import QueueVerdictLine from './QueueVerdictLine';
@@ -12,7 +12,6 @@ import {
   type DocketRowModel,
 } from './queueRowShared';
 import {
-  QUEUE_ROW_CONTENT_TRANSITION,
   QUEUE_ROW_LAYOUT_TRANSITION,
   QUEUE_ROW_SELECT_TRANSITION,
 } from './queueRowMotion';
@@ -39,7 +38,6 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
     decisionVariant,
     queueContext,
     attentionDriver,
-    oneLiner,
     sectorStage,
     sortKeyValue,
   } = model;
@@ -52,8 +50,6 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
 
   const layoutTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_LAYOUT_TRANSITION;
   const selectTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_SELECT_TRANSITION;
-  const contentTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_CONTENT_TRANSITION;
-
   const ambientPadding =
     rowIndex % 2 === 0 ? queueRowPadding.ambient : queueRowPadding.ambientAlt;
   const selectedPadding = queueRowPadding.selected;
@@ -123,7 +119,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
         <div className="min-w-0">
           <div
             className={`flex min-w-0 flex-col sm:flex-row sm:items-start sm:justify-between ${
-              isSelected ? 'gap-phi-3 sm:gap-phi-4' : 'gap-phi-1 sm:gap-phi-3'
+              isSelected ? 'gap-phi-5 sm:gap-phi-6' : 'gap-phi-1 sm:gap-phi-3'
             }`}
           >
             <div className="min-w-0 flex-1">
@@ -136,7 +132,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
                 layout={!reduceMotion}
                 className={`min-w-0 break-words font-sans transition-[color,font-weight] ${
                   isSelected
-                    ? 'text-[clamp(15px,1.3vw,18px)] font-semibold leading-[1.15] tracking-[-0.01em] text-oxford'
+                    ? 'text-[clamp(28px,2.6vw,36px)] font-semibold leading-[1.15] tracking-[-0.01em] text-oxford'
                     : 'text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.15] tracking-[-0.01em] text-oxford/60'
                 }`}
                 style={{
@@ -197,33 +193,6 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
             </motion.div>
           ) : null}
 
-          <AnimatePresence initial={false} mode="popLayout">
-            {isSelected && oneLiner ? (
-              <motion.p
-                key="oneliner-selected"
-                layout
-                initial={reduceMotion ? false : { opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
-                transition={contentTransition}
-                className="mt-phi-3 queue-row-prose text-[14px] leading-[1.55] text-oxford/72"
-              >
-                {oneLiner}
-              </motion.p>
-            ) : isSelected && attentionDriver.detail ? (
-              <motion.p
-                key="detail"
-                layout
-                initial={reduceMotion ? false : { opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
-                transition={contentTransition}
-                className="mt-phi-3 queue-row-prose text-[14px] leading-[1.55] text-oxford/62"
-              >
-                {attentionDriver.detail}
-              </motion.p>
-            ) : null}
-          </AnimatePresence>
         </div>
       </motion.div>
     </motion.div>

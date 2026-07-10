@@ -18,7 +18,7 @@ export const queueRowPadding = {
   ambient: 10,
   ambientAlt: 11,
   interrupt: 16,
-  selected: 14,
+  selected: 24,
 } as const;
 
 /**
