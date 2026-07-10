@@ -39,9 +39,9 @@ function matchesQuery(row: AdminUserRow, query: string): boolean {
 function StatCard({ label, value, hint }: { label: string; value: number | string; hint: string }) {
   return (
     <div className="border border-oxford/[0.08] bg-paper/70 p-5">
-      <p className="type-meta uppercase tracking-[0.14em] text-oxford/60">{label}</p>
-      <p className="mt-3 font-display text-[34px] leading-none text-oxford">{value}</p>
-      <p className="mt-2 type-meta text-oxford/60">{hint}</p>
+      <p className="type-label-section">{label}</p>
+      <p className="type-data mt-3 text-[34px] leading-none text-oxford">{value}</p>
+      <p className="type-meta mt-2">{hint}</p>
     </div>
   );
 }
@@ -49,7 +49,7 @@ function StatCard({ label, value, hint }: { label: string; value: number | strin
 function StatusPill({ active, label }: { active: boolean; label: string }) {
   return (
     <span
-      className={`inline-flex items-center border px-2 py-1 type-meta uppercase tracking-[0.12em] ${
+      className={`type-status inline-flex items-center border px-2 py-1 ${
         active
           ? 'border-oxford/20 bg-oxford text-paper'
           : 'border-oxford/[0.08] bg-transparent text-oxford/60'
@@ -111,7 +111,7 @@ export default function AdminDashboardPage() {
     <main className="min-h-[100dvh] bg-paper text-oxford px-5 py-6 lg:px-12 lg:py-10">
       <header className="flex flex-col gap-6 border-b border-oxford/[0.08] pb-8 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="type-meta uppercase tracking-[0.18em] text-oxford/60">Aethria Admin</p>
+          <p className="type-label-section">Aethria Admin</p>
           <h1 className="mt-3 font-display text-[44px] leading-none text-oxford lg:text-[58px]">
             Master Log
           </h1>
@@ -123,7 +123,7 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             onClick={() => void loadOverview()}
-            className="type-meta uppercase tracking-[0.14em] text-oxford/60 hover:text-oxford transition-colors"
+            className="type-action hover:text-oxford transition-colors"
           >
             Refresh
           </button>
@@ -134,7 +134,7 @@ export default function AdminDashboardPage() {
               setOverview(null);
               setAuthenticated(false);
             }}
-            className="type-meta uppercase tracking-[0.14em] text-oxford/60 hover:text-oxford transition-colors"
+            className="type-action hover:text-oxford transition-colors"
           >
             Exit Admin
           </button>
@@ -168,7 +168,7 @@ export default function AdminDashboardPage() {
                   key={option}
                   type="button"
                   onClick={() => setFilter(option)}
-                  className={`border px-3 py-2 type-meta uppercase tracking-[0.12em] transition-colors ${
+                  className={`type-action border px-3 py-2 transition-colors ${
                     filter === option
                       ? 'border-oxford bg-oxford text-paper'
                       : 'border-oxford/[0.08] text-oxford/60 hover:text-oxford'
@@ -189,7 +189,7 @@ export default function AdminDashboardPage() {
           <div className="overflow-x-auto border border-oxford/[0.08]">
             <table className="min-w-[1080px] w-full border-collapse">
               <thead className="bg-oxford/[0.03]">
-                <tr className="type-meta uppercase tracking-[0.14em] text-oxford/60">
+                <tr className="type-label-section">
                   <th className="px-4 py-3 text-left font-normal">User</th>
                   <th className="px-4 py-3 text-left font-normal">Session</th>
                   <th className="px-4 py-3 text-left font-normal">Agents</th>
@@ -256,4 +256,3 @@ export default function AdminDashboardPage() {
     </main>
   );
 }
-

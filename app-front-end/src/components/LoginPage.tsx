@@ -254,12 +254,8 @@ export default function LoginPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
               transition={{ duration: 0.5, ease: EASE, delay: 0.05 }}
+              className="type-label-section"
               style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: '11px',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: 'rgba(var(--color-oxford-rgb), 0.55)',
                 marginBottom: '16px',
               }}
             >
@@ -315,13 +311,13 @@ export default function LoginPage() {
               className="flex w-full flex-col items-center mb-phi-8"
             >
               {/* Same voice as the home page: mono eyebrow, then the mark. */}
-              <p className="m-0 mb-phi-5 text-center font-mono text-[12px] uppercase tracking-[0.22em] tabular-nums text-oxford/60">
+              <p className="type-label-section m-0 mb-phi-5 text-center tabular-nums">
                 {dateline}
               </p>
               <h1 className="font-wordmark text-center text-[clamp(48px,8vw,80px)] font-medium text-oxford leading-[0.9] m-0 tracking-normal">
                 Aethria<span className="wordmark-dot">.</span>
               </h1>
-              <p className="type-meta uppercase tracking-[0.24em] text-oxford/60 mt-phi-4">
+              <p className="type-label-section mt-phi-4">
                 Deal flow operating system
               </p>
             </motion.div>
@@ -422,7 +418,7 @@ export default function LoginPage() {
                   <div className="flex flex-col">
                     <label
                       htmlFor="login-identifier"
-                      className="type-meta mb-phi-2 uppercase tracking-[0.14em] text-oxford/60"
+                      className="type-label-section mb-phi-2"
                     >
                       Email or username
                     </label>
@@ -443,7 +439,7 @@ export default function LoginPage() {
                   <div className="flex flex-col">
                     <label
                       htmlFor="login-password"
-                      className="type-meta mb-phi-2 uppercase tracking-[0.14em] text-oxford/60"
+                      className="type-label-section mb-phi-2"
                     >
                       Password
                     </label>
@@ -474,7 +470,7 @@ export default function LoginPage() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.2, ease: EASE }}
-                      className="type-meta text-[12px] text-escalation text-center mb-phi-6 tracking-[0.06em]"
+                      className="type-meta mb-phi-6 text-center text-escalation"
                     >
                       {error}
                     </motion.p>

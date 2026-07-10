@@ -20,13 +20,13 @@ function Readout({ label, value, tone }: { label: string; value: string; tone?: 
   return (
     <div className="flex flex-col gap-phi-1">
       <span
-        className={`font-mono text-[clamp(22px,2vw,30px)] font-semibold leading-none tracking-[-0.03em] tabular-nums ${
+        className={`type-data text-[clamp(22px,2vw,30px)] leading-none ${
           tone === 'escalation' ? 'text-escalation' : 'text-oxford'
         }`}
       >
         {value}
       </span>
-      <span className="type-meta uppercase tracking-[0.1em] text-oxford/60">{label}</span>
+      <span className="type-label-section">{label}</span>
     </div>
   );
 }
@@ -35,7 +35,7 @@ function SectionHead({ title, detail }: { title: string; detail?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-phi-4 border-t border-oxford/[0.075] pt-phi-4">
       <h2 className="type-label-section text-oxford/[0.72]">{title}</h2>
-      {detail ? <span className="type-meta tabular-nums text-oxford/60">{detail}</span> : null}
+      {detail ? <span className="type-meta tabular-nums">{detail}</span> : null}
     </div>
   );
 }
@@ -132,11 +132,11 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                     className={`mt-phi-2 hidden border-b border-oxford/[0.06] pb-phi-2 ${BOOK_GRID}`}
                     aria-hidden
                   >
-                    <span className="type-meta uppercase tracking-[0.1em] text-oxford/60">Company</span>
-                    <span className="type-meta uppercase tracking-[0.1em] text-oxford/60">Sector</span>
-                    <span className="type-meta uppercase tracking-[0.1em] text-oxford/60">Stage</span>
-                    <span className="text-right type-meta uppercase tracking-[0.1em] text-oxford/60">Score</span>
-                    <span className="text-right type-meta uppercase tracking-[0.1em] text-oxford/60">Ruling</span>
+                    <span className="type-label-section">Company</span>
+                    <span className="type-label-section">Sector</span>
+                    <span className="type-label-section">Stage</span>
+                    <span className="type-label-section text-right">Score</span>
+                    <span className="type-label-section text-right">Ruling</span>
                   </div>
                   <ul className="flex flex-col lg:mt-0 mt-phi-2">
                     {convictionBook.map((s) => (
@@ -160,10 +160,10 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           <span className="hidden min-w-0 truncate type-meta text-oxford/60 lg:block">
                             {s.scout.funding_stage || '—'}
                           </span>
-                          <span className="shrink-0 text-right font-mono text-[13px] tabular-nums text-oxford/70">
+                          <span className="type-data shrink-0 text-right text-oxford/70">
                             {s.review?.overall_score != null ? Number(s.review.overall_score).toFixed(1) : '—'}
                           </span>
-                          <span className="hidden shrink-0 text-right font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60 lg:block">
+                          <span className="type-status hidden shrink-0 text-right lg:block">
                             {isDealHumanResolved(s) ? 'Ruled' : '—'}
                           </span>
                         </button>
@@ -186,7 +186,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                 <ul className="mt-phi-4 flex flex-col gap-phi-3">
                   {sectorRows.map((row, i) => (
                     <li key={row.sector} className="grid grid-cols-[minmax(90px,140px)_1fr_64px] items-center gap-phi-4">
-                      <span className="truncate type-meta uppercase tracking-[0.1em] text-oxford/60">{row.sector}</span>
+                      <span className="type-label-section truncate">{row.sector}</span>
                       <span className="relative block h-px bg-oxford/10">
                         <motion.span
                           className="absolute inset-y-0 left-0 origin-left bg-oxford/45"
@@ -196,7 +196,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           transition={{ duration: 0.9, delay: reduceMotion ? 0 : 0.1 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                         />
                       </span>
-                      <span className="text-right font-mono text-[12px] tabular-nums text-oxford/60">
+                      <span className="type-data text-right text-oxford/60">
                         {row.count} · {row.pct.toFixed(0)}%
                       </span>
                     </li>
@@ -229,7 +229,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           {e.startup_name ?? (e.startup_id ? startupNameById.get(e.startup_id) : null) ?? 'Unknown'}
                         </span>
                         <span
-                          className={`shrink-0 font-mono text-[12px] tabular-nums ${
+                          className={`type-data shrink-0 ${
                             e.stale_warning ? 'text-escalation' : 'text-oxford/60'
                           }`}
                         >
@@ -253,10 +253,10 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                     const body = (
                       <>
                         <span className="flex items-baseline justify-between gap-phi-3">
-                          <span className="min-w-0 truncate type-meta uppercase tracking-[0.08em] text-oxford/60">
+                          <span className="type-label-section min-w-0 truncate">
                             {companyName ?? sig.signal_type.replace(/_/g, ' ')}
                           </span>
-                          <span className="shrink-0 font-mono text-[12px] tabular-nums tracking-[0.04em] text-oxford/60">
+                          <span className="type-data shrink-0 text-oxford/60">
                             {signalWhen(sig)}
                           </span>
                         </span>

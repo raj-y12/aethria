@@ -52,7 +52,7 @@ function ReadoutKey({
       className="group flex flex-col items-start gap-phi-1 border-0 bg-transparent p-0 text-left btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
     >
       <span
-        className={`font-mono text-[clamp(22px,2vw,30px)] font-semibold leading-none tracking-[-0.03em] tabular-nums transition-colors ${
+        className={`type-data text-[clamp(22px,2vw,30px)] leading-none transition-colors ${
           tone === 'escalation'
             ? 'text-escalation'
             : active
@@ -62,7 +62,7 @@ function ReadoutKey({
       >
         {value}
       </span>
-      <span className="relative type-meta uppercase tracking-[0.1em] text-oxford/60 transition-colors group-hover:text-oxford">
+      <span className="type-label-section relative transition-colors group-hover:text-oxford">
         {label}
         <span
           aria-hidden
@@ -243,7 +243,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
             <h2 className="type-display mt-phi-5 text-[clamp(26px,3vw,40px)] leading-[1.1] text-oxford">
               The pipeline is filling.
             </h2>
-            <p className="mt-phi-3 max-w-[36ch] font-mono text-[12px] tracking-[0.06em] text-oxford/60">
+            <p className="type-note mt-phi-3 max-w-[36ch] text-oxford/60">
               Scouts are searching against your mandate. New matters appear here as they land.
             </p>
             <button

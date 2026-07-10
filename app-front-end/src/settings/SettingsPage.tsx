@@ -60,11 +60,11 @@ const inputCls =
   'w-full rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 type-body-sm text-oxford outline-none transition-colors placeholder:text-oxford/45 focus:border-oxford/45';
 const selectCls =
   `${inputCls} cursor-pointer appearance-none bg-no-repeat bg-[length:10px] bg-[center_right_2px] pr-7`;
-const labelCls = 'type-label-section text-oxford/60';
-const sectionLabelCls = 'type-label-section text-oxford/[0.72]';
-const metaCls = 'type-meta text-oxford/60';
+const labelCls = 'type-label-section';
+const sectionLabelCls = 'type-label-section';
+const metaCls = 'type-meta';
 const actionBtnCls =
-  'type-label-section inline-flex min-h-[36px] items-center rounded-none border-0 bg-transparent p-0 text-oxford/60 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
+  'type-action inline-flex min-h-[36px] items-center rounded-none border-0 bg-transparent p-0 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
 
 /**
  * One pending edit bucket and the pipeline stages it touches once deployed.
@@ -106,9 +106,9 @@ function SettingsSidebarFooter({
       aria-label="Deployment status"
     >
       <div className="flex items-center justify-between gap-phi-2">
-        <span className="font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60">{live ? 'Live' : 'Draft'}</span>
+        <span className="type-status">{live ? 'Live' : 'Draft'}</span>
         <span
-          className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[12px] uppercase tracking-[0.10em] transition-colors ${live ? 'text-oxford/60' : 'text-escalation/80'}`}
+          className={`type-status inline-flex shrink-0 items-center gap-phi-2 transition-colors ${live ? '' : 'text-escalation/80'}`}
           aria-live="polite"
         >
           <span
@@ -257,7 +257,7 @@ function ToggleRow({
     <div className="flex items-center justify-between gap-phi-5 border-b border-oxford/[0.055] py-phi-3 last:border-0">
       <div className="min-w-0">
         <label htmlFor={id} className="type-body-sm text-oxford">{label}</label>
-        {hint && <p className="mt-phi-1 type-meta leading-snug text-oxford/60">{hint}</p>}
+        {hint && <p className="type-note mt-phi-1 leading-snug text-oxford/60">{hint}</p>}
       </div>
       <button
         id={id}
@@ -299,7 +299,7 @@ function ChipGroup({
               type="button"
               aria-pressed={active}
               onClick={() => toggle(option)}
-              className={`type-meta inline-flex min-h-[36px] items-center justify-center rounded-none px-phi-3 transition-colors ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] text-oxford/60 hover:bg-oxford/[0.075]'}`}
+              className={`type-action inline-flex min-h-[36px] items-center justify-center rounded-none px-phi-3 transition-colors ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] hover:bg-oxford/[0.075]'}`}
             >
               {option}
             </button>
@@ -358,18 +358,18 @@ function PreviewPanel({
         <p className="type-label-section text-oxford/60">Configuration Preview</p>
         <div className="mt-phi-4 flex flex-col gap-phi-5">
           <div>
-            <p className="type-meta text-oxford/60">Mandate</p>
+            <p className="type-label-section">Mandate</p>
             <p className="mt-phi-2 type-body-emphasis text-oxford">{config.mandate.fundName || 'Unnamed fund'}</p>
             <p className="mt-phi-1 type-body-sm text-oxford/60">
               {[...config.mandate.preferredStages, ...config.mandate.geographies].filter(Boolean).join(' · ') || 'No mandate scope set'}
             </p>
           </div>
           <div className="border-t border-oxford/[0.06] pt-phi-4">
-            <p className="type-meta text-oxford/60">Total scoring weight</p>
-            <p className={`mt-phi-2 font-mono text-[1.65rem] tabular-nums ${weightTotal === 100 ? 'text-oxford' : 'text-escalation/75'}`}>{weightTotal}%</p>
+            <p className="type-label-section">Total scoring weight</p>
+            <p className={`type-data mt-phi-2 text-[1.65rem] ${weightTotal === 100 ? 'text-oxford' : 'text-escalation/75'}`}>{weightTotal}%</p>
           </div>
           <div className="border-t border-oxford/[0.06] pt-phi-4">
-            <p className="type-meta text-oxford/60">Verdict marks</p>
+            <p className="type-label-section">Verdict marks</p>
             <div className="mt-phi-3 flex flex-wrap gap-phi-2">
               {(['INVEST', 'MONITOR', 'PASS'] as const).map((id) => (
                 <DecisionBadge key={id} variant={id} />
@@ -377,11 +377,11 @@ function PreviewPanel({
             </div>
           </div>
           <div className="border-t border-oxford/[0.06] pt-phi-4">
-            <p className="type-meta text-oxford/60">Score cutoffs</p>
+            <p className="type-label-section">Score cutoffs</p>
             <div className="mt-phi-3 flex flex-col gap-phi-2">
               {config.scoreBands.map((item) => (
                 <p key={item.id} className="type-meta text-oxford/60">
-                  <span className="font-mono tabular-nums">{item.min}–{item.max}</span> {item.label}
+                  <span className="type-data">{item.min}–{item.max}</span> {item.label}
                 </p>
               ))}
               <p className="type-meta text-oxford/60">
@@ -390,7 +390,7 @@ function PreviewPanel({
             </div>
           </div>
           <div className="border-t border-oxford/[0.06] pt-phi-4">
-            <p className="type-meta text-oxford/60">Risk gating</p>
+            <p className="type-label-section">Risk gating</p>
             <p className="mt-phi-2 type-body-sm text-oxford/60">
               {config.risk.requireAcknowledgement ? `${config.risk.sensitivity} sensitivity` : 'Acknowledgement disabled'}
             </p>
@@ -658,7 +658,7 @@ export default function SettingsPage() {
             surface="oxford"
             onClick={() => navigate('/v1')}
           />
-          <p className="px-2 pb-phi-1 pt-phi-4 font-mono text-[12px] uppercase tracking-[0.12em] text-white/60">
+          <p className="type-label-section type-label-inverse px-2 pb-phi-1 pt-phi-4">
             Configuration
           </p>
           {sections.map((section) => (
@@ -677,9 +677,9 @@ export default function SettingsPage() {
       footer: (
         <section aria-label="Deployment status" className="border-t border-white/[0.07] px-2 pt-phi-3">
           <div className="flex items-center justify-between gap-phi-2">
-            <span className="font-mono text-[12px] uppercase tracking-[0.12em] text-white/60">{unsaved ? 'Draft' : 'Live'}</span>
+            <span className="type-status type-status-inverse">{unsaved ? 'Draft' : 'Live'}</span>
             <span
-              className={`inline-flex shrink-0 items-center gap-phi-2 font-mono text-[12px] uppercase tracking-[0.10em] ${
+              className={`type-status inline-flex shrink-0 items-center gap-phi-2 ${
                 unsaved ? 'text-escalation-bright/90' : 'text-white/60'
               }`}
               aria-live="polite"
@@ -718,7 +718,7 @@ export default function SettingsPage() {
               type="button"
               onClick={() => spineActionsRef.current.reset()}
               disabled={saving}
-              className="inline-flex min-h-[32px] w-full items-center justify-center font-mono text-[12px] uppercase tracking-[0.12em] text-white/60 transition-colors hover:text-white/80 disabled:opacity-50 btn-interaction"
+              className="type-action type-action-inverse inline-flex min-h-[32px] w-full items-center justify-center transition-colors hover:text-white/80 disabled:opacity-50 btn-interaction"
               title="Restore local defaults; deploy to make them live"
             >
               Reset to defaults
@@ -783,7 +783,7 @@ export default function SettingsPage() {
             <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]">
               <div className="flex min-w-0 flex-col px-phi-5 py-phi-6 lg:px-phi-7">
                 <header className="mb-phi-7 max-w-[54rem]">
-                  <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-oxford/60">
+                  <p className="type-label-section">
                     Configuration · {draft.versionLabel}
                   </p>
                   <h1 className="type-display mt-phi-3 text-[clamp(28px,3vw,42px)] leading-[1.08] text-oxford">
@@ -911,16 +911,16 @@ export default function SettingsPage() {
                   <div className="flex flex-col gap-phi-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-phi-4 border-b border-oxford/[0.06] pb-phi-4">
                       <div className="flex items-baseline gap-phi-3">
-                        <p className={`font-mono text-[1.6rem] tabular-nums ${weightValidation.valid ? 'text-oxford' : 'text-escalation/75'}`}>{weightValidation.total}%</p>
-                        <p className="type-meta text-oxford/60">Total weight</p>
+                        <p className={`type-data text-[1.6rem] ${weightValidation.valid ? 'text-oxford' : 'text-escalation/75'}`}>{weightValidation.total}%</p>
+                        <p className="type-label-section">Total weight</p>
                       </div>
-                      <p className="type-meta text-oxford/60">Adjust one — the rest rebalance to 100</p>
+                      <p className="type-note text-oxford/60">Adjust one — the rest rebalance to 100</p>
                     </div>
                     {draft.scoringWeights.map((item) => (
                       <div key={item.key} className="grid gap-phi-3 border-b border-oxford/[0.055] py-phi-4 md:grid-cols-[minmax(150px,22%)_minmax(0,1fr)_92px] md:items-start">
                         <div>
                           <p className="type-body-emphasis text-oxford">{item.label}</p>
-                          <p className="mt-phi-1 type-meta leading-snug text-oxford/60">{item.description}</p>
+                          <p className="type-note mt-phi-1 leading-snug text-oxford/60">{item.description}</p>
                         </div>
                         <p className="type-body-sm leading-relaxed text-oxford/60">{getWeightImpactText(item.key)}</p>
                         <input
@@ -932,7 +932,7 @@ export default function SettingsPage() {
                             ...current,
                             scoringWeights: rebalanceWeights(current.scoringWeights, item.key, Number(event.target.value)),
                           }))}
-                          className={`${inputCls} text-right font-mono tabular-nums`}
+                          className={`${inputCls} type-data text-right`}
                           aria-label={`${item.label} weight`}
                         />
                       </div>

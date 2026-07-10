@@ -10,9 +10,9 @@ import {
 import type { FundConfiguration } from '../lib/fundConfiguration';
 import { DEFAULT_VERDICT_BADGES } from '../lib/fundConfiguration';
 
-const labelCls = 'type-label-section text-oxford/60';
+const labelCls = 'type-label-section';
 const inputCls =
-  'w-full max-w-[5.5rem] rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 type-body-sm font-mono tabular-nums text-oxford outline-none transition-colors focus:border-oxford/45';
+  'type-data w-full max-w-[5.5rem] rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 text-oxford outline-none transition-colors focus:border-oxford/45';
 
 const bandColors = {
   pass: DEFAULT_VERDICT_BADGES.find((b) => b.id === 'PASS')?.backgroundColor ?? '#eabfb7',
@@ -28,13 +28,13 @@ function ThresholdBar({ boundaries }: { boundaries: DecisionThresholdBoundaries 
     <div>
       <div className="flex h-9 w-full overflow-hidden border border-oxford/[0.1]">
         <div
-          className="flex items-center justify-center type-meta uppercase tracking-badge text-oxford/70"
+          className="type-status flex items-center justify-center text-oxford/70"
           style={{ width: `${boundaries.passMonitorBoundary}%`, backgroundColor: bandColors.pass }}
         >
           Pass
         </div>
         <div
-          className="flex items-center justify-center type-meta uppercase tracking-badge text-oxford/70"
+          className="type-status flex items-center justify-center text-oxford/70"
           style={{
             width: `${boundaries.monitorInvestBoundary - boundaries.passMonitorBoundary}%`,
             backgroundColor: bandColors.monitor,
@@ -43,13 +43,13 @@ function ThresholdBar({ boundaries }: { boundaries: DecisionThresholdBoundaries 
           Monitor
         </div>
         <div
-          className="flex items-center justify-center type-meta uppercase tracking-badge text-oxford/70"
+          className="type-status flex items-center justify-center text-oxford/70"
           style={{ width: `${100 - boundaries.monitorInvestBoundary}%`, backgroundColor: bandColors.invest }}
         >
           Invest
         </div>
       </div>
-      <p className="mt-phi-2 font-mono text-[12px] tabular-nums text-oxford/60">
+      <p className="type-data mt-phi-2 text-oxford/60">
         0–{passMax} · {boundaries.passMonitorBoundary}–{monitorMax} · {boundaries.monitorInvestBoundary}–100
       </p>
     </div>

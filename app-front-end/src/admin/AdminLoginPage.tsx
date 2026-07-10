@@ -28,7 +28,7 @@ export default function AdminLoginPage({ onAuthenticated }: AdminLoginPageProps)
   return (
     <main className="min-h-[100dvh] bg-paper text-oxford flex items-center justify-center px-6">
       <section className="w-full max-w-[460px] border border-oxford/[0.08] bg-paper/80 px-8 py-10">
-        <p className="type-meta uppercase tracking-[0.18em] text-oxford/60">Aethria Admin</p>
+        <p className="type-label-section">Aethria Admin</p>
         <h1 className="mt-4 font-display text-[40px] leading-none text-oxford">Master Access</h1>
         <p className="mt-5 type-body text-oxford/60">
           Enter the backend admin secret to view global user, session, and agent telemetry.
@@ -36,7 +36,7 @@ export default function AdminLoginPage({ onAuthenticated }: AdminLoginPageProps)
 
         <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
           <label className="flex flex-col gap-2">
-            <span className="type-meta uppercase tracking-[0.14em] text-oxford/60">Admin Secret</span>
+            <span className="type-label-section">Admin Secret</span>
             <input
               type="password"
               value={secret}
@@ -57,7 +57,7 @@ export default function AdminLoginPage({ onAuthenticated }: AdminLoginPageProps)
           <button
             type="submit"
             disabled={!secret.trim() || submitting}
-            className="mt-2 border border-oxford bg-oxford text-paper px-5 py-3 type-meta uppercase tracking-[0.14em] disabled:opacity-35 disabled:cursor-not-allowed transition-opacity"
+            className="type-action mt-2 border border-oxford bg-oxford px-5 py-3 text-paper disabled:opacity-35 disabled:cursor-not-allowed transition-opacity"
           >
             {submitting ? 'Verifying' : 'Enter Dashboard'}
           </button>
@@ -66,4 +66,3 @@ export default function AdminLoginPage({ onAuthenticated }: AdminLoginPageProps)
     </main>
   );
 }
-

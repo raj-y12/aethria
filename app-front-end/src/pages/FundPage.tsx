@@ -10,10 +10,10 @@ import type { Startup } from '../types/startup';
 function HeaderReadout({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-phi-1">
-      <span className="font-mono text-[clamp(22px,2vw,30px)] font-semibold leading-none tracking-[-0.03em] tabular-nums text-oxford">
+      <span className="type-data text-[clamp(22px,2vw,30px)] leading-none text-oxford">
         {value}
       </span>
-      <span className="type-meta uppercase tracking-[0.1em] text-oxford/60">{label}</span>
+      <span className="type-label-section">{label}</span>
     </div>
   );
 }
@@ -64,7 +64,7 @@ export default function FundPage({ data }: { data: SystemData }) {
             sub={
               <Link
                 to="/v1/settings"
-                className="inline-block type-meta uppercase tracking-[0.1em] text-oxford/60 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                className="type-action inline-block transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
               >
                 Edit mandate →
               </Link>
