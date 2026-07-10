@@ -13,6 +13,7 @@ import { UI_DETAIL_EMPTY_HINT } from '../design-system/ui-text';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import AssessmentScorecard from './scoring/AssessmentScorecard';
+import MemoMasthead from './memo/MemoMasthead';
 import MemoRulingSection from './memo/MemoRulingSection';
 import MemoPrecedentStrip from './memo/MemoPrecedentStrip';
 import MemoPortfolioContext from './memo/MemoPortfolioContext';
@@ -58,9 +59,7 @@ import {
   toJudgmentReasoning,
   firstNonEmpty,
   getPartnerEconomicBadgeVariant,
-  formatSectorAndCategory,
   memoHeaderThesisLine,
-  isLookupStartup,
   pipelineReplayOneLiner,
   decisionLabel,
   uniqueRiskItems,
@@ -113,8 +112,6 @@ export interface InvestmentMemoContentProps {
 export interface InvestmentMemoContentHandle {
   downloadPDF: () => void;
 }
-
-const actionBtnCls = 'memoAction';
 
 const SEVERITY_LABEL: Record<AdverseRegisterItem['severity'], string> = {
   high: 'High',
@@ -259,8 +256,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   );
 
   const contentKey = displayStartup?.id ?? startup?.id ?? 'empty';
-  const companyName = displayStartup?.scout.name?.trim() || '';
-  const sectorCategory = displayStartup ? formatSectorAndCategory(displayStartup) : '';
 
   useEffect(() => {
     if (!startup?.id) {
@@ -337,9 +332,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [displayStartup, showJudgment]
   );
   const showEscalationBadge = !!(displayStartup?.partner?.human_review_required && decisionBadgeVariant);
-  const showLookupBadge = !!(displayStartup && isLookupStartup(displayStartup));
-  const headerLocation = displayStartup?.scout.location?.trim() || '';
-  const headerMeta = [sectorCategory.trim(), showLookupBadge ? 'LOOKUP' : ''].filter(Boolean).join(' · ');
   const headerThesisLine = displayStartup ? memoHeaderThesisLine(displayStartup) : '';
   const reasoningParagraphs = useMemo(
     () => (displayStartup && showJudgment ? toJudgmentReasoning(displayStartup) : []),
@@ -619,24 +611,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           role="region"
           aria-label="Investment memo"
         >
-          {onClose && (
-            <div className="memoHeaderActions">
-              {onAddContext ? (
-                <div className="mr-auto basis-full sm:basis-auto">
-                  <button
-                    type="button"
-                    onClick={onAddContext}
-                    className="border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 font-mono text-[12px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90"
-                    aria-label={`Add context and re-review ${companyName || 'this company'}`}
-                  >
-                    Add context →
-                  </button>
-                </div>
-              ) : null}
-              <button type="button" onClick={handleDownloadPDF} className={actionBtnCls}>IC Pack (PDF)</button>
-              <button type="button" onClick={onClose} className={actionBtnCls}>Close</button>
-            </div>
-          )}
+          <MemoMasthead
+            startup={displayStartup}
+            onAddContext={onAddContext}
+            onDownloadPDF={handleDownloadPDF}
+            onClose={onClose}
+            readOnly={readOnly}
+            compact={coverOverride != null}
+          />
 
           {memoPipeline === 'failed' && (
             <div className="memoGateStrip memoGateStrip--error">
@@ -671,17 +653,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Executive cover (or the workspace's Decision Stage) ── */}
             {coverOverride ?? (
             <header className="memoCover">
-              {!embedded ? <p className="memoKicker">Investment Memo</p> : null}
-              <div className="memoCoverTitleRow">
-                {headerLocation ? (
-                  <p className="memoMeta memoCoverLocation">{renderWithMonoNumbers(headerLocation)}</p>
-                ) : null}
-                <h1 className="memoCoverCompany" id="memo-title">
-                  {companyName || '—'}
-                </h1>
-                {headerMeta ? <p className="memoMeta">{renderWithMonoNumbers(headerMeta)}</p> : null}
-              </div>
-
+              <h1 className="memoCoverCompany" id="memo-title">
+                {displayStartup.scout.name?.trim() || '—'}
+              </h1>
               {readOnly ? (
                 <p className="memoShareBanner" role="status">
                   Read-only view — share this link with a co-GP. Rulings and edits are disabled.

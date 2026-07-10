@@ -87,15 +87,84 @@
   text-transform: uppercase;
 }
 
-/* === Action buttons === */
-.memoHeaderActions {
+/* === Masthead — one owner for the document's identity and actions === */
+.memoMasthead {
+  margin-bottom: clamp(18px, 2.4vw, 26px);
+}
+.memoMastheadBand {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
   align-items: center;
-  gap: 13px 21px;
-  margin-bottom: 13px;
+  justify-content: space-between;
+  gap: 8px 21px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.10);
 }
+.memoMastheadKicker {
+  font-family: var(--memo-font-mono);
+  font-size: 0.66rem;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+  margin: 0;
+}
+.memoMastheadActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0 21px;
+  margin-left: auto;
+}
+.memoMastheadPrimary {
+  appearance: none;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.12);
+  background: var(--color-oxford);
+  color: var(--color-paper);
+  padding: 0 16px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: opacity 150ms ease;
+}
+.memoMastheadPrimary:hover { opacity: 0.9; }
+.memoMastheadPrimary:focus { outline: none; }
+.memoMastheadPrimary:focus-visible {
+  outline: 2px solid rgba(var(--color-oxford-rgb), 0.22);
+  outline-offset: 2px;
+}
+.memoMastheadLocation { margin: 14px 0 0; }
+
+/* Classification tags — quiet bordered stamps; the word carries the meaning. */
+.memoTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.memoTag {
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.70);
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.12);
+  padding: 5px 8px;
+}
+.memoTag--origin {
+  background: rgba(var(--color-oxford-rgb), 0.06);
+}
+
+/* === Action buttons === */
 .memoAction {
   appearance: none;
   border: none;
@@ -1228,17 +1297,6 @@
    =================================================================== */
 
 /* Executive cover */
-.memoCover .memoKicker { margin-bottom: 14px; }
-.memoCoverTitleRow {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  width: 100%;
-}
-.memoCoverLocation {
-  margin: 0;
-}
 .memoCoverStandfirst {
   margin: clamp(12px, 1.6vw, 16px) 0 0;
   max-width: 34rem;
@@ -4266,10 +4324,6 @@
   .memoScroll {
     padding-inline: 20px;
     overflow-x: hidden;
-  }
-
-  .memoCoverTitleRow {
-    align-items: flex-start;
   }
 
   .memoMeta,

@@ -28,8 +28,6 @@ import { isDealUnresolved } from '../lib/dealState';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
 
-const PANEL_ACTION_CLASS = productInteraction.panelActionInline;
-
 /**
  * A readout that is also the instrument's control: the numeral reads the queue
  * and clicking it sets the view. One chrome band — no second tab strip below.
@@ -303,30 +301,11 @@ export default function FlowPage({ data }: { data: SystemData }) {
                       ref={memoContentRef}
                       startup={memoStartup}
                       embedded
+                      onAddContext={() => openRerun(memoStartup)}
                       coverOverride={
                         <DecisionStage
                           startup={memoStartup}
                           fundConfiguration={fundConfiguration}
-                          action={
-                            <span className="inline-flex items-center gap-phi-4">
-                              <button
-                                type="button"
-                                onClick={() => openRerun(memoStartup)}
-                                className={PANEL_ACTION_CLASS}
-                                aria-label={`Add context and re-review ${memoStartup.scout.name}`}
-                              >
-                                Add context
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => memoContentRef.current?.downloadPDF()}
-                                className={PANEL_ACTION_CLASS}
-                                aria-label="Download IC pack as PDF"
-                              >
-                                IC pack (PDF)
-                              </button>
-                            </span>
-                          }
                         />
                       }
                       onMemoPipelineReady={handleMemoPipelineReady}

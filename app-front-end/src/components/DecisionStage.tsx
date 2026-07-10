@@ -23,8 +23,6 @@ import type { Startup, SingleReview } from '../types/startup';
 interface DecisionStageProps {
   startup: Startup;
   fundConfiguration?: FundConfiguration;
-  /** Quiet utility action (e.g. IC pack PDF) — sits on the kicker line, not in its own header band. */
-  action?: React.ReactNode;
 }
 
 /** Conviction on the canonical 0–100 scale — same semantics as the queue. */
@@ -121,17 +119,16 @@ function Instrument({
   );
 }
 
-export default function DecisionStage({ startup, fundConfiguration, action }: DecisionStageProps) {
+export default function DecisionStage({ startup, fundConfiguration }: DecisionStageProps) {
   const reduceMotion = usePrefersReducedMotion();
   const config = fundConfiguration ?? createDefaultFundConfiguration();
 
   const score = useMemo(() => convictionScore(startup, config), [startup, config]);
   const state = stageState(startup);
 
-  const kicker = [startup.scout.sector, startup.scout.funding_stage, startup.scout.location]
-    .map((v) => (v ?? '').toString().trim())
-    .filter(Boolean)
-    .join(' · ');
+  // Sector and stage now live in the masthead's classification tags — the
+  // stage kicker keeps only what the tags don't say.
+  const kicker = (startup.scout.location ?? '').toString().trim();
 
   const standfirst = (
     startup.scout.one_line ??
@@ -189,17 +186,14 @@ export default function DecisionStage({ startup, fundConfiguration, action }: De
       animate="visible"
       variants={reduceMotion ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
     >
-      {/* Compression: one quiet line of context, with the utility action on its right. */}
-      {kicker || action ? (
-        <motion.div
+      {/* Compression: one quiet line of context. */}
+      {kicker ? (
+        <motion.p
           variants={STAGE_ITEM}
-          className="flex min-w-0 items-baseline justify-between gap-phi-4"
+          className="min-w-0 truncate font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60"
         >
-          <p className="min-w-0 truncate font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60">
-            {kicker}
-          </p>
-          {action ? <div className="shrink-0">{action}</div> : null}
-        </motion.div>
+          {kicker}
+        </motion.p>
       ) : null}
 
       {/* The state of the call leads the brief — not the machine's number. */}
