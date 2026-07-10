@@ -98,8 +98,6 @@
   justify-content: space-between;
   gap: 8px 21px;
   padding-bottom: 10px;
-  /* Classic nameplate rule — thick-thin double, the broadsheet signature. */
-  border-bottom: 3px double rgba(var(--color-oxford-rgb), 0.45);
 }
 .memoMastheadKicker {
   font-family: var(--memo-font-mono);
@@ -4471,5 +4469,332 @@
     column-span: all;
     text-align: left;
     margin-bottom: clamp(16px, 2cqw, 22px);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Modern IC dossier — approved July 2026.
+   Editorial hierarchy comes from type, spacing, and aligned data;
+   the vintage broadsheet rules and prose columns are intentionally
+   neutralised here while the existing content order stays intact.
+   ═══════════════════════════════════════════════════════════════ */
+
+.memoBody {
+  max-width: min(100%, 52rem);
+}
+
+.memoPanel--embedded .memoBody {
+  max-width: min(100%, var(--memo-editorial-measure, 44rem));
+}
+
+/* Major sections no longer need a rule to announce every transition. */
+.memoDocSection:not(.memoDisclosureSection),
+.memoDocSection:not(.memoDisclosureSection) + .memoDocSection:not(.memoDisclosureSection) {
+  margin-top: clamp(42px, 5vw, 64px);
+  padding-top: 0;
+  border-top: 0;
+}
+
+.memoDocSection:not(.memoDisclosureSection)::before {
+  content: none;
+}
+
+.memoDocSectionTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: clamp(18px, 2.4vw, 27px);
+}
+
+.memoSectionNumber {
+  flex: 0 0 auto;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--color-accent) 78%, var(--color-oxford));
+  font-variant-numeric: tabular-nums;
+}
+
+.memoDocSectionTitle .memoDocSectionHead {
+  margin: 0;
+  color: rgba(var(--color-oxford-rgb), 0.82);
+}
+
+.memoDocSectionTitle .memoDocSectionHead::before {
+  content: none;
+}
+
+/* Recommendation reads as the dossier lede, not a ruled report section. */
+.memoCoverRuling {
+  margin-top: clamp(28px, 3.6vw, 44px);
+  padding-top: 0;
+  border-top: 0;
+}
+
+.memoCoverRulingWord {
+  max-width: 36rem;
+  letter-spacing: -0.035em;
+}
+
+.memoCoverStandfirst {
+  margin-top: 12px;
+  max-width: 38rem;
+  text-wrap: pretty;
+}
+
+.memoCoverDecider {
+  margin-top: clamp(22px, 2.8vw, 30px);
+  padding-left: 0;
+  border-left: 0;
+  max-width: 40rem;
+}
+
+.memoCoverDeciderLabel {
+  color: color-mix(in srgb, var(--color-accent) 72%, var(--color-oxford));
+}
+
+.memoCoverBrief {
+  margin-top: clamp(24px, 3vw, 34px);
+  gap: 0;
+  max-width: 40rem;
+  padding: 4px 16px;
+  background: rgba(var(--color-oxford-rgb), 0.035);
+}
+
+.memoCoverBriefItem {
+  padding-block: 12px;
+}
+
+.memoCoverBriefItem + .memoCoverBriefItem {
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.075);
+}
+
+/* Snapshot is a compact IC fact record. */
+.memoSnapshot {
+  gap: 0;
+  max-width: 100%;
+}
+
+.memoSnapshotRow {
+  grid-template-columns: minmax(9.5rem, 0.3fr) minmax(0, 1fr);
+  gap: 8px clamp(22px, 3vw, 34px);
+  padding-block: clamp(11px, 1.5vw, 15px);
+}
+
+.memoSnapshotRow + .memoSnapshotRow {
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.075);
+}
+
+.memoSnapshotText {
+  max-width: 42rem;
+}
+
+/* Why Now stays in one deliberate reading flow at the real 44rem width. */
+@container memoPanel (min-width: 640px) {
+  .memoCaseList {
+    display: flex;
+    max-width: 42rem;
+    column-count: initial;
+    column-gap: normal;
+    column-rule: 0;
+    text-align: left;
+    hyphens: none;
+    -webkit-hyphens: none;
+  }
+
+  .memoCasePoint,
+  .memoCasePoint--lead {
+    margin-bottom: 0;
+  }
+}
+
+.memoCaseList {
+  counter-reset: memo-case;
+  gap: clamp(15px, 2vw, 22px);
+}
+
+.memoCasePoint,
+.memoCasePoint--lead {
+  counter-increment: memo-case;
+  padding-left: 30px;
+  font-family: var(--memo-font-ui);
+  text-align: left;
+}
+
+.memoCasePoint::before,
+.memoCasePoint--lead::before {
+  content: counter(memo-case, decimal-leading-zero);
+  display: block;
+  top: 0.28em;
+  width: auto;
+  height: auto;
+  background: transparent;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  line-height: 1.35;
+  letter-spacing: 0.05em;
+  color: rgba(var(--color-oxford-rgb), 0.36);
+}
+
+.memoCasePoint--lead {
+  max-width: 38rem;
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  line-height: 1.4;
+  font-weight: 560;
+  letter-spacing: -0.018em;
+}
+
+/* Limits, reviewers, and risks share one restrained evidence-row language. */
+.memoKillerList {
+  border-top: 0;
+}
+
+.memoKiller {
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  padding-block: clamp(15px, 1.9vw, 20px);
+  border-bottom: 0;
+}
+
+.memoKiller + .memoKiller,
+.memoConsensusRow + .memoConsensusRow,
+.memoEvRisk + .memoEvRisk {
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.075);
+}
+
+.memoEvRisk {
+  grid-template-columns: minmax(4.25rem, 5rem) minmax(0, 1fr);
+  padding-block: clamp(15px, 1.9vw, 20px);
+  border-top: 0;
+}
+
+.memoEvRisk:first-child {
+  padding-top: 0;
+}
+
+/* Score dimensions are the one place where compact dossier cells improve scanning. */
+.memoScoreDimensionStack,
+.memoDocScorecardRow {
+  gap: 8px;
+}
+
+.memoScoreDimensionCard,
+.memoDocScoreBtn {
+  background: rgba(var(--color-oxford-rgb), 0.038);
+  border: 0;
+  border-radius: 0;
+}
+
+.memoDocScorePanel + .memoDocScorePanel {
+  border-top-color: rgba(var(--color-oxford-rgb), 0.075);
+}
+
+/* The ruling is the terminal action surface, not another pale section. */
+.memoRulingControls {
+  margin-inline: clamp(-20px, -2.5vw, -12px);
+  padding: clamp(22px, 3vw, 30px) clamp(20px, 3vw, 30px);
+  background: var(--color-oxford);
+  color: var(--color-paper);
+}
+
+.memoRulingControls > .memoDocSectionHead {
+  color: rgba(var(--color-paper-rgb), 0.72);
+}
+
+.memoRulingControls > .memoDocSectionHead::before {
+  background: color-mix(in srgb, var(--color-accent) 72%, transparent);
+}
+
+.memoRulingControls .memoRulingPanel {
+  color: var(--color-paper);
+}
+
+.memoRulingControls .memoDecisionChoice {
+  border-color: rgba(var(--color-paper-rgb), 0.24);
+  color: rgba(var(--color-paper-rgb), 0.82);
+  background: transparent;
+}
+
+.memoRulingControls .memoDecisionChoice:hover:not(:disabled) {
+  border-color: rgba(var(--color-paper-rgb), 0.48);
+  color: var(--color-paper);
+}
+
+.memoRulingControls .memoDecisionChoice[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-oxford);
+}
+
+.memoRulingControls .memoRulingTextarea {
+  border-color: rgba(var(--color-paper-rgb), 0.2);
+  color: var(--color-paper);
+  background: rgba(var(--color-paper-rgb), 0.055);
+}
+
+.memoRulingControls .memoRulingTextarea::placeholder {
+  color: rgba(var(--color-paper-rgb), 0.42);
+}
+
+.memoRulingControls .memoRulingTextarea:focus {
+  border-color: rgba(var(--color-paper-rgb), 0.48);
+}
+
+.memoRulingControls .memoRulingSubmit {
+  background: var(--color-accent);
+  color: var(--color-oxford);
+}
+
+.memoRulingControls .memoRulingSubmit:disabled {
+  border-color: rgba(var(--color-paper-rgb), 0.18);
+  color: rgba(var(--color-paper-rgb), 0.36);
+}
+
+.memoRulingControls .memoRiskAckButton {
+  color: var(--color-paper);
+  border-color: rgba(var(--color-paper-rgb), 0.28);
+}
+
+/* Appendix reads as a quiet document index. */
+.memoDiscGroup {
+  margin-top: clamp(34px, 4vw, 52px);
+}
+
+.memoAppendixLabel {
+  margin-bottom: 10px;
+  color: rgba(var(--color-oxford-rgb), 0.48);
+}
+
+.memoDiscGroup .memoDisclosureSection.memoDocSection {
+  border-top-color: rgba(var(--color-oxford-rgb), 0.075);
+}
+
+.memoDiscGroup .memoDisclosureToggle {
+  padding-block: clamp(13px, 1.7vw, 17px);
+}
+
+@container memoPanel (max-width: 620px) {
+  .memoSnapshotRow,
+  .memoEvRisk {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .memoRulingControls {
+    margin-inline: 0;
+  }
+}
+
+@container memoPanel (max-width: 440px) {
+  .memoDocSectionTitle {
+    gap: 9px;
+  }
+
+  .memoDecisionChoices {
+    grid-template-columns: 1fr;
+  }
+
+  .memoDisclosureToggle {
+    grid-template-columns: 1fr auto;
   }
 }

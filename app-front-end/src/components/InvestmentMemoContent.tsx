@@ -17,6 +17,7 @@ import MemoMasthead from './memo/MemoMasthead';
 import MemoRulingSection from './memo/MemoRulingSection';
 import MemoPrecedentStrip from './memo/MemoPrecedentStrip';
 import MemoPortfolioContext from './memo/MemoPortfolioContext';
+import MemoSectionTitle from './memo/MemoSectionTitle';
 import { DECISION_BADGE_LABEL } from './DecisionBadge';
 import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 import { resolveEscalation } from '../api/escalations';
@@ -731,7 +732,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Company snapshot — one definition grid: verified vitals first, then narrative rows ── */}
             {(snapshotRows.length > 0 || hasVitals) && (
               <section className="memoDocSection memoSnapshotSection" aria-labelledby="memo-snapshot">
-                <h2 className="memoDocSectionHead" id="memo-snapshot">Snapshot</h2>
+                <MemoSectionTitle number="01" id="memo-snapshot">Snapshot</MemoSectionTitle>
                 <dl className="memoSnapshot">
                   {[
                     ...vitalsStrip.map((v) => ({ label: v.label, text: v.value })),
@@ -760,7 +761,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Investment case ── */}
             {investmentCasePoints.length > 0 && (
               <section className="memoDocSection memoCaseSection" aria-labelledby="memo-case">
-                <h2 className="memoDocSectionHead" id="memo-case">Why Now</h2>
+                <MemoSectionTitle number="02" id="memo-case">Why Now</MemoSectionTitle>
                 <ol className="memoCaseList">
                   {investmentCasePoints.map((point, i) => (
                     <li key={i} className={`memoCasePoint${i === 0 ? ' memoCasePoint--lead' : ''}`}>
@@ -774,7 +775,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Investment killers ── */}
             {memoKillers.length > 0 && (
               <section className="memoDocSection memoKillerSection" aria-labelledby="memo-killers">
-                <h2 className="memoDocSectionHead" id="memo-killers">What Limits Conviction</h2>
+                <MemoSectionTitle number="03" id="memo-killers">What Limits Conviction</MemoSectionTitle>
                 <ol className="memoKillerList">
                   {memoKillers.map((killer, i) => (
                     <li key={i} className={`memoKiller memoKiller--${killer.severity}`}>
@@ -826,7 +827,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               const gapPoints = (r?.thesis_deviation_points ?? []).filter((s) => String(s ?? '').trim());
               return (
                 <section className="memoDocSection memoScoringSection" aria-labelledby="memo-scoring">
-                  <h2 className="memoDocSectionHead" id="memo-scoring">Assessment</h2>
+                  <MemoSectionTitle number="04" id="memo-scoring">Assessment</MemoSectionTitle>
                   {hasScorecard ? (
                     <div className="memoDocScoreScope">
                       <AssessmentScorecard
@@ -941,7 +942,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Risk register ── */}
             {(adverseRegister.length > 0 || riskFactors.risks.length > 0 || riskFactors.mitigation.length > 0 || missingEvidenceItems.length > 0) && (
               <section className="memoDocSection memoRiskRegisterSection" aria-labelledby="memo-risk-register">
-                <h2 className="memoDocSectionHead" id="memo-risk-register">Risks</h2>
+                <MemoSectionTitle number="05" id="memo-risk-register">Risks</MemoSectionTitle>
                 {adverseRegister.length > 0 && (
                   <p className="memoEvStatLine">
                     {renderWithMonoNumbers(`${highAdverseCount} high · ${adverseRegister.length} material`)}
