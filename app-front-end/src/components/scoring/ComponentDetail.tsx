@@ -15,7 +15,7 @@ export default function ComponentDetail({ componentName, component, showDebug = 
 
   return (
     <div className="mt-2 border border-oxford/10 bg-paper px-3 py-2">
-      <p className="type-meta uppercase tracking-[0.08em] text-oxford/60">{componentName}</p>
+      <p className="type-label-section">{componentName}</p>
       <p className="mt-1.5 type-meta text-oxford/[0.62]">{deterministicMapping}</p>
       {component.rule && <p className="mt-1 type-meta text-oxford/60">Rule trigger: {component.rule}</p>}
       {component.evidence && <p className="mt-1.5 type-note text-oxford/75 leading-relaxed"><span className="text-oxford/[0.62]">Evidence:</span> {component.evidence}</p>}

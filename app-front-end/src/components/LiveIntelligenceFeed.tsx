@@ -181,7 +181,7 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
                     <>
                       {e.message}
                       {/* Verdict inline with its subject — never floated to the panel edge. */}
-                      <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-oxford/80">
+                      <span className="type-status text-oxford/80">
                         {' '}· {e.decision}
                       </span>
                     </>

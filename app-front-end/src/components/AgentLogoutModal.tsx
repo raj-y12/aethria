@@ -105,7 +105,7 @@ export default function AgentLogoutModal({
             initial={{ opacity: 0, transform: 'translateY(10px)' }}
             animate={{ opacity: 1, transform: 'translateY(0px)' }}
             transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
-            className="type-meta uppercase tracking-[0.16em] text-oxford/60 mb-phi-3"
+            className="type-label-section mb-phi-3"
           >
             System Notification
           </motion.p>
@@ -165,7 +165,7 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
                   onClick={() => void handleTurnOff()}
                   disabled={busy}
-                  className="w-full min-h-[44px] font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60 hover:text-oxford btn-interaction transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                  className="type-action w-full min-h-[44px] hover:text-oxford btn-interaction transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {busy ? 'Pausing pipeline...' : 'Pause pipeline and log out'}
                 </motion.button>
@@ -191,7 +191,7 @@ export default function AgentLogoutModal({
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
                   onClick={() => void handleTurnOn()}
                   disabled={busy}
-                  className="w-full min-h-[44px] font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60 hover:text-oxford btn-interaction transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                  className="type-action w-full min-h-[44px] hover:text-oxford btn-interaction transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {busy ? 'Starting pipeline...' : 'Start pipeline and log out'}
                 </motion.button>
@@ -206,7 +206,7 @@ export default function AgentLogoutModal({
               type="button"
               onClick={onCancel}
               disabled={busy}
-              className="mt-phi-2 type-meta uppercase tracking-[0.12em] text-oxford/60 hover:text-oxford btn-interaction cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-40 border-b border-oxford/10 pb-0.5"
+              className="type-action mt-phi-2 hover:text-oxford btn-interaction cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-40 border-b border-oxford/10 pb-0.5"
             >
               Cancel
             </motion.button>

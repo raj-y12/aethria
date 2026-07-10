@@ -34,7 +34,6 @@ function QueueVerdictText({
   prominent?: boolean;
   tone?: 'default' | 'burgundy' | 'muted';
 }) {
-  const size = prominent ? 'text-[12px]' : 'text-[12px]';
   const toneClass =
     tone === 'burgundy'
       ? prominent
@@ -48,7 +47,7 @@ function QueueVerdictText({
           ? 'text-oxford/[0.72]'
           : 'text-oxford/60';
   return (
-    <span className={`font-mono uppercase tracking-[0.08em] ${size} ${toneClass}`}>{children}</span>
+    <span className={`type-status ${toneClass}`}>{children}</span>
   );
 }
 
@@ -76,9 +75,7 @@ export default function QueueVerdictLine({
           ·
         </span>
         <span
-          className={`font-mono tabular-nums ${
-            prominent ? 'text-[12px] font-semibold text-oxford/75' : 'text-[12px] font-medium text-oxford/60'
-          }`}
+          className={`type-data ${prominent ? 'text-oxford/75' : 'text-oxford/60'}`}
         >
           {convictionLabel}
         </span>
@@ -145,6 +142,6 @@ export default function QueueVerdictLine({
   }
 
   return (
-    <p className={`font-mono uppercase ${prominent ? 'text-[12px]' : 'text-[12px]'} text-oxford/60`}>—</p>
+    <p className="type-status">—</p>
   );
 }

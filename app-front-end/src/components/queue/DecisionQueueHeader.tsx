@@ -126,17 +126,17 @@ export default function DecisionQueueHeader({
       title={`${config.thresholds.staleAfterHours}h stale · ${config.risk.sensitivity} risk`}
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-1 border-b border-oxford/[0.06] pb-phi-2">
-        <span className="type-meta uppercase tracking-[0.12em] text-oxford/60">Docket</span>
+        <span className="type-label-section">Docket</span>
 
         <div className="flex items-center gap-x-phi-4">
           <label className="flex items-center gap-phi-2">
-            <span className="type-meta uppercase tracking-[0.12em] text-oxford/60">Sort</span>
+            <span className="type-label-section">Sort</span>
             <select
               value={sortFilter}
               onChange={(e) => onSortFilterChange(e.target.value as SortFilter)}
               aria-label="Sort deals"
               style={sortSelectStyle}
-              className="type-meta h-9 cursor-pointer appearance-none border-0 bg-transparent bg-no-repeat bg-[length:8px] bg-[center_right_2px] pr-5 uppercase tracking-[0.12em] text-oxford/60 outline-none transition-colors hover:text-oxford/80 focus-visible:outline-none"
+              className="type-action h-9 cursor-pointer appearance-none border-0 bg-transparent bg-no-repeat bg-[length:8px] bg-[center_right_2px] pr-5 outline-none transition-colors hover:text-oxford/80 focus-visible:outline-none"
             >
               {SORT_OPTIONS.map(({ value, label }) => (
                 <option key={value} value={value}>
@@ -150,7 +150,7 @@ export default function DecisionQueueHeader({
             type="button"
             onClick={onToggleAdvancedFilters}
             aria-expanded={showAdvancedFilters}
-            className={`type-meta inline-flex h-9 shrink-0 items-center gap-phi-1 uppercase tracking-[0.12em] transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+            className={`type-action inline-flex h-9 shrink-0 items-center gap-phi-1 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
               showAdvancedFilters || hasActiveFilters
                 ? 'text-oxford'
                 : 'text-oxford/60 hover:text-oxford'

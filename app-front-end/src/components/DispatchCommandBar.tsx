@@ -102,7 +102,7 @@ function ProgressSteps({ progress }: { progress: LookupProgress }) {
               aria-hidden
             />
             <span
-              className={`font-mono text-[12px] uppercase tracking-[0.12em] ${
+              className={`type-action ${
                 step.state === 'done'
                   ? 'text-oxford/70'
                   : step.state === 'active'
@@ -134,7 +134,7 @@ function DispatchFooterBar({ actions }: { actions: DispatchFooterAction[] }) {
           <button
             type="button"
             onClick={action.onClick}
-            className="type-meta border-b border-oxford/10 px-1 pb-0.5 uppercase tracking-[0.12em] text-oxford/60 transition-colors hover:text-oxford btn-interaction cursor-pointer"
+            className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:text-oxford btn-interaction cursor-pointer"
           >
             {action.label}
           </button>
@@ -311,7 +311,7 @@ export default function DispatchCommandBar({
                 }}
                 aria-label={c.active ? `Resume active analysis for ${c.label}` : `Open analysis for ${c.label}`}
                 aria-pressed={c.active}
-                className={`inline-flex min-h-9 items-center gap-phi-2 border px-phi-4 py-phi-2 font-mono text-[12px] uppercase tracking-[0.1em] transition-colors btn-interaction ${
+                className={`type-action inline-flex min-h-9 items-center gap-phi-2 border px-phi-4 py-phi-2 transition-colors btn-interaction ${
                   c.active
                     ? 'border-oxford/30 bg-oxford/[0.06] text-oxford'
                     : 'border-oxford/[0.12] text-oxford/60 hover:border-oxford/25 hover:text-oxford/70'
@@ -336,7 +336,7 @@ export default function DispatchCommandBar({
 
         <div key={view} className="flex w-full flex-col items-center">
           <Reveal delay={0.1}>
-            <p className="type-meta mb-phi-3 uppercase tracking-[0.16em] text-oxford/60">{eyebrow}</p>
+            <p className="type-label-section mb-phi-3">{eyebrow}</p>
           </Reveal>
 
           <Reveal delay={0.16} y={12}>
@@ -352,7 +352,7 @@ export default function DispatchCommandBar({
           {view === 'rerun' ? (
             <Reveal delay={0.24} className="mt-phi-3 flex w-full max-w-md flex-col items-center gap-phi-5">
               {rerun!.sector ? (
-                <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60">
+                <p className="type-label-section">
                   {rerun!.sector}
                 </p>
               ) : null}
@@ -363,7 +363,7 @@ export default function DispatchCommandBar({
               <div className="w-full">
                 <label
                   htmlFor="dispatch-rerun-context"
-                  className="font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60"
+                  className="type-action"
                 >
                   Additional context
                 </label>
@@ -382,7 +382,7 @@ export default function DispatchCommandBar({
                     type="button"
                     onClick={handleSubmitRerun}
                   disabled={isBusy || !rerunContext.trim()}
-                  className="border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 font-mono text-[12px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="type-action border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
                 >
                     Review again →
                   </button>
@@ -405,8 +405,8 @@ export default function DispatchCommandBar({
                 aria-label={`Lookup could not resolve ${failure!.query}`}
               >
                 <div className="mb-phi-3 flex items-baseline justify-between gap-phi-3">
-                  <p className="font-mono text-[12px] uppercase tracking-[0.11em] text-oxford/60">Result</p>
-                  <p className="text-right font-mono text-[12px] uppercase tracking-[0.1em] text-oxford/60">
+                  <p className="type-label-section">Result</p>
+                  <p className="type-status text-right">
                     Unresolved
                   </p>
                 </div>
@@ -419,7 +419,7 @@ export default function DispatchCommandBar({
                 <button
                   type="button"
                   onClick={handleRetry}
-                  className="mt-phi-4 w-full border border-solid border-oxford/12 bg-oxford px-4 py-2.5 font-mono text-[12px] uppercase tracking-[0.12em] text-paper transition-opacity hover:opacity-90"
+                  className="type-action mt-phi-4 w-full border border-solid border-oxford/12 bg-oxford px-4 py-2.5 text-paper transition-opacity hover:opacity-90"
                 >
                   Try another lookup
                 </button>
@@ -428,7 +428,7 @@ export default function DispatchCommandBar({
           ) : view === 'progress' ? (
             <Reveal delay={0.24} className="mt-phi-3 flex flex-col items-center gap-phi-5">
               {progress!.sector ? (
-                <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-oxford/60">
+                <p className="type-status">
                   {progress!.sector}
                 </p>
               ) : null}

@@ -573,7 +573,7 @@ export function InstitutionalMandateTab({
                   v{v.version_number}
                   {v.is_active ? ' · active' : ''}
                 </span>
-                <span className="font-mono type-meta text-oxford/60 tabular-nums">
+                <span className="type-meta tabular-nums text-oxford/60">
                   {formatDate(v.created_at)}
                 </span>
               </li>
@@ -996,7 +996,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                   {h.direction}
                 </span>
                 <div className="flex min-w-0 flex-col gap-phi-1">
-                  <span className="type-meta tracking-[0.06em] text-oxford/70">{h.parameter.replace(/_/g, ' ')}</span>
+                  <span className="type-meta text-oxford/70">{h.parameter.replace(/_/g, ' ')}</span>
                   <p className="type-meta leading-relaxed text-oxford/60">{h.reasoning}</p>
                 </div>
               </div>
