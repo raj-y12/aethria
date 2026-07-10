@@ -72,39 +72,23 @@
 
 .memoMastheadFolio {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   min-width: 0;
 }
 
-.memoMastheadBrand {
-  margin: 0;
-  font-family: var(--memo-font-display);
-  font-size: 0.875rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-}
-
-.memoMastheadIssue {
-  display: grid;
-  justify-items: end;
-  gap: 3px;
-  margin: 0;
+.memoMastheadDate {
+  flex: 0 0 auto;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
   font-size: 0.625rem;
   line-height: 1.5;
   letter-spacing: 0.09em;
-  text-align: right;
   text-transform: uppercase;
 }
 
 .memoMastheadIdentity {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: clamp(24px, 5cqi, 60px);
   margin-top: clamp(34px, 5.5cqi, 62px);
 }
 
@@ -151,9 +135,9 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 6px 15px;
-  min-width: max-content;
-  padding-bottom: 3px;
+  min-width: 0;
 }
 
 .memoAction,
@@ -1563,23 +1547,8 @@
     --memo-section-space: 52px;
   }
 
-  .memoMastheadFolio,
-  .memoMastheadIdentity {
-    grid-template-columns: 1fr;
-  }
-
-  .memoMastheadIdentity {
-    gap: 24px;
-  }
-
   .memoMastheadActions {
-    justify-content: flex-start;
     min-width: 0;
-  }
-
-  .memoMastheadIssue {
-    justify-items: start;
-    text-align: left;
   }
 
   .memoDocSectionTitle {

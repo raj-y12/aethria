@@ -28,31 +28,13 @@ export default function MemoMasthead({
   const location = startup.scout.location?.trim() || '';
   const descriptor = startup.scout.one_line?.trim() || '';
   const discoveredAt = startup.timestamps?.discovered_at;
-  const dossierRef = startup.id
-    ? startup.id.replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase().padStart(6, '0')
-    : '000000';
   const issueDate = discoveredAt
     ? new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(discoveredAt))
     : '';
   return (
     <header className="memoMasthead">
       <div className="memoMastheadFolio">
-        <p className="memoMastheadBrand">Aethria / IC</p>
-        <p className="memoMastheadIssue" aria-label="Memo issue">
-          <span>{`Dossier ${dossierRef}`}</span>
-          {issueDate ? <time dateTime={discoveredAt}>{issueDate}</time> : null}
-        </p>
-      </div>
-      <div className="memoMastheadIdentity">
-        <div className="memoMastheadSubject">
-          <h1 className="memoCoverCompany memoMastheadCompany" id="memo-title">
-            {companyName || '—'}
-          </h1>
-          {descriptor ? <p className="memoMastheadDescriptor">{descriptor}</p> : null}
-          {location ? (
-            <p className="memoMeta memoMastheadLocation">{renderWithMonoNumbers(location)}</p>
-          ) : null}
-        </div>
+        {issueDate ? <time className="memoMastheadDate" dateTime={discoveredAt}>{issueDate}</time> : <span />}
         <div className="memoMastheadActions" aria-label="Memo actions">
           {!readOnly && onAddContext ? (
             <button
@@ -76,6 +58,17 @@ export default function MemoMasthead({
             <button type="button" className="memoAction" onClick={onClose}>
               Close
             </button>
+          ) : null}
+        </div>
+      </div>
+      <div className="memoMastheadIdentity">
+        <div className="memoMastheadSubject">
+          <h1 className="memoCoverCompany memoMastheadCompany" id="memo-title">
+            {companyName || '—'}
+          </h1>
+          {descriptor ? <p className="memoMastheadDescriptor">{descriptor}</p> : null}
+          {location ? (
+            <p className="memoMeta memoMastheadLocation">{renderWithMonoNumbers(location)}</p>
           ) : null}
         </div>
       </div>

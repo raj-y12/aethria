@@ -52,10 +52,15 @@ describe('MemoMasthead', () => {
   });
 
   it('renders the complete dossier identity when embedded or standalone', () => {
-    render(<MemoMasthead startup={startup} onDownloadPDF={vi.fn()} />);
+    const { container } = render(
+      <MemoMasthead startup={startup} onAddContext={vi.fn()} onDownloadPDF={vi.fn()} />,
+    );
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
-    expect(screen.getByText('Aethria / IC')).toBeInTheDocument();
-    expect(screen.getByText(/Dossier/i)).toHaveTextContent('Dossier IXTURE');
+    expect(screen.queryByText('Aethria / IC')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Dossier/i)).not.toBeInTheDocument();
+    expect(screen.getByText('01 Jun 2026')).toBeInTheDocument();
+    expect(container.querySelector('.memoMastheadFolio > time')).not.toBeNull();
+    expect(container.querySelector('.memoMastheadFolio > .memoMastheadActions')).not.toBeNull();
     expect(screen.getByText('Berlin')).toBeInTheDocument();
     expect(screen.getByText('Fixture one-liner')).toBeInTheDocument();
     expect(screen.getByText('INDUSTRIAL AI')).toBeInTheDocument();
