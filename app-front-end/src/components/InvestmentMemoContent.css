@@ -12,8 +12,6 @@
   --memo-font-ui: var(--font-sans, "Figtree Variable", system-ui, -apple-system, sans-serif);
   --memo-font-mono: var(--font-mono, "Space Mono", ui-monospace, monospace);
   --memo-font-display: var(--font-display, "Playfair Display", Georgia, "Times New Roman", serif);
-  /* Newsprint running copy — matches web-front-end --font-serif-text. */
-  --memo-font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
   /* Tuned for ~1440px (MacBook Air): restrained, spacious — readable without feeling big. */
   --memo-size-body:      0.875rem;   /* 14px — prose, lists, reasoning */
   --memo-size-secondary: 0.8125rem;  /* 13px — secondary prose, takes */
@@ -104,12 +102,12 @@
   border-bottom: 3px double rgba(var(--color-oxford-rgb), 0.45);
 }
 .memoMastheadKicker {
-  font-family: var(--memo-font-display);
-  font-size: 1.0625rem;
+  font-family: var(--memo-font-mono);
+  font-size: 0.66rem;
   line-height: 1.2;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--memo-ink-strong);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
   margin: 0;
 }
 .memoMastheadActions {
@@ -4429,58 +4427,11 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Broadsheet layer — the memo set as a modern newspaper page.
-   Mirrors web-front-end's newsprint system (np-serif / np-cols /
-   diamond rules): Playfair for headlines and the verdict, Source
-   Serif 4 for running copy, mono stays for slugs, labels, and data.
-   Appended last so it wins the cascade over the base type rules.
+   Broadsheet layer — newspaper structure without the type change:
+   nameplate double rule (masthead), diamond section rules, and the
+   two-column Why Now. Fonts stay the house set (Figtree/Space Mono).
+   Appended last so it wins the cascade over the base rules.
    ═══════════════════════════════════════════════════════════════ */
-
-/* — Running copy → text serif (newsprint body) — */
-.memoDocProse,
-.memoSnapshotText,
-.memoCasePoint,
-.memoKillerStatement,
-.memoListItem,
-.memoEvRiskTitle,
-.memoEvRiskWhy,
-.memoConsensusTake,
-.memoLedgerText,
-.memoLedgerEmpty,
-.memoCoverDeciderText,
-.memoCoverBrief dd,
-.memoCoverNextMoveText,
-.memoReplayDetail,
-.memoRulingIntro {
-  font-family: var(--memo-font-serif);
-}
-/* Serif renders optically smaller than Figtree — give body copy back a point. */
-.memoDocProse,
-.memoSnapshotText,
-.memoCasePoint,
-.memoKillerStatement {
-  font-size: calc(var(--memo-size-body) + 0.0625rem);
-}
-
-/* — Headline & verdict → editorial display serif — */
-.memoCoverCompany {
-  font-family: var(--memo-font-display);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.memoCoverRulingWord {
-  font-family: var(--memo-font-display);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-/* Deck — the standfirst reads as a serif italic subhead under the headline. */
-.memoCoverStandfirst {
-  font-family: var(--memo-font-serif);
-  font-style: italic;
-  font-weight: 400;
-  font-size: clamp(1.0625rem, 1.5vw, 1.1875rem);
-  line-height: 1.55;
-}
 
 /* — Section rules → hairline with the centered diamond (Lazard break) — */
 .memoDocSection {
