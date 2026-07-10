@@ -652,9 +652,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Executive cover (or the workspace's Decision Stage) ── */}
             {coverOverride ?? (
             <header className="memoCover">
-              <h1 className="memoCoverCompany" id="memo-title">
-                {displayStartup.scout.name?.trim() || '—'}
-              </h1>
               {readOnly ? (
                 <p className="memoShareBanner" role="status">
                   Read-only view — share this link with a co-GP. Rulings and edits are disabled.

@@ -215,9 +215,10 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       ) : null}
 
       {/* The subject — sans matches the selected docket row; size stays stage scale. */}
+      {/* Broadsheet headline — display serif, matching the memo's newsprint setting. */}
       <motion.h2
         variants={STAGE_ITEM}
-        className="mt-phi-5 break-words font-sans font-semibold leading-[1.05] text-oxford"
+        className="mt-phi-5 break-words font-display font-semibold leading-[1.04] tracking-[-0.01em] text-oxford"
         style={{ fontSize: 'clamp(34px, 3.8vw, 56px)' }}
       >
         {startup.scout.name}
@@ -226,7 +227,8 @@ export default function DecisionStage({ startup, fundConfiguration }: DecisionSt
       {standfirst ? (
         <motion.p
           variants={STAGE_ITEM}
-          className="mt-phi-4 max-w-[36rem] font-sans text-[16px] leading-[1.55] text-oxford/70"
+          className="mt-phi-4 max-w-[38rem] text-[17px] italic leading-[1.55] text-oxford/70"
+          style={{ fontFamily: '"Source Serif 4", Georgia, serif' }}
         >
           {standfirst}
         </motion.p>

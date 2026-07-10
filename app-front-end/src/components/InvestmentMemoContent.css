@@ -12,6 +12,8 @@
   --memo-font-ui: var(--font-sans, "Figtree Variable", system-ui, -apple-system, sans-serif);
   --memo-font-mono: var(--font-mono, "Space Mono", ui-monospace, monospace);
   --memo-font-display: var(--font-display, "Playfair Display", Georgia, "Times New Roman", serif);
+  /* Newsprint running copy — matches web-front-end --font-serif-text. */
+  --memo-font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
   /* Tuned for ~1440px (MacBook Air): restrained, spacious — readable without feeling big. */
   --memo-size-body:      0.875rem;   /* 14px — prose, lists, reasoning */
   --memo-size-secondary: 0.8125rem;  /* 13px — secondary prose, takes */
@@ -94,19 +96,20 @@
 .memoMastheadBand {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 8px 21px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.10);
+  padding-bottom: 10px;
+  /* Classic nameplate rule — thick-thin double, the broadsheet signature. */
+  border-bottom: 3px double rgba(var(--color-oxford-rgb), 0.45);
 }
 .memoMastheadKicker {
-  font-family: var(--memo-font-mono);
-  font-size: 0.66rem;
+  font-family: var(--memo-font-display);
+  font-size: 1.0625rem;
   line-height: 1.2;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--memo-ink-faint);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--memo-ink-strong);
   margin: 0;
 }
 .memoMastheadActions {
@@ -371,21 +374,6 @@
 }
 .memoPanel--embedded .memoRulingControls {
   margin-top: clamp(24px, 3vw, 32px);
-}
-/* Ruling controls dock at the bottom of the memo scroll region on desktop so the
-   decision stays reachable on long memos; they release once their natural position
-   scrolls into view. Mobile keeps in-flow placement with safe-area padding. */
-@media (min-width: 1024px) {
-  .memoRulingControls {
-    background: var(--color-paper);
-    padding-bottom: clamp(14px, 1.8vw, 20px);
-    box-shadow: 0 -1px 0 0 rgba(var(--color-oxford-rgb), 0.10);
-  }
-}
-@media (max-width: 1023px) {
-  .memoRulingControls {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
 }
 .memoPanel--embedded .memoRulingPanel {
   gap: 14px;
@@ -4438,4 +4426,99 @@
 }
 .memoPanel--embedded .memoDisclosureSection + .memoDisclosureSection {
   margin-top: clamp(10px, 1.4vw, 13px);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Broadsheet layer — the memo set as a modern newspaper page.
+   Mirrors web-front-end's newsprint system (np-serif / np-cols /
+   diamond rules): Playfair for headlines and the verdict, Source
+   Serif 4 for running copy, mono stays for slugs, labels, and data.
+   Appended last so it wins the cascade over the base type rules.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* — Running copy → text serif (newsprint body) — */
+.memoDocProse,
+.memoSnapshotText,
+.memoCasePoint,
+.memoKillerStatement,
+.memoListItem,
+.memoEvRiskTitle,
+.memoEvRiskWhy,
+.memoConsensusTake,
+.memoLedgerText,
+.memoLedgerEmpty,
+.memoCoverDeciderText,
+.memoCoverBrief dd,
+.memoCoverNextMoveText,
+.memoReplayDetail,
+.memoRulingIntro {
+  font-family: var(--memo-font-serif);
+}
+/* Serif renders optically smaller than Figtree — give body copy back a point. */
+.memoDocProse,
+.memoSnapshotText,
+.memoCasePoint,
+.memoKillerStatement {
+  font-size: calc(var(--memo-size-body) + 0.0625rem);
+}
+
+/* — Headline & verdict → editorial display serif — */
+.memoCoverCompany {
+  font-family: var(--memo-font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.memoCoverRulingWord {
+  font-family: var(--memo-font-display);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+/* Deck — the standfirst reads as a serif italic subhead under the headline. */
+.memoCoverStandfirst {
+  font-family: var(--memo-font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.0625rem, 1.5vw, 1.1875rem);
+  line-height: 1.55;
+}
+
+/* — Section rules → hairline with the centered diamond (Lazard break) — */
+.memoDocSection {
+  position: relative;
+  border-top-color: rgba(var(--color-oxford-rgb), 0.12);
+}
+.memoDocSection:not(.memoDisclosureSection)::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 4px;
+  height: 4px;
+  background: rgba(var(--color-oxford-rgb), 0.25);
+  transform: translate(-50%, -50%) rotate(45deg);
+  pointer-events: none;
+}
+
+/* — Why Now → justified two-column newspaper setting on wide panels — */
+@container memoPanel (min-width: 640px) {
+  .memoCaseList {
+    display: block;
+    max-width: none;
+    column-count: 2;
+    column-gap: clamp(28px, 4cqw, 44px);
+    column-rule: 1px solid rgba(var(--color-oxford-rgb), 0.1);
+    text-align: justify;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+  }
+  .memoCasePoint {
+    break-inside: avoid;
+    margin-bottom: clamp(12px, 1.6cqw, 18px);
+  }
+  /* The lede spans both columns, ragged-right like a standfirst. */
+  .memoCasePoint--lead {
+    column-span: all;
+    text-align: left;
+    margin-bottom: clamp(16px, 2cqw, 22px);
+  }
 }
