@@ -107,7 +107,7 @@ export type LookupJobStatus = {
   message?: string;
 };
 
-/** Poll after queueOnDemandLookup when no matching startup row yet; failed=true if worker recorded an error. */
+/** Poll after queueOnDemandLookup; failed=true if the worker recorded an error at any stage. */
 export async function fetchLookupJobStatus(lookupId: string): Promise<LookupJobStatus> {
   const id = lookupId.trim();
   if (!id) {

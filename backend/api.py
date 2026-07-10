@@ -122,6 +122,7 @@ from portfolio.rejection import RejectionAnalyzer
 from portfolio.cost_control import CostController
 from pipeline_runner import (
     _rss_mb as _pipeline_rss_mb,
+    _record_lookup_failure,
     reprocess_startups_missing_fund_thesis,
     run_one_pipeline_cycle,
     run_on_demand_lookup,
@@ -147,7 +148,7 @@ from utils.partner_codes import LEGACY_TO_RECOMMENDATION, recommendation_from_le
 _agent_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _agent_worker_task: Optional[asyncio.Task] = None
 _lookup_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
-_lookup_worker_task: Optional[asyncio.Task] = None
+_lookup_worker_tasks: List[asyncio.Task] = []
 _cancelled_lookup_ids: set[str] = set()
 _logger_agents = logging.getLogger("api.agents")
 _logger_visible = logging.getLogger("uvicorn.error")
@@ -285,11 +286,23 @@ async def _lookup_worker() -> None:
                     user_id[:12] if user_id else "?",
                     e,
                 )
+                await _record_lookup_failure(
+                    user_id,
+                    lookup_id,
+                    "Lookup worker failed unexpectedly. Please retry the lookup.",
+                )
             finally:
                 _release_security_lock(str(job.get("lock_key") or "").strip() or None)
                 _lookup_queue.task_done()
         except asyncio.CancelledError:
             break
+
+
+def _lookup_worker_count() -> int:
+    """Match queue consumers to the lookup concurrency limit."""
+    from pipeline_concurrency import max_concurrent_lookups
+
+    return max_concurrent_lookups()
 
 
 # ---------------------------------------------------------------------------
@@ -553,17 +566,22 @@ async def _resume_all_user_loops() -> None:
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    global _agent_queue, _agent_worker_task, _lookup_queue, _lookup_worker_task, _loops_lock
+    global _agent_queue, _agent_worker_task, _lookup_queue, _lookup_worker_tasks, _loops_lock
     global _rss_sampler_task
     _loops_lock = asyncio.Lock()
     _agent_queue = asyncio.Queue()
     _lookup_queue = asyncio.Queue()
     _agent_worker_task = asyncio.create_task(_agent_worker())
-    _lookup_worker_task = asyncio.create_task(_lookup_worker())
+    _lookup_worker_tasks = [
+        asyncio.create_task(_lookup_worker()) for _ in range(_lookup_worker_count())
+    ]
     _rss_sampler_task = asyncio.create_task(_rss_sampler())
     global _loop_lag_sampler_task
     _loop_lag_sampler_task = asyncio.create_task(_event_loop_lag_sampler())
-    _logger_agents.info("Pipeline agent worker + on-demand lookup worker started")
+    _logger_agents.info(
+        "Pipeline agent worker + %d on-demand lookup workers started",
+        len(_lookup_worker_tasks),
+    )
     # Surface unapplied migrations loudly at startup. The storage write path
     # tolerates missing columns by dropping fields and retrying — convenient, but
     # it hides drift. This makes it a single visible signal instead.
@@ -615,7 +633,7 @@ async def _lifespan(app: FastAPI):
         except asyncio.CancelledError:
             pass
     # Cancel queue workers + memory/loop-lag samplers
-    for t in (_lookup_worker_task, _agent_worker_task, _rss_sampler_task, _loop_lag_sampler_task):
+    for t in (*_lookup_worker_tasks, _agent_worker_task, _rss_sampler_task, _loop_lag_sampler_task):
         if t:
             t.cancel()
             try:

@@ -13,6 +13,7 @@ import {
 } from '../api/startups';
 import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
+import { resolveLookupFailure } from '../lib/lookupFailure';
 import {
   getDispatchLookupStorageKey,
   loadDispatchLookupSnapshot,
@@ -339,7 +340,7 @@ export function useDispatchLookup({
     queryKey: ['startups', 'lookup-status', pendingLookup?.lookupId ?? ''],
     queryFn: () => fetchLookupJobStatus(pendingLookup!.lookupId),
     enabled: Boolean(
-      pendingLookup && !pendingLookupMatch && pendingLookup.lookupId.trim().length > 0,
+      pendingLookup && !pendingLookup.autoOpened && pendingLookup.lookupId.trim().length > 0,
     ),
     staleTime: 4_000,
     refetchInterval: (q) => {
@@ -356,17 +357,12 @@ export function useDispatchLookup({
 
   useEffect(() => {
     if (!pendingLookup || pendingLookup.autoOpened) return;
-    const statusMessage = pendingLookupMatch
-      ? memoStatusQuery.data?.status === 'failed'
-        ? memoStatusQuery.data.error
-        : undefined
-      : lookupFailureQuery.data?.failed
-        ? lookupFailureQuery.data.message
-        : undefined;
-    const failed = pendingLookupMatch
-      ? memoStatusQuery.data?.status === 'failed'
-      : lookupFailureQuery.data?.failed === true;
-    if (!failed) return;
+    const statusMessage = resolveLookupFailure({
+      hasMatchedStartup: Boolean(pendingLookupMatch),
+      memoStatus: memoStatusQuery.data,
+      jobStatus: lookupFailureQuery.data,
+    });
+    if (!statusMessage) return;
     const reason =
       statusMessage ??
       `We couldn't confirm a company matching "${pendingLookup.queryLabel}". Try the exact name or add the website to disambiguate (example: "Aethria aethria.com").`;

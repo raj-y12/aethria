@@ -38,6 +38,7 @@ from supabase_doc_store import list_upsert
 from utils.settings_loader import load_settings, is_thesis_reprocess_agents_enabled
 from supabase_client import get_service_client
 from supabase_storage import SupabaseStartupsStorage
+from pipeline_state import upsert_pipeline_state
 from scout.engine import ScoutEngine
 from reviewer.engine import ReviewerEngine
 from partner.engine import PartnerEngine
@@ -261,6 +262,29 @@ async def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message
             lid[:16],
             e,
         )
+
+
+async def _mark_lookup_pipeline_failed(
+    storage: SupabaseStartupsStorage,
+    startup_id: Optional[str],
+    pipeline_run_id: str,
+    message: str,
+) -> None:
+    """Best-effort terminal state for a lookup that already persisted a row."""
+    sid = (startup_id or "").strip()
+    client = getattr(storage, "_client", None)
+    uid = str(getattr(storage, "_user_id", None) or "").strip()
+    if not sid or not client or not uid:
+        return
+    await asyncio.to_thread(
+        upsert_pipeline_state,
+        client,
+        user_id=uid,
+        startup_id=sid,
+        pipeline_run_id=pipeline_run_id,
+        status="failed",
+        error=(message or "Lookup failed.").strip()[:500],
+    )
 
 
 async def run_one_pipeline_cycle(user_id: str, *, manual_one_shot: bool = False) -> None:
@@ -691,6 +715,7 @@ async def _run_on_demand_lookup_inner(
     reviewer_engine = engines.reviewer_engine
     partner_engine = engines.partner_engine
 
+    startup_id: Optional[str] = None
     try:
         lookup_run_id = str(uuid4())
         logger.info(
@@ -779,8 +804,10 @@ async def _run_on_demand_lookup_inner(
                 await asyncio.sleep(0.8 * attempt)
         if not reviewed:
             logger.warning("[%s] On-demand lookup not reviewed: %s", user_id[:12], startup_id)
-            # Do not mark lookup as failed when scout persisted a startup successfully.
-            # This is a partial completion state; UI should keep polling/matching rows.
+            message = "Lookup found the company, but analyst review could not complete after retrying."
+            await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
+            await _record_lookup_failure(user_id, lid, message)
+            metrics.inc_lookup("error")
             return startup_id
         _notify_startups_changed(user_id, "lookup_reviewer")
         if cancelled():
@@ -804,6 +831,11 @@ async def _run_on_demand_lookup_inner(
                 await asyncio.sleep(0.6 * attempt)
         if not decided:
             logger.warning("[%s] On-demand lookup not decided yet: %s", user_id[:12], startup_id)
+            message = "Lookup review completed, but the partner decision could not complete after retrying."
+            await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
+            await _record_lookup_failure(user_id, lid, message)
+            metrics.inc_lookup("error")
+            return startup_id
         else:
             _notify_startups_changed(user_id, "lookup_partner")
         logger.info(
@@ -818,10 +850,13 @@ async def _run_on_demand_lookup_inner(
     except Exception as e:
         metrics.inc_lookup("error")
         logger.exception("[%s] On-demand lookup error (%s): %s", user_id[:12], company, e)
+        message = "Lookup failed with an unexpected error. Try again or check server logs."
+        if startup_id:
+            await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
         await _record_lookup_failure(
             user_id,
             lid,
-            "Lookup failed with an unexpected error. Try again or check server logs.",
+            message,
         )
         return None
     finally:

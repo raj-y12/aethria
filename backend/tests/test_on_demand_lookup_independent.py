@@ -21,6 +21,7 @@ class _FakeReviewerEngine:
     active_thesis = "unset"
     use_resource_fund_thesis_fallback = "unset"
     calls = 0
+    result = True
 
     def __init__(self, *args, **kwargs):
         type(self).active_thesis = kwargs.get("active_thesis", "missing")
@@ -31,13 +32,14 @@ class _FakeReviewerEngine:
 
     async def run_startup(self, *args, **kwargs):
         type(self).calls += 1
-        return True
+        return type(self).result
 
 
 class _FakePartnerEngine:
     fund_thesis = "unset"
     use_resource_fund_thesis_fallback = "unset"
     calls = 0
+    result = True
 
     def __init__(self, *args, **kwargs):
         type(self).fund_thesis = kwargs.get("fund_thesis", "missing")
@@ -48,7 +50,7 @@ class _FakePartnerEngine:
 
     async def run_startup(self, *args, **kwargs):
         type(self).calls += 1
-        return True
+        return type(self).result
 
 
 class _FakeThesis:
@@ -63,11 +65,16 @@ class _FakeThesis:
 def _wire_common_engines(monkeypatch):
     _FakeScoutEngine.calls = 0
     _FakeReviewerEngine.calls = 0
+    _FakeReviewerEngine.result = True
     _FakePartnerEngine.calls = 0
+    _FakePartnerEngine.result = True
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr("pipeline_runner.get_service_client", lambda: SimpleNamespace())
-    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id: SimpleNamespace())
+    monkeypatch.setattr(
+        "pipeline_runner.SupabaseStartupsStorage",
+        lambda client, user_id: SimpleNamespace(_client=client, _user_id=user_id),
+    )
     monkeypatch.setattr("pipeline_runner.load_settings", lambda user_id: {"cost_budget": {"enabled": False}})
     monkeypatch.setattr("pipeline_runner.DealMemory", lambda user_id: SimpleNamespace())
     monkeypatch.setattr("pipeline_runner.ScoutEngine", _FakeScoutEngine)
@@ -150,3 +157,53 @@ async def test_on_demand_lookup_cancelled_after_scout_stops_before_review(monkey
     assert _FakeScoutEngine.calls == 1
     assert _FakeReviewerEngine.calls == 0
     assert _FakePartnerEngine.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_on_demand_lookup_records_terminal_failure_when_review_exhausts_retries(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+    _FakeReviewerEngine.result = False
+    recorded = []
+    states = []
+
+    async def _record(user_id, lookup_id, message):
+        recorded.append((user_id, lookup_id, message))
+
+    monkeypatch.setattr("pipeline_runner._record_lookup_failure", _record)
+    monkeypatch.setattr("pipeline_runner.upsert_pipeline_state", lambda *a, **k: states.append(k))
+
+    startup_id = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-review-fail")
+
+    assert startup_id == "startup-1"
+    assert _FakeReviewerEngine.calls == 3
+    assert _FakePartnerEngine.calls == 0
+    assert recorded and recorded[0][:2] == ("user_123", "lookup-review-fail")
+    assert "review" in recorded[0][2].lower()
+    assert states[-1]["startup_id"] == "startup-1"
+    assert states[-1]["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_on_demand_lookup_records_terminal_failure_when_partner_exhausts_retries(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+    _FakePartnerEngine.result = False
+    recorded = []
+    states = []
+
+    async def _record(user_id, lookup_id, message):
+        recorded.append((user_id, lookup_id, message))
+
+    monkeypatch.setattr("pipeline_runner._record_lookup_failure", _record)
+    monkeypatch.setattr("pipeline_runner.upsert_pipeline_state", lambda *a, **k: states.append(k))
+
+    startup_id = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-partner-fail")
+
+    assert startup_id == "startup-1"
+    assert _FakeReviewerEngine.calls == 1
+    assert _FakePartnerEngine.calls == 2
+    assert recorded and recorded[0][:2] == ("user_123", "lookup-partner-fail")
+    assert "decision" in recorded[0][2].lower()
+    assert states[-1]["startup_id"] == "startup-1"
+    assert states[-1]["status"] == "failed"
