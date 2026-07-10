@@ -130,10 +130,10 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
               ) : null}
               <motion.h2
                 layout={!reduceMotion}
-                className={`min-w-0 break-words font-sans transition-[color,font-weight] ${
+                className={`min-w-0 break-words transition-[color,font-weight] ${
                   isSelected
-                    ? 'text-[clamp(28px,2.6vw,36px)] font-semibold leading-[1.15] tracking-[-0.01em] text-oxford'
-                    : 'text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.15] tracking-[-0.01em] text-oxford/60'
+                    ? 'font-display text-[clamp(28px,2.6vw,36px)] font-medium leading-[1.1] tracking-[-0.02em] text-oxford'
+                    : 'font-sans text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.15] tracking-[-0.01em] text-oxford/60'
                 }`}
                 style={{
                   transitionDuration: `${selectTransition.duration}s`,
