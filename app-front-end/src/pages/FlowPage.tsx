@@ -9,6 +9,7 @@ import InvestmentMemo from '../components/InvestmentMemo';
 import InvestmentMemoContent, { type InvestmentMemoContentHandle } from '../components/InvestmentMemoContent';
 import AgentDispatch from '../components/AgentDispatch';
 import RoomHeader from '../components/RoomHeader';
+import { workspaceLayout } from '../design-system/workspaceLayout';
 import { useAppFrame } from '../components/AppFrame';
 import { tokens } from '../design-system/tokens';
 import { transitionOrReduced } from '../design-system/motion';
@@ -196,7 +197,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
 
   return (
     <div className="page-transition-enter flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[var(--room-max-flow)] flex-col px-phi-5 pt-phi-6 pb-phi-5">
+      <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop} ${workspaceLayout.pageBottom} flex h-full min-h-0 flex-col`}>
         <div className="flex-none pb-phi-4 lg:hidden">
           <AgentDispatch
             input={inlineDispatch.input}
@@ -211,7 +212,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
         </div>
 
         <RoomHeader
-          className="border-b border-oxford/[0.075] pb-phi-5"
+          className={`border-b border-oxford/[0.075] ${workspaceLayout.headerBottom}`}
           eyebrow="Judgment"
           title="Flow"
           sub={headerSub}

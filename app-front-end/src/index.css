@@ -118,15 +118,9 @@
   --queue-content-measure: 42rem;
   --memo-editorial-measure: 44rem;
 
-  /* Per-room canvas widths — density targets (UI/UX audit 2026-07-10, P1
-     "data placement"). One cap per room, set by what the room does:
-     Flow    — working room: queue + active memo side by side, wants the screen.
-     Portfolio — monitoring room: comparative lists earn moderate width.
-     Fund    — reading room: the mandate is prose; hold the measure and fill
-               the adjacent column instead of stretching empty paper. */
-  --room-max-flow: 1560px;
-  --room-max-portfolio: 1400px;
-  --room-max-fund: 1180px;
+  /* One shared outer canvas keeps peer workspaces aligned. Their internal
+     grids and scroll behavior remain page-specific. */
+  --room-max: 1180px;
 
   /* Semantic surfaces — mirror tokens.surface + Tailwind bg-surface-* */
   --surface-canvas: var(--color-paper);

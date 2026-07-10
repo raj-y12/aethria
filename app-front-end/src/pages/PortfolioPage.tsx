@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import RoomHeader from '../components/RoomHeader';
+import { workspaceLayout } from '../design-system/workspaceLayout';
 import { usePrefersReducedMotion } from '../hooks';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup, SignalItem } from '../types/startup';
@@ -97,10 +98,10 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
 
   return (
     <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <div className="mx-auto w-full max-w-[var(--room-max-portfolio)] px-phi-5 pt-phi-6 pb-phi-8">
+      <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop} ${workspaceLayout.pageBottom}`}>
         {/* ── Header: place + book composition in one line of sight ── */}
         <RoomHeader
-          className="pb-phi-6"
+          className={workspaceLayout.headerBottom}
           eyebrow="Conviction"
           title="Portfolio"
           readouts={

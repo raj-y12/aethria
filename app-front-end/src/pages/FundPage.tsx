@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import RoomHeader from '../components/RoomHeader';
+import { workspaceLayout } from '../design-system/workspaceLayout';
 import SystemIntelligence, { FundFacetNav, type FundFacetTab } from '../components/SystemIntelligence';
 import { useFundConfiguration } from '../hooks';
 import type { SystemData } from '../hooks/useSystemData';
@@ -53,9 +54,9 @@ export default function FundPage({ data }: { data: SystemData }) {
   return (
     <div className="page-transition-enter flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex-none bg-paper">
-        <div className="mx-auto w-full max-w-[var(--room-max-fund)] px-phi-5 pt-phi-6">
+        <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop}`}>
           <RoomHeader
-            className="pb-phi-5"
+            className={workspaceLayout.headerBottom}
             eyebrow={`The instrument${
               runtime?.active_version_number != null ? ` · Mandate v${runtime.active_version_number}` : ''
             }`}
@@ -86,9 +87,9 @@ export default function FundPage({ data }: { data: SystemData }) {
 
       <div
         ref={bodyScrollRef}
-        className="scrollbar-gutter-stable min-h-0 flex-1 overflow-y-auto overscroll-contain bg-paper"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-paper"
       >
-        <div className="mx-auto w-full max-w-[var(--room-max-fund)] px-phi-5 pb-phi-5 pt-phi-3">
+        <div className={`${workspaceLayout.shell} ${workspaceLayout.pageBottom} pt-phi-3`}>
           <SystemIntelligence
             activeTab={activeTab}
             onTabChange={setActiveTab}
