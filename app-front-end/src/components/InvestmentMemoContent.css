@@ -344,31 +344,22 @@
 }
 
 .memoDossierMetrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-  gap: clamp(16px, 2.5cqi, 24px);
   margin: 16px 0 0;
-  padding: clamp(16px, 2.5cqi, 24px) 0;
-  border-top: 1px solid var(--memo-rule);
+}
+
+/* Same row grammar as the Snapshot section: mono label beside the value. */
+.memoDossierMetric {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.38fr) minmax(0, 0.62fr);
+  gap: 16px;
+  align-items: baseline;
+  margin: 0;
+  padding: 11px 0;
   border-bottom: 1px solid var(--memo-rule);
 }
 
-.memoDossierMetric {
-  margin: 0;
-  padding: 0;
-  border-bottom: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.memoDossierMetric:last-child {
-  margin-bottom: 0;
-  border-bottom: 0;
-}
-
-.memoDossierMetric dt {
-  order: -1;
+.memoDossierMetric:first-child {
+  border-top: 1px solid var(--memo-rule);
 }
 
 .memoDossierMetric dd {
@@ -377,6 +368,7 @@
   font-size: 0.8125rem;
   font-weight: 650;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .memoDossierCallout {
