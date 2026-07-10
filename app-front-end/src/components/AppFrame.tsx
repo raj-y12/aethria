@@ -335,11 +335,6 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                           className="type-label-tab flex min-h-[44px] items-center px-1 text-white/60 hover:text-white btn-interaction"
                         >
                           {item.label}
-                          {item.sublabel ? (
-                            <span className="ml-phi-2 font-sans font-normal normal-case tracking-normal opacity-80">
-                              {item.sublabel}
-                            </span>
-                          ) : null}
                         </button>
                       ))}
                       <button

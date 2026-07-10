@@ -49,7 +49,6 @@ export function SpineNavButton({
   compact,
   surface = 'oxford',
   running = false,
-  sublabel,
 }: {
   label: string;
   active: boolean;
@@ -60,8 +59,6 @@ export function SpineNavButton({
   surface?: 'oxford' | 'paper';
   /** Shows a breathing dot before the label (e.g. a lookup running in the background). */
   running?: boolean;
-  /** Plain-language subtitle under the brand label (e.g. Flow → "Deals"). */
-  sublabel?: string;
 }) {
   const onPaper = surface === 'paper';
   const textActive = onPaper ? 'text-oxford' : 'text-white';
@@ -78,8 +75,8 @@ export function SpineNavButton({
     <button
       type="button"
       onClick={onClick}
-      title={shortcut ? `${sublabel ?? label} (${shortcut})` : sublabel ?? label}
-      className={`group type-label-tab w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
+      title={shortcut ? `${label} (${shortcut})` : label}
+      className={`group w-full flex items-center justify-between gap-phi-3 font-mono text-[11px] uppercase tracking-[0.1em] cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
         active ? `${textActive} ${bgActive}` : `${textIdle} ${bgHover}`
       } ${compact ? 'min-h-[32px] px-phi-4 py-phi-1' : 'min-h-[44px] px-2 py-1'}`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
@@ -93,14 +90,7 @@ export function SpineNavButton({
             aria-hidden
           />
         ) : null}
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate">{label}</span>
-          {sublabel ? (
-            <span className="truncate font-sans text-[12px] font-normal normal-case leading-snug tracking-normal opacity-80">
-              {sublabel}
-            </span>
-          ) : null}
-        </span>
+        <span className="truncate">{label}</span>
       </span>
       {shortcut ? (
         <span
