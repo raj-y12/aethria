@@ -4,7 +4,7 @@ import MemoDossierOpening from '../MemoDossierOpening';
 
 describe('MemoDossierOpening', () => {
   it('renders the recommendation as a lede with a compact decision record', () => {
-    render(
+    const { container } = render(
       <MemoDossierOpening
         recommendation="Proceed"
         recommendationTone="invest"
@@ -19,6 +19,9 @@ describe('MemoDossierOpening', () => {
     );
 
     expect(screen.getByRole('heading', { level: 2, name: 'Proceed' })).toBeInTheDocument();
+    expect(container.querySelector('.memoDossierOpeningGrid')).not.toBeNull();
+    expect(container.querySelector('.memoDossierQuestion--pull')).not.toBeNull();
+    expect(container.querySelector('.memoDossierOpeningGrid .memoDossierQuestion')).toBeNull();
     expect(screen.getByRole('complementary', { name: 'Decision record' })).toHaveTextContent(
       'Founder-led acquisition',
     );
