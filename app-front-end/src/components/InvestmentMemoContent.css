@@ -372,6 +372,24 @@
 .memoPanel--embedded .memoRulingControls {
   margin-top: clamp(24px, 3vw, 32px);
 }
+/* Ruling controls dock at the bottom of the memo scroll region on desktop so the
+   decision stays reachable on long memos; they release once their natural position
+   scrolls into view. Mobile keeps in-flow placement with safe-area padding. */
+@media (min-width: 1024px) {
+  .memoRulingControls {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    background: var(--color-paper);
+    padding-bottom: clamp(14px, 1.8vw, 20px);
+    box-shadow: 0 -1px 0 0 rgba(var(--color-oxford-rgb), 0.10);
+  }
+}
+@media (max-width: 1023px) {
+  .memoRulingControls {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
 .memoPanel--embedded .memoRulingPanel {
   gap: 14px;
 }
