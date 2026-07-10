@@ -128,17 +128,17 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
                   {startup.scout.location.trim()}
                 </p>
               ) : null}
+              {/* Keyed on selection: the title fades in already set in its final
+                  face — tweening font-weight steps across Playfair's static files. */}
               <motion.h2
-                layout={!reduceMotion}
-                className={`min-w-0 break-words transition-[color,font-weight] ${
+                key={isSelected ? 'selected' : 'ambient'}
+                initial={reduceMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className={`min-w-0 break-words ${
                   isSelected
                     ? 'font-display text-[clamp(28px,2.6vw,36px)] font-medium leading-[1.1] tracking-[-0.02em] text-oxford'
                     : 'font-sans text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.15] tracking-[-0.01em] text-oxford/60'
                 }`}
-                style={{
-                  transitionDuration: `${selectTransition.duration}s`,
-                  transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-                }}
                 transition={selectTransition}
               >
                 {startup.scout.name}
