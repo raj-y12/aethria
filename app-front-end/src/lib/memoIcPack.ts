@@ -348,6 +348,25 @@ function drawHeading(doc: jsPDF, title: string, y: number): number {
   return y + 5;
 }
 
+/** Draw one pre-wrapped line stretched to `width` by widening word gaps —
+ *  the broadsheet justification the on-screen memo only gets in print. */
+function drawJustifiedSeg(doc: jsPDF, seg: string, x: number, y: number, width: number): void {
+  const words = seg.split(' ').filter(Boolean);
+  const spaceW = doc.getTextWidth(' ');
+  const wordsW = words.reduce((sum, w) => sum + doc.getTextWidth(w), 0);
+  const extra = width - wordsW - (words.length - 1) * spaceW;
+  if (words.length < 2 || extra <= 0) {
+    doc.text(seg, x, y);
+    return;
+  }
+  const gap = spaceW + extra / (words.length - 1);
+  let cx = x;
+  for (const w of words) {
+    doc.text(w, cx, y);
+    cx += doc.getTextWidth(w) + gap;
+  }
+}
+
 /** Body line; bolds a leading "Label: " prefix and hang-indents bullets. */
 function drawBodyLine(doc: jsPDF, line: string, y: number): number {
   const maxW = contentWidth(doc);
@@ -366,6 +385,7 @@ function drawBodyLine(doc: jsPDF, line: string, y: number): number {
   wrapped.forEach((seg, i) => {
     y = ensureSpace(doc, y, PDF_LINE_HEIGHT);
     const x = PDF_MARGIN + indent;
+    const isLastLine = i === wrapped.length - 1;
     if (isBullet && i === 0) {
       setColor(doc, MUTED);
       doc.setFont('helvetica', 'normal');
@@ -380,11 +400,19 @@ function drawBodyLine(doc: jsPDF, line: string, y: number): number {
       setColor(doc, INK);
       // remainder of first line after the label
       const firstRest = seg.slice(label.length).trimStart();
-      if (firstRest) doc.text(firstRest, x + lw, y);
+      if (firstRest && isLastLine) {
+        doc.text(firstRest, x + lw, y);
+      } else if (firstRest) {
+        drawJustifiedSeg(doc, firstRest, x + lw, y, maxW - indent - lw);
+      }
     } else {
       doc.setFont('helvetica', 'normal');
       setColor(doc, INK);
-      doc.text(seg, x, y);
+      if (isLastLine) {
+        doc.text(seg, x, y);
+      } else {
+        drawJustifiedSeg(doc, seg, x, y, maxW - indent);
+      }
     }
     y += PDF_LINE_HEIGHT;
   });
