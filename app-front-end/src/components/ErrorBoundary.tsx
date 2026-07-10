@@ -53,7 +53,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
       >
         <div className="max-w-md text-center">
           <p className="type-meta text-oxford/60">Something went wrong</p>
-          <h2 className="mt-phi-2 font-serif text-[1.4rem] text-oxford">
+          <h2 className="mt-phi-2 font-display text-[1.4rem] text-oxford">
             This view hit an unexpected error.
           </h2>
           <p className="mt-phi-3 type-meta text-oxford/60">

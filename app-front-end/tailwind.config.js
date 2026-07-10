@@ -63,7 +63,6 @@ export default {
       fontFamily: {
         display: ['"Playfair Display"', 'Georgia', 'serif'],
         wordmark: ['"Playfair Display"', 'Georgia', 'serif'],
-        cormorant: ['"Playfair Display"', 'Georgia', 'serif'],
         // Figtree Variable is the canonical app UI font — matches web-front-end warmth.
         sans: ['"Figtree Variable"', 'system-ui', '-apple-system', 'sans-serif'],
         body: ['"Figtree Variable"', 'system-ui', '-apple-system', 'sans-serif'],

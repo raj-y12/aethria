@@ -768,7 +768,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           value={evalDraft}
           onChange={(e) => setEvalDraft(e.target.value)}
           rows={5}
-          className="w-full max-w-2xl font-mono type-meta text-oxford/70 bg-oxford/[0.03] border border-oxford/[0.1] px-phi-3 py-phi-2 resize-y"
+          className="w-full max-w-2xl type-meta text-oxford/70 bg-oxford/[0.03] border border-oxford/[0.1] px-phi-3 py-phi-2 resize-y"
           placeholder={'startup_id_one\nstartup_id_two'}
         />
         <div className="flex flex-wrap items-center gap-phi-3 mt-phi-3">
@@ -819,7 +819,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                   <div key={agent} className="flex flex-wrap items-center justify-between gap-phi-3 py-phi-3">
                     <div className="min-w-0">
                       <span className="type-meta text-oxford/70">{agent}</span>
-                      <p className="font-mono type-meta text-oxford/60 truncate max-w-xl" title={libKey}>{libKey}</p>
+                      <p className="type-meta text-oxford/60 truncate max-w-xl" title={libKey}>{libKey}</p>
                     </div>
                     <button
                       type="button"
@@ -857,7 +857,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                     <div key={p.library_key} className="flex flex-wrap items-start justify-between gap-phi-3 py-phi-3">
                       <div className="min-w-0 flex-1">
                         <span className="type-meta text-oxford/70">{agent}</span>
-                        <p className="font-mono type-meta text-oxford/60 break-all">{p.library_key}</p>
+                        <p className="type-meta text-oxford/60 break-all">{p.library_key}</p>
                         {p.reasoning && (
                           <p className="type-meta text-oxford/60 mt-phi-1 line-clamp-2">{p.reasoning}</p>
                         )}
@@ -943,7 +943,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
             {evalResult.rows && evalResult.rows.length > 0 && (
               <details className="mt-phi-3">
                 <summary className="type-meta text-oxford/60 cursor-pointer">Per startup</summary>
-                <ul className="mt-phi-2 space-y-phi-1 font-mono type-meta text-oxford/60 max-h-40 overflow-y-auto">
+                <ul className="mt-phi-2 space-y-phi-1 type-meta text-oxford/60 max-h-40 overflow-y-auto">
                   {evalResult.rows.map((row) => (
                     <li key={row.startup_id}>
                       {row.startup_id.slice(0, 8)}… {row.status}

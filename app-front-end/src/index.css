@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+/* Fonts are self-hosted via @fontsource imports in main.tsx — no CDN. */
 /*
  * Aethria — High-fidelity institutional design (aligned with web-front-end).
  * Palette: deep blue #001433, paper #F4F1EA, body ink #26313f, shell/memo on paper, accent #7D2B3A (escalations only), heritageGold #a88a5e (decorative only).
@@ -384,7 +384,7 @@
    * No arbitrary sizes outside this scale.
    */
   .type-hero {
-    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-family: var(--font-display);
     font-size: 37px;  /* 23px × φ ≈ 37px */
     line-height: 1.15;
     letter-spacing: -0.02em;
@@ -488,7 +488,7 @@
    * Mirrors web-front-end --font-display role.
    */
   .type-display {
-    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-family: var(--font-display);
     font-weight: 500;
     letter-spacing: -0.02em;
     line-height: 1.1;
@@ -496,7 +496,7 @@
   }
   /** Display at memo/verdict scale — pairs with .type-display. Size: 37px → 60px (37×φ) */
   .type-display-xl {
-    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-family: var(--font-display);
     font-weight: 500;
     font-size: clamp(2.3125rem, 5vw, 3.75rem); /* 37px → 60px (37×φ ≈ 60) */
     line-height: 1.0;
