@@ -3,6 +3,7 @@
  */
 import type { jsPDF } from 'jspdf';
 import type { Startup } from '../types/startup';
+import { buildMemoTags } from './memoTags';
 import { getNextStepText, judgmentToParagraphs, parseNextStepItems } from './memoText';
 import {
   DECISION_LABELS,
@@ -167,27 +168,6 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
   if (startup.scout.biggest_unknown?.trim()) exec.push(`Biggest unknown: ${startup.scout.biggest_unknown.trim()}`);
   if (exec.length) sections.push({ title: 'Executive summary', lines: exec });
 
-  const origin: string[] = [];
-  const ot = (startup.scout.origin_type ?? '').toLowerCase();
-  if (ot === 'on_demand_lookup') {
-    origin.push('Channel: On-demand lookup');
-    if (startup.scout.lookup_query) origin.push(`Lookup input: ${startup.scout.lookup_query}`);
-    if (startup.scout.lookup_website) origin.push(`Website: ${startup.scout.lookup_website}`);
-    if (startup.scout.lookup_input_type) origin.push(`Input type: ${startup.scout.lookup_input_type}`);
-  } else {
-    origin.push(`Channel: Scout pipeline (${startup.scout.scout_type || 'scout'})`);
-  }
-  origin.push(`Company ID: ${startup.id}`);
-  sections.push({ title: 'Deal origin', lines: origin });
-
-  const timelineLines = getPipelineReplaySteps(startup).map(
-    (s) => `${s.label}: ${s.atDisplay} — ${s.detail}`
-  );
-  sections.push({ title: 'Pipeline replay (timeline)', lines: timelineLines });
-
-  const judgment = buildJudgmentLines(startup);
-  if (judgment.length) sections.push({ title: 'Investment judgment', lines: judgment });
-
   const overview: string[] = [];
   if (startup.scout.problem) overview.push(`Problem: ${startup.scout.problem}`);
   if (startup.scout.solution) overview.push(`Solution: ${startup.scout.solution}`);
@@ -258,6 +238,9 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
   }
   if (dissent.length) sections.push({ title: 'Open questions & dissent notes', lines: dissent });
 
+  const judgment = buildJudgmentLines(startup);
+  if (judgment.length) sections.push({ title: 'Investment judgment', lines: judgment });
+
   if (startup.human_resolution) {
     const hr = startup.human_resolution;
     const lines = [
@@ -285,6 +268,25 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
     if (p.llm_fallback_reason) rec.push(`Engine note: ${p.llm_fallback_reason}`);
     sections.push({ title: 'Formal recommendation', lines: rec });
   }
+
+  // Provenance runs at the back, mirroring the on-screen appendix disclosures.
+  const origin: string[] = [];
+  const ot = (startup.scout.origin_type ?? '').toLowerCase();
+  if (ot === 'on_demand_lookup') {
+    origin.push('Channel: On-demand lookup');
+    if (startup.scout.lookup_query) origin.push(`Lookup input: ${startup.scout.lookup_query}`);
+    if (startup.scout.lookup_website) origin.push(`Website: ${startup.scout.lookup_website}`);
+    if (startup.scout.lookup_input_type) origin.push(`Input type: ${startup.scout.lookup_input_type}`);
+  } else {
+    origin.push(`Channel: Scout pipeline (${startup.scout.scout_type || 'scout'})`);
+  }
+  origin.push(`Company ID: ${startup.id}`);
+  sections.push({ title: 'Deal origin', lines: origin });
+
+  const timelineLines = getPipelineReplaySteps(startup).map(
+    (s) => `${s.label}: ${s.atDisplay} — ${s.detail}`
+  );
+  sections.push({ title: 'Pipeline replay (timeline)', lines: timelineLines });
 
   const appendix: string[] = [
     `Generated: ${fmtDate(new Date().toISOString())}`,
@@ -492,9 +494,9 @@ export async function buildMemoPDF(startup: Startup): Promise<jsPDF> {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(PDF_FONT_SIZE_BODY);
   setColor(doc, MUTED);
-  const sector = startup.scout.sector?.trim() || '—';
-  const stage = startup.scout.funding_stage?.trim() || '';
-  doc.text(stage ? `${sector}  ·  ${stage}` : sector, PDF_MARGIN, y);
+  // Same classification tags as the on-screen masthead.
+  const tagLine = buildMemoTags(startup).map((tag) => tag.label).join('  ·  ') || '—';
+  doc.text(tagLine, PDF_MARGIN, y);
   y += 4.5;
   doc.setFontSize(PDF_FONT_SIZE_SMALL);
   doc.text(`Prepared ${fmtDate(new Date().toISOString())}`, PDF_MARGIN, y);

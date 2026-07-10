@@ -183,16 +183,6 @@ export default function FlowPage({ data }: { data: SystemData }) {
     return ids;
   }, [watchlistAnalytics]);
 
-  const headerSub = (
-    <p className="type-body-sm text-oxford/60">
-      {selectedStartup
-        ? memoStartup?.scout?.name ?? selectedStartup.scout.name
-        : openCount > 0
-          ? 'Top of the queue takes the stage.'
-          : 'Nothing open — the desk is clear.'}
-    </p>
-  );
-
   return (
     <div className="page-transition-enter flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop} ${workspaceLayout.pageBottom} flex h-full min-h-0 flex-col`}>
@@ -213,7 +203,6 @@ export default function FlowPage({ data }: { data: SystemData }) {
           className={`border-b border-oxford/[0.075] ${workspaceLayout.headerBottom}`}
           eyebrow="Judgment"
           title="Flow"
-          sub={headerSub}
           readouts={
             <div
               className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4"

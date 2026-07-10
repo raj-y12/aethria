@@ -193,31 +193,7 @@ export function getPartnerEconomicBadgeVariant(startup: Startup): 'INVEST' | 'PA
   return 'MONITOR';
 }
 
-export function formatSectorAndCategory(startup: Startup): string {
-  const sector = startup.scout.sector?.trim() || '—';
-  const category = startup.scout.funding_stage?.trim() || startup.scout.scout_type?.trim() || '';
-  return (category ? `${sector} · ${category}` : sector).toUpperCase();
-}
-
-export interface MemoTag {
-  label: string;
-  kind: 'sector' | 'stage' | 'origin';
-}
-
-/** Classification tags for the memo masthead: sector → stage → LOOKUP origin.
- *  Same field reads as formatSectorAndCategory (kept for the PDF header). */
-export function buildMemoTags(startup: Startup): MemoTag[] {
-  const tags: MemoTag[] = [];
-  const push = (value: unknown, kind: MemoTag['kind']) => {
-    const label = collapseWhitespace(value).replace(/_/g, ' ').toUpperCase();
-    if (!label || tags.some((tag) => tag.label === label)) return;
-    tags.push({ label, kind });
-  };
-  push(startup.scout.sector, 'sector');
-  push(startup.scout.funding_stage || startup.scout.scout_type, 'stage');
-  if (isLookupStartup(startup)) push('LOOKUP', 'origin');
-  return tags;
-}
+export { buildMemoTags, type MemoTag } from '../../lib/memoTags';
 
 export function memoHeaderThesisLine(startup: Startup): string {
   const scoutOneLine = startup.scout.one_line?.trim();
