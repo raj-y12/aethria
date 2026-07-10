@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { tokens } from '../tokens';
+import { DECISION_BADGE_CLASS } from '../verdictBadgeTokens';
 
 describe('memo-calibrated mono typography roles', () => {
   it('defines the label and metadata roles at the approved scale', () => {
@@ -38,5 +39,10 @@ describe('memo-calibrated mono typography roles', () => {
       font: 'mono',
       uppercase: true,
     });
+  });
+
+  it('protects semantic verdict text colours from role defaults', () => {
+    expect(DECISION_BADGE_CLASS.escalation).toContain('!text-white');
+    expect(Object.values(DECISION_BADGE_CLASS).every((classes) => classes.includes('!text-'))).toBe(true);
   });
 });

@@ -13,12 +13,12 @@ export const VERDICT_CHIP_CLASS =
  * All badges are flat, full-fill, square chips (no rounding, no shadows).
  */
 export const DECISION_BADGE_CLASS: Record<DecisionBadgeVariant, string> = {
-  INVEST: 'bg-[#bfe3cc] text-[#17442d]',
-  PASS: 'bg-[#eabfb7] text-[#5e2621]',
-  MONITOR: 'bg-[#e5d39f] text-[#5f4716]',
-  awaiting: 'bg-[#c9d9ea] text-[#253f5a]',
-  undecided: 'bg-[#bccfe5] text-[#213a54]',
-  escalation: 'bg-escalation text-white',
+  INVEST: 'bg-[#bfe3cc] !text-[#17442d]',
+  PASS: 'bg-[#eabfb7] !text-[#5e2621]',
+  MONITOR: 'bg-[#e5d39f] !text-[#5f4716]',
+  awaiting: 'bg-[#c9d9ea] !text-[#253f5a]',
+  undecided: 'bg-[#bccfe5] !text-[#213a54]',
+  escalation: 'bg-escalation !text-white',
 };
 
 /**
@@ -26,9 +26,9 @@ export const DECISION_BADGE_CLASS: Record<DecisionBadgeVariant, string> = {
  * strong = positive, medium = watch, weak = negative.
  */
 export const REVIEWER_BADGE_CLASS: Record<ReviewerQualityBand, string> = {
-  STRONG: 'bg-[#bfe3cc] text-[#17442d]',
-  MEDIUM: 'bg-[#e5d39f] text-[#5f4716]',
-  WEAK: 'bg-[#eabfb7] text-[#5e2621]',
+  STRONG: 'bg-[#bfe3cc] !text-[#17442d]',
+  MEDIUM: 'bg-[#e5d39f] !text-[#5f4716]',
+  WEAK: 'bg-[#eabfb7] !text-[#5e2621]',
 };
 
 /**
@@ -40,7 +40,7 @@ export const REVIEWER_BADGE_CLASS: Record<ReviewerQualityBand, string> = {
 export type QueueAnnotationVariant = 'burgundy' | 'gold' | 'positive';
 
 export const QUEUE_ANNOTATION_CLASS: Record<QueueAnnotationVariant, string> = {
-  burgundy: 'bg-[#7D2B3A] text-[#F4F1EA]',
-  gold: 'bg-[#d9c9a3] text-[#4a3810]',
-  positive: 'bg-[#b5d4bc] text-[#17442d]',
+  burgundy: 'bg-[#7D2B3A] !text-[#F4F1EA]',
+  gold: 'bg-[#d9c9a3] !text-[#4a3810]',
+  positive: 'bg-[#b5d4bc] !text-[#17442d]',
 };
