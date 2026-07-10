@@ -420,33 +420,68 @@
     letter-spacing: 0;
   }
   .type-label-section {
-    font-family: "Space Mono", ui-monospace, monospace;
-    font-size: 12px;
-    line-height: var(--type-meta-leading, 1.45);
-    letter-spacing: 0.12em;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
+    color: rgba(var(--color-oxford-rgb), 0.42);
   }
   .type-label-tab {
-    font-family: "Space Mono", ui-monospace, monospace;
-    font-size: 12px;
-    line-height: var(--type-meta-leading, 1.45);
-    letter-spacing: 0.10em;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
+    color: rgba(var(--color-oxford-rgb), 0.42);
   }
   .type-meta {
-    font-family: "Space Mono", ui-monospace, monospace;
-    font-size: 12px;
-    line-height: var(--type-meta-leading, 1.45);
-    letter-spacing: 0.06em;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: 0.04em;
+    color: rgba(var(--color-oxford-rgb), 0.52);
   }
   /** Data figures in lists / pipe strip — mono, tabular. */
   .type-data {
-    font-family: "Space Mono", ui-monospace, monospace;
-    font-size: var(--type-data-size, 12px);
-    line-height: 1.38;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.015em;
+    color: rgba(var(--color-oxford-rgb), 0.82);
+  }
+  .type-status {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.075em;
+    text-transform: uppercase;
+    color: rgba(var(--color-oxford-rgb), 0.62);
+  }
+  .type-action {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: 0.075em;
+    text-transform: uppercase;
+    color: rgba(var(--color-oxford-rgb), 0.72);
+  }
+  .type-label-inverse { color: rgba(var(--color-paper-rgb), 0.56); }
+  .type-meta-inverse { color: rgba(var(--color-paper-rgb), 0.64); }
+  .type-data-inverse { color: rgba(var(--color-paper-rgb), 0.88); }
+  .type-status-inverse { color: rgba(var(--color-paper-rgb), 0.72); }
+  .type-action-inverse { color: rgba(var(--color-paper-rgb), 0.72); }
+  .type-action-strong {
+    font-weight: 600;
+    color: rgba(var(--color-oxford-rgb), 0.9);
   }
   /**
    * Display type — Playfair Display for editorial headings (memo verdict, company name,
@@ -576,10 +611,12 @@
     .type-body         { font-size: 13px; }
     .type-body-sm      { font-size: 12px; }
     .type-body-emphasis { font-size: 13px; }
-    .type-label-section { font-size: 12px; }
-    .type-label-tab    { font-size: 12px; }
-    .type-meta         { font-size: 12px; }
-    .type-data         { font-size: 11px; }
+    .type-label-section { font-size: 10px; }
+    .type-label-tab    { font-size: 10px; }
+    .type-meta         { font-size: 11px; }
+    .type-data         { font-size: 13px; }
+    .type-status       { font-size: 10px; }
+    .type-action       { font-size: 10px; }
     .type-display-xl   { font-size: 26px; }
   }
 }

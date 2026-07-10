@@ -129,9 +129,12 @@ export const tokens = {
     body: { size: '14px', lineHeight: 1.618, letterSpacing: '0', font: 'body' as const },
     /** Secondary body — 12px (~8% below 14px body); primary body stays 14px. */
     bodySm: { size: '12px', lineHeight: 1.48, letterSpacing: '0', font: 'body' as const },
-    labelSection: { size: '11px', lineHeight: 1.5, letterSpacing: '0.12em', font: 'mono' as const },
-    labelTab: { size: '11px', lineHeight: 1.5, letterSpacing: '0.10em', font: 'mono' as const },
-    meta: { size: '11px', lineHeight: 1.5, letterSpacing: '0.06em', font: 'mono' as const },
+    labelSection: { size: '10px', lineHeight: 1.45, letterSpacing: '0.09em', fontWeight: 400, font: 'mono' as const, uppercase: true },
+    labelTab: { size: '10px', lineHeight: 1.45, letterSpacing: '0.09em', fontWeight: 400, font: 'mono' as const, uppercase: true },
+    meta: { size: '11px', lineHeight: 1.5, letterSpacing: '0.04em', fontWeight: 400, font: 'mono' as const },
+    data: { size: '13px', lineHeight: 1.35, letterSpacing: '-0.015em', fontWeight: 600, font: 'mono' as const, tabular: true },
+    status: { size: '10px', lineHeight: 1.4, letterSpacing: '0.075em', fontWeight: 600, font: 'mono' as const, uppercase: true },
+    action: { size: '10px', lineHeight: 1.4, letterSpacing: '0.075em', fontWeight: 400, font: 'mono' as const, uppercase: true },
   },
   frameBorder: '1px solid rgba(0, 20, 51, 0.06)',
   motion: {
