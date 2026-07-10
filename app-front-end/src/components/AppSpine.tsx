@@ -207,10 +207,10 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
             override.footer ?? null
           ) : (
             <>
-              {/* ── Instrument slab: pipeline readouts + mandate ── */}
+              {/* ── Pipeline readouts + mandate — a ruled section, not a slab ── */}
               <section
                 aria-label="Pipeline and mandate"
-                className="bg-white/[0.04] px-phi-3 py-phi-4"
+                className="border-t border-white/10 px-2 pt-phi-4"
               >
                 <div className="flex items-baseline justify-between gap-phi-2">
                   <span className="type-label-section type-label-inverse">Pipeline</span>
@@ -260,7 +260,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                       ? `Active mandate: ${mandate.fundName || 'configured'} — open Fund`
                       : 'No active thesis — open settings'
                   }
-                  className="group mt-phi-4 w-full min-w-0 border-l border-white/20 py-phi-1 pl-phi-3 text-left transition-colors hover:border-white/35 btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                  className="group mt-phi-4 block w-full min-w-0 border-t border-white/10 pt-phi-3 text-left btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
                 >
                   <span className="type-label-section type-label-inverse">
                     Mandate
@@ -281,27 +281,22 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
           )}
 
           {/* ── Operator — Today footer voice ── */}
-          <footer aria-label="Operator" className="min-w-0 px-1">
-            <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
-              <span
-                className="type-action type-action-inverse max-w-full truncate border-b border-white/10 px-1 pb-0.5"
-                title={displayName}
-              >
-                {displayName}
-              </span>
-              <span className="type-meta px-1 text-white/20" aria-hidden>·</span>
+          <footer aria-label="Operator" className="min-w-0 border-t border-white/10 px-2 pt-phi-3">
+            <p className="type-label-section type-label-inverse truncate" title={displayName}>
+              {displayName}
+            </p>
+            <div className="mt-phi-2 flex items-center gap-phi-4">
               <Link
                 to="/v1/settings"
-                className="type-action type-action-inverse border-b border-white/10 px-1 pb-0.5 transition-colors hover:text-white btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                className="type-action type-action-inverse transition-colors hover:text-white btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
               >
                 Settings
               </Link>
-              <span className="type-meta px-1 text-white/20" aria-hidden>·</span>
               <button
                 type="button"
                 onClick={requestLogout}
                 disabled={agentActionPending}
-                className="type-action type-action-inverse border-b border-white/10 px-1 pb-0.5 transition-colors hover:text-white disabled:opacity-50 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                className="type-action type-action-inverse transition-colors hover:text-white disabled:opacity-50 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
               >
                 {agentActionPending ? 'Updating…' : 'Log out'}
               </button>
