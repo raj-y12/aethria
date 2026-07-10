@@ -4257,6 +4257,18 @@
   /* Span the full memo width so the disclosure dividers line up with every other
      section. The prose inside keeps its own 66ch measure for readability. */
 }
+/* Appendix eyebrow — labels the disclosure run; hides itself when every
+   disclosure fails its render condition and the group holds only the label. */
+.memoAppendixLabel {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: var(--memo-size-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--memo-ink-faint);
+}
+.memoAppendixLabel:only-child { display: none; }
+.memoAppendixLabel + .memoDisclosureSection { margin-top: clamp(12px, 1.6vw, 16px); }
 /* A group whose disclosures all fail their render conditions would otherwise leave a
    phantom divider + the full top margin. Collapse it entirely. */
 .memoDiscGroup:empty {
@@ -4391,27 +4403,6 @@
   color: rgba(var(--color-oxford-rgb), 0.35);
   opacity: 1;
   cursor: not-allowed;
-}
-
-/* === Open-in: the document sections compose in sequence when a memo mounts.
-   The body is keyed on the memo, so this re-fires each time a memo opens or the
-   selected deal changes. The cover (<header>) is excluded — this starts at the
-   Snapshot, the first <section>. === */
-@keyframes memoSectionReveal {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.memoBody > section {
-  animation: memoSectionReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.memoBody > section:nth-of-type(1) { animation-delay: 0.05s; }
-.memoBody > section:nth-of-type(2) { animation-delay: 0.11s; }
-.memoBody > section:nth-of-type(3) { animation-delay: 0.17s; }
-.memoBody > section:nth-of-type(4) { animation-delay: 0.23s; }
-.memoBody > section:nth-of-type(5) { animation-delay: 0.29s; }
-.memoBody > section:nth-of-type(n + 6) { animation-delay: 0.35s; }
-@media (prefers-reduced-motion: reduce) {
-  .memoBody > section { animation: none; }
 }
 
 /* === Collapsed disclosure stack (Partner rationale, Decision context, Company

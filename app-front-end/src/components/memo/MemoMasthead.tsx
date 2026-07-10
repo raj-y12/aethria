@@ -62,6 +62,9 @@ export default function MemoMasthead({
       </div>
       {!compact ? (
         <>
+          <h1 className="memoCoverCompany memoMastheadCompany" id="memo-title">
+            {companyName || '—'}
+          </h1>
           {location ? (
             <p className="memoMeta memoMastheadLocation">{renderWithMonoNumbers(location)}</p>
           ) : null}

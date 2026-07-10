@@ -643,8 +643,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           <motion.div
             className="memoBody"
             key={contentKey}
-            // Opacity-only umbrella; the document sections carry the staggered
-            // open-in (memoSectionReveal in CSS) so transforms don't compound.
+            // Single opacity fade for the whole document — no per-section stagger.
             initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.23, 1, 0.32, 1] })}
@@ -732,62 +731,25 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             </header>
             )}
 
-            {/* ── Company snapshot ── */}
+            {/* ── Company snapshot — one definition grid: verified vitals first, then narrative rows ── */}
             {(snapshotRows.length > 0 || hasVitals) && (
               <section className="memoDocSection memoSnapshotSection" aria-labelledby="memo-snapshot">
                 <h2 className="memoDocSectionHead" id="memo-snapshot">Snapshot</h2>
-                {hasVitals && (
-                  <div className={`memoVitals${snapshotRows.length > 0 ? ' mb-4 border-b border-oxford/8 pb-4' : ''}`}>
-                    {vitalsStrip.length > 0 && (
-                      <dl className="flex flex-wrap gap-x-8 gap-y-1.5">
-                        {vitalsStrip.map((v) => (
-                          <div key={v.label} className="flex items-baseline gap-2">
-                            <dt className="type-label uppercase tracking-[0.06em] text-oxford/60">{v.label}</dt>
-                            <dd className="type-data text-oxford/[0.82] tabular-nums">{renderWithMonoNumbers(v.value)}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    )}
-                    {(fundingLine || tractionLine || ipLine || modelLine) && (
-                      <div className={`${vitalsStrip.length > 0 ? 'mt-2.5 ' : ''}space-y-1.5`}>
-                        {fundingLine && (
-                          <p className="type-body-sm leading-snug text-oxford/75">
-                            <span className="type-label uppercase tracking-[0.06em] text-oxford/60 mr-2">Funding</span>
-                            {renderWithMonoNumbers(fundingLine)}
-                          </p>
-                        )}
-                        {tractionLine && (
-                          <p className="type-body-sm leading-snug text-oxford/75">
-                            <span className="type-label uppercase tracking-[0.06em] text-oxford/60 mr-2">Traction</span>
-                            {renderWithMonoNumbers(tractionLine)}
-                          </p>
-                        )}
-                        {modelLine && (
-                          <p className="type-body-sm leading-snug text-oxford/70">
-                            <span className="type-label uppercase tracking-[0.06em] text-oxford/60 mr-2">Model</span>
-                            {renderWithMonoNumbers(modelLine)}
-                          </p>
-                        )}
-                        {ipLine && (
-                          <p className="type-body-sm leading-snug text-oxford/70">
-                            <span className="type-label uppercase tracking-[0.06em] text-oxford/60 mr-2">IP</span>
-                            {renderWithMonoNumbers(ipLine)}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {snapshotRows.length > 0 && (
-                  <dl className="memoSnapshot">
-                    {snapshotRows.map((row) => (
-                      <div key={row.label} className="memoSnapshotRow">
-                        <dt className="memoSnapshotLabel">{row.label}</dt>
-                        <dd className="memoSnapshotText">{renderWithMonoNumbers(row.text)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
+                <dl className="memoSnapshot">
+                  {[
+                    ...vitalsStrip.map((v) => ({ label: v.label, text: v.value })),
+                    ...(fundingLine ? [{ label: 'Funding', text: fundingLine }] : []),
+                    ...(tractionLine ? [{ label: 'Traction', text: tractionLine }] : []),
+                    ...(modelLine ? [{ label: 'Model', text: modelLine }] : []),
+                    ...(ipLine ? [{ label: 'IP', text: ipLine }] : []),
+                    ...snapshotRows,
+                  ].map((row) => (
+                    <div key={row.label} className="memoSnapshotRow">
+                      <dt className="memoSnapshotLabel">{row.label}</dt>
+                      <dd className="memoSnapshotText">{renderWithMonoNumbers(row.text)}</dd>
+                    </div>
+                  ))}
+                </dl>
               </section>
             )}
 
@@ -1074,8 +1036,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               />
             )}
 
-            {/* ── Supporting detail (sits under the ruling) ── */}
+            {/* ── Appendix (sits under the ruling) ── */}
             <div className="memoDiscGroup">
+            {/* Hidden via :only-child when every disclosure fails its render condition. */}
+            <p className="memoAppendixLabel" aria-hidden>Appendix</p>
             {/* ── Partner rationale ── */}
             {showJudgment && reasoningParagraphs.length > 0 && (
               <MemoDisclosureSection
