@@ -71,7 +71,7 @@ function HomeDoor({
       />
 
       <span
-        className={`type-data relative z-10 transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[2px] text-oxford/60 group-hover:text-oxford/70`}
+        className={`type-data relative z-10 transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[2px] text-oxford/60 group-hover:text-oxford`}
         aria-hidden
       >
         {numeral}
@@ -325,8 +325,8 @@ export default function HomePage({ data }: { data: SystemData }) {
                   label="Fund"
                   detail={
                     mandateVersion != null
-                      ? `Mandate v${mandateVersion}${mandateAmended ? ` · amended ${mandateAmended}` : ''}`
-                      : 'No mandate'
+                      ? `${fundName || 'Mandate'} · v${mandateVersion}${mandateAmended ? ` · amended ${mandateAmended}` : ''}`
+                      : fundName || 'No mandate'
                   }
                   index={1}
                   onClick={() => navigate('/v1/fund')}
@@ -342,17 +342,6 @@ export default function HomePage({ data }: { data: SystemData }) {
             <span className="type-action border-b border-oxford/10 px-1 pb-0.5">
               {displayName}
             </span>
-            {fundName || mandateVersion != null ? (
-              <>
-                <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
-                <Link
-                  to="/v1/fund"
-                  className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:text-oxford btn-interaction"
-                >
-                  {fundName || `Mandate v${mandateVersion}`}
-                </Link>
-              </>
-            ) : null}
             <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
             <button
               type="button"
