@@ -346,14 +346,14 @@ export default function HomePage({ data }: { data: SystemData }) {
             <button
               type="button"
               onClick={openDispatch}
-              className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:text-oxford btn-interaction"
+              className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:border-oxford/40 hover:text-oxford btn-interaction"
             >
               {dispatchActive ? 'Lookup running' : 'Dispatch ⌘K'}
             </button>
             <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
             <Link
               to="/v1/settings"
-              className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:text-oxford btn-interaction"
+              className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:border-oxford/40 hover:text-oxford btn-interaction"
             >
               Settings
             </Link>
@@ -362,7 +362,7 @@ export default function HomePage({ data }: { data: SystemData }) {
               type="button"
               onClick={requestLogout}
               disabled={agentActionPending}
-              className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:text-oxford disabled:opacity-50 btn-interaction"
+              className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:border-oxford/40 hover:text-oxford disabled:opacity-50 btn-interaction"
             >
               {agentActionPending ? 'Updating…' : 'Log out'}
             </button>
