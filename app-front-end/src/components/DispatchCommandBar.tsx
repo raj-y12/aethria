@@ -134,7 +134,7 @@ function DispatchFooterBar({ actions }: { actions: DispatchFooterAction[] }) {
           <button
             type="button"
             onClick={action.onClick}
-            className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:text-oxford btn-interaction cursor-pointer"
+            className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:border-oxford/40 hover:text-oxford btn-interaction cursor-pointer"
           >
             {action.label}
           </button>
