@@ -9,6 +9,7 @@ import DecisionBadge from '../DecisionBadge';
 import EscalationQueueMarker from './EscalationQueueMarker';
 import type { DecisionBadgeVariant } from '../../lib/decisionBadgeVariant';
 import {
+  attentionDriverBadgeLabel,
   getQueueConvictionPct,
   getVisibleRecommendation,
   type QueueAttentionDriver,
@@ -83,6 +84,21 @@ export default function QueueVerdictLine({
     ) : null;
 
   if (ctx.isEscalated && attentionDriver) {
+    // Ambient escalated rows stay quiet mono text — a docket of eighty rows
+    // must not become a wall of filled chips. The chip appears on selection.
+    if (!prominent) {
+      const quietLabel =
+        attentionDriverBadgeLabel(attentionDriver, { ageDays: ctx.ageDays }) ?? 'Needs ruling';
+      return (
+        <div
+          className="inline-flex flex-wrap items-center justify-end gap-x-phi-2 gap-y-0"
+          aria-label={`Escalated${convictionLabel != null ? `, ${convictionLabel} conviction` : ''}`}
+        >
+          <QueueVerdictText tone="burgundy">{quietLabel}</QueueVerdictText>
+          {convictionEl}
+        </div>
+      );
+    }
     return (
       <div
         className="inline-flex flex-wrap items-center justify-end gap-x-phi-2 gap-y-0"

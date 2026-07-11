@@ -117,9 +117,14 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
         </motion.span>
 
         <div className="min-w-0">
+          {/* Selected rows stack like a mini masthead — the title owns the full
+              column width so it never fights the verdict chip for space. Ambient
+              rows keep the one-line name + quiet status ledger layout. */}
           <div
-            className={`flex min-w-0 flex-col sm:flex-row sm:items-start sm:justify-between ${
-              isSelected ? 'gap-phi-5 sm:gap-phi-6' : 'gap-phi-1 sm:gap-phi-3'
+            className={`flex min-w-0 ${
+              isSelected
+                ? 'flex-col gap-phi-3'
+                : 'flex-col gap-phi-1 sm:flex-row sm:items-start sm:justify-between sm:gap-phi-3'
             }`}
           >
             <div className="min-w-0 flex-1">
@@ -136,7 +141,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
                 animate={{ opacity: 1 }}
                 className={`min-w-0 break-words ${
                   isSelected
-                    ? 'font-display text-[clamp(28px,2.6vw,36px)] font-medium leading-[1.1] tracking-[-0.02em] text-oxford'
+                    ? 'text-balance font-display text-[clamp(28px,2.6vw,36px)] font-medium leading-[1.1] tracking-[-0.02em] text-oxford'
                     : 'font-sans text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.15] tracking-[-0.01em] text-oxford/60'
                 }`}
                 transition={selectTransition}
@@ -144,7 +149,11 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
                 {startup.scout.name}
               </motion.h2>
             </div>
-            <motion.div layout={!reduceMotion} className="shrink-0 sm:text-right sm:pt-px" transition={layoutTransition}>
+            <motion.div
+              layout={!reduceMotion}
+              className={isSelected ? 'shrink-0' : 'shrink-0 sm:text-right sm:pt-px'}
+              transition={layoutTransition}
+            >
               <QueueVerdictLine
                 ctx={queueContext}
                 decisionVariant={decisionVariant}
