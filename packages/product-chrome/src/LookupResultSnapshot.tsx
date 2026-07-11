@@ -70,7 +70,7 @@ export default function LookupResultSnapshot({
               {intelligenceKicker}
             </p>
             {showCompanyName ? (
-              <h3 className="pc-font-sans text-xl font-semibold leading-tight tracking-tight text-oxford sm:text-2xl">
+              <h3 className="pc-font-display text-xl font-medium leading-tight tracking-[-0.02em] text-oxford sm:text-2xl">
                 {companyName}
               </h3>
             ) : null}
@@ -94,8 +94,8 @@ export default function LookupResultSnapshot({
         {!isMemo && showCompanyName && companyName ? (
           <h3
             className={cx(
-              'pc-font-sans font-semibold leading-tight tracking-tight text-oxford',
-              compact ? 'text-base' : lg ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl',
+              'pc-font-display font-medium leading-tight tracking-[-0.02em] text-oxford',
+              compact ? 'text-base' : lg ? 'text-3xl sm:text-4xl' : 'text-xl sm:text-2xl',
             )}
           >
             {companyName}
@@ -118,9 +118,13 @@ export default function LookupResultSnapshot({
         )}
         <p
           className={cx(
-            'font-sans leading-[1.6] text-oxford/58',
-            isMemo ? 'mt-3 text-[15px] font-normal' : lg ? 'mt-2.5' : 'mt-1.5',
-            !isMemo && (compact ? 'text-[13px]' : lg ? 'text-base sm:text-[17px]' : 'text-[15px]'),
+            // The takeover card carries the summary as a serif standfirst —
+            // it is the finding, not a caption.
+            lg
+              ? 'pc-font-display mt-3 text-[clamp(1.125rem,2.4vw,1.45rem)] leading-[1.45] tracking-[-0.012em] text-oxford/80'
+              : 'font-sans leading-[1.6] text-oxford/58',
+            isMemo ? 'mt-3 text-[15px] font-normal' : !lg ? 'mt-1.5' : '',
+            !isMemo && !lg && (compact ? 'text-[13px]' : 'text-[15px]'),
           )}
         >
           {summary}

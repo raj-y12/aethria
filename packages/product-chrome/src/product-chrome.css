@@ -16,3 +16,8 @@
 .pc-font-sans {
   font-family: var(--font-sans, 'Figtree', system-ui, -apple-system, sans-serif);
 }
+
+/* Editorial display serif — matches the host page's display role. */
+.pc-font-display {
+  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
+}
