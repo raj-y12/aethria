@@ -651,7 +651,7 @@ export default function SettingsPage() {
       nav: (
         <>
           <SpineNavButton
-            label="← Today"
+            label="← Home"
             active={false}
             ariaPressed={false}
             compact
