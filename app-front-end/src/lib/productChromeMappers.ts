@@ -161,8 +161,9 @@ export function buildLookupSnapshotProps(
     thesisBits.push(`${Math.round(review.thesis_alignment_score * 100)}% alignment`);
   }
 
+  // The standfirst is the review's own synthesis — thesis fit already has its
+  // dedicated mono line below, so thesis_fit_line here would say it twice.
   const summary =
-    review.aethria_view?.thesis_fit_line?.trim() ||
     review.overall_summary?.trim() ||
     startup.scout.one_line?.trim() ||
     'Analyst review in progress.';
