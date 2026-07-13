@@ -17,6 +17,18 @@ export interface PendingChange {
   stages: string;
 }
 
+export interface FundThesisChange {
+  key: keyof FundConfiguration['mandate'];
+  label: string;
+  previous: string;
+  proposed: string;
+}
+
+export interface FundThesisChangeSet {
+  firstPublication: boolean;
+  changes: FundThesisChange[];
+}
+
 interface SettingsSectionDefinition {
   id: SectionId;
   label: string;
@@ -53,6 +65,80 @@ export function serializeDecisionConfig(config: FundConfiguration): string {
     delete comparable[key];
   }
   return JSON.stringify(comparable);
+}
+
+const THESIS_FIELDS: ReadonlyArray<{
+  key: keyof FundConfiguration['mandate'];
+  label: string;
+}> = [
+  { key: 'fundName', label: 'Fund name' },
+  { key: 'mandateName', label: 'Mandate name' },
+  { key: 'preferredStages', label: 'Preferred stages' },
+  { key: 'geographies', label: 'Geographies' },
+  { key: 'customGeography', label: 'Custom geography' },
+  { key: 'sectors', label: 'Sectors' },
+  { key: 'customSectors', label: 'Custom sectors' },
+  { key: 'excludedSectors', label: 'Excluded sectors' },
+  { key: 'businessModels', label: 'Preferred business models' },
+  { key: 'checkSizeMin', label: 'Minimum cheque size' },
+  { key: 'checkSizeMax', label: 'Maximum cheque size' },
+  { key: 'ownershipTarget', label: 'Ownership target' },
+  { key: 'minimumTraction', label: 'Minimum traction' },
+  { key: 'thesisText', label: 'Thesis notes' },
+];
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('en', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+function formatThesisValue(
+  key: keyof FundConfiguration['mandate'],
+  value: FundConfiguration['mandate'][keyof FundConfiguration['mandate']] | undefined,
+): string {
+  if (Array.isArray(value)) return value.length ? value.join(', ') : 'Not set';
+  if (value == null || value === '') return 'Not set';
+  if ((key === 'checkSizeMin' || key === 'checkSizeMax') && typeof value === 'number') {
+    return formatCurrency(value);
+  }
+  if (key === 'ownershipTarget' && typeof value === 'number') return `${value}%`;
+  return String(value);
+}
+
+export function getFundThesisChangeSet(
+  draft: FundConfiguration,
+  savedSnapshot: string,
+  firstPublication: boolean,
+): FundThesisChangeSet | null {
+  let saved: Partial<FundConfiguration> | null = null;
+  try {
+    saved = savedSnapshot
+      ? (JSON.parse(savedSnapshot) as Partial<FundConfiguration>)
+      : null;
+  } catch {
+    saved = null;
+  }
+
+  const previousMandate = saved?.mandate;
+  const forceReview = firstPublication || previousMandate == null;
+  const changes = THESIS_FIELDS.flatMap<FundThesisChange>((field) => {
+    const previous = formatThesisValue(field.key, previousMandate?.[field.key]);
+    const proposed = formatThesisValue(field.key, draft.mandate[field.key]);
+    if (proposed === 'Not set' && forceReview) return [];
+    if (!forceReview && previous === proposed) return [];
+    return [{
+      key: field.key,
+      label: field.label,
+      previous: firstPublication ? 'No thesis currently deployed' : previous,
+      proposed,
+    }];
+  });
+
+  return changes.length ? { firstPublication, changes } : null;
 }
 
 export function getPendingChanges(
