@@ -3,16 +3,14 @@ import { usePrefersReducedMotion } from '../hooks';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
-/**
- * The focused-mode top edge. Left: an exit back to the app (the spine is gone
- * in this mode, so this is the only way out). Right: live deploy state and the
- * one deploy transaction. Runtime toggles live in the rail, not here.
- */
+export type SettingsStatusTone = 'live' | 'draft' | 'progress' | 'error' | 'restored' | 'success';
+
+/** Fixed settings action point. Transaction state is owned by SettingsPage. */
 export default function SettingsTopBar({
   live,
-  pendingCount,
   saving,
-  actionMessage,
+  message,
+  tone,
   canUndo,
   onBack,
   onRestoreDefaults,
@@ -20,9 +18,9 @@ export default function SettingsTopBar({
   onDeploy,
 }: {
   live: boolean;
-  pendingCount: number;
   saving: boolean;
-  actionMessage?: string | null;
+  message: string;
+  tone: SettingsStatusTone;
   canUndo: boolean;
   onBack: () => void;
   onRestoreDefaults: () => void;
@@ -30,6 +28,15 @@ export default function SettingsTopBar({
   onDeploy: () => void;
 }) {
   const reduceMotion = usePrefersReducedMotion();
+  const statusClass = tone === 'error'
+    ? 'text-escalation/85'
+    : tone === 'draft' || tone === 'progress'
+      ? 'text-escalation/80'
+      : 'text-oxford/65';
+  const statusDot = tone === 'error' || tone === 'draft' || tone === 'progress'
+    ? 'bg-escalation/70'
+    : 'bg-oxford';
+
   return (
     <motion.header
       className="flex-none border-b border-oxford/[0.08] bg-paper"
@@ -37,7 +44,7 @@ export default function SettingsTopBar({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE, delay: 0.04 }}
     >
-      <div className="flex items-center justify-between gap-phi-4 px-phi-5 py-phi-3 lg:px-phi-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2 px-phi-5 py-phi-3 lg:px-phi-6">
         <div className="flex min-w-0 items-center gap-phi-4">
           <button
             type="button"
@@ -52,42 +59,32 @@ export default function SettingsTopBar({
           </p>
         </div>
 
-        <div className="flex items-center gap-phi-4">
-          {actionMessage ? (
-            <span className="type-status inline-flex items-center gap-phi-2 text-oxford/65" aria-live="polite">
-              <span>{actionMessage}</span>
-              {canUndo ? (
-                <>
-                  <span aria-hidden>·</span>
-                  <button
-                    type="button"
-                    onClick={onUndo}
-                    className="type-action inline-flex min-h-11 items-center border-b border-oxford/15 text-oxford transition-colors hover:border-oxford/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-                  >
-                    Undo
-                  </button>
-                </>
-              ) : null}
-            </span>
-          ) : (
-            <span
-              className="type-status hidden items-center gap-phi-2 sm:inline-flex"
-              aria-live="polite"
-            >
-              <span
-                className={`h-1.5 w-1.5 shrink-0 ${live ? 'bg-oxford' : 'bg-escalation/70 signal-dot-breathe'}`}
-                aria-hidden
-              />
-              <span className={live ? 'text-oxford/60' : 'text-escalation/80'}>
-                {live ? 'Live' : `Draft · ${pendingCount} pending`}
-              </span>
-            </span>
-          )}
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-phi-4 gap-y-phi-1">
+          <span
+            className={`type-status inline-flex min-w-0 items-center gap-phi-2 ${statusClass}`}
+            aria-live="polite"
+            role={tone === 'error' ? 'alert' : 'status'}
+          >
+            <span className={`h-1.5 w-1.5 shrink-0 ${statusDot}`} aria-hidden />
+            <span className="break-words">{message}</span>
+            {canUndo ? (
+              <>
+                <span aria-hidden>·</span>
+                <button
+                  type="button"
+                  onClick={onUndo}
+                  className="type-action inline-flex min-h-11 shrink-0 items-center border-b border-oxford/15 text-oxford transition-colors hover:border-oxford/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                >
+                  Undo
+                </button>
+              </>
+            ) : null}
+          </span>
           <button
             type="button"
             onClick={onRestoreDefaults}
             disabled={saving}
-            className="type-action inline-flex min-h-11 items-center px-phi-1 text-oxford/60 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            className="type-action inline-flex min-h-11 shrink-0 items-center px-phi-1 text-oxford/60 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
           >
             Restore defaults
           </button>
@@ -95,7 +92,7 @@ export default function SettingsTopBar({
             type="button"
             onClick={onDeploy}
             disabled={saving || live}
-            className="btn-aethria-solid min-h-11 disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn-aethria-solid min-h-11 shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {saving ? 'Deploying…' : 'Deploy changes'}
           </button>

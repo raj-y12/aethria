@@ -15,7 +15,7 @@ import { useFundConfiguration, usePrefersReducedMotion } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
 import FundThesisConfirmationModal from './FundThesisConfirmationModal';
 import SettingsActionDialog from './SettingsActionDialog';
-import SettingsTopBar from './SettingsTopBar';
+import SettingsTopBar, { type SettingsStatusTone } from './SettingsTopBar';
 import SettingsRail from './SettingsRail';
 import SettingsMobileNav from './SettingsMobileNav';
 import OperationsStrip from './OperationsStrip';
@@ -23,6 +23,7 @@ import { validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
   getDeploymentConfirmation,
   getPendingChanges,
+  sectionForDeploymentError,
   serializeDecisionConfig,
   SETTINGS_SECTIONS,
   type PendingChange,
@@ -222,7 +223,11 @@ function RoomSection({
   className?: string;
 }) {
   return (
-    <section id={id} className={`flex min-w-0 scroll-mt-16 flex-col gap-phi-4 px-phi-4 pb-phi-5 pt-phi-5 lg:scroll-mt-0 ${className ?? ''}`}>
+    <section
+      id={id}
+      tabIndex={-1}
+      className={`flex min-w-0 scroll-mt-16 flex-col gap-phi-4 px-phi-4 pb-phi-5 pt-phi-5 outline-none lg:scroll-mt-0 ${className ?? ''}`}
+    >
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
           <h2 className={sectionLabelCls}>{title}</h2>
@@ -294,6 +299,7 @@ export default function SettingsPage() {
   const [errors, setErrors] = useState<string[]>([]);
   const [thesisConfirmation, setThesisConfirmation] = useState<FundThesisChangeSet | null>(null);
   const [activeSection, setActiveSection] = useState<SectionId>('thesis');
+  const [attentionSection, setAttentionSection] = useState<SectionId | null>(null);
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState('');
@@ -345,12 +351,17 @@ export default function SettingsPage() {
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
   const thresholdValidation = useMemo(() => validateDecisionThresholds(draft), [draft]);
-  const attentionSection: SectionId | null = !bandValidation.valid || !thresholdValidation.valid
-    ? 'thresholds'
-    : !weightValidation.valid
-      ? 'weights'
-      : null;
 
+  useEffect(() => {
+    if (attentionSection === 'weights' && weightValidation.valid) setAttentionSection(null);
+    if (
+      attentionSection === 'thresholds'
+      && bandValidation.valid
+      && thresholdValidation.valid
+    ) {
+      setAttentionSection(null);
+    }
+  }, [attentionSection, bandValidation.valid, thresholdValidation.valid, weightValidation.valid]);
   // Draft vs Live only covers deployable decision configuration. Runtime
   // controls save independently in OperationsStrip and never enter this list.
   const pendingChanges = useMemo<PendingChange[]>(
@@ -361,7 +372,17 @@ export default function SettingsPage() {
     () => serializeDecisionConfig(draft) !== savedSnapshot,
     [draft, savedSnapshot],
   );
-  const actionMessage = status === 'Defaults restored' || status === 'Restore undone' ? status : null;
+  const topBarStatus: { message: string; tone: SettingsStatusTone } = saving
+    ? { message: 'Deploying…', tone: 'progress' }
+    : errors.length > 0
+      ? { message: errors.join(' '), tone: 'error' }
+      : status === 'Defaults restored'
+        ? { message: status, tone: 'restored' }
+        : status
+          ? { message: status, tone: 'success' }
+          : pendingChanges.length > 0
+            ? { message: `Draft changes · ${pendingChanges.length} pending`, tone: 'draft' }
+            : { message: 'Live', tone: 'live' };
   const storageNotReady = agentsStatus != null && !agentsStatus.supabase_configured;
 
   // Clicking a rail item scrolls its section to the top of the reading column.
@@ -426,11 +447,23 @@ export default function SettingsPage() {
     ...thresholdValidation.errors,
   ];
 
+  const routeDeploymentErrors = (messages: string[]) => {
+    if (!messages.length) return;
+    setErrors(messages);
+    const section = sectionForDeploymentError(messages[0]);
+    setAttentionSection(section);
+    setActiveSection(section);
+    document.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => document.getElementById(section)?.focus());
+    });
+  };
+
   const performDeploy = async () => {
     if (!settings) return;
     const nextErrors = getDeploymentErrors();
     if (nextErrors.length) {
-      setErrors(nextErrors);
+      routeDeploymentErrors(nextErrors);
       return;
     }
     setSaving(true);
@@ -443,7 +476,7 @@ export default function SettingsPage() {
     const result = await patchSettings(mapped);
     if (result.error) {
       setSaving(false);
-      setErrors(result.error.errors.length ? result.error.errors : [result.error.message]);
+      routeDeploymentErrors(result.error.errors.length ? result.error.errors : [result.error.message]);
       return;
     }
 
@@ -472,13 +505,14 @@ export default function SettingsPage() {
     await queryClient.invalidateQueries({ queryKey: ['fund-thesis'] });
 
     if (policyError) {
-      setErrors([`Settings and fund thesis are live, but the scoring policy did not publish: ${policyError}`]);
+      routeDeploymentErrors([`Settings and fund thesis are live, but the scoring policy did not publish: ${policyError}`]);
     } else {
       const thesisPart = summary?.active_version_number != null
         ? ` · ${thesisVersionLabel(summary.active_version_number)}`
         : '';
       const policyPart = policyResult.policy ? ` · policy ${policyResult.policy.policy_version_id}` : '';
       setStatus(`Deployed — configuration is live${thesisPart}${policyPart}.`);
+      setAttentionSection(null);
     }
     setSaving(false);
   };
@@ -487,7 +521,7 @@ export default function SettingsPage() {
     if (saving) return;
     const nextErrors = getDeploymentErrors();
     if (nextErrors.length) {
-      setErrors(nextErrors);
+      routeDeploymentErrors(nextErrors);
       return;
     }
     const confirmation = getDeploymentConfirmation(
@@ -578,10 +612,10 @@ export default function SettingsPage() {
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper text-oxford">
       <SettingsTopBar
         live={pendingChanges.length === 0}
-        pendingCount={pendingChanges.length}
         saving={saving}
-        actionMessage={actionMessage}
-        canUndo={preRestoreDraft != null}
+        message={topBarStatus.message}
+        tone={topBarStatus.tone}
+        canUndo={topBarStatus.tone === 'restored' && preRestoreDraft != null}
         onBack={requestExit}
         onRestoreDefaults={() => setDialog('restore')}
         onUndo={undoRestore}
@@ -621,18 +655,6 @@ export default function SettingsPage() {
                 onSettingsChange={setSettings}
               />
             </div>
-
-            {((status && !actionMessage) || errors.length > 0) && (
-              <div className="mb-phi-4 border-b border-oxford/[0.08] pb-phi-3" role={errors.length ? 'alert' : 'status'}>
-                {errors.length > 0 ? (
-                  <ul className="flex flex-col gap-phi-1">
-                    {errors.map((error) => <li key={error} className="type-body-sm text-escalation/75">{error}</li>)}
-                  </ul>
-                ) : (
-                  <p className="type-body-sm text-oxford/60">{status}</p>
-                )}
-              </div>
-            )}
 
             <div className="divide-y divide-oxford/[0.06]">
                   <GroupHeader
@@ -717,7 +739,11 @@ export default function SettingsPage() {
                     label="Thresholds"
                     description="Drag the dividers to set where Pass, Monitor, and Invest begin."
                   >
-                    <DecisionThresholdsPanel draft={draft} updateDraft={updateDraft} updateThreshold={updateThreshold} />
+                    <DecisionThresholdsPanel
+                      draft={draft}
+                      updateDraft={updateDraft}
+                      updateThreshold={updateThreshold}
+                    />
                   </RoomSection>
 
                   <RoomSection

@@ -52,6 +52,15 @@ export const SETTINGS_SECTIONS = [
   group: SettingsPersistenceGroup;
 }[];
 
+export function sectionForDeploymentError(error: string): SectionId {
+  const value = error.toLowerCase();
+  if (value.includes('weight')) return 'weights';
+  if (value.includes('threshold') || value.includes('score band')) return 'thresholds';
+  if (value.includes('memo')) return 'memo';
+  if (value.includes('risk') || value.includes('ruling')) return 'workflow';
+  return 'thesis';
+}
+
 export function serializeDecisionConfig(config: FundConfiguration): string {
   const comparable = { ...config } as Record<string, unknown>;
   for (const key of [

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from '../settingsModel';
+import {
+  sectionForDeploymentError,
+  SETTINGS_GROUPS,
+  SETTINGS_SECTIONS,
+} from '../settingsModel';
 
 describe('settings persistence model', () => {
   it('defines the two truthful persistence groups', () => {
@@ -21,5 +25,17 @@ describe('settings persistence model', () => {
       'budget',
       'system',
     ]);
+  });
+});
+
+describe('deployment error routing', () => {
+  it.each([
+    ['Scoring weights must total 100', 'weights'],
+    ['Monitor threshold overlaps invest', 'thresholds'],
+    ['Memo output is invalid', 'memo'],
+    ['Risk ruling is incomplete', 'workflow'],
+    ['Fund thesis is required', 'thesis'],
+  ] as const)('routes %s to %s', (error, section) => {
+    expect(sectionForDeploymentError(error)).toBe(section);
   });
 });

@@ -256,4 +256,29 @@ describe('Settings safe draft actions', () => {
     expect(mocks.navigate).toHaveBeenCalledWith('/v1');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  it('routes a deployment validation error to the affected section', async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    mocks.patchSettings.mockResolvedValue({
+      error: { message: 'Fund thesis is required', errors: [] },
+    });
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText('Fund name'), {
+      target: { value: 'Validation Route Fund' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+
+    const thesisSection = document.getElementById('thesis');
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Fund thesis is required'));
+    await waitFor(() => expect(thesisSection).toHaveFocus());
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Thesis — Needs attention' })).toBeInTheDocument();
+  });
 });
