@@ -48,6 +48,8 @@ interface WorkGridProps {
   onQueueViewChange: (view: QueueView) => void;
   /** Reports per-view row counts so the room header readouts stay live. */
   onViewCounts?: (counts: Record<QueueView, number>) => void;
+  /** AppFrame releases the initial cascade after a bare-to-full chrome entrance. */
+  entranceReady?: boolean;
 }
 
 const EMPTY_WATCHLIST_IDS = new Set<string>();
@@ -163,6 +165,7 @@ const WorkGrid = ({
   queueView,
   onQueueViewChange,
   onViewCounts,
+  entranceReady = true,
 }: WorkGridProps): JSX.Element => {
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
   const config = fundConfiguration ?? createDefaultFundConfiguration();
@@ -200,19 +203,17 @@ const WorkGrid = ({
   // first row; doing that mid-entrance is what made Flow stutter on open.
   const [autoSelectReady, setAutoSelectReady] = useState(reduceMotion);
   useEffect(() => {
-    if (reduceMotion) return;
+    if (reduceMotion) {
+      setAutoSelectReady(true);
+      return;
+    }
+    if (!entranceReady) {
+      setAutoSelectReady(false);
+      return;
+    }
     const timer = window.setTimeout(() => setAutoSelectReady(true), 150);
     return () => window.clearTimeout(timer);
-  }, [reduceMotion]);
-  // Let the chrome (spine slide + page-enter) land before the docket staggers
-  // in — otherwise the sidebar, the rows, and the memo all animate at once and
-  // the entrance stutters. After this window, re-staggers (filter/sort) are snappy.
-  const [chromeSettled, setChromeSettled] = useState(reduceMotion);
-  useEffect(() => {
-    if (reduceMotion) return;
-    const timer = window.setTimeout(() => setChromeSettled(true), 200);
-    return () => window.clearTimeout(timer);
-  }, [reduceMotion]);
+  }, [entranceReady, reduceMotion]);
   const hasActiveFilters =
     sourceFilters.size > 0 ||
     outcomeFilters.size > 0 ||
@@ -250,9 +251,9 @@ const WorkGrid = ({
       ? undefined
       : {
           hidden: {},
-          visible: { transition: { staggerChildren: 0.04, delayChildren: chromeSettled ? 0.04 : 0.1 } },
+          visible: { transition: { staggerChildren: 0.04, delayChildren: 0.04 } },
         },
-    [reduceMotion, chromeSettled]
+    [reduceMotion]
   );
 
   const rowVariants = useMemo((): Variants | undefined =>
@@ -449,7 +450,7 @@ const WorkGrid = ({
                 key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
                 className="max-w-[32rem]"
                 initial={reduceMotion ? false : 'hidden'}
-                animate="visible"
+                animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}
                 variants={emptyStateContainerVariants}
               >
                 <motion.p className="type-label-tab text-oxford/60" variants={emptyStateItemVariants}>
@@ -511,7 +512,7 @@ const WorkGrid = ({
             key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
             className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1 pb-phi-6"
             initial={reduceMotion ? false : 'hidden'}
-            animate="visible"
+            animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}
             variants={listContainerVariants}
           >
             {orderedModels.map((model, idx) => {

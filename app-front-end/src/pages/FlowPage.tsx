@@ -82,7 +82,13 @@ function ReadoutKey({
  */
 export default function FlowPage({ data }: { data: SystemData }) {
   const { startups, signals, watchlistAnalytics } = data;
-  const { inlineDispatch, setPageOverlayOpen, openDispatch, openRerun } = useAppFrame();
+  const {
+    inlineDispatch,
+    setPageOverlayOpen,
+    openDispatch,
+    openRerun,
+    workspaceChromeReady,
+  } = useAppFrame();
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const reduceMotion = usePrefersReducedMotion();
@@ -269,6 +275,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
                 queueView={queueView}
                 onQueueViewChange={setQueueView}
                 onViewCounts={setViewCounts}
+                entranceReady={workspaceChromeReady}
               />
             </section>
 
