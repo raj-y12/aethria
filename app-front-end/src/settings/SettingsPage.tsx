@@ -1,32 +1,37 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useNavigate } from 'react-router';
+import { motion } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import LoadingAnimation from '../components/LoadingAnimation';
 import { workspaceLayout } from '../design-system/workspaceLayout';
 import { getQueryConfig } from '../lib/queryIntent';
-import { formatDateTime } from '../lib/dates';
 import { fetchSettings, patchSettings, publishPolicy, type Settings } from '../api/settings';
 import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
 import {
   fetchFundThesisSummary,
   type FundThesisSummary,
 } from '../api/fundThesis';
-import { useFundConfiguration } from '../hooks';
+import { useFundConfiguration, usePrefersReducedMotion } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
 import FundThesisConfirmationModal from './FundThesisConfirmationModal';
-import SettingsRoomChrome from './SettingsRoomChrome';
+import SettingsTopBar from './SettingsTopBar';
+import SettingsRail from './SettingsRail';
+import OperationsStrip from './OperationsStrip';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
   getDeploymentConfirmation,
   getPendingChanges,
   serializeDecisionConfig,
+  SETTINGS_SECTIONS,
   type PendingChange,
   type FundThesisChangeSet,
-  type SettingsTab,
+  type SectionId,
 } from './settingsModel';
+
+const CONTENT_EASE = [0.16, 1, 0.3, 1] as const;
 import {
   applyThesisVersionMetadata,
   clearFundConfiguration,
-  getWeightImpactText,
   mapFundConfigToSettings,
   thesisVersionLabel,
   rebalanceWeights,
@@ -246,7 +251,7 @@ function EditorialStatus({
 }: {
   label: string;
   value: string;
-  detail: string;
+  detail?: string;
   tone?: 'neutral' | 'ready' | 'warning';
 }) {
   const dotClass = tone === 'ready'
@@ -261,20 +266,36 @@ function EditorialStatus({
         <span className={`h-1.5 w-1.5 shrink-0 ${dotClass}`} aria-hidden />
         {value}
       </p>
-      <p className="type-note leading-relaxed text-oxford/60 sm:col-start-2">{detail}</p>
+      {detail ? <p className="type-note leading-relaxed text-escalation/70 sm:col-start-2">{detail}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * The two settings families, stated once. Configuration deploys as a fund
+ * version; Administration is live runtime state. The save-model tag is the
+ * whole distinction in three words.
+ */
+function GroupHeader({ title, tag }: { title: string; tag: string }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1 px-phi-4 pb-phi-3 pt-phi-7">
+      <h2 className="type-display text-[1.5rem] leading-none text-oxford">{title}</h2>
+      <p className="type-status text-oxford/45">{tag}</p>
     </div>
   );
 }
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const reduceMotion = usePrefersReducedMotion();
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [thesisConfirmation, setThesisConfirmation] = useState<FundThesisChangeSet | null>(null);
-  const [activeTab, setActiveTab] = useState<SettingsTab>('decision');
+  const [activeSection, setActiveSection] = useState<SectionId>('thesis');
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState('');
@@ -333,20 +354,39 @@ export default function SettingsPage() {
   );
   const storageNotReady = agentsStatus != null && !agentsStatus.supabase_configured;
 
-  const selectTab = (tab: SettingsTab) => {
-    setActiveTab(tab);
-    contentScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  // Clicking a rail item scrolls its section to the top of the reading column.
+  // The scroll-spy observer below then confirms the active state from what's
+  // actually on screen, so a click and a manual scroll converge on one source.
+  const scrollToSection = (id: SectionId) => {
+    setActiveSection(id);
+    const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${id}`);
+    target?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
   };
 
-  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const nextTab: SettingsTab = event.key === 'ArrowLeft' || event.key === 'Home'
-      ? 'decision'
-      : 'admin';
-    selectTab(nextTab);
-    requestAnimationFrame(() => document.getElementById(`settings-tab-${nextTab}`)?.focus());
-  };
+  // Scroll-spy: the section nearest the top of the reading column wins. Rebinds
+  // once the settings payload resolves (sections mount) — never on every draft
+  // edit, so typing in a field can't thrash the observer.
+  useEffect(() => {
+    const root = contentScrollRef.current;
+    if (!root) return;
+    const targets = SETTINGS_SECTIONS
+      .map((section) => root.querySelector<HTMLElement>(`#${section.id}`))
+      .filter((node): node is HTMLElement => node != null);
+    if (!targets.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        const id = visible[0]?.target.getAttribute('id') as SectionId | null;
+        if (id) setActiveSection(id);
+      },
+      { root, rootMargin: '-15% 0px -70% 0px', threshold: [0, 0.25, 0.6] },
+    );
+    targets.forEach((target) => observer.observe(target));
+    return () => observer.disconnect();
+  }, [settings]);
 
   const updateDraft = (updater: (current: FundConfiguration) => FundConfiguration) => {
     setDraft((current) => updater(current));
@@ -488,39 +528,44 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="page-transition-enter flex min-h-0 flex-1 flex-col overflow-hidden bg-paper text-oxford">
-      <div className="flex-none bg-paper">
-        <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop}`}>
-          <SettingsRoomChrome
-            activeTab={activeTab}
-            settings={settings}
-            storageUnavailable={storageNotReady}
-            pendingChanges={pendingChanges}
-            saving={saving}
-            thesisVersion={thesisSummary?.active_version_number != null
-              ? `Fund Thesis v${thesisSummary.active_version_number}`
-              : 'Not published'}
-            policyVersion={draft.activePolicyVersionId ?? 'Not published'}
-            onSettingsChange={setSettings}
-            onTabChange={selectTab}
-            onTabKeyDown={handleTabKeyDown}
-            onDeploy={requestDeploy}
-            onReset={handleReset}
-          />
-        </div>
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper text-oxford">
+      <SettingsTopBar
+        live={pendingChanges.length === 0}
+        pendingCount={pendingChanges.length}
+        saving={saving}
+        onBack={() => navigate('/v1')}
+        onReset={handleReset}
+        onDeploy={requestDeploy}
+      />
 
-      <div
-        ref={contentScrollRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-paper"
-      >
-        <main className={`${workspaceLayout.shell} ${workspaceLayout.pageBottom} pt-phi-3`}>
-          <div
-            id={`settings-panel-${activeTab}`}
-            role="tabpanel"
-            aria-labelledby={`settings-tab-${activeTab}`}
-            className="min-h-full"
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <SettingsRail
+          activeSection={activeSection}
+          onNavigate={scrollToSection}
+          settings={settings}
+          storageUnavailable={storageNotReady}
+          onSettingsChange={setSettings}
+        />
+
+        <div
+          ref={contentScrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-paper"
+        >
+          <motion.main
+            className={`${workspaceLayout.pageBottom} mx-auto w-full max-w-[52rem] px-phi-5 pt-phi-5 lg:px-phi-7`}
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: CONTENT_EASE, delay: 0.16 }}
           >
+            <div className="mb-phi-5 border border-oxford/[0.08] lg:hidden">
+              <OperationsStrip
+                variant="bar"
+                settings={settings}
+                storageUnavailable={storageNotReady}
+                onSettingsChange={setSettings}
+              />
+            </div>
+
             {(status || errors.length > 0) && (
               <div className="mb-phi-4 border-b border-oxford/[0.08] pb-phi-3" role={errors.length ? 'alert' : 'status'}>
                 {errors.length > 0 ? (
@@ -533,14 +578,13 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {activeTab === 'decision' ? (
-              <div className="flex flex-col gap-phi-3">
-                <div className="grid grid-cols-1 gap-x-phi-6 gap-y-phi-3 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
+            <div className="divide-y divide-oxford/[0.06]">
+                  <GroupHeader title="Configuration" tag="Deploys as a version" />
+
                   <RoomSection
                     id="thesis"
                     title="The mandate"
                     label="Fund thesis"
-                    description="Define the companies this fund is built to find, assess, and back."
                   >
                     <SpecRow label="Identity">
                       <div className="grid gap-phi-5 md:grid-cols-2">
@@ -582,10 +626,8 @@ export default function SettingsPage() {
 
                   <RoomSection
                     id="version"
-                    title="Version context"
+                    title="Version"
                     label="Live state"
-                    description="Mandate changes become a new immutable thesis version only after you confirm deployment."
-                    className="lg:border-l lg:border-oxford/[0.06]"
                   >
                     <SpecRow label="Draft">
                       <p className="type-body-sm text-oxford">{draft.versionLabel}</p>
@@ -598,27 +640,23 @@ export default function SettingsPage() {
                       </p>
                     </SpecRow>
                     <SpecRow label="Storage">
-                      <p className="type-body-sm leading-relaxed text-oxford/65">
-                        {storageNotReady
-                          ? 'Unavailable — Supabase is required to publish thesis versions.'
-                          : 'Ready — your next confirmed mandate change will publish a new version.'}
+                      <p className="type-body-sm text-oxford/65">
+                        {storageNotReady ? 'Unavailable' : 'Ready'}
                       </p>
                     </SpecRow>
                   </RoomSection>
-                </div>
 
                 {!bandValidation.valid && (
-                  <div className="mx-phi-4 border-l-2 border-escalation/35 bg-escalation/[0.035] px-phi-4 py-phi-3">
+                  <div className="border-l-2 border-escalation/35 bg-escalation/[0.035] px-phi-4 py-phi-3">
                     {bandValidation.errors.map((error) => <p key={error} className="type-body-sm text-escalation/75">{error}</p>)}
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 gap-x-phi-6 gap-y-phi-3 border-t border-oxford/[0.06] lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
                   <RoomSection
                     id="thresholds"
                     title="Decision mechanics"
                     label="Thresholds"
-                    description="Set the score bands that turn analysis into PASS, MONITOR, or INVEST."
+                    description="Drag the dividers to set where Pass, Monitor, and Invest begin."
                   >
                     <DecisionThresholdsPanel draft={draft} updateDraft={updateDraft} updateThreshold={updateThreshold} />
                   </RoomSection>
@@ -627,8 +665,6 @@ export default function SettingsPage() {
                     id="sensitivity"
                     title="Escalation sensitivity"
                     label="Risk posture"
-                    description="Choose how readily adverse evidence is raised before a ruling."
-                    className="lg:border-l lg:border-oxford/[0.06]"
                   >
                     <div className="flex flex-col gap-phi-2 border-t border-oxford/[0.06] py-phi-4">
                       <label htmlFor="risk-sensitivity" className={labelCls}>Sensitivity</label>
@@ -637,17 +673,13 @@ export default function SettingsPage() {
                         <option value="balanced">Balanced · standard review</option>
                         <option value="aggressive">Aggressive · surface only stronger risk</option>
                       </select>
-                      <p className="type-note leading-relaxed text-oxford/60">This changes which signals are escalated, not whether a person must acknowledge them.</p>
                     </div>
                   </RoomSection>
-                </div>
 
                 <RoomSection
                   id="weights"
                   title="Scoring weights"
                   label="Reviewer mix"
-                  description="Set how much each reviewer dimension contributes to the overall score."
-                  className="border-t border-oxford/[0.06]"
                 >
                   <div className="flex flex-col">
                     <div className="flex flex-wrap items-baseline justify-between gap-phi-4 border-t border-oxford/[0.06] py-phi-4">
@@ -658,12 +690,8 @@ export default function SettingsPage() {
                       <p className="type-note text-oxford/60">Adjust one — the rest rebalance to 100</p>
                     </div>
                     {draft.scoringWeights.map((item) => (
-                      <div key={item.key} className="grid gap-phi-3 border-t border-oxford/[0.06] py-phi-4 md:grid-cols-[minmax(150px,22%)_minmax(0,1fr)_92px] md:items-start">
-                        <div>
-                          <p className="type-body-emphasis text-oxford">{item.label}</p>
-                          <p className="type-note mt-phi-1 leading-snug text-oxford/60">{item.description}</p>
-                        </div>
-                        <p className="type-body-sm leading-relaxed text-oxford/60">{getWeightImpactText(item.key)}</p>
+                      <div key={item.key} className="grid gap-phi-3 border-t border-oxford/[0.06] py-phi-4 md:grid-cols-[minmax(0,1fr)_92px] md:items-baseline">
+                        <p className="type-body-emphasis text-oxford">{item.label}</p>
                         <input
                           type="number"
                           min={0}
@@ -678,22 +706,20 @@ export default function SettingsPage() {
                         />
                       </div>
                     ))}
-                    <p className="border-t border-oxford/[0.06] py-phi-4 type-note leading-relaxed text-oxford/55">
+                    <p className="border-t border-oxford/[0.06] py-phi-4 type-note text-oxford/55">
                       {draft.activePolicyVersionId
-                        ? `Live policy ${draft.activePolicyVersionId}${draft.lastPublishedAt ? ` · published ${formatDateTime(draft.lastPublishedAt)}` : ''}. Deploying scoring changes publishes the next version.`
-                        : 'No scoring policy has been published yet. Deploy these settings to publish the first version.'}
+                        ? `Live policy ${draft.activePolicyVersionId}. Deploying publishes the next version.`
+                        : 'Deploy to publish the first scoring policy.'}
                     </p>
                   </div>
                 </RoomSection>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-phi-3">
-                <div className="grid grid-cols-1 gap-x-phi-6 gap-y-phi-3 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
+
+                  <GroupHeader title="Administration" tag="Saves immediately" />
+
                   <RoomSection
                     id="memo"
                     title="Memo output"
                     label="Presentation"
-                    description="Choose the shape, audience, and evidence shown in new investment memos."
                   >
                     <div className="grid gap-phi-5 border-t border-oxford/[0.06] py-phi-4 md:grid-cols-2">
                       <div className="flex flex-col gap-phi-2">
@@ -725,22 +751,17 @@ export default function SettingsPage() {
                     id="workflow"
                     title="Ruling workflow"
                     label="Governance"
-                    description="Control what must happen before a recommendation becomes a recorded ruling."
-                    className="lg:border-l lg:border-oxford/[0.06]"
                   >
                     <div className="border-t border-oxford/[0.06]">
                       <ToggleRow id="risk-ack" checked={draft.risk.requireAcknowledgement} onChange={(value) => updateRisk('requireAcknowledgement', value)} label="Require acknowledgement before ruling" hint="High-risk pending deals need a reviewed-risk step before Commit." />
                       <ToggleRow id="risk-high-only" checked={draft.risk.onlyGateHighSeverity} onChange={(value) => updateRisk('onlyGateHighSeverity', value)} label="Only gate high severity risks" hint="Medium adverse items stay visible without blocking the ruling." />
                     </div>
                   </RoomSection>
-                </div>
 
-                <div className="grid grid-cols-1 gap-x-phi-6 gap-y-phi-3 border-t border-oxford/[0.06] lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
                   <RoomSection
                     id="budget"
                     title="Cost budget"
                     label="Live limits"
-                    description="The limits that constrain model usage. Enable or pause enforcement from the operational strip above."
                   >
                     <div className="grid gap-x-phi-8 sm:grid-cols-2">
                       <SpecRow label="Per run"><p className="type-data text-[1.35rem]">{settings.cost_budget.max_tokens_per_run.toLocaleString()} tokens</p></SpecRow>
@@ -748,47 +769,37 @@ export default function SettingsPage() {
                       <SpecRow label="Daily"><p className="type-data text-[1.35rem]">${settings.cost_budget.daily_cost_ceiling.toLocaleString()}</p></SpecRow>
                       <SpecRow label="Weekly"><p className="type-data text-[1.35rem]">${settings.cost_budget.weekly_cost_ceiling.toLocaleString()}</p></SpecRow>
                     </div>
-                    <p className="border-t border-oxford/[0.06] pt-phi-4 type-note text-oxford/55">Budget enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} and saves immediately when changed above.</p>
+                    <p className="border-t border-oxford/[0.06] pt-phi-4 type-note text-oxford/55">Enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} — toggle it in the rail.</p>
                   </RoomSection>
 
                   <RoomSection
                     id="system"
                     title="System state"
                     label="Run gates"
-                    description="The required services that determine whether the pipeline can run."
-                    className="lg:border-l lg:border-oxford/[0.06]"
                   >
                     {agentsStatus ? (
                       <div className="border-t border-oxford/[0.06]">
                         <EditorialStatus
                           label="Storage"
                           value={agentsStatus.supabase_configured ? 'Ready' : 'Unavailable'}
-                          detail={agentsStatus.supabase_configured
-                            ? 'Supabase is configured for user-scoped pipeline data.'
-                            : 'Runtime controls and pipeline execution require Supabase storage.'}
+                          detail={agentsStatus.supabase_configured ? undefined : 'Supabase required to run the pipeline.'}
                           tone={agentsStatus.supabase_configured ? 'ready' : 'warning'}
                         />
                         <EditorialStatus
                           label="OpenAI"
                           value={agentsStatus.openai_configured ? 'Ready' : 'Unavailable'}
-                          detail={agentsStatus.openai_configured
-                            ? 'Models are configured for scout and reviewer work.'
-                            : 'The pipeline will skip runs until an API key is configured.'}
+                          detail={agentsStatus.openai_configured ? undefined : 'API key required to run the pipeline.'}
                           tone={agentsStatus.openai_configured ? 'ready' : 'warning'}
                         />
                         <EditorialStatus
                           label="Worker"
                           value={agentsStatus.worker_ready ? 'Ready' : 'Not ready'}
-                          detail="The in-process worker accepts queued pipeline and lookup work."
                           tone={agentsStatus.worker_ready ? 'ready' : 'warning'}
                         />
                         <EditorialStatus
                           label="Pipeline"
                           value={agentsStatus.agents_will_run ? 'Able to run' : 'Blocked'}
-                          detail={agentsStatus.thesis_error
-                            ?? (agentsStatus.agents_will_run
-                              ? 'Storage, model access, and thesis gates currently pass.'
-                              : 'One or more required runtime gates are not ready.')}
+                          detail={agentsStatus.agents_will_run ? undefined : (agentsStatus.thesis_error ?? 'A required gate is not ready.')}
                           tone={agentsStatus.agents_will_run ? 'ready' : 'warning'}
                         />
                       </div>
@@ -801,11 +812,9 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </RoomSection>
-                </div>
-              </div>
-            )}
-          </div>
-        </main>
+            </div>
+          </motion.main>
+        </div>
       </div>
 
       <FundThesisConfirmationModal

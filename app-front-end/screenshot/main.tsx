@@ -43,7 +43,8 @@ function Harness({ data }: { data: SystemData }) {
   const isFund = pathname.startsWith('/v1/fund');
   const isPortfolio = pathname.startsWith('/v1/portfolio');
   const isFlow = pathname.startsWith('/v1/flow');
-  const bare = !isSettings && !isFund && !isPortfolio && !isFlow;
+  // Settings is a bare/takeover surface (spine dissolves), matching App.tsx.
+  const bare = !isFund && !isPortfolio && !isFlow;
 
   return (
     <div className="min-h-[100dvh]">

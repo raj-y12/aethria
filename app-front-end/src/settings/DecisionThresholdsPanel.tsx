@@ -85,11 +85,20 @@ function ThresholdHandle({
       className="group absolute top-1/2 z-[2] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/55"
       style={{ left: `${value}%` }}
     >
+      <span
+        className={`pointer-events-none absolute -top-phi-4 type-data ${variant === 'divider' ? 'text-oxford' : 'text-oxford/55'}`}
+        aria-hidden
+      >
+        {value}
+      </span>
       {variant === 'divider' ? (
-        <span className="h-9 w-px bg-oxford/70 transition-transform group-hover:scale-x-[2] group-focus-visible:scale-x-[2]" aria-hidden />
+        <>
+          <span className="absolute inset-y-1 w-[2px] bg-oxford" aria-hidden />
+          <span className="relative h-3 w-3 bg-oxford ring-2 ring-paper transition-transform group-hover:scale-110 group-focus-visible:ring-2 group-focus-visible:ring-oxford/45" aria-hidden />
+        </>
       ) : (
-        <span className="flex h-5 w-3 items-end justify-center border-b-2 border-oxford/80" aria-hidden>
-          <span className="h-2.5 w-px bg-oxford/80" />
+        <span className="flex h-5 w-3 items-end justify-center border-b-2 border-oxford/70" aria-hidden>
+          <span className="h-2.5 w-px bg-oxford/70" />
         </span>
       )}
     </button>
@@ -108,10 +117,7 @@ function ThresholdBar({
   const monitorMax = boundaries.monitorInvestBoundary - 1;
 
   return (
-    <div>
-      <p className="mb-phi-3 type-note leading-relaxed text-oxford/60">
-        Drag a marker or use arrow keys. Numeric fields remain available below.
-      </p>
+    <div className="pt-phi-6">
       <div ref={barRef} className="relative h-11 w-full">
         <div className="flex h-full w-full overflow-hidden border border-oxford/[0.1]">
           <div
@@ -313,36 +319,6 @@ export default function DecisionThresholdsPanel({
 
       <ThresholdBar boundaries={boundaries} onChange={applyBounds} />
 
-      <div className="grid gap-phi-5 sm:grid-cols-3">
-        <ScoreInput
-          id="threshold-monitor-start"
-          label="Monitor starts at"
-          suffix={`avg ${formatReviewerAvg(boundaries.passMonitorBoundary)}`}
-          value={boundaries.passMonitorBoundary}
-          min={2}
-          max={99}
-          onCommit={(value) => applyBounds({ passMonitorBoundary: value })}
-        />
-        <ScoreInput
-          id="threshold-invest-start"
-          label="Invest starts at"
-          suffix={`avg ${formatReviewerAvg(boundaries.monitorInvestBoundary)}`}
-          value={boundaries.monitorInvestBoundary}
-          min={boundaries.passMonitorBoundary + 1}
-          max={100}
-          onCommit={(value) => applyBounds({ monitorInvestBoundary: value })}
-        />
-        <ScoreInput
-          id="threshold-auto-pass"
-          label="Auto-pass below"
-          suffix={`avg ${formatReviewerAvg(boundaries.autoPassCeiling)}`}
-          value={boundaries.autoPassCeiling}
-          min={0}
-          max={Math.max(0, boundaries.passMonitorBoundary - 1)}
-          onCommit={(value) => applyBounds({ autoPassCeiling: value })}
-        />
-      </div>
-
       <div className="grid gap-phi-5 border-t border-oxford/[0.055] pt-phi-5 sm:grid-cols-2">
         <ScoreInput
           id="stale-after"
@@ -354,7 +330,7 @@ export default function DecisionThresholdsPanel({
         />
         <DecimalInput
           id="confidence-floor"
-          label="Scout confidence min"
+          label="Min scout confidence"
           value={draft.thresholds.confidenceFloor}
           min={0}
           max={1}

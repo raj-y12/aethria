@@ -8,6 +8,8 @@ interface OperationsStripProps {
   settings: Settings;
   storageUnavailable: boolean;
   onSettingsChange: (settings: Settings) => void;
+  /** 'bar' = horizontal (mobile top); 'rail' = vertical (desktop rail foot). */
+  variant?: 'bar' | 'rail';
 }
 
 const controls: Array<{
@@ -58,7 +60,9 @@ export default function OperationsStrip({
   settings,
   storageUnavailable,
   onSettingsChange,
+  variant = 'bar',
 }: OperationsStripProps) {
+  const isRail = variant === 'rail';
   const queryClient = useQueryClient();
   const [optimistic, setOptimistic] = useState(settings);
   const optimisticRef = useRef(settings);
@@ -120,18 +124,20 @@ export default function OperationsStrip({
 
   return (
     <section
-      className="border-b border-oxford/[0.08] bg-paper px-phi-4 py-phi-3 lg:px-phi-6"
+      className={isRail
+        ? 'bg-paper px-phi-4 py-phi-5'
+        : 'border-b border-oxford/[0.08] bg-paper px-phi-4 py-phi-3 lg:px-phi-6'}
       aria-labelledby="operations-strip-title"
     >
-      <div className="flex flex-col gap-phi-3 lg:flex-row lg:items-center lg:gap-phi-6">
-        <div className="shrink-0 lg:mr-auto">
+      <div className={isRail ? 'flex flex-col gap-phi-4' : 'flex flex-col gap-phi-3 lg:flex-row lg:items-center lg:gap-phi-6'}>
+        <div className={isRail ? '' : 'shrink-0 lg:mr-auto'}>
           <p id="operations-strip-title" className="type-label-section text-oxford">
             Pipeline controls
           </p>
           <p className="mt-phi-1 type-note text-oxford/60">Changes apply immediately.</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-phi-5 gap-y-phi-2 sm:grid-cols-4">
+        <div className={isRail ? 'flex flex-col gap-phi-1' : 'grid grid-cols-2 gap-x-phi-5 gap-y-phi-2 sm:grid-cols-4'}>
           {controls.map((control) => {
             const checked = isEnabled(optimistic, control.key);
             const isPending = pending.has(control.key);
