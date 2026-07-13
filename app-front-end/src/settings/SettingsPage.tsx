@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import { useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import LoadingAnimation from '../components/LoadingAnimation';
+import { workspaceLayout } from '../design-system/workspaceLayout';
 import { getQueryConfig } from '../lib/queryIntent';
 import { formatDateTime } from '../lib/dates';
-import { useAppFrame } from '../components/AppFrame';
-import { SpineNavButton } from '../components/SystemBar';
 import { fetchSettings, patchSettings, publishPolicy, type Settings } from '../api/settings';
 import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
 import {
@@ -15,17 +13,14 @@ import {
 import { useFundConfiguration } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
 import FundThesisConfirmationModal from './FundThesisConfirmationModal';
-import OperationsStrip from './OperationsStrip';
+import SettingsRoomChrome from './SettingsRoomChrome';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
-  SETTINGS_SECTIONS,
   getDeploymentConfirmation,
   getPendingChanges,
   serializeDecisionConfig,
-  tabForSection,
   type PendingChange,
   type FundThesisChangeSet,
-  type SectionId,
   type SettingsTab,
 } from './settingsModel';
 import {
@@ -58,10 +53,6 @@ const selectCls =
 const labelCls = 'type-label-section';
 const sectionLabelCls = 'type-label-section';
 const metaCls = 'type-meta';
-function formatSettingsSavedAt(iso: string): string {
-  const formatted = formatDateTime(iso);
-  return formatted === '—' ? 'Saved' : formatted;
-}
 
 function TextField({
   id,
@@ -212,7 +203,7 @@ function SettingsSection({
   children,
   className,
 }: {
-  id: SectionId;
+  id: string;
   title: string;
   kicker: string;
   children: React.ReactNode;
@@ -261,8 +252,6 @@ function EditorialStatus({
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const { setSpineOverride } = useAppFrame();
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
@@ -270,7 +259,6 @@ export default function SettingsPage() {
   const [errors, setErrors] = useState<string[]>([]);
   const [thesisConfirmation, setThesisConfirmation] = useState<FundThesisChangeSet | null>(null);
   const [activeTab, setActiveTab] = useState<SettingsTab>('decision');
-  const [activeSection, setActiveSection] = useState<SectionId>('thesis');
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState('');
@@ -317,37 +305,6 @@ export default function SettingsPage() {
     setDraft((current) => applyThesisVersionMetadata(current, versionNumber));
   }, [thesisSummary?.active_version_number]);
 
-  useEffect(() => {
-    const root = contentScrollRef.current;
-    if (!root) return;
-
-    const targets = SETTINGS_SECTIONS
-      .filter((section) => section.tab === activeTab)
-      .map((section) => root.querySelector<HTMLElement>(`#${section.id}`))
-      .filter((node): node is HTMLElement => node != null);
-    if (!targets.length) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-        if (!visible.length) return;
-        const id = visible[0].target.getAttribute('id') as SectionId | null;
-        if (id) setActiveSection(id);
-      },
-      {
-        root,
-        // Favor the section currently near the top of the scroll viewport.
-        rootMargin: '-20% 0px -65% 0px',
-        threshold: [0, 0.15, 0.35, 0.6],
-      }
-    );
-
-    targets.forEach((target) => observer.observe(target));
-    return () => observer.disconnect();
-  }, [activeTab, loading, settings]);
-
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
   const thresholdValidation = useMemo(() => validateDecisionThresholds(draft), [draft]);
@@ -358,13 +315,10 @@ export default function SettingsPage() {
     () => getPendingChanges(draft, savedSnapshot),
     [draft, savedSnapshot],
   );
-  const unsaved = pendingChanges.length > 0;
   const storageNotReady = agentsStatus != null && !agentsStatus.supabase_configured;
 
   const selectTab = (tab: SettingsTab) => {
     setActiveTab(tab);
-    const firstSection = SETTINGS_SECTIONS.find((section) => section.tab === tab);
-    if (firstSection) setActiveSection(firstSection.id);
     contentScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -495,120 +449,7 @@ export default function SettingsPage() {
     setErrors([]);
   };
 
-  // ── The spine is the only rail: project section nav + draft state into it. ──
-  // Handlers (and the pending list) are reached through refs so the projection
-  // effect re-runs only when displayed values change, never on identity.
-  const lastDeployedAt = draft.lastPublishedAt ?? draft.lastSavedAt;
-  const spineActionsRef = useRef({ deploy: () => {}, reset: () => {} });
-  spineActionsRef.current = { deploy: requestDeploy, reset: handleReset };
-  const pendingRef = useRef<PendingChange[]>(pendingChanges);
-  pendingRef.current = pendingChanges;
-  const pendingKey = pendingChanges.map((item) => item.label).join('|');
-
-  useEffect(() => {
-    const scrollToSection = (id: SectionId) => {
-      const nextTab = tabForSection(id);
-      setActiveTab(nextTab);
-      setActiveSection(id);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${id}`);
-          target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-      });
-    };
-    const pending = pendingRef.current;
-    setSpineOverride({
-      nav: (
-        <>
-          <SpineNavButton
-            label="← Home"
-            active={false}
-            ariaPressed={false}
-            compact
-            surface="oxford"
-            onClick={() => navigate('/v1')}
-          />
-          {(['decision', 'admin'] as const).map((tab) => (
-            <div key={tab}>
-              <p className="type-label-section type-label-inverse px-2 pb-phi-1 pt-phi-4">
-                {tab === 'decision' ? 'Decision' : 'Administration'}
-              </p>
-              {SETTINGS_SECTIONS.filter((section) => section.tab === tab).map((section) => (
-                <SpineNavButton
-                  key={section.id}
-                  label={section.label}
-                  active={activeTab === tab && activeSection === section.id}
-                  ariaPressed={activeTab === tab && activeSection === section.id}
-                  compact
-                  surface="oxford"
-                  onClick={() => scrollToSection(section.id)}
-                />
-              ))}
-            </div>
-          ))}
-        </>
-      ),
-      footer: (
-        <section aria-label="Deployment status" className="border-t border-white/[0.07] px-2 pt-phi-3">
-          <div className="flex items-center justify-between gap-phi-2">
-            <span className="type-status type-status-inverse">{unsaved ? 'Draft' : 'Live'}</span>
-            <span
-              className={`type-status inline-flex shrink-0 items-center gap-phi-2 ${
-                unsaved ? 'text-escalation-bright/90' : 'text-white/60'
-              }`}
-              aria-live="polite"
-            >
-              <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-none ${unsaved ? 'bg-escalation-bright/80' : 'bg-white/55'}`}
-                aria-hidden
-              />
-              {unsaved ? `${pending.length} pending` : 'Deployed'}
-            </span>
-          </div>
-          {unsaved ? (
-            <ul className="mt-phi-2 flex flex-col gap-phi-1" aria-label="Pending changes">
-              {pending.map((item) => (
-                <li key={item.label} className="flex items-baseline justify-between gap-phi-3 font-sans text-[12px] leading-snug">
-                  <span className="shrink-0 text-white/85">{item.label}</span>
-                  <span className="text-right text-white/60">{item.stages}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-phi-2 truncate font-sans text-[12px] leading-snug text-white/60">
-              {lastDeployedAt ? `Live · deployed ${formatSettingsSavedAt(lastDeployedAt)}` : 'Deploy to put configuration live'}
-            </p>
-          )}
-          <div className="mt-phi-3 flex flex-col gap-phi-2 xl:hidden">
-            <button
-              type="button"
-              onClick={() => spineActionsRef.current.deploy()}
-              disabled={saving || !unsaved}
-              className="w-full btn-aethria-solid !bg-paper !text-oxford disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {saving ? 'Deploying…' : 'Deploy changes'}
-            </button>
-            <button
-              type="button"
-              onClick={() => spineActionsRef.current.reset()}
-              disabled={saving}
-              className="type-action type-action-inverse inline-flex min-h-[32px] w-full items-center justify-center transition-colors hover:text-white/80 disabled:opacity-50 btn-interaction"
-              title="Restore local defaults; deploy to make them live"
-            >
-              Reset to defaults
-            </button>
-          </div>
-        </section>
-      ),
-    });
-  }, [setSpineOverride, navigate, activeTab, activeSection, unsaved, saving, lastDeployedAt, pendingKey]);
-
-  // Leaving the room returns the spine to the workspaces.
-  useEffect(() => () => setSpineOverride(null), [setSpineOverride]);
-
-  // In-place loader — never a full-screen takeover. The spine (with this
-  // page's section nav) stays mounted, so opening Settings doesn't "break".
+  // In-place loader keeps the application frame mounted while settings resolve.
   if (loading) {
     return (
       <div className="flex h-full flex-col items-center justify-center overflow-hidden bg-paper">
@@ -631,100 +472,50 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-paper text-oxford">
-      <main className="flex min-h-0 flex-1 overflow-hidden bg-paper">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper pl-phi-3 pr-phi-5 pt-phi-4 pb-phi-5 lg:pl-phi-3 lg:pr-phi-5 lg:pt-phi-5 lg:pb-phi-5">
-          {/* Section nav + draft state live in the spine (setSpineOverride) — one rail. */}
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:h-full lg:min-h-0">
-              <div className="flex items-center justify-between border-b border-oxford/[0.08] px-phi-5 py-phi-4 lg:hidden">
-            <div className="flex min-w-0 flex-col gap-phi-2">
-              <p className={sectionLabelCls}>{activeTab === 'decision' ? 'Decision settings' : 'Administration'}</p>
-              {unsaved ? (
-                <p className="type-meta text-oxford/60">{pendingChanges.length} pending — not yet live</p>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={requestDeploy}
-              disabled={saving || !unsaved}
-              className="btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {saving ? 'Deploying…' : 'Deploy changes'}
-            </button>
+    <div className="page-transition-enter flex min-h-0 flex-1 flex-col overflow-hidden bg-paper text-oxford">
+      <div className="flex-none bg-paper">
+        <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop}`}>
+          <SettingsRoomChrome
+            activeTab={activeTab}
+            settings={settings}
+            storageUnavailable={storageNotReady}
+            pendingChanges={pendingChanges}
+            saving={saving}
+            thesisVersion={thesisSummary?.active_version_number != null
+              ? `Fund Thesis v${thesisSummary.active_version_number}`
+              : 'Not published'}
+            policyVersion={draft.activePolicyVersionId ?? 'Not published'}
+            onSettingsChange={setSettings}
+            onTabChange={selectTab}
+            onTabKeyDown={handleTabKeyDown}
+            onDeploy={requestDeploy}
+            onReset={handleReset}
+          />
+        </div>
+      </div>
+
+      <div
+        ref={contentScrollRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-paper"
+      >
+        <main className={`${workspaceLayout.shell} ${workspaceLayout.pageBottom} pt-phi-3`}>
+          <div
+            id={`settings-panel-${activeTab}`}
+            role="tabpanel"
+            aria-labelledby={`settings-tab-${activeTab}`}
+            className="min-h-full"
+          >
+            {(status || errors.length > 0) && (
+              <div className="mb-phi-4 border-b border-oxford/[0.08] pb-phi-3" role={errors.length ? 'alert' : 'status'}>
+                {errors.length > 0 ? (
+                  <ul className="flex flex-col gap-phi-1">
+                    {errors.map((error) => <li key={error} className="type-body-sm text-escalation/75">{error}</li>)}
+                  </ul>
+                ) : (
+                  <p className="type-body-sm text-oxford/60">{status}</p>
+                )}
               </div>
-
-              <OperationsStrip
-                settings={settings}
-                storageUnavailable={storageNotReady}
-                onSettingsChange={setSettings}
-              />
-
-              <div
-                className="flex min-h-12 items-end gap-phi-5 border-b border-oxford/[0.09] px-phi-4 lg:px-phi-6"
-                role="tablist"
-                aria-label="Settings mode"
-              >
-                {(['decision', 'admin'] as const).map((tab) => {
-                  const selected = activeTab === tab;
-                  const label = tab === 'decision' ? 'Decision' : 'Administration';
-                  return (
-                    <button
-                      key={tab}
-                      id={`settings-tab-${tab}`}
-                      type="button"
-                      role="tab"
-                      aria-selected={selected}
-                      aria-controls={`settings-panel-${tab}`}
-                      tabIndex={selected ? 0 : -1}
-                      onClick={() => selectTab(tab)}
-                      onKeyDown={handleTabKeyDown}
-                      className={`relative min-h-11 px-phi-1 type-action transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-                        selected ? 'text-oxford' : 'text-oxford/50 hover:text-oxford/75'
-                      }`}
-                    >
-                      {label}
-                      <span
-                        className={`absolute inset-x-0 bottom-0 h-px transition-opacity ${selected ? 'bg-oxford opacity-100' : 'opacity-0'}`}
-                        aria-hidden
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div ref={contentScrollRef} className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
-            <div
-              id={`settings-panel-${activeTab}`}
-              role="tabpanel"
-              aria-labelledby={`settings-tab-${activeTab}`}
-              className="min-h-full"
-            >
-              <div className="mx-auto flex w-full max-w-[68rem] min-w-0 flex-col px-phi-5 py-phi-7 lg:px-phi-7 lg:py-phi-8">
-                <header className="mb-phi-7 max-w-[54rem]">
-                  <p className="type-label-section">
-                    {activeTab === 'decision' ? `Decision configuration · ${draft.versionLabel}` : 'Administration · output and operations'}
-                  </p>
-                  <h1 className="type-display mt-phi-3 text-[clamp(28px,3vw,42px)] leading-[1.08] text-oxford">
-                    {activeTab === 'decision' ? 'How the fund decides' : 'How the system operates'}<span className="wordmark-dot">.</span>
-                  </h1>
-                  <p className="mt-phi-3 max-w-[42rem] type-body-sm leading-relaxed text-oxford/60">
-                    {activeTab === 'decision'
-                      ? 'Decision edits stay in draft until you deploy them. One deployment updates the fund thesis and scoring policy together.'
-                      : 'Preferences below remain draft until deployed. Pipeline controls above save immediately.'}
-                  </p>
-                  {(status || errors.length > 0) && (
-                    <div className="mt-phi-5 border-t border-oxford/[0.08] pt-phi-3" role={errors.length ? 'alert' : 'status'}>
-                      {errors.length > 0 ? (
-                        <ul className="flex flex-col gap-phi-1">
-                          {errors.map((error) => <li key={error} className="type-body-sm text-escalation/75">{error}</li>)}
-                        </ul>
-                      ) : (
-                        <p className="type-body-sm text-oxford/60">{status}</p>
-                      )}
-                    </div>
-                  )}
-                </header>
+            )}
 
                 {activeTab === 'decision' ? (
                   <>
@@ -937,13 +728,10 @@ export default function SettingsPage() {
                     </SettingsSection>
                   </>
                 )}
-              </div>
-            </div>
           </div>
-            </div>
-          </div>
-        </div>
-      </main>
+        </main>
+      </div>
+
       <FundThesisConfirmationModal
         open={thesisConfirmation != null}
         changes={thesisConfirmation?.changes ?? []}
