@@ -35,6 +35,11 @@ describe('Settings focused-mode layout contract', () => {
     expect(source).not.toContain('lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]');
   });
 
+  it('offsets mobile section targets below the sticky navigator without changing desktop', () => {
+    expect(source).toContain('scroll-mt-16');
+    expect(source).toContain('lg:scroll-mt-0');
+  });
+
   it('keeps every configuration section in the single column', () => {
     expect(source).toContain('The mandate');
     expect(source).toContain('Decision mechanics');

@@ -220,7 +220,7 @@ function RoomSection({
   className?: string;
 }) {
   return (
-    <section id={id} className={`flex min-w-0 flex-col gap-phi-4 px-phi-4 pb-phi-5 pt-phi-5 ${className ?? ''}`}>
+    <section id={id} className={`flex min-w-0 scroll-mt-16 flex-col gap-phi-4 px-phi-4 pb-phi-5 pt-phi-5 lg:scroll-mt-0 ${className ?? ''}`}>
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
           <h2 className={sectionLabelCls}>{title}</h2>
