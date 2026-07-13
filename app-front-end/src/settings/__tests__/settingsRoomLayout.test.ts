@@ -1,7 +1,118 @@
-import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import appSource from '../../App.tsx?raw';
+import type { Settings } from '../../api/settings';
+import {
+  createDefaultFundConfiguration,
+  type FundConfiguration,
+} from '../../lib/fundConfiguration';
 import operationsSource from '../OperationsStrip.tsx?raw';
+import topBarSource from '../SettingsTopBar.tsx?raw';
 import source from '../SettingsPage.tsx?raw';
+import SettingsPage from '../SettingsPage';
+
+const mocks = vi.hoisted(() => ({
+  navigate: vi.fn(),
+  patchSettings: vi.fn(),
+  publishPolicy: vi.fn(),
+  setConfiguration: vi.fn(),
+  saveLocalConfiguration: vi.fn(),
+}));
+
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
+  return { ...actual, useNavigate: () => mocks.navigate };
+});
+
+vi.mock('../../api/settings', async () => {
+  const actual = await vi.importActual<typeof import('../../api/settings')>('../../api/settings');
+  return {
+    ...actual,
+    fetchSettings: vi.fn(() => Promise.resolve(settings)),
+    patchSettings: mocks.patchSettings,
+    publishPolicy: mocks.publishPolicy,
+  };
+});
+
+vi.mock('../../api/agents', async () => {
+  const actual = await vi.importActual<typeof import('../../api/agents')>('../../api/agents');
+  return {
+    ...actual,
+    fetchAgentsStatus: vi.fn(() => Promise.resolve({
+      supabase_configured: true,
+      openai_configured: true,
+      worker_ready: true,
+      agents_will_run: true,
+    })),
+  };
+});
+
+vi.mock('../../api/fundThesis', async () => {
+  const actual = await vi.importActual<typeof import('../../api/fundThesis')>('../../api/fundThesis');
+  return {
+    ...actual,
+    fetchFundThesisSummary: vi.fn(() => Promise.resolve({ active_version_number: null })),
+  };
+});
+
+let liveConfiguration: FundConfiguration;
+
+vi.mock('../../hooks', async () => {
+  const actual = await vi.importActual<typeof import('../../hooks')>('../../hooks');
+  return {
+    ...actual,
+    usePrefersReducedMotion: () => true,
+    useFundConfiguration: () => ({
+      configuration: liveConfiguration,
+      setConfiguration: mocks.setConfiguration,
+      save: mocks.saveLocalConfiguration,
+    }),
+  };
+});
+
+const settings: Settings = {
+  fund_identity: {
+    fund_name: 'Default Identity',
+    stage_focus: 'Seed',
+    geographic_focus: 'Europe',
+  },
+  agent_config: {
+    scouts_enabled: true,
+    reviewers_enabled: true,
+    partners_enabled: true,
+    max_agents_per_run: 4,
+    confidence_threshold: 0.65,
+    scout_region: 'europe',
+  },
+  cost_budget: {
+    enabled: true,
+    max_tokens_per_run: 80_000,
+    daily_cost_ceiling: 25,
+    weekly_cost_ceiling: 100,
+    cooldown_seconds: 300,
+  },
+  portfolio: {
+    auto_watchlist: true,
+    signal_scan_frequency: 'daily',
+    memo_verbosity: 'standard',
+  },
+};
+
+function renderPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  queryClient.setQueryData(['settings'], settings);
+  return render(
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(SettingsPage),
+    ),
+  );
+}
 
 describe('Settings focused-mode layout contract', () => {
   it('dissolves the app spine like the front door (bare chrome)', () => {
@@ -59,5 +170,83 @@ describe('Settings focused-mode layout contract', () => {
   it('keeps the rounded switch language', () => {
     expect(source).toContain('rounded-full');
     expect(operationsSource).toContain('rounded-full');
+  });
+
+  it('uses safe top-bar action language and 44px targets', () => {
+    expect(topBarSource).toContain('Restore defaults');
+    expect(topBarSource).toContain('min-h-11');
+    expect(source).toContain('requestExit');
+  });
+});
+
+describe('Settings safe draft actions', () => {
+  beforeEach(() => {
+    liveConfiguration = {
+      ...createDefaultFundConfiguration(settings),
+      mandate: {
+        ...createDefaultFundConfiguration(settings).mandate,
+        fundName: 'Last Live Fund',
+      },
+      activePolicyVersionId: 'policy-live',
+    };
+    settings.fund_config = liveConfiguration;
+    mocks.navigate.mockReset();
+    mocks.patchSettings.mockReset();
+    mocks.publishPolicy.mockReset();
+    mocks.setConfiguration.mockReset();
+    mocks.saveLocalConfiguration.mockReset();
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: class {
+        observe() {}
+        disconnect() {}
+      },
+    });
+  });
+
+  it('confirms restore, changes only the draft, and offers an exact Undo', async () => {
+    renderPage();
+    const fundName = await screen.findByLabelText('Fund name');
+    fireEvent.change(fundName, { target: { value: 'Working Draft Fund' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));
+    const restoreDialog = screen.getByRole('dialog', { name: 'Restore default settings?' });
+    fireEvent.click(within(restoreDialog).getByRole('button', { name: 'Restore defaults' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Fund name')).toHaveValue('Default Identity'));
+    expect(mocks.patchSettings).not.toHaveBeenCalled();
+    expect(mocks.publishPolicy).not.toHaveBeenCalled();
+    expect(mocks.setConfiguration).not.toHaveBeenCalled();
+    expect(screen.getByText('Defaults restored')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(screen.getByLabelText('Fund name')).toHaveValue('Working Draft Fund');
+  });
+
+  it('keeps editing or discards to the last live configuration before leaving', async () => {
+    renderPage();
+    const fundName = await screen.findByLabelText('Fund name');
+    fireEvent.change(fundName, { target: { value: 'Exit Draft Fund' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Aethria/i }));
+    expect(screen.getByRole('dialog', { name: 'Leave settings?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Leave settings?' })).not.toBeInTheDocument());
+    expect(mocks.navigate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Aethria/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard and leave' }));
+    expect(screen.getByLabelText('Fund name')).toHaveValue('Last Live Fund');
+    expect(mocks.navigate).toHaveBeenCalledWith('/v1');
+  });
+
+  it('navigates immediately when no deployable policy changes exist', async () => {
+    renderPage();
+    await screen.findByLabelText('Fund name');
+
+    fireEvent.click(screen.getByRole('button', { name: /Aethria/i }));
+
+    expect(mocks.navigate).toHaveBeenCalledWith('/v1');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

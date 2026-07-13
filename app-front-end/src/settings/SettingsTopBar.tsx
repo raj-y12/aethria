@@ -12,15 +12,21 @@ export default function SettingsTopBar({
   live,
   pendingCount,
   saving,
+  actionMessage,
+  canUndo,
   onBack,
-  onReset,
+  onRestoreDefaults,
+  onUndo,
   onDeploy,
 }: {
   live: boolean;
   pendingCount: number;
   saving: boolean;
+  actionMessage?: string | null;
+  canUndo: boolean;
   onBack: () => void;
-  onReset: () => void;
+  onRestoreDefaults: () => void;
+  onUndo: () => void;
   onDeploy: () => void;
 }) {
   const reduceMotion = usePrefersReducedMotion();
@@ -36,7 +42,7 @@ export default function SettingsTopBar({
           <button
             type="button"
             onClick={onBack}
-            className="type-action inline-flex items-center gap-phi-2 text-oxford/60 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            className="type-action inline-flex min-h-11 items-center gap-phi-2 text-oxford/60 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
           >
             <span aria-hidden>←</span> Aethria
           </button>
@@ -47,31 +53,49 @@ export default function SettingsTopBar({
         </div>
 
         <div className="flex items-center gap-phi-4">
-          <span
-            className="type-status hidden items-center gap-phi-2 sm:inline-flex"
-            aria-live="polite"
-          >
-            <span
-              className={`h-1.5 w-1.5 shrink-0 ${live ? 'bg-oxford' : 'bg-escalation/70 signal-dot-breathe'}`}
-              aria-hidden
-            />
-            <span className={live ? 'text-oxford/60' : 'text-escalation/80'}>
-              {live ? 'Live' : `Draft · ${pendingCount} pending`}
+          {actionMessage ? (
+            <span className="type-status inline-flex items-center gap-phi-2 text-oxford/65" aria-live="polite">
+              <span>{actionMessage}</span>
+              {canUndo ? (
+                <>
+                  <span aria-hidden>·</span>
+                  <button
+                    type="button"
+                    onClick={onUndo}
+                    className="type-action inline-flex min-h-11 items-center border-b border-oxford/15 text-oxford transition-colors hover:border-oxford/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                  >
+                    Undo
+                  </button>
+                </>
+              ) : null}
             </span>
-          </span>
+          ) : (
+            <span
+              className="type-status hidden items-center gap-phi-2 sm:inline-flex"
+              aria-live="polite"
+            >
+              <span
+                className={`h-1.5 w-1.5 shrink-0 ${live ? 'bg-oxford' : 'bg-escalation/70 signal-dot-breathe'}`}
+                aria-hidden
+              />
+              <span className={live ? 'text-oxford/60' : 'text-escalation/80'}>
+                {live ? 'Live' : `Draft · ${pendingCount} pending`}
+              </span>
+            </span>
+          )}
           <button
             type="button"
-            onClick={onReset}
+            onClick={onRestoreDefaults}
             disabled={saving}
             className="type-action inline-flex min-h-11 items-center px-phi-1 text-oxford/60 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
           >
-            Reset
+            Restore defaults
           </button>
           <button
             type="button"
             onClick={onDeploy}
             disabled={saving || live}
-            className="btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn-aethria-solid min-h-11 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {saving ? 'Deploying…' : 'Deploy changes'}
           </button>

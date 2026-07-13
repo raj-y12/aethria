@@ -14,6 +14,7 @@ import {
 import { useFundConfiguration, usePrefersReducedMotion } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
 import FundThesisConfirmationModal from './FundThesisConfirmationModal';
+import SettingsActionDialog from './SettingsActionDialog';
 import SettingsTopBar from './SettingsTopBar';
 import SettingsRail from './SettingsRail';
 import SettingsMobileNav from './SettingsMobileNav';
@@ -32,7 +33,7 @@ import {
 const CONTENT_EASE = [0.16, 1, 0.3, 1] as const;
 import {
   applyThesisVersionMetadata,
-  clearFundConfiguration,
+  createDefaultFundConfiguration,
   mapFundConfigToSettings,
   thesisVersionLabel,
   rebalanceWeights,
@@ -59,6 +60,7 @@ const selectCls =
 const labelCls = 'type-label-section';
 const sectionLabelCls = 'type-label-section';
 const metaCls = 'type-meta';
+type SettingsDialogState = 'restore' | 'leave' | null;
 
 function TextField({
   id,
@@ -157,8 +159,8 @@ function ToggleRow({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-          checked ? 'border-oxford/30 bg-oxford' : 'border-oxford/15 bg-oxford/[0.09]'
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+          checked ? 'bg-oxford' : 'bg-oxford/[0.09]'
         }`}
       >
         <span className={`absolute top-[3px] block h-4 w-4 rounded-full shadow-sm transition-transform ${checked ? 'translate-x-[22px] bg-paper' : 'translate-x-[3px] bg-oxford/35'}`} />
@@ -295,6 +297,8 @@ export default function SettingsPage() {
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState('');
+  const [dialog, setDialog] = useState<SettingsDialogState>(null);
+  const [preRestoreDraft, setPreRestoreDraft] = useState<FundConfiguration | null>(null);
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
 
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
@@ -353,6 +357,11 @@ export default function SettingsPage() {
     () => getPendingChanges(draft, savedSnapshot),
     [draft, savedSnapshot],
   );
+  const hasPendingPolicyChanges = useMemo(
+    () => serializeDecisionConfig(draft) !== savedSnapshot,
+    [draft, savedSnapshot],
+  );
+  const actionMessage = status === 'Defaults restored' || status === 'Restore undone' ? status : null;
   const storageNotReady = agentsStatus != null && !agentsStatus.supabase_configured;
 
   // Clicking a rail item scrolls its section to the top of the reading column.
@@ -391,6 +400,7 @@ export default function SettingsPage() {
 
   const updateDraft = (updater: (current: FundConfiguration) => FundConfiguration) => {
     setDraft((current) => updater(current));
+    setPreRestoreDraft(null);
     setStatus(null);
     setErrors([]);
   };
@@ -497,14 +507,50 @@ export default function SettingsPage() {
     void performDeploy();
   };
 
-  const handleReset = () => {
-    const next = clearFundConfiguration(settings);
-    setConfiguration(next);
+  const restoreDefaults = () => {
+    if (!settings) return;
+    const next = createDefaultFundConfiguration({ ...settings, fund_config: undefined });
+    setPreRestoreDraft(draft);
     setDraft(next);
-    setSavedSnapshot(serializeDecisionConfig(next));
-    setStatus(null);
+    setDialog(null);
+    setStatus('Defaults restored');
     setErrors([]);
   };
+
+  const undoRestore = () => {
+    if (!preRestoreDraft) return;
+    setDraft(preRestoreDraft);
+    setPreRestoreDraft(null);
+    setStatus('Restore undone');
+    setErrors([]);
+  };
+
+  const navigateBack = () => navigate('/v1');
+
+  const requestExit = () => {
+    if (hasPendingPolicyChanges) {
+      setDialog('leave');
+      return;
+    }
+    navigateBack();
+  };
+
+  const discardAndLeave = () => {
+    setDraft(configuration);
+    setPreRestoreDraft(null);
+    setDialog(null);
+    navigateBack();
+  };
+
+  useEffect(() => {
+    if (!hasPendingPolicyChanges) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [hasPendingPolicyChanges]);
 
   // In-place loader keeps the application frame mounted while settings resolve.
   if (loading) {
@@ -534,8 +580,11 @@ export default function SettingsPage() {
         live={pendingChanges.length === 0}
         pendingCount={pendingChanges.length}
         saving={saving}
-        onBack={() => navigate('/v1')}
-        onReset={handleReset}
+        actionMessage={actionMessage}
+        canUndo={preRestoreDraft != null}
+        onBack={requestExit}
+        onRestoreDefaults={() => setDialog('restore')}
+        onUndo={undoRestore}
         onDeploy={requestDeploy}
       />
 
@@ -573,7 +622,7 @@ export default function SettingsPage() {
               />
             </div>
 
-            {(status || errors.length > 0) && (
+            {((status && !actionMessage) || errors.length > 0) && (
               <div className="mb-phi-4 border-b border-oxford/[0.08] pb-phi-3" role={errors.length ? 'alert' : 'status'}>
                 {errors.length > 0 ? (
                   <ul className="flex flex-col gap-phi-1">
@@ -837,6 +886,25 @@ export default function SettingsPage() {
         busy={saving}
         onCancel={() => setThesisConfirmation(null)}
         onConfirm={confirmThesisDeployment}
+      />
+      <SettingsActionDialog
+        open={dialog === 'restore'}
+        title="Restore default settings?"
+        description="This replaces your current draft with the default fund policy. Your live policy remains unchanged until you deploy."
+        confirmLabel="Restore defaults"
+        busy={saving}
+        onCancel={() => setDialog(null)}
+        onConfirm={restoreDefaults}
+      />
+      <SettingsActionDialog
+        open={dialog === 'leave'}
+        title="Leave settings?"
+        description="Your policy draft has undeployed changes. Keep editing, or discard the draft and return to the live configuration."
+        confirmLabel="Discard and leave"
+        busy={saving}
+        destructive
+        onCancel={() => setDialog(null)}
+        onConfirm={discardAndLeave}
       />
     </div>
   );
