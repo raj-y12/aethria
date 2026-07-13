@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import LoadingAnimation from '../components/LoadingAnimation';
@@ -15,7 +15,17 @@ import {
 import DecisionBadge from '../components/DecisionBadge';
 import { useFundConfiguration } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
+import OperationsStrip from './OperationsStrip';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
+import {
+  SETTINGS_SECTIONS,
+  getPendingChanges,
+  serializeDecisionConfig,
+  tabForSection,
+  type PendingChange,
+  type SectionId,
+  type SettingsTab,
+} from './settingsModel';
 import {
   applyThesisVersionMetadata,
   clearFundConfiguration,
@@ -31,27 +41,10 @@ import {
   type RiskSensitivity,
 } from '../lib/fundConfiguration';
 
-type SectionId =
-  | 'mandate'
-  | 'memo'
-  | 'risk'
-  | 'thresholds'
-  | 'budget'
-  | 'weights';
-
 const SELECT_CHEVRON =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%231a2b48' fill-opacity='0.45' d='M0 3h10L5 8z'/%3E%3C/svg%3E\")";
 
 const selectStyle: CSSProperties = { backgroundImage: SELECT_CHEVRON };
-
-const sections: Array<{ id: SectionId; label: string; short: string }> = [
-  { id: 'mandate', label: 'Fund Mandate', short: 'Mandate' },
-  { id: 'memo', label: 'Memo Output', short: 'Memo' },
-  { id: 'risk', label: 'Ruling', short: 'Ruling' },
-  { id: 'thresholds', label: 'Decision Thresholds', short: 'Thresholds' },
-  { id: 'budget', label: 'Operations', short: 'Operations' },
-  { id: 'weights', label: 'Scoring Weights', short: 'Weights' },
-];
 
 const stageOptions = ['Pre-seed', 'Seed', 'Series A', 'Series B+'];
 const geographyOptions = ['US', 'Europe', 'UK/Ireland', 'Global'];
@@ -65,25 +58,6 @@ const sectionLabelCls = 'type-label-section';
 const metaCls = 'type-meta';
 const actionBtnCls =
   'type-action inline-flex min-h-[36px] items-center rounded-none border-0 bg-transparent p-0 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30';
-
-/**
- * One pending edit bucket and the pipeline stages it touches once deployed.
- * Deploy is a single transaction: PATCH /api/settings (which republishes the
- * fund thesis server-side when mandate content changed) followed by a scoring
- * policy publish (idempotent — same hash re-activates the same version).
- */
-interface PendingChange {
-  label: string;
-  stages: string;
-}
-
-function serializeConfig(config: FundConfiguration): string {
-  const rest = { ...config } as Record<string, unknown>;
-  for (const key of ['lastSavedAt', 'version', 'versionLabel', 'activePolicyVersionId', 'draftPolicyHash', 'publishedPolicyHash', 'lastPublishedAt']) {
-    delete rest[key];
-  }
-  return JSON.stringify(rest);
-}
 
 function SettingsSidebarFooter({
   pending,
@@ -153,14 +127,6 @@ function SettingsSidebarFooter({
       </div>
     </div>
   );
-}
-
-function serializeOperations(settings: Settings | null): string {
-  if (!settings) return '';
-  return JSON.stringify({
-    agent_config: settings.agent_config,
-    cost_budget: settings.cost_budget,
-  });
 }
 
 function formatSettingsSavedAt(iso: string): string {
@@ -336,6 +302,34 @@ function SettingsSection({
   );
 }
 
+function StatusRegisterRow({
+  label,
+  value,
+  detail,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: 'neutral' | 'ready' | 'warning';
+}) {
+  const dotClass = tone === 'ready'
+    ? 'bg-oxford'
+    : tone === 'warning'
+      ? 'bg-escalation/75'
+      : 'bg-oxford/30';
+  return (
+    <div className="grid gap-phi-2 border-b border-oxford/[0.06] py-phi-4 last:border-b-0 md:grid-cols-[minmax(10rem,24%)_minmax(10rem,22%)_minmax(0,1fr)] md:items-baseline md:gap-phi-5">
+      <p className="type-label-section text-oxford/65">{label}</p>
+      <p className="type-body-sm inline-flex items-center gap-phi-2 text-oxford">
+        <span className={`h-1.5 w-1.5 shrink-0 ${dotClass}`} aria-hidden />
+        {value}
+      </p>
+      <p className="type-note leading-relaxed text-oxford/60">{detail}</p>
+    </div>
+  );
+}
+
 function PreviewPanel({
   config,
   pending,
@@ -417,11 +411,11 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<SettingsTab>('decision');
   const [activeSection, setActiveSection] = useState<SectionId>('mandate');
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState('');
-  const [savedOperationsSnapshot, setSavedOperationsSnapshot] = useState('');
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
 
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
@@ -442,7 +436,6 @@ export default function SettingsPage() {
     if (seededRef.current || !settingsQuery.data) return;
     seededRef.current = true;
     setSettings(settingsQuery.data);
-    setSavedOperationsSnapshot(serializeOperations(settingsQuery.data));
   }, [settingsQuery.data]);
 
   const loading = settings == null && settingsQuery.isPending;
@@ -456,7 +449,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setDraft(configuration);
-    setSavedSnapshot(serializeConfig(configuration));
+    setSavedSnapshot(serializeDecisionConfig(configuration));
   }, [configuration]);
 
   useEffect(() => {
@@ -470,7 +463,8 @@ export default function SettingsPage() {
     const root = contentScrollRef.current;
     if (!root) return;
 
-    const targets = sections
+    const targets = SETTINGS_SECTIONS
+      .filter((section) => section.tab === activeTab)
       .map((section) => root.querySelector<HTMLElement>(`#${section.id}`))
       .filter((node): node is HTMLElement => node != null);
     if (!targets.length) return;
@@ -494,49 +488,37 @@ export default function SettingsPage() {
 
     targets.forEach((target) => observer.observe(target));
     return () => observer.disconnect();
-  }, [loading, settings]);
+  }, [activeTab, loading, settings]);
 
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
   const thresholdValidation = useMemo(() => validateDecisionThresholds(draft), [draft]);
 
-  // Draft vs Live: pending edit buckets and the pipeline stages each touches.
-  const operationsDirty = serializeOperations(settings) !== savedOperationsSnapshot;
-  const pendingChanges = useMemo<PendingChange[]>(() => {
-    const items: PendingChange[] = [];
-    let saved: Partial<FundConfiguration> | null = null;
-    try {
-      saved = savedSnapshot ? (JSON.parse(savedSnapshot) as Partial<FundConfiguration>) : null;
-    } catch {
-      saved = null;
-    }
-    const differs = (a: unknown, b: unknown) => JSON.stringify(a) !== JSON.stringify(b);
-    if (saved) {
-      if (differs(draft.mandate, saved.mandate)) {
-        items.push({ label: 'Mandate', stages: 'Scout · Reviewer' });
-      }
-      if (
-        differs(draft.scoringWeights, saved.scoringWeights)
-        || differs(draft.scoreBands, saved.scoreBands)
-        || differs(draft.thresholds, saved.thresholds)
-      ) {
-        items.push({ label: 'Scoring', stages: 'Reviewer · Partner' });
-      }
-      if (differs(draft.risk, saved.risk)) items.push({ label: 'Ruling', stages: 'Decision flow' });
-      if (differs(draft.memo, saved.memo)) items.push({ label: 'Memo output', stages: 'Partner memos' });
-      // Catch-all for config fields outside the buckets above (e.g. rubric).
-      if (!items.length && serializeConfig(draft) !== savedSnapshot) {
-        items.push({ label: 'Configuration', stages: 'Pipeline' });
-      }
-    }
-    if (operationsDirty) items.push({ label: 'Operations', stages: 'Pipeline runtime' });
-    if (!draft.activePolicyVersionId) {
-      items.push({ label: 'Scoring policy', stages: 'Never published' });
-    }
-    return items;
-  }, [draft, savedSnapshot, operationsDirty]);
+  // Draft vs Live only covers deployable decision configuration. Runtime
+  // controls save independently in OperationsStrip and never enter this list.
+  const pendingChanges = useMemo<PendingChange[]>(
+    () => getPendingChanges(draft, savedSnapshot),
+    [draft, savedSnapshot],
+  );
   const unsaved = pendingChanges.length > 0;
   const storageNotReady = agentsStatus != null && !agentsStatus.supabase_configured;
+
+  const selectTab = (tab: SettingsTab) => {
+    setActiveTab(tab);
+    const firstSection = SETTINGS_SECTIONS.find((section) => section.tab === tab);
+    if (firstSection) setActiveSection(firstSection.id);
+    contentScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const nextTab: SettingsTab = event.key === 'ArrowLeft' || event.key === 'Home'
+      ? 'decision'
+      : 'admin';
+    selectTab(nextTab);
+    requestAnimationFrame(() => document.getElementById(`settings-tab-${nextTab}`)?.focus());
+  };
 
   const updateDraft = (updater: (current: FundConfiguration) => FundConfiguration) => {
     setDraft((current) => updater(current));
@@ -596,7 +578,6 @@ export default function SettingsPage() {
     const summary = await fetchFundThesisSummary().catch(() => null);
     const liveSettings = refreshed ?? result.data ?? settings;
     setSettings(liveSettings);
-    setSavedOperationsSnapshot(serializeOperations(liveSettings));
     let liveConfig = liveSettings.fund_config ?? draft;
     if (summary?.active_version_number != null) {
       setThesisSummary(summary);
@@ -605,7 +586,7 @@ export default function SettingsPage() {
     const saved = saveLocalConfiguration(liveConfig);
     setConfiguration(saved);
     setDraft(saved);
-    setSavedSnapshot(serializeConfig(saved));
+    setSavedSnapshot(serializeDecisionConfig(saved));
     await queryClient.invalidateQueries({ queryKey: ['settings'] });
     await queryClient.invalidateQueries({ queryKey: ['fund-thesis'] });
 
@@ -625,7 +606,7 @@ export default function SettingsPage() {
     const next = clearFundConfiguration(settings);
     setConfiguration(next);
     setDraft(next);
-    setSavedSnapshot(serializeConfig(next));
+    setSavedSnapshot(serializeDecisionConfig(next));
     setStatus(null);
     setErrors([]);
   };
@@ -642,9 +623,15 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const scrollToSection = (id: SectionId) => {
+      const nextTab = tabForSection(id);
+      setActiveTab(nextTab);
       setActiveSection(id);
-      const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${id}`);
-      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${id}`);
+          target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
     };
     const pending = pendingRef.current;
     setSpineOverride({
@@ -658,23 +645,27 @@ export default function SettingsPage() {
             surface="oxford"
             onClick={() => navigate('/v1')}
           />
-          <p className="type-label-section type-label-inverse px-2 pb-phi-1 pt-phi-4">
-            Configuration
-          </p>
-          {sections.map((section) => (
-            <SpineNavButton
-              key={section.id}
-              label={section.label}
-              active={activeSection === section.id}
-              ariaPressed={activeSection === section.id}
-              compact
-              surface="oxford"
-              onClick={() => scrollToSection(section.id)}
-            />
+          {(['decision', 'admin'] as const).map((tab) => (
+            <div key={tab}>
+              <p className="type-label-section type-label-inverse px-2 pb-phi-1 pt-phi-4">
+                {tab === 'decision' ? 'Decision' : 'Administration'}
+              </p>
+              {SETTINGS_SECTIONS.filter((section) => section.tab === tab).map((section) => (
+                <SpineNavButton
+                  key={section.id}
+                  label={section.label}
+                  active={activeTab === tab && activeSection === section.id}
+                  ariaPressed={activeTab === tab && activeSection === section.id}
+                  compact
+                  surface="oxford"
+                  onClick={() => scrollToSection(section.id)}
+                />
+              ))}
+            </div>
           ))}
         </>
       ),
-      footer: (
+      footer: activeTab === 'decision' ? (
         <section aria-label="Deployment status" className="border-t border-white/[0.07] px-2 pt-phi-3">
           <div className="flex items-center justify-between gap-phi-2">
             <span className="type-status type-status-inverse">{unsaved ? 'Draft' : 'Live'}</span>
@@ -712,7 +703,7 @@ export default function SettingsPage() {
               disabled={saving || !unsaved}
               className="w-full btn-aethria-solid !bg-paper !text-oxford disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {saving ? 'Deploying…' : 'Deploy changes'}
+              {saving ? 'Deploying…' : 'Deploy decision changes'}
             </button>
             <button
               type="button"
@@ -725,9 +716,9 @@ export default function SettingsPage() {
             </button>
           </div>
         </section>
-      ),
+      ) : null,
     });
-  }, [setSpineOverride, navigate, activeSection, unsaved, saving, lastDeployedAt, pendingKey]);
+  }, [setSpineOverride, navigate, activeTab, activeSection, unsaved, saving, lastDeployedAt, pendingKey]);
 
   // Leaving the room returns the spine to the workspaces.
   useEffect(() => () => setSpineOverride(null), [setSpineOverride]);
@@ -764,36 +755,83 @@ export default function SettingsPage() {
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:h-full lg:min-h-0">
               <div className="flex items-center justify-between border-b border-oxford/[0.08] px-phi-5 py-phi-4 lg:hidden">
             <div className="flex min-w-0 flex-col gap-phi-2">
-              <p className={sectionLabelCls}>Fund Configuration</p>
-              {unsaved ? (
+              <p className={sectionLabelCls}>{activeTab === 'decision' ? 'Decision settings' : 'Administration'}</p>
+              {activeTab === 'decision' && unsaved ? (
                 <p className="type-meta text-oxford/60">{pendingChanges.length} pending — not yet live</p>
               ) : null}
             </div>
+            {activeTab === 'decision' && (
               <button
                 type="button"
                 onClick={handleDeploy}
                 disabled={saving || !unsaved}
                 className="btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {saving ? 'Deploying…' : 'Deploy'}
+                {saving ? 'Deploying…' : 'Deploy decision changes'}
               </button>
+            )}
+              </div>
+
+              <OperationsStrip
+                settings={settings}
+                storageUnavailable={storageNotReady}
+                onSettingsChange={setSettings}
+              />
+
+              <div
+                className="flex min-h-12 items-end gap-phi-5 border-b border-oxford/[0.09] px-phi-4 lg:px-phi-6"
+                role="tablist"
+                aria-label="Settings mode"
+              >
+                {(['decision', 'admin'] as const).map((tab) => {
+                  const selected = activeTab === tab;
+                  const label = tab === 'decision' ? 'Decision' : 'Administration';
+                  return (
+                    <button
+                      key={tab}
+                      id={`settings-tab-${tab}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      aria-controls={`settings-panel-${tab}`}
+                      tabIndex={selected ? 0 : -1}
+                      onClick={() => selectTab(tab)}
+                      onKeyDown={handleTabKeyDown}
+                      className={`relative min-h-11 px-phi-1 type-action transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+                        selected ? 'text-oxford' : 'text-oxford/50 hover:text-oxford/75'
+                      }`}
+                    >
+                      {label}
+                      <span
+                        className={`absolute inset-x-0 bottom-0 h-px transition-opacity ${selected ? 'bg-oxford opacity-100' : 'opacity-0'}`}
+                        aria-hidden
+                      />
+                    </button>
+                  );
+                })}
               </div>
 
               <div ref={contentScrollRef} className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
-            <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]">
+            <div
+              id={`settings-panel-${activeTab}`}
+              role="tabpanel"
+              aria-labelledby={`settings-tab-${activeTab}`}
+              className={`grid min-h-full ${activeTab === 'decision' ? 'xl:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]' : ''}`}
+            >
               <div className="flex min-w-0 flex-col px-phi-5 py-phi-6 lg:px-phi-7">
                 <header className="mb-phi-7 max-w-[54rem]">
                   <p className="type-label-section">
-                    Configuration · {draft.versionLabel}
+                    {activeTab === 'decision' ? `Decision configuration · ${draft.versionLabel}` : 'Administration · live system state'}
                   </p>
                   <h1 className="type-display mt-phi-3 text-[clamp(28px,3vw,42px)] leading-[1.08] text-oxford">
-                    How this fund thinks<span className="wordmark-dot">.</span>
+                    {activeTab === 'decision' ? 'How this fund thinks' : 'What is running now'}<span className="wordmark-dot">.</span>
                   </h1>
                   <p className="mt-phi-3 max-w-[42rem] type-body-sm leading-relaxed text-oxford/60">
-                    Configure the mandate, memo output, ruling experience, and the engine settings that sit behind them.
-                    Edits stay in draft until you deploy — one action puts the settings, fund thesis, and scoring policy live.
+                    {activeTab === 'decision'
+                      ? 'Decision edits stay in draft until you deploy them. One deployment updates the fund thesis and scoring policy together.'
+                      : 'Administration shows the system state that is live now. Runtime switches above save immediately.'}
                   </p>
-                  {(status || errors.length > 0) && (
+                  {activeTab === 'decision' && (status || errors.length > 0) && (
                     <div className="mt-phi-5 border-t border-oxford/[0.08] pt-phi-3" role={errors.length ? 'alert' : 'status'}>
                       {errors.length > 0 ? (
                         <ul className="flex flex-col gap-phi-1">
@@ -806,6 +844,8 @@ export default function SettingsPage() {
                   )}
                 </header>
 
+                {activeTab === 'decision' ? (
+                  <>
                 <SettingsSection id="mandate" title="Fund Mandate" kicker="The operating mandate used by discovery, fund-fit language, and frontend recommendation context.">
                   <div className="grid gap-phi-5">
                     <div className="grid gap-phi-5 md:grid-cols-2">
@@ -871,6 +911,15 @@ export default function SettingsPage() {
 
                 <SettingsSection id="risk" title="Ruling" kicker="Choose what needs acknowledgement before a decision is recorded.">
                   <div className="grid gap-phi-5">
+                    <div className="flex max-w-md flex-col gap-phi-2">
+                      <label htmlFor="risk-sensitivity" className={labelCls}>Escalation sensitivity</label>
+                      <select id="risk-sensitivity" value={draft.risk.sensitivity} onChange={(event) => updateRisk('sensitivity', event.target.value as RiskSensitivity)} className={selectCls} style={selectStyle}>
+                        <option value="conservative">Conservative · surface more risk</option>
+                        <option value="balanced">Balanced · standard review</option>
+                        <option value="aggressive">Aggressive · surface only stronger risk</option>
+                      </select>
+                      <p className="type-note leading-relaxed text-oxford/60">Controls how readily adverse evidence is escalated before a ruling.</p>
+                    </div>
                     <div className="border-y border-oxford/[0.06]">
                       <ToggleRow id="risk-ack" checked={draft.risk.requireAcknowledgement} onChange={(value) => updateRisk('requireAcknowledgement', value)} label="Require acknowledgement before ruling" hint="High-risk pending deals need a reviewed-risk step before Commit." />
                       <ToggleRow id="risk-high-only" checked={draft.risk.onlyGateHighSeverity} onChange={(value) => updateRisk('onlyGateHighSeverity', value)} label="Only gate high severity risks" hint="Leaves medium adverse items visible without slowing the ruling." />
@@ -888,23 +937,6 @@ export default function SettingsPage() {
 
                 <SettingsSection id="thresholds" title="Decision Thresholds" kicker="Set the score bands that turn analysis into PASS, MONITOR, or INVEST. The bar below shows the live ranges.">
                   <DecisionThresholdsPanel draft={draft} updateDraft={updateDraft} updateThreshold={updateThreshold} />
-                </SettingsSection>
-
-                <SettingsSection id="budget" title="Operations" kicker="Control which agents run and how often the pipeline checks for new work. No hidden runtime limits.">
-                  <div className="grid gap-phi-5 md:grid-cols-2">
-                    <div className="flex flex-col gap-phi-2">
-                      <label htmlFor="risk-sensitivity" className={labelCls}>Escalation sensitivity</label>
-                      <select id="risk-sensitivity" value={draft.risk.sensitivity} onChange={(event) => updateRisk('sensitivity', event.target.value as RiskSensitivity)} className={selectCls} style={selectStyle}>
-                        <option value="conservative">Conservative</option>
-                        <option value="balanced">Balanced</option>
-                        <option value="aggressive">Aggressive</option>
-                      </select>
-                    </div>
-                    <ToggleRow id="scouts-enabled" checked={settings.agent_config.scouts_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, scouts_enabled: value } } : current)} label="Scouts enabled" />
-                    <ToggleRow id="reviewers-enabled" checked={settings.agent_config.reviewers_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, reviewers_enabled: value } } : current)} label="Reviewers enabled" />
-                    <ToggleRow id="partners-enabled" checked={settings.agent_config.partners_enabled} onChange={(value) => setSettings((current) => current ? { ...current, agent_config: { ...current.agent_config, partners_enabled: value } } : current)} label="Partners enabled" />
-                    <ToggleRow id="budget-enabled" checked={settings.cost_budget.enabled} onChange={(value) => setSettings((current) => current ? { ...current, cost_budget: { ...current.cost_budget, enabled: value } } : current)} label="Cost budget enabled" />
-                  </div>
                 </SettingsSection>
 
                 <SettingsSection id="weights" title="Scoring Weights" kicker="Set how much each reviewer dimension contributes to the overall score. The total stays balanced at 100%.">
@@ -938,35 +970,121 @@ export default function SettingsPage() {
                       </div>
                     ))}
 
-                    <div className="mt-phi-2 border-t border-oxford/[0.08] pt-phi-4">
-                      <div className="flex flex-wrap items-baseline justify-between gap-phi-3">
-                        <div>
-                          <p className={labelCls}>Live scoring policy</p>
-                          <p className="mt-phi-1 type-body-sm text-oxford/60">{draft.activePolicyVersionId ?? 'No published policy'}</p>
-                        </div>
-                        <p className="type-meta text-oxford/60">
-                          {draft.lastPublishedAt
-                            ? `Last published ${formatDateTime(draft.lastPublishedAt)}`
-                            : 'Published on first deploy'}
-                        </p>
-                      </div>
-                      <p className="mt-phi-3 type-meta text-oxford/60">
-                        Deploying a scoring change publishes the next policy version automatically. New reviews use the live version.
-                      </p>
-                    </div>
                   </div>
                 </SettingsSection>
+                  </>
+                ) : (
+                  <>
+                    <SettingsSection
+                      id="policy"
+                      title="Scoring policy"
+                      kicker="The published scoring rules used by new reviews and partner decisions."
+                    >
+                      <div className="border-y border-oxford/[0.08]">
+                        <StatusRegisterRow
+                          label="Live policy"
+                          value={draft.activePolicyVersionId ?? 'Not published'}
+                          detail={draft.activePolicyVersionId
+                            ? 'New reviews use this policy version.'
+                            : 'Deploy decision settings once to publish the first policy.'}
+                          tone={draft.activePolicyVersionId ? 'ready' : 'warning'}
+                        />
+                        <StatusRegisterRow
+                          label="Published"
+                          value={draft.lastPublishedAt ? formatDateTime(draft.lastPublishedAt) : 'Not yet'}
+                          detail="A scoring change publishes the next version when decision settings are deployed."
+                        />
+                      </div>
+                    </SettingsSection>
 
+                    <SettingsSection
+                      id="thesis"
+                      title="Fund thesis"
+                      kicker="The active mandate version that gates discovery and evaluation for this fund."
+                    >
+                      <div className="border-y border-oxford/[0.08]">
+                        <StatusRegisterRow
+                          label="Active version"
+                          value={thesisSummary
+                            ? `Fund Thesis v${thesisSummary.active_version_number}`
+                            : 'No active version'}
+                          detail={thesisSummary
+                            ? 'Scout and reviewer stages are aligned to this published thesis.'
+                            : 'Deploy the mandate to publish the fund thesis.'}
+                          tone={thesisSummary ? 'ready' : 'warning'}
+                        />
+                        <StatusRegisterRow
+                          label="Next decision deploy"
+                          value={thesisSummary
+                            ? `Publishes v${thesisSummary.active_version_number + 1} when changed`
+                            : 'Publishes v1'}
+                          detail="Unchanged thesis content is deduplicated, so a deploy does not create a needless version."
+                        />
+                      </div>
+                    </SettingsSection>
+
+                    <SettingsSection
+                      id="system"
+                      title="Storage and agents"
+                      kicker="The infrastructure checks that determine whether the pipeline can run."
+                    >
+                      {agentsStatus ? (
+                        <div className="border-y border-oxford/[0.08]">
+                          <StatusRegisterRow
+                            label="Storage"
+                            value={agentsStatus.supabase_configured ? 'Ready' : 'Unavailable'}
+                            detail={agentsStatus.supabase_configured
+                              ? 'Supabase is configured for user-scoped pipeline data.'
+                              : 'Runtime controls and pipeline execution require Supabase storage.'}
+                            tone={agentsStatus.supabase_configured ? 'ready' : 'warning'}
+                          />
+                          <StatusRegisterRow
+                            label="OpenAI"
+                            value={agentsStatus.openai_configured ? 'Ready' : 'Unavailable'}
+                            detail={agentsStatus.openai_configured
+                              ? 'Models are configured for scout and reviewer work.'
+                              : 'The pipeline will skip runs until an API key is configured.'}
+                            tone={agentsStatus.openai_configured ? 'ready' : 'warning'}
+                          />
+                          <StatusRegisterRow
+                            label="Worker"
+                            value={agentsStatus.worker_ready ? 'Ready' : 'Not ready'}
+                            detail="The in-process worker accepts queued pipeline and lookup work."
+                            tone={agentsStatus.worker_ready ? 'ready' : 'warning'}
+                          />
+                          <StatusRegisterRow
+                            label="Pipeline"
+                            value={agentsStatus.agents_will_run ? 'Able to run' : 'Blocked'}
+                            detail={agentsStatus.thesis_error
+                              ?? (agentsStatus.agents_will_run
+                                ? 'Storage, model access, and thesis gates currently pass.'
+                                : 'One or more required runtime gates are not ready.')}
+                            tone={agentsStatus.agents_will_run ? 'ready' : 'warning'}
+                          />
+                        </div>
+                      ) : (
+                        <div className="border-y border-oxford/[0.08] py-phi-5">
+                          <p className="type-body-sm text-oxford">Status unavailable</p>
+                          <p className="mt-phi-2 type-note leading-relaxed text-oxford/60">
+                            Aethria could not read the agent status endpoint. Runtime switch values above still reflect saved settings.
+                          </p>
+                        </div>
+                      )}
+                    </SettingsSection>
+                  </>
+                )}
               </div>
 
-              <PreviewPanel
-                config={draft}
-                pending={pendingChanges}
-                lastDeployedAt={lastDeployedAt}
-                deploying={saving}
-                onDeploy={() => void handleDeploy()}
-                onReset={handleReset}
-              />
+              {activeTab === 'decision' && (
+                <PreviewPanel
+                  config={draft}
+                  pending={pendingChanges}
+                  lastDeployedAt={lastDeployedAt}
+                  deploying={saving}
+                  onDeploy={() => void handleDeploy()}
+                  onReset={handleReset}
+                />
+              )}
             </div>
           </div>
             </div>
