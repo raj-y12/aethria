@@ -38,6 +38,26 @@ describe('SettingsActionDialog', () => {
     await waitFor(() => expect(dialog).toContainElement(document.activeElement as HTMLElement));
   });
 
+  it('focuses the dialog fallback when it opens busy', async () => {
+    renderDialog({ busy: true });
+
+    const dialog = screen.getByRole('dialog', { name: 'Restore defaults?' });
+    await waitFor(() => expect(dialog).toHaveFocus());
+
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(dialog).toHaveFocus();
+  });
+
+  it('moves focus to an enabled action when a busy dialog becomes ready', async () => {
+    const { rerender, props } = renderDialog({ busy: true });
+    const dialog = screen.getByRole('dialog', { name: 'Restore defaults?' });
+    await waitFor(() => expect(dialog).toHaveFocus());
+
+    rerender(<SettingsActionDialog {...props} busy={false} />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus());
+  });
+
   it('keeps Tab and Shift+Tab inside the dialog', async () => {
     renderDialog();
     const cancel = screen.getByRole('button', { name: 'Cancel' });

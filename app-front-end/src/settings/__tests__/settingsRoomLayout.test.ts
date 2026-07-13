@@ -169,6 +169,7 @@ describe('Settings focused-mode layout contract', () => {
 
   it('keeps the rounded switch language', () => {
     expect(source).toContain('rounded-full');
+    expect(source).toContain('rounded-full border transition-colors');
     expect(operationsSource).toContain('rounded-full');
   });
 
@@ -218,6 +219,12 @@ describe('Settings safe draft actions', () => {
     expect(mocks.publishPolicy).not.toHaveBeenCalled();
     expect(mocks.setConfiguration).not.toHaveBeenCalled();
     expect(screen.getByText('Defaults restored')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Aethria/i }));
+    expect(screen.getByRole('dialog', { name: 'Leave settings?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Leave settings?' })).not.toBeInTheDocument());
+    expect(mocks.navigate).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect(screen.getByLabelText('Fund name')).toHaveValue('Working Draft Fund');

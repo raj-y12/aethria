@@ -159,8 +159,8 @@ function ToggleRow({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-          checked ? 'bg-oxford' : 'bg-oxford/[0.09]'
+        className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+          checked ? 'border-oxford/30 bg-oxford' : 'border-oxford/15 bg-oxford/[0.09]'
         }`}
       >
         <span className={`absolute top-[3px] block h-4 w-4 rounded-full shadow-sm transition-transform ${checked ? 'translate-x-[22px] bg-paper' : 'translate-x-[3px] bg-oxford/35'}`} />

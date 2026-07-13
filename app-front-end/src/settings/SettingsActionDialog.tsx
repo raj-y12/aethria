@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useFocusTrap, usePrefersReducedMotion } from '../hooks';
+import { usePrefersReducedMotion } from '../hooks';
 
 export type SettingsActionDialogProps = {
   open: boolean;
@@ -15,6 +15,8 @@ export type SettingsActionDialogProps = {
 };
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+const ENABLED_FOCUSABLE =
+  'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
 export default function SettingsActionDialog({
   open,
@@ -40,7 +42,41 @@ export default function SettingsActionDialog({
     restoreFocusRef.current?.focus?.();
   }, [open]);
 
-  useFocusTrap(open, dialogRef);
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => {
+      const firstEnabled = dialogRef.current?.querySelector<HTMLElement>(ENABLED_FOCUSABLE);
+      (firstEnabled ?? dialogRef.current)?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [busy, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const enabled = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(ENABLED_FOCUSABLE));
+      const first = enabled[0];
+      const last = enabled[enabled.length - 1];
+      const current = document.activeElement as HTMLElement | null;
+
+      if (!first || !last) {
+        event.preventDefault();
+        dialogRef.current.focus();
+      } else if (!current || !dialogRef.current.contains(current)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && current === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && current === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', trapFocus);
+    return () => document.removeEventListener('keydown', trapFocus);
+  }, [open]);
 
   useEffect(() => {
     if (!open || busy) return;
@@ -67,6 +103,7 @@ export default function SettingsActionDialog({
           <motion.div
             ref={dialogRef}
             role="dialog"
+            tabIndex={-1}
             aria-modal="true"
             aria-labelledby={titleId}
             aria-describedby={descriptionId}
