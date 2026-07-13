@@ -76,7 +76,8 @@ describe('OperationsStrip', () => {
 
     expect(screen.getByText('Pipeline controls')).toBeInTheDocument();
     expect(screen.getByText('These controls save immediately.')).toBeInTheDocument();
-    expect(screen.getByText('On', { selector: '[data-operation-status="scouts"]' })).toBeInTheDocument();
+    // State lives in the switch, not a redundant On/Off caption.
+    expect(screen.getByRole('switch', { name: /scouts/i })).toHaveAttribute('aria-checked', 'true');
 
     fireEvent.click(screen.getByRole('switch', { name: /scouts/i }));
 
@@ -86,6 +87,8 @@ describe('OperationsStrip', () => {
     expect(screen.getByRole('switch', { name: /scouts/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('switch', { name: /scouts/i })).toBeDisabled();
     expect(screen.getByRole('switch', { name: /reviewers/i })).not.toBeDisabled();
+    // While the save is in flight, the only caption shown is the transient status.
+    expect(screen.getByText('Saving', { selector: '[data-operation-status="scouts"]' })).toBeInTheDocument();
 
     request.resolve({ data: { ...settings, agent_config: { ...settings.agent_config, scouts_enabled: false } } });
     await waitFor(() => expect(screen.getByRole('switch', { name: /scouts/i })).not.toBeDisabled());

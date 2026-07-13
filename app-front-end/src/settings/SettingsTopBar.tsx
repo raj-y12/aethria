@@ -32,7 +32,7 @@ export default function SettingsTopBar({
     ? 'text-escalation/85'
     : tone === 'draft' || tone === 'progress'
       ? 'text-escalation/80'
-      : 'text-oxford/65';
+      : 'text-oxford/70';
   const statusDot = tone === 'error' || tone === 'draft' || tone === 'progress'
     ? 'bg-escalation/70'
     : 'bg-oxford';
@@ -49,7 +49,7 @@ export default function SettingsTopBar({
           <button
             type="button"
             onClick={onBack}
-            className="type-action inline-flex min-h-11 items-center gap-phi-2 text-oxford/60 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            className="type-action inline-flex min-h-11 items-center gap-phi-2 text-xs text-oxford/70 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
           >
             <span aria-hidden>←</span> Aethria
           </button>
@@ -61,7 +61,7 @@ export default function SettingsTopBar({
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-phi-4 gap-y-phi-1">
           <span
-            className={`type-status inline-flex min-w-0 items-center gap-phi-2 ${statusClass}`}
+            className={`type-status inline-flex min-w-0 items-center gap-phi-2 text-xs ${statusClass}`}
             aria-live="polite"
             role={tone === 'error' ? 'alert' : 'status'}
           >
@@ -73,7 +73,7 @@ export default function SettingsTopBar({
                 <button
                   type="button"
                   onClick={onUndo}
-                  className="type-action inline-flex min-h-11 shrink-0 items-center border-b border-oxford/15 text-oxford transition-colors hover:border-oxford/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                  className="type-action inline-flex min-h-11 shrink-0 items-center border-b border-oxford/15 text-xs text-oxford transition-colors hover:border-oxford/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
                 >
                   Undo
                 </button>
@@ -84,7 +84,7 @@ export default function SettingsTopBar({
             type="button"
             onClick={onRestoreDefaults}
             disabled={saving}
-            className="type-action inline-flex min-h-11 shrink-0 items-center px-phi-1 text-oxford/60 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            className="type-action inline-flex min-h-11 shrink-0 items-center px-phi-1 text-xs text-oxford/70 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
           >
             Restore defaults
           </button>

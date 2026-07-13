@@ -10,7 +10,7 @@ import {
 import type { FundConfiguration } from '../lib/fundConfiguration';
 import { DEFAULT_VERDICT_BADGES } from '../lib/fundConfiguration';
 
-const labelCls = 'type-label-section';
+const labelCls = 'type-label-section text-xs text-oxford/70';
 const inputCls =
   'type-data w-full max-w-[5.5rem] rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 text-oxford outline-none transition-colors focus:border-oxford/45';
 
@@ -86,7 +86,7 @@ function ThresholdHandle({
       style={{ left: `${value}%` }}
     >
       <span
-        className={`pointer-events-none absolute -top-phi-4 type-data ${variant === 'divider' ? 'text-oxford' : 'text-oxford/55'}`}
+        className={`pointer-events-none absolute -top-phi-4 type-data ${variant === 'divider' ? 'text-oxford' : 'text-oxford/70'}`}
         aria-hidden
       >
         {value}
@@ -121,13 +121,13 @@ function ThresholdBar({
       <div ref={barRef} className="relative h-11 w-full">
         <div className="flex h-full w-full overflow-hidden border border-oxford/[0.1]">
           <div
-            className="type-status flex items-center justify-center text-oxford/70"
+            className="type-status flex items-center justify-center text-xs text-oxford/70"
             style={{ width: `${boundaries.passMonitorBoundary}%`, backgroundColor: bandColors.pass }}
           >
             Pass
           </div>
           <div
-            className="type-status flex items-center justify-center text-oxford/70"
+            className="type-status flex items-center justify-center text-xs text-oxford/70"
             style={{
               width: `${boundaries.monitorInvestBoundary - boundaries.passMonitorBoundary}%`,
               backgroundColor: bandColors.monitor,
@@ -136,7 +136,7 @@ function ThresholdBar({
             Monitor
           </div>
           <div
-            className="type-status flex items-center justify-center text-oxford/70"
+            className="type-status flex items-center justify-center text-xs text-oxford/70"
             style={{ width: `${100 - boundaries.monitorInvestBoundary}%`, backgroundColor: bandColors.invest }}
           >
             Invest
@@ -173,7 +173,7 @@ function ThresholdBar({
           onChange={onChange}
         />
       </div>
-      <p className="type-data mt-phi-2 text-oxford/60">
+      <p className="type-data mt-phi-2 text-oxford/70">
         0–{passMax} · {boundaries.passMonitorBoundary}–{monitorMax} · {boundaries.monitorInvestBoundary}–100
       </p>
     </div>
@@ -218,9 +218,11 @@ function ScoreInput({
       <div className="flex flex-wrap items-baseline gap-phi-3">
         <input
           id={id}
-          type="text"
+          type="number"
           inputMode="numeric"
-          pattern="[0-9]*"
+          min={min}
+          max={max}
+          step={1}
           value={text}
           onChange={(event) => handleChange(event.target.value)}
           onBlur={() => {
@@ -232,7 +234,7 @@ function ScoreInput({
           aria-describedby={suffix ? `${id}-suffix` : undefined}
         />
         {suffix && (
-          <span id={`${id}-suffix`} className="type-meta text-oxford/60">{suffix}</span>
+          <span id={`${id}-suffix`} className="type-meta text-xs text-oxford/70">{suffix}</span>
         )}
       </div>
     </div>
@@ -318,6 +320,38 @@ export default function DecisionThresholdsPanel({
       )}
 
       <ThresholdBar boundaries={boundaries} onChange={applyBounds} />
+
+      <div>
+        <p className="type-note text-oxford/70">
+          Drag a marker, use arrow keys, or enter an exact score.
+        </p>
+        <div className="mt-phi-4 grid gap-phi-5 sm:grid-cols-3">
+          <ScoreInput
+            id="monitor-start"
+            label="Monitor starts at"
+            value={boundaries.passMonitorBoundary}
+            min={2}
+            max={boundaries.monitorInvestBoundary - 1}
+            onCommit={(value) => applyBounds({ passMonitorBoundary: value })}
+          />
+          <ScoreInput
+            id="invest-start"
+            label="Invest starts at"
+            value={boundaries.monitorInvestBoundary}
+            min={boundaries.passMonitorBoundary + 1}
+            max={100}
+            onCommit={(value) => applyBounds({ monitorInvestBoundary: value })}
+          />
+          <ScoreInput
+            id="auto-pass-below"
+            label="Auto-pass below"
+            value={boundaries.autoPassCeiling}
+            min={0}
+            max={boundaries.passMonitorBoundary - 1}
+            onCommit={(value) => applyBounds({ autoPassCeiling: value })}
+          />
+        </div>
+      </div>
 
       <div className="grid gap-phi-5 border-t border-oxford/[0.055] pt-phi-5 sm:grid-cols-2">
         <ScoreInput

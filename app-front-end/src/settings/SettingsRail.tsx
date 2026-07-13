@@ -41,8 +41,8 @@ export default function SettingsRail({
         {SETTINGS_GROUPS.map((group) => (
           <div key={group.id}>
             <div className="flex items-baseline justify-between gap-phi-2 px-phi-2 pb-phi-2">
-              <p className="type-label-section">{group.label}</p>
-              <span className="type-status text-oxford/40">{group.persistence}</span>
+              <p className="type-label-section text-xs text-oxford/70">{group.label}</p>
+              <span className="type-status text-xs text-oxford/70">{group.persistence}</span>
             </div>
             <div className="flex flex-col">
               {SETTINGS_SECTIONS.filter((section) => section.group === group.id).map((section) => {
@@ -55,7 +55,7 @@ export default function SettingsRail({
                     onClick={() => onNavigate(section.id)}
                     aria-current={active ? 'true' : undefined}
                     className={`relative flex items-center px-phi-2 py-phi-2 text-left type-body-sm transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-                      active ? 'text-oxford' : 'text-oxford/55 hover:text-oxford/80'
+                      active ? 'text-oxford' : 'text-oxford/70 hover:text-oxford/80'
                     }`}
                   >
                     {active ? (

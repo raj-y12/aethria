@@ -41,6 +41,46 @@ describe('scoreFromPointer', () => {
 });
 
 describe('DecisionThresholdsPanel ladder', () => {
+  it('offers exact numeric entry for each decision boundary with live valid ranges', () => {
+    render(<ThresholdHarness />);
+    const boundaries = getDecisionThresholdBoundaries(createDefaultFundConfiguration());
+
+    const monitor = screen.getByRole('spinbutton', { name: 'Monitor starts at' });
+    const invest = screen.getByRole('spinbutton', { name: 'Invest starts at' });
+    const autoPass = screen.getByRole('spinbutton', { name: 'Auto-pass below' });
+
+    expect(monitor).toHaveAttribute('min', '2');
+    expect(monitor).toHaveAttribute('max', String(boundaries.monitorInvestBoundary - 1));
+    expect(invest).toHaveAttribute('min', String(boundaries.passMonitorBoundary + 1));
+    expect(invest).toHaveAttribute('max', '100');
+    expect(autoPass).toHaveAttribute('min', '0');
+    expect(autoPass).toHaveAttribute('max', String(boundaries.passMonitorBoundary - 1));
+  });
+
+  it('routes exact entry through the same boundary update as the visual control', () => {
+    render(<ThresholdHarness />);
+    const original = getDecisionThresholdBoundaries(createDefaultFundConfiguration());
+
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Monitor starts at' }), {
+      target: { value: String(original.passMonitorBoundary + 1) },
+    });
+
+    expect(screen.getByRole('slider', { name: 'Monitor starts' })).toHaveAttribute(
+      'aria-valuenow',
+      String(original.passMonitorBoundary + 1),
+    );
+    expect(screen.getByRole('spinbutton', { name: 'Invest starts at' })).toHaveAttribute(
+      'min',
+      String(original.passMonitorBoundary + 2),
+    );
+  });
+
+  it('explains visual, keyboard, and exact score entry', () => {
+    render(<ThresholdHarness />);
+
+    expect(screen.getByText('Drag a marker, use arrow keys, or enter an exact score.')).toBeInTheDocument();
+  });
+
   it('exposes three named sliders with their valid ranges', () => {
     render(<ThresholdHarness />);
     const boundaries = getDecisionThresholdBoundaries(createDefaultFundConfiguration());

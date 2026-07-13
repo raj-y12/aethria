@@ -58,9 +58,9 @@ const inputCls =
   'w-full rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 type-body-sm text-oxford outline-none transition-colors placeholder:text-oxford/45 focus:border-oxford/45';
 const selectCls =
   `${inputCls} cursor-pointer appearance-none bg-no-repeat bg-[length:10px] bg-[center_right_2px] pr-7`;
-const labelCls = 'type-label-section';
-const sectionLabelCls = 'type-label-section';
-const metaCls = 'type-meta';
+const labelCls = 'type-label-section text-xs text-oxford/70';
+const sectionLabelCls = 'type-label-section text-xs text-oxford/70';
+const metaCls = 'type-meta text-xs text-oxford/70';
 type SettingsDialogState = 'restore' | 'leave' | null;
 
 function TextField({
@@ -152,7 +152,7 @@ function ToggleRow({
     <div className="flex items-center justify-between gap-phi-5 py-phi-3">
       <div className="min-w-0">
         <label htmlFor={id} className="type-body-sm text-oxford">{label}</label>
-        {hint && <p className="type-note mt-phi-1 leading-snug text-oxford/60">{hint}</p>}
+        {hint && <p className="type-note mt-phi-1 leading-snug text-oxford/70">{hint}</p>}
       </div>
       <button
         id={id}
@@ -196,7 +196,7 @@ function ChipGroup({
               type="button"
               aria-pressed={active}
               onClick={() => toggle(option)}
-              className={`type-action inline-flex min-h-[36px] items-center justify-center rounded-none px-phi-3 transition-colors ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] hover:bg-oxford/[0.075]'}`}
+              className={`type-action inline-flex min-h-[36px] items-center justify-center rounded-none px-phi-3 text-xs transition-colors ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] text-oxford/70 hover:bg-oxford/[0.075]'}`}
             >
               {option}
             </button>
@@ -231,10 +231,10 @@ function RoomSection({
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
           <h2 className={sectionLabelCls}>{title}</h2>
-          {label ? <span className="type-label-section text-oxford/45">{label}</span> : null}
+          {label ? <span className="type-label-section text-xs text-oxford/70">{label}</span> : null}
         </div>
         {description ? (
-          <p className="mt-phi-2 max-w-[42rem] type-body-sm leading-relaxed text-oxford/60">{description}</p>
+          <p className="mt-phi-2 max-w-[42rem] type-body-sm leading-relaxed text-oxford/70">{description}</p>
         ) : null}
       </div>
       <div className="min-w-0">{children}</div>
@@ -245,7 +245,7 @@ function RoomSection({
 function SpecRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="grid gap-phi-3 border-t border-oxford/[0.06] py-phi-4 sm:grid-cols-[clamp(110px,18%,160px)_minmax(0,1fr)] sm:items-start sm:gap-phi-5">
-      <p className="type-label-section pt-phi-2 text-oxford/55">{label}</p>
+      <p className="type-label-section pt-phi-2 text-xs text-oxford/70">{label}</p>
       <div className="min-w-0">{children}</div>
     </div>
   );
@@ -269,7 +269,7 @@ function EditorialStatus({
       : 'bg-oxford/30';
   return (
     <div className="grid gap-x-phi-4 gap-y-phi-1 border-b border-oxford/[0.05] py-phi-3 last:border-b-0 sm:grid-cols-[minmax(6rem,32%)_minmax(0,1fr)] sm:items-baseline">
-      <p className="type-label-section text-oxford/65">{label}</p>
+      <p className="type-label-section text-xs text-oxford/70">{label}</p>
       <p className="type-body-sm inline-flex items-center gap-phi-2 text-oxford">
         <span className={`h-1.5 w-1.5 shrink-0 ${dotClass}`} aria-hidden />
         {value}
@@ -283,7 +283,7 @@ function GroupHeader({ title, description }: { title: string; description: strin
   return (
     <div className="px-phi-4 pb-phi-3 pt-phi-7">
       <h2 className="type-display text-[1.5rem] leading-none text-oxford">{title}</h2>
-      <p className="mt-phi-2 type-body-sm text-oxford/60">{description}</p>
+      <p className="mt-phi-2 type-body-sm text-oxford/70">{description}</p>
     </div>
   );
 }
@@ -605,9 +605,29 @@ export default function SettingsPage() {
     return (
       <div className="flex h-full flex-col overflow-hidden bg-paper">
         <main className="flex min-h-0 flex-1 items-center justify-center">
-          <div>
+          <div className="max-w-md px-phi-5 text-center">
             <p className={sectionLabelCls}>Settings unavailable</p>
-            <p className="mt-phi-2 type-body-sm text-oxford/60">The settings API did not return a payload.</p>
+            <p className="mt-phi-2 type-body-sm text-oxford/70">
+              Aethria could not load your settings. Retry now, or return to the workspace.
+            </p>
+            <div className="mt-phi-4 flex flex-wrap items-center justify-center gap-phi-3">
+              <button
+                type="button"
+                onClick={() => void settingsQuery.refetch()}
+                disabled={settingsQuery.isFetching}
+                aria-busy={settingsQuery.isFetching}
+                className="btn-aethria-solid min-h-11 disabled:cursor-wait disabled:opacity-50"
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={navigateBack}
+                className="type-action inline-flex min-h-11 items-center px-phi-3 text-xs text-oxford/70 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+              >
+                Back to Aethria
+              </button>
+            </div>
           </div>
         </main>
       </div>
@@ -776,9 +796,9 @@ export default function SettingsPage() {
                     <div className="flex flex-wrap items-baseline justify-between gap-phi-4 border-t border-oxford/[0.06] py-phi-4">
                       <div className="flex items-baseline gap-phi-3">
                         <p className={`type-data text-[1.6rem] ${weightValidation.valid ? 'text-oxford' : 'text-escalation/75'}`}>{weightValidation.total}%</p>
-                        <p className="type-label-section">Total weight</p>
+                        <p className="type-label-section text-xs text-oxford/70">Total weight</p>
                       </div>
-                      <p className="type-note text-oxford/60">Adjust one — the rest rebalance to 100</p>
+                      <p className="type-note text-oxford/70">Adjust one — the rest rebalance to 100</p>
                     </div>
                     {draft.scoringWeights.map((item) => (
                       <div key={item.key} className="grid gap-phi-3 border-t border-oxford/[0.06] py-phi-4 md:grid-cols-[minmax(0,1fr)_92px] md:items-baseline">
@@ -797,7 +817,7 @@ export default function SettingsPage() {
                         />
                       </div>
                     ))}
-                    <p className="border-t border-oxford/[0.06] py-phi-4 type-note text-oxford/55">
+                    <p className="border-t border-oxford/[0.06] py-phi-4 type-note text-oxford/70">
                       {draft.activePolicyVersionId
                         ? `Live policy ${draft.activePolicyVersionId}. Deploying publishes the next version.`
                         : 'Deploy to publish the first scoring policy.'}
@@ -863,7 +883,7 @@ export default function SettingsPage() {
                       <SpecRow label="Daily"><p className="type-data text-[1.35rem]">${settings.cost_budget.daily_cost_ceiling.toLocaleString()}</p></SpecRow>
                       <SpecRow label="Weekly"><p className="type-data text-[1.35rem]">${settings.cost_budget.weekly_cost_ceiling.toLocaleString()}</p></SpecRow>
                     </div>
-                    <p className="border-t border-oxford/[0.06] pt-phi-4 type-note text-oxford/55">Enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} — toggle it in the rail.</p>
+                    <p className="border-t border-oxford/[0.06] pt-phi-4 type-note text-oxford/70">Enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} — toggle it in the rail.</p>
                   </RoomSection>
 
                   <RoomSection
@@ -900,7 +920,7 @@ export default function SettingsPage() {
                     ) : (
                       <div className="border-t border-oxford/[0.06] py-phi-4">
                         <p className="type-body-sm text-oxford">Status unavailable</p>
-                        <p className="mt-phi-2 type-note leading-relaxed text-oxford/60">
+                        <p className="mt-phi-2 type-note leading-relaxed text-oxford/70">
                           Aethria could not read the agent status endpoint. Runtime switch values above still reflect saved settings.
                         </p>
                       </div>

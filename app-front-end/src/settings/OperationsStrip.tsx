@@ -131,10 +131,10 @@ export default function OperationsStrip({
     >
       <div className={isRail ? 'flex flex-col gap-phi-4' : 'flex flex-col gap-phi-3 lg:flex-row lg:items-center lg:gap-phi-6'}>
         <div className={isRail ? '' : 'shrink-0 lg:mr-auto'}>
-          <p id="operations-strip-title" className="type-label-section text-oxford">
+          <p id="operations-strip-title" className="type-label-section text-xs text-oxford">
             Pipeline controls
           </p>
-          <p className="mt-phi-1 type-note text-oxford/60">These controls save immediately.</p>
+          <p className="mt-phi-1 type-note text-oxford/70">These controls save immediately.</p>
         </div>
 
         <div className={isRail ? 'flex flex-col gap-phi-1' : 'grid grid-cols-2 gap-x-phi-5 gap-y-phi-2 sm:grid-cols-4'}>
@@ -148,12 +148,14 @@ export default function OperationsStrip({
               >
                 <div>
                   <p className="type-body-sm text-oxford">{control.label}</p>
-                  <p
-                    className="mt-0.5 type-status text-[9px] leading-none text-oxford/55"
-                    data-operation-status={control.key}
-                  >
-                    {isPending ? 'Saving' : checked ? 'On' : 'Off'}
-                  </p>
+                  {isPending ? (
+                    <p
+                      className="mt-0.5 type-status text-xs leading-none text-oxford/70"
+                      data-operation-status={control.key}
+                    >
+                      Saving
+                    </p>
+                  ) : null}
                 </div>
                 <button
                   type="button"
@@ -166,8 +168,8 @@ export default function OperationsStrip({
                   className="group inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-oxford transition-opacity disabled:cursor-not-allowed disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
                 >
                   <span
-                    className={`relative block h-6 w-11 rounded-full border transition-colors ${
-                      checked ? 'border-oxford/30 bg-oxford' : 'border-oxford/15 bg-oxford/[0.09]'
+                    className={`relative block h-6 w-11 rounded-full transition-colors ${
+                      checked ? 'bg-oxford' : 'bg-oxford/[0.09]'
                     }`}
                     aria-hidden
                   >

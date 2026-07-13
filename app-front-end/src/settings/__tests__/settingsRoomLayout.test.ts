@@ -15,6 +15,7 @@ import SettingsPage from '../SettingsPage';
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
+  fetchSettings: vi.fn(),
   patchSettings: vi.fn(),
   publishPolicy: vi.fn(),
   setConfiguration: vi.fn(),
@@ -30,7 +31,7 @@ vi.mock('../../api/settings', async () => {
   const actual = await vi.importActual<typeof import('../../api/settings')>('../../api/settings');
   return {
     ...actual,
-    fetchSettings: vi.fn(() => Promise.resolve(settings)),
+    fetchSettings: mocks.fetchSettings,
     patchSettings: mocks.patchSettings,
     publishPolicy: mocks.publishPolicy,
   };
@@ -105,6 +106,19 @@ function renderPage() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   queryClient.setQueryData(['settings'], settings);
+  return render(
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(SettingsPage),
+    ),
+  );
+}
+
+function renderUnavailablePage() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return render(
     createElement(
       QueryClientProvider,
@@ -192,6 +206,8 @@ describe('Settings safe draft actions', () => {
     };
     settings.fund_config = liveConfiguration;
     mocks.navigate.mockReset();
+    mocks.fetchSettings.mockReset();
+    mocks.fetchSettings.mockResolvedValue(settings);
     mocks.patchSettings.mockReset();
     mocks.publishPolicy.mockReset();
     mocks.setConfiguration.mockReset();
@@ -255,6 +271,28 @@ describe('Settings safe draft actions', () => {
 
     expect(mocks.navigate).toHaveBeenCalledWith('/v1');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('offers retry and back actions when settings are unavailable', async () => {
+    let finishRetry: ((value: null) => void) | undefined;
+    const retryRequest = new Promise<null>((resolve) => { finishRetry = resolve; });
+    mocks.fetchSettings
+      .mockRejectedValueOnce(new Error('settings unavailable'))
+      .mockImplementationOnce(() => retryRequest);
+    renderUnavailablePage();
+
+    const retry = await screen.findByRole('button', { name: 'Retry' });
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(mocks.fetchSettings).toHaveBeenCalledTimes(2));
+    expect(retry).toBeDisabled();
+    expect(retry).toHaveAttribute('aria-busy', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Aethria' }));
+    expect(mocks.navigate).toHaveBeenCalledWith('/v1');
+
+    finishRetry?.(null);
+    await waitFor(() => expect(retry).not.toBeDisabled());
   });
 
   it('routes a deployment validation error to the affected section', async () => {
