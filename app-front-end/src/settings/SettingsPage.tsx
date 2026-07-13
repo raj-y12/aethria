@@ -151,9 +151,11 @@ function ToggleRow({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`h-6 w-11 shrink-0 rounded-none transition-colors ${checked ? 'bg-oxford' : 'bg-oxford/[0.09]'}`}
+        className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+          checked ? 'border-oxford/30 bg-oxford' : 'border-oxford/15 bg-oxford/[0.09]'
+        }`}
       >
-        <span className={`block h-4 w-4 rounded-none transition-transform ${checked ? 'translate-x-5 bg-paper' : 'translate-x-1 bg-oxford/35'}`} />
+        <span className={`absolute top-[3px] block h-4 w-4 rounded-full shadow-sm transition-transform ${checked ? 'translate-x-[22px] bg-paper' : 'translate-x-[3px] bg-oxford/35'}`} />
       </button>
     </div>
   );
@@ -196,29 +198,43 @@ function ChipGroup({
   );
 }
 
-function SettingsSection({
+function RoomSection({
   id,
   title,
-  kicker,
+  label,
+  description,
   children,
   className,
 }: {
   id: string;
   title: string;
-  kicker: string;
+  label?: string;
+  description?: string;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <section id={id} className={`scroll-mt-phi-6 py-phi-8 first:pt-0 ${className ?? ''}`}>
-      <div className="grid gap-phi-6 lg:grid-cols-[minmax(10rem,22%)_minmax(0,1fr)] lg:gap-phi-8">
-        <div>
-          <p className={sectionLabelCls}>{title}</p>
-          <p className="mt-phi-3 max-w-[17rem] type-body-sm leading-relaxed text-oxford/60">{kicker}</p>
+    <section id={id} className={`flex min-w-0 flex-col gap-phi-4 px-phi-4 pb-phi-5 pt-phi-5 ${className ?? ''}`}>
+      <div>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
+          <h2 className={sectionLabelCls}>{title}</h2>
+          {label ? <span className="type-label-section text-oxford/45">{label}</span> : null}
         </div>
-        <div className="min-w-0">{children}</div>
+        {description ? (
+          <p className="mt-phi-2 max-w-[42rem] type-body-sm leading-relaxed text-oxford/60">{description}</p>
+        ) : null}
       </div>
+      <div className="min-w-0">{children}</div>
     </section>
+  );
+}
+
+function SpecRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-phi-3 border-t border-oxford/[0.06] py-phi-4 sm:grid-cols-[clamp(110px,18%,160px)_minmax(0,1fr)] sm:items-start sm:gap-phi-5">
+      <p className="type-label-section pt-phi-2 text-oxford/55">{label}</p>
+      <div className="min-w-0">{children}</div>
+    </div>
   );
 }
 
@@ -239,13 +255,13 @@ function EditorialStatus({
       ? 'bg-escalation/75'
       : 'bg-oxford/30';
   return (
-    <div className="grid gap-phi-1 py-phi-3 md:grid-cols-[minmax(8rem,20%)_minmax(9rem,24%)_minmax(0,1fr)] md:items-baseline md:gap-phi-5">
+    <div className="grid gap-x-phi-4 gap-y-phi-1 border-b border-oxford/[0.05] py-phi-3 last:border-b-0 sm:grid-cols-[minmax(6rem,32%)_minmax(0,1fr)] sm:items-baseline">
       <p className="type-label-section text-oxford/65">{label}</p>
       <p className="type-body-sm inline-flex items-center gap-phi-2 text-oxford">
         <span className={`h-1.5 w-1.5 shrink-0 ${dotClass}`} aria-hidden />
         {value}
       </p>
-      <p className="type-note leading-relaxed text-oxford/60">{detail}</p>
+      <p className="type-note leading-relaxed text-oxford/60 sm:col-start-2">{detail}</p>
     </div>
   );
 }
@@ -517,55 +533,124 @@ export default function SettingsPage() {
               </div>
             )}
 
-                {activeTab === 'decision' ? (
-                  <>
-                <SettingsSection id="thesis" title="Fund thesis" kicker="Define the companies this fund is built to find, assess, and back.">
-                  <div className="grid gap-phi-5">
-                    <div className="grid gap-phi-5 md:grid-cols-2">
-                      <TextField id="fund-name" label="Fund name" value={draft.mandate.fundName} onChange={(value) => updateMandate('fundName', String(value))} />
-                      <TextField id="mandate-name" label="Mandate name" value={draft.mandate.mandateName} onChange={(value) => updateMandate('mandateName', String(value))} />
-                    </div>
-                    <ChipGroup label="Preferred stages" options={stageOptions} selected={draft.mandate.preferredStages} onChange={(value) => updateMandate('preferredStages', value)} />
-                    <ChipGroup label="Geographies" options={geographyOptions} selected={draft.mandate.geographies} onChange={(value) => updateMandate('geographies', value)} />
-                    <TextField id="custom-geography" label="Custom geography" value={draft.mandate.customGeography} onChange={(value) => updateMandate('customGeography', String(value))} />
-                    <ChipGroup label="Sectors" options={sectorOptions} selected={draft.mandate.sectors} onChange={(value) => updateMandate('sectors', value)} />
-                    <div className="grid gap-phi-5 md:grid-cols-2">
-                      <TextField id="custom-sectors" label="Custom sectors" value={draft.mandate.customSectors} onChange={(value) => updateMandate('customSectors', String(value))} />
-                      <TextField id="excluded-sectors" label="Excluded sectors" value={draft.mandate.excludedSectors} onChange={(value) => updateMandate('excludedSectors', String(value))} />
-                    </div>
-                    <TextField id="business-models" label="Preferred business models" value={draft.mandate.businessModels} onChange={(value) => updateMandate('businessModels', String(value))} />
-                    <div className="grid gap-phi-5 md:grid-cols-3">
-                      <TextField id="check-min" label="Check size min" type="number" value={draft.mandate.checkSizeMin} onChange={(value) => updateMandate('checkSizeMin', Number(value))} min={0} />
-                      <TextField id="check-max" label="Check size max" type="number" value={draft.mandate.checkSizeMax} onChange={(value) => updateMandate('checkSizeMax', Number(value))} min={0} />
-                      <TextField id="ownership" label="Ownership target %" type="number" value={draft.mandate.ownershipTarget} onChange={(value) => updateMandate('ownershipTarget', Number(value))} min={0} max={100} />
-                    </div>
-                    <TextField id="minimum-traction" label="Minimum traction expectations" value={draft.mandate.minimumTraction} onChange={(value) => updateMandate('minimumTraction', String(value))} />
-                    <TextAreaField id="thesis-text" label="Notes / thesis text" rows={7} value={draft.mandate.thesisText} onChange={(value) => updateMandate('thesisText', value)} />
-                    <div className="pt-phi-2">
-                      <p className="type-note text-oxford/55">
-                        {storageNotReady
-                          ? 'Supabase storage is required to version the fund thesis.'
-                          : thesisSummary
-                            ? `Live: Fund Thesis v${thesisSummary.active_version_number}. Deploying a mandate change publishes the next version automatically.`
-                            : 'No active thesis yet — deploying the mandate publishes v1.'}
+            {activeTab === 'decision' ? (
+              <div className="flex flex-col gap-phi-3">
+                <div className="grid grid-cols-1 gap-x-phi-6 gap-y-phi-3 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
+                  <RoomSection
+                    id="thesis"
+                    title="The mandate"
+                    label="Fund thesis"
+                    description="Define the companies this fund is built to find, assess, and back."
+                  >
+                    <SpecRow label="Identity">
+                      <div className="grid gap-phi-5 md:grid-cols-2">
+                        <TextField id="fund-name" label="Fund name" value={draft.mandate.fundName} onChange={(value) => updateMandate('fundName', String(value))} />
+                        <TextField id="mandate-name" label="Mandate name" value={draft.mandate.mandateName} onChange={(value) => updateMandate('mandateName', String(value))} />
+                      </div>
+                    </SpecRow>
+                    <SpecRow label="Where to invest">
+                      <div className="grid gap-phi-5">
+                        <ChipGroup label="Preferred stages" options={stageOptions} selected={draft.mandate.preferredStages} onChange={(value) => updateMandate('preferredStages', value)} />
+                        <ChipGroup label="Geographies" options={geographyOptions} selected={draft.mandate.geographies} onChange={(value) => updateMandate('geographies', value)} />
+                        <TextField id="custom-geography" label="Custom geography" value={draft.mandate.customGeography} onChange={(value) => updateMandate('customGeography', String(value))} />
+                      </div>
+                    </SpecRow>
+                    <SpecRow label="What to invest in">
+                      <div className="grid gap-phi-5">
+                        <ChipGroup label="Sectors" options={sectorOptions} selected={draft.mandate.sectors} onChange={(value) => updateMandate('sectors', value)} />
+                        <div className="grid gap-phi-5 md:grid-cols-2">
+                          <TextField id="custom-sectors" label="Custom sectors" value={draft.mandate.customSectors} onChange={(value) => updateMandate('customSectors', String(value))} />
+                          <TextField id="excluded-sectors" label="Excluded sectors" value={draft.mandate.excludedSectors} onChange={(value) => updateMandate('excludedSectors', String(value))} />
+                        </div>
+                        <TextField id="business-models" label="Preferred business models" value={draft.mandate.businessModels} onChange={(value) => updateMandate('businessModels', String(value))} />
+                      </div>
+                    </SpecRow>
+                    <SpecRow label="Economics">
+                      <div className="grid gap-phi-5 md:grid-cols-3">
+                        <TextField id="check-min" label="Check size min" type="number" value={draft.mandate.checkSizeMin} onChange={(value) => updateMandate('checkSizeMin', Number(value))} min={0} />
+                        <TextField id="check-max" label="Check size max" type="number" value={draft.mandate.checkSizeMax} onChange={(value) => updateMandate('checkSizeMax', Number(value))} min={0} />
+                        <TextField id="ownership" label="Ownership target %" type="number" value={draft.mandate.ownershipTarget} onChange={(value) => updateMandate('ownershipTarget', Number(value))} min={0} max={100} />
+                      </div>
+                    </SpecRow>
+                    <SpecRow label="Proof required">
+                      <TextField id="minimum-traction" label="Minimum traction expectations" value={draft.mandate.minimumTraction} onChange={(value) => updateMandate('minimumTraction', String(value))} />
+                    </SpecRow>
+                    <SpecRow label="Thesis narrative">
+                      <TextAreaField id="thesis-text" label="Notes / thesis text" rows={7} value={draft.mandate.thesisText} onChange={(value) => updateMandate('thesisText', value)} />
+                    </SpecRow>
+                  </RoomSection>
+
+                  <RoomSection
+                    id="version"
+                    title="Version context"
+                    label="Live state"
+                    description="Mandate changes become a new immutable thesis version only after you confirm deployment."
+                    className="lg:border-l lg:border-oxford/[0.06]"
+                  >
+                    <SpecRow label="Draft">
+                      <p className="type-body-sm text-oxford">{draft.versionLabel}</p>
+                    </SpecRow>
+                    <SpecRow label="Live thesis">
+                      <p className="type-body-sm text-oxford">
+                        {thesisSummary?.active_version_number != null
+                          ? `Fund Thesis v${thesisSummary.active_version_number}`
+                          : 'Not published'}
                       </p>
-                    </div>
-                  </div>
-                </SettingsSection>
+                    </SpecRow>
+                    <SpecRow label="Storage">
+                      <p className="type-body-sm leading-relaxed text-oxford/65">
+                        {storageNotReady
+                          ? 'Unavailable — Supabase is required to publish thesis versions.'
+                          : 'Ready — your next confirmed mandate change will publish a new version.'}
+                      </p>
+                    </SpecRow>
+                  </RoomSection>
+                </div>
 
                 {!bandValidation.valid && (
-                  <div className="mb-phi-5 border border-escalation/25 bg-escalation/[0.035] px-phi-4 py-phi-3">
+                  <div className="mx-phi-4 border-l-2 border-escalation/35 bg-escalation/[0.035] px-phi-4 py-phi-3">
                     {bandValidation.errors.map((error) => <p key={error} className="type-body-sm text-escalation/75">{error}</p>)}
                   </div>
                 )}
 
-                <SettingsSection id="thresholds" title="Decision thresholds" kicker="Set the score bands that turn analysis into PASS, MONITOR, or INVEST." className="border-t border-oxford/[0.06]">
-                  <DecisionThresholdsPanel draft={draft} updateDraft={updateDraft} updateThreshold={updateThreshold} />
-                </SettingsSection>
+                <div className="grid grid-cols-1 gap-x-phi-6 gap-y-phi-3 border-t border-oxford/[0.06] lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
+                  <RoomSection
+                    id="thresholds"
+                    title="Decision mechanics"
+                    label="Thresholds"
+                    description="Set the score bands that turn analysis into PASS, MONITOR, or INVEST."
+                  >
+                    <DecisionThresholdsPanel draft={draft} updateDraft={updateDraft} updateThreshold={updateThreshold} />
+                  </RoomSection>
 
-                <SettingsSection id="weights" title="Scoring weights" kicker="Set how much each reviewer dimension contributes to the overall score." className="border-t border-oxford/[0.06]">
-                  <div className="flex flex-col gap-phi-4">
-                    <div className="flex flex-wrap items-baseline justify-between gap-phi-4 pb-phi-2">
+                  <RoomSection
+                    id="sensitivity"
+                    title="Escalation sensitivity"
+                    label="Risk posture"
+                    description="Choose how readily adverse evidence is raised before a ruling."
+                    className="lg:border-l lg:border-oxford/[0.06]"
+                  >
+                    <div className="flex flex-col gap-phi-2 border-t border-oxford/[0.06] py-phi-4">
+                      <label htmlFor="risk-sensitivity" className={labelCls}>Sensitivity</label>
+                      <select id="risk-sensitivity" value={draft.risk.sensitivity} onChange={(event) => updateRisk('sensitivity', event.target.value as RiskSensitivity)} className={selectCls} style={selectStyle}>
+                        <option value="conservative">Conservative · surface more risk</option>
+                        <option value="balanced">Balanced · standard review</option>
+                        <option value="aggressive">Aggressive · surface only stronger risk</option>
+                      </select>
+                      <p className="type-note leading-relaxed text-oxford/60">This changes which signals are escalated, not whether a person must acknowledge them.</p>
+                    </div>
+                  </RoomSection>
+                </div>
+
+                <RoomSection
+                  id="weights"
+                  title="Scoring weights"
+                  label="Reviewer mix"
+                  description="Set how much each reviewer dimension contributes to the overall score."
+                  className="border-t border-oxford/[0.06]"
+                >
+                  <div className="flex flex-col">
+                    <div className="flex flex-wrap items-baseline justify-between gap-phi-4 border-t border-oxford/[0.06] py-phi-4">
                       <div className="flex items-baseline gap-phi-3">
                         <p className={`type-data text-[1.6rem] ${weightValidation.valid ? 'text-oxford' : 'text-escalation/75'}`}>{weightValidation.total}%</p>
                         <p className="type-label-section">Total weight</p>
@@ -573,7 +658,7 @@ export default function SettingsPage() {
                       <p className="type-note text-oxford/60">Adjust one — the rest rebalance to 100</p>
                     </div>
                     {draft.scoringWeights.map((item) => (
-                      <div key={item.key} className="grid gap-phi-3 py-phi-3 md:grid-cols-[minmax(150px,22%)_minmax(0,1fr)_92px] md:items-start">
+                      <div key={item.key} className="grid gap-phi-3 border-t border-oxford/[0.06] py-phi-4 md:grid-cols-[minmax(150px,22%)_minmax(0,1fr)_92px] md:items-start">
                         <div>
                           <p className="type-body-emphasis text-oxford">{item.label}</p>
                           <p className="type-note mt-phi-1 leading-snug text-oxford/60">{item.description}</p>
@@ -593,141 +678,132 @@ export default function SettingsPage() {
                         />
                       </div>
                     ))}
-                    <div className="pt-phi-3">
-                      <p className="type-note leading-relaxed text-oxford/55">
-                        {draft.activePolicyVersionId
-                          ? `Live policy ${draft.activePolicyVersionId}${draft.lastPublishedAt ? ` · published ${formatDateTime(draft.lastPublishedAt)}` : ''}. Deploying scoring changes publishes the next version.`
-                          : 'No scoring policy has been published yet. Deploy these settings to publish the first version.'}
-                      </p>
+                    <p className="border-t border-oxford/[0.06] py-phi-4 type-note leading-relaxed text-oxford/55">
+                      {draft.activePolicyVersionId
+                        ? `Live policy ${draft.activePolicyVersionId}${draft.lastPublishedAt ? ` · published ${formatDateTime(draft.lastPublishedAt)}` : ''}. Deploying scoring changes publishes the next version.`
+                        : 'No scoring policy has been published yet. Deploy these settings to publish the first version.'}
+                    </p>
+                  </div>
+                </RoomSection>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-phi-3">
+                <div className="grid grid-cols-1 gap-x-phi-6 gap-y-phi-3 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
+                  <RoomSection
+                    id="memo"
+                    title="Memo output"
+                    label="Presentation"
+                    description="Choose the shape, audience, and evidence shown in new investment memos."
+                  >
+                    <div className="grid gap-phi-5 border-t border-oxford/[0.06] py-phi-4 md:grid-cols-2">
+                      <div className="flex flex-col gap-phi-2">
+                        <label htmlFor="memo-style" className={labelCls}>Memo style</label>
+                        <select id="memo-style" value={draft.memo.style} onChange={(event) => updateMemo('style', event.target.value as MemoStyle)} className={selectCls} style={selectStyle}>
+                          <option value="concise">Concise</option>
+                          <option value="standard">Standard</option>
+                          <option value="detailed">Detailed</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-phi-2">
+                        <label htmlFor="memo-tone" className={labelCls}>Memo tone</label>
+                        <select id="memo-tone" value={draft.memo.tone} onChange={(event) => updateMemo('tone', event.target.value as MemoTone)} className={selectCls} style={selectStyle}>
+                          <option value="partner">Partner-facing</option>
+                          <option value="analyst">Analyst-facing</option>
+                        </select>
+                      </div>
                     </div>
-                  </div>
-                </SettingsSection>
+                    <div className="grid gap-x-phi-7 md:grid-cols-2">
+                      <ToggleRow id="deep-dive-collapsed" checked={draft.memo.deepDiveCollapsed} onChange={(value) => updateMemo('deepDiveCollapsed', value)} label="Collapse deep dive by default" />
+                      <ToggleRow id="evidence-excerpts" checked={draft.memo.includeEvidenceExcerpts} onChange={(value) => updateMemo('includeEvidenceExcerpts', value)} label="Include evidence excerpts" />
+                      <ToggleRow id="missing-data" checked={draft.memo.includeMissingData} onChange={(value) => updateMemo('includeMissingData', value)} label="Include missing-data section" />
+                      <ToggleRow id="score-reasoning" checked={draft.memo.includeScoreReasoning} onChange={(value) => updateMemo('includeScoreReasoning', value)} label="Include score reasoning" />
+                      <ToggleRow id="source-confidence" checked={draft.memo.includeSourceConfidence} onChange={(value) => updateMemo('includeSourceConfidence', value)} label="Include source confidence" />
+                    </div>
+                  </RoomSection>
 
-                <SettingsSection id="sensitivity" title="Escalation sensitivity" kicker="Choose how readily adverse evidence is raised before a ruling." className="border-t border-oxford/[0.06]">
-                  <div className="flex max-w-lg flex-col gap-phi-2">
-                    <label htmlFor="risk-sensitivity" className={labelCls}>Sensitivity</label>
-                    <select id="risk-sensitivity" value={draft.risk.sensitivity} onChange={(event) => updateRisk('sensitivity', event.target.value as RiskSensitivity)} className={selectCls} style={selectStyle}>
-                      <option value="conservative">Conservative · surface more risk</option>
-                      <option value="balanced">Balanced · standard review</option>
-                      <option value="aggressive">Aggressive · surface only stronger risk</option>
-                    </select>
-                    <p className="type-note leading-relaxed text-oxford/60">This changes which signals are escalated, not whether a person must acknowledge them.</p>
-                  </div>
-                </SettingsSection>
-                  </>
-                ) : (
-                  <>
-                    <SettingsSection
-                      id="memo"
-                      title="Memo output"
-                      kicker="Choose the shape, audience, and evidence shown in new investment memos."
-                    >
-                      <div className="grid gap-phi-5">
-                        <div className="grid gap-phi-5 md:grid-cols-2">
-                          <div className="flex flex-col gap-phi-2">
-                            <label htmlFor="memo-style" className={labelCls}>Memo style</label>
-                            <select id="memo-style" value={draft.memo.style} onChange={(event) => updateMemo('style', event.target.value as MemoStyle)} className={selectCls} style={selectStyle}>
-                              <option value="concise">Concise</option>
-                              <option value="standard">Standard</option>
-                              <option value="detailed">Detailed</option>
-                            </select>
-                          </div>
-                          <div className="flex flex-col gap-phi-2">
-                            <label htmlFor="memo-tone" className={labelCls}>Memo tone</label>
-                            <select id="memo-tone" value={draft.memo.tone} onChange={(event) => updateMemo('tone', event.target.value as MemoTone)} className={selectCls} style={selectStyle}>
-                              <option value="partner">Partner-facing</option>
-                              <option value="analyst">Analyst-facing</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="grid gap-x-phi-7 md:grid-cols-2">
-                          <ToggleRow id="deep-dive-collapsed" checked={draft.memo.deepDiveCollapsed} onChange={(value) => updateMemo('deepDiveCollapsed', value)} label="Collapse deep dive by default" />
-                          <ToggleRow id="evidence-excerpts" checked={draft.memo.includeEvidenceExcerpts} onChange={(value) => updateMemo('includeEvidenceExcerpts', value)} label="Include evidence excerpts" />
-                          <ToggleRow id="missing-data" checked={draft.memo.includeMissingData} onChange={(value) => updateMemo('includeMissingData', value)} label="Include missing-data section" />
-                          <ToggleRow id="score-reasoning" checked={draft.memo.includeScoreReasoning} onChange={(value) => updateMemo('includeScoreReasoning', value)} label="Include score reasoning" />
-                          <ToggleRow id="source-confidence" checked={draft.memo.includeSourceConfidence} onChange={(value) => updateMemo('includeSourceConfidence', value)} label="Include source confidence" />
-                        </div>
+                  <RoomSection
+                    id="workflow"
+                    title="Ruling workflow"
+                    label="Governance"
+                    description="Control what must happen before a recommendation becomes a recorded ruling."
+                    className="lg:border-l lg:border-oxford/[0.06]"
+                  >
+                    <div className="border-t border-oxford/[0.06]">
+                      <ToggleRow id="risk-ack" checked={draft.risk.requireAcknowledgement} onChange={(value) => updateRisk('requireAcknowledgement', value)} label="Require acknowledgement before ruling" hint="High-risk pending deals need a reviewed-risk step before Commit." />
+                      <ToggleRow id="risk-high-only" checked={draft.risk.onlyGateHighSeverity} onChange={(value) => updateRisk('onlyGateHighSeverity', value)} label="Only gate high severity risks" hint="Medium adverse items stay visible without blocking the ruling." />
+                    </div>
+                  </RoomSection>
+                </div>
+
+                <div className="grid grid-cols-1 gap-x-phi-6 gap-y-phi-3 border-t border-oxford/[0.06] lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
+                  <RoomSection
+                    id="budget"
+                    title="Cost budget"
+                    label="Live limits"
+                    description="The limits that constrain model usage. Enable or pause enforcement from the operational strip above."
+                  >
+                    <div className="grid gap-x-phi-8 sm:grid-cols-2">
+                      <SpecRow label="Per run"><p className="type-data text-[1.35rem]">{settings.cost_budget.max_tokens_per_run.toLocaleString()} tokens</p></SpecRow>
+                      <SpecRow label="Cooldown"><p className="type-data text-[1.35rem]">{settings.cost_budget.cooldown_seconds}s</p></SpecRow>
+                      <SpecRow label="Daily"><p className="type-data text-[1.35rem]">${settings.cost_budget.daily_cost_ceiling.toLocaleString()}</p></SpecRow>
+                      <SpecRow label="Weekly"><p className="type-data text-[1.35rem]">${settings.cost_budget.weekly_cost_ceiling.toLocaleString()}</p></SpecRow>
+                    </div>
+                    <p className="border-t border-oxford/[0.06] pt-phi-4 type-note text-oxford/55">Budget enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} and saves immediately when changed above.</p>
+                  </RoomSection>
+
+                  <RoomSection
+                    id="system"
+                    title="System state"
+                    label="Run gates"
+                    description="The required services that determine whether the pipeline can run."
+                    className="lg:border-l lg:border-oxford/[0.06]"
+                  >
+                    {agentsStatus ? (
+                      <div className="border-t border-oxford/[0.06]">
+                        <EditorialStatus
+                          label="Storage"
+                          value={agentsStatus.supabase_configured ? 'Ready' : 'Unavailable'}
+                          detail={agentsStatus.supabase_configured
+                            ? 'Supabase is configured for user-scoped pipeline data.'
+                            : 'Runtime controls and pipeline execution require Supabase storage.'}
+                          tone={agentsStatus.supabase_configured ? 'ready' : 'warning'}
+                        />
+                        <EditorialStatus
+                          label="OpenAI"
+                          value={agentsStatus.openai_configured ? 'Ready' : 'Unavailable'}
+                          detail={agentsStatus.openai_configured
+                            ? 'Models are configured for scout and reviewer work.'
+                            : 'The pipeline will skip runs until an API key is configured.'}
+                          tone={agentsStatus.openai_configured ? 'ready' : 'warning'}
+                        />
+                        <EditorialStatus
+                          label="Worker"
+                          value={agentsStatus.worker_ready ? 'Ready' : 'Not ready'}
+                          detail="The in-process worker accepts queued pipeline and lookup work."
+                          tone={agentsStatus.worker_ready ? 'ready' : 'warning'}
+                        />
+                        <EditorialStatus
+                          label="Pipeline"
+                          value={agentsStatus.agents_will_run ? 'Able to run' : 'Blocked'}
+                          detail={agentsStatus.thesis_error
+                            ?? (agentsStatus.agents_will_run
+                              ? 'Storage, model access, and thesis gates currently pass.'
+                              : 'One or more required runtime gates are not ready.')}
+                          tone={agentsStatus.agents_will_run ? 'ready' : 'warning'}
+                        />
                       </div>
-                    </SettingsSection>
-
-                    <SettingsSection
-                      id="workflow"
-                      title="Ruling workflow"
-                      kicker="Control what must happen before a recommendation becomes a recorded ruling."
-                      className="border-t border-oxford/[0.06]"
-                    >
-                      <div className="grid gap-x-phi-7 md:grid-cols-2">
-                        <ToggleRow id="risk-ack" checked={draft.risk.requireAcknowledgement} onChange={(value) => updateRisk('requireAcknowledgement', value)} label="Require acknowledgement before ruling" hint="High-risk pending deals need a reviewed-risk step before Commit." />
-                        <ToggleRow id="risk-high-only" checked={draft.risk.onlyGateHighSeverity} onChange={(value) => updateRisk('onlyGateHighSeverity', value)} label="Only gate high severity risks" hint="Medium adverse items stay visible without blocking the ruling." />
+                    ) : (
+                      <div className="border-t border-oxford/[0.06] py-phi-4">
+                        <p className="type-body-sm text-oxford">Status unavailable</p>
+                        <p className="mt-phi-2 type-note leading-relaxed text-oxford/60">
+                          Aethria could not read the agent status endpoint. Runtime switch values above still reflect saved settings.
+                        </p>
                       </div>
-                    </SettingsSection>
-
-                    <SettingsSection
-                      id="budget"
-                      title="Cost budget"
-                      kicker="The live limits that constrain model usage. Enable or pause enforcement from the strip above."
-                      className="border-t border-oxford/[0.06]"
-                    >
-                      <div className="grid gap-x-phi-8 gap-y-phi-5 sm:grid-cols-2">
-                        <div><p className={labelCls}>Per run</p><p className="type-data mt-phi-2 text-[1.35rem]">{settings.cost_budget.max_tokens_per_run.toLocaleString()} tokens</p></div>
-                        <div><p className={labelCls}>Cooldown</p><p className="type-data mt-phi-2 text-[1.35rem]">{settings.cost_budget.cooldown_seconds}s</p></div>
-                        <div><p className={labelCls}>Daily ceiling</p><p className="type-data mt-phi-2 text-[1.35rem]">${settings.cost_budget.daily_cost_ceiling.toLocaleString()}</p></div>
-                        <div><p className={labelCls}>Weekly ceiling</p><p className="type-data mt-phi-2 text-[1.35rem]">${settings.cost_budget.weekly_cost_ceiling.toLocaleString()}</p></div>
-                      </div>
-                      <p className="mt-phi-5 type-note text-oxford/55">Budget enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} and saves immediately when changed above.</p>
-                    </SettingsSection>
-
-                    <SettingsSection
-                      id="system"
-                      title="System state"
-                      kicker="A compact view of the gates that determine whether the pipeline can run."
-                      className="border-t border-oxford/[0.06]"
-                    >
-                      {agentsStatus ? (
-                        <div>
-                          <EditorialStatus
-                            label="Storage"
-                            value={agentsStatus.supabase_configured ? 'Ready' : 'Unavailable'}
-                            detail={agentsStatus.supabase_configured
-                              ? 'Supabase is configured for user-scoped pipeline data.'
-                              : 'Runtime controls and pipeline execution require Supabase storage.'}
-                            tone={agentsStatus.supabase_configured ? 'ready' : 'warning'}
-                          />
-                          <EditorialStatus
-                            label="OpenAI"
-                            value={agentsStatus.openai_configured ? 'Ready' : 'Unavailable'}
-                            detail={agentsStatus.openai_configured
-                              ? 'Models are configured for scout and reviewer work.'
-                              : 'The pipeline will skip runs until an API key is configured.'}
-                            tone={agentsStatus.openai_configured ? 'ready' : 'warning'}
-                          />
-                          <EditorialStatus
-                            label="Worker"
-                            value={agentsStatus.worker_ready ? 'Ready' : 'Not ready'}
-                            detail="The in-process worker accepts queued pipeline and lookup work."
-                            tone={agentsStatus.worker_ready ? 'ready' : 'warning'}
-                          />
-                          <EditorialStatus
-                            label="Pipeline"
-                            value={agentsStatus.agents_will_run ? 'Able to run' : 'Blocked'}
-                            detail={agentsStatus.thesis_error
-                              ?? (agentsStatus.agents_will_run
-                                ? 'Storage, model access, and thesis gates currently pass.'
-                                : 'One or more required runtime gates are not ready.')}
-                            tone={agentsStatus.agents_will_run ? 'ready' : 'warning'}
-                          />
-                        </div>
-                      ) : (
-                        <div className="py-phi-3">
-                          <p className="type-body-sm text-oxford">Status unavailable</p>
-                          <p className="mt-phi-2 type-note leading-relaxed text-oxford/60">
-                            Aethria could not read the agent status endpoint. Runtime switch values above still reflect saved settings.
-                          </p>
-                        </div>
-                      )}
-                    </SettingsSection>
-                  </>
-                )}
+                    )}
+                  </RoomSection>
+                </div>
+              </div>
+            )}
           </div>
         </main>
       </div>

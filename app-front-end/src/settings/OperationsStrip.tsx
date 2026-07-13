@@ -160,14 +160,14 @@ export default function OperationsStrip({
                   className="group inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-oxford transition-opacity disabled:cursor-not-allowed disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
                 >
                   <span
-                    className={`relative block h-6 w-11 transition-colors ${
-                      checked ? 'bg-oxford' : 'bg-oxford/[0.09]'
+                    className={`relative block h-6 w-11 rounded-full border transition-colors ${
+                      checked ? 'border-oxford/30 bg-oxford' : 'border-oxford/15 bg-oxford/[0.09]'
                     }`}
                     aria-hidden
                   >
                     <span
-                      className={`absolute top-1 block h-4 w-4 transition-transform ${
-                        checked ? 'translate-x-6 bg-paper' : 'translate-x-1 bg-oxford/35'
+                      className={`absolute top-[3px] block h-4 w-4 rounded-full shadow-sm transition-transform ${
+                        checked ? 'translate-x-[22px] bg-paper' : 'translate-x-[3px] bg-oxford/35'
                       }`}
                     />
                   </span>
