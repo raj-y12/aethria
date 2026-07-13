@@ -74,6 +74,10 @@ describe('OperationsStrip', () => {
     vi.mocked(patchSettings).mockReturnValue(request.promise);
     renderStrip();
 
+    expect(screen.getByText('Pipeline controls')).toBeInTheDocument();
+    expect(screen.getByText('Changes apply immediately.')).toBeInTheDocument();
+    expect(screen.getByText('On', { selector: '[data-operation-status="scouts"]' })).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('switch', { name: /scouts/i }));
 
     expect(patchSettings).toHaveBeenCalledWith({

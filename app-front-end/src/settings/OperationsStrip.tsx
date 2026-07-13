@@ -13,12 +13,11 @@ interface OperationsStripProps {
 const controls: Array<{
   key: OperationKey;
   label: string;
-  description: string;
 }> = [
-  { key: 'scouts', label: 'Scouts', description: 'Discover companies' },
-  { key: 'reviewers', label: 'Reviewers', description: 'Score opportunities' },
-  { key: 'partners', label: 'Partners', description: 'Issue decisions' },
-  { key: 'budget', label: 'Cost budget', description: 'Enforce spend limits' },
+  { key: 'scouts', label: 'Scouts' },
+  { key: 'reviewers', label: 'Reviewers' },
+  { key: 'partners', label: 'Partners' },
+  { key: 'budget', label: 'Cost budget' },
 ];
 
 function isEnabled(settings: Settings, key: OperationKey): boolean {
@@ -121,29 +120,34 @@ export default function OperationsStrip({
 
   return (
     <section
-      className="border-y border-oxford/[0.09] bg-paper/95 px-phi-4 py-phi-3 backdrop-blur-sm lg:px-phi-6"
+      className="border-b border-oxford/[0.08] bg-paper px-phi-4 py-phi-3 lg:px-phi-6"
       aria-labelledby="operations-strip-title"
     >
-      <div className="flex flex-col gap-phi-3 xl:flex-row xl:items-center xl:gap-phi-6">
-        <div className="min-w-[11rem] shrink-0">
+      <div className="flex flex-col gap-phi-3 lg:flex-row lg:items-center lg:gap-phi-6">
+        <div className="shrink-0 lg:mr-auto">
           <p id="operations-strip-title" className="type-label-section text-oxford">
             Pipeline controls
           </p>
           <p className="mt-phi-1 type-note text-oxford/60">Changes apply immediately.</p>
         </div>
 
-        <div className="grid min-w-0 flex-1 grid-cols-2 border-l border-t border-oxford/[0.07] md:grid-cols-4 md:border-t-0">
+        <div className="grid grid-cols-2 gap-x-phi-5 gap-y-phi-2 sm:grid-cols-4">
           {controls.map((control) => {
             const checked = isEnabled(optimistic, control.key);
             const isPending = pending.has(control.key);
             return (
               <div
                 key={control.key}
-                className="flex min-w-0 items-center justify-between gap-phi-2 border-b border-r border-oxford/[0.07] px-phi-3 py-phi-2 md:border-b-0"
+                className="flex min-w-[7.5rem] items-center justify-between gap-phi-2"
               >
-                <div className="min-w-0">
+                <div>
                   <p className="type-body-sm text-oxford">{control.label}</p>
-                  <p className="mt-0.5 truncate type-note text-oxford/55">{control.description}</p>
+                  <p
+                    className="mt-0.5 type-status text-[9px] leading-none text-oxford/55"
+                    data-operation-status={control.key}
+                  >
+                    {isPending ? 'Saving' : checked ? 'On' : 'Off'}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -153,22 +157,19 @@ export default function OperationsStrip({
                   aria-busy={isPending}
                   disabled={storageUnavailable || isPending}
                   onClick={() => void save(control.key, !checked)}
-                  className="group inline-flex min-h-11 min-w-11 shrink-0 flex-col items-center justify-center gap-1 text-oxford transition-opacity disabled:cursor-not-allowed disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
+                  className="group inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-oxford transition-opacity disabled:cursor-not-allowed disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
                 >
                   <span
-                    className={`relative block h-4 w-8 border transition-colors ${
-                      checked ? 'border-oxford bg-oxford' : 'border-oxford/20 bg-oxford/[0.06]'
+                    className={`relative block h-6 w-11 transition-colors ${
+                      checked ? 'bg-oxford' : 'bg-oxford/[0.09]'
                     }`}
                     aria-hidden
                   >
                     <span
-                      className={`absolute top-0.5 block h-2.5 w-2.5 transition-transform ${
-                        checked ? 'translate-x-[17px] bg-paper' : 'translate-x-0.5 bg-oxford/45'
+                      className={`absolute top-1 block h-4 w-4 transition-transform ${
+                        checked ? 'translate-x-6 bg-paper' : 'translate-x-1 bg-oxford/35'
                       }`}
                     />
-                  </span>
-                  <span className="type-status text-[9px] leading-none text-oxford/60">
-                    {isPending ? 'Saving' : checked ? 'On' : 'Off'}
                   </span>
                 </button>
               </div>
