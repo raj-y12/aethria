@@ -205,4 +205,76 @@ describe('SettingsPage durable policy publish recovery', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Deploy changes' })).toBeDisabled());
     expect(window.localStorage.getItem(recoveryKeys[0])).toBeNull();
   });
+
+  it('does not retry a stale checkpoint when newer authoritative deployable content exists', async () => {
+    const initial = createSettings();
+    const deployed = createSettings('Recovery Fund');
+    const first = await failAfterSettingsPatch(initial, deployed);
+    const recoveryKey = Object.keys(window.localStorage).find((key) =>
+      key.startsWith('aethria.settings.policy-publish.v1:'),
+    )!;
+    first.unmount();
+
+    let newer = createSettings('Recovery Fund');
+    newer.fund_config = {
+      ...newer.fund_config!,
+      mandate: { ...newer.fund_config!.mandate, mandateName: 'Newer authoritative mandate' },
+    };
+    newer = withPublishedPolicy(newer, 'newer-authoritative-policy');
+    const removeSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage cleanup blocked');
+    });
+    try {
+      renderPage(newer);
+
+      await waitFor(() => expect(screen.getByRole('textbox', { name: 'Mandate name' }))
+        .toHaveValue('Newer authoritative mandate'));
+      expect(screen.queryByRole('button', { name: 'Retry publish' })).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Deploy changes' })).toBeDisabled());
+      expect(mocks.publishPolicy).toHaveBeenCalledTimes(1);
+      expect(window.localStorage.getItem(recoveryKey)).not.toBeNull();
+    } finally {
+      removeSpy.mockRestore();
+    }
+  });
+
+  it('keeps checkpoint retry primary while Restore defaults can be undone exactly', async () => {
+    const initial = createSettings();
+    const deployed = createSettings('Recovery Fund');
+    deployed.fund_config = {
+      ...deployed.fund_config!,
+      mandate: { ...deployed.fund_config!.mandate, mandateName: 'Custom recovery mandate' },
+    };
+    mocks.fetchSettings.mockResolvedValue(deployed);
+    mocks.patchSettings.mockResolvedValue({ data: deployed });
+    mocks.publishPolicy.mockRejectedValueOnce(new Error('Policy service unavailable'));
+    renderPage(initial);
+
+    fireEvent.change(await screen.findByLabelText('Fund name'), { target: { value: 'Recovery Fund' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Mandate name' }), {
+      target: { value: 'Custom recovery mandate' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Scoring policy publish pending'));
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry publish' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Restore defaults' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent('Scoring policy publish pending');
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Retry publish' })).toBeEnabled();
+    expect(screen.getByRole('textbox', { name: 'Mandate name' })).toHaveValue('Seed mandate');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+
+    expect(screen.getByRole('textbox', { name: 'Mandate name' })).toHaveValue('Custom recovery mandate');
+    expect(screen.getByRole('status')).toHaveTextContent('Scoring policy publish pending');
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry publish' })).toBeEnabled();
+    expect(mocks.publishPolicy).toHaveBeenCalledTimes(1);
+  });
 });

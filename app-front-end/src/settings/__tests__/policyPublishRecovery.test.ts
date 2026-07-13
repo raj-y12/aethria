@@ -60,16 +60,79 @@ describe('policy publish recovery storage', () => {
     const storage = {
       getItem: (storageKey: string) => values.get(storageKey) ?? null,
       setItem: (storageKey: string, value: string) => values.set(storageKey, value),
+      removeItem: (storageKey: string) => values.delete(storageKey),
     };
 
     savePolicyPublishRecovery(storage, key, settings, settings.fund_config!);
     expect(loadPolicyPublishRecovery(storage, key, settings)).toMatchObject(settings.fund_config!);
+    const metadataOnlyChange: Settings = {
+      ...settings,
+      fund_config: {
+        ...settings.fund_config!,
+        version: 42,
+        versionLabel: 'Fund Thesis v42',
+        activePolicyVersionId: 'server-managed-policy-id',
+        draftPolicyHash: 'server-managed-draft-hash',
+        publishedPolicyHash: 'server-managed-published-hash',
+        lastPublishedAt: '2026-07-13T12:00:00.000Z',
+      },
+    };
+    expect(loadPolicyPublishRecovery(storage, key, metadataOnlyChange)).not.toBeNull();
     expect(loadPolicyPublishRecovery(storage, key, otherFund)).toBeNull();
 
     values.set(key, '{not json');
     expect(loadPolicyPublishRecovery(storage, key, settings)).toBeNull();
     values.set(key, JSON.stringify({ version: 1, fundScope: 'Recovery Fund', fundConfig: {} }));
     expect(loadPolicyPublishRecovery(storage, key, settings)).toBeNull();
+  });
+
+  it('removes a checkpoint whose deployable content differs from newer authoritative settings', () => {
+    const checkpointSettings = createSettings('Recovery Fund');
+    const authoritativeSettings = createSettings('Recovery Fund');
+    authoritativeSettings.fund_config = {
+      ...authoritativeSettings.fund_config!,
+      mandate: {
+        ...authoritativeSettings.fund_config!.mandate,
+        mandateName: 'Newer authoritative mandate',
+      },
+    };
+    const key = getPolicyPublishRecoveryStorageKey('user-a', checkpointSettings)!;
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (storageKey: string) => values.get(storageKey) ?? null,
+      setItem: (storageKey: string, value: string) => { values.set(storageKey, value); },
+      removeItem: vi.fn((storageKey: string) => { values.delete(storageKey); }),
+    };
+
+    savePolicyPublishRecovery(storage, key, checkpointSettings, checkpointSettings.fund_config!);
+
+    expect(loadPolicyPublishRecovery(storage, key, authoritativeSettings)).toBeNull();
+    expect(storage.removeItem).toHaveBeenCalledWith(key);
+    expect(values.has(key)).toBe(false);
+  });
+
+  it('rejects a stale checkpoint even when removing it from storage fails', () => {
+    const checkpointSettings = createSettings('Recovery Fund');
+    const authoritativeSettings = createSettings('Recovery Fund');
+    authoritativeSettings.fund_config = {
+      ...authoritativeSettings.fund_config!,
+      thresholds: {
+        ...authoritativeSettings.fund_config!.thresholds,
+        escalation: 82,
+      },
+    };
+    const key = getPolicyPublishRecoveryStorageKey('user-a', checkpointSettings)!;
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (storageKey: string) => values.get(storageKey) ?? null,
+      setItem: (storageKey: string, value: string) => { values.set(storageKey, value); },
+      removeItem: vi.fn(() => { throw new Error('remove blocked'); }),
+    };
+
+    savePolicyPublishRecovery(storage, key, checkpointSettings, checkpointSettings.fund_config!);
+
+    expect(loadPolicyPublishRecovery(storage, key, authoritativeSettings)).toBeNull();
+    expect(storage.removeItem).toHaveBeenCalledWith(key);
   });
 
   it('fails safely when browser storage access throws', () => {

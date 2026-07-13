@@ -3,6 +3,7 @@ import {
   createDefaultFundConfiguration,
   type FundConfiguration,
 } from '../lib/fundConfiguration';
+import { serializeDecisionConfig } from './settingsModel';
 
 export const POLICY_PUBLISH_RECOVERY_STORAGE_PREFIX = 'aethria.settings.policy-publish.v1';
 const POLICY_PUBLISH_RECOVERY_VERSION = 1;
@@ -58,7 +59,7 @@ function normalizeFundConfig(value: unknown, settings: Settings): FundConfigurat
 }
 
 export function loadPolicyPublishRecovery(
-  storage: Pick<Storage, 'getItem'> | null | undefined,
+  storage: Pick<Storage, 'getItem' | 'removeItem'> | null | undefined,
   key: string | null,
   settings: Settings | null | undefined,
 ): FundConfiguration | null {
@@ -69,7 +70,17 @@ export function loadPolicyPublishRecovery(
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed) || parsed.version !== POLICY_PUBLISH_RECOVERY_VERSION) return null;
     if (parsed.fundScope !== getFundScope(settings)) return null;
-    return normalizeFundConfig(parsed.fundConfig, settings);
+    const recovered = normalizeFundConfig(parsed.fundConfig, settings);
+    const authoritative = normalizeFundConfig(settings.fund_config, settings);
+    if (!recovered) return null;
+    if (
+      !authoritative
+      || serializeDecisionConfig(recovered) !== serializeDecisionConfig(authoritative)
+    ) {
+      clearPolicyPublishRecovery(storage, key);
+      return null;
+    }
+    return recovered;
   } catch {
     return null;
   }

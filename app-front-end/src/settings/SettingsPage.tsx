@@ -746,7 +746,7 @@ export default function SettingsPage() {
         saving={saving}
         message={topBarStatus.message}
         tone={topBarStatus.tone}
-        canUndo={topBarStatus.tone === 'restored' && preRestoreDraft != null}
+        canUndo={preRestoreDraft != null}
         onBack={requestExit}
         onRestoreDefaults={() => setDialog('restore')}
         onUndo={undoRestore}
