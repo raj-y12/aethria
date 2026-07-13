@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import FundThesisConfirmationModal from '../FundThesisConfirmationModal';
+import modalSource from '../FundThesisConfirmationModal.tsx?raw';
 
 const changes = [
   {
@@ -28,6 +29,16 @@ beforeAll(() => {
 });
 
 describe('FundThesisConfirmationModal', () => {
+  it('uses the Dispatch takeover composition', () => {
+    expect(modalSource).toContain('paper-dot-grid');
+    expect(modalSource).toContain('items-center justify-center');
+    expect(modalSource).toContain('Fund thesis change');
+    expect(modalSource).toContain('Confirm the new mandate');
+    expect(modalSource).toContain('Confirm update');
+    expect(modalSource).not.toContain('<header');
+    expect(modalSource).not.toContain('<footer');
+  });
+
   it('requires an explicit confirmation after showing the live and proposed values', () => {
     const onConfirm = vi.fn();
     render(
@@ -41,14 +52,14 @@ describe('FundThesisConfirmationModal', () => {
       />,
     );
 
-    expect(screen.getByRole('dialog', { name: /confirm fund thesis change/i })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /confirm the new mandate/i })).toBeInTheDocument();
     expect(screen.getByText('Currently live')).toBeInTheDocument();
     expect(screen.getByText('Fintech')).toBeInTheDocument();
     expect(screen.getByText('Proposed')).toBeInTheDocument();
     expect(screen.getByText('Climate')).toBeInTheDocument();
     expect(onConfirm).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: /yes, update fund thesis/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirm update/i }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
@@ -92,7 +103,7 @@ describe('FundThesisConfirmationModal', () => {
     expect(screen.getByText('No thesis currently deployed')).toBeInTheDocument();
     expect(screen.getByText(/publishing your first fund thesis/i)).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /yes, update fund thesis/i })).toHaveFocus();
+      expect(screen.getByRole('button', { name: /confirm update/i })).toHaveFocus();
     });
   });
 
