@@ -217,12 +217,17 @@ describe('Settings safe draft actions', () => {
     mocks.publishPolicy.mockReset();
     mocks.setConfiguration.mockReset();
     mocks.saveLocalConfiguration.mockReset();
+    mocks.saveLocalConfiguration.mockImplementation((configuration: FundConfiguration) => configuration);
     Object.defineProperty(window, 'IntersectionObserver', {
       configurable: true,
       value: class {
         observe() {}
         disconnect() {}
       },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
     });
   });
 
@@ -249,6 +254,79 @@ describe('Settings safe draft actions', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect(screen.getByLabelText('Fund name')).toHaveValue('Working Draft Fund');
+    expect(screen.getByRole('status')).toHaveTextContent('Draft changes · 1 pending');
+  });
+
+  it('keeps a partial policy publish retryable and skips the already-deployed thesis step', async () => {
+    const deployedConfiguration = {
+      ...liveConfiguration,
+      mandate: { ...liveConfiguration.mandate, fundName: 'Retryable Fund' },
+    };
+    const deployedSettings = { ...settings, fund_config: deployedConfiguration };
+    mocks.fetchSettings.mockResolvedValue(deployedSettings);
+    mocks.patchSettings.mockResolvedValue({ data: deployedSettings });
+    mocks.publishPolicy
+      .mockRejectedValueOnce(new Error('Policy service unavailable'))
+      .mockResolvedValueOnce({ policy: { policy_version_id: 'policy-retry' } });
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText('Fund name'), { target: { value: 'Retryable Fund' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('scoring policy did not publish'));
+    expect(screen.getByRole('button', { name: 'Deploy changes' })).not.toBeDisabled();
+    expect(mocks.patchSettings).toHaveBeenCalledTimes(1);
+    expect(mocks.publishPolicy).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
+
+    await waitFor(() => expect(mocks.publishPolicy).toHaveBeenCalledTimes(2));
+    expect(mocks.patchSettings).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('configuration is live'));
+    expect(screen.getByRole('button', { name: 'Deploy changes' })).toBeDisabled();
+  });
+
+  it('clears deployment state and exposes an actionable error when settings PATCH rejects', async () => {
+    mocks.patchSettings.mockRejectedValue(new Error('Settings network unavailable'));
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText('Fund name'), { target: { value: 'Rejected Deploy Fund' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Settings network unavailable'));
+    expect(screen.getByRole('button', { name: 'Deploy changes' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Restore defaults' })).not.toBeDisabled();
+  });
+
+  it('publishes the retry checkpoint without overwriting edits made after the failure', async () => {
+    const checkpointConfiguration = {
+      ...liveConfiguration,
+      mandate: { ...liveConfiguration.mandate, fundName: 'Checkpoint Fund' },
+    };
+    const checkpointSettings = { ...settings, fund_config: checkpointConfiguration };
+    mocks.fetchSettings.mockResolvedValue(checkpointSettings);
+    mocks.patchSettings.mockResolvedValue({ data: checkpointSettings });
+    mocks.publishPolicy
+      .mockRejectedValueOnce(new Error('Policy service unavailable'))
+      .mockResolvedValueOnce({ policy: { policy_version_id: 'policy-checkpoint' } });
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText('Fund name'), { target: { value: 'Checkpoint Fund' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('scoring policy did not publish'));
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Mandate name' }), { target: { value: 'Later draft mandate' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
+
+    await waitFor(() => expect(mocks.publishPolicy).toHaveBeenCalledTimes(2));
+    expect(mocks.patchSettings).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('textbox', { name: 'Mandate name' })).toHaveValue('Later draft mandate');
+    expect(screen.getByRole('status')).toHaveTextContent('Draft changes · 1 pending');
+    expect(screen.getByRole('button', { name: 'Deploy changes' })).not.toBeDisabled();
   });
 
   it('keeps editing or discards to the last live configuration before leaving', async () => {
@@ -320,19 +398,33 @@ describe('Settings safe draft actions', () => {
     const thesisSection = document.getElementById('thesis');
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Fund thesis is required'));
     await waitFor(() => expect(thesisSection).toHaveFocus());
-    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
     expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Thesis — Needs attention' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Fund name'), {
       target: { value: 'Corrected Thesis Fund' },
     });
-    expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'Thesis — Needs attention' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Thesis — Needs attention' })).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Restore default settings?' })).getByRole('button', { name: 'Restore defaults' }));
+    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
+
+    const correctedConfiguration = {
+      ...liveConfiguration,
+      mandate: { ...liveConfiguration.mandate, fundName: 'Corrected Thesis Fund' },
+    };
+    const correctedSettings = { ...settings, fund_config: correctedConfiguration };
+    mocks.patchSettings.mockResolvedValueOnce({ data: correctedSettings });
+    mocks.publishPolicy.mockResolvedValueOnce({ policy: { policy_version_id: 'policy-corrected' } });
+    mocks.fetchSettings.mockResolvedValue(correctedSettings);
     fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument());
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Confirm the new mandate' })).getByRole('button', { name: 'Confirm update' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Restore default settings?' })).getByRole('button', { name: 'Restore defaults' }));

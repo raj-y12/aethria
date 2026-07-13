@@ -99,27 +99,36 @@ export default function OperationsStrip({
     const body = key === 'budget'
       ? { cost_budget: next.cost_budget }
       : { agent_config: next.agent_config };
-    const result = await patchSettings(body);
-    setOperationPending(key, false);
+    try {
+      const result = await patchSettings(body);
+      if (result.error || !result.data) {
+        commitOptimistic(updateOperation(optimisticRef.current, key, previousEnabled));
+        setError(
+          result.error?.errors[0]
+          ?? result.error?.message
+          ?? 'We could not save this control. Try again.',
+        );
+        return;
+      }
 
-    if (result.error || !result.data) {
+      const reconciled = preservePendingValues(
+        result.data,
+        optimisticRef.current,
+        pendingRef.current,
+      );
+      commitOptimistic(reconciled);
+      onSettingsChange(reconciled);
+      queryClient.setQueryData(['settings'], reconciled);
+    } catch (requestError) {
       commitOptimistic(updateOperation(optimisticRef.current, key, previousEnabled));
       setError(
-        result.error?.errors[0]
-        ?? result.error?.message
-        ?? 'We could not save this control. Try again.',
+        requestError instanceof Error && requestError.message
+          ? requestError.message
+          : 'We could not save this control. Try again.',
       );
-      return;
+    } finally {
+      setOperationPending(key, false);
     }
-
-    const reconciled = preservePendingValues(
-      result.data,
-      optimisticRef.current,
-      pendingRef.current,
-    );
-    commitOptimistic(reconciled);
-    onSettingsChange(reconciled);
-    queryClient.setQueryData(['settings'], reconciled);
   };
 
   return (

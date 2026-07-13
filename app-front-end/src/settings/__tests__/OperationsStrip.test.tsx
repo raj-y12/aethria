@@ -121,6 +121,18 @@ describe('OperationsStrip', () => {
     expect(screen.getByRole('switch', { name: /reviewers/i })).toHaveAttribute('aria-checked', 'true');
   });
 
+  it('rolls back and releases a control when the request rejects', async () => {
+    vi.mocked(patchSettings).mockRejectedValue(new Error('Runtime settings request failed'));
+    renderStrip();
+
+    fireEvent.click(screen.getByRole('switch', { name: /scouts/i }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Runtime settings request failed'));
+    expect(screen.getByRole('switch', { name: /scouts/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('switch', { name: /scouts/i })).not.toBeDisabled();
+    expect(screen.queryByText('Saving', { selector: '[data-operation-status="scouts"]' })).not.toBeInTheDocument();
+  });
+
   it('disables runtime changes when storage is unavailable', () => {
     renderStrip({ storageUnavailable: true });
 

@@ -127,7 +127,7 @@ export default function SettingsActionDialog({
                 type="button"
                 onClick={onCancel}
                 disabled={busy}
-                className="type-action inline-flex min-h-11 items-center justify-center px-phi-4 text-oxford/65 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                className="type-action inline-flex min-h-11 items-center justify-center px-phi-4 !text-xs text-oxford/65 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
               >
                 {confirmLabel === 'Discard and leave' ? 'Keep editing' : 'Cancel'}
               </button>
@@ -135,7 +135,7 @@ export default function SettingsActionDialog({
                 type="button"
                 onClick={onConfirm}
                 disabled={busy}
-                className={`inline-flex min-h-11 items-center justify-center px-phi-5 type-action transition-colors disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+                className={`inline-flex min-h-11 items-center justify-center px-phi-5 type-action !text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
                   destructive
                     ? 'bg-escalation text-paper hover:bg-escalation/90'
                     : 'bg-oxford text-paper hover:bg-oxford/90'

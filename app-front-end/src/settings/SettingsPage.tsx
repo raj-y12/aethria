@@ -62,6 +62,9 @@ const labelCls = 'type-label-section text-xs text-oxford/70';
 const sectionLabelCls = 'type-label-section text-xs text-oxford/70';
 const metaCls = 'type-meta text-xs text-oxford/70';
 type SettingsDialogState = 'restore' | 'leave' | null;
+type AttentionSource = 'local' | 'server';
+type SettingsAttention = { section: SectionId; source: AttentionSource };
+type PendingPolicyPublish = { fundConfig: FundConfiguration };
 
 function TextField({
   id,
@@ -299,7 +302,8 @@ export default function SettingsPage() {
   const [errors, setErrors] = useState<string[]>([]);
   const [thesisConfirmation, setThesisConfirmation] = useState<FundThesisChangeSet | null>(null);
   const [activeSection, setActiveSection] = useState<SectionId>('thesis');
-  const [attentionSection, setAttentionSection] = useState<SectionId | null>(null);
+  const [attention, setAttention] = useState<SettingsAttention | null>(null);
+  const [pendingPolicyPublish, setPendingPolicyPublish] = useState<PendingPolicyPublish | null>(null);
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState('');
@@ -309,6 +313,9 @@ export default function SettingsPage() {
 
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
   const [draft, setDraft] = useState<FundConfiguration>(configuration);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const attentionSection = attention?.section ?? null;
 
   // Settings ride the shared ['settings'] cache (also fed by useSystemData):
   // returning visitors get the page instantly instead of a loading takeover.
@@ -353,15 +360,16 @@ export default function SettingsPage() {
   const thresholdValidation = useMemo(() => validateDecisionThresholds(draft), [draft]);
 
   useEffect(() => {
-    if (attentionSection === 'weights' && weightValidation.valid) setAttentionSection(null);
+    if (attention?.source !== 'local') return;
+    if (attention.section === 'weights' && weightValidation.valid) setAttention(null);
     if (
-      attentionSection === 'thresholds'
+      attention.section === 'thresholds'
       && bandValidation.valid
       && thresholdValidation.valid
     ) {
-      setAttentionSection(null);
+      setAttention(null);
     }
-  }, [attentionSection, bandValidation.valid, thresholdValidation.valid, weightValidation.valid]);
+  }, [attention, bandValidation.valid, thresholdValidation.valid, weightValidation.valid]);
   // Draft vs Live only covers deployable decision configuration. Runtime
   // controls save independently in OperationsStrip and never enter this list.
   const pendingChanges = useMemo<PendingChange[]>(
@@ -369,8 +377,8 @@ export default function SettingsPage() {
     [draft, savedSnapshot],
   );
   const hasPendingPolicyChanges = useMemo(
-    () => serializeDecisionConfig(draft) !== savedSnapshot,
-    [draft, savedSnapshot],
+    () => serializeDecisionConfig(draft) !== savedSnapshot || pendingPolicyPublish != null,
+    [draft, pendingPolicyPublish, savedSnapshot],
   );
   const topBarStatus: { message: string; tone: SettingsStatusTone } = saving
     ? { message: 'Deploying…', tone: 'progress' }
@@ -419,28 +427,24 @@ export default function SettingsPage() {
     return () => observer.disconnect();
   }, [settings]);
 
-  const updateDraft = (
-    updater: (current: FundConfiguration) => FundConfiguration,
-    affectedSection?: 'thesis' | 'memo' | 'workflow',
-  ) => {
+  const updateDraft = (updater: (current: FundConfiguration) => FundConfiguration) => {
     setDraft((current) => updater(current));
     setPreRestoreDraft(null);
     setStatus(null);
     setErrors([]);
-    if (affectedSection === attentionSection) setAttentionSection(null);
   };
 
   const updateMandate = <K extends keyof FundConfiguration['mandate']>(key: K, value: FundConfiguration['mandate'][K]) =>
-    updateDraft((current) => ({ ...current, mandate: { ...current.mandate, [key]: value } }), 'thesis');
+    updateDraft((current) => ({ ...current, mandate: { ...current.mandate, [key]: value } }));
 
   const updateThreshold = <K extends keyof FundConfiguration['thresholds']>(key: K, value: FundConfiguration['thresholds'][K]) =>
     updateDraft((current) => ({ ...current, thresholds: { ...current.thresholds, [key]: value } }));
 
   const updateRisk = <K extends keyof FundConfiguration['risk']>(key: K, value: FundConfiguration['risk'][K]) =>
-    updateDraft((current) => ({ ...current, risk: { ...current.risk, [key]: value } }), 'workflow');
+    updateDraft((current) => ({ ...current, risk: { ...current.risk, [key]: value } }));
 
   const updateMemo = <K extends keyof FundConfiguration['memo']>(key: K, value: FundConfiguration['memo'][K]) =>
-    updateDraft((current) => ({ ...current, memo: { ...current.memo, [key]: value } }), 'memo');
+    updateDraft((current) => ({ ...current, memo: { ...current.memo, [key]: value } }));
 
   // One explicit deployment transaction. Both backend steps are idempotent
   // (thesis sync dedupes on unchanged content; policy publish dedupes by hash),
@@ -451,13 +455,13 @@ export default function SettingsPage() {
     ...thresholdValidation.errors,
   ];
 
-  const routeDeploymentErrors = (messages: string[]) => {
+  const routeDeploymentErrors = (messages: string[], source: AttentionSource) => {
     if (!messages.length) return;
     setErrors(messages);
     const section = sectionForDeploymentError(messages[0]);
-    setAttentionSection(section);
+    setAttention({ section, source });
     setActiveSection(section);
-    document.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById(section)?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     requestAnimationFrame(() => {
       requestAnimationFrame(() => document.getElementById(section)?.focus());
     });
@@ -465,67 +469,107 @@ export default function SettingsPage() {
 
   const performDeploy = async () => {
     if (!settings) return;
-    const nextErrors = getDeploymentErrors();
+    const retryCheckpoint = pendingPolicyPublish;
+    const nextErrors = retryCheckpoint ? [] : getDeploymentErrors();
     if (nextErrors.length) {
-      routeDeploymentErrors(nextErrors);
+      routeDeploymentErrors(nextErrors, 'local');
       return;
     }
     setSaving(true);
     setErrors([]);
     setStatus(null);
+    const deployedDraftSnapshot = serializeDecisionConfig(draft);
+    let checkpoint = retryCheckpoint;
 
-    // Step 1 — persist settings; the backend republishes the fund thesis
-    // when mandate content changed (no-op otherwise).
-    const mapped = mapFundConfigToSettings(draft, settings);
-    const result = await patchSettings(mapped);
-    if (result.error) {
-      setSaving(false);
-      routeDeploymentErrors(result.error.errors.length ? result.error.errors : [result.error.message]);
-      return;
-    }
+    try {
+      let persistedSettings: Settings | null = null;
+      if (!checkpoint) {
+        // Step 1 — persist settings; the backend republishes the fund thesis
+        // when mandate content changed (no-op otherwise).
+        const mapped = mapFundConfigToSettings(draft, settings);
+        const result = await patchSettings(mapped);
+        if (result.error) {
+          routeDeploymentErrors(
+            result.error.errors.length ? result.error.errors : [result.error.message],
+            'server',
+          );
+          return;
+        }
+        persistedSettings = result.data ?? null;
+        const fundConfig = persistedSettings?.fund_config ?? draft;
+        checkpoint = { fundConfig };
+        setPendingPolicyPublish(checkpoint);
+        setSavedSnapshot(serializeDecisionConfig(fundConfig));
+        if (persistedSettings) setSettings(persistedSettings);
+      }
 
-    // Step 2 — publish the scoring policy from what was just saved.
-    const policyResult = await publishPolicy(result.data?.fund_config ?? draft);
-    const policyError = policyResult.error
-      ? (policyResult.error.errors.length ? policyResult.error.errors.join(' ') : policyResult.error.message)
-      : null;
+      // Step 2 — publish the scoring policy. A checkpoint makes a failed
+      // publish independently retryable without republishing the thesis.
+      const policyResult = await publishPolicy(checkpoint.fundConfig);
+      if (policyResult.error) {
+        const policyError = policyResult.error.errors.length
+          ? policyResult.error.errors.join(' ')
+          : policyResult.error.message;
+        routeDeploymentErrors(
+          [`Settings and fund thesis are live, but the scoring policy did not publish: ${policyError}`],
+          'server',
+        );
+        return;
+      }
+      setPendingPolicyPublish(null);
 
-    // Step 3 — reconcile local state with what is now live (policy publish
-    // rewrites fund_config pointers server-side, so refetch is the authority).
-    const refreshed = await fetchSettings().catch(() => null);
-    const summary = await fetchFundThesisSummary().catch(() => null);
-    const liveSettings = refreshed ?? result.data ?? settings;
-    setSettings(liveSettings);
-    let liveConfig = liveSettings.fund_config ?? draft;
-    if (summary?.active_version_number != null) {
-      setThesisSummary(summary);
-      liveConfig = applyThesisVersionMetadata(liveConfig, summary.active_version_number);
-    }
-    const saved = saveLocalConfiguration(liveConfig);
-    setConfiguration(saved);
-    setDraft(saved);
-    setSavedSnapshot(serializeDecisionConfig(saved));
-    await queryClient.invalidateQueries({ queryKey: ['settings'] });
-    await queryClient.invalidateQueries({ queryKey: ['fund-thesis'] });
+      // Step 3 — reconcile local state with what is now live (policy publish
+      // rewrites fund_config pointers server-side, so refetch is the authority).
+      const refreshed = await fetchSettings().catch(() => null);
+      const summary = await fetchFundThesisSummary().catch(() => null);
+      const liveSettings = refreshed ?? persistedSettings ?? settings;
+      setSettings(liveSettings);
+      let liveConfig = liveSettings.fund_config ?? checkpoint.fundConfig;
+      if (summary?.active_version_number != null) {
+        setThesisSummary(summary);
+        liveConfig = applyThesisVersionMetadata(liveConfig, summary.active_version_number);
+      }
+      const saved = saveLocalConfiguration(liveConfig);
+      setConfiguration(saved);
+      const draftStillMatchesTransaction =
+        serializeDecisionConfig(draftRef.current) === deployedDraftSnapshot
+        && deployedDraftSnapshot === serializeDecisionConfig(checkpoint.fundConfig);
+      if (draftStillMatchesTransaction) setDraft(saved);
+      setSavedSnapshot(serializeDecisionConfig(saved));
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ['settings'] }),
+        queryClient.invalidateQueries({ queryKey: ['fund-thesis'] }),
+      ]);
 
-    if (policyError) {
-      routeDeploymentErrors([`Settings and fund thesis are live, but the scoring policy did not publish: ${policyError}`]);
-    } else {
       const thesisPart = summary?.active_version_number != null
         ? ` · ${thesisVersionLabel(summary.active_version_number)}`
         : '';
       const policyPart = policyResult.policy ? ` · policy ${policyResult.policy.policy_version_id}` : '';
-      setStatus(`Deployed — configuration is live${thesisPart}${policyPart}.`);
-      setAttentionSection(null);
+      setStatus(draftStillMatchesTransaction ? `Deployed — configuration is live${thesisPart}${policyPart}.` : null);
+      setErrors([]);
+      setAttention(null);
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'The deployment request failed. Try again.';
+      const prefix = checkpoint
+        ? 'Settings and fund thesis are live, but the scoring policy did not publish: '
+        : 'Deployment failed: ';
+      routeDeploymentErrors([`${prefix}${message}`], 'server');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const requestDeploy = () => {
     if (saving) return;
+    if (pendingPolicyPublish) {
+      void performDeploy();
+      return;
+    }
     const nextErrors = getDeploymentErrors();
     if (nextErrors.length) {
-      routeDeploymentErrors(nextErrors);
+      routeDeploymentErrors(nextErrors, 'local');
       return;
     }
     const confirmation = getDeploymentConfirmation(
@@ -553,16 +597,14 @@ export default function SettingsPage() {
     setDialog(null);
     setStatus('Defaults restored');
     setErrors([]);
-    setAttentionSection(null);
   };
 
   const undoRestore = () => {
     if (!preRestoreDraft) return;
     setDraft(preRestoreDraft);
     setPreRestoreDraft(null);
-    setStatus('Restore undone');
+    setStatus(null);
     setErrors([]);
-    setAttentionSection(null);
   };
 
   const navigateBack = () => navigate('/v1');
@@ -637,7 +679,7 @@ export default function SettingsPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper text-oxford">
       <SettingsTopBar
-        live={pendingChanges.length === 0}
+        live={pendingChanges.length === 0 && pendingPolicyPublish == null}
         saving={saving}
         message={topBarStatus.message}
         tone={topBarStatus.tone}
