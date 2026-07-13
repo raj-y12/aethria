@@ -87,7 +87,6 @@ export default function FlowPage({ data }: { data: SystemData }) {
     setPageOverlayOpen,
     openDispatch,
     openRerun,
-    workspaceChromeReady,
   } = useAppFrame();
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
@@ -189,7 +188,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
   }, [watchlistAnalytics]);
 
   return (
-    <div className="page-transition-enter flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop} ${workspaceLayout.pageBottom} flex h-full min-h-0 flex-col`}>
         <div className="flex-none pb-phi-4 lg:hidden">
           <AgentDispatch
@@ -275,7 +274,6 @@ export default function FlowPage({ data }: { data: SystemData }) {
                 queueView={queueView}
                 onQueueViewChange={setQueueView}
                 onViewCounts={setViewCounts}
-                entranceReady={workspaceChromeReady}
               />
             </section>
 

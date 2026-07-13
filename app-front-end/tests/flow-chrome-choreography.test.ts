@@ -7,21 +7,24 @@ const flowPageSource = readFileSync(resolve(import.meta.dirname, '../src/pages/F
 const workGridSource = readFileSync(resolve(import.meta.dirname, '../src/components/WorkGrid.tsx'), 'utf8');
 
 describe('Home to Flow entrance choreography', () => {
-  it('lets AppFrame own an animation-completion readiness signal', () => {
-    expect(appFrameSource).toContain('workspaceChromeReady');
-    expect(appFrameSource).toContain('completeWorkspaceChromeEntrance');
-    expect(appFrameSource).toContain('onAnimationComplete={completeWorkspaceChromeEntrance}');
+  it('places the workspace in its final geometry before the spine animates', () => {
+    expect(appFrameSource).not.toContain('layout="position"');
+    expect(appFrameSource).not.toContain('chromeModeChanged');
+    expect(appFrameSource).not.toContain('workspaceChromeReady');
   });
 
-  it('holds the initial docket cascade until real chrome completion', () => {
-    expect(flowPageSource).toContain('entranceReady={workspaceChromeReady}');
-    expect(workGridSource).toContain("animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}");
-    expect(workGridSource).not.toContain('chromeSettled');
-    expect(workGridSource).not.toContain('setChromeSettled');
+  it('starts one light row cascade immediately, without a second page entrance', () => {
+    expect(flowPageSource).not.toContain('page-transition-enter');
+    expect(flowPageSource).not.toContain('entranceReady=');
+    expect(workGridSource).toContain("animate={reduceMotion ? undefined : 'visible'}");
+    expect(workGridSource).toContain('staggerChildren: 0.026');
+    expect(workGridSource).toContain("translateY(3px)");
   });
 
-  it('starts memo auto-selection from the same readiness boundary', () => {
-    expect(workGridSource).toContain('if (!entranceReady)');
-    expect(workGridSource).toContain('[entranceReady, reduceMotion]');
+  it('selects the initial case before paint so rows never reflow mid-cascade', () => {
+    expect(workGridSource).toContain('useLayoutEffect(() => {');
+    expect(workGridSource).not.toContain('INITIAL_MEMO_DELAY_MS');
+    expect(workGridSource).not.toContain('autoSelectReady');
+    expect(workGridSource).not.toContain('entranceReady');
   });
 });
