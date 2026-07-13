@@ -41,13 +41,24 @@ describe('SettingsTopBar deployment feedback', () => {
     ['Deployed successfully', 'success'],
   ] as const)('keeps the %s state visible', (message, tone) => {
     renderTopBar({ message, tone, saving: tone === 'progress', live: tone === 'live' });
-    expect(screen.getByRole(tone === 'error' ? 'alert' : 'status')).toHaveTextContent(message);
+    const status = screen.getByRole(tone === 'error' ? 'alert' : 'status');
+    expect(status).toHaveTextContent(message);
+    expect(status).toHaveClass('!text-xs');
   });
 
   it('keeps restored-default feedback and Undo together', () => {
     renderTopBar({ message: 'Defaults restored', tone: 'restored', canUndo: true });
     expect(screen.getByText('Defaults restored')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Undo' })).toBeVisible();
+  });
+
+  it('forces every functional top-bar label to the 12px readability floor', () => {
+    renderTopBar({ message: 'Defaults restored', tone: 'restored', canUndo: true });
+
+    expect(screen.getByRole('button', { name: 'Aethria' })).toHaveClass('!text-xs');
+    expect(screen.getByRole('button', { name: 'Restore defaults' })).toHaveClass('!text-xs');
+    expect(screen.getByRole('button', { name: 'Undo' })).toHaveClass('!text-xs');
+    expect(screen.getByRole('status')).toHaveClass('!text-xs');
   });
 
   it('uses an alert for deployment errors and keeps Deploy dominant', () => {
