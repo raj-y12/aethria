@@ -27,6 +27,11 @@ vi.mock('react-router', async () => {
   return { ...actual, useNavigate: () => mocks.navigate };
 });
 
+vi.mock('@clerk/react-router', async () => {
+  const actual = await vi.importActual<typeof import('@clerk/react-router')>('@clerk/react-router');
+  return { ...actual, useAuth: () => ({ userId: 'user-settings-layout-test' }) };
+});
+
 vi.mock('../../api/settings', async () => {
   const actual = await vi.importActual<typeof import('../../api/settings')>('../../api/settings');
   return {
@@ -218,6 +223,9 @@ describe('Settings safe draft actions', () => {
     mocks.setConfiguration.mockReset();
     mocks.saveLocalConfiguration.mockReset();
     mocks.saveLocalConfiguration.mockImplementation((configuration: FundConfiguration) => configuration);
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith('aethria.settings.policy-publish.v1:')) window.localStorage.removeItem(key);
+    }
     Object.defineProperty(window, 'IntersectionObserver', {
       configurable: true,
       value: class {
@@ -275,11 +283,11 @@ describe('Settings safe draft actions', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('scoring policy did not publish'));
-    expect(screen.getByRole('button', { name: 'Deploy changes' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Retry publish' })).not.toBeDisabled();
     expect(mocks.patchSettings).toHaveBeenCalledTimes(1);
     expect(mocks.publishPolicy).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry publish' }));
 
     await waitFor(() => expect(mocks.publishPolicy).toHaveBeenCalledTimes(2));
     expect(mocks.patchSettings).toHaveBeenCalledTimes(1);
@@ -320,7 +328,7 @@ describe('Settings safe draft actions', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('scoring policy did not publish'));
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Mandate name' }), { target: { value: 'Later draft mandate' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry publish' }));
 
     await waitFor(() => expect(mocks.publishPolicy).toHaveBeenCalledTimes(2));
     expect(mocks.patchSettings).toHaveBeenCalledTimes(1);

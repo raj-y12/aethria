@@ -28,6 +28,7 @@ function renderTopBar({
       onRestoreDefaults={vi.fn()}
       onUndo={vi.fn()}
       onDeploy={vi.fn()}
+      actionLabel={saving ? 'Deploying…' : 'Deploy changes'}
     />,
   );
 }

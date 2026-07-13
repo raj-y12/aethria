@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router';
+import { useAuth } from '@clerk/react-router';
 import { motion } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import LoadingAnimation from '../components/LoadingAnimation';
@@ -35,6 +36,7 @@ const CONTENT_EASE = [0.16, 1, 0.3, 1] as const;
 import {
   applyThesisVersionMetadata,
   createDefaultFundConfiguration,
+  loadFundConfiguration,
   mapFundConfigToSettings,
   thesisVersionLabel,
   rebalanceWeights,
@@ -45,6 +47,13 @@ import {
   type MemoTone,
   type RiskSensitivity,
 } from '../lib/fundConfiguration';
+import {
+  clearPolicyPublishRecovery,
+  getPolicyPublishRecoveryStorage,
+  getPolicyPublishRecoveryStorageKey,
+  loadPolicyPublishRecovery,
+  savePolicyPublishRecovery,
+} from './policyPublishRecovery';
 
 const SELECT_CHEVRON =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%231a2b48' fill-opacity='0.45' d='M0 3h10L5 8z'/%3E%3C/svg%3E\")";
@@ -64,7 +73,7 @@ const metaCls = 'type-meta text-xs text-oxford/70';
 type SettingsDialogState = 'restore' | 'leave' | null;
 type AttentionSource = 'local' | 'server';
 type SettingsAttention = { section: SectionId; source: AttentionSource };
-type PendingPolicyPublish = { fundConfig: FundConfiguration };
+type PendingPolicyPublish = { fundConfig: FundConfiguration; storageKey: string | null };
 
 function TextField({
   id,
@@ -294,6 +303,7 @@ function GroupHeader({ title, description }: { title: string; description: strin
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { userId } = useAuth();
   const reduceMotion = usePrefersReducedMotion();
 
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -310,6 +320,8 @@ export default function SettingsPage() {
   const [dialog, setDialog] = useState<SettingsDialogState>(null);
   const [preRestoreDraft, setPreRestoreDraft] = useState<FundConfiguration | null>(null);
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
+  const draftSeededRef = useRef(false);
+  const hydratedRecoveryKeyRef = useRef<string | null>(null);
 
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
   const [draft, setDraft] = useState<FundConfiguration>(configuration);
@@ -343,10 +355,33 @@ export default function SettingsPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Seed once from the first authoritative settings payload. Later hook updates
+  // are transaction results and must pass the reconciliation guard below.
   useEffect(() => {
-    setDraft(configuration);
-    setSavedSnapshot(serializeDecisionConfig(configuration));
-  }, [configuration]);
+    if (!settings || draftSeededRef.current) return;
+    draftSeededRef.current = true;
+    const initial = loadFundConfiguration(settings);
+    setDraft(initial);
+    setSavedSnapshot(serializeDecisionConfig(initial));
+  }, [settings]);
+
+  const recoveryStorageKey = useMemo(
+    () => getPolicyPublishRecoveryStorageKey(userId, settings),
+    [settings, userId],
+  );
+
+  useEffect(() => {
+    if (!settings || !recoveryStorageKey || hydratedRecoveryKeyRef.current === recoveryStorageKey) return;
+    const restored = loadPolicyPublishRecovery(
+      getPolicyPublishRecoveryStorage(),
+      recoveryStorageKey,
+      settings,
+    );
+    hydratedRecoveryKeyRef.current = recoveryStorageKey;
+    if (!restored) return;
+    setPendingPolicyPublish({ fundConfig: restored, storageKey: recoveryStorageKey });
+    setSavedSnapshot(serializeDecisionConfig(restored));
+  }, [recoveryStorageKey, settings]);
 
   useEffect(() => {
     const versionNumber = thesisSummary?.active_version_number;
@@ -380,8 +415,19 @@ export default function SettingsPage() {
     () => serializeDecisionConfig(draft) !== savedSnapshot || pendingPolicyPublish != null,
     [draft, pendingPolicyPublish, savedSnapshot],
   );
-  const topBarStatus: { message: string; tone: SettingsStatusTone } = saving
-    ? { message: 'Deploying…', tone: 'progress' }
+  const checkpointDraftCount = pendingPolicyPublish
+    ? pendingChanges.filter((change) => change.label !== 'Scoring policy').length
+    : 0;
+  const checkpointMessage = checkpointDraftCount > 0
+    ? `Scoring policy publish pending · ${checkpointDraftCount} newer draft ${checkpointDraftCount === 1 ? 'change' : 'changes'}`
+    : 'Scoring policy publish pending';
+  const topBarStatus: { message: string; tone: SettingsStatusTone } = pendingPolicyPublish
+    ? {
+        message: errors.length > 0 ? `${checkpointMessage} · ${errors.join(' ')}` : checkpointMessage,
+        tone: errors.length > 0 ? 'error' : saving ? 'progress' : 'draft',
+      }
+    : saving
+      ? { message: 'Deploying…', tone: 'progress' }
     : errors.length > 0
       ? { message: errors.join(' '), tone: 'error' }
       : status === 'Defaults restored'
@@ -497,7 +543,15 @@ export default function SettingsPage() {
         }
         persistedSettings = result.data ?? null;
         const fundConfig = persistedSettings?.fund_config ?? draft;
-        checkpoint = { fundConfig };
+        const checkpointSettings = persistedSettings ?? settings;
+        const storageKey = getPolicyPublishRecoveryStorageKey(userId, checkpointSettings);
+        checkpoint = { fundConfig, storageKey };
+        savePolicyPublishRecovery(
+          getPolicyPublishRecoveryStorage(),
+          storageKey,
+          checkpointSettings,
+          fundConfig,
+        );
         setPendingPolicyPublish(checkpoint);
         setSavedSnapshot(serializeDecisionConfig(fundConfig));
         if (persistedSettings) setSettings(persistedSettings);
@@ -517,6 +571,7 @@ export default function SettingsPage() {
         return;
       }
       setPendingPolicyPublish(null);
+      clearPolicyPublishRecovery(getPolicyPublishRecoveryStorage(), checkpoint.storageKey);
 
       // Step 3 — reconcile local state with what is now live (policy publish
       // rewrites fund_config pointers server-side, so refetch is the authority).
@@ -534,7 +589,15 @@ export default function SettingsPage() {
       const draftStillMatchesTransaction =
         serializeDecisionConfig(draftRef.current) === deployedDraftSnapshot
         && deployedDraftSnapshot === serializeDecisionConfig(checkpoint.fundConfig);
-      if (draftStillMatchesTransaction) setDraft(saved);
+      setDraft((current) => draftStillMatchesTransaction
+        ? saved
+        : {
+            ...current,
+            activePolicyVersionId: saved.activePolicyVersionId,
+            draftPolicyHash: saved.draftPolicyHash,
+            publishedPolicyHash: saved.publishedPolicyHash,
+            lastPublishedAt: saved.lastPublishedAt,
+          });
       setSavedSnapshot(serializeDecisionConfig(saved));
       await Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: ['settings'] }),
@@ -688,6 +751,7 @@ export default function SettingsPage() {
         onRestoreDefaults={() => setDialog('restore')}
         onUndo={undoRestore}
         onDeploy={requestDeploy}
+        actionLabel={pendingPolicyPublish ? (saving ? 'Retrying…' : 'Retry publish') : (saving ? 'Deploying…' : 'Deploy changes')}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">

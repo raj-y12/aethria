@@ -16,6 +16,7 @@ export default function SettingsTopBar({
   onRestoreDefaults,
   onUndo,
   onDeploy,
+  actionLabel,
 }: {
   live: boolean;
   saving: boolean;
@@ -26,6 +27,7 @@ export default function SettingsTopBar({
   onRestoreDefaults: () => void;
   onUndo: () => void;
   onDeploy: () => void;
+  actionLabel: string;
 }) {
   const reduceMotion = usePrefersReducedMotion();
   const statusClass = tone === 'error'
@@ -94,7 +96,7 @@ export default function SettingsTopBar({
             disabled={saving || live}
             className="btn-aethria-solid min-h-11 shrink-0 text-xs disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {saving ? 'Deploying…' : 'Deploy changes'}
+            {actionLabel}
           </button>
         </div>
       </div>
