@@ -280,5 +280,22 @@ describe('Settings safe draft actions', () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
     expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Thesis — Needs attention' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Fund name'), {
+      target: { value: 'Corrected Thesis Fund' },
+    });
+    expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Thesis — Needs attention' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Restore default settings?' })).getByRole('button', { name: 'Restore defaults' }));
+    expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument();
   });
 });

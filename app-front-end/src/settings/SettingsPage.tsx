@@ -419,24 +419,28 @@ export default function SettingsPage() {
     return () => observer.disconnect();
   }, [settings]);
 
-  const updateDraft = (updater: (current: FundConfiguration) => FundConfiguration) => {
+  const updateDraft = (
+    updater: (current: FundConfiguration) => FundConfiguration,
+    affectedSection?: 'thesis' | 'memo' | 'workflow',
+  ) => {
     setDraft((current) => updater(current));
     setPreRestoreDraft(null);
     setStatus(null);
     setErrors([]);
+    if (affectedSection === attentionSection) setAttentionSection(null);
   };
 
   const updateMandate = <K extends keyof FundConfiguration['mandate']>(key: K, value: FundConfiguration['mandate'][K]) =>
-    updateDraft((current) => ({ ...current, mandate: { ...current.mandate, [key]: value } }));
+    updateDraft((current) => ({ ...current, mandate: { ...current.mandate, [key]: value } }), 'thesis');
 
   const updateThreshold = <K extends keyof FundConfiguration['thresholds']>(key: K, value: FundConfiguration['thresholds'][K]) =>
     updateDraft((current) => ({ ...current, thresholds: { ...current.thresholds, [key]: value } }));
 
   const updateRisk = <K extends keyof FundConfiguration['risk']>(key: K, value: FundConfiguration['risk'][K]) =>
-    updateDraft((current) => ({ ...current, risk: { ...current.risk, [key]: value } }));
+    updateDraft((current) => ({ ...current, risk: { ...current.risk, [key]: value } }), 'workflow');
 
   const updateMemo = <K extends keyof FundConfiguration['memo']>(key: K, value: FundConfiguration['memo'][K]) =>
-    updateDraft((current) => ({ ...current, memo: { ...current.memo, [key]: value } }));
+    updateDraft((current) => ({ ...current, memo: { ...current.memo, [key]: value } }), 'memo');
 
   // One explicit deployment transaction. Both backend steps are idempotent
   // (thesis sync dedupes on unchanged content; policy publish dedupes by hash),
@@ -549,6 +553,7 @@ export default function SettingsPage() {
     setDialog(null);
     setStatus('Defaults restored');
     setErrors([]);
+    setAttentionSection(null);
   };
 
   const undoRestore = () => {
@@ -557,6 +562,7 @@ export default function SettingsPage() {
     setPreRestoreDraft(null);
     setStatus('Restore undone');
     setErrors([]);
+    setAttentionSection(null);
   };
 
   const navigateBack = () => navigate('/v1');
