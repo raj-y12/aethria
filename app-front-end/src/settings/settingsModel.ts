@@ -3,13 +3,13 @@ import type { FundConfiguration } from '../lib/fundConfiguration';
 export type SettingsTab = 'decision' | 'admin';
 
 export type SectionId =
-  | 'mandate'
-  | 'memo'
-  | 'risk'
+  | 'thesis'
   | 'thresholds'
   | 'weights'
-  | 'policy'
-  | 'thesis'
+  | 'sensitivity'
+  | 'memo'
+  | 'workflow'
+  | 'budget'
   | 'system';
 
 export interface PendingChange {
@@ -17,21 +17,23 @@ export interface PendingChange {
   stages: string;
 }
 
-export const SETTINGS_SECTIONS: ReadonlyArray<{
+interface SettingsSectionDefinition {
   id: SectionId;
   label: string;
   short: string;
   tab: SettingsTab;
-}> = [
-  { id: 'mandate', label: 'Fund mandate', short: 'Mandate', tab: 'decision' },
-  { id: 'memo', label: 'Memo output', short: 'Memo', tab: 'decision' },
-  { id: 'risk', label: 'Ruling', short: 'Ruling', tab: 'decision' },
+}
+
+export const SETTINGS_SECTIONS = [
+  { id: 'thesis', label: 'Fund thesis', short: 'Thesis', tab: 'decision' },
   { id: 'thresholds', label: 'Decision thresholds', short: 'Thresholds', tab: 'decision' },
   { id: 'weights', label: 'Scoring weights', short: 'Weights', tab: 'decision' },
-  { id: 'policy', label: 'Scoring policy', short: 'Policy', tab: 'admin' },
-  { id: 'thesis', label: 'Fund thesis', short: 'Thesis', tab: 'admin' },
-  { id: 'system', label: 'Storage and agents', short: 'System', tab: 'admin' },
-];
+  { id: 'sensitivity', label: 'Escalation sensitivity', short: 'Sensitivity', tab: 'decision' },
+  { id: 'memo', label: 'Memo output', short: 'Memo', tab: 'admin' },
+  { id: 'workflow', label: 'Ruling workflow', short: 'Workflow', tab: 'admin' },
+  { id: 'budget', label: 'Cost budget', short: 'Budget', tab: 'admin' },
+  { id: 'system', label: 'System state', short: 'System', tab: 'admin' },
+] satisfies ReadonlyArray<SettingsSectionDefinition>;
 
 export function tabForSection(id: SectionId): SettingsTab {
   return SETTINGS_SECTIONS.find((section) => section.id === id)?.tab ?? 'decision';

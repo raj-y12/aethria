@@ -9,12 +9,33 @@ import {
 
 describe('settings navigation model', () => {
   it('maps each settings section to its owning tab', () => {
-    expect(tabForSection('mandate')).toBe('decision');
+    expect(tabForSection('thesis')).toBe('decision');
+    expect(tabForSection('thresholds')).toBe('decision');
     expect(tabForSection('weights')).toBe('decision');
-    expect(tabForSection('policy')).toBe('admin');
+    expect(tabForSection('sensitivity')).toBe('decision');
+    expect(tabForSection('memo')).toBe('admin');
+    expect(tabForSection('workflow')).toBe('admin');
+    expect(tabForSection('budget')).toBe('admin');
     expect(tabForSection('system')).toBe('admin');
-    expect(SETTINGS_SECTIONS.filter((item) => item.tab === 'decision')).toHaveLength(5);
-    expect(SETTINGS_SECTIONS.filter((item) => item.tab === 'admin')).toHaveLength(3);
+    expect(SETTINGS_SECTIONS.filter((item) => item.tab === 'decision')).toHaveLength(4);
+    expect(SETTINGS_SECTIONS.filter((item) => item.tab === 'admin')).toHaveLength(4);
+  });
+
+  it('keeps Administration preferences in the deployable pending list', () => {
+    const live = {
+      ...createDefaultFundConfiguration(),
+      activePolicyVersionId: 'policy-v4',
+    };
+    const savedSnapshot = serializeDecisionConfig(live);
+    const changed = {
+      ...live,
+      memo: { ...live.memo, style: 'detailed' as const },
+    };
+
+    expect(getPendingChanges(changed, savedSnapshot)).toContainEqual({
+      label: 'Memo output',
+      stages: 'Partner memos',
+    });
   });
 
   it('reports only deployable decision changes', () => {
