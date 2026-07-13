@@ -92,7 +92,7 @@ export default function SettingsTopBar({
             type="button"
             onClick={onDeploy}
             disabled={saving || live}
-            className="btn-aethria-solid min-h-11 shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn-aethria-solid min-h-11 shrink-0 text-xs disabled:cursor-not-allowed disabled:opacity-40"
           >
             {saving ? 'Deploying…' : 'Deploy changes'}
           </button>

@@ -616,7 +616,7 @@ export default function SettingsPage() {
                 onClick={() => void settingsQuery.refetch()}
                 disabled={settingsQuery.isFetching}
                 aria-busy={settingsQuery.isFetching}
-                className="btn-aethria-solid min-h-11 disabled:cursor-wait disabled:opacity-50"
+                className="btn-aethria-solid min-h-11 text-xs disabled:cursor-wait disabled:opacity-50"
               >
                 Retry
               </button>

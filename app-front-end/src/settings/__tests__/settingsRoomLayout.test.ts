@@ -192,6 +192,11 @@ describe('Settings focused-mode layout contract', () => {
     expect(topBarSource).toContain('min-h-11');
     expect(source).toContain('requestExit');
   });
+
+  it('keeps solid recovery and deployment actions at the 12px readability floor', () => {
+    expect(source).toContain('btn-aethria-solid min-h-11 text-xs');
+    expect(topBarSource).toContain('btn-aethria-solid min-h-11 shrink-0 text-xs');
+  });
 });
 
 describe('Settings safe draft actions', () => {
