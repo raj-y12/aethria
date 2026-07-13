@@ -14,14 +14,17 @@ import {
 } from '../api/fundThesis';
 import { useFundConfiguration } from '../hooks';
 import DecisionThresholdsPanel from './DecisionThresholdsPanel';
+import FundThesisConfirmationModal from './FundThesisConfirmationModal';
 import OperationsStrip from './OperationsStrip';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
   SETTINGS_SECTIONS,
+  getDeploymentConfirmation,
   getPendingChanges,
   serializeDecisionConfig,
   tabForSection,
   type PendingChange,
+  type FundThesisChangeSet,
   type SectionId,
   type SettingsTab,
 } from './settingsModel';
@@ -265,6 +268,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [thesisConfirmation, setThesisConfirmation] = useState<FundThesisChangeSet | null>(null);
   const [activeTab, setActiveTab] = useState<SettingsTab>('decision');
   const [activeSection, setActiveSection] = useState<SectionId>('thesis');
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
@@ -395,13 +399,15 @@ export default function SettingsPage() {
   // One explicit deployment transaction. Both backend steps are idempotent
   // (thesis sync dedupes on unchanged content; policy publish dedupes by hash),
   // so the whole sequence can run unconditionally and re-running converges.
-  const handleDeploy = async () => {
+  const getDeploymentErrors = () => [
+    ...(weightValidation.valid ? [] : [`Scoring weights total ${weightValidation.total}%, not 100%.`]),
+    ...bandValidation.errors,
+    ...thresholdValidation.errors,
+  ];
+
+  const performDeploy = async () => {
     if (!settings) return;
-    const nextErrors = [
-      ...(weightValidation.valid ? [] : [`Scoring weights total ${weightValidation.total}%, not 100%.`]),
-      ...bandValidation.errors,
-      ...thresholdValidation.errors,
-    ];
+    const nextErrors = getDeploymentErrors();
     if (nextErrors.length) {
       setErrors(nextErrors);
       return;
@@ -456,6 +462,30 @@ export default function SettingsPage() {
     setSaving(false);
   };
 
+  const requestDeploy = () => {
+    if (saving) return;
+    const nextErrors = getDeploymentErrors();
+    if (nextErrors.length) {
+      setErrors(nextErrors);
+      return;
+    }
+    const confirmation = getDeploymentConfirmation(
+      draft,
+      savedSnapshot,
+      (thesisSummary?.active_version_number ?? 0) > 0,
+    );
+    if (confirmation) {
+      setThesisConfirmation(confirmation);
+      return;
+    }
+    void performDeploy();
+  };
+
+  const confirmThesisDeployment = () => {
+    setThesisConfirmation(null);
+    void performDeploy();
+  };
+
   const handleReset = () => {
     const next = clearFundConfiguration(settings);
     setConfiguration(next);
@@ -470,7 +500,7 @@ export default function SettingsPage() {
   // effect re-runs only when displayed values change, never on identity.
   const lastDeployedAt = draft.lastPublishedAt ?? draft.lastSavedAt;
   const spineActionsRef = useRef({ deploy: () => {}, reset: () => {} });
-  spineActionsRef.current = { deploy: () => void handleDeploy(), reset: handleReset };
+  spineActionsRef.current = { deploy: requestDeploy, reset: handleReset };
   const pendingRef = useRef<PendingChange[]>(pendingChanges);
   pendingRef.current = pendingChanges;
   const pendingKey = pendingChanges.map((item) => item.label).join('|');
@@ -616,7 +646,7 @@ export default function SettingsPage() {
             </div>
             <button
               type="button"
-              onClick={handleDeploy}
+              onClick={requestDeploy}
               disabled={saving || !unsaved}
               className="btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -914,6 +944,14 @@ export default function SettingsPage() {
           </div>
         </div>
       </main>
+      <FundThesisConfirmationModal
+        open={thesisConfirmation != null}
+        changes={thesisConfirmation?.changes ?? []}
+        firstPublication={thesisConfirmation?.firstPublication ?? false}
+        busy={saving}
+        onCancel={() => setThesisConfirmation(null)}
+        onConfirm={confirmThesisDeployment}
+      />
     </div>
   );
 }

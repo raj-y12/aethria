@@ -141,6 +141,14 @@ export function getFundThesisChangeSet(
   return changes.length ? { firstPublication, changes } : null;
 }
 
+export function getDeploymentConfirmation(
+  draft: FundConfiguration,
+  savedSnapshot: string,
+  hasActiveThesis: boolean,
+): FundThesisChangeSet | null {
+  return getFundThesisChangeSet(draft, savedSnapshot, !hasActiveThesis);
+}
+
 export function getPendingChanges(
   draft: FundConfiguration,
   savedSnapshot: string,
