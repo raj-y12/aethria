@@ -134,7 +134,7 @@ export default function OperationsStrip({
           <p id="operations-strip-title" className="type-label-section text-oxford">
             Pipeline controls
           </p>
-          <p className="mt-phi-1 type-note text-oxford/60">Changes apply immediately.</p>
+          <p className="mt-phi-1 type-note text-oxford/60">These controls save immediately.</p>
         </div>
 
         <div className={isRail ? 'flex flex-col gap-phi-1' : 'grid grid-cols-2 gap-x-phi-5 gap-y-phi-2 sm:grid-cols-4'}>

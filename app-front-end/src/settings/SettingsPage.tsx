@@ -16,6 +16,7 @@ import DecisionThresholdsPanel from './DecisionThresholdsPanel';
 import FundThesisConfirmationModal from './FundThesisConfirmationModal';
 import SettingsTopBar from './SettingsTopBar';
 import SettingsRail from './SettingsRail';
+import SettingsMobileNav from './SettingsMobileNav';
 import OperationsStrip from './OperationsStrip';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
@@ -271,16 +272,11 @@ function EditorialStatus({
   );
 }
 
-/**
- * The two settings families, stated once. Configuration deploys as a fund
- * version; Administration is live runtime state. The save-model tag is the
- * whole distinction in three words.
- */
-function GroupHeader({ title, tag }: { title: string; tag: string }) {
+function GroupHeader({ title, description }: { title: string; description: string }) {
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1 px-phi-4 pb-phi-3 pt-phi-7">
+    <div className="px-phi-4 pb-phi-3 pt-phi-7">
       <h2 className="type-display text-[1.5rem] leading-none text-oxford">{title}</h2>
-      <p className="type-status text-oxford/45">{tag}</p>
+      <p className="mt-phi-2 type-body-sm text-oxford/60">{description}</p>
     </div>
   );
 }
@@ -345,6 +341,11 @@ export default function SettingsPage() {
   const weightValidation = useMemo(() => validateWeights(draft.scoringWeights), [draft.scoringWeights]);
   const bandValidation = useMemo(() => validateScoreBands(draft.scoreBands), [draft.scoreBands]);
   const thresholdValidation = useMemo(() => validateDecisionThresholds(draft), [draft]);
+  const attentionSection: SectionId | null = !bandValidation.valid || !thresholdValidation.valid
+    ? 'thresholds'
+    : !weightValidation.valid
+      ? 'weights'
+      : null;
 
   // Draft vs Live only covers deployable decision configuration. Runtime
   // controls save independently in OperationsStrip and never enter this list.
@@ -541,6 +542,7 @@ export default function SettingsPage() {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <SettingsRail
           activeSection={activeSection}
+          attentionSection={attentionSection}
           onNavigate={scrollToSection}
           settings={settings}
           storageUnavailable={storageNotReady}
@@ -551,6 +553,11 @@ export default function SettingsPage() {
           ref={contentScrollRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-paper"
         >
+          <SettingsMobileNav
+            activeSection={activeSection}
+            attentionSection={attentionSection}
+            onSelect={scrollToSection}
+          />
           <motion.main
             className={`${workspaceLayout.pageBottom} mx-auto w-full max-w-[52rem] px-phi-5 pt-phi-5 lg:px-phi-7`}
             initial={reduceMotion ? false : { opacity: 0, y: 10 }}
@@ -579,7 +586,10 @@ export default function SettingsPage() {
             )}
 
             <div className="divide-y divide-oxford/[0.06]">
-                  <GroupHeader title="Configuration" tag="Deploys as a version" />
+                  <GroupHeader
+                    title="Fund policy"
+                    description="Changes here stay in draft until you deploy a new version."
+                  />
 
                   <RoomSection
                     id="thesis"
@@ -714,8 +724,6 @@ export default function SettingsPage() {
                   </div>
                 </RoomSection>
 
-                  <GroupHeader title="Administration" tag="Saves immediately" />
-
                   <RoomSection
                     id="memo"
                     title="Memo output"
@@ -757,6 +765,11 @@ export default function SettingsPage() {
                       <ToggleRow id="risk-high-only" checked={draft.risk.onlyGateHighSeverity} onChange={(value) => updateRisk('onlyGateHighSeverity', value)} label="Only gate high severity risks" hint="Medium adverse items stay visible without blocking the ruling." />
                     </div>
                   </RoomSection>
+
+                  <GroupHeader
+                    title="Live runtime"
+                    description="Changes here save immediately and affect the running system."
+                  />
 
                   <RoomSection
                     id="budget"

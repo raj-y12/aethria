@@ -75,7 +75,7 @@ describe('OperationsStrip', () => {
     renderStrip();
 
     expect(screen.getByText('Pipeline controls')).toBeInTheDocument();
-    expect(screen.getByText('Changes apply immediately.')).toBeInTheDocument();
+    expect(screen.getByText('These controls save immediately.')).toBeInTheDocument();
     expect(screen.getByText('On', { selector: '[data-operation-status="scouts"]' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('switch', { name: /scouts/i }));

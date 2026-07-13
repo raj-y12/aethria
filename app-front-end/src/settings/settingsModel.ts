@@ -1,12 +1,13 @@
 import type { FundConfiguration } from '../lib/fundConfiguration';
 
-export type SettingsTab = 'decision' | 'admin';
+export type SettingsPersistenceGroup = 'policy' | 'runtime';
 
 export type SectionId =
   | 'thesis'
+  | 'version'
   | 'thresholds'
-  | 'weights'
   | 'sensitivity'
+  | 'weights'
   | 'memo'
   | 'workflow'
   | 'budget'
@@ -29,27 +30,27 @@ export interface FundThesisChangeSet {
   changes: FundThesisChange[];
 }
 
-interface SettingsSectionDefinition {
+export const SETTINGS_GROUPS = [
+  { id: 'policy', label: 'Fund policy', persistence: 'Deploys as a version' },
+  { id: 'runtime', label: 'Live runtime', persistence: 'Saves immediately' },
+] as const;
+
+export const SETTINGS_SECTIONS = [
+  { id: 'thesis', label: 'Fund thesis', short: 'Thesis', group: 'policy' },
+  { id: 'version', label: 'Version context', short: 'Version', group: 'policy' },
+  { id: 'thresholds', label: 'Decision thresholds', short: 'Thresholds', group: 'policy' },
+  { id: 'sensitivity', label: 'Escalation sensitivity', short: 'Sensitivity', group: 'policy' },
+  { id: 'weights', label: 'Scoring weights', short: 'Weights', group: 'policy' },
+  { id: 'memo', label: 'Memo output', short: 'Memo', group: 'policy' },
+  { id: 'workflow', label: 'Ruling workflow', short: 'Workflow', group: 'policy' },
+  { id: 'budget', label: 'Cost budget', short: 'Budget', group: 'runtime' },
+  { id: 'system', label: 'System state', short: 'System', group: 'runtime' },
+] as const satisfies readonly {
   id: SectionId;
   label: string;
   short: string;
-  tab: SettingsTab;
-}
-
-export const SETTINGS_SECTIONS = [
-  { id: 'thesis', label: 'Fund thesis', short: 'Thesis', tab: 'decision' },
-  { id: 'thresholds', label: 'Decision thresholds', short: 'Thresholds', tab: 'decision' },
-  { id: 'weights', label: 'Scoring weights', short: 'Weights', tab: 'decision' },
-  { id: 'sensitivity', label: 'Escalation sensitivity', short: 'Sensitivity', tab: 'decision' },
-  { id: 'memo', label: 'Memo output', short: 'Memo', tab: 'admin' },
-  { id: 'workflow', label: 'Ruling workflow', short: 'Workflow', tab: 'admin' },
-  { id: 'budget', label: 'Cost budget', short: 'Budget', tab: 'admin' },
-  { id: 'system', label: 'System state', short: 'System', tab: 'admin' },
-] satisfies ReadonlyArray<SettingsSectionDefinition>;
-
-export function tabForSection(id: SectionId): SettingsTab {
-  return SETTINGS_SECTIONS.find((section) => section.id === id)?.tab ?? 'decision';
-}
+  group: SettingsPersistenceGroup;
+}[];
 
 export function serializeDecisionConfig(config: FundConfiguration): string {
   const comparable = { ...config } as Record<string, unknown>;

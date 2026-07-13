@@ -2,27 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultFundConfiguration } from '../../lib/fundConfiguration';
 import {
   SETTINGS_SECTIONS,
+  SETTINGS_GROUPS,
   getFundThesisChangeSet,
   getPendingChanges,
   serializeDecisionConfig,
-  tabForSection,
 } from '../settingsModel';
 
 describe('settings navigation model', () => {
-  it('maps each settings section to its owning tab', () => {
-    expect(tabForSection('thesis')).toBe('decision');
-    expect(tabForSection('thresholds')).toBe('decision');
-    expect(tabForSection('weights')).toBe('decision');
-    expect(tabForSection('sensitivity')).toBe('decision');
-    expect(tabForSection('memo')).toBe('admin');
-    expect(tabForSection('workflow')).toBe('admin');
-    expect(tabForSection('budget')).toBe('admin');
-    expect(tabForSection('system')).toBe('admin');
-    expect(SETTINGS_SECTIONS.filter((item) => item.tab === 'decision')).toHaveLength(4);
-    expect(SETTINGS_SECTIONS.filter((item) => item.tab === 'admin')).toHaveLength(4);
+  it('maps each settings section to its persistence group', () => {
+    expect(SETTINGS_GROUPS.map((group) => group.id)).toEqual(['policy', 'runtime']);
+    expect(SETTINGS_SECTIONS.filter((item) => item.group === 'policy')).toHaveLength(7);
+    expect(SETTINGS_SECTIONS.filter((item) => item.group === 'runtime')).toHaveLength(2);
   });
 
-  it('keeps Administration preferences in the deployable pending list', () => {
+  it('keeps fund policy preferences in the deployable pending list', () => {
     const live = {
       ...createDefaultFundConfiguration(),
       activePolicyVersionId: 'policy-v4',

@@ -14,8 +14,17 @@ describe('Settings focused-mode layout contract', () => {
   it('is a top bar + navigation rail over one scrolling reading column', () => {
     expect(source).toContain('<SettingsTopBar');
     expect(source).toContain('<SettingsRail');
+    expect(source).toContain('<SettingsMobileNav');
     expect(source).toContain('ref={contentScrollRef}');
     expect(source).toContain('overscroll-contain bg-paper');
+  });
+
+  it('states the persistence model truthfully', () => {
+    expect(source).toContain('title="Fund policy"');
+    expect(source).toContain('Changes here stay in draft until you deploy a new version.');
+    expect(source).toContain('title="Live runtime"');
+    expect(source).toContain('Changes here save immediately and affect the running system.');
+    expect(operationsSource).toContain('These controls save immediately.');
   });
 
   it('replaces tabs with a scroll-spy of stacked sections', () => {
