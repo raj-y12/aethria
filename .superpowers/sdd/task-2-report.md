@@ -47,3 +47,16 @@
 ### Concerns
 
 - No concerns identified. DispatchCommandBar and dot motion were not changed.
+
+## Review fix: pointer-gated action hover
+
+- Replaced `productInteraction.action` on the Use/Resolve controls with a component-local equivalent that preserves the existing `type-action` typography, focus, and disabled behavior while gating `hover:text-oxford` behind the fine-pointer media query.
+
+### Verification
+
+- `cd app-front-end && npm test -- --run src/components/__tests__/CandidatePicker.test.tsx src/api/__tests__/startupsLookup.test.ts` — passed: 2 files, 4 tests.
+- `cd app-front-end && npm run build` — passed TypeScript compilation and Vite production build.
+
+### Concerns
+
+- No concerns identified. The focused change is limited to the two CandidatePicker action controls.

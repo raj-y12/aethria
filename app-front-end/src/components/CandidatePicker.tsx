@@ -1,11 +1,13 @@
 import { useState, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
 import type { LookupCandidate } from '../api/startups';
-import { productInteraction } from '../design-system/productSystem';
 import { transitionOrReduced } from '../design-system/motion';
 import { tokens } from '../design-system/tokens';
 import { usePrefersReducedMotion } from '../hooks';
 import { domainLabel, evidenceLabels, identityConfidence, isBestIdentityMatch } from '../lib/candidateIdentity';
+
+const candidateAction =
+  'type-action min-h-[44px] rounded-none border-0 bg-transparent p-0 transition-colors disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 focus-visible:ring-offset-0 [@media(hover:hover)_and_(pointer:fine)]:hover:text-oxford';
 
 interface CandidatePickerProps {
   candidates: LookupCandidate[];
@@ -84,7 +86,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
                 onClick={() => onPick(candidate)}
                 disabled={busy}
                 aria-label={`Use ${candidate.name} at ${domain}`}
-                className={`${productInteraction.action} candidate-identity__action whitespace-nowrap transition-transform duration-150 active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oxford disabled:opacity-60`}
+                className={`${candidateAction} candidate-identity__action whitespace-nowrap transition-transform duration-150 active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oxford disabled:opacity-60`}
               >
                 Use this company <span aria-hidden>→</span>
               </button>
@@ -110,7 +112,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
               disabled={busy}
               className="min-w-0 flex-1 bg-transparent px-0 py-phi-2 font-sans text-[13px] text-oxford placeholder:text-oxford/60 outline-none focus-visible:ring-1 focus-visible:ring-oxford/30"
             />
-            <button type="button" onClick={submitRefine} disabled={busy || !website.trim()} className={`${productInteraction.action} transition-transform duration-150 active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oxford`}>
+            <button type="button" onClick={submitRefine} disabled={busy || !website.trim()} className={`${candidateAction} transition-transform duration-150 active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oxford`}>
               Resolve website
             </button>
           </div>
