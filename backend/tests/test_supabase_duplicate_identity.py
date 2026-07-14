@@ -76,7 +76,7 @@ def test_normalized_company_name_migration_enforces_tenant_uniqueness():
 
     sql = (
         Path(__file__).parents[2]
-        / "supabase/migrations/20260714000002_startups_normalized_name_unique.sql"
+        / "supabase/migrations/20260714192642_startups_normalized_name_unique.sql"
     ).read_text().lower()
 
     assert "unique index" in sql

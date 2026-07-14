@@ -56,7 +56,7 @@ def test_claim_due_jobs_fails_closed_on_rpc_error(monkeypatch):
 def test_schedule_migration_claim_is_transactional_and_service_role_only():
     sql = (
         Path(__file__).parents[2]
-        / "supabase/migrations/20260714000001_agent_job_schedules.sql"
+        / "supabase/migrations/20260714192632_agent_job_schedules.sql"
     ).read_text().lower()
 
     assert "create or replace function public.claim_due_agent_jobs" in sql

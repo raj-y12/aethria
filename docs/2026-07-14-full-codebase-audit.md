@@ -114,10 +114,10 @@ The `codex/audit-remediation` work uses this audit as its baseline.
 | Item | Remediation |
 |---|---|
 | Bug 1 | Rerun memo persistence explicitly generates the display memo; the internal memo and summary now use `recommendation`, `confidence`, and `decision_rationale`. |
-| Bug 2 | Both storage backends return the existing tenant-scoped startup ID for duplicate names; ScoutEngine propagates and persists that ID with an `already_in_deal_flow` outcome that Dispatch can open. Migration `20260714000002_startups_normalized_name_unique.sql` adds a normalized tenant/name unique index to close concurrent insert races. |
+| Bug 2 | Both storage backends return the existing tenant-scoped startup ID for duplicate names; ScoutEngine propagates and persists that ID with an `already_in_deal_flow` outcome that Dispatch can open. Migration `20260714192642_startups_normalized_name_unique.sql` adds a normalized tenant/name unique index to close concurrent insert races. |
 | Bug 3 | The original claim that `_read_file()` always read local JSON was not accurate—it already dispatched to Supabase. PortfolioEngine now uses a public `get_all_signals()` boundary, and stale warning updates are idempotent. |
 | Bug 4 | Decision filters normalize both legacy and canonical input, then compare `PartnerInfo.recommendation`. |
-| Bugs 5–6 | Meta and portfolio stages use atomic per-user PostgreSQL schedule claims. Migration `20260714000001_agent_job_schedules.sql` is required before deployment. Timestamp backdating was removed. |
+| Bugs 5–6 | Meta and portfolio stages use atomic per-user PostgreSQL schedule claims. Migration `20260714192632_agent_job_schedules.sql` and its verification follow-ups are required before deployment. Timestamp backdating was removed. |
 | Bug 7 | Cancellation state is insertion-ordered and evicts only the oldest key at capacity. |
 | Bug 8 | Enabling the global loop with every stage disabled returns `409`, persists `stopped`, and does not start a loop. |
 | Drift 8 | Production cycles invoke reference pruning after scout and before reviewer. |
@@ -127,4 +127,4 @@ The API router split, standalone-loop retirement, reviewer deduplication, and di
 
 ### Deployment preflight
 
-Apply `20260714000001_agent_job_schedules.sql` before starting the remediated workers. Before applying `20260714000002_startups_normalized_name_unique.sql`, run its normalized-name duplicate query and deliberately reconcile any rows it reports. The migration aborts instead of guessing which tenant data to merge or delete.
+Apply the `20260714192632` through `20260714192902` migrations in order before starting the remediated workers. Before applying `20260714192642_startups_normalized_name_unique.sql`, run its normalized-name duplicate query and deliberately reconcile any rows it reports. The migration aborts instead of guessing which tenant data to merge or delete.
