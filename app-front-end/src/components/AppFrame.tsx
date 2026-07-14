@@ -3,7 +3,9 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -121,6 +123,24 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
     fundConfiguration,
     onOpenMemo: handleOpenMemo,
   });
+  const previousDispatchOpen = useRef(dispatch.commandBarOpen);
+  const [dispatchExitPending, setDispatchExitPending] = useState(false);
+  const dispatchClosing = previousDispatchOpen.current && !dispatch.commandBarOpen;
+
+  useLayoutEffect(() => {
+    if (dispatch.commandBarOpen) {
+      setDispatchExitPending(false);
+    } else if (previousDispatchOpen.current) {
+      setDispatchExitPending(true);
+    }
+    previousDispatchOpen.current = dispatch.commandBarOpen;
+  }, [dispatch.commandBarOpen]);
+
+  const dispatchTransitionActive =
+    dispatch.commandBarOpen || dispatchClosing || dispatchExitPending;
+  const completeDispatchExit = useCallback(() => {
+    setDispatchExitPending(false);
+  }, []);
 
   // Scroll lock has one owner: the frame. Covers the dispatch takeover and any
   // full-screen page overlay (mobile memo) without double-locking the body.
@@ -284,8 +304,8 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   });
 
   /** Dispatch is a front-door surface — hide workspace chrome while it is open. */
-  const showSpine = !bareChrome && !dispatch.commandBarOpen;
-  const showMobileChrome = !isDesktop && !bareChrome && !dispatch.commandBarOpen;
+  const showSpine = !bareChrome && !dispatchTransitionActive;
+  const showMobileChrome = !isDesktop && !bareChrome && !dispatchTransitionActive;
 
   return (
     <AppFrameContext.Provider value={contextValue}>
@@ -408,48 +428,66 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
               ) : null}
             </AnimatePresence>
             <motion.main
+              layout="position"
+              transition={chromeTransition}
               className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper"
             >
               {children}
-              <DispatchCommandBar
-                open={dispatch.commandBarOpen}
-                onClose={dispatch.closeCommandBar}
-                input={dispatch.input}
-                setInput={dispatch.setInput}
-                onSubmit={() => void dispatch.submit()}
-                onCancel={dispatch.cancel}
-                isBusy={dispatch.busy}
-                message={dispatch.message}
-                onClearMessage={dispatch.clearMessage}
-                lookupPhase={dispatch.phaseLabel}
-                progress={dispatch.progress}
-                chips={dispatch.chips}
-                onFocusChip={dispatch.focusChip}
-                failure={dispatch.failure}
-                onRetry={dispatch.dismissFailure}
-                candidates={dispatch.candidates}
-                needsWebsite={dispatch.needsWebsite}
-                onPickCandidate={dispatch.pickCandidate}
-                onRefineWebsite={dispatch.refineWithWebsite}
-                rerun={
-                  dispatch.rerunTarget
-                    ? {
-                        name: dispatch.rerunTarget.scout.name,
-                        sector: dispatch.rerunTarget.scout.sector ?? null,
+              <AnimatePresence initial={false} onExitComplete={completeDispatchExit}>
+                {dispatch.commandBarOpen ? (
+                  <motion.div
+                    key="dispatch-takeover"
+                    initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
+                    transition={transitionOrReduced(reduceMotion, {
+                      duration: tokens.motion.duration.short,
+                      ease: tokens.motion.ease,
+                    })}
+                    className="absolute inset-0 z-20"
+                  >
+                    <DispatchCommandBar
+                      open
+                      onClose={dispatch.closeCommandBar}
+                      input={dispatch.input}
+                      setInput={dispatch.setInput}
+                      onSubmit={() => void dispatch.submit()}
+                      onCancel={dispatch.cancel}
+                      isBusy={dispatch.busy}
+                      message={dispatch.message}
+                      onClearMessage={dispatch.clearMessage}
+                      lookupPhase={dispatch.phaseLabel}
+                      progress={dispatch.progress}
+                      chips={dispatch.chips}
+                      onFocusChip={dispatch.focusChip}
+                      failure={dispatch.failure}
+                      onRetry={dispatch.dismissFailure}
+                      candidates={dispatch.candidates}
+                      needsWebsite={dispatch.needsWebsite}
+                      onPickCandidate={dispatch.pickCandidate}
+                      onRefineWebsite={dispatch.refineWithWebsite}
+                      rerun={
+                        dispatch.rerunTarget
+                          ? {
+                              name: dispatch.rerunTarget.scout.name,
+                              sector: dispatch.rerunTarget.scout.sector ?? null,
+                            }
+                          : null
                       }
-                    : null
-                }
-                onSubmitRerun={(context) => void dispatch.submitRerun(context)}
-                result={
-                  dispatch.lookupDecided && dispatch.snapshotProps ? (
-                    <LookupResultSnapshot
-                      {...dispatch.snapshotProps}
-                      onOpenMemo={dispatch.openLookupMemo}
-                      className="w-full"
+                      onSubmitRerun={(context) => void dispatch.submitRerun(context)}
+                      result={
+                        dispatch.lookupDecided && dispatch.snapshotProps ? (
+                          <LookupResultSnapshot
+                            {...dispatch.snapshotProps}
+                            onOpenMemo={dispatch.openLookupMemo}
+                            className="w-full"
+                          />
+                        ) : null
+                      }
                     />
-                  ) : null
-                }
-              />
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
             </motion.main>
           </div>
         </LayoutGroup>

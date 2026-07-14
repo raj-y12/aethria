@@ -7,10 +7,12 @@ const flowPageSource = readFileSync(resolve(import.meta.dirname, '../src/pages/F
 const workGridSource = readFileSync(resolve(import.meta.dirname, '../src/components/WorkGrid.tsx'), 'utf8');
 
 describe('Home to Flow entrance choreography', () => {
-  it('places the workspace in its final geometry before the spine animates', () => {
-    expect(appFrameSource).not.toContain('layout="position"');
-    expect(appFrameSource).not.toContain('chromeModeChanged');
-    expect(appFrameSource).not.toContain('workspaceChromeReady');
+  it('restores synchronized workspace motion and sequences chrome after Dispatch exits', () => {
+    expect(appFrameSource).toContain('layout="position"');
+    expect(appFrameSource).toContain('transition={chromeTransition}');
+    expect(appFrameSource).toContain('dispatchTransitionActive');
+    expect(appFrameSource).toContain('onExitComplete={completeDispatchExit}');
+    expect(appFrameSource).toContain("exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}");
   });
 
   it('starts one light row cascade immediately, without a second page entrance', () => {
