@@ -35,15 +35,17 @@ describe('Home to Flow entrance choreography', () => {
     expect(workGridSource).toContain("translateY(3px)");
   });
 
-  it('keeps the memo closed until a row or deep link explicitly selects a deal', () => {
+  it('reveals the first desktop memo only after the WorkGrid stagger completes', () => {
     expect(flowPageSource).toContain('const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);');
     expect(flowPageSource).toContain("const openId = searchParams.get('open');");
     expect(flowPageSource).toContain('onStartupClick={handleStartupClick}');
-    expect(flowPageSource).not.toContain('autoSelectFirst=');
-    expect(flowPageSource).not.toContain('onAutoSelect=');
-    expect(flowPageSource).not.toContain('handleAutoSelect');
-    expect(workGridSource).not.toContain('autoSelectFirst');
-    expect(workGridSource).not.toContain('onAutoSelect');
-    expect(workGridSource).not.toContain('top of the current view takes the canvas');
+    expect(flowPageSource).toContain('const handleGridEntranceComplete = useCallback((startup: Startup) => {');
+    expect(flowPageSource).toContain('setSelectedStartup((current) => current ?? startup);');
+    expect(flowPageSource).toContain('onEntranceComplete={isDesktop ? handleGridEntranceComplete : undefined}');
+    expect(workGridSource).toContain('onEntranceComplete?: (startup: Startup) => void;');
+    expect(workGridSource).toContain('onAnimationComplete={completeEntrance}');
+    expect(workGridSource).toContain('onEntranceComplete?.(first.startup);');
+    expect(flowPageSource).not.toContain('INITIAL_MEMO_DELAY_MS');
+    expect(flowPageSource).not.toContain('setTimeout(');
   });
 });

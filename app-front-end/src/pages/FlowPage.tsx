@@ -98,6 +98,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   const memoContentRef = useRef<InvestmentMemoContentHandle | null>(null);
+  const initialMemoRevealHandledRef = useRef(false);
 
   // The room header readouts are the queue views — state lives here, the
   // docket (WorkGrid) is controlled and reports its per-view counts back.
@@ -120,6 +121,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
 
   const handleStartupClick = useCallback(
     (startup: Startup) => {
+      initialMemoRevealHandledRef.current = true;
       restoreRef.current = document.activeElement as HTMLElement | null;
       setSelectedStartup(startup.is_new_to_user ? acknowledge(startup) : startup);
     },
@@ -131,6 +133,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
     if (!openId || startups.length === 0) return;
     const match = startups.find((s) => s.id === openId);
     if (match) {
+      initialMemoRevealHandledRef.current = true;
       setSelectedStartup(match.is_new_to_user ? acknowledge(match) : match);
     }
     const params = new URLSearchParams(searchParams);
@@ -169,6 +172,12 @@ export default function FlowPage({ data }: { data: SystemData }) {
 
   useEscapeKey(handleCloseMemo, memoOpen && !isDesktop);
   useRestoreFocus(memoOpen, restoreRef, true);
+
+  const handleGridEntranceComplete = useCallback((startup: Startup) => {
+    if (initialMemoRevealHandledRef.current) return;
+    initialMemoRevealHandledRef.current = true;
+    setSelectedStartup((current) => current ?? startup);
+  }, []);
 
   const useModal = Boolean(selectedStartup && !isDesktop);
   useEffect(() => {
@@ -270,6 +279,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
                 onQueueViewChange={setQueueView}
                 onViewCounts={setViewCounts}
                 entranceReady={workspaceChromeReady}
+                onEntranceComplete={isDesktop ? handleGridEntranceComplete : undefined}
               />
             </section>
 

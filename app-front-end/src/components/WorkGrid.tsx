@@ -46,6 +46,8 @@ interface WorkGridProps {
   onViewCounts?: (counts: Record<QueueView, number>) => void;
   /** AppFrame releases the initial cascade after a bare-to-full chrome entrance. */
   entranceReady?: boolean;
+  /** Fires once, after the initial visible row cascade has fully settled. */
+  onEntranceComplete?: (startup: Startup) => void;
 }
 
 const EMPTY_WATCHLIST_IDS = new Set<string>();
@@ -160,6 +162,7 @@ const WorkGrid = ({
   onQueueViewChange,
   onViewCounts,
   entranceReady = true,
+  onEntranceComplete,
 }: WorkGridProps): JSX.Element => {
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
   const config = fundConfiguration ?? createDefaultFundConfiguration();
@@ -344,6 +347,19 @@ const WorkGrid = ({
     return sorted;
   }, [allModels, queueView, sourceFilters, outcomeFilters, flagFilters, reviewFilters, sortFilter, pinnedNewId]);
 
+  const entranceCompleteRef = useRef(false);
+  const completeEntrance = useCallback(() => {
+    if (!entranceReady || entranceCompleteRef.current || !onEntranceComplete) return;
+    const first = orderedModels[0];
+    if (!first) return;
+    entranceCompleteRef.current = true;
+    onEntranceComplete?.(first.startup);
+  }, [entranceReady, onEntranceComplete, orderedModels]);
+
+  useEffect(() => {
+    if (reduceMotion && entranceReady) completeEntrance();
+  }, [completeEntrance, entranceReady, reduceMotion]);
+
   // Drop the pin once the selection moves off the pinned row (memo closed or
   // a different row selected), letting the acknowledged row leave the NEW view.
   useEffect(() => {
@@ -482,6 +498,7 @@ const WorkGrid = ({
             initial={reduceMotion ? false : 'hidden'}
             animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}
             variants={listContainerVariants}
+            onAnimationComplete={completeEntrance}
           >
             {orderedModels.map((model, idx) => {
               const isSelected = selectedId === model.startup.id;
