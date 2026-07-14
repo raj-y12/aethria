@@ -170,10 +170,6 @@ export default function FlowPage({ data }: { data: SystemData }) {
   useEscapeKey(handleCloseMemo, memoOpen && !isDesktop);
   useRestoreFocus(memoOpen, restoreRef, true);
 
-  const handleAutoSelect = useCallback((startup: Startup) => {
-    setSelectedStartup(startup);
-  }, []);
-
   const useModal = Boolean(selectedStartup && !isDesktop);
   useEffect(() => {
     setPageOverlayOpen(useModal);
@@ -270,8 +266,6 @@ export default function FlowPage({ data }: { data: SystemData }) {
                 selectedId={selectedStartup?.id ?? null}
                 watchlistIds={watchlistIds}
                 fundConfiguration={fundConfiguration}
-                autoSelectFirst={isDesktop}
-                onAutoSelect={handleAutoSelect}
                 queueView={queueView}
                 onQueueViewChange={setQueueView}
                 onViewCounts={setViewCounts}

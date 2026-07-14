@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import { LayoutGroup, motion, type Variants } from 'framer-motion';
 import type { Startup } from '../types/startup';
@@ -39,10 +39,6 @@ interface WorkGridProps {
   selectedId?: string | null;
   watchlistIds?: Set<string>;
   fundConfiguration?: FundConfiguration;
-  /** The canvas always has an anchor: select the top-priority row when nothing is selected. */
-  autoSelectFirst?: boolean;
-  /** Auto-selection callback — unlike onStartupClick it must not acknowledge new rows. */
-  onAutoSelect?: (startup: Startup) => void;
   /** Controlled queue view — the room header readouts own view switching. */
   queueView: QueueView;
   onQueueViewChange: (view: QueueView) => void;
@@ -160,8 +156,6 @@ const WorkGrid = ({
   selectedId,
   watchlistIds,
   fundConfiguration,
-  autoSelectFirst = false,
-  onAutoSelect,
   queueView,
   onQueueViewChange,
   onViewCounts,
@@ -355,16 +349,6 @@ const WorkGrid = ({
   useEffect(() => {
     if (pinnedNewId && selectedId !== pinnedNewId) setPinnedNewId(null);
   }, [selectedId, pinnedNewId]);
-
-  // The decision stage always has a subject: when nothing is selected, the
-  // top of the current view takes the canvas (without acknowledging it).
-  // Deep links (?queue=…, ?open=…) win — wait until they have been consumed.
-  useLayoutEffect(() => {
-    if (!autoSelectFirst || selectedId != null) return;
-    if (searchParams.get('queue') != null || searchParams.get('open') != null) return;
-    const first = orderedModels[0]?.startup;
-    if (first) onAutoSelect?.(first);
-  }, [autoSelectFirst, selectedId, orderedModels, onAutoSelect, searchParams]);
 
   const handleRowSelect = useCallback(
     (startup: Startup) => {

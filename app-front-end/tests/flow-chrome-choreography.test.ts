@@ -35,9 +35,15 @@ describe('Home to Flow entrance choreography', () => {
     expect(workGridSource).toContain("translateY(3px)");
   });
 
-  it('selects the initial case before paint so rows never reflow mid-cascade', () => {
-    expect(workGridSource).toContain('useLayoutEffect(() => {');
-    expect(workGridSource).not.toContain('INITIAL_MEMO_DELAY_MS');
-    expect(workGridSource).not.toContain('autoSelectReady');
+  it('keeps the memo closed until a row or deep link explicitly selects a deal', () => {
+    expect(flowPageSource).toContain('const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);');
+    expect(flowPageSource).toContain("const openId = searchParams.get('open');");
+    expect(flowPageSource).toContain('onStartupClick={handleStartupClick}');
+    expect(flowPageSource).not.toContain('autoSelectFirst=');
+    expect(flowPageSource).not.toContain('onAutoSelect=');
+    expect(flowPageSource).not.toContain('handleAutoSelect');
+    expect(workGridSource).not.toContain('autoSelectFirst');
+    expect(workGridSource).not.toContain('onAutoSelect');
+    expect(workGridSource).not.toContain('top of the current view takes the canvas');
   });
 });
