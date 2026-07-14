@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Settings } from '../api/settings';
 import {
   FUND_CONFIG_EVENT,
@@ -10,20 +10,23 @@ import {
 
 export function useFundConfiguration(settings?: Settings | null) {
   const [configuration, setConfiguration] = useState<FundConfiguration>(() => loadFundConfiguration(settings));
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const remoteConfigKey = JSON.stringify(settings?.fund_config ?? null);
 
   useEffect(() => {
-    setConfiguration(loadFundConfiguration(settings));
-  }, [settings]);
+    setConfiguration(loadFundConfiguration(settingsRef.current));
+  }, [remoteConfigKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const handleUpdate = (event: Event) => {
       const custom = event as CustomEvent<FundConfiguration>;
-      setConfiguration(custom.detail ?? loadFundConfiguration(settings));
+      setConfiguration(custom.detail ?? loadFundConfiguration(settingsRef.current));
     };
     window.addEventListener(FUND_CONFIG_EVENT, handleUpdate);
     return () => window.removeEventListener(FUND_CONFIG_EVENT, handleUpdate);
-  }, [settings]);
+  }, []);
 
   const save = (next: FundConfiguration) => {
     const saved = saveFundConfiguration(next);

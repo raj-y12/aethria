@@ -82,7 +82,12 @@ function ReadoutKey({
  */
 export default function FlowPage({ data }: { data: SystemData }) {
   const { startups, signals, watchlistAnalytics } = data;
-  const { inlineDispatch, setPageOverlayOpen, openDispatch, openRerun } = useAppFrame();
+  const {
+    inlineDispatch,
+    setPageOverlayOpen,
+    openDispatch,
+    openRerun,
+  } = useAppFrame();
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const reduceMotion = usePrefersReducedMotion();
@@ -183,7 +188,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
   }, [watchlistAnalytics]);
 
   return (
-    <div className="page-transition-enter flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop} ${workspaceLayout.pageBottom} flex h-full min-h-0 flex-col`}>
         <div className="flex-none pb-phi-4 lg:hidden">
           <AgentDispatch

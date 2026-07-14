@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import { LayoutGroup, motion, type Variants } from 'framer-motion';
 import type { Startup } from '../types/startup';
@@ -195,24 +195,6 @@ const WorkGrid = ({
   // the analyst clicks off it (closes the memo or selects another row).
   const [pinnedNewId, setPinnedNewId] = useState<string | null>(null);
   const reduceMotion = usePrefersReducedMotion();
-  // Defer the default top-of-queue auto-selection until the page-entrance
-  // animation has settled. Auto-select mounts the (heavy) memo and expands the
-  // first row; doing that mid-entrance is what made Flow stutter on open.
-  const [autoSelectReady, setAutoSelectReady] = useState(reduceMotion);
-  useEffect(() => {
-    if (reduceMotion) return;
-    const timer = window.setTimeout(() => setAutoSelectReady(true), 150);
-    return () => window.clearTimeout(timer);
-  }, [reduceMotion]);
-  // Let the chrome (spine slide + page-enter) land before the docket staggers
-  // in — otherwise the sidebar, the rows, and the memo all animate at once and
-  // the entrance stutters. After this window, re-staggers (filter/sort) are snappy.
-  const [chromeSettled, setChromeSettled] = useState(reduceMotion);
-  useEffect(() => {
-    if (reduceMotion) return;
-    const timer = window.setTimeout(() => setChromeSettled(true), 200);
-    return () => window.clearTimeout(timer);
-  }, [reduceMotion]);
   const hasActiveFilters =
     sourceFilters.size > 0 ||
     outcomeFilters.size > 0 ||
@@ -250,20 +232,20 @@ const WorkGrid = ({
       ? undefined
       : {
           hidden: {},
-          visible: { transition: { staggerChildren: 0.04, delayChildren: chromeSettled ? 0.04 : 0.1 } },
+          visible: { transition: { staggerChildren: 0.026, delayChildren: 0.02 } },
         },
-    [reduceMotion, chromeSettled]
+    [reduceMotion]
   );
 
   const rowVariants = useMemo((): Variants | undefined =>
     reduceMotion
       ? undefined
       : {
-          hidden: { opacity: 0, transform: 'translateY(6px)' },
+          hidden: { opacity: 0, transform: 'translateY(3px)' },
           visible: {
             opacity: 1,
             transform: 'translateY(0px)',
-            transition: { duration: tokens.motion.duration.short, ease: tokens.motion.ease },
+            transition: { duration: 0.18, ease: tokens.motion.ease },
           },
         },
     [reduceMotion]
@@ -374,12 +356,12 @@ const WorkGrid = ({
   // The decision stage always has a subject: when nothing is selected, the
   // top of the current view takes the canvas (without acknowledging it).
   // Deep links (?queue=…, ?open=…) win — wait until they have been consumed.
-  useEffect(() => {
-    if (!autoSelectFirst || selectedId != null || !autoSelectReady) return;
+  useLayoutEffect(() => {
+    if (!autoSelectFirst || selectedId != null) return;
     if (searchParams.get('queue') != null || searchParams.get('open') != null) return;
     const first = orderedModels[0]?.startup;
     if (first) onAutoSelect?.(first);
-  }, [autoSelectFirst, autoSelectReady, selectedId, orderedModels, onAutoSelect, searchParams]);
+  }, [autoSelectFirst, selectedId, orderedModels, onAutoSelect, searchParams]);
 
   const handleRowSelect = useCallback(
     (startup: Startup) => {
@@ -449,7 +431,7 @@ const WorkGrid = ({
                 key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
                 className="max-w-[32rem]"
                 initial={reduceMotion ? false : 'hidden'}
-                animate="visible"
+                animate={reduceMotion ? undefined : 'visible'}
                 variants={emptyStateContainerVariants}
               >
                 <motion.p className="type-label-tab text-oxford/60" variants={emptyStateItemVariants}>
@@ -511,7 +493,7 @@ const WorkGrid = ({
             key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
             className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1 pb-phi-6"
             initial={reduceMotion ? false : 'hidden'}
-            animate="visible"
+            animate={reduceMotion ? undefined : 'visible'}
             variants={listContainerVariants}
           >
             {orderedModels.map((model, idx) => {

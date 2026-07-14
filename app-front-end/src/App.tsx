@@ -76,8 +76,9 @@ function AppShell() {
       <AppFrame
         data={systemData}
         startupsError={systemData.startupsError}
-        // The front door is a centered Dispatch-style surface with its own keys.
-        chrome={!isSettingsRoute && !isPortfolioRoute && !isFundRoute && !isFlowRoute ? 'bare' : 'full'}
+        // Bare = spine dissolves: the front door and Settings are both focused,
+        // Dispatch-style takeovers with their own way back to the app.
+        chrome={!isPortfolioRoute && !isFundRoute && !isFlowRoute ? 'bare' : 'full'}
       >
         <ErrorBoundary key={pathname} label="workspace">
           {isSettingsRoute ? (

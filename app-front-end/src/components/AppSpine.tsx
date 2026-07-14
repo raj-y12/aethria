@@ -183,6 +183,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                   shortcut={item.shortcut}
                   compact
                   surface="oxford"
+                  indicatorId="spine-workspaces-active"
                 />
               ))}
               <div className="my-phi-2 px-2">

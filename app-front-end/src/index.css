@@ -565,16 +565,8 @@
       opacity 150ms var(--motion-ease),
       transform 120ms var(--motion-ease);
   }
-  /* scale(0.97) gives instant tactile press feedback — translateY(1px) barely registers */
-  .btn-interaction:active:not(:disabled) {
-    transform: scale(0.97);
-    opacity: 0.88;
-  }
-  /** Opt out of :active press feedback from .btn-interaction (nav tabs, queue chrome). */
-  .btn-interaction--no-press:active:not(:disabled) {
-    transform: none;
-    opacity: 1;
-  }
+  /* No press-down (scale/opacity) on :active — deliberately omitted. Hover and
+     focus transitions carry the feedback; the tactile shrink read as cheap. */
   .btn-interaction:disabled {
     opacity: 0.7;
     cursor: not-allowed;

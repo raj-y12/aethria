@@ -1,0 +1,90 @@
+import { motion } from 'framer-motion';
+import type { Settings } from '../api/settings';
+import { usePrefersReducedMotion } from '../hooks';
+import OperationsStrip from './OperationsStrip';
+import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SectionId } from './settingsModel';
+
+const EASE = [0.16, 1, 0.3, 1] as const;
+const INDICATOR_EASE = [0.77, 0, 0.175, 1] as const;
+
+/**
+ * The focused-mode navigation rail — stands where the app spine used to be.
+ * A scroll-spy table of contents (clicking scrolls; the active item is driven
+ * by what's on screen) with the instant-save pipeline controls pinned at its
+ * foot. The active marker slides between items via a shared layout animation.
+ */
+export default function SettingsRail({
+  activeSection,
+  attentionSection,
+  onNavigate,
+  settings,
+  storageUnavailable,
+  onSettingsChange,
+}: {
+  activeSection: SectionId;
+  attentionSection: SectionId | null;
+  onNavigate: (id: SectionId) => void;
+  settings: Settings;
+  storageUnavailable: boolean;
+  onSettingsChange: (settings: Settings) => void;
+}) {
+  const reduceMotion = usePrefersReducedMotion();
+  return (
+    <motion.aside
+      className="hidden w-[13.5rem] flex-none flex-col overflow-y-auto border-r border-oxford/[0.08] bg-paper lg:flex"
+      aria-label="Settings sections"
+      initial={reduceMotion ? false : { opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.45, ease: EASE, delay: 0.1 }}
+    >
+      <nav className="flex flex-col gap-phi-5 px-phi-4 pb-phi-4 pt-phi-5">
+        {SETTINGS_GROUPS.map((group) => (
+          <div key={group.id}>
+            <div className="flex items-baseline justify-between gap-phi-2 px-phi-4 pb-phi-2">
+              <p className="type-label-section text-xs text-oxford/70">{group.label}</p>
+              <span className="type-status text-xs text-oxford/70">{group.persistence}</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              {SETTINGS_SECTIONS.filter((section) => section.group === group.id).map((section) => {
+                const active = activeSection === section.id;
+                const needsAttention = attentionSection === section.id;
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => onNavigate(section.id)}
+                    aria-current={active ? 'true' : undefined}
+                    className={`relative flex min-h-[32px] items-center px-phi-4 py-phi-1 text-left type-body-sm transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+                      active ? 'text-oxford' : 'text-oxford/70 hover:text-oxford/80'
+                    }`}
+                  >
+                    {active ? (
+                      <motion.span
+                        layoutId="settings-rail-active"
+                        className="absolute inset-y-1 left-0 w-[2px] bg-oxford"
+                        transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: INDICATOR_EASE }}
+                        aria-hidden
+                      />
+                    ) : null}
+                    <span className="truncate">
+                      {section.label}{needsAttention ? ' — Needs attention' : ''}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="mt-auto border-t border-oxford/[0.08]">
+        <OperationsStrip
+          variant="rail"
+          settings={settings}
+          storageUnavailable={storageUnavailable}
+          onSettingsChange={onSettingsChange}
+        />
+      </div>
+    </motion.aside>
+  );
+}
