@@ -34,7 +34,7 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
         >
           <div className="pointer-events-auto flex w-full max-w-[min(92vw,32rem)] items-center gap-phi-3 rounded-full bg-oxford px-phi-4 py-phi-3 text-paper shadow-[0_10px_28px_rgba(0,20,51,0.2)] sm:gap-phi-4">
             <span className="h-2 w-2 shrink-0 rounded-full bg-paper signal-dot-breathe" aria-hidden />
-            <p className="min-w-0 flex-1 truncate font-sans text-[13px] font-medium text-paper sm:text-[14px]">
+            <p className="min-w-0 flex-1 truncate font-display text-[15px] leading-none text-paper sm:text-[16px]">
               <span className="sr-only">Memo ready: </span>
               {name}
             </p>
