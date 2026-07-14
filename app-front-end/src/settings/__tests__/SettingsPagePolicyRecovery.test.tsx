@@ -90,6 +90,18 @@ function createSettings(fundName = 'Original Fund'): Settings {
   return { ...base, fund_config: createDefaultFundConfiguration(base) };
 }
 
+function withMandateName(settings: Settings, mandateName: string): Settings {
+  return {
+    ...settings,
+    fund_config: settings.fund_config
+      ? {
+          ...settings.fund_config,
+          mandate: { ...settings.fund_config.mandate, mandateName },
+        }
+      : settings.fund_config,
+  };
+}
+
 function renderPage(settings: Settings) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -98,7 +110,7 @@ function renderPage(settings: Settings) {
   const Wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
-  return render(<SettingsPage />, { wrapper: Wrapper });
+  return { ...render(<SettingsPage />, { wrapper: Wrapper }), queryClient };
 }
 
 function withPublishedPolicy(settings: Settings, policyId: string): Settings {
@@ -141,6 +153,42 @@ describe('SettingsPage durable policy publish recovery', () => {
       configurable: true,
       value: vi.fn(),
     });
+  });
+
+  it('reconciles a clean editor with the authoritative settings response on entry', async () => {
+    const cached = withMandateName(createSettings(), 'Cached mandate');
+    const fresh = withMandateName(createSettings(), 'Fresh mandate');
+    let resolveFresh: ((settings: Settings) => void) | undefined;
+    mocks.fetchSettings.mockImplementationOnce(() => new Promise<Settings>((resolve) => {
+      resolveFresh = resolve;
+    }));
+
+    renderPage(cached);
+
+    expect(await screen.findByRole('textbox', { name: 'Mandate name' })).toHaveValue('Cached mandate');
+    await waitFor(() => expect(mocks.fetchSettings).toHaveBeenCalledTimes(1));
+    resolveFresh?.(fresh);
+
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Mandate name' })).toHaveValue('Fresh mandate'));
+  });
+
+  it('preserves an edited draft when the authoritative settings response arrives', async () => {
+    const cached = withMandateName(createSettings(), 'Cached mandate');
+    const fresh = withMandateName(createSettings(), 'Fresh mandate');
+    let resolveFresh: ((settings: Settings) => void) | undefined;
+    mocks.fetchSettings.mockImplementationOnce(() => new Promise<Settings>((resolve) => {
+      resolveFresh = resolve;
+    }));
+
+    const { queryClient } = renderPage(cached);
+
+    const mandateName = await screen.findByRole('textbox', { name: 'Mandate name' });
+    await waitFor(() => expect(mocks.fetchSettings).toHaveBeenCalledTimes(1));
+    fireEvent.change(mandateName, { target: { value: 'My unsaved mandate' } });
+    resolveFresh?.(fresh);
+
+    await waitFor(() => expect(queryClient.getQueryData(['settings'])).toEqual(fresh));
+    expect(mandateName).toHaveValue('My unsaved mandate');
   });
 
   it('keeps later draft edits visible through a real-hook retry and returns them to ordinary draft state', async () => {

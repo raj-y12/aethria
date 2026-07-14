@@ -9,12 +9,14 @@ class _FakeScoutEngine:
     active_thesis = "unset"
     calls = 0
     outcome = None
+    resolution = None
 
     def __init__(self, *args, **kwargs):
         type(self).active_thesis = kwargs.get("active_thesis", "missing")
 
     async def run_named_lookup(self, **kwargs):
         type(self).calls += 1
+        type(self).resolution = kwargs.get("resolution")
         self.last_lookup_outcome = type(self).outcome
         return "startup-1"
 
@@ -67,6 +69,7 @@ class _FakeThesis:
 def _wire_common_engines(monkeypatch):
     _FakeScoutEngine.calls = 0
     _FakeScoutEngine.outcome = None
+    _FakeScoutEngine.resolution = None
     _FakeReviewerEngine.calls = 0
     _FakeReviewerEngine.result = True
     _FakePartnerEngine.calls = 0
@@ -103,6 +106,34 @@ async def test_on_demand_lookup_evaluates_against_active_thesis(monkeypatch):
     assert _FakeScoutEngine.active_thesis == _FakeThesis.CONTEXT
     assert _FakeReviewerEngine.active_thesis == _FakeThesis.CONTEXT
     assert _FakePartnerEngine.fund_thesis == _FakeThesis.CONTEXT
+
+
+@pytest.mark.asyncio
+async def test_on_demand_lookup_forwards_resolution_and_records_stage_timings(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+    resolution = SimpleNamespace(canonical_name="Acme")
+    observed = []
+    monkeypatch.setattr(
+        "pipeline_runner.metrics.observe_pipeline_stage",
+        lambda duration, **labels: observed.append(labels),
+    )
+
+    startup_id = await run_on_demand_lookup(
+        "user_123",
+        "Acme",
+        lookup_id="lookup-timed-123",
+        resolution=resolution,
+    )
+
+    assert startup_id == "startup-1"
+    assert _FakeScoutEngine.resolution is resolution
+    assert [(item["stage"], item["outcome"]) for item in observed] == [
+        ("scout", "success"),
+        ("reviewer", "success"),
+        ("partner", "success"),
+    ]
+    assert all(item["pipeline"] == "lookup" for item in observed)
 
 
 @pytest.mark.asyncio

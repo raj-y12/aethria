@@ -2,11 +2,18 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, animate } from 'framer-motion';
 import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePrefersReducedMotion } from '../hooks';
 import AuthInstitutionalFooter from './AuthInstitutionalFooter';
 import ActivityStatsRow, { activityStatsFromSummary } from './ActivityStatsRow';
-import { fetchActivitySummaryWithToken, pingBackendWarmup, type ActivitySummary } from '../api/activity';
+import {
+  fetchActivitySummaryWithToken,
+  markActivitySeenWithToken,
+  pingBackendWarmup,
+  type ActivitySummary,
+} from '../api/activity';
 import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from '../lib/loginEntryTransition';
+import { fetchStartupsWithToken } from '../api/startups';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -43,6 +50,7 @@ export default function LoginPage() {
   const { isLoaded, isSignedIn } = useUser();
   const { signIn } = useSignIn();
   const clerk = useClerk();
+  const queryClient = useQueryClient();
 
   const [phase, setPhase] = useState<Phase>('form');
   const [welcomeName, setWelcomeName] = useState('');
@@ -61,6 +69,7 @@ export default function LoginPage() {
   const hasRedirectedRef = useRef(false);
   const formShakeRef = useRef<HTMLDivElement>(null);
   const enterTimeoutRef = useRef<number | null>(null);
+  const activityTokenRef = useRef<string | null>(null);
 
   // Wake a cold backend while the user types credentials, so the first
   // authenticated call (the welcome screen's activity summary) lands warm.
@@ -99,6 +108,8 @@ export default function LoginPage() {
     if (entering) return;
     const transition = getLoginEntryTransition(reduceMotion);
     sessionStorage.setItem(LOGIN_ENTRY_SESSION_KEY, '1');
+    const activityToken = activityTokenRef.current;
+    if (activityToken) void markActivitySeenWithToken(activityToken).catch(() => {});
     setEntering(true);
     enterTimeoutRef.current = window.setTimeout(() => {
       navigate('/v1', { replace: true });
@@ -163,7 +174,23 @@ export default function LoginPage() {
           }
           const token = await clerk.session?.getToken();
           if (token) {
-            const summary = await fetchActivitySummaryWithToken(token);
+            activityTokenRef.current = token;
+            // Use the authenticated welcome beat to seed the primary app query.
+            // Register the preload with TanStack Query so navigation subscribes
+            // to the same in-flight request instead of issuing a duplicate GET.
+            const startupPreload = queryClient.fetchQuery({
+              queryKey: ['startups', 'list'],
+              queryFn: async () => {
+                const startups = await fetchStartupsWithToken(token);
+                if (!startups) throw new Error('startup preload unavailable');
+                return startups;
+              },
+              staleTime: 90_000,
+            }).catch(() => null);
+            const [summary] = await Promise.all([
+              fetchActivitySummaryWithToken(token),
+              startupPreload,
+            ]);
             if (summary) setActivity(summary);
           }
         } catch {
@@ -202,7 +229,7 @@ export default function LoginPage() {
       passwordRef.current?.focus();
       setLoading(false);
     }
-  }, [loading, phase, username, password, signIn, navigate, isSignedIn, clerk]);
+  }, [loading, phase, username, password, signIn, navigate, isSignedIn, clerk, queryClient]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, field: 'username' | 'password') => {
@@ -216,8 +243,9 @@ export default function LoginPage() {
 
   if (!isLoaded) return null;
 
-  const stats = activity ? activityStatsFromSummary(activity) : null;
-  const enterDelay = stats ? 0.22 + stats.length * 0.07 + 0.1 : 0.2;
+  const stats = activity ? activityStatsFromSummary(activity) : [];
+  const hasStats = stats.length > 0;
+  const enterDelay = hasStats ? 0.22 + stats.length * 0.07 + 0.1 : 0.2;
   const entryTransition = getLoginEntryTransition(reduceMotion);
 
   const dateline = new Date()
@@ -298,7 +326,9 @@ export default function LoginPage() {
                   textAlign: 'center',
                 }}
               >
-                Agents continued working. Here is what happened.
+                {activityLoading || hasStats
+                  ? 'Agents continued working. Here is what happened.'
+                  : 'Your workspace is current.'}
               </p>
             </motion.div>
           ) : (
@@ -352,14 +382,14 @@ export default function LoginPage() {
               )}
 
               {/* Stats — numbers count up on reveal */}
-              {!activityLoading && stats && (
+              {!activityLoading && hasStats && (
                 <div style={{ marginBottom: '64px' }}>
                   <ActivityStatsRow stats={stats} reduceMotion={reduceMotion} />
                 </div>
               )}
 
               {/* No activity */}
-              {!activityLoading && !stats && (
+              {!activityLoading && !hasStats && (
                 <p
                   style={{
                     fontFamily: "var(--font-sans)",

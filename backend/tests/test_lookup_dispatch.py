@@ -122,6 +122,70 @@ def test_resolve_endpoint_returns_ambiguous_with_candidates(monkeypatch):
     assert {"https://lyra.ie", "https://lyra.com"} <= domains
 
 
+def test_resolved_lookup_token_reuses_server_side_resolution(monkeypatch):
+    import api
+
+    sources = [
+        {
+            "title": "Acme",
+            "url": "https://acme.example",
+            "snippet": "Acme builds warehouse robots.",
+        }
+    ]
+    client = _resolve_test_client(monkeypatch, sources)
+
+    class CapturingQueue:
+        def __init__(self):
+            self.jobs = []
+
+        async def put(self, job):
+            self.jobs.append(job)
+
+    queue = CapturingQueue()
+    monkeypatch.setattr(api, "_lookup_queue", queue)
+
+    resolved = client.post(
+        "/api/startups/lookup/resolve",
+        json={"lookup_input": "Acme"},
+        headers={"Authorization": "Bearer t"},
+    )
+    assert resolved.status_code == 200
+    token = resolved.json().get("resolution_token")
+    assert token
+
+    queued = client.post(
+        "/api/startups/lookup",
+        json={
+            "lookup_input": "Acme https://acme.example",
+            "lookup_id": "lookup-acme-123",
+            "resolution_token": token,
+        },
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert queued.status_code == 202
+    assert len(queue.jobs) == 1
+    resolution = queue.jobs[0]["resolution"]
+    assert resolution.canonical_name == "Acme"
+    assert resolution.website == "https://acme.example"
+
+
+def test_resolution_token_is_tenant_scoped_and_single_use():
+    import api
+    from resolver.company_resolver import CompanyResolution
+
+    resolution = CompanyResolution(
+        query="Acme",
+        canonical_name="Acme",
+        resolution_status="FOUND",
+    )
+    token = api._cache_lookup_resolution("user-a", resolution)
+
+    assert api._consume_lookup_resolution("user-b", token) is None
+    assert api._consume_lookup_resolution("user-a", token) is resolution
+    assert api._consume_lookup_resolution("user-a", token) is None
+
+
 def test_resolve_endpoint_uses_separate_bucket_from_lookup(monkeypatch):
     """Resolve has its own 30/min bucket, so six resolves (over the lookup's
     5/min limit) all still succeed and never touch the queue's budget."""

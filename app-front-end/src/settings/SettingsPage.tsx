@@ -238,7 +238,7 @@ function RoomSection({
     <section
       id={id}
       tabIndex={-1}
-      className={`flex min-w-0 scroll-mt-16 flex-col gap-phi-4 px-phi-4 pb-phi-5 pt-phi-5 outline-none lg:scroll-mt-0 ${className ?? ''}`}
+      className={`flex min-w-0 scroll-mt-16 flex-col gap-phi-4 pb-phi-5 pt-phi-5 outline-none lg:scroll-mt-0 ${className ?? ''}`}
     >
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
@@ -293,7 +293,7 @@ function EditorialStatus({
 
 function GroupHeader({ title, description }: { title: string; description: string }) {
   return (
-    <div className="px-phi-4 pb-phi-3 pt-phi-7">
+    <div className="pb-phi-3 pt-phi-7">
       <h2 className="type-display text-[1.5rem] leading-none text-oxford">{title}</h2>
       <p className="mt-phi-2 type-body-sm text-oxford/70">{description}</p>
     </div>
@@ -317,10 +317,11 @@ export default function SettingsPage() {
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
   const [thesisSummary, setThesisSummary] = useState<FundThesisSummary | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState('');
+  const savedSnapshotRef = useRef(savedSnapshot);
+  savedSnapshotRef.current = savedSnapshot;
   const [dialog, setDialog] = useState<SettingsDialogState>(null);
   const [preRestoreDraft, setPreRestoreDraft] = useState<FundConfiguration | null>(null);
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
-  const draftSeededRef = useRef(false);
   const hydratedRecoveryKeyRef = useRef<string | null>(null);
 
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
@@ -335,15 +336,36 @@ export default function SettingsPage() {
     queryKey: ['settings'],
     queryFn: () => fetchSettings().catch(() => null),
     ...getQueryConfig('STATIC'),
+    refetchOnMount: 'always',
   });
 
-  // Seed the editable draft once — later refetches (e.g. after invalidation)
-  // must never clobber in-progress edits.
+  // Warm cache data gives an instant first paint, while the mount refetch above
+  // reconciles it with the server. Incoming data may replace a clean draft, but
+  // never clobbers edits the user has made since the last saved snapshot.
   const seededRef = useRef(false);
   useEffect(() => {
-    if (seededRef.current || !settingsQuery.data) return;
-    seededRef.current = true;
-    setSettings(settingsQuery.data);
+    const incomingSettings = settingsQuery.data;
+    if (!incomingSettings) return;
+    const incomingConfiguration = loadFundConfiguration(incomingSettings);
+    const incomingSnapshot = serializeDecisionConfig(incomingConfiguration);
+    if (!seededRef.current) {
+      seededRef.current = true;
+      setSettings(incomingSettings);
+      draftRef.current = incomingConfiguration;
+      savedSnapshotRef.current = incomingSnapshot;
+      setDraft(incomingConfiguration);
+      setSavedSnapshot(incomingSnapshot);
+      return;
+    }
+
+    setSettings(incomingSettings);
+    if (serializeDecisionConfig(draftRef.current) !== savedSnapshotRef.current) return;
+
+    setConfiguration(incomingConfiguration);
+    draftRef.current = incomingConfiguration;
+    savedSnapshotRef.current = incomingSnapshot;
+    setDraft(incomingConfiguration);
+    setSavedSnapshot(incomingSnapshot);
   }, [settingsQuery.data]);
 
   const loading = settings == null && settingsQuery.isPending;
@@ -354,16 +376,6 @@ export default function SettingsPage() {
     fetchFundThesisSummary().then((data) => { if (!cancelled) setThesisSummary(data); }).catch(() => undefined);
     return () => { cancelled = true; };
   }, []);
-
-  // Seed once from the first authoritative settings payload. Later hook updates
-  // are transaction results and must pass the reconciliation guard below.
-  useEffect(() => {
-    if (!settings || draftSeededRef.current) return;
-    draftSeededRef.current = true;
-    const initial = loadFundConfiguration(settings);
-    setDraft(initial);
-    setSavedSnapshot(serializeDecisionConfig(initial));
-  }, [settings]);
 
   const recoveryStorageKey = useMemo(
     () => getPolicyPublishRecoveryStorageKey(userId, settings),
@@ -774,7 +786,7 @@ export default function SettingsPage() {
             onSelect={scrollToSection}
           />
           <motion.main
-            className={`${workspaceLayout.pageBottom} mx-auto w-full max-w-[52rem] px-phi-5 pt-phi-5 lg:px-phi-7`}
+            className={`${workspaceLayout.pageBottom} mx-auto w-full max-w-[52rem] px-phi-5 pt-phi-5`}
             initial={reduceMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: CONTENT_EASE, delay: 0.16 }}
@@ -860,7 +872,7 @@ export default function SettingsPage() {
                   </RoomSection>
 
                 {!bandValidation.valid && (
-                  <div className="border-l-2 border-escalation/35 bg-escalation/[0.035] px-phi-4 py-phi-3">
+                  <div className="border-l-2 border-escalation/35 bg-escalation/[0.035] py-phi-3 pl-phi-3">
                     {bandValidation.errors.map((error) => <p key={error} className="type-body-sm text-escalation/75">{error}</p>)}
                   </div>
                 )}

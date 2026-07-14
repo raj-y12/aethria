@@ -611,6 +611,7 @@ async def run_on_demand_lookup(
     is_cancelled: Optional[Callable[[], bool]] = None,
     additional_context: Optional[str] = None,
     replace_startup_id: Optional[str] = None,
+    resolution: Optional[Any] = None,
 ) -> Optional[str]:
     """
     Run scout -> reviewer -> partner for one explicit company name.
@@ -643,6 +644,7 @@ async def run_on_demand_lookup(
             is_cancelled=is_cancelled,
             additional_context=additional_context,
             replace_startup_id=replace_startup_id,
+            resolution=resolution,
         )
 
 
@@ -679,6 +681,7 @@ async def _run_on_demand_lookup_inner(
     is_cancelled: Optional[Callable[[], bool]] = None,
     additional_context: Optional[str] = None,
     replace_startup_id: Optional[str] = None,
+    resolution: Optional[Any] = None,
 ) -> Optional[str]:
     tenant = TenantContext(user_id=user_id)
     logger.info(
@@ -806,6 +809,7 @@ async def _run_on_demand_lookup_inner(
                 metrics.inc_lookup("not_found")
                 return None
         else:
+            scout_stage_started = time.perf_counter()
             startup_id = await scout_engine.run_named_lookup(
                 company_name=company,
                 scout_type="market_driven",
@@ -815,6 +819,13 @@ async def _run_on_demand_lookup_inner(
                 lookup_id=lookup_id,
                 pipeline_run_id=lookup_run_id,
                 additional_context=additional_context,
+                resolution=resolution,
+            )
+            metrics.observe_pipeline_stage(
+                time.perf_counter() - scout_stage_started,
+                pipeline="lookup",
+                stage="scout",
+                outcome="success" if startup_id else "incomplete",
             )
             lookup_outcome = getattr(scout_engine, "last_lookup_outcome", None) or {}
         if not startup_id:
@@ -839,6 +850,7 @@ async def _run_on_demand_lookup_inner(
             logger.info("[%s] Lookup cancelled after scout: %s (%s)", user_id[:12], company, startup_id)
             return startup_id
         # Supabase can be briefly stale right after insert; retry reviewer handoff once or twice.
+        reviewer_stage_started = time.perf_counter()
         reviewed = False
         review_attempts = 3
         for attempt in range(1, review_attempts + 1):
@@ -857,6 +869,12 @@ async def _run_on_demand_lookup_inner(
                 break
             if attempt < review_attempts:
                 await asyncio.sleep(0.8 * attempt)
+        metrics.observe_pipeline_stage(
+            time.perf_counter() - reviewer_stage_started,
+            pipeline="lookup",
+            stage="reviewer",
+            outcome="success" if reviewed else "incomplete",
+        )
         if not reviewed:
             logger.warning("[%s] On-demand lookup not reviewed: %s", user_id[:12], startup_id)
             message = "Lookup found the company, but analyst review could not complete after retrying."
@@ -868,6 +886,7 @@ async def _run_on_demand_lookup_inner(
         if cancelled():
             logger.info("[%s] Lookup cancelled after review: %s (%s)", user_id[:12], company, startup_id)
             return startup_id
+        partner_stage_started = time.perf_counter()
         decided = False
         partner_attempts = 2
         for attempt in range(1, partner_attempts + 1):
@@ -884,6 +903,12 @@ async def _run_on_demand_lookup_inner(
                 break
             if attempt < partner_attempts:
                 await asyncio.sleep(0.6 * attempt)
+        metrics.observe_pipeline_stage(
+            time.perf_counter() - partner_stage_started,
+            pipeline="lookup",
+            stage="partner",
+            outcome="success" if decided else "incomplete",
+        )
         if not decided:
             logger.warning("[%s] On-demand lookup not decided yet: %s", user_id[:12], startup_id)
             message = "Lookup review completed, but the partner decision could not complete after retrying."

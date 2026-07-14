@@ -285,6 +285,40 @@ def test_filter_references_by_url_probe_lenient_keeps_hard_dead_link(monkeypatch
     assert out["references"] == ["TinyPay official site - https://tinypay.example/"]
 
 
+def test_filter_references_by_url_probe_runs_independent_references_concurrently(monkeypatch):
+    import threading
+    import time
+
+    from utils.reference_verify import filter_references_by_url_probe
+
+    monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
+    monkeypatch.setenv("REFERENCE_PROBE_CONCURRENCY", "2")
+    lock = threading.Lock()
+    active = 0
+    max_active = 0
+
+    def probe(_url, timeout=4.0):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.04)
+        with lock:
+            active -= 1
+        return "reachable"
+
+    monkeypatch.setattr("utils.reference_verify.probe_url_status", probe)
+    references = [
+        "TinyPay official site - https://tinypay.example/",
+        "TinyPay funding - https://news.example/tinypay",
+    ]
+
+    out = filter_references_by_url_probe({"references": references})
+
+    assert max_active == 2
+    assert out["references"] == references
+
+
 def test_finalize_lenient_lookup_restores_refs_when_all_pruned(monkeypatch):
     # When every reference fails the live probe, a lenient (lookup) finalize keeps the
     # model's URL-bearing citations as a fallback so the company is not dropped to zero.

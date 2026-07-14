@@ -15,6 +15,8 @@ import logging
 import os
 import re
 import ssl
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -23,6 +25,13 @@ from urllib.request import Request, urlopen
 import certifi
 
 logger = logging.getLogger(__name__)
+
+# Shared across all simultaneously-running scouts/lookups so reference checking
+# cannot multiply into one thread pool per pipeline stage.
+_REFERENCE_PROBE_EXECUTOR = ThreadPoolExecutor(
+    max_workers=8,
+    thread_name_prefix="reference-probe",
+)
 
 _URL_RE = re.compile(r"https?://[^\s\]\)\"'<>]+", re.IGNORECASE)
 
@@ -275,13 +284,12 @@ def filter_references_by_url_probe(
     refs = output.get("references")
     if not isinstance(refs, list):
         return output
-    kept: List[str] = []
-    for r in refs:
+    def evaluate_reference(r: Any) -> Optional[str]:
         if not isinstance(r, str):
-            continue
+            return None
         s = r.strip()
         if not s:
-            continue
+            return None
         urls = extract_http_urls(s)
         hard_negative = False
         soft_accept = False
@@ -300,9 +308,26 @@ def filter_references_by_url_probe(
         # that left us with only the model's own citations) must not delete the reference
         # and drop the company entirely. Keep it; verification is best-effort here.
         if lenient or soft_accept or not hard_negative:
-            kept.append(s)
-        else:
-            logger.warning("reference_verify: dropped hard-dead reference: %s", s[:120])
+            return s
+        logger.warning("reference_verify: dropped hard-dead reference: %s", s[:120])
+        return None
+
+    try:
+        concurrency = int(os.getenv("REFERENCE_PROBE_CONCURRENCY", "8"))
+    except ValueError:
+        concurrency = 8
+    concurrency = max(1, min(concurrency, 8, len(refs) or 1))
+    if concurrency == 1:
+        evaluated = [evaluate_reference(r) for r in refs]
+    else:
+        limiter = threading.BoundedSemaphore(concurrency)
+
+        def evaluate_bounded(r: Any) -> Optional[str]:
+            with limiter:
+                return evaluate_reference(r)
+
+        evaluated = list(_REFERENCE_PROBE_EXECUTOR.map(evaluate_bounded, refs))
+    kept = [r for r in evaluated if r is not None]
     if not kept and refs:
         logger.warning(
             "reference_verify: all %d reference(s) failed URL probe — "

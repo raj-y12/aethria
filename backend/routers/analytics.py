@@ -231,7 +231,8 @@ def get_system_health(request: Request):
 async def get_activity_summary(request: Request):
     """
     Return aggregated pipeline activity since the user's last visit.
-    Does NOT update last_seen_at — that only happens on POST /api/activity/seen (dismiss).
+    Does NOT update last_seen_at — that only happens when the client explicitly
+    acknowledges a report or records the start of an away window.
     """
     user_id: str = getattr(request.state, "user_id", None)
     if not user_id:
@@ -250,8 +251,7 @@ async def get_activity_summary(request: Request):
         totals["open_in_progress"],
     )
 
-    # last_seen_at is NOT updated here — only updated when the user explicitly
-    # dismisses the modal via POST /api/activity/seen
+    # Reading is side-effect free; the client advances the boundary explicitly.
     return JSONResponse(content=totals)
 
 
@@ -327,7 +327,7 @@ def _activity_summary_totals_sync(user_id: str):
 
 @router.post("/api/activity/seen")
 def mark_activity_seen(request: Request):
-    """Mark the current time as last_seen_at. Called when the user dismisses the summary modal."""
+    """Mark the current time as the report boundary / start of an away window."""
     user_id = require_authenticated_user(request)
     limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
     if limited is not None:
@@ -343,4 +343,5 @@ def mark_activity_seen(request: Request):
         ).execute()
     except Exception as e:
         logging.getLogger("api").warning("Could not update user_state last_seen_at: %s", e)
+        return JSONResponse(status_code=503, content={"ok": False, "detail": "activity marker unavailable"})
     return JSONResponse(content={"ok": True})

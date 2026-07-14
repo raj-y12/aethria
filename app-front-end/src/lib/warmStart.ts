@@ -34,12 +34,12 @@ const storageKey = (userId: string) => `${STORAGE_PREFIX}${userId}`;
 
 export function clearWarmStartSnapshots(): void {
   try {
-    for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
-      const key = sessionStorage.key(i);
-      if (key?.startsWith(STORAGE_PREFIX)) sessionStorage.removeItem(key);
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(STORAGE_PREFIX)) localStorage.removeItem(key);
     }
   } catch {
-    // Session storage may be unavailable in hardened/private browser modes.
+    // Persistent storage may be unavailable in hardened/private browser modes.
   }
 }
 
@@ -47,7 +47,7 @@ type Snapshot = { at: number; entries: [readonly string[], unknown][] };
 
 export function hydrateWarmStart(queryClient: QueryClient, userId: string): void {
   try {
-    const raw = sessionStorage.getItem(storageKey(userId));
+    const raw = localStorage.getItem(storageKey(userId));
     if (!raw) return;
     const snapshot = JSON.parse(raw) as Snapshot;
     if (!snapshot || !Array.isArray(snapshot.entries)) return;
@@ -69,7 +69,7 @@ export function persistWarmSnapshot(queryClient: QueryClient, userId: string): v
       if (data !== undefined) entries.push([key, data]);
     }
     if (entries.length === 0) return;
-    sessionStorage.setItem(storageKey(userId), JSON.stringify({ at: Date.now(), entries }));
+    localStorage.setItem(storageKey(userId), JSON.stringify({ at: Date.now(), entries }));
   } catch {
     // Quota exceeded / private mode — skip; warm start is best-effort.
   }
@@ -78,7 +78,7 @@ export function persistWarmSnapshot(queryClient: QueryClient, userId: string): v
 /** Age of the stored snapshot in ms, or null when absent/corrupt. */
 function snapshotAge(userId: string): number | null {
   try {
-    const raw = sessionStorage.getItem(storageKey(userId));
+    const raw = localStorage.getItem(storageKey(userId));
     if (!raw) return null;
     const at = (JSON.parse(raw) as Snapshot)?.at;
     return typeof at === 'number' ? Date.now() - at : null;

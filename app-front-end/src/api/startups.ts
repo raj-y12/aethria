@@ -17,6 +17,30 @@ export async function fetchStartups(): Promise<Startup[]> {
   return Array.isArray(data) ? data : [];
 }
 
+/**
+ * Seed deal flow during the post-password welcome screen. The global auth
+ * getter may not be wired to the newly-created Clerk session yet, so this path
+ * accepts that session's token directly and remains best-effort.
+ */
+export async function fetchStartupsWithToken(
+  token: string,
+  timeoutMs = 8_000,
+): Promise<Startup[] | null> {
+  const t = token.trim();
+  if (!t) return null;
+  try {
+    const res = await fetch(`${API_BASE}/api/startups`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${t}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return null;
+    const data: unknown = await res.json();
+    return Array.isArray(data) ? (data as Startup[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Full record for memo / detail panel (GET /api/startups/:id). */
 export async function fetchStartupDetail(startupId: string): Promise<Startup | null> {
   if (import.meta.env.VITE_USE_FIXTURES === '1') {
@@ -143,7 +167,9 @@ export async function queueOnDemandLookup(
   lookupInput: string,
   lookupId: string,
   /** Optional operator-supplied background (private traction/team facts) to fill missing-evidence gaps. */
-  additionalContext?: string
+  additionalContext?: string,
+  /** Opaque, short-lived server token returned by resolveLookupCandidates. */
+  resolutionToken?: string | null,
 ): Promise<{ status: string; companyName: string; lookupId: string; lookupInputType?: string }> {
   const input = lookupInput.trim();
   const id = lookupId.trim();
@@ -164,6 +190,7 @@ export async function queueOnDemandLookup(
       lookup_input: input,
       lookup_id: id,
       ...(context ? { additional_context: context } : {}),
+      ...(resolutionToken?.trim() ? { resolution_token: resolutionToken.trim() } : {}),
     }),
   });
   if (!res.ok) {
@@ -241,6 +268,7 @@ export interface LookupResolveResult {
   companyName: string;
   websiteHint: string | null;
   candidates: LookupCandidate[];
+  resolutionToken: string | null;
 }
 
 /**
@@ -278,5 +306,9 @@ export async function resolveLookupCandidates(
     companyName: String(data?.company_name ?? input),
     websiteHint: typeof data?.website_hint === 'string' ? data.website_hint : null,
     candidates,
+    resolutionToken:
+      typeof data?.resolution_token === 'string' && data.resolution_token
+        ? data.resolution_token
+        : null,
   };
 }

@@ -234,11 +234,55 @@ _AGENT_TRIGGER_LOCK_TTL_SECONDS = int(os.getenv("AGENT_TRIGGER_LOCK_TTL_SECONDS"
 _LOOKUP_LOCK_TTL_SECONDS = int(os.getenv("LOOKUP_LOCK_TTL_SECONDS", "900"))
 _CANCELLED_LOOKUP_MAX = max(1, int(os.getenv("CANCELLED_LOOKUP_MAX", "1000")))
 _META_TRIGGER_LOCK_TTL_SECONDS = int(os.getenv("META_TRIGGER_LOCK_TTL_SECONDS", "900"))
+_LOOKUP_RESOLUTION_TTL_SECONDS = max(
+    30, min(int(os.getenv("LOOKUP_RESOLUTION_TTL_SECONDS", "300")), 900)
+)
+_LOOKUP_RESOLUTION_CACHE_MAX = max(
+    16, min(int(os.getenv("LOOKUP_RESOLUTION_CACHE_MAX", "512")), 4096)
+)
+_lookup_resolution_cache: OrderedDict[str, tuple[str, float, Any]] = OrderedDict()
 DEFAULT_STARTUPS_LIST_LIMIT = max(1, min(int(os.getenv("STARTUPS_LIST_DEFAULT_LIMIT", "250")), 500))
 MAX_STARTUPS_LIST_LIMIT = max(
     DEFAULT_STARTUPS_LIST_LIMIT,
     min(int(os.getenv("STARTUPS_LIST_MAX_LIMIT", "500")), 1000),
 )
+
+
+def _prune_lookup_resolution_cache(now: Optional[float] = None) -> None:
+    current = time.monotonic() if now is None else now
+    expired = [
+        token
+        for token, (_, expires_at, _) in _lookup_resolution_cache.items()
+        if expires_at <= current
+    ]
+    for token in expired:
+        _lookup_resolution_cache.pop(token, None)
+    while len(_lookup_resolution_cache) > _LOOKUP_RESOLUTION_CACHE_MAX:
+        _lookup_resolution_cache.popitem(last=False)
+
+
+def _cache_lookup_resolution(user_id: str, resolution: Any) -> str:
+    _prune_lookup_resolution_cache()
+    token = str(uuid4())
+    _lookup_resolution_cache[token] = (
+        user_id.strip(),
+        time.monotonic() + _LOOKUP_RESOLUTION_TTL_SECONDS,
+        resolution,
+    )
+    _prune_lookup_resolution_cache()
+    return token
+
+
+def _consume_lookup_resolution(user_id: str, token: Optional[str]) -> Any:
+    normalized = (token or "").strip()
+    if not normalized:
+        return None
+    _prune_lookup_resolution_cache()
+    cached = _lookup_resolution_cache.get(normalized)
+    if cached is None or cached[0] != user_id.strip():
+        return None
+    _lookup_resolution_cache.pop(normalized, None)
+    return cached[2]
 
 
 async def _agent_worker() -> None:
@@ -290,6 +334,7 @@ async def _lookup_worker() -> None:
                     is_cancelled=lambda user_id=user_id, lookup_id=lookup_id: _is_lookup_cancelled(user_id, lookup_id),
                     additional_context=str(job.get("additional_context") or "").strip() or None,
                     replace_startup_id=str(job.get("replace_startup_id") or "").strip() or None,
+                    resolution=job.get("resolution"),
                 )
             except Exception as e:
                 _logger_agents.exception(
@@ -2346,6 +2391,10 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
     if limited is not None:
         _release_security_lock(lock_key)
         return limited
+    resolution = _consume_lookup_resolution(
+        user_id,
+        str(body.get("resolution_token") or "").strip() or None,
+    )
     await _lookup_queue.put(
         {
             "user_id": user_id,
@@ -2356,6 +2405,7 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
             "lookup_id": lookup_id,
             "lock_key": lock_key,
             "additional_context": additional_context,
+            "resolution": resolution,
         }
     )
     return JSONResponse(
@@ -2491,13 +2541,23 @@ async def resolve_lookup_candidates(request: Request, body: Dict[str, Any]):
         raise HTTPException(status_code=422, detail="Could not derive company name from lookup_input")
     website_hint = str(body.get("website_hint") or parsed.get("website") or "").strip() or None
 
+    resolver_started = time.perf_counter()
     resolution = await asyncio.to_thread(
         resolve_company,
         company_name,
         user_id=user_id,
         website_hint=website_hint,
     )
+    metrics.observe_pipeline_stage(
+        time.perf_counter() - resolver_started,
+        pipeline="lookup",
+        stage="resolver",
+        outcome="success",
+    )
     status = _resolve_status_for(resolution, website_hint=website_hint)
+    resolution_token = (
+        _cache_lookup_resolution(user_id, resolution) if status == "resolved" else None
+    )
     candidates = [c.model_dump(mode="json") for c in resolution.candidates]
     return JSONResponse(
         status_code=200,
@@ -2507,6 +2567,7 @@ async def resolve_lookup_candidates(request: Request, body: Dict[str, Any]):
             "company_name": company_name,
             "website_hint": website_hint,
             "candidates": candidates if status != "resolved" else candidates[:1],
+            "resolution_token": resolution_token,
         },
     )
 

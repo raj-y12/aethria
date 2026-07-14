@@ -54,6 +54,13 @@ if ENABLED:
         ["stage"],  # startups_found | reviewed | decided | escalations
         registry=REGISTRY,
     )
+    PIPELINE_STAGE_DURATION = Histogram(
+        "aethria_pipeline_stage_duration_seconds",
+        "Wall-clock duration of a bounded pipeline stage.",
+        ["pipeline", "stage", "outcome"],
+        buckets=(0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 30, 60, 120),
+        registry=REGISTRY,
+    )
     LOOKUPS = Counter(
         "aethria_lookups_total",
         "On-demand lookups, by outcome.",
@@ -124,6 +131,26 @@ def inc_stage(stage: str, amount: int) -> None:
         PIPELINE_STAGE_ITEMS.labels(stage=stage).inc(amount)
     except Exception as e:  # pragma: no cover
         logger.debug("inc_stage failed: %s", e)
+
+
+def observe_pipeline_stage(
+    duration_seconds: float,
+    *,
+    pipeline: str,
+    stage: str,
+    outcome: str,
+) -> None:
+    """Observe a stage without tenant/job labels, keeping metric cardinality bounded."""
+    if not ENABLED or duration_seconds < 0:
+        return
+    try:
+        PIPELINE_STAGE_DURATION.labels(
+            pipeline=pipeline,
+            stage=stage,
+            outcome=outcome,
+        ).observe(duration_seconds)
+    except Exception as e:  # pragma: no cover
+        logger.debug("observe_pipeline_stage failed: %s", e)
 
 
 def set_event_loop_lag(seconds: float) -> None:

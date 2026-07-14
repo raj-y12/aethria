@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from api import _backend_to_frontend, acknowledge_startup
-from routers.analytics import _aggregate_activity_totals
+from routers.analytics import _aggregate_activity_totals, mark_activity_seen
 
 
 def test_activity_totals_split_agent_and_human_decisions():
@@ -104,3 +104,25 @@ async def test_acknowledge_startup_sets_seen_fields(monkeypatch):
     assert captured_patch["last_seen_by_user_at"] == captured_patch["acknowledged_at"]
     assert result["id"] == "s1"
     assert result["is_new_to_user"] is False
+
+
+def test_mark_activity_seen_reports_persistence_failure(monkeypatch):
+    class BrokenQuery:
+        def upsert(self, *args, **kwargs):
+            return self
+
+        def execute(self):
+            raise RuntimeError("database unavailable")
+
+    class BrokenService:
+        def table(self, name):
+            assert name == "user_state"
+            return BrokenQuery()
+
+    monkeypatch.setattr("routers.analytics.require_authenticated_user", lambda request: "user_123")
+    monkeypatch.setattr("routers.analytics._enforce_rate_limits", lambda *args, **kwargs: None)
+    monkeypatch.setattr("routers.analytics.get_service_client", lambda: BrokenService())
+
+    response = mark_activity_seen(SimpleNamespace(state=SimpleNamespace(user_id="user_123")))
+
+    assert response.status_code == 503

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { useClerk, useUser } from '@clerk/react';
 import { useAgentsEnabled } from './useAgentsEnabled';
 import { toggleAgents } from '../api/agents';
+import { markActivitySeen } from '../api/activity';
 
 /**
  * Shared sign-out + agent gating modal flow (SystemBar fixed, AccountRailPanel).
@@ -18,9 +19,13 @@ export function useAgentLogoutFlow() {
 
   const displayName = user?.username ?? user?.primaryEmailAddress?.emailAddress ?? 'Account';
 
-  const doLogout = useCallback(() => {
+  const doLogout = useCallback(async () => {
     localStorage.removeItem('aethria_last_activity');
-    signOut?.().then(() => navigate('/sign-in', { replace: true }));
+    // Logout is the most reliable start of the next "away" window. Do not let
+    // a transient marker failure trap the user in the app.
+    await markActivitySeen({ keepalive: true }).catch(() => {});
+    await signOut?.();
+    navigate('/sign-in', { replace: true });
   }, [navigate, signOut]);
 
   const toggleAgentsAndLogout = useCallback(
@@ -29,7 +34,7 @@ export function useAgentLogoutFlow() {
       setAgentActionError(null);
       try {
         await toggleAgents(enabled);
-        doLogout();
+        void doLogout();
       } catch {
         setAgentActionError('Unable to update agent state. Please retry.');
       } finally {
@@ -45,7 +50,7 @@ export function useAgentLogoutFlow() {
     onCancel: () => setShowLogoutModal(false),
     onKeepRunning: () => {
       setShowLogoutModal(false);
-      doLogout();
+      void doLogout();
     },
     onTurnOffAndLogout: async () => {
       await toggleAgentsAndLogout(false);

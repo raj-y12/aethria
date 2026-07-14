@@ -92,9 +92,9 @@ export function useDispatchLookup({
   const storageKey = useMemo(() => getDispatchLookupStorageKey(userId), [userId]);
 
   const queueLookup = useCallback(
-    async (value: string, requestSeq: number) => {
+    async (value: string, requestSeq: number, resolutionToken?: string | null) => {
       const lookupId = crypto.randomUUID();
-      const queued = await queueOnDemandLookup(value, lookupId);
+      const queued = await queueOnDemandLookup(value, lookupId, undefined, resolutionToken);
       if (requestSeqRef.current !== requestSeq) return;
       const current = pendingLookup;
       if (current && !current.autoOpened && current.lookupId !== queued.lookupId) {
@@ -149,7 +149,11 @@ export function useDispatchLookup({
         return;
       }
       const pick = resolved.candidates[0];
-      await queueLookup(pick ? `${pick.name} ${pick.website}` : value, requestSeq);
+      await queueLookup(
+        pick ? `${pick.name} ${pick.website}` : value,
+        requestSeq,
+        resolved.resolutionToken,
+      );
     } catch {
       setMessage('Could not submit lookup request. Please retry in a few seconds.');
     } finally {
@@ -166,7 +170,12 @@ export function useDispatchLookup({
       setBusy(true);
       setCancelPending(false);
       try {
-        await queueLookup(`${candidate.name} ${candidate.website}`, requestSeq);
+        const resolved = await resolveLookupCandidates(candidate.name, candidate.website);
+        await queueLookup(
+          `${candidate.name} ${candidate.website}`,
+          requestSeq,
+          resolved.resolutionToken,
+        );
       } catch {
         setMessage('Could not submit lookup request. Please retry in a few seconds.');
       } finally {
@@ -202,7 +211,11 @@ export function useDispatchLookup({
           return;
         }
         const pick = resolved.candidates[0];
-        await queueLookup(pick ? `${pick.name} ${pick.website}` : `${value} ${websiteHint}`, requestSeq);
+        await queueLookup(
+          pick ? `${pick.name} ${pick.website}` : `${value} ${websiteHint}`,
+          requestSeq,
+          resolved.resolutionToken,
+        );
       } catch {
         setMessage('Could not resolve that website. Please retry.');
       } finally {

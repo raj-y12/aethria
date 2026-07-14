@@ -1,4 +1,4 @@
-import { useState, useLayoutEffect, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useLayoutEffect, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useLocation, Navigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
 import { useQueryClient } from '@tanstack/react-query';
@@ -20,6 +20,8 @@ import { usePrefersReducedMotion } from './hooks';
 import LoginPage from './components/LoginPage';
 import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from './lib/loginEntryTransition';
 import { clearWarmStartSnapshots } from './lib/warmStart';
+import { useForegroundSync } from './hooks/useForegroundSync';
+import { useSinceAwaySummary } from './hooks/useActivitySummary';
 
 const APP_ROOT = '/v1';
 const SETTINGS_ROOT = `${APP_ROOT}/settings`;
@@ -27,12 +29,14 @@ const ADMIN_ROOT = '/admin';
 
 function AppShell() {
   const { pathname } = useLocation();
+  const { userId } = useAuth();
   const isSettingsRoute = pathname.startsWith(SETTINGS_ROOT);
   const isFundRoute = pathname.startsWith(`${APP_ROOT}/fund`);
   const isPortfolioRoute = pathname.startsWith(`${APP_ROOT}/portfolio`);
   const isFlowRoute = pathname.startsWith(`${APP_ROOT}/flow`) || pathname.startsWith(`${APP_ROOT}/deal`);
   const [arrivedFromLogin] = useState(() => sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY) === '1');
   const triggeredAgentsRef = useRef(false);
+  const queryClient = useQueryClient();
   const reduceMotion = usePrefersReducedMotion();
   const entryTransition = getLoginEntryTransition(reduceMotion);
   const systemData = useSystemData({
@@ -42,6 +46,20 @@ function AppShell() {
     portfolioPanelOpen: isPortfolioRoute,
   });
   const agentsEnabled = useAgentsEnabled();
+  const sinceAway = useSinceAwaySummary(userId ?? '');
+
+  const refreshActiveData = useCallback(() => {
+    // Force only mounted queries to refetch, and do not cancel any request that
+    // is already in flight from login, polling, or an SSE nudge.
+    void queryClient.refetchQueries({ type: 'active' }, { cancelRefetch: false });
+  }, [queryClient]);
+  const wakeAgents = useCallback(() => {
+    if (!agentsEnabled || isSettingsRoute) return;
+    void triggerAgents().catch(() => {
+      // The normal loop/status polling and next foreground event retry safely.
+    });
+  }, [agentsEnabled, isSettingsRoute]);
+  useForegroundSync({ refresh: refreshActiveData, wakeAgents });
 
   // The login-entry handoff key is consumed here (captured into state above);
   // clearing it after mount keeps later AppShell remounts from re-animating.
@@ -92,7 +110,7 @@ function AppShell() {
           ) : isFlowRoute ? (
             <FlowPage data={systemData} />
           ) : (
-            <HomePage data={systemData} />
+            <HomePage data={systemData} sinceAway={sinceAway} />
           )}
         </ErrorBoundary>
       </AppFrame>
@@ -127,6 +145,9 @@ function App() {
   }, [userId, queryClient]);
 
   useLayoutEffect(() => {
+    // Clerk exposes an unresolved signed-in state during boot. Treating that as
+    // a sign-out erased the cross-tab warm cache before the user was identified.
+    if (!isLoaded) return;
     if (!isSignedIn) {
       loginEntryHandoffRef.current = false;
       setTokenGetter(null);
@@ -136,7 +157,7 @@ function App() {
     }
     setTokenGetter(getToken);
     return () => setTokenGetter(null);
-  }, [isSignedIn, getToken]);
+  }, [isLoaded, isSignedIn, getToken]);
 
   useEffect(() => {
     if (!isSignedIn || !getToken) {

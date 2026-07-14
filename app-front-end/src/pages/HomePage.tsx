@@ -5,7 +5,7 @@ import Reveal from '../components/Reveal';
 import { useAppFrame } from '../components/AppFrame';
 import AgentLogoutModal from '../components/AgentLogoutModal';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
-import { useSinceAwaySummary } from '../hooks/useActivitySummary';
+import type { ActivitySummary } from '../api/activity';
 import { usePrefersReducedMotion } from '../hooks';
 import { useFundReadiness } from '../hooks/useFundReadiness';
 import { transitionOrReduced } from '../design-system/motion';
@@ -102,13 +102,12 @@ function HomeDoor({
  * the desk (the door to Flow), and two quiet doors to Portfolio and Fund.
  * Content doubles as navigation; the type and the hairlines do the work.
  */
-export default function HomePage({ data }: { data: SystemData }) {
+export default function HomePage({ data, sinceAway }: { data: SystemData; sinceAway: ActivitySummary | null }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { openDispatch, dispatchActive } = useAppFrame();
   // What the agents did since the last visit (marks the report seen; null when
   // the login screen already presented it or nothing happened).
-  const sinceAway = useSinceAwaySummary();
   const {
     displayName,
     agentActionPending,

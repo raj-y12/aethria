@@ -106,20 +106,12 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
   const liveGate: QueryLiveGate = { tabVisible: isTabVisible, userActive };
 
   const prevSystemPanelOpen = useRef(systemPanelOpen);
-  const prevTabVisible = useRef(isTabVisible);
-
   useEffect(() => {
     const panelJustOpened = systemPanelOpen && !prevSystemPanelOpen.current;
-    const tabJustVisible = isTabVisible && !prevTabVisible.current;
     prevSystemPanelOpen.current = systemPanelOpen;
-    prevTabVisible.current = isTabVisible;
-
-    if (tabJustVisible) {
-      void queryClient.invalidateQueries({ queryKey: ['startups', 'list'] });
-    }
 
     if (!systemPanelOpen || !isTabVisible) return;
-    if (panelJustOpened || tabJustVisible) {
+    if (panelJustOpened) {
       void queryClient.invalidateQueries({ queryKey: ['meta'] });
       void queryClient.invalidateQueries({ queryKey: ['analytics'] });
       void queryClient.invalidateQueries({ queryKey: ['analytics', 'system-health'] });
@@ -130,7 +122,8 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
 
   // Push-based freshness: an SSE stream nudges us to refetch the moment the
   // pipeline writes new data. Only run it while the tab is visible (bounds open
-  // connections; the tab-focus invalidation above covers the return trip).
+  // connections; AppShell's foreground sync refreshes all active queries on
+  // the return trip before this stream reconnects).
   // "Healthy" means the hello frame was parsed — not just an open HTTP 200.
   const streamHealthy = useStartupsStream(isTabVisible);
 

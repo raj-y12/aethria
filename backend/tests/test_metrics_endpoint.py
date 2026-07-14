@@ -36,6 +36,17 @@ def test_metrics_exposition_is_well_formed(client):
     assert "aethria_pipeline_cycle_duration_seconds_count" in body
 
 
+def test_metrics_exposes_low_cardinality_pipeline_stage_duration(client):
+    import metrics
+
+    metrics.observe_pipeline_stage(0.25, pipeline="lookup", stage="resolver", outcome="success")
+
+    body = client.get("/metrics").text
+    assert "aethria_pipeline_stage_duration_seconds" in body
+    assert 'pipeline="lookup"' in body
+    assert 'stage="resolver"' in body
+
+
 def test_metrics_token_required_when_set(monkeypatch):
     monkeypatch.setenv("METRICS_ENABLED", "true")
     monkeypatch.setenv("METRICS_TOKEN", "s3cret")

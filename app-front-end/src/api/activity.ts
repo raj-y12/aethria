@@ -22,8 +22,12 @@ export async function fetchActivitySummary(): Promise<ActivitySummary> {
   return res.json() as Promise<ActivitySummary>;
 }
 
-export async function markActivitySeen(): Promise<void> {
-  await authedFetch(`${API_BASE}/api/activity/seen`, { method: 'POST' });
+export async function markActivitySeen(options: { keepalive?: boolean } = {}): Promise<void> {
+  const res = await authedFetch(`${API_BASE}/api/activity/seen`, {
+    method: 'POST',
+    keepalive: options.keepalive,
+  });
+  if (!res.ok) throw new Error('activity seen marker request failed');
 }
 
 /**
@@ -49,6 +53,18 @@ export async function fetchActivitySummaryWithToken(
   } catch {
     return null; // timeout or network error — welcome screen proceeds without stats
   }
+}
+
+/** Mark the end of the login report before the global token getter is wired. */
+export async function markActivitySeenWithToken(token: string): Promise<void> {
+  const t = token.trim();
+  if (!t) return;
+  const res = await fetch(`${API_BASE}/api/activity/seen`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', Authorization: `Bearer ${t}` },
+    keepalive: true,
+  });
+  if (!res.ok) throw new Error('activity seen marker request failed');
 }
 
 /**

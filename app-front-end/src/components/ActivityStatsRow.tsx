@@ -11,12 +11,13 @@ export interface ActivityStatItem {
 }
 
 export function activityStatsFromSummary(s: ActivitySummary): ActivityStatItem[] {
-  return [
+  const stats = [
     { label: 'Discovered', value: s.found, accent: false },
     { label: 'Evaluated', value: s.reviewed, accent: false },
     { label: 'Agent-decided', value: s.agent_decided ?? s.decided, accent: false },
     { label: 'Escalated', value: s.escalations, accent: true },
   ];
+  return stats.some((stat) => stat.value > 0) ? stats : [];
 }
 
 /** Large mono stat numerals — matches Decision Stage conviction weight. */
