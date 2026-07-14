@@ -32,18 +32,18 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
           role="status"
           aria-live="polite"
         >
-          <div className="pointer-events-auto flex w-full max-w-[min(92vw,32rem)] items-center gap-phi-2 rounded-full bg-oxford px-phi-2 py-phi-2 text-paper shadow-[0_10px_28px_rgba(0,20,51,0.2)] sm:gap-phi-3 sm:px-phi-3">
-            <p className="min-w-0 flex-1 truncate pl-phi-2 font-sans text-[13px] font-medium text-paper sm:text-[14px]">
+          <div className="pointer-events-auto flex w-full max-w-[min(92vw,32rem)] items-center gap-phi-3 rounded-full bg-oxford px-phi-4 py-phi-3 text-paper shadow-[0_10px_28px_rgba(0,20,51,0.2)] sm:gap-phi-4">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-paper signal-dot-breathe" aria-hidden />
+            <p className="min-w-0 flex-1 truncate font-sans text-[13px] font-medium text-paper sm:text-[14px]">
               <span className="sr-only">Memo ready: </span>
               {name}
             </p>
             <div className="flex shrink-0 items-center gap-phi-2">
-              <span className="h-1.5 w-1.5 shrink-0 bg-paper signal-dot-breathe" aria-hidden />
-              {recommendation ? <DecisionBadge variant={recommendation} className="!h-7 !min-w-[4.75rem] !rounded-full !px-3" /> : null}
+              {recommendation ? <DecisionBadge variant={recommendation} className="!h-6 !min-w-[4.25rem] !rounded-full !px-2.5" /> : null}
               <button
                 type="button"
                 onClick={onOpen}
-                className="type-action inline-flex h-7 min-w-[4.75rem] shrink-0 items-center justify-center rounded-full bg-paper px-phi-3 text-[10px] text-oxford transition-[background-color,transform] duration-150 hover:bg-paper-bright active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70 motion-reduce:transition-none motion-reduce:active:scale-100"
+                className="type-action inline-flex h-6 min-w-[4.25rem] shrink-0 items-center justify-center rounded-full bg-paper px-phi-2.5 text-[10px] text-oxford transition-[background-color,transform] duration-150 hover:bg-paper-bright active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70 motion-reduce:transition-none motion-reduce:active:scale-100"
               >
                 Open memo
               </button>
