@@ -48,6 +48,8 @@ interface WorkGridProps {
   onQueueViewChange: (view: QueueView) => void;
   /** Reports per-view row counts so the room header readouts stay live. */
   onViewCounts?: (counts: Record<QueueView, number>) => void;
+  /** AppFrame releases the initial cascade after a bare-to-full chrome entrance. */
+  entranceReady?: boolean;
 }
 
 const EMPTY_WATCHLIST_IDS = new Set<string>();
@@ -163,6 +165,7 @@ const WorkGrid = ({
   queueView,
   onQueueViewChange,
   onViewCounts,
+  entranceReady = true,
 }: WorkGridProps): JSX.Element => {
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
   const config = fundConfiguration ?? createDefaultFundConfiguration();
@@ -431,7 +434,7 @@ const WorkGrid = ({
                 key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
                 className="max-w-[32rem]"
                 initial={reduceMotion ? false : 'hidden'}
-                animate={reduceMotion ? undefined : 'visible'}
+                animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}
                 variants={emptyStateContainerVariants}
               >
                 <motion.p className="type-label-tab text-oxford/60" variants={emptyStateItemVariants}>
@@ -493,7 +496,7 @@ const WorkGrid = ({
             key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
             className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1 pb-phi-6"
             initial={reduceMotion ? false : 'hidden'}
-            animate={reduceMotion ? undefined : 'visible'}
+            animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}
             variants={listContainerVariants}
           >
             {orderedModels.map((model, idx) => {

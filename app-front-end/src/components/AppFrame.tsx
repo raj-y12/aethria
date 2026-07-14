@@ -64,6 +64,8 @@ interface AppFrameContextValue {
   setPageOverlayOpen: (open: boolean) => void;
   /** A room can take over the spine's contextual regions (see SpineOverride). */
   setSpineOverride: (override: SpineOverride | null) => void;
+  /** False only while bare chrome is becoming a full workspace frame. */
+  workspaceChromeReady: boolean;
 }
 
 const AppFrameContext = createContext<AppFrameContextValue | null>(null);
@@ -97,7 +99,10 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const reduceMotion = usePrefersReducedMotion();
   const previousChrome = useRef(chrome);
-  const chromeModeChanged = previousChrome.current !== chrome;
+  const [workspaceChromeReady, setWorkspaceChromeReady] = useState(true);
+  const enteringFullChrome = previousChrome.current === 'bare' && chrome === 'full';
+  const resolvedWorkspaceChromeReady =
+    reduceMotion || (!enteringFullChrome && workspaceChromeReady);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pageOverlayOpen, setPageOverlayOpen] = useState(false);
   const [spineOverride, setSpineOverride] = useState<SpineOverride | null>(null);
@@ -111,8 +116,20 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   const { startups, liveGate } = data;
 
   useLayoutEffect(() => {
+    const previous = previousChrome.current;
     previousChrome.current = chrome;
-  }, [chrome]);
+
+    if (reduceMotion || chrome === 'bare') {
+      setWorkspaceChromeReady(true);
+      return;
+    }
+
+    if (previous === 'bare') setWorkspaceChromeReady(false);
+  }, [chrome, reduceMotion]);
+
+  const completeWorkspaceChromeEntrance = useCallback(() => {
+    setWorkspaceChromeReady(true);
+  }, []);
 
   const acknowledge = useAcknowledgeStartup();
   const handleOpenMemo = useCallback(
@@ -283,6 +300,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
     inlineDispatch,
     setPageOverlayOpen,
     setSpineOverride,
+    workspaceChromeReady: resolvedWorkspaceChromeReady,
   };
 
   const chromeTransition = transitionOrReduced(reduceMotion, {
@@ -314,6 +332,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
               animate={{ opacity: 1, y: 0 }}
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
               transition={chromeTransition}
+              onAnimationComplete={completeWorkspaceChromeEntrance}
               className="flex-none"
             >
               <MobileHeader onMenuToggle={() => setMobileMenuOpen((open) => !open)} />
@@ -403,6 +422,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                   animate={{ opacity: 1, x: 0 }}
                   exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -28 }}
                   transition={chromeTransition}
+                  onAnimationComplete={completeWorkspaceChromeEntrance}
                   className="hidden lg:flex flex-none overflow-hidden"
                 >
                   <AppSpine
@@ -416,7 +436,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
               ) : null}
             </AnimatePresence>
             <motion.main
-              layout={chromeModeChanged ? false : 'position'}
+              layout="position"
               transition={chromeTransition}
               className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper"
             >

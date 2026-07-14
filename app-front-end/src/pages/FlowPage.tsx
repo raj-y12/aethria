@@ -87,6 +87,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
     setPageOverlayOpen,
     openDispatch,
     openRerun,
+    workspaceChromeReady,
   } = useAppFrame();
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
@@ -274,6 +275,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
                 queueView={queueView}
                 onQueueViewChange={setQueueView}
                 onViewCounts={setViewCounts}
+                entranceReady={workspaceChromeReady}
               />
             </section>
 

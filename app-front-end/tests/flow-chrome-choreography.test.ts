@@ -7,21 +7,30 @@ const flowPageSource = readFileSync(resolve(import.meta.dirname, '../src/pages/F
 const workGridSource = readFileSync(resolve(import.meta.dirname, '../src/components/WorkGrid.tsx'), 'utf8');
 
 describe('Home to Flow entrance choreography', () => {
-  it('uses reciprocal Dispatch motion without disturbing Home to Flow geometry', () => {
-    expect(appFrameSource).toContain('const chromeModeChanged = previousChrome.current !== chrome;');
-    expect(appFrameSource).toContain("layout={chromeModeChanged ? false : 'position'}");
+  it('runs the full chrome entrance before releasing the existing Flow stagger', () => {
+    expect(appFrameSource).toContain('workspaceChromeReady: boolean;');
+    expect(appFrameSource).toContain('const enteringFullChrome =');
+    expect(appFrameSource).toContain('onAnimationComplete={completeWorkspaceChromeEntrance}');
+    expect(appFrameSource).toContain('layout="position"');
+    expect(appFrameSource).not.toContain('chromeModeChanged');
     expect(appFrameSource).toContain('const showSpine = !bareChrome && !dispatch.commandBarOpen;');
     expect(appFrameSource).toContain('const showMobileChrome = !isDesktop && !bareChrome && !dispatch.commandBarOpen;');
     expect(appFrameSource).toContain("exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}");
     expect(appFrameSource).not.toContain('dispatchExitPending');
     expect(appFrameSource).not.toContain('dispatchTransitionActive');
     expect(appFrameSource).not.toContain('onExitComplete={completeDispatchExit}');
+    expect(flowPageSource).toContain('workspaceChromeReady');
+    expect(flowPageSource).toContain('entranceReady={workspaceChromeReady}');
+    expect(workGridSource).toContain('entranceReady?: boolean;');
+    expect(workGridSource).toContain("animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}");
+    expect(workGridSource).toContain('staggerChildren: 0.026');
+    expect(workGridSource).not.toContain('autoSelectReady');
   });
 
-  it('starts one light row cascade immediately, without a second page entrance', () => {
+  it('starts one light row cascade after chrome, without a second page entrance', () => {
     expect(flowPageSource).not.toContain('page-transition-enter');
-    expect(flowPageSource).not.toContain('entranceReady=');
-    expect(workGridSource).toContain("animate={reduceMotion ? undefined : 'visible'}");
+    expect(flowPageSource).toContain('entranceReady={workspaceChromeReady}');
+    expect(workGridSource).toContain("animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}");
     expect(workGridSource).toContain('staggerChildren: 0.026');
     expect(workGridSource).toContain("translateY(3px)");
   });
@@ -30,6 +39,5 @@ describe('Home to Flow entrance choreography', () => {
     expect(workGridSource).toContain('useLayoutEffect(() => {');
     expect(workGridSource).not.toContain('INITIAL_MEMO_DELAY_MS');
     expect(workGridSource).not.toContain('autoSelectReady');
-    expect(workGridSource).not.toContain('entranceReady');
   });
 });
