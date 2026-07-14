@@ -28,29 +28,18 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 16 }}
           transition={{ duration: 0.28, ease: EASE }}
-          className="pointer-events-none fixed inset-x-0 bottom-phi-5 z-[9998] flex justify-center px-phi-4"
+          className="pointer-events-none fixed bottom-phi-5 right-phi-5 z-[9998] flex justify-end px-phi-0 max-sm:inset-x-phi-3 max-sm:right-auto"
           role="status"
           aria-live="polite"
         >
-          <div className="pointer-events-auto w-full max-w-[min(92vw,30rem)] border border-oxford/20 border-t-2 border-t-oxford bg-paper-bright text-oxford shadow-[0_10px_28px_rgba(0,20,51,0.12)]">
-            <div className="flex items-center justify-between border-b border-oxford/10 px-phi-3 py-phi-2 sm:px-phi-4">
-              <div className="flex items-center gap-phi-2 type-status text-oxford/55">
-                <span className="h-1.5 w-1.5 shrink-0 bg-oxford signal-dot-breathe" aria-hidden />
-                <span>Memo ready</span>
-              </div>
-              <button
-                type="button"
-                onClick={onDismiss}
-                aria-label="Dismiss memo ready notification"
-                className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-base leading-none text-oxford/45 transition-colors hover:text-oxford btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/45"
-              >
-                ×
-              </button>
+          <div className="pointer-events-auto flex w-full max-w-[min(92vw,24rem)] items-center gap-phi-3 border border-oxford/20 bg-paper-bright px-phi-3 py-phi-3 text-oxford shadow-[0_10px_28px_rgba(0,20,51,0.12)]">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center bg-oxford font-mono text-[12px] text-paper" aria-hidden>✓</span>
+            <div className="min-w-0 flex-1">
+              <div className="type-status text-oxford/55">Memo ready</div>
+              <p className="mt-phi-1 truncate font-sans text-[15px] font-medium leading-tight text-oxford">{name}</p>
             </div>
-            <div className="flex items-center gap-phi-3 px-phi-3 py-phi-3 sm:px-phi-4">
-              <p className="min-w-0 flex-1 truncate font-sans text-[15px] font-medium leading-tight text-oxford">{name}</p>
-              <div className="flex shrink-0 items-center gap-phi-2">
-                {recommendation ? <DecisionBadge variant={recommendation} /> : null}
+            <div className="flex shrink-0 items-center gap-phi-2">
+              {recommendation ? <DecisionBadge variant={recommendation} /> : null}
               <button
                 type="button"
                 onClick={onOpen}
@@ -58,7 +47,7 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
               >
                 Open memo
               </button>
-              </div>
+              <button type="button" onClick={onDismiss} aria-label="Dismiss memo ready notification" className="shrink-0 cursor-pointer border-0 bg-transparent p-1 text-base leading-none text-oxford/45 transition-colors hover:text-oxford btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/45">×</button>
             </div>
           </div>
         </motion.div>
