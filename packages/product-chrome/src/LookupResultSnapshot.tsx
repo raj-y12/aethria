@@ -121,7 +121,7 @@ export default function LookupResultSnapshot({
             // The takeover card carries the summary as a serif standfirst —
             // it is the finding, not a caption.
             lg
-              ? 'pc-font-display mt-3 text-[clamp(1.125rem,2.4vw,1.45rem)] leading-[1.45] tracking-[-0.012em] text-oxford/80'
+              ? 'pc-font-display mt-3 text-[clamp(1rem,1.8vw,1.125rem)] leading-[1.4] tracking-[-0.012em] text-oxford/80'
               : 'font-sans leading-[1.6] text-oxford/58',
             isMemo ? 'mt-3 text-[15px] font-normal' : !lg ? 'mt-1.5' : '',
             !isMemo && !lg && (compact ? 'text-[13px]' : 'text-[15px]'),
