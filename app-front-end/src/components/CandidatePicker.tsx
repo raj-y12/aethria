@@ -4,7 +4,7 @@ import type { LookupCandidate } from '../api/startups';
 import { transitionOrReduced } from '../design-system/motion';
 import { tokens } from '../design-system/tokens';
 import { usePrefersReducedMotion } from '../hooks';
-import { domainLabel, evidenceLabels, identityConfidence, isBestIdentityMatch } from '../lib/candidateIdentity';
+import { candidateIdentityKey, domainLabel, evidenceLabels, identityConfidence, isBestIdentityMatch } from '../lib/candidateIdentity';
 
 const candidateAction =
   'type-action min-h-[44px] rounded-none border-0 bg-transparent p-0 transition-colors transition-transform duration-150 active:scale-[0.985] motion-reduce:transition-none motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 focus-visible:ring-offset-0 [@media(hover:hover)_and_(pointer:fine)]:hover:text-oxford';
@@ -63,7 +63,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
           const evidence = evidenceLabels(candidate.source_badges, Boolean(domain));
           return (
             <li
-              key={`${candidate.name}:${candidate.website}:${index}`}
+              key={candidateIdentityKey(candidate, candidates, index)}
               className="candidate-identity__row grid grid-cols-1 items-center gap-phi-4 border-b border-oxford/[0.12] bg-oxford/[0.025] p-phi-3 transition-colors duration-150 sm:grid-cols-[minmax(3rem,.12fr)_minmax(0,1fr)_auto] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-oxford/[0.05]"
             >
               <div className="candidate-identity__rail flex flex-col gap-phi-2 font-mono text-[11px] text-oxford/50">
@@ -77,8 +77,12 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
                 <p className="mt-phi-1 type-meta text-oxford/60 line-clamp-3 max-h-[4.5rem] overflow-hidden">{candidate.description || 'No description was confirmed for this domain.'}</p>
                 <div className="mt-phi-2 flex flex-wrap items-center gap-x-phi-2 gap-y-phi-1 type-meta text-oxford/60" aria-label={`Verification evidence for ${candidate.name}`}>
                   <span>{confidence.label}</span>
-                  <span>Verified by</span>
-                  {evidence.map((label) => <span key={label}>{label}</span>)}
+                  {evidence.length ? (
+                    <>
+                      <span>Verified by</span>
+                      {evidence.map((label) => <span key={label}>{label}</span>)}
+                    </>
+                  ) : <span>No verification evidence confirmed</span>}
                 </div>
               </div>
               <button

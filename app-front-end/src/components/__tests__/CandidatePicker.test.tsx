@@ -76,6 +76,12 @@ describe('CandidatePicker', () => {
     expect(description).toHaveClass('line-clamp-3', 'max-h-[4.5rem]', 'overflow-hidden');
   });
 
+  it('does not leave a dangling verification prefix without evidence', () => {
+    render(<CandidatePicker candidates={[{ ...candidates[0], website: '', source_badges: [] }]} onPick={() => undefined} onRefine={() => undefined} />);
+    expect(screen.getByText('No verification evidence confirmed')).toBeInTheDocument();
+    expect(screen.queryByText('Verified by')).not.toBeInTheDocument();
+  });
+
   it('gives picker actions a short transform affordance with reduced-motion fallbacks', () => {
     render(<CandidatePicker candidates={candidates} onPick={() => undefined} onRefine={() => undefined} />);
     const refineTrigger = screen.getByRole('button', { name: 'None of these companies' });

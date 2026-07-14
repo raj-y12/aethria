@@ -3,6 +3,7 @@ import {
   domainLabel,
   evidenceLabels,
   identityConfidence,
+  candidateIdentityKey,
   isBestIdentityMatch,
 } from '../candidateIdentity';
 
@@ -28,10 +29,19 @@ describe('candidate identity presentation', () => {
     expect(isBestIdentityMatch(candidates[1], 1, candidates)).toBe(true);
     expect(isBestIdentityMatch(candidates[2], 2, candidates)).toBe(false);
     expect(isBestIdentityMatch({ confidence: 0.69 } as never, 0, [{ confidence: 0.69 }] as never)).toBe(false);
+    expect(isBestIdentityMatch({ confidence: 0.82 } as never, 0)).toBe(true);
   });
 
   it('renders a clean registrable domain label', () => {
     expect(domainLabel('https://www.acme.ie/about')).toBe('acme.ie');
     expect(domainLabel('not a website')).toBe('');
+  });
+
+  it('creates duplicate-safe keys from candidate identity data', () => {
+    const candidates = [
+      { name: 'Acme', website: 'https://acme.ie', source_badges: ['official'], confidence: 0.8 },
+      { name: 'Acme', website: 'https://acme.ie', source_badges: ['official'], confidence: 0.8 },
+    ] as never;
+    expect(candidateIdentityKey(candidates[0], candidates, 0)).not.toBe(candidateIdentityKey(candidates[1], candidates, 1));
   });
 });
