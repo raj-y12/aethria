@@ -69,4 +69,16 @@ describe('CandidatePicker', () => {
     expect(row.className).toContain('pointer:fine');
     expect(refineTrigger.className).toContain('pointer:fine');
   });
+
+  it('gives picker actions a short transform affordance with reduced-motion fallbacks', () => {
+    render(<CandidatePicker candidates={candidates} onPick={() => undefined} onRefine={() => undefined} />);
+    const refineTrigger = screen.getByRole('button', { name: 'None of these companies' });
+    const expectedMotionClasses = ['duration-150', 'active:scale-[0.985]', 'motion-reduce:transition-none', 'motion-reduce:active:scale-100'];
+
+    expectedMotionClasses.forEach((className) => expect(refineTrigger.className).toContain(className));
+
+    expect(screen.getByRole('button', { name: 'Use Lyra Health at lyrahealth.com' }).className).toContain('motion-reduce:active:scale-100');
+    fireEvent.click(refineTrigger);
+    expect(screen.getByRole('button', { name: 'Resolve website' }).className).toContain('motion-reduce:active:scale-100');
+  });
 });

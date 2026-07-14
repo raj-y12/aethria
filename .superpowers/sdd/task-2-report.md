@@ -60,3 +60,19 @@
 ### Concerns
 
 - No concerns identified. The focused change is limited to the two CandidatePicker action controls.
+
+## Review fix: reduced-motion action transitions
+
+### Files
+
+- Modified `app-front-end/src/components/CandidatePicker.tsx` so the “None of these companies”, “Use this company”, and “Resolve website” actions use a 150ms transform transition with a subtle active scale, while `motion-reduce` disables transform transitions and scaling.
+- Modified `app-front-end/src/components/__tests__/CandidatePicker.test.tsx` with focused assertions for the action motion classes.
+
+### Verification
+
+- `cd app-front-end && npm test -- --run src/components/__tests__/CandidatePicker.test.tsx src/api/__tests__/startupsLookup.test.ts` — passed: 2 files, 5 tests.
+- `cd app-front-end && npm run build` — passed TypeScript compilation and Vite production build.
+
+### Concerns
+
+- No concerns identified. The focused change is limited to CandidatePicker actions.
