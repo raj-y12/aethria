@@ -18,8 +18,10 @@ Restore the earlier synchronized workspace-and-spine transition and add the miss
 - Render Dispatch through `AnimatePresence` as a keyed motion surface.
 - Make closing the exact reciprocal of opening: Dispatch follows the same path backward while the spine and workspace reverse their opening motion at the same time.
 - Keep the desktop spine, mobile chrome, workspace, and Dispatch transitions concurrent in both directions; do not serialize their animations.
-- Disable workspace position layout animation during bare Home → full Flow chrome changes so the Flow row stagger begins in stable final geometry.
+- Use the same 500 ms spine/workspace position transition during bare Home → full Flow chrome changes.
+- Hold the existing Flow queue stagger until that chrome transition completes, then release it from the actual Framer Motion completion callback.
 - Keep Dispatch's internal views, progress stages, result presentation, and focus behavior unchanged.
+- Preserve all existing Flow row, empty-state, selected-memo, readout, and micro-interaction animations.
 
 This centralizes coordination where the spine, workspace, and Dispatch are already composed. Dispatch remains responsible for its content while `AppFrame` remains responsible for application chrome.
 
@@ -30,7 +32,8 @@ For normal motion preferences:
 1. Opening Dispatch starts all frame motion together: the spine slides/fades from `x: 0` to `x: -28`, the workspace expands with position layout animation, and Dispatch fades from `opacity: 0` to `1` while moving from `y: 10` to `y: 0`.
 2. Closing Dispatch starts the exact reverse at the same time: the spine slides/fades from `x: -28` to `x: 0`, the workspace contracts with the same position layout animation, and Dispatch fades from `opacity: 1` to `0` while moving from `y: 0` to `y: 10`.
 3. Each element uses the same duration and easing in both directions. No element waits for another element's exit callback.
-4. Home → Flow changes the frame from bare to full chrome without workspace position layout animation, preserving the existing immediate Flow row stagger.
+4. Home → Flow uses the same 500 ms spine/workspace entrance. Flow content renders in its initial animation state during that movement; the existing queue stagger begins immediately after the chrome completion callback.
+5. The queue keeps its existing `26 ms` row stagger, and the existing empty-state, selected-memo, readout, and micro-interaction animations remain unchanged.
 
 For reduced motion:
 
@@ -42,7 +45,9 @@ For reduced motion:
 
 `dispatch.commandBarOpen` remains the sole source of truth for Dispatch and chrome visibility. When it becomes false, `AnimatePresence` retains the Dispatch surface for its exit while the spine/mobile chrome mount immediately and animate in concurrently.
 
-`AppFrame` records only whether its `chrome` prop changed between bare and full modes. Position layout animation is disabled for that render so route-level Home → Flow choreography does not inherit Dispatch motion. No timeout or Dispatch exit-pending state is required.
+`AppFrame` records whether it is entering full chrome from a bare page. During that entrance it exposes `workspaceChromeReady: false` through the frame context. The desktop spine or mobile chrome sets it to true from its Framer Motion `onAnimationComplete` callback.
+
+`FlowPage` passes `workspaceChromeReady` to `WorkGrid`. `WorkGrid` retains its existing variants but stays in `hidden` until the frame is ready, then switches to `visible` and runs its current stagger. Reduced motion resolves readiness immediately. No fixed timeout or Dispatch exit-pending state is required.
 
 ## Accessibility
 
@@ -55,10 +60,12 @@ For reduced motion:
 
 Add focused regression coverage that proves:
 
-- the workspace uses position layout animation with the shared chrome transition during Dispatch motion;
+- the workspace uses position layout animation with the shared chrome transition during Dispatch and Home → Flow motion;
 - Dispatch exposes reciprocal `y: 10 → 0` enter and `y: 0 → 10` exit states inside `AnimatePresence`;
 - spine/mobile chrome visibility follows logical Dispatch open state so their return overlaps the retained exit surface;
-- bare ↔ full chrome changes disable workspace layout animation for Home → Flow;
+- bare → full chrome keeps `workspaceChromeReady` false until the spine/mobile entrance completes;
+- Flow passes readiness to `WorkGrid`, which releases its existing `26 ms` row stagger only after completion;
+- existing Flow empty-state, selected-memo, readout, and micro-interaction animations remain present;
 - reduced motion removes spatial movement while retaining a valid exit phase.
 
 Run the focused tests, the frontend test suite relevant to app-frame choreography, TypeScript/build verification, and lint if configured.
