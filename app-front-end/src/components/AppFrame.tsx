@@ -96,6 +96,8 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   const bareChrome = chrome === 'bare';
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const reduceMotion = usePrefersReducedMotion();
+  const previousChrome = useRef(chrome);
+  const chromeModeChanged = previousChrome.current !== chrome;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pageOverlayOpen, setPageOverlayOpen] = useState(false);
   const [spineOverride, setSpineOverride] = useState<SpineOverride | null>(null);
@@ -107,6 +109,10 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   } = useAgentLogoutFlow();
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
   const { startups, liveGate } = data;
+
+  useLayoutEffect(() => {
+    previousChrome.current = chrome;
+  }, [chrome]);
 
   const acknowledge = useAcknowledgeStartup();
   const handleOpenMemo = useCallback(
@@ -123,24 +129,6 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
     fundConfiguration,
     onOpenMemo: handleOpenMemo,
   });
-  const previousDispatchOpen = useRef(dispatch.commandBarOpen);
-  const [dispatchExitPending, setDispatchExitPending] = useState(false);
-  const dispatchClosing = previousDispatchOpen.current && !dispatch.commandBarOpen;
-
-  useLayoutEffect(() => {
-    if (dispatch.commandBarOpen) {
-      setDispatchExitPending(false);
-    } else if (previousDispatchOpen.current) {
-      setDispatchExitPending(true);
-    }
-    previousDispatchOpen.current = dispatch.commandBarOpen;
-  }, [dispatch.commandBarOpen]);
-
-  const dispatchTransitionActive =
-    dispatch.commandBarOpen || dispatchClosing || dispatchExitPending;
-  const completeDispatchExit = useCallback(() => {
-    setDispatchExitPending(false);
-  }, []);
 
   // Scroll lock has one owner: the frame. Covers the dispatch takeover and any
   // full-screen page overlay (mobile memo) without double-locking the body.
@@ -304,8 +292,8 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   });
 
   /** Dispatch is a front-door surface — hide workspace chrome while it is open. */
-  const showSpine = !bareChrome && !dispatchTransitionActive;
-  const showMobileChrome = !isDesktop && !bareChrome && !dispatchTransitionActive;
+  const showSpine = !bareChrome && !dispatch.commandBarOpen;
+  const showMobileChrome = !isDesktop && !bareChrome && !dispatch.commandBarOpen;
 
   return (
     <AppFrameContext.Provider value={contextValue}>
@@ -428,18 +416,18 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
               ) : null}
             </AnimatePresence>
             <motion.main
-              layout="position"
+              layout={chromeModeChanged ? false : 'position'}
               transition={chromeTransition}
               className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper"
             >
               {children}
-              <AnimatePresence initial={false} onExitComplete={completeDispatchExit}>
+              <AnimatePresence initial={false}>
                 {dispatch.commandBarOpen ? (
                   <motion.div
                     key="dispatch-takeover"
                     initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
                     transition={transitionOrReduced(reduceMotion, {
                       duration: tokens.motion.duration.short,
                       ease: tokens.motion.ease,

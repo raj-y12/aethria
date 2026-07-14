@@ -7,12 +7,15 @@ const flowPageSource = readFileSync(resolve(import.meta.dirname, '../src/pages/F
 const workGridSource = readFileSync(resolve(import.meta.dirname, '../src/components/WorkGrid.tsx'), 'utf8');
 
 describe('Home to Flow entrance choreography', () => {
-  it('restores synchronized workspace motion and sequences chrome after Dispatch exits', () => {
-    expect(appFrameSource).toContain('layout="position"');
-    expect(appFrameSource).toContain('transition={chromeTransition}');
-    expect(appFrameSource).toContain('dispatchTransitionActive');
-    expect(appFrameSource).toContain('onExitComplete={completeDispatchExit}');
-    expect(appFrameSource).toContain("exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}");
+  it('uses reciprocal Dispatch motion without disturbing Home to Flow geometry', () => {
+    expect(appFrameSource).toContain('const chromeModeChanged = previousChrome.current !== chrome;');
+    expect(appFrameSource).toContain("layout={chromeModeChanged ? false : 'position'}");
+    expect(appFrameSource).toContain('const showSpine = !bareChrome && !dispatch.commandBarOpen;');
+    expect(appFrameSource).toContain('const showMobileChrome = !isDesktop && !bareChrome && !dispatch.commandBarOpen;');
+    expect(appFrameSource).toContain("exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}");
+    expect(appFrameSource).not.toContain('dispatchExitPending');
+    expect(appFrameSource).not.toContain('dispatchTransitionActive');
+    expect(appFrameSource).not.toContain('onExitComplete={completeDispatchExit}');
   });
 
   it('starts one light row cascade immediately, without a second page entrance', () => {
