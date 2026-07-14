@@ -32,21 +32,20 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
           role="status"
           aria-live="polite"
         >
-          <div className="pointer-events-auto flex w-full max-w-[min(92vw,34rem)] flex-wrap items-center gap-x-phi-4 gap-y-phi-3 rounded-xl bg-oxford px-phi-4 py-phi-3 text-paper shadow-[0_12px_36px_rgba(0,20,51,0.18)] sm:flex-nowrap">
-            <div className="flex min-w-0 flex-1 items-center gap-phi-3">
-              <div className="flex shrink-0 items-center gap-phi-2 type-status text-paper/60">
-                <span className="h-1.5 w-1.5 shrink-0 bg-paper signal-dot-breathe" aria-hidden />
-                <span className="whitespace-nowrap">Memo ready</span>
+          <div className="pointer-events-auto flex w-full max-w-[min(92vw,27rem)] items-center gap-phi-3 rounded-md border border-oxford/20 border-l-[3px] border-l-oxford bg-paper-bright px-phi-3 py-phi-3 text-oxford shadow-[0_10px_28px_rgba(0,20,51,0.12)] sm:px-phi-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-phi-2 type-status text-oxford/55">
+                <span className="h-1.5 w-1.5 shrink-0 bg-oxford signal-dot-breathe" aria-hidden />
+                <span>Memo ready</span>
               </div>
-              <span className="h-4 w-px shrink-0 bg-paper/20" aria-hidden />
-              <p className="min-w-0 truncate font-display text-[1.15rem] leading-tight text-paper">{name}</p>
+              <p className="mt-phi-1 truncate font-display text-[1.1rem] leading-tight text-oxford">{name}</p>
             </div>
-            <div className="ml-auto flex shrink-0 items-center gap-phi-2">
+            <div className="flex shrink-0 items-center gap-phi-2">
               {recommendation ? <DecisionBadge variant={recommendation} className="!rounded-md" /> : null}
               <button
                 type="button"
                 onClick={onOpen}
-                className="type-action inline-flex h-[34px] shrink-0 items-center justify-center rounded-md bg-paper px-phi-4 text-oxford transition-[background-color,transform] duration-150 hover:bg-paper-bright active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70 motion-reduce:transition-none motion-reduce:active:scale-100"
+                className="type-action inline-flex h-[32px] shrink-0 items-center justify-center rounded-md bg-oxford px-phi-3 text-paper transition-[background-color,transform] duration-150 hover:bg-oxford/90 active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/45 motion-reduce:transition-none motion-reduce:active:scale-100"
               >
                 Open memo
               </button>
