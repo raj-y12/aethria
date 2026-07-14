@@ -32,20 +32,21 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
           role="status"
           aria-live="polite"
         >
-          <div className="pointer-events-auto flex w-full max-w-[min(92vw,30rem)] flex-wrap items-center gap-x-phi-3 gap-y-phi-2 rounded-lg bg-oxford px-phi-3 py-phi-2.5 text-paper shadow-[0_12px_36px_rgba(0,20,51,0.18)] sm:flex-nowrap sm:px-phi-4">
-            <div className="flex min-w-0 flex-1 items-baseline gap-phi-2">
-              <div className="flex shrink-0 items-center gap-phi-2 type-status text-paper/65">
+          <div className="pointer-events-auto flex w-full max-w-[min(92vw,34rem)] flex-wrap items-center gap-x-phi-4 gap-y-phi-3 rounded-xl bg-oxford px-phi-4 py-phi-3 text-paper shadow-[0_12px_36px_rgba(0,20,51,0.18)] sm:flex-nowrap">
+            <div className="flex min-w-0 flex-1 items-center gap-phi-3">
+              <div className="flex shrink-0 items-center gap-phi-2 type-status text-paper/60">
                 <span className="h-1.5 w-1.5 shrink-0 bg-paper signal-dot-breathe" aria-hidden />
-                <span>Memo ready</span>
+                <span className="whitespace-nowrap">Memo ready</span>
               </div>
-              <p className="min-w-0 truncate font-display text-[1.05rem] leading-tight text-paper">{name}</p>
+              <span className="h-4 w-px shrink-0 bg-paper/20" aria-hidden />
+              <p className="min-w-0 truncate font-display text-[1.15rem] leading-tight text-paper">{name}</p>
             </div>
-            <div className="ml-auto flex items-center gap-phi-2">
+            <div className="ml-auto flex shrink-0 items-center gap-phi-2">
               {recommendation ? <DecisionBadge variant={recommendation} className="!rounded-md" /> : null}
               <button
                 type="button"
                 onClick={onOpen}
-                className="type-action inline-flex h-[30px] shrink-0 items-center justify-center rounded-md bg-paper px-phi-3 text-oxford transition-[background-color,transform] duration-150 hover:bg-paper-bright active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70 motion-reduce:transition-none motion-reduce:active:scale-100"
+                className="type-action inline-flex h-[34px] shrink-0 items-center justify-center rounded-md bg-paper px-phi-4 text-oxford transition-[background-color,transform] duration-150 hover:bg-paper-bright active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70 motion-reduce:transition-none motion-reduce:active:scale-100"
               >
                 Open memo
               </button>
@@ -53,7 +54,7 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
                 type="button"
                 onClick={onDismiss}
                 aria-label="Dismiss memo ready notification"
-                className="shrink-0 cursor-pointer border-0 bg-transparent p-1 text-lg leading-none text-paper/60 transition-colors hover:text-paper btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70"
+                className="shrink-0 cursor-pointer border-0 bg-transparent p-1.5 text-lg leading-none text-paper/45 transition-colors hover:text-paper btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70"
               >
                 ×
               </button>
