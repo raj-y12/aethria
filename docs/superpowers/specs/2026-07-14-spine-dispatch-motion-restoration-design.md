@@ -16,8 +16,9 @@ Restore the earlier synchronized workspace-and-spine transition and add the miss
 
 - Restore `layout="position"` and the shared chrome transition on the workspace `motion.main`.
 - Render Dispatch through `AnimatePresence` as a keyed motion surface.
-- Dispatch enters with the existing restrained product motion language and exits by fading while lifting slightly upward.
-- Keep the desktop spine and mobile chrome hidden until the Dispatch exit animation completes; only then begin their return animation.
+- Make closing the exact reciprocal of opening: Dispatch follows the same path backward while the spine and workspace reverse their opening motion at the same time.
+- Keep the desktop spine, mobile chrome, workspace, and Dispatch transitions concurrent in both directions; do not serialize their animations.
+- Disable workspace position layout animation during bare Home → full Flow chrome changes so the Flow row stagger begins in stable final geometry.
 - Keep Dispatch's internal views, progress stages, result presentation, and focus behavior unchanged.
 
 This centralizes coordination where the spine, workspace, and Dispatch are already composed. Dispatch remains responsible for its content while `AppFrame` remains responsible for application chrome.
@@ -26,10 +27,10 @@ This centralizes coordination where the spine, workspace, and Dispatch are alrea
 
 For normal motion preferences:
 
-1. Opening Dispatch slides/fades the spine away while the workspace reflows with position layout animation.
-2. Dispatch enters as a full-frame paper surface with a short fade and small upward settle.
-3. Closing Dispatch fades and lifts the takeover out.
-4. After that exit completes, the spine/mobile chrome returns and the workspace shifts into place with the restored synchronized position animation.
+1. Opening Dispatch starts all frame motion together: the spine slides/fades from `x: 0` to `x: -28`, the workspace expands with position layout animation, and Dispatch fades from `opacity: 0` to `1` while moving from `y: 10` to `y: 0`.
+2. Closing Dispatch starts the exact reverse at the same time: the spine slides/fades from `x: -28` to `x: 0`, the workspace contracts with the same position layout animation, and Dispatch fades from `opacity: 1` to `0` while moving from `y: 0` to `y: 10`.
+3. Each element uses the same duration and easing in both directions. No element waits for another element's exit callback.
+4. Home → Flow changes the frame from bare to full chrome without workspace position layout animation, preserving the existing immediate Flow row stagger.
 
 For reduced motion:
 
@@ -39,9 +40,9 @@ For reduced motion:
 
 ## State and Lifecycle
 
-`dispatch.commandBarOpen` remains the source of truth for whether Dispatch is logically open. A small frame-level transition state records whether the closing surface is still present. The visibility rules for the spine and mobile chrome include that transition state, preventing them from returning underneath a still-exiting Dispatch surface.
+`dispatch.commandBarOpen` remains the sole source of truth for Dispatch and chrome visibility. When it becomes false, `AnimatePresence` retains the Dispatch surface for its exit while the spine/mobile chrome mount immediately and animate in concurrently.
 
-The transition state is cleared by the presence exit-complete callback rather than a hard-coded timeout, so duration token changes cannot desynchronize the sequence.
+`AppFrame` records only whether its `chrome` prop changed between bare and full modes. Position layout animation is disabled for that render so route-level Home → Flow choreography does not inherit Dispatch motion. No timeout or Dispatch exit-pending state is required.
 
 ## Accessibility
 
@@ -54,9 +55,10 @@ The transition state is cleared by the presence exit-complete callback rather th
 
 Add focused regression coverage that proves:
 
-- the workspace uses position layout animation with the shared chrome transition;
-- Dispatch exposes distinct enter and exit motion states inside `AnimatePresence`;
-- the spine/mobile chrome visibility condition includes the Dispatch exit lifecycle;
+- the workspace uses position layout animation with the shared chrome transition during Dispatch motion;
+- Dispatch exposes reciprocal `y: 10 → 0` enter and `y: 0 → 10` exit states inside `AnimatePresence`;
+- spine/mobile chrome visibility follows logical Dispatch open state so their return overlaps the retained exit surface;
+- bare ↔ full chrome changes disable workspace layout animation for Home → Flow;
 - reduced motion removes spatial movement while retaining a valid exit phase.
 
 Run the focused tests, the frontend test suite relevant to app-frame choreography, TypeScript/build verification, and lint if configured.
