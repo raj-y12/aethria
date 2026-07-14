@@ -2,6 +2,9 @@ import { useState, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
 import type { LookupCandidate } from '../api/startups';
 import { productInteraction } from '../design-system/productSystem';
+import { transitionOrReduced } from '../design-system/motion';
+import { tokens } from '../design-system/tokens';
+import { usePrefersReducedMotion } from '../hooks';
 import { domainLabel, evidenceLabels, identityConfidence, isBestIdentityMatch } from '../lib/candidateIdentity';
 
 interface CandidatePickerProps {
@@ -15,6 +18,7 @@ interface CandidatePickerProps {
 export default function CandidatePicker({ candidates, onPick, onRefine, busy, heading }: CandidatePickerProps) {
   const [refineOpen, setRefineOpen] = useState(false);
   const [website, setWebsite] = useState('');
+  const reduceMotion = usePrefersReducedMotion();
 
   const submitRefine = () => {
     const value = website.trim();
@@ -26,9 +30,12 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 4 }}
+      animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      transition={transitionOrReduced(reduceMotion, {
+        duration: tokens.motion.duration.micro,
+        ease: tokens.motion.ease,
+      })}
       className="candidate-identity mt-phi-3 grid gap-phi-4"
       aria-labelledby="candidate-identity-title"
     >
@@ -55,7 +62,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
           return (
             <li
               key={candidate.website}
-              className="candidate-identity__row grid grid-cols-[minmax(3rem,.12fr)_minmax(0,1fr)_auto] items-center gap-phi-4 border-b border-oxford/[0.12] bg-oxford/[0.025] p-phi-3 transition-colors duration-150 hover:bg-oxford/[0.05]"
+              className="candidate-identity__row grid grid-cols-1 items-center gap-phi-4 border-b border-oxford/[0.12] bg-oxford/[0.025] p-phi-3 transition-colors duration-150 sm:grid-cols-[minmax(3rem,.12fr)_minmax(0,1fr)_auto] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-oxford/[0.05]"
             >
               <div className="candidate-identity__rail flex flex-col gap-phi-2 font-mono text-[11px] text-oxford/50">
                 <span>{String(index + 1).padStart(2, '0')}</span>
@@ -113,7 +120,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
           type="button"
           onClick={() => setRefineOpen(true)}
           disabled={busy}
-          className="justify-self-start type-meta cursor-pointer border-0 bg-transparent p-0 text-oxford/60 transition-colors hover:text-oxford focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oxford disabled:opacity-60"
+          className="justify-self-start type-meta cursor-pointer border-0 bg-transparent p-0 text-oxford/60 transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:text-oxford focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-oxford disabled:opacity-60"
         >
           None of these companies
         </button>

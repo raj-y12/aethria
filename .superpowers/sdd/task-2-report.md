@@ -31,3 +31,19 @@
 ## Concerns
 
 - No concerns identified. The existing `motion` entrance animation remains for the picker wrapper; no DispatchCommandBar or dot-motion code was changed.
+
+## Review fix
+
+### Files
+
+- Modified `app-front-end/src/components/CandidatePicker.tsx` to collapse candidate rows to one column below `sm`, retain the three-column evidence rail at `sm` and above, gate hover styles to fine pointers, and honor `usePrefersReducedMotion` with reduced Framer Motion transitions.
+- Modified `app-front-end/src/components/__tests__/CandidatePicker.test.tsx` with responsive/fine-pointer class contract coverage and a `matchMedia` test shim.
+
+### Verification
+
+- `cd app-front-end && npm test -- --run src/components/__tests__/CandidatePicker.test.tsx src/api/__tests__/startupsLookup.test.ts` — passed: 2 files, 4 tests.
+- `cd app-front-end && npm run build` — passed TypeScript compilation and Vite production build.
+
+### Concerns
+
+- No concerns identified. DispatchCommandBar and dot motion were not changed.

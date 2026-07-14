@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import CandidatePicker from '../CandidatePicker';
 
 const candidates = [
@@ -18,6 +18,22 @@ const candidates = [
     source_badges: [],
   },
 ];
+
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    }),
+  });
+});
 
 describe('CandidatePicker', () => {
   it('shows a decision-useful identity brief for every candidate', () => {
@@ -42,5 +58,15 @@ describe('CandidatePicker', () => {
     fireEvent.change(screen.getByLabelText('Company website'), { target: { value: 'other.example' } });
     fireEvent.click(screen.getByRole('button', { name: 'Resolve website' }));
     expect(onRefine).toHaveBeenCalledWith('other.example');
+  });
+
+  it('keeps the evidence rail responsive and gates hover affordances to fine pointers', () => {
+    render(<CandidatePicker candidates={candidates} onPick={() => undefined} onRefine={() => undefined} />);
+    const row = screen.getAllByRole('listitem')[0];
+    const refineTrigger = screen.getByRole('button', { name: 'None of these companies' });
+
+    expect(row).toHaveClass('grid-cols-1', 'sm:grid-cols-[minmax(3rem,.12fr)_minmax(0,1fr)_auto]');
+    expect(row.className).toContain('pointer:fine');
+    expect(refineTrigger.className).toContain('pointer:fine');
   });
 });
