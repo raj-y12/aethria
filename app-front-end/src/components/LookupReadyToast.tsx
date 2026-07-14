@@ -32,31 +32,33 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
           role="status"
           aria-live="polite"
         >
-          <div className="pointer-events-auto flex w-full max-w-[min(92vw,27rem)] items-center gap-phi-3 rounded-md border border-oxford/20 border-l-[3px] border-l-oxford bg-paper-bright px-phi-3 py-phi-3 text-oxford shadow-[0_10px_28px_rgba(0,20,51,0.12)] sm:px-phi-4">
-            <div className="min-w-0 flex-1">
+          <div className="pointer-events-auto w-full max-w-[min(92vw,30rem)] border border-oxford/20 border-t-2 border-t-oxford bg-paper-bright text-oxford shadow-[0_10px_28px_rgba(0,20,51,0.12)]">
+            <div className="flex items-center justify-between border-b border-oxford/10 px-phi-3 py-phi-2 sm:px-phi-4">
               <div className="flex items-center gap-phi-2 type-status text-oxford/55">
                 <span className="h-1.5 w-1.5 shrink-0 bg-oxford signal-dot-breathe" aria-hidden />
                 <span>Memo ready</span>
               </div>
-              <p className="mt-phi-1 truncate font-display text-[1.1rem] leading-tight text-oxford">{name}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-phi-2">
-              {recommendation ? <DecisionBadge variant={recommendation} className="!rounded-md" /> : null}
-              <button
-                type="button"
-                onClick={onOpen}
-                className="type-action inline-flex h-[32px] shrink-0 items-center justify-center rounded-md bg-oxford px-phi-3 text-paper transition-[background-color,transform] duration-150 hover:bg-oxford/90 active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/45 motion-reduce:transition-none motion-reduce:active:scale-100"
-              >
-                Open memo
-              </button>
               <button
                 type="button"
                 onClick={onDismiss}
                 aria-label="Dismiss memo ready notification"
-                className="shrink-0 cursor-pointer border-0 bg-transparent p-1.5 text-lg leading-none text-paper/45 transition-colors hover:text-paper btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70"
+                className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-base leading-none text-oxford/45 transition-colors hover:text-oxford btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/45"
               >
                 ×
               </button>
+            </div>
+            <div className="flex items-center gap-phi-3 px-phi-3 py-phi-3 sm:px-phi-4">
+              <p className="min-w-0 flex-1 truncate font-sans text-[15px] font-medium leading-tight text-oxford">{name}</p>
+              <div className="flex shrink-0 items-center gap-phi-2">
+                {recommendation ? <DecisionBadge variant={recommendation} /> : null}
+              <button
+                type="button"
+                onClick={onOpen}
+                className="type-action inline-flex h-[32px] shrink-0 items-center justify-center bg-oxford px-phi-3 text-paper transition-[background-color,transform] duration-150 hover:bg-oxford/90 active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/45 motion-reduce:transition-none motion-reduce:active:scale-100"
+              >
+                Open memo
+              </button>
+              </div>
             </div>
           </div>
         </motion.div>
