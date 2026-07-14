@@ -426,21 +426,23 @@ export default function DispatchCommandBar({
               </article>
             </Reveal>
           ) : view === 'progress' ? (
-            <Reveal delay={0.24} className="mt-phi-3 flex flex-col items-center gap-phi-5">
-              {progress!.sector ? (
-                <p className="type-status">
-                  {progress!.sector}
-                </p>
-              ) : null}
-              <ProgressSteps progress={progress!} />
-              {message ? (
-                <p className="type-body max-w-[40ch] text-center text-oxford/60" aria-live="polite">
-                  {message}
-                </p>
-              ) : null}
+            <>
+              <Reveal delay={0.24} className="mt-phi-3 flex flex-col items-center gap-phi-5">
+                {progress!.sector ? (
+                  <p className="type-status">
+                    {progress!.sector}
+                  </p>
+                ) : null}
+                <ProgressSteps progress={progress!} />
+                {message ? (
+                  <p className="type-body max-w-[40ch] text-center text-oxford/60" aria-live="polite">
+                    {message}
+                  </p>
+                ) : null}
+              </Reveal>
               {(candidates && candidates.length > 0) || needsWebsite ? (
                 onPickCandidate && onRefineWebsite ? (
-                  <div className="w-full max-w-md text-left">
+                  <div className="w-full max-w-4xl text-left">
                     <CandidatePicker
                       candidates={candidates ?? []}
                       onPick={onPickCandidate}
@@ -455,7 +457,7 @@ export default function DispatchCommandBar({
                   </div>
                 ) : null
               ) : null}
-            </Reveal>
+            </>
           ) : (
             <>
               <Reveal delay={0.24} className="mt-phi-3">
