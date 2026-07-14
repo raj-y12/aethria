@@ -15,3 +15,13 @@ Verification:
 - `npm run build`: pass.
 - Full frontend suite: 202/203 passed; one unrelated `settingsRoomLayout` test timed out at its existing 5s limit (`routes a deployment validation error to the affected section`).
 
+Review follow-up:
+
+- Scoped the reduced-motion `opacity` and `transform` fallback to `.dot-grid-pulse`; the shared selector group now only applies `animation: none !important`.
+- Added a source-level regression test proving unrelated reduced-motion selectors do not receive the dot-specific declarations.
+
+Follow-up verification (2026-07-14):
+
+- `cd app-front-end && npm test -- --run src/components/__tests__/DispatchDotPulse.test.tsx`: pass (1 file, 3 tests).
+- `npm run build`: pass (`tsc && vite build`; Vite production bundle generated successfully).
+- `git diff --check`: pass (no output).

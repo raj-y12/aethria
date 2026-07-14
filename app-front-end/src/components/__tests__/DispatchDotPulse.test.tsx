@@ -32,4 +32,16 @@ describe('DispatchDotPulse', () => {
     expect(source).not.toContain('onAnimationIteration');
     expect(source).not.toContain('relocate(');
   });
+
+  it('scopes reduced-motion opacity and transform to the dot pulse only', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
+    const reducedMotion = source.slice(source.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+    const sharedRule = reducedMotion.match(/\.escalation-pulse,[\s\S]*?\{([\s\S]*?)\n  \}/)?.[1] ?? '';
+    const dotRule = reducedMotion.match(/\.dot-grid-pulse \{\s*(opacity:[\s\S]*?)\n  \}/)?.[1] ?? '';
+
+    expect(sharedRule).toContain('animation: none !important;');
+    expect(sharedRule).not.toMatch(/\b(?:opacity|transform):/);
+    expect(dotRule).toContain('opacity: 0.08;');
+    expect(dotRule).toContain('transform: none;');
+  });
 });

@@ -745,6 +745,9 @@
   .pulse-fast,
   .dot-grid-pulse {
     animation: none !important;
+  }
+
+  .dot-grid-pulse {
     opacity: 0.08;
     transform: none;
   }
