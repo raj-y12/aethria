@@ -353,6 +353,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [displayStartup]
   );
   const companyResolution = displayStartup?.scout.company_resolution ?? null;
+  const founderNames =
+    (companyResolution?.founder_names?.length ? companyResolution.founder_names : null) ??
+    displayStartup?.scout.founder_names ??
+    [];
   const resolutionStatus = (
     displayStartup?.scout.resolution_status ??
     companyResolution?.resolution_status ??
@@ -1152,10 +1156,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                       </span>
                     </li>
                   ) : null}
-                  {(companyResolution?.founder_names?.length ?? 0) > 0 ? (
+                  {founderNames.length > 0 ? (
                     <li className="memoListItem">
                       <span className="memoBullet">·</span>
-                      <span>Founders: {companyResolution!.founder_names!.join(', ')}</span>
+                      <span>Founders: {founderNames.join(', ')}</span>
                     </li>
                   ) : null}
                   {(companyResolution?.missing_fields?.length ?? 0) > 0 ? (

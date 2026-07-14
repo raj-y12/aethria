@@ -82,6 +82,11 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
         funding_stage=scout_output.get("funding_stage"),
         location=(str(scout_output.get("location") or "").strip() or None),
         est_tam=scout_output.get("est_tam"),
+        founder_names=(
+            [str(name).strip() for name in scout_output.get("founder_names") if str(name).strip()]
+            if isinstance(scout_output.get("founder_names"), list)
+            else None
+        ),
         field_provenance=scout_output.get("field_provenance") if isinstance(scout_output.get("field_provenance"), dict) else None,
         references=scout_output.get("references") or None,
         source_evidence=scout_output.get("source_evidence") if isinstance(scout_output.get("source_evidence"), list) else None,

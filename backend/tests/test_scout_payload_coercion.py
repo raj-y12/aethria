@@ -80,6 +80,49 @@ def test_coerce_payload_fixes_missing_name_and_target_users():
     assert isinstance(out["references"], list)
 
 
+def test_postprocess_extracts_founders_from_grounded_sources_when_model_omits_them(monkeypatch):
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    monkeypatch.setattr("scout.base.finalize_scout_references", lambda data, **kwargs: data)
+    payload = {
+        "name": "Aethria",
+        "one_line": "Investment intelligence.",
+        "sector": "AI",
+        "problem": "Slow diligence.",
+        "solution": "Automated research.",
+        "target_users": "Funds",
+        "why_now": "AI retrieval is mature.",
+        "confidence": 0.8,
+        "primary_thesis": "Strong wedge.",
+        "key_assumptions": ["Demand exists", "Sources are accurate"],
+        "biggest_unknown": "Conversion.",
+        "references": ["Aethria - https://aethria.co"],
+    }
+
+    out = scout._postprocess_scout_dict(
+        payload,
+        {
+            "sources": [
+                {
+                    "url": "https://techcrunch.com/aethria",
+                    "title": "Aethria founders",
+                    "snippet": "Aethria was founded by Jane Smith and John Doe.",
+                }
+            ],
+            "url_allowlist": {"https://techcrunch.com/aethria"},
+        },
+        grounded_enabled=False,
+        fail_closed=False,
+    )
+
+    assert out is not None
+    assert out["founder_names"] == ["Jane Smith", "John Doe"]
+
+
 def test_site_summary_from_html_extracts_title_and_description():
     html = """
     <html>

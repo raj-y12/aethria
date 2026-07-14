@@ -66,6 +66,7 @@ export interface Scout {
   funding_stage?: string;
   location?: string;
   est_tam?: string;
+  founder_names?: string[];
   references?: string[];
   source_evidence?: Array<{
     reference: string;

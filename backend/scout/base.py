@@ -359,6 +359,17 @@ class Scout(ABC):
             refs.append(f"{out.get('name') or 'Company'} official website - {normalized_site}")
         out["references"] = refs
 
+        founders = out.get("founder_names")
+        if isinstance(founders, str):
+            founders = [founders]
+        elif not isinstance(founders, list):
+            founders = []
+        out["founder_names"] = [
+            self._coerce_text(name)
+            for name in founders
+            if self._coerce_text(name)
+        ][:8]
+
         # financials is an optional object of grounded proposals; keep only a dict so the
         # grounding gate has a stable shape (it drops anything unverifiable anyway).
         fin = out.get("financials")
@@ -381,6 +392,38 @@ class Scout(ABC):
     ) -> Optional[Dict[str, Any]]:
         """Allowlist filter + reference finalize. Returns None if fail-closed with no references."""
         out = dict(data)
+        if not out.get("founder_names"):
+            # Keep founder extraction deterministic even when the model omits the
+            # optional field. Resolver and open-discovery paths share this evidence
+            # shape, so both flows get the same grounded fallback.
+            from resolver.company_resolver import EvidenceSource, _extract_founders
+
+            company_tokens = [
+                token
+                for token in re.sub(r"[^a-z0-9 ]+", " ", str(out.get("name") or "").lower()).split()
+                if len(token) >= 3
+            ]
+            evidence = [
+                EvidenceSource(
+                    url=str(source.get("url") or ""),
+                    title=str(source.get("title") or ""),
+                    snippet=str(source.get("snippet") or ""),
+                )
+                for source in list(source_pack.get("sources") or [])
+                if isinstance(source, dict)
+                and str(source.get("url") or "").strip()
+                and (
+                    for_lookup
+                    or not company_tokens
+                    or all(
+                        token in (
+                            f"{source.get('title') or ''} {source.get('snippet') or ''}"
+                        ).lower()
+                        for token in company_tokens
+                    )
+                )
+            ]
+            out["founder_names"] = _extract_founders(evidence)
         allowlist_urls = set(source_pack.get("url_allowlist") or set())
         if explicit_website and str(explicit_website).strip():
             site = str(explicit_website).strip()
@@ -644,6 +687,8 @@ class Scout(ABC):
             return data
         data["resolution_status"] = resolution.resolution_status
         data["company_resolution"] = resolution.model_dump(mode="json")
+        if not data.get("founder_names") and resolution.founder_names:
+            data["founder_names"] = list(resolution.founder_names)
         return data
 
     @staticmethod
@@ -875,7 +920,7 @@ class Scout(ABC):
                             "not a hypothetical idea, not a product category or market theme, and not a mega-cap incumbent like Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, or their cloud brands. "
                             "`name` must be that company's actual brand or legal name as used in the wild (not a generic label like \"AI compliance tooling\"). "
                             "Use retrieved snippets aggressively: when sources mention TAM/market size/CAGR, funding round/investors/valuation, customers/pilots/ARR/MRR/users, or founders/executives, "
-                            "you MUST weave those facts into problem, solution, why_now, and primary_thesis, and set `est_tam` / `funding_stage` / `location` when supported (approximate TAM as a string is fine; location as \"City, CC\" e.g. \"Berlin, DE\"). "
+                            "you MUST weave those facts into problem, solution, why_now, and primary_thesis, and set `est_tam` / `funding_stage` / `location` when supported (approximate TAM as a string is fine; location as \"City, CC\" e.g. \"Berlin, DE\"). Extract every explicitly named founder or co-founder into `founder_names`; use [] only when the retrieved sources do not name any. "
                             "Output ONLY valid JSON matching the ScoutOutput schema "
                             "(resources/contracts/schemas/scout_output_v1.json). Exact shape:\n\n"
                             "{\n"
@@ -903,6 +948,7 @@ class Scout(ABC):
                             '  },\\n'
                             '  \"references\": [\"string\", ...] // REQUIRED: 1-8 sources that PROVE the company exists\\n'
                             "}\n\n"
+                            "Include a founder_names array containing every explicitly named founder or co-founder in the retrieved evidence; use [] only when no names are supported. "
                             "CRITICAL - references must PROVE the company exists: company website URL, funding/news article, Crunchbase, LinkedIn, or press release. "
                             "Each reference must be a concrete, verifiable source (e.g. \"Startup X - https://startupx.com\", \"Startup X raised $10M - TechCrunch 2024\"). "
                             "Do NOT use \"General domain knowledge\" or \"no specific external sources\"—those are rejected. "
@@ -977,11 +1023,17 @@ class Scout(ABC):
             source_pack = {"provider": "none", "sources": [], "url_allowlist": set()}
             if grounded_enabled:
                 nq = company
+                lookup_host = hostname_from_user_hint(site)
                 source_pack = retrieve_source_pack_merged(
                     queries=[
                         f"{nq} startup funding round investors valuation site",
                         f"{nq} product customers traction revenue users pilots",
                         f"{nq} founders CEO CTO leadership engineering team",
+                        *(
+                            [f"site:{lookup_host} founders team about leadership"]
+                            if lookup_host
+                            else []
+                        ),
                     ],
                     recency_query=recency_query(nq),
                     user_id=self._tenant_user_id,
@@ -1077,6 +1129,7 @@ class Scout(ABC):
                 '  "location": "string" | null,\n'
                 '  "references": ["string", ...]\n'
                 "}\n\n"
+                "Include a founder_names array containing every explicitly named founder or co-founder in the retrieved evidence; use [] only when no names are supported. "
                 "CRITICAL: references must contain verifiable sources proving this company exists. "
                 "Prefer primary sources first: official company domain, official docs/blog, product pages, or company-owned GitHub/LinkedIn profile. "
                 "Do not rely only on directory/paywalled sources (PitchBook/Crunchbase/Tracxn/CBInsights) if primary sources are available. "

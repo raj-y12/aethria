@@ -36,6 +36,7 @@ class ScoutOutput(TypedDict):
     key_assumptions: List[str]
     biggest_unknown: str
     references: List[str]
+    founder_names: List[str]
 
 
 def validate_scout_output(data: dict) -> ScoutOutput:
@@ -113,6 +114,14 @@ def validate_scout_output(data: dict) -> ScoutOutput:
             "references must include at least one http(s) URL per source line (prose-only citations are rejected)."
         )
     validate_references_not_only_incumbent_domains(valid_refs)
+
+    founders = data.get("founder_names", [])
+    if founders is None:
+        founders = []
+    if not isinstance(founders, list) or len(founders) > 8:
+        raise ValueError("founder_names must be a list with at most 8 names")
+    if any(not isinstance(name, str) or not name.strip() for name in founders):
+        raise ValueError("founder_names must contain non-empty strings")
 
     return ScoutOutput(**data)
 

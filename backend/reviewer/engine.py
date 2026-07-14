@@ -205,6 +205,7 @@ class ReviewerEngine:
             "primary_thesis": getattr(si, "primary_thesis", None),
             "key_assumptions": getattr(si, "key_assumptions", None),
             "biggest_unknown": getattr(si, "biggest_unknown", None),
+            "founder_names": getattr(si, "founder_names", None) or [],
         }
         for opt in ("lookup_id", "lookup_query", "lookup_website", "origin_type", "operator_context"):
             v = getattr(si, opt, None)

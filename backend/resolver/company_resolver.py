@@ -162,13 +162,16 @@ _FOUNDER_PATTERNS = (
         r"([A-Z][\w'’.-]+(?:\s+[A-Z][\w'’.-]+){1,2}(?:\s*(?:,|and)\s*[A-Z][\w'’.-]+(?:\s+[A-Z][\w'’.-]+){1,2})*)"
     ),
     re.compile(
-        r"([A-Z][\w'’.-]+(?:\s+[A-Z][\w'’.-]+){1,2})\s*(?:,|–|-|—)?\s*"
-        r"(?:is\s+the\s+)?(?:co-?founder|founder)\s*(?:&|and)?\s*(?:ceo|cto|coo)?",
-        re.IGNORECASE,
+        r"([A-Z][\w'’.-]+(?:\s+[A-Z][\w'’.-]+){1,2})\s*(?:,|–|-|—)\s*"
+        r"(?:is\s+the\s+)?(?:co-?founder|founder|ceo|cto|coo)\b",
     ),
     re.compile(
-        r"(?:CEO|CTO|chief executive)\s+(?:and\s+(?:co-?founder|founder)\s+)?"
+        r"(?:(?i:CEO|CTO|chief executive|co-?founder|founder))\s*(?:[:\-–—]\s*)"
         r"([A-Z][\w'’.-]+\s+[A-Z][\w'’.-]+)"
+    ),
+    re.compile(
+        r"(?:(?i:founding team|founders?|co-?founders?))\s*[:\-–—]\s*"
+        r"([A-Z][\w'’.-]+(?:\s+[A-Z][\w'’.-]+){1,2}(?:\s*(?:,|and|&)\s*[A-Z][\w'’.-]+(?:\s+[A-Z][\w'’.-]+){1,2})+)"
     ),
 )
 
@@ -354,6 +357,7 @@ def _build_queries(company: str, *, phase: int, website_hint: Optional[str]) -> 
         host = hostname_from_user_hint(website_hint)
         if host:
             queries.insert(0, f"{c} {host}")
+            queries.insert(1, f"site:{host} founders team about leadership")
         return queries
     return [
         f"{c} founder CEO",
@@ -376,6 +380,7 @@ def _extract_founders(sources: List[EvidenceSource]) -> List[str]:
                         continue
                     if name.lower() in _FOUNDER_NAME_REJECT:
                         continue
+                    name = re.sub(r"^(?:and|&|,|;|:)\s+", "", name, flags=re.IGNORECASE)
                     if len(name.split()) < 2:
                         continue
                     if name not in found:
@@ -782,7 +787,7 @@ def resolve_company(
             anchors = [
                 s for s in all_sources if s.source_type in ("official_site", "linkedin", "crunchbase")
             ]
-            if len(strong) >= 3 and anchors:
+            if len(strong) >= 3 and anchors and _extract_founders(all_sources):
                 _log_stage(
                     resolution,
                     stage="search_phase_2",

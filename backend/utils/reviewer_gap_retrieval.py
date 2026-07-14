@@ -11,10 +11,30 @@ import os
 from typing import Any, Dict, List
 from urllib.parse import urlparse
 
-from utils.reference_verify import hostname_from_user_hint
+from utils.reference_verify import hostname_from_user_hint, registrable_domain
 from utils.scout_field_gaps import is_missing_tam, is_weak_funding_stage
 
 logger = logging.getLogger(__name__)
+
+_TRUSTED_CORROBORATION_DOMAINS = frozenset(
+    {
+        "linkedin.com",
+        "crunchbase.com",
+        "dealroom.co",
+        "ycombinator.com",
+        "pitchbook.com",
+        "techcrunch.com",
+        "businesswire.com",
+        "prnewswire.com",
+        "reuters.com",
+        "venturebeat.com",
+        "sifted.eu",
+        "tech.eu",
+        "forbes.com",
+        "bloomberg.com",
+        "theinformation.com",
+    }
+)
 
 
 def _truthy(key: str, default: str = "true") -> bool:
@@ -30,13 +50,16 @@ def _only_when_gaps() -> bool:
 
 
 def scout_has_information_gaps(scout: Dict[str, Any]) -> bool:
-    """True when Scout likely needs outside help for market / funding / corroboration."""
+    """True when Scout likely needs outside help for market / funding / team evidence."""
     if is_missing_tam(scout.get("est_tam")):
         return True
     if is_weak_funding_stage(scout.get("funding_stage")):
         return True
     refs = scout.get("references")
     if not isinstance(refs, list) or len([r for r in refs if isinstance(r, str) and r.strip()]) < 2:
+        return True
+    founders = scout.get("founder_names")
+    if not isinstance(founders, list) or not any(str(name).strip() for name in founders):
         return True
     return False
 
@@ -92,7 +115,12 @@ def _restrict_pack_to_lookup_website(pack: Dict[str, Any], scout: Dict[str, Any]
             source_host = (urlparse(str(source.get("url") or "")).hostname or "").lower().strip(".")
         except Exception:
             source_host = ""
-        if source_host == anchor_host or source_host.endswith("." + anchor_host):
+        source_reg = registrable_domain(source_host)
+        if (
+            source_host == anchor_host
+            or source_host.endswith("." + anchor_host)
+            or source_reg in _TRUSTED_CORROBORATION_DOMAINS
+        ):
             sources.append(source)
     existing = {
         str(source.get("url") or "").strip().lower().rstrip("/")
@@ -138,6 +166,11 @@ def fetch_reviewer_gap_pack(scout: Dict[str, Any], user_id: str) -> Dict[str, An
         return None
 
     queries = build_gap_queries(scout)
+    website = str(scout.get("lookup_website") or "").strip()
+    anchor_host = hostname_from_user_hint(website)
+    if anchor_host:
+        queries.insert(0, f"site:{anchor_host} founders team about leadership")
+    queries = queries[:4]
     if not queries:
         return None
 

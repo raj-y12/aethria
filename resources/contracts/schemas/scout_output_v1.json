@@ -35,6 +35,12 @@
       "maxLength": 128,
       "description": "HQ or primary operating city when known from sources, e.g. Paris, FR"
     },
+    "founder_names": {
+      "type": "array",
+      "description": "Founder or co-founder names explicitly supported by retrieved sources.",
+      "items": { "type": "string", "minLength": 2, "maxLength": 160 },
+      "maxItems": 8
+    },
     "references": {
       "description": "Required. References that PROVE the company exists: company website URL, news article, Crunchbase, LinkedIn, press release. 'General domain knowledge' is rejected.",
       "type": "array",

@@ -25,6 +25,7 @@ def test_no_gaps_when_well_filled():
             "name": "Acme",
             "est_tam": "$5B",
             "funding_stage": "Series A",
+            "founder_names": ["Jane Doe"],
             "references": ["https://acme.com", "https://news.com/acme"],
         }
     )
@@ -101,7 +102,7 @@ def test_enrich_skips_broad_gap_search_when_operator_context_is_present(monkeypa
     assert "_reviewer_web_supplement" not in out
 
 
-def test_reviewer_gap_retrieval_filters_to_lookup_website(monkeypatch):
+def test_reviewer_gap_retrieval_keeps_trusted_external_corroboration(monkeypatch):
     monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL", "1")
     monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL_ONLY_WHEN_GAPS", "1")
 
@@ -121,8 +122,18 @@ def test_reviewer_gap_retrieval_filters_to_lookup_website(monkeypatch):
                     "url": "https://aethria.co",
                     "snippet": "Official product site.",
                 },
+                {
+                    "source_id": "S3",
+                    "title": "Aethria raises a seed round",
+                    "url": "https://techcrunch.com/2026/01/01/aethria-seed-round",
+                    "snippet": "Aethria was founded by Jane Smith and John Doe.",
+                },
             ],
-            "url_allowlist": {"https://aethriasolutions.com", "https://aethria.co"},
+            "url_allowlist": {
+                "https://aethriasolutions.com",
+                "https://aethria.co",
+                "https://techcrunch.com/2026/01/01/aethria-seed-round",
+            },
         }
 
     monkeypatch.setattr("utils.retrieval_grounding.retrieve_source_pack_merged", fake_retrieve)
@@ -139,5 +150,33 @@ def test_reviewer_gap_retrieval_filters_to_lookup_website(monkeypatch):
 
     assert pack is not None
     urls = [source["url"] for source in pack["sources"]]
-    assert urls == ["https://aethria.co"]
-    assert pack["url_allowlist"] == {"https://aethria.co"}
+    assert urls == [
+        "https://aethria.co",
+        "https://techcrunch.com/2026/01/01/aethria-seed-round",
+    ]
+    assert pack["url_allowlist"] == set(urls)
+
+
+def test_reviewer_gap_retrieval_runs_for_missing_founders_even_when_other_fields_exist(monkeypatch):
+    monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL", "1")
+    monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL_ONLY_WHEN_GAPS", "1")
+    captured = {}
+
+    def fake_retrieve(**kwargs):
+        captured.update(kwargs)
+        return {"provider": "tavily", "sources": [{"url": "https://techcrunch.com/aethria"}]}
+
+    monkeypatch.setattr("utils.retrieval_grounding.retrieve_source_pack_merged", fake_retrieve)
+    pack = fetch_reviewer_gap_pack(
+        {
+            "name": "Aethria",
+            "est_tam": "$4B",
+            "funding_stage": "Seed",
+            "founder_names": [],
+            "references": ["Aethria - https://aethria.co", "Aethria - https://linkedin.com/company/aethria"],
+        },
+        "user-1",
+    )
+
+    assert pack is not None
+    assert any("founders" in query for query in captured["queries"])
