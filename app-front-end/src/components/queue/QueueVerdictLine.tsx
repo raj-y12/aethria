@@ -102,9 +102,17 @@ export default function QueueVerdictLine({
     return (
       <div
         className="inline-flex flex-wrap items-center justify-end gap-x-phi-2 gap-y-0"
-        aria-label={`Escalated${convictionLabel != null ? `, ${convictionLabel} conviction` : ''}`}
+        aria-label={`Escalated${recommendation ? `, partner recommends ${recommendation.toLowerCase()}` : ''}${convictionLabel != null ? `, ${convictionLabel} conviction` : ''}`}
       >
         <EscalationQueueMarker ctx={ctx} driver={attentionDriver} />
+        {recommendation && (
+          <DecisionBadge
+            variant={recommendation}
+            queue
+            prominent={prominent}
+            badges={ctx.fundConfiguration?.verdictBadges}
+          />
+        )}
         {convictionEl}
       </div>
     );

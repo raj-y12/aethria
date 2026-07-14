@@ -11,8 +11,8 @@
   --memo-font-mono: var(--font-mono, "Space Mono", ui-monospace, monospace);
   --memo-paper: var(--color-paper, #f4f1ea);
   --memo-ink: rgba(var(--color-oxford-rgb), 0.9);
-  --memo-ink-body: rgba(var(--color-oxford-rgb), 0.72);
-  --memo-ink-muted: rgba(var(--color-oxford-rgb), 0.52);
+  --memo-ink-body: rgba(var(--color-oxford-rgb), 0.82);
+  --memo-ink-muted: rgba(var(--color-oxford-rgb), 0.6);
   --memo-ink-faint: rgba(var(--color-oxford-rgb), 0.38);
   --memo-rule: rgba(var(--color-oxford-rgb), 0.1);
   --memo-rule-strong: rgba(var(--color-oxford-rgb), 0.22);
