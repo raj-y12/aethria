@@ -43,7 +43,7 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
               <button
                 type="button"
                 onClick={onOpen}
-                className="type-action inline-flex h-6 min-w-[4.25rem] shrink-0 items-center justify-center rounded-full bg-paper px-phi-2.5 text-[10px] text-oxford transition-[background-color,transform] duration-150 hover:bg-paper-bright active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70 motion-reduce:transition-none motion-reduce:active:scale-100"
+                className="type-action inline-flex h-6 min-w-[4.25rem] shrink-0 items-center justify-center rounded-full bg-paper px-phi-4 text-[10px] text-oxford transition-[background-color,transform] duration-150 hover:bg-paper-bright active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70 motion-reduce:transition-none motion-reduce:active:scale-100"
               >
                 Open memo
               </button>
