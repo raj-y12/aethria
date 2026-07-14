@@ -32,23 +32,20 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
           role="status"
           aria-live="polite"
         >
-          <div className="pointer-events-auto grid w-full max-w-[min(92vw,36rem)] gap-phi-3 bg-oxford px-phi-4 py-phi-4 text-paper shadow-[0_12px_36px_rgba(0,20,51,0.18)] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-phi-5 sm:px-phi-5">
-            <div className="min-w-0">
-              <div className="flex items-center gap-phi-2 type-status text-paper/65">
+          <div className="pointer-events-auto flex w-full max-w-[min(92vw,30rem)] flex-wrap items-center gap-x-phi-3 gap-y-phi-2 rounded-lg bg-oxford px-phi-3 py-phi-2.5 text-paper shadow-[0_12px_36px_rgba(0,20,51,0.18)] sm:flex-nowrap sm:px-phi-4">
+            <div className="flex min-w-0 flex-1 items-baseline gap-phi-2">
+              <div className="flex shrink-0 items-center gap-phi-2 type-status text-paper/65">
                 <span className="h-1.5 w-1.5 shrink-0 bg-paper signal-dot-breathe" aria-hidden />
                 <span>Memo ready</span>
-                {recommendation ? <span aria-hidden>·</span> : null}
-                {recommendation ? <span>{recommendation}</span> : null}
               </div>
-              <p className="mt-phi-1 truncate font-display text-[1.35rem] leading-tight text-paper sm:text-[1.5rem]">{name}</p>
-              <p className="mt-phi-1 type-body-sm text-paper/65">Your investment memo is ready to review.</p>
+              <p className="min-w-0 truncate font-display text-[1.05rem] leading-tight text-paper">{name}</p>
             </div>
-            <div className="flex items-center justify-between gap-phi-3 sm:justify-end">
-              {recommendation ? <DecisionBadge variant={recommendation} /> : null}
+            <div className="ml-auto flex items-center gap-phi-2">
+              {recommendation ? <DecisionBadge variant={recommendation} className="!rounded-md" /> : null}
               <button
                 type="button"
                 onClick={onOpen}
-                className="type-action inline-flex h-[34px] shrink-0 items-center justify-center bg-paper px-phi-4 text-oxford transition-[background-color,transform] duration-150 hover:bg-paper-bright active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70 motion-reduce:transition-none motion-reduce:active:scale-100"
+                className="type-action inline-flex h-[30px] shrink-0 items-center justify-center rounded-md bg-paper px-phi-3 text-oxford transition-[background-color,transform] duration-150 hover:bg-paper-bright active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70 motion-reduce:transition-none motion-reduce:active:scale-100"
               >
                 Open memo
               </button>

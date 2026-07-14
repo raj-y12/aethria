@@ -33,6 +33,7 @@ export default function DecisionBadge({
   variant,
   badges,
   label,
+  className = '',
   prominent: _prominent = false,
   queue: _queue = false,
 }: {
@@ -40,6 +41,8 @@ export default function DecisionBadge({
   badges?: VerdictBadgeConfig[];
   /** Optional override for badge copy (e.g. specific escalation driver). */
   label?: string;
+  /** Optional presentation override for contexts such as floating alerts. */
+  className?: string;
   /** @deprecated Size unified — kept for call-site compatibility. */
   prominent?: boolean;
   /** @deprecated Size unified — kept for call-site compatibility. */
@@ -50,7 +53,7 @@ export default function DecisionBadge({
 
   return (
     <span
-      className={`${VERDICT_CHIP_CLASS} rounded-none ${DECISION_BADGE_CLASS[variant]}`}
+      className={`${VERDICT_CHIP_CLASS} rounded-none ${DECISION_BADGE_CLASS[variant]} ${className}`}
       style={style}
       aria-label={text}
     >
