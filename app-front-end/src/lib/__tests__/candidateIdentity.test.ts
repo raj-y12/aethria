@@ -22,14 +22,16 @@ describe('candidate identity presentation', () => {
     expect(evidenceLabels([], false)).toEqual([]);
   });
 
-  it('marks only the first strong candidate as the best match', () => {
-    const candidate = { confidence: 0.82 } as never;
-    expect(isBestIdentityMatch(candidate, 0)).toBe(true);
-    expect(isBestIdentityMatch(candidate, 1)).toBe(false);
-    expect(isBestIdentityMatch({ confidence: 0.69 } as never, 0)).toBe(false);
+  it('marks the first highest-confidence strong candidate as the best match', () => {
+    const candidates = [{ confidence: 0.64 }, { confidence: 0.82 }, { confidence: 0.82 }] as never;
+    expect(isBestIdentityMatch(candidates[0], 0, candidates)).toBe(false);
+    expect(isBestIdentityMatch(candidates[1], 1, candidates)).toBe(true);
+    expect(isBestIdentityMatch(candidates[2], 2, candidates)).toBe(false);
+    expect(isBestIdentityMatch({ confidence: 0.69 } as never, 0, [{ confidence: 0.69 }] as never)).toBe(false);
   });
 
   it('renders a clean registrable domain label', () => {
     expect(domainLabel('https://www.acme.ie/about')).toBe('acme.ie');
+    expect(domainLabel('not a website')).toBe('');
   });
 });

@@ -63,7 +63,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
           const evidence = evidenceLabels(candidate.source_badges, Boolean(domain));
           return (
             <li
-              key={candidate.website}
+              key={`${candidate.name}:${candidate.website}:${index}`}
               className="candidate-identity__row grid grid-cols-1 items-center gap-phi-4 border-b border-oxford/[0.12] bg-oxford/[0.025] p-phi-3 transition-colors duration-150 sm:grid-cols-[minmax(3rem,.12fr)_minmax(0,1fr)_auto] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-oxford/[0.05]"
             >
               <div className="candidate-identity__rail flex flex-col gap-phi-2 font-mono text-[11px] text-oxford/50">
@@ -71,10 +71,10 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
                 <span>{confidence.percent}%</span>
               </div>
               <div className="candidate-identity__body min-w-0">
-                {isBestIdentityMatch(candidate, index) ? <span className="type-label-section text-oxford/60">Best match</span> : null}
+                {isBestIdentityMatch(candidate, index, candidates) ? <span className="type-label-section text-oxford/60">Best match</span> : null}
                 <h3 className="mt-phi-1 font-sans text-[15px] font-medium text-oxford">{candidate.name}</h3>
-                <p className="mt-0.5 truncate type-meta text-oxford/70">{domain}</p>
-                <p className="mt-phi-1 type-meta text-oxford/60">{candidate.description || 'No description was confirmed for this domain.'}</p>
+                <p className="mt-0.5 truncate type-meta text-oxford/70">{domain || 'Website not verified'}</p>
+                <p className="mt-phi-1 type-meta text-oxford/60 line-clamp-3 max-h-[4.5rem] overflow-hidden">{candidate.description || 'No description was confirmed for this domain.'}</p>
                 <div className="mt-phi-2 flex flex-wrap items-center gap-x-phi-2 gap-y-phi-1 type-meta text-oxford/60" aria-label={`Verification evidence for ${candidate.name}`}>
                   <span>{confidence.label}</span>
                   <span>Verified by</span>

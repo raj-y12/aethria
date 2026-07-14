@@ -70,6 +70,12 @@ describe('CandidatePicker', () => {
     expect(refineTrigger.className).toContain('pointer:fine');
   });
 
+  it('keeps long descriptions bounded for responsive rows', () => {
+    render(<CandidatePicker candidates={[{ ...candidates[0], description: 'A very long company description that should remain readable without making each candidate row grow indefinitely.' }]} onPick={() => undefined} onRefine={() => undefined} />);
+    const description = screen.getByText(/A very long company description/);
+    expect(description).toHaveClass('line-clamp-3', 'max-h-[4.5rem]', 'overflow-hidden');
+  });
+
   it('gives picker actions a short transform affordance with reduced-motion fallbacks', () => {
     render(<CandidatePicker candidates={candidates} onPick={() => undefined} onRefine={() => undefined} />);
     const refineTrigger = screen.getByRole('button', { name: 'None of these companies' });

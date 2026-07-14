@@ -10,7 +10,16 @@ const EVIDENCE_LABELS: Record<string, string> = {
 };
 
 export function domainLabel(website: string): string {
-  return website.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
+  const value = website.trim();
+  if (!value) return '';
+  try {
+    const parsed = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(value) ? value : `https://${value}`);
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    if (!hostname || (!hostname.includes('.') && !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname))) return '';
+    return hostname;
+  } catch {
+    return '';
+  }
 }
 
 export function identityConfidence(confidence: number) {
@@ -26,6 +35,9 @@ export function evidenceLabels(sourceBadges: string[], hasDomain: boolean): stri
   return labels.length ? labels : hasDomain ? ['Official domain candidate'] : [];
 }
 
-export function isBestIdentityMatch(candidate: LookupCandidate, index: number): boolean {
-  return index === 0 && candidate.confidence >= 0.7;
+export function isBestIdentityMatch(candidate: LookupCandidate, index: number, candidates: LookupCandidate[]): boolean {
+  const confidence = (value: number) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+  const strongest = Math.max(...candidates.map((entry) => confidence(entry.confidence)), 0);
+  const firstStrongestIndex = candidates.findIndex((entry) => confidence(entry.confidence) === strongest);
+  return index === firstStrongestIndex && strongest >= 0.7 && confidence(candidate.confidence) === strongest;
 }
