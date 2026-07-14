@@ -16,6 +16,7 @@ import os
 
 from models import Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
 from utils.reference_validation import is_generic_reference
+from utils.partner_codes import normalize_recommendation
 
 
 logger = logging.getLogger(__name__)
@@ -152,6 +153,7 @@ class Storage:
             scout_info=scout_info,
             financials=financials or Financials(),
         )
+        persisted_id: List[str] = [startup.startup_id]
 
         def updater(data: List[dict]) -> List[dict]:
             new_name = (startup.scout_info.name or "").strip().lower()
@@ -159,6 +161,7 @@ class Storage:
                 # Duplicate by startup_id
                 if existing.get("startup_id") == startup.startup_id:
                     self.logger.warning(f"Startup {startup.startup_id} already exists; skipping add")
+                    persisted_id[0] = startup.startup_id
                     return data
                 # Duplicate by company name (case-insensitive)
                 es = existing.get("scout_info") or {}
@@ -167,13 +170,14 @@ class Storage:
                     self.logger.info(
                         f"Duplicate company name detected in storage; skipping add: {startup.scout_info.name}"
                     )
+                    persisted_id[0] = str(existing.get("startup_id") or startup.startup_id)
                     return data
             data.append(startup.to_dict())
             return data
 
         self._atomic_update(updater)
         self.logger.info(f"Added startup: {startup.scout_info.name} ({startup.startup_id})")
-        return startup.startup_id
+        return persisted_id[0]
 
     def add_review(
         self,
@@ -367,10 +371,16 @@ class Storage:
         decision: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> List[Startup]:
-        """Get startups that have a partner decision. If decision is set (YES/NO/MAYBE), filter by it."""
+        """Get decided startups, accepting canonical or legacy filter codes."""
         with_decision = [s for s in self.get_all_startups() if s.partner_info is not None]
         if decision is not None:
-            with_decision = [s for s in with_decision if s.partner_info.decision == decision]
+            recommendation = normalize_recommendation(decision)
+            if recommendation is None:
+                return []
+            with_decision = [
+                s for s in with_decision
+                if s.partner_info and s.partner_info.recommendation == recommendation
+            ]
         if limit is not None:
             with_decision = with_decision[:limit]
         return with_decision

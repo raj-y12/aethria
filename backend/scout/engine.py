@@ -9,8 +9,6 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 from utils.timeutil import utcnow
 
-from functools import partial
-
 from resolver.company_resolver import (
     CompanyResolution,
     build_fallback_scout_payload,
@@ -326,16 +324,12 @@ class ScoutEngine:
 
         # ── Stage 1: resolve company identity ────────────────────────────────
         if resolution is None:
-            loop = asyncio.get_event_loop()
             try:
-                resolution = await loop.run_in_executor(
-                    None,
-                    partial(
-                        resolve_company,
-                        company,
-                        user_id=self.tenant_user_id,
-                        website_hint=website,
-                    ),
+                resolution = await asyncio.to_thread(
+                    resolve_company,
+                    company,
+                    user_id=self.tenant_user_id,
+                    website_hint=website,
                 )
             except Exception as e:
                 self.logger.warning("Company resolver failed for %s: %s", company, e)
@@ -421,40 +415,34 @@ class ScoutEngine:
             if lookup_id and str(lookup_id).strip():
                 payload["lookup_id"] = str(lookup_id).strip()
             pr = (pipeline_run_id or "").strip() or None
-            sid = payload.get("id")
-            if self.storage and pr and sid:
-                from pipeline_state import pipeline_stage_log, upsert_pipeline_state
-
-                client = getattr(self.storage, "_client", None)
-                uid = getattr(self.storage, "_user_id", None)
-                if client and uid:
-                    pipeline_stage_log(
-                        pr, startup_id=sid, user_id=uid, stage="ingesting", phase="STARTED"
-                    )
-                    upsert_pipeline_state(
-                        client,
-                        user_id=uid,
-                        startup_id=sid,
-                        pipeline_run_id=pr,
-                        status="ingesting",
-                    )
-                    pipeline_stage_log(
-                        pr, startup_id=sid, user_id=uid, stage="ingesting", phase="DONE"
-                    )
+            persisted_id = str(payload.get("id") or "")
             if self.storage:
-                await asyncio.to_thread(self.storage.add_discovery, payload, pipeline_run_id=pr)
+                persisted_id = await asyncio.to_thread(
+                    self.storage.add_discovery,
+                    payload,
+                    pipeline_run_id=pr,
+                )
+            already_exists = bool(persisted_id and persisted_id != str(payload.get("id") or ""))
             self.last_lookup_outcome = {
-                "status": payload.get("resolution_status") or "FOUND",
-                "startup_id": payload.get("id"),
-                "message": None,
+                "status": (
+                    "ALREADY_IN_DEAL_FLOW"
+                    if already_exists
+                    else payload.get("resolution_status") or "FOUND"
+                ),
+                "startup_id": persisted_id,
+                "message": (
+                    "This company is already in your deal flow."
+                    if already_exists
+                    else None
+                ),
             }
             self.logger.info(
                 "[lookup] persisted company=%s startup_id=%s resolution_status=%s",
                 company,
-                payload.get("id"),
-                payload.get("resolution_status") or "-",
+                persisted_id,
+                self.last_lookup_outcome["status"],
             )
-            return payload.get("id")
+            return persisted_id or None
         except Exception as e:
             self.logger.error("Failed named lookup persistence for %s: %s", company, e)
             self.last_lookup_outcome = {

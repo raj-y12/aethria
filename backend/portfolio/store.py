@@ -512,6 +512,29 @@ class PortfolioStore:
                     self._write_local_file(self.files["watchlist"], records)
                 return
         raise ValueError(f"Watchlist record {watchlist_id} not found")
+
+    def update_watchlist_fields(self, watchlist_id: str, patch: Dict[str, Any]) -> bool:
+        """Update one watchlist record only when the requested fields changed."""
+        records = self.get_all_watchlist()
+        for index, record in enumerate(records):
+            if record.get("id") != watchlist_id:
+                continue
+            if all(record.get(key) == value for key, value in patch.items()):
+                return False
+            updated = dict(record)
+            updated.update(patch)
+            updated["version"] = int(record.get("version") or 0) + 1
+            if self._using_supabase():
+                list_upsert(
+                    self._supabase_tables["watchlist"],
+                    updated,
+                    user_id=self._supabase_uid(),
+                )
+            else:
+                records[index] = updated
+                self._write_local_file(self.files["watchlist"], records)
+            return True
+        raise ValueError(f"Watchlist record {watchlist_id} not found")
     
     # Signal methods
     def add_signal(
@@ -612,3 +635,7 @@ class PortfolioStore:
     def get_all_watchlist(self) -> List[Dict[str, Any]]:
         """Get all watchlist companies."""
         return self._read_file(self.files["watchlist"])
+
+    def get_all_signals(self) -> List[Dict[str, Any]]:
+        """Get all signal records through the configured storage backend."""
+        return self._read_file(self.files["signals"])

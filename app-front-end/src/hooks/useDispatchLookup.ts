@@ -14,7 +14,7 @@ import {
 import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 import { resolveLookupFailure } from '../lib/lookupFailure';
-import { lookupChipStatus } from '../lib/lookupTracking';
+import { findTrackedLookupStartup, lookupChipStatus } from '../lib/lookupTracking';
 import {
   getDispatchLookupStorageKey,
   loadDispatchLookupSnapshot,
@@ -308,19 +308,30 @@ export function useDispatchLookup({
     });
   }, [backgroundLookups, storageKey, hydratedStorageKey, pendingLookup]);
 
+  const lookupFailureQuery = useQuery({
+    queryKey: ['startups', 'lookup-status', pendingLookup?.lookupId ?? ''],
+    queryFn: () => fetchLookupJobStatus(pendingLookup!.lookupId),
+    enabled: Boolean(
+      pendingLookup && !pendingLookup.autoOpened && pendingLookup.lookupId.trim().length > 0,
+    ),
+    staleTime: 4_000,
+    refetchInterval: (q) => {
+      if (!liveGate.tabVisible) return false;
+      const row = q.state.data as { failed?: boolean; status?: string } | undefined;
+      if (row?.failed || row?.status === 'already_in_deal_flow') return false;
+      return 8_000;
+    },
+    retry: 1,
+  });
+
   const pendingLookupMatch = useMemo(() => {
     if (!pendingLookup) return null;
-    const id = pendingLookup.lookupId.trim();
-    if (!id) return null;
-    return (
-      startups.find((s) => {
-        if (!pendingLookup.isRerun && (s.scout.origin_type ?? '').toLowerCase() !== 'on_demand_lookup') {
-          return false;
-        }
-        return (s.scout.lookup_id ?? '').trim() === id;
-      }) ?? null
-    );
-  }, [startups, pendingLookup]);
+    return findTrackedLookupStartup(startups, {
+      lookupId: pendingLookup.lookupId,
+      outcomeStartupId: lookupFailureQuery.data?.startup_id,
+      isRerun: pendingLookup.isRerun,
+    });
+  }, [startups, pendingLookup, lookupFailureQuery.data?.startup_id]);
 
   // Poll the pipeline status for every matched lookup. A row can be created by
   // Scout and then fail during Review/Partner; stopping the failure poll as soon
@@ -333,25 +344,6 @@ export function useDispatchLookup({
     refetchInterval: () => {
       if (!liveGate.tabVisible) return false;
       return 3_000;
-    },
-    retry: 1,
-  });
-
-  const lookupFailureQuery = useQuery({
-    queryKey: ['startups', 'lookup-status', pendingLookup?.lookupId ?? ''],
-    queryFn: () => fetchLookupJobStatus(pendingLookup!.lookupId),
-    enabled: Boolean(
-      pendingLookup && !pendingLookup.autoOpened && pendingLookup.lookupId.trim().length > 0,
-    ),
-    staleTime: 4_000,
-    refetchInterval: (q) => {
-      // A lookup in flight must keep checking even while the analyst sits still
-      // watching the takeover — the idle gate would otherwise freeze failure
-      // detection. Only stop when the tab is hidden or the job already failed.
-      if (!liveGate.tabVisible) return false;
-      const row = q.state.data as { failed?: boolean } | undefined;
-      if (row?.failed) return false;
-      return 8_000;
     },
     retry: 1,
   });
@@ -534,16 +526,13 @@ export function useDispatchLookup({
 
   // Resolve a tracked lookup's startup row (status from the live list).
   const findLookupMatch = useCallback(
-    (id: string) =>
-      startups.find(
-        (s) =>
-          (s.scout.lookup_id ?? '').trim() === id.trim() &&
-          (
-            pendingLookup?.isRerun ||
-            (s.scout.origin_type ?? '').toLowerCase() === 'on_demand_lookup'
-          ),
-      ) ?? null,
-    [pendingLookup?.isRerun, startups],
+    (id: string) => findTrackedLookupStartup(startups, {
+      lookupId: id,
+      outcomeStartupId:
+        id === pendingLookup?.lookupId ? lookupFailureQuery.data?.startup_id : undefined,
+      isRerun: Boolean(pendingLookup?.isRerun),
+    }),
+    [lookupFailureQuery.data?.startup_id, pendingLookup, startups],
   );
 
   // Chips for the takeover: active lookup first, then backgrounded ones.

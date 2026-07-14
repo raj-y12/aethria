@@ -8,12 +8,14 @@ from pipeline_runner import run_on_demand_lookup
 class _FakeScoutEngine:
     active_thesis = "unset"
     calls = 0
+    outcome = None
 
     def __init__(self, *args, **kwargs):
         type(self).active_thesis = kwargs.get("active_thesis", "missing")
 
     async def run_named_lookup(self, **kwargs):
         type(self).calls += 1
+        self.last_lookup_outcome = type(self).outcome
         return "startup-1"
 
 
@@ -64,6 +66,7 @@ class _FakeThesis:
 
 def _wire_common_engines(monkeypatch):
     _FakeScoutEngine.calls = 0
+    _FakeScoutEngine.outcome = None
     _FakeReviewerEngine.calls = 0
     _FakeReviewerEngine.result = True
     _FakePartnerEngine.calls = 0
@@ -229,6 +232,7 @@ async def test_add_context_rerun_regenerates_and_persists_memo(monkeypatch):
         def generate_memo(self, current, **kwargs):
             assert current is startup
             assert kwargs["tenant_user_id"] == "user_123"
+            assert kwargs["for_display"] is True
             return "# Regenerated memo\n\nNew pilot evidence incorporated."
 
     monkeypatch.setattr("pipeline_runner.MemoGenerator", _MemoGenerator)
@@ -249,5 +253,44 @@ async def test_add_context_rerun_regenerates_and_persists_memo(monkeypatch):
         (
             "startup-1",
             {"investment_memo_markdown": "# Regenerated memo\n\nNew pilot evidence incorporated."},
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_duplicate_lookup_persists_terminal_existing_startup_outcome(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+    _FakeScoutEngine.outcome = {
+        "status": "ALREADY_IN_DEAL_FLOW",
+        "startup_id": "startup-1",
+        "message": "This company is already in your deal flow.",
+    }
+    outcomes = []
+
+    def record(table, payload, *, user_id):
+        outcomes.append((table, payload, user_id))
+        return payload["id"]
+
+    monkeypatch.setattr("pipeline_runner.list_upsert", record)
+
+    startup_id = await run_on_demand_lookup(
+        "user_123",
+        "Acme",
+        lookup_id="lookup-existing-1",
+    )
+
+    assert startup_id == "startup-1"
+    assert outcomes == [
+        (
+            "lookup_job_outcomes",
+            {
+                "id": "lookup-existing-1",
+                "lookup_id": "lookup-existing-1",
+                "status": "already_in_deal_flow",
+                "startup_id": "startup-1",
+                "message": "This company is already in your deal flow.",
+            },
+            "user_123",
         )
     ]

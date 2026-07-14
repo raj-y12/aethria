@@ -7,6 +7,7 @@ the asyncio.to_thread offloads in pipeline_runner regress.
 """
 import asyncio
 import time
+import threading
 
 import pytest
 
@@ -107,3 +108,19 @@ async def test_slow_engine_construction_does_not_block_event_loop(monkeypatch):
 
     worst_gap = await _run_cycle_with_heartbeat(expect_error=_EngineBuildReached)
     _assert_loop_stayed_free(worst_gap, "engine construction")
+
+
+async def test_reference_pruning_is_offloaded_from_event_loop():
+    caller_thread = threading.get_ident()
+    worker_threads = []
+
+    class Storage:
+        def remove_startups_without_references(self):
+            worker_threads.append(threading.get_ident())
+            time.sleep(0.05)
+            return 2
+
+    removed = await pipeline_runner._prune_unreferenced_startups(Storage(), "user-prune")
+
+    assert removed == 2
+    assert worker_threads and worker_threads[0] != caller_thread

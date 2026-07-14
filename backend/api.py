@@ -13,7 +13,7 @@ import os
 import env_config
 import re
 import time
-from functools import partial
+from collections import OrderedDict
 from uuid import uuid4
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -149,7 +149,7 @@ _agent_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _agent_worker_task: Optional[asyncio.Task] = None
 _lookup_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _lookup_worker_tasks: List[asyncio.Task] = []
-_cancelled_lookup_ids: set[str] = set()
+_cancelled_lookup_ids: OrderedDict[str, None] = OrderedDict()
 _logger_agents = logging.getLogger("api.agents")
 _logger_visible = logging.getLogger("uvicorn.error")
 
@@ -179,9 +179,20 @@ def _is_lookup_cancelled(user_id: str, lookup_id: Optional[str]) -> bool:
 
 
 def _mark_lookup_cancelled(user_id: str, lookup_id: str) -> None:
-    if len(_cancelled_lookup_ids) >= _CANCELLED_LOOKUP_MAX:
-        _cancelled_lookup_ids.clear()
-    _cancelled_lookup_ids.add(_lookup_cancel_key(user_id, lookup_id))
+    key = _lookup_cancel_key(user_id, lookup_id)
+    if isinstance(_cancelled_lookup_ids, OrderedDict):
+        if key in _cancelled_lookup_ids:
+            _cancelled_lookup_ids.move_to_end(key)
+            return
+        while len(_cancelled_lookup_ids) >= _CANCELLED_LOOKUP_MAX:
+            _cancelled_lookup_ids.popitem(last=False)
+        _cancelled_lookup_ids[key] = None
+        return
+
+    # Compatibility for tests or older in-process state initialized as a set.
+    while len(_cancelled_lookup_ids) >= _CANCELLED_LOOKUP_MAX:
+        _cancelled_lookup_ids.remove(next(iter(_cancelled_lookup_ids)))
+    _cancelled_lookup_ids.add(key)
 
 # Per-user persistent agent loops: user_id -> asyncio.Task
 # Protected by _loops_lock to prevent duplicate tasks per user.
@@ -221,7 +232,7 @@ _admin_login_attempts: Dict[str, List[float]] = {}
 
 _AGENT_TRIGGER_LOCK_TTL_SECONDS = int(os.getenv("AGENT_TRIGGER_LOCK_TTL_SECONDS", "900"))
 _LOOKUP_LOCK_TTL_SECONDS = int(os.getenv("LOOKUP_LOCK_TTL_SECONDS", "900"))
-_CANCELLED_LOOKUP_MAX = int(os.getenv("CANCELLED_LOOKUP_MAX", "1000"))
+_CANCELLED_LOOKUP_MAX = max(1, int(os.getenv("CANCELLED_LOOKUP_MAX", "1000")))
 _META_TRIGGER_LOCK_TTL_SECONDS = int(os.getenv("META_TRIGGER_LOCK_TTL_SECONDS", "900"))
 DEFAULT_STARTUPS_LIST_LIMIT = max(1, min(int(os.getenv("STARTUPS_LIST_DEFAULT_LIMIT", "250")), 500))
 MAX_STARTUPS_LIST_LIMIT = max(
@@ -1472,11 +1483,20 @@ def lookup_job_status(request: Request, lookup_id: str = ""):
     if not env_config.use_supabase_storage():
         return {"lookup_id": raw, "failed": False}
     row = list_get_by_id("lookup_job_outcomes", raw, user_id=uid)
-    if not row or row.get("status") != "failed":
-        return {"lookup_id": raw, "failed": False}
+    if not row:
+        return {"lookup_id": raw, "failed": False, "status": "pending"}
+    if row.get("status") != "failed":
+        return {
+            "lookup_id": raw,
+            "failed": False,
+            "status": str(row.get("status") or "pending"),
+            "startup_id": row.get("startup_id"),
+            "message": row.get("message"),
+        }
     return {
         "lookup_id": raw,
         "failed": True,
+        "status": "failed",
         "message": str(row.get("message") or "Lookup failed."),
     }
 
@@ -2194,7 +2214,15 @@ async def toggle_agents(request: Request):
         raise HTTPException(status_code=503, detail=f"Could not load settings: {e}") from e
 
     ac = s.setdefault("agent_config", {})
-    if enabled:
+    has_enabled_stage = bool(
+        ac.get("scouts_enabled")
+        or ac.get("reviewers_enabled")
+        or ac.get("partners_enabled")
+    )
+    invalid_enable = enabled and not has_enabled_stage
+    if invalid_enable:
+        ac["agents_status"] = "stopped"
+    elif enabled:
         # Mark status; individual toggles already saved by PATCH /api/settings
         ac["agents_status"] = "running"
         ac["agents_last_started_at"] = datetime.now(timezone.utc).isoformat()
@@ -2209,7 +2237,17 @@ async def toggle_agents(request: Request):
         await asyncio.to_thread(save_settings, s, user_id)
     except Exception as e:
         _logger_agents.warning("toggle_agents: could not save settings for user %s: %s", user_id[:12], e)
+        raise HTTPException(status_code=503, detail="Could not save agent state") from e
 
+    if invalid_enable:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": "Enable at least one agent stage before starting the agent loop.",
+                "enabled": False,
+                "user_id": user_id,
+            },
+        )
     if enabled:
         await _ensure_user_loop(user_id)
         _logger_agents.info("toggle_agents enabled user=%s", user_id[:12])
@@ -2453,10 +2491,11 @@ async def resolve_lookup_candidates(request: Request, body: Dict[str, Any]):
         raise HTTPException(status_code=422, detail="Could not derive company name from lookup_input")
     website_hint = str(body.get("website_hint") or parsed.get("website") or "").strip() or None
 
-    loop = asyncio.get_event_loop()
-    resolution = await loop.run_in_executor(
-        None,
-        partial(resolve_company, company_name, user_id=user_id, website_hint=website_hint),
+    resolution = await asyncio.to_thread(
+        resolve_company,
+        company_name,
+        user_id=user_id,
+        website_hint=website_hint,
     )
     status = _resolve_status_for(resolution, website_hint=website_hint)
     candidates = [c.model_dump(mode="json") for c in resolution.candidates]
@@ -2529,7 +2568,7 @@ async def trigger_meta_cycle(request: Request):
         return limited
     try:
         agent = MetaAgent(user_id=uid)
-        report = await agent.run_cycle()
+        report = await agent.run_cycle(force=True)
         if not report:
             return {"status": "no-op", "cycle_number": 0}
         cycle_number = int(report.get("cycle_number", 0))

@@ -19,6 +19,10 @@ class _FakeTable:
         self.calls.append(("eq", column, value))
         return self
 
+    def ilike(self, column, value):
+        self.calls.append(("ilike", column, value))
+        return self
+
     def limit(self, value):
         self.calls.append(("limit", value))
         return self
@@ -64,9 +68,11 @@ def test_supabase_add_startup_duplicate_checks_are_targeted():
     select_calls = [call for call in table.calls if call[0] == "select"]
     assert select_calls[:2] == [
         ("select", "startup_id", (), {}),
-        ("select", "startup_id", (), {}),
+        ("select", "startup_id,display_name", (), {}),
     ]
-    assert table.calls.count(("limit", 1)) >= 2
+    assert ("ilike", "display_name", "TraceCo") in table.calls
+    assert ("limit", 1) in table.calls
+    assert ("limit", 20) in table.calls
 
 
 def test_startups_endpoint_uses_bounded_projection(monkeypatch):

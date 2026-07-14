@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 import asyncio
+from collections import OrderedDict
 
 from fastapi.testclient import TestClient
 import pytest
@@ -104,6 +105,131 @@ def test_cancel_lookup_marks_lookup_cancelled(monkeypatch):
     assert response.json()["cancelled"] == ["lookup-cancel-1", "lookup-cancel-2"]
     assert api._is_lookup_cancelled("user_a", "lookup-cancel-1") is True
     assert api._is_lookup_cancelled("user_b", "lookup-cancel-1") is False
+
+
+def test_cancel_lookup_capacity_evicts_only_oldest_key(monkeypatch):
+    import api
+
+    monkeypatch.setattr(api, "_cancelled_lookup_ids", OrderedDict())
+    monkeypatch.setattr(api, "_CANCELLED_LOOKUP_MAX", 3)
+    for lookup_id in ("lookup-0001", "lookup-0002", "lookup-0003", "lookup-0004"):
+        api._mark_lookup_cancelled("user_a", lookup_id)
+
+    assert api._is_lookup_cancelled("user_a", "lookup-0001") is False
+    assert api._is_lookup_cancelled("user_a", "lookup-0002") is True
+    assert api._is_lookup_cancelled("user_a", "lookup-0003") is True
+    assert api._is_lookup_cancelled("user_a", "lookup-0004") is True
+
+
+def test_toggle_agents_rejects_enable_when_all_stages_are_disabled(monkeypatch):
+    import api
+    from security.rate_limiter import InMemorySecurityStore
+
+    saved = []
+    started = []
+
+    async def fake_ensure(user_id):
+        started.append(user_id)
+        return True
+
+    monkeypatch.setattr(
+        __import__("routers.deps", fromlist=["x"]),
+        "_security_store",
+        InMemorySecurityStore(),
+    )
+    monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
+    monkeypatch.setattr(
+        api,
+        "load_settings",
+        lambda user_id: {
+            "agent_config": {
+                "scouts_enabled": False,
+                "reviewers_enabled": False,
+                "partners_enabled": False,
+                "agents_status": "stopped",
+            }
+        },
+    )
+    monkeypatch.setattr(api, "save_settings", lambda settings, user_id: saved.append(settings))
+    monkeypatch.setattr(api, "_ensure_user_loop", fake_ensure)
+
+    response = TestClient(api.app).post(
+        "/api/agents/toggle",
+        json={"enabled": True},
+        headers=_auth_headers(),
+    )
+
+    assert response.status_code == 409
+    assert "stage" in response.json()["detail"].lower()
+    assert saved[-1]["agent_config"]["agents_status"] == "stopped"
+    assert started == []
+
+
+def test_toggle_agents_returns_503_when_stopped_state_cannot_be_saved(monkeypatch):
+    import api
+    from security.rate_limiter import InMemorySecurityStore
+
+    monkeypatch.setattr(
+        __import__("routers.deps", fromlist=["x"]),
+        "_security_store",
+        InMemorySecurityStore(),
+    )
+    monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
+    monkeypatch.setattr(
+        api,
+        "load_settings",
+        lambda user_id: {"agent_config": {"agents_status": "running"}},
+    )
+    monkeypatch.setattr(
+        api,
+        "save_settings",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("write failed")),
+    )
+
+    response = TestClient(api.app).post(
+        "/api/agents/toggle",
+        json={"enabled": True},
+        headers=_auth_headers(),
+    )
+
+    assert response.status_code == 503
+    assert "save" in response.json()["detail"].lower()
+
+
+def test_lookup_status_surfaces_existing_startup_outcome(monkeypatch):
+    import api
+    from security.rate_limiter import InMemorySecurityStore
+
+    monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
+    monkeypatch.setattr(
+        __import__("routers.deps", fromlist=["x"]),
+        "_security_store",
+        InMemorySecurityStore(),
+    )
+    monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
+    monkeypatch.setattr(
+        api,
+        "list_get_by_id",
+        lambda *a, **k: {
+            "status": "already_in_deal_flow",
+            "startup_id": "existing-startup",
+            "message": "This company is already in your deal flow.",
+        },
+    )
+
+    response = TestClient(api.app).get(
+        "/api/startups/lookup-status?lookup_id=lookup-existing-1",
+        headers=_auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "lookup_id": "lookup-existing-1",
+        "failed": False,
+        "status": "already_in_deal_flow",
+        "startup_id": "existing-startup",
+        "message": "This company is already in your deal flow.",
+    }
 
 
 def test_manual_agent_trigger_when_ops_off_is_coalesced_without_second_enqueue(monkeypatch):

@@ -411,14 +411,14 @@ class MemoGenerator:
                 if startup.review_info:
                     lines.append(f"**Quality assessment:** {startup.review_info.verdict}")
                     lines.append("")
-                decision_label = startup.partner_info.decision
-                if startup.partner_info.decision == "MAYBE" and startup.partner_info.human_review_required:
-                    decision_label = "MAYBE *(edge-case; human review required)*"
+                decision_label = startup.partner_info.recommendation
+                if startup.partner_info.human_review_required:
+                    decision_label += " *(human review required)*"
                 lines.append(f"**Investment decision:** {decision_label}")
-                lines.append(f"**Conviction Level:** {startup.partner_info.conviction_level}/10")
+                lines.append(f"**Confidence:** {startup.partner_info.confidence:.0%}")
                 lines.append("")
                 lines.append("### Rationale")
-                lines.append(startup.partner_info.rationale)
+                lines.append(startup.partner_info.decision_rationale)
                 lines.append("")
                 if startup.partner_info.human_review_required:
                     lines.append("**⚠️ Human Review Required**")
@@ -497,7 +497,10 @@ class MemoGenerator:
                 f"**Review Score:** {avg_score:.1f} — {score_to_label(avg_score)} ({startup.review_info.verdict})"
             )
         if startup.partner_info:
-            lines.append(f"**Decision:** {startup.partner_info.decision} (Conviction: {startup.partner_info.conviction_level}/10)")
+            lines.append(
+                f"**Decision:** {startup.partner_info.recommendation} "
+                f"(Confidence: {startup.partner_info.confidence:.0%})"
+            )
             if startup.partner_info.human_review_required:
                 lines.append("**⚠️ Human review required**")
         lines.append("")

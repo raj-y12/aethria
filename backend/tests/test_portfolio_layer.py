@@ -20,6 +20,9 @@ else:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logging
+from datetime import timedelta
+from types import SimpleNamespace
+from utils.timeutil import utcnow
 from utils.storage import Storage
 from portfolio.store import PortfolioStore
 from portfolio.engine import PortfolioEngine
@@ -321,3 +324,90 @@ async def test_unresolved_escalation_is_not_routed_until_ruled(monkeypatch, tmp_
     assert [r["startup_id"] for r in store.get_all_watchlist()] == ["ruled-startup"]
     assert store.get_all_portfolio() == []
     assert store.get_all_rejections() == []
+
+
+def test_watchlist_review_uses_public_signal_query(monkeypatch):
+    startup_id = "signalled-startup"
+    raw_file_reads = []
+    updates = []
+
+    class FakeStore:
+        files = {"signals": Path("must-not-be-read.json")}
+
+        def get_all_watchlist(self):
+            return [{
+                "id": "watch-1",
+                "startup_id": startup_id,
+                "added_at": (utcnow() - timedelta(days=75)).isoformat(),
+            }]
+
+        def get_all_signals(self):
+            return [{"startup_id": startup_id}]
+
+        def _read_file(self, path):
+            raw_file_reads.append(path)
+            raise AssertionError("engine must use PortfolioStore's public signal query")
+
+    engine = object.__new__(PortfolioEngine)
+    engine.portfolio_store = FakeStore()
+    engine.discovery_storage = SimpleNamespace(
+        get_startup=lambda sid: None,
+        update_startup_partial=lambda *args: updates.append(args),
+    )
+    engine.logger = logging.getLogger("test.portfolio.watchlist")
+
+    engine._run_watchlist_review_sync()
+
+    assert raw_file_reads == []
+    assert updates == []
+
+
+def test_stale_watchlist_warning_is_idempotent_within_same_day():
+    entry = {
+        "id": "watch-1",
+        "startup_id": "stale-startup",
+        "added_at": (utcnow() - timedelta(days=40)).isoformat(),
+    }
+    writes = []
+
+    class FakeStore:
+        def get_all_watchlist(self):
+            return [dict(entry)]
+
+        def get_all_signals(self):
+            return []
+
+        def update_watchlist_fields(self, watchlist_id, patch):
+            changed = any(entry.get(key) != value for key, value in patch.items())
+            if changed:
+                entry.update(patch)
+                writes.append((watchlist_id, dict(patch)))
+            return changed
+
+    engine = object.__new__(PortfolioEngine)
+    engine.portfolio_store = FakeStore()
+    engine.discovery_storage = SimpleNamespace()
+    engine.logger = logging.getLogger("test.portfolio.watchlist")
+
+    engine._run_watchlist_review_sync()
+    engine._run_watchlist_review_sync()
+
+    assert writes == [("watch-1", {"stale_warning": True, "days_on_watchlist": 40})]
+
+
+def test_get_all_signals_routes_through_supabase_backend(monkeypatch):
+    calls = []
+    store = object.__new__(PortfolioStore)
+    store.files = {"signals": Path("signals.json")}
+    store._supabase_tables = {"signals": "portfolio_signals"}
+    store._tenant_user_id = "user-signals"
+    store._using_supabase = lambda: True
+    store._supabase_uid = lambda: "user-signals"
+    monkeypatch.setattr(
+        "portfolio.store.list_get_all",
+        lambda table, *, user_id: calls.append((table, user_id))
+        or [{"startup_id": "startup-1"}],
+    )
+
+    assert store.get_all_signals() == [{"startup_id": "startup-1"}]
+    assert calls == [("portfolio_signals", "user-signals")]

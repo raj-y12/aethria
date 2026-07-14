@@ -41,3 +41,13 @@ def legacy_from_recommendation(recommendation: str) -> str:
     """Map INVEST/PASS/MONITOR -> YES/NO/MAYBE; unknown values default to MAYBE."""
     r = (recommendation or "").strip().upper()
     return RECOMMENDATION_TO_LEGACY.get(r, "MAYBE")
+
+
+def normalize_recommendation(value: Optional[str]) -> Optional[str]:
+    """Return a canonical recommendation for canonical or legacy input."""
+    if value is None:
+        return None
+    normalized = str(value).strip().upper()
+    if normalized in RECOMMENDATION_TO_LEGACY:
+        return normalized
+    return LEGACY_TO_RECOMMENDATION.get(normalized)

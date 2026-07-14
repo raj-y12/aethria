@@ -104,6 +104,8 @@ export async function fetchMemo(startupId: string): Promise<MemoApiResponse | nu
 export type LookupJobStatus = {
   lookup_id: string;
   failed: boolean;
+  status?: 'pending' | 'failed' | 'already_in_deal_flow';
+  startup_id?: string;
   message?: string;
 };
 
@@ -128,6 +130,11 @@ export async function fetchLookupJobStatus(lookupId: string): Promise<LookupJobS
   return {
     lookup_id: typeof data?.lookup_id === 'string' ? data.lookup_id : id,
     failed: Boolean(data?.failed),
+    status:
+      data?.status === 'failed' || data?.status === 'already_in_deal_flow'
+        ? data.status
+        : 'pending',
+    startup_id: typeof data?.startup_id === 'string' ? data.startup_id : undefined,
     message: typeof data?.message === 'string' ? data.message : undefined,
   };
 }

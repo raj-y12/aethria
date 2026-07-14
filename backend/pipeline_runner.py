@@ -11,7 +11,7 @@ import env_config
 import metrics
 import resource
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from utils.timeutil import utcnow
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
@@ -234,6 +234,18 @@ def _notify_startups_changed(user_id: str, reason: str) -> None:
         logger.debug("[%s] startups_changed notify failed: %s", user_id[:12], e)
 
 
+async def _prune_unreferenced_startups(
+    storage: SupabaseStartupsStorage,
+    user_id: str,
+) -> int:
+    """Apply the mandatory reference gate without blocking the serving loop."""
+    removed = await asyncio.to_thread(storage.remove_startups_without_references)
+    if removed:
+        logger.info("[%s] Reference gate pruned %s startup(s)", user_id[:12], removed)
+        _notify_startups_changed(user_id, "reference_prune")
+    return removed
+
+
 async def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str) -> None:
     lid = (lookup_id or "").strip()
     if not lid or not user_id or not str(user_id).strip():
@@ -262,6 +274,45 @@ async def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message
             uid[:12],
             lid[:16],
             e,
+        )
+
+
+async def _record_lookup_outcome(
+    user_id: str,
+    lookup_id: Optional[str],
+    *,
+    status: str,
+    startup_id: str,
+    message: Optional[str] = None,
+) -> None:
+    """Persist a terminal non-failure lookup outcome for frontend correlation."""
+    lid = (lookup_id or "").strip()
+    sid = (startup_id or "").strip()
+    uid = (user_id or "").strip()
+    if not lid or not sid or not uid or not env_config.use_supabase_storage():
+        return
+    record = {
+        "id": lid,
+        "lookup_id": lid,
+        "status": status.strip().lower(),
+        "startup_id": sid,
+        "message": (message or "").strip() or None,
+    }
+    if record["message"] is None:
+        record.pop("message")
+    try:
+        await asyncio.to_thread(
+            list_upsert,
+            "lookup_job_outcomes",
+            record,
+            user_id=uid,
+        )
+    except Exception as exc:
+        logger.warning(
+            "[%s] Could not persist lookup outcome for %s: %s",
+            uid[:12],
+            lid[:16],
+            exc,
         )
 
 
@@ -416,6 +467,11 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
         else:
             logger.info("[%s] Scout stage skipped (disabled in settings)", user_id[:12])
 
+        # Mandatory production gate: periodic discoveries without verifiable
+        # external references must not reach reviewer/partner stages. Existing
+        # on-demand lookup and resolution-status guards live in storage.
+        await _prune_unreferenced_startups(storage, user_id)
+
         _activity_reviewed_count = 0
         _activity_decided_count = 0
         _activity_escalations_count = 0
@@ -481,10 +537,6 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
             feedback_interval=86400,
             health_interval=3600,
         )
-        portfolio_engine.last_execution = utcnow() - timedelta(days=1)
-        portfolio_engine.last_signal = utcnow() - timedelta(days=1)
-        portfolio_engine.last_feedback = utcnow() - timedelta(days=1)
-        portfolio_engine.last_health = utcnow() - timedelta(days=1)
         agents_executed += 1
         await portfolio_engine.run_cycle()
 
@@ -717,6 +769,7 @@ async def _run_on_demand_lookup_inner(
     partner_engine = engines.partner_engine
 
     startup_id: Optional[str] = None
+    lookup_outcome: Dict[str, Any] = {}
     try:
         lookup_run_id = str(uuid4())
         logger.info(
@@ -763,6 +816,7 @@ async def _run_on_demand_lookup_inner(
                 pipeline_run_id=lookup_run_id,
                 additional_context=additional_context,
             )
+            lookup_outcome = getattr(scout_engine, "last_lookup_outcome", None) or {}
         if not startup_id:
             # The resolver/scout records WHY it failed (status, queries used, missing
             # evidence) so the UI can explain instead of looking like a random failure.
@@ -853,6 +907,7 @@ async def _run_on_demand_lookup_inner(
                 regenerated_memo = await asyncio.to_thread(
                     MemoGenerator().generate_memo,
                     updated_startup,
+                    for_display=True,
                     tenant_user_id=user_id,
                     fund_thesis=thesis_ctx,
                 )
@@ -872,6 +927,14 @@ async def _run_on_demand_lookup_inner(
                     status="ready",
                 )
             _notify_startups_changed(user_id, "lookup_partner")
+            if lookup_outcome.get("status") == "ALREADY_IN_DEAL_FLOW":
+                await _record_lookup_outcome(
+                    user_id,
+                    lid,
+                    status="already_in_deal_flow",
+                    startup_id=startup_id,
+                    message=lookup_outcome.get("message"),
+                )
         logger.info(
             "[%s] On-demand lookup completed for %s (%s) rss_mb_end=%.1f",
             user_id[:12],

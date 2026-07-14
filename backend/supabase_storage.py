@@ -23,6 +23,7 @@ from agent_trace import (
     merge_stage_trace,
 )
 from utils.reference_validation import is_generic_reference
+from utils.partner_codes import normalize_recommendation
 from utils.storage import _merge_startup_dict_patch
 
 logger = logging.getLogger(__name__)
@@ -755,29 +756,18 @@ class SupabaseStartupsStorage:
             )
             if ((r.data or []) if hasattr(r, "data") else []):
                 self.logger.warning("Startup %s already exists; skipping add", startup.startup_id)
-                return startup.startup_id
+                return str(r.data[0].get("startup_id") or startup.startup_id)
         except Exception as e:
             self.logger.warning("Duplicate id check select failed: %s", e)
 
         new_name = (startup.scout_info.name or "").strip()
-        if new_name:
-            try:
-                r = (
-                    self._client.table(TABLE)
-                    .select("startup_id")
-                    .eq("user_id", self._user_id)
-                    .eq("display_name", new_name)
-                    .limit(1)
-                    .execute()
-                )
-                if ((r.data or []) if hasattr(r, "data") else []):
-                    self.logger.info(
-                        "Duplicate company name detected in storage; skipping add: %s",
-                        startup.scout_info.name,
-                    )
-                    return startup.startup_id
-            except Exception as e:
-                self.logger.warning("Duplicate name check select failed: %s", e)
+        existing_name_id = self._find_startup_id_by_name(new_name)
+        if existing_name_id:
+            self.logger.info(
+                "Duplicate company name detected in storage; skipping add: %s",
+                startup.scout_info.name,
+            )
+            return existing_name_id
 
         sid = startup.startup_id
         if pr:
@@ -794,6 +784,26 @@ class SupabaseStartupsStorage:
         try:
             self.upsert_startup_dict(startup.to_dict())
         except Exception as e:
+            # The normalized tenant/name unique index closes the preflight race.
+            # If another lookup won between SELECT and INSERT, continue with its
+            # canonical row instead of surfacing a phantom failure.
+            existing_name_id = self._find_startup_id_by_name(new_name)
+            if existing_name_id and existing_name_id != sid:
+                if pr:
+                    try:
+                        self._client.table("startup_pipeline_state").delete().eq(
+                            "user_id", self._user_id
+                        ).eq("startup_id", sid).execute()
+                    except Exception as cleanup_error:
+                        self.logger.warning(
+                            "Could not remove raced lookup pipeline state %s: %s",
+                            sid,
+                            cleanup_error,
+                        )
+                self.logger.info(
+                    "Concurrent duplicate resolved to existing startup %s", existing_name_id
+                )
+                return existing_name_id
             if pr:
                 upsert_pipeline_state(
                     self._client,
@@ -817,6 +827,32 @@ class SupabaseStartupsStorage:
             )
         self.logger.info("Added startup: %s (%s)", startup.scout_info.name, startup.startup_id)
         return startup.startup_id
+
+    def _find_startup_id_by_name(self, company_name: str) -> Optional[str]:
+        """Return a case-insensitive exact tenant/name match, if one exists."""
+        name = (company_name or "").strip()
+        if not name:
+            return None
+        try:
+            response = (
+                self._client.table(TABLE)
+                .select("startup_id,display_name")
+                .eq("user_id", self._user_id)
+                .ilike("display_name", name)
+                .limit(20)
+                .execute()
+            )
+        except Exception as exc:
+            self.logger.warning("Duplicate name check select failed: %s", exc)
+            return None
+        normalized = name.casefold()
+        rows = (response.data or []) if hasattr(response, "data") else []
+        for row in rows:
+            if str(row.get("display_name") or "").strip().casefold() == normalized:
+                startup_id = str(row.get("startup_id") or "").strip()
+                if startup_id:
+                    return startup_id
+        return None
 
     def add_review(
         self,
@@ -1170,6 +1206,9 @@ class SupabaseStartupsStorage:
         decision: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> List[Startup]:
+        recommendation = normalize_recommendation(decision)
+        if decision is not None and recommendation is None:
+            return []
         lim = limit if limit is not None else 500
         try:
             q = (
@@ -1180,16 +1219,19 @@ class SupabaseStartupsStorage:
                 .order("updated_at", desc=True)
                 .limit(lim)
             )
-            if decision is not None:
-                q = q.eq("partner_decision", decision)
+            if recommendation is not None:
+                q = q.eq("partner_decision", recommendation)
             r = q.execute()
         except Exception as e:
             self.logger.warning("get_startups_with_decision failed: %s", e)
             return self._legacy_get_startups_with_decision(decision, limit)
         rows = (r.data or []) if hasattr(r, "data") else []
         startups = self._rows_to_startups(rows, skip_invalid=True)
-        if decision is not None:
-            startups = [s for s in startups if s.partner_info and s.partner_info.decision == decision]
+        if recommendation is not None:
+            startups = [
+                s for s in startups
+                if s.partner_info and s.partner_info.recommendation == recommendation
+            ]
         if limit is not None:
             startups = startups[:limit]
         return startups
@@ -1199,7 +1241,13 @@ class SupabaseStartupsStorage:
     ) -> List[Startup]:
         with_decision = [s for s in self.get_all_startups(skip_invalid=True) if s.partner_info is not None]
         if decision is not None:
-            with_decision = [s for s in with_decision if s.partner_info.decision == decision]
+            recommendation = normalize_recommendation(decision)
+            if recommendation is None:
+                return []
+            with_decision = [
+                s for s in with_decision
+                if s.partner_info and s.partner_info.recommendation == recommendation
+            ]
         if limit is not None:
             with_decision = with_decision[:limit]
         return with_decision

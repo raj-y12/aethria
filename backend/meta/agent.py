@@ -16,6 +16,7 @@ from meta.mutator import PromptMutator, _append_to_json_list
 from meta.reweighter import ScoutReweighter
 from meta.calibrator import ThresholdCalibrator
 from supabase_doc_store import doc_get_int, doc_set_int
+from utils.job_schedule import claim_due_jobs
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +46,17 @@ class MetaAgent:
         doc_set_int(_CYCLE_COUNTER_TABLE, cycle, user_id=self.user_id)
         return cycle
 
-    async def run_cycle(self) -> Optional[Dict]:
+    async def run_cycle(self, *, force: bool = False) -> Optional[Dict]:
         if not self.enabled:
             self.logger.info("[MetaAgent] Disabled via META_AGENT_ENABLED=false")
+            return None
+        due = await asyncio.to_thread(
+            claim_due_jobs,
+            self.user_id,
+            {"meta": 0 if force else self.interval},
+        )
+        if "meta" not in due:
+            self.logger.debug("[MetaAgent] Daily interval has not elapsed")
             return None
         # The whole cycle is blocking doc-store/analysis I/O — one hop off the
         # serving event loop rather than dozens of per-call thread hops.

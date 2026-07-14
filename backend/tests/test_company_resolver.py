@@ -215,6 +215,67 @@ def test_engine_lookup_persists_fallback_when_scout_fails(monkeypatch):
         engine.close()
 
 
+def test_engine_lookup_uses_existing_id_returned_by_storage(monkeypatch):
+    """A tenant-scoped duplicate must continue with the persisted row, not the
+    newly generated scout UUID that was never inserted."""
+    from scout.engine import ScoutEngine
+
+    state_writes = []
+
+    class NoPhantomStateClient:
+        def table(self, name):
+            state_writes.append(name)
+            raise AssertionError("duplicate lookup must not persist state for the unused scout UUID")
+
+    class FakeStorage:
+        _user_id = USER
+        _client = NoPhantomStateClient()
+
+        def add_discovery(self, payload, *, pipeline_run_id=None):
+            assert payload["id"] != "existing-startup"
+            return "existing-startup"
+
+    engine = ScoutEngine(api_key="sk-test", storage=FakeStorage(), tenant_user_id=USER)
+    try:
+        resolution = CompanyResolution(
+            query="Acme Robotics",
+            canonical_name="Acme Robotics",
+            website="https://acmerobotics.com",
+            confidence=0.8,
+            resolution_status="FOUND",
+            evidence_sources=[
+                EvidenceSource(
+                    url="https://acmerobotics.com",
+                    title="Acme Robotics",
+                    snippet="Warehouse robots.",
+                    source_type="official_site",
+                    match_score=1.0,
+                )
+            ],
+        )
+
+        async def no_result(*a, **kw):
+            return None
+
+        for scout in engine.scouts:
+            monkeypatch.setattr(scout, "discover_company", no_result)
+
+        startup_id = asyncio.run(
+            engine.run_named_lookup(
+                "Acme Robotics",
+                resolution=resolution,
+                pipeline_run_id="11111111-1111-4111-8111-111111111111",
+            )
+        )
+
+        assert startup_id == "existing-startup"
+        assert engine.last_lookup_outcome["status"] == "ALREADY_IN_DEAL_FLOW"
+        assert engine.last_lookup_outcome["startup_id"] == "existing-startup"
+        assert state_writes == []
+    finally:
+        engine.close()
+
+
 def test_engine_lookup_not_found_sets_transparent_outcome(monkeypatch):
     from scout.engine import ScoutEngine
 

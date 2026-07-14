@@ -25,6 +25,7 @@ from portfolio.rejection import RejectionAnalyzer
 from analytics.clustering import ClusterAnalyzer
 from utils.storage import Storage
 from utils.partner_codes import legacy_from_recommendation
+from utils.job_schedule import claim_due_jobs
 
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,7 @@ class PortfolioEngine:
                 "or AETHRIA_AGENT_USER_ID when USE_SUPABASE_STORAGE is enabled"
             )
         offline = (tenant_uid or "offline_analytics").strip()
+        self.tenant_user_id = tenant_uid
 
         # Initialize components
         self.rejection_analyzer = RejectionAnalyzer(
@@ -120,25 +122,52 @@ class PortfolioEngine:
     async def run_cycle(self):
         """Run one cycle of all portfolio components."""
         now = utcnow()
-        
+        if self.tenant_user_id:
+            try:
+                due = await asyncio.to_thread(
+                    claim_due_jobs,
+                    self.tenant_user_id,
+                    {
+                        "execution": self.execution_interval,
+                        "signals": self.signal_interval,
+                        "feedback": self.feedback_interval,
+                        "health": self.health_interval,
+                    },
+                )
+            except Exception as exc:
+                # Without an authoritative claim we must not run expensive work,
+                # but a schedule outage must not abort activity persistence or meta.
+                self.logger.error("Portfolio schedule claim failed: %s", exc, exc_info=True)
+                return
+        else:
+            due = set()
+            if (now - self.last_execution).total_seconds() >= self.execution_interval:
+                due.add("execution")
+            if (now - self.last_signal).total_seconds() >= self.signal_interval:
+                due.add("signals")
+            if (now - self.last_feedback).total_seconds() >= self.feedback_interval:
+                due.add("feedback")
+            if (now - self.last_health).total_seconds() >= self.health_interval:
+                due.add("health")
+
         # Execution Agent: Process new Partner decisions
-        if (now - self.last_execution).total_seconds() >= self.execution_interval:
+        if "execution" in due:
             await self._run_execution()
             self.last_execution = now
         
         # Signal Tracker: Check watchlist
-        if (now - self.last_signal).total_seconds() >= self.signal_interval:
+        if "signals" in due:
             await self._run_signals()
             await self._run_watchlist_review()
             self.last_signal = now
         
         # Feedback Loop: Calculate metrics
-        if (now - self.last_feedback).total_seconds() >= self.feedback_interval:
+        if "feedback" in due:
             await self._run_feedback()
             self.last_feedback = now
         
         # Health Monitor: Check system health
-        if (now - self.last_health).total_seconds() >= self.health_interval:
+        if "health" in due:
             await self._run_health()
             self.last_health = now
     
@@ -282,7 +311,7 @@ class PortfolioEngine:
                 return
 
             now = utcnow()
-            signals = self.portfolio_store._read_file(self.portfolio_store.files["signals"])
+            signals = self.portfolio_store.get_all_signals()
             signal_startup_ids = {s.get("startup_id") for s in signals}
 
             for entry in watchlist:
@@ -298,10 +327,14 @@ class PortfolioEngine:
                 if days < 30:
                     continue
                 elif days <= 60 and not has_signals:
-                    entry["stale_warning"] = True
-                    entry["days_on_watchlist"] = days
-                    self.portfolio_store._append_record("watchlist", entry)
-                    self.logger.info(f"Watchlist stale warning: {startup_id} ({days} days, no signals)")
+                    changed = self.portfolio_store.update_watchlist_fields(
+                        entry.get("id"),
+                        {"stale_warning": True, "days_on_watchlist": days},
+                    )
+                    if changed:
+                        self.logger.info(
+                            f"Watchlist stale warning: {startup_id} ({days} days, no signals)"
+                        )
                 elif days > 60 and not has_signals:
                     self.logger.warning(f"Watchlist decay: {startup_id} ({days} days, no signals) - escalating")
 
