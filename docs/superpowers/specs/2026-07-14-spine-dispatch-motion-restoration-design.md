@@ -22,6 +22,7 @@ Restore the earlier synchronized workspace-and-spine transition and add the miss
 - Hold the existing Flow queue stagger until that chrome transition completes, then release it from the actual Framer Motion completion callback.
 - Keep Dispatch's internal views, progress stages, result presentation, and focus behavior unchanged.
 - Preserve all existing Flow row, empty-state, selected-memo, readout, and micro-interaction animations.
+- Do not auto-select the first Flow row. The memo remains closed until a row click or an explicit `?open=<id>` deep link selects a deal.
 
 This centralizes coordination where the spine, workspace, and Dispatch are already composed. Dispatch remains responsible for its content while `AppFrame` remains responsible for application chrome.
 
@@ -34,6 +35,7 @@ For normal motion preferences:
 3. Each element uses the same duration and easing in both directions. No element waits for another element's exit callback.
 4. Home → Flow uses the same 500 ms spine/workspace entrance. Flow content renders in its initial animation state during that movement; the existing queue stagger begins immediately after the chrome completion callback.
 5. The queue keeps its existing `26 ms` row stagger, and the existing empty-state, selected-memo, readout, and micro-interaction animations remain unchanged.
+6. Flow starts without an active memo. Clicking a row or following an explicit memo deep link sets the selection and runs the existing memo reveal animation; no timer or automatic first-row selection opens it.
 
 For reduced motion:
 
@@ -48,6 +50,8 @@ For reduced motion:
 `AppFrame` records whether it is entering full chrome from a bare page. During that entrance it exposes `workspaceChromeReady: false` through the frame context. The desktop spine or mobile chrome sets it to true from its Framer Motion `onAnimationComplete` callback.
 
 `FlowPage` passes `workspaceChromeReady` to `WorkGrid`. `WorkGrid` retains its existing variants but stays in `hidden` until the frame is ready, then switches to `visible` and runs its current stagger. Reduced motion resolves readiness immediately. No fixed timeout or Dispatch exit-pending state is required.
+
+Memo selection remains owned by `FlowPage`. Ordinary entry leaves `selectedStartup` null. Row clicks and the existing `?open=<id>` route are the only automatic inputs that set it; `WorkGrid` has no first-row auto-selection effect.
 
 ## Accessibility
 
@@ -66,6 +70,8 @@ Add focused regression coverage that proves:
 - bare → full chrome keeps `workspaceChromeReady` false until the spine/mobile entrance completes;
 - Flow passes readiness to `WorkGrid`, which releases its existing `26 ms` row stagger only after completion;
 - existing Flow empty-state, selected-memo, readout, and micro-interaction animations remain present;
+- ordinary Flow entry does not auto-select a row or render a memo;
+- row clicks and explicit `?open=<id>` deep links still render the memo with its existing reveal;
 - reduced motion removes spatial movement while retaining a valid exit phase.
 
 Run the focused tests, the frontend test suite relevant to app-frame choreography, TypeScript/build verification, and lint if configured.
