@@ -28,26 +28,25 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 16 }}
           transition={{ duration: 0.28, ease: EASE }}
-          className="pointer-events-none fixed bottom-phi-5 right-phi-5 z-[9998] flex justify-end px-phi-0 max-sm:inset-x-phi-3 max-sm:right-auto"
+          className="pointer-events-none fixed inset-x-0 bottom-phi-5 z-[9998] flex justify-center px-phi-3"
           role="status"
           aria-live="polite"
         >
-          <div className="pointer-events-auto flex w-full max-w-[min(92vw,24rem)] items-center gap-phi-3 border border-oxford/20 bg-paper-bright px-phi-3 py-phi-3 text-oxford shadow-[0_10px_28px_rgba(0,20,51,0.12)]">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center bg-oxford font-mono text-[12px] text-paper" aria-hidden>✓</span>
-            <div className="min-w-0 flex-1">
-              <div className="type-status text-oxford/55">Memo ready</div>
-              <p className="mt-phi-1 truncate font-sans text-[15px] font-medium leading-tight text-oxford">{name}</p>
-            </div>
+          <div className="pointer-events-auto flex w-full max-w-[min(92vw,32rem)] items-center gap-phi-2 rounded-full bg-oxford px-phi-2 py-phi-2 text-paper shadow-[0_10px_28px_rgba(0,20,51,0.2)] sm:gap-phi-3 sm:px-phi-3">
+            <p className="min-w-0 flex-1 truncate pl-phi-2 font-sans text-[13px] font-medium text-paper sm:text-[14px]">
+              <span className="mr-phi-2 font-mono text-[10px] uppercase tracking-[0.12em] text-paper/60">Memo ready</span>
+              {name}
+            </p>
             <div className="flex shrink-0 items-center gap-phi-2">
-              {recommendation ? <DecisionBadge variant={recommendation} /> : null}
+              {recommendation ? <DecisionBadge variant={recommendation} className="!h-8 !min-w-[5.5rem] !rounded-full" /> : null}
               <button
                 type="button"
                 onClick={onOpen}
-                className="type-action inline-flex h-[32px] shrink-0 items-center justify-center bg-oxford px-phi-3 text-paper transition-[background-color,transform] duration-150 hover:bg-oxford/90 active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/45 motion-reduce:transition-none motion-reduce:active:scale-100"
+                className="type-action inline-flex h-8 min-w-[5.5rem] shrink-0 items-center justify-center rounded-full bg-paper px-phi-3 text-oxford transition-[background-color,transform] duration-150 hover:bg-paper-bright active:scale-[0.98] btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70 motion-reduce:transition-none motion-reduce:active:scale-100"
               >
                 Open memo
               </button>
-              <button type="button" onClick={onDismiss} aria-label="Dismiss memo ready notification" className="shrink-0 cursor-pointer border-0 bg-transparent p-1 text-base leading-none text-oxford/45 transition-colors hover:text-oxford btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/45">×</button>
+              <button type="button" onClick={onDismiss} aria-label="Dismiss memo ready notification" className="shrink-0 cursor-pointer border-0 bg-transparent p-1 text-base leading-none text-paper/50 transition-colors hover:text-paper btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-paper/70">×</button>
             </div>
           </div>
         </motion.div>

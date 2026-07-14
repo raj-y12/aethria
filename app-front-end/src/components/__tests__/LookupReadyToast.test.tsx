@@ -18,7 +18,7 @@ describe('LookupReadyToast', () => {
     expect(screen.getByText('Aethria')).toBeInTheDocument();
     expect(screen.getByLabelText('INVEST')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open memo' })).toBeInTheDocument();
-    expect(screen.getByRole('status').firstElementChild).toHaveClass('border');
+    expect(screen.getByRole('status').firstElementChild).toHaveClass('bg-oxford', 'rounded-full');
   });
 
   it('opens and dismisses through explicit controls', () => {
