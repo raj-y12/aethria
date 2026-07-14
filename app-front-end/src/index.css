@@ -655,8 +655,8 @@
 
 /* Live signal dots — slow breathe pulse */
 @keyframes signal-dot-breathe {
-  0%, 100% { transform: scale(0.7); opacity: 0.4; }
-  50% { transform: scale(1.2); opacity: 1; }
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 
 .signal-dot-breathe {
