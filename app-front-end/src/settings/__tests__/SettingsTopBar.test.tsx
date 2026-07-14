@@ -53,18 +53,23 @@ describe('SettingsTopBar deployment feedback', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeVisible();
   });
 
-  it('forces every functional top-bar label to the 12px readability floor', () => {
+  it('sizes the top-bar actions to the log-out button scale', () => {
     renderTopBar({ message: 'Defaults restored', tone: 'restored', canUndo: true });
 
-    expect(screen.getByRole('button', { name: 'Aethria' })).toHaveClass('!text-xs');
-    expect(screen.getByRole('button', { name: 'Restore defaults' })).toHaveClass('!text-xs');
-    expect(screen.getByRole('button', { name: 'Undo' })).toHaveClass('!text-xs');
-    expect(screen.getByRole('status')).toHaveClass('!text-xs');
+    // Buttons use the canonical mono action scale (like the log-out modal), not
+    // the 12px override.
+    for (const name of ['Aethria', 'Restore defaults', 'Undo']) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toHaveClass('type-action');
+      expect(button).not.toHaveClass('!text-xs');
+    }
   });
 
   it('uses an alert for deployment errors and keeps Deploy dominant', () => {
     renderTopBar({ message: 'Memo output is invalid', tone: 'error' });
     expect(screen.getByRole('alert')).toHaveTextContent('Memo output is invalid');
-    expect(screen.getByRole('button', { name: 'Deploy changes' })).toHaveClass('btn-aethria-solid', 'min-h-11');
+    const deploy = screen.getByRole('button', { name: 'Deploy changes' });
+    expect(deploy).toHaveClass('btn-aethria-solid');
+    expect(deploy).not.toHaveClass('min-h-11');
   });
 });

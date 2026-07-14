@@ -198,9 +198,12 @@ describe('Settings focused-mode layout contract', () => {
     expect(source).toContain('requestExit');
   });
 
-  it('keeps solid recovery and deployment actions at the 12px readability floor', () => {
-    expect(source).toContain('btn-aethria-solid min-h-11 text-xs');
-    expect(topBarSource).toContain('btn-aethria-solid min-h-11 shrink-0 text-xs');
+  it('sizes solid recovery and deployment actions to the log-out button scale', () => {
+    // Canonical btn-aethria-solid (11px, 36px) — no 12px or 44px override.
+    expect(source).toContain('btn-aethria-solid disabled');
+    expect(source).not.toContain('btn-aethria-solid min-h-11');
+    expect(topBarSource).toContain('btn-aethria-solid shrink-0 disabled');
+    expect(topBarSource).not.toContain('btn-aethria-solid min-h-11');
   });
 });
 

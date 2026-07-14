@@ -721,14 +721,14 @@ export default function SettingsPage() {
                 onClick={() => void settingsQuery.refetch()}
                 disabled={settingsQuery.isFetching}
                 aria-busy={settingsQuery.isFetching}
-                className="btn-aethria-solid min-h-11 text-xs disabled:cursor-wait disabled:opacity-50"
+                className="btn-aethria-solid disabled:cursor-wait disabled:opacity-50"
               >
                 Retry
               </button>
               <button
                 type="button"
                 onClick={navigateBack}
-                className="type-action inline-flex min-h-11 items-center px-phi-3 text-xs text-oxford/70 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                className="type-action inline-flex min-h-11 items-center px-phi-3 text-oxford/70 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
               >
                 Back to Aethria
               </button>

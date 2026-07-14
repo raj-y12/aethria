@@ -139,8 +139,17 @@ export default function FundThesisConfirmationModal({
               initial={{ opacity: 0, transform: 'translateY(10px)' }}
               animate={{ opacity: 1, transform: 'translateY(0)' }}
               transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE_OUT, delay: reduceMotion ? 0 : 0.42 }}
-              className="mt-phi-7 flex flex-wrap items-center justify-center gap-x-1 gap-y-1"
+              className="mt-phi-7 flex w-full max-w-sm flex-col items-center gap-phi-4"
             >
+              <button
+                ref={confirmRef}
+                type="button"
+                onClick={onConfirm}
+                disabled={busy}
+                className="w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {busy ? 'Updating fund thesis…' : 'Confirm update'}
+              </button>
               <button
                 type="button"
                 onClick={onCancel}
@@ -149,18 +158,6 @@ export default function FundThesisConfirmationModal({
               >
                 <span className="border-b border-oxford/10 pb-0.5 transition-colors hover:border-oxford/40">
                   Go back
-                </span>
-              </button>
-              <span className="text-oxford/35" aria-hidden>·</span>
-              <button
-                ref={confirmRef}
-                type="button"
-                onClick={onConfirm}
-                disabled={busy}
-                className="type-action inline-flex min-h-11 items-center justify-center px-phi-3 text-oxford transition-colors hover:text-oxford/70 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-              >
-                <span className="border-b border-oxford/10 pb-0.5 transition-colors hover:border-oxford/40">
-                  {busy ? 'Updating fund thesis…' : 'Confirm update'}
                 </span>
               </button>
             </motion.div>

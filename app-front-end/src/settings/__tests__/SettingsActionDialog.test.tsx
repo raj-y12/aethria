@@ -31,11 +31,11 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof SettingsAct
 }
 
 describe('SettingsActionDialog', () => {
-  it('keeps both dialog actions at the 12px readability floor', () => {
+  it('styles the actions like the full-screen log-out takeover', () => {
     renderDialog();
 
-    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveClass('!text-xs');
-    expect(screen.getByRole('button', { name: 'Restore defaults' })).toHaveClass('!text-xs');
+    expect(screen.getByRole('button', { name: 'Restore defaults' })).toHaveClass('btn-aethria-solid');
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveClass('type-action');
   });
 
   it('moves focus into the dialog when it opens', async () => {

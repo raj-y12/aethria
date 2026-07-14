@@ -46,12 +46,12 @@ export default function SettingsTopBar({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE, delay: 0.04 }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2 px-phi-5 py-phi-3 lg:px-phi-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2 px-phi-4 py-phi-3">
         <div className="flex min-w-0 items-center gap-phi-4">
           <button
             type="button"
             onClick={onBack}
-            className="type-action inline-flex min-h-11 items-center gap-phi-2 !text-xs text-oxford/70 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            className="type-action inline-flex min-h-11 items-center gap-phi-2 text-oxford/70 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
           >
             <span aria-hidden>←</span> Aethria
           </button>
@@ -75,7 +75,7 @@ export default function SettingsTopBar({
                 <button
                   type="button"
                   onClick={onUndo}
-                  className="type-action inline-flex min-h-11 shrink-0 items-center border-b border-oxford/15 !text-xs text-oxford transition-colors hover:border-oxford/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                  className="type-action inline-flex min-h-11 shrink-0 items-center border-b border-oxford/15 text-oxford transition-colors hover:border-oxford/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
                 >
                   Undo
                 </button>
@@ -86,7 +86,7 @@ export default function SettingsTopBar({
             type="button"
             onClick={onRestoreDefaults}
             disabled={saving}
-            className="type-action inline-flex min-h-11 shrink-0 items-center px-phi-1 !text-xs text-oxford/70 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            className="type-action inline-flex min-h-11 shrink-0 items-center px-phi-1 text-oxford/70 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
           >
             Restore defaults
           </button>
@@ -94,7 +94,7 @@ export default function SettingsTopBar({
             type="button"
             onClick={onDeploy}
             disabled={saving || live}
-            className="btn-aethria-solid min-h-11 shrink-0 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn-aethria-solid shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {actionLabel}
           </button>

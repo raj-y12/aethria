@@ -3,24 +3,30 @@ import { Link, useNavigate } from 'react-router';
 import RoomHeader from '../components/RoomHeader';
 import { workspaceLayout } from '../design-system/workspaceLayout';
 import SystemIntelligence, { FundFacetNav, type FundFacetTab } from '../components/SystemIntelligence';
-import { useFundConfiguration } from '../hooks';
+import { useFundConfiguration, useCountUp } from '../hooks';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
 
-function HeaderReadout({ label, value }: { label: string; value: string }) {
+/**
+ * A readout counts up when given a numeric `value` (with optional suffix like
+ * "%"); pass `text` instead for values that don't count sensibly (signed drift).
+ */
+function HeaderReadout({ label, value, suffix, text }: { label: string; value?: number | null; suffix?: string; text?: string }) {
+  const shown = useCountUp(value ?? 0);
+  const display = text != null ? text : value == null ? '--' : `${shown.toLocaleString()}${suffix ?? ''}`;
   return (
     <div className="flex flex-col gap-phi-1">
-      <span className="type-data text-[clamp(22px,2vw,30px)] leading-none text-oxford">
-        {value}
+      <span className="type-data text-[clamp(22px,2vw,30px)] leading-none tabular-nums text-oxford">
+        {display}
       </span>
       <span className="type-label-section">{label}</span>
     </div>
   );
 }
 
-function pct(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return '--';
-  return `${Math.round(v <= 1 ? v * 100 : v)}%`;
+function pctNum(v: number | null | undefined): number | null {
+  if (v == null || Number.isNaN(v)) return null;
+  return Math.round(v <= 1 ? v * 100 : v);
 }
 
 function drift(v: number | null | undefined): string {
@@ -71,13 +77,10 @@ export default function FundPage({ data }: { data: SystemData }) {
             }
             readouts={
               <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
-                <HeaderReadout label="Mandate match" value={pct(stats?.pct_matching_thesis)} />
-                <HeaderReadout label="Mean alignment" value={pct(stats?.avg_alignment_score)} />
-                <HeaderReadout label="Drift" value={drift(stats?.drift_vs_previous)} />
-                <HeaderReadout
-                  label="Reviewed"
-                  value={(stats?.reviewed_with_thesis_count ?? 0).toLocaleString()}
-                />
+                <HeaderReadout label="Mandate match" value={pctNum(stats?.pct_matching_thesis)} suffix="%" />
+                <HeaderReadout label="Mean alignment" value={pctNum(stats?.avg_alignment_score)} suffix="%" />
+                <HeaderReadout label="Drift" text={drift(stats?.drift_vs_previous)} />
+                <HeaderReadout label="Reviewed" value={stats?.reviewed_with_thesis_count ?? null} />
               </div>
             }
           />

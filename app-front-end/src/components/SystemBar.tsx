@@ -49,6 +49,7 @@ export function SpineNavButton({
   compact,
   surface = 'oxford',
   running = false,
+  indicatorId,
 }: {
   label: string;
   active: boolean;
@@ -59,14 +60,25 @@ export function SpineNavButton({
   surface?: 'oxford' | 'paper';
   /** Shows a breathing dot before the label (e.g. a lookup running in the background). */
   running?: boolean;
+  /**
+   * Shared layout id for a sliding active background. Buttons in the same nav
+   * that pass the same id hand the highlight between them with a glide instead
+   * of a blink. Omit to keep the static background.
+   */
+  indicatorId?: string;
 }) {
+  const reduceMotion = usePrefersReducedMotion();
   const onPaper = surface === 'paper';
-  const textActive = onPaper ? 'text-oxford' : 'text-white';
+  // On oxford, .type-action-inverse pins the button color at paper/72 with
+  // class-level specificity (idle white/60 intentionally loses to it), so the
+  // active state needs !important to hold full white. On paper the inverse
+  // class must be omitted entirely or it paints cream text on cream.
+  const textActive = onPaper ? 'text-oxford' : '!text-white';
   const textIdle = onPaper ? 'text-oxford/60 hover:text-oxford/80' : 'text-white/60 hover:text-white/[0.88]';
   const ring = onPaper ? 'focus-visible:ring-oxford/35' : 'focus-visible:ring-white/35';
   const bgActive = onPaper ? 'bg-surface-selected' : 'bg-white/[0.08]';
   const bgHover = onPaper ? 'hover:bg-oxford/[0.04]' : 'hover:bg-white/[0.05]';
-  const shortcutActive = onPaper ? 'text-oxford/60' : 'text-white/75';
+  const shortcutActive = onPaper ? 'text-oxford' : 'text-white';
   const shortcutIdle = onPaper
     ? 'text-oxford/60 group-hover:text-oxford'
     : 'text-white/60 group-hover:text-white';
@@ -76,14 +88,22 @@ export function SpineNavButton({
       type="button"
       onClick={onClick}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`type-action type-action-inverse group w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
-        active ? `${textActive} ${bgActive}` : `${textIdle} ${bgHover}`
+      className={`type-action ${onPaper ? '' : 'type-action-inverse '}group relative w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
+        active ? `${textActive} ${indicatorId ? '' : bgActive}` : `${textIdle} ${bgHover}`
       } ${compact ? 'min-h-[32px] px-phi-4 py-phi-1' : 'min-h-[44px] px-2 py-1'}`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
       aria-pressed={ariaPressed}
       aria-current={active ? 'page' : undefined}
     >
-      <span className="inline-flex min-w-0 items-center gap-phi-2">
+      {active && indicatorId ? (
+        <motion.span
+          layoutId={indicatorId}
+          className={`absolute inset-0 ${bgActive}`}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: [0.77, 0, 0.175, 1] }}
+          aria-hidden
+        />
+      ) : null}
+      <span className="relative inline-flex min-w-0 items-center gap-phi-2">
         {running ? (
           <span
             className={`h-1.5 w-1.5 shrink-0 rounded-none signal-dot-breathe ${onPaper ? 'bg-oxford' : 'bg-white'}`}
@@ -94,7 +114,7 @@ export function SpineNavButton({
       </span>
       {shortcut ? (
         <span
-          className={`tabular-nums transition-colors ${active ? shortcutActive : shortcutIdle}`}
+          className={`relative tabular-nums transition-colors ${active ? shortcutActive : shortcutIdle}`}
           aria-hidden
         >
           {shortcutKeyToRomanNumeral(shortcut)}

@@ -90,9 +90,11 @@ describe('FundThesisConfirmationModal', () => {
     const cancel = screen.getByRole('button', { name: /go back/i });
     const confirm = screen.getByRole('button', { name: /confirm update/i });
     expect(cancel).toHaveClass('min-h-11');
-    expect(confirm).toHaveClass('min-h-11');
     expect(within(cancel).getByText('Go back')).toHaveClass('border-b', 'border-oxford/10', 'hover:border-oxford/40');
-    expect(within(confirm).getByText('Confirm update')).toHaveClass('border-b', 'border-oxford/10', 'hover:border-oxford/40');
+    // The confirm action is the canonical solid primary (36px), matching the
+    // log-out takeover — no 44px override.
+    expect(confirm).toHaveClass('btn-aethria-solid');
+    expect(confirm).not.toHaveClass('min-h-11');
   });
 
   it('matches the Dispatch upward reveal cadence with reduced-motion overrides', () => {

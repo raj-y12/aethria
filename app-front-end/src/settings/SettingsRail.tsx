@@ -37,14 +37,14 @@ export default function SettingsRail({
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.45, ease: EASE, delay: 0.1 }}
     >
-      <nav className="flex flex-col gap-phi-5 px-phi-4 py-phi-6">
+      <nav className="flex flex-col gap-phi-5 px-phi-4 pb-phi-4 pt-phi-5">
         {SETTINGS_GROUPS.map((group) => (
           <div key={group.id}>
-            <div className="flex items-baseline justify-between gap-phi-2 px-phi-2 pb-phi-2">
+            <div className="flex items-baseline justify-between gap-phi-2 px-phi-4 pb-phi-2">
               <p className="type-label-section text-xs text-oxford/70">{group.label}</p>
               <span className="type-status text-xs text-oxford/70">{group.persistence}</span>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col gap-0.5">
               {SETTINGS_SECTIONS.filter((section) => section.group === group.id).map((section) => {
                 const active = activeSection === section.id;
                 const needsAttention = attentionSection === section.id;
@@ -54,7 +54,7 @@ export default function SettingsRail({
                     type="button"
                     onClick={() => onNavigate(section.id)}
                     aria-current={active ? 'true' : undefined}
-                    className={`relative flex items-center px-phi-2 py-phi-2 text-left type-body-sm transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+                    className={`relative flex min-h-[32px] items-center px-phi-4 py-phi-1 text-left type-body-sm transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
                       active ? 'text-oxford' : 'text-oxford/70 hover:text-oxford/80'
                     }`}
                   >

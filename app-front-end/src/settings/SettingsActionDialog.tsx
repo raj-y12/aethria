@@ -8,7 +8,10 @@ export type SettingsActionDialogProps = {
   title: string;
   description: string;
   confirmLabel: string;
+  /** Short kicker above the title, matching the log-out takeover. */
+  eyebrow?: string;
   busy?: boolean;
+  /** Accepted for call-site compatibility; the takeover keeps one visual language. */
   destructive?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -23,8 +26,8 @@ export default function SettingsActionDialog({
   title,
   description,
   confirmLabel,
+  eyebrow = 'Confirm',
   busy = false,
-  destructive = false,
   onCancel,
   onConfirm,
 }: SettingsActionDialogProps) {
@@ -33,6 +36,8 @@ export default function SettingsActionDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const reduceMotion = usePrefersReducedMotion();
+
+  const cancelLabel = confirmLabel === 'Discard and leave' ? 'Keep editing' : 'Cancel';
 
   useEffect(() => {
     if (open) {
@@ -93,58 +98,72 @@ export default function SettingsActionDialog({
     <AnimatePresence>
       {open ? (
         <motion.div
-          key="settings-action-backdrop"
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-oxford/55 p-phi-5"
+          ref={dialogRef}
+          key="settings-action-takeover"
+          role="dialog"
+          tabIndex={-1}
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-paper p-phi-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.24, ease: EASE }}
+          transition={{ duration: reduceMotion ? 0 : 0.4, ease: EASE }}
         >
-          <motion.div
-            ref={dialogRef}
-            role="dialog"
-            tabIndex={-1}
-            aria-modal="true"
-            aria-labelledby={titleId}
-            aria-describedby={descriptionId}
-            className="w-full max-w-[30rem] border border-oxford/15 bg-paper shadow-[0_24px_80px_rgba(26,43,72,0.22)]"
-            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: reduceMotion ? 0 : 0.32, ease: EASE }}
+          <motion.p
+            initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(10px)' }}
+            animate={{ opacity: 1, transform: 'translateY(0px)' }}
+            transition={{ duration: 0.45, ease: EASE, delay: 0.05 }}
+            className="type-label-section mb-phi-3"
           >
-            <div className="border-b border-oxford/[0.08] px-phi-5 py-phi-4">
-              <p className="type-label-section text-oxford/55">Dispatch confirmation</p>
-              <h2 id={titleId} className="mt-phi-2 type-display text-[1.7rem] leading-tight text-oxford">
-                {title}
-              </h2>
-              <p id={descriptionId} className="mt-phi-3 type-body-sm leading-relaxed text-oxford/65">
-                {description}
-              </p>
-            </div>
-            <div className="flex flex-col-reverse gap-phi-2 px-phi-5 py-phi-4 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={onCancel}
-                disabled={busy}
-                className="type-action inline-flex min-h-11 items-center justify-center px-phi-4 !text-xs text-oxford/65 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-              >
-                {confirmLabel === 'Discard and leave' ? 'Keep editing' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={onConfirm}
-                disabled={busy}
-                className={`inline-flex min-h-11 items-center justify-center px-phi-5 type-action !text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-                  destructive
-                    ? 'bg-escalation text-paper hover:bg-escalation/90'
-                    : 'bg-oxford text-paper hover:bg-oxford/90'
-                }`}
-              >
-                {busy ? 'Working…' : confirmLabel}
-              </button>
-            </div>
-          </motion.div>
+            {eyebrow}
+          </motion.p>
+          <motion.h1
+            id={titleId}
+            initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(12px)' }}
+            animate={{ opacity: 1, transform: 'translateY(0px)' }}
+            transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
+            className="m-0 max-w-[18ch] text-center type-display text-[clamp(28px,4vw,52px)] font-medium leading-[1.1] text-oxford"
+          >
+            {title}
+          </motion.h1>
+          <motion.p
+            id={descriptionId}
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, ease: EASE, delay: 0.18 }}
+            className="mb-phi-8 mt-phi-3 max-w-[42ch] text-center type-body text-oxford/60"
+          >
+            {description}
+          </motion.p>
+
+          {/* DOM order is Cancel then Confirm (safe first focus + focus-trap order);
+              flex-col-reverse paints the primary on top, like the log-out modal. */}
+          <div className="flex w-full max-w-sm flex-col-reverse items-center gap-phi-4">
+            <motion.button
+              type="button"
+              onClick={onCancel}
+              disabled={busy}
+              initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(10px)' }}
+              animate={{ opacity: 1, transform: 'translateY(0px)' }}
+              transition={{ duration: 0.45, ease: EASE, delay: 0.32 }}
+              className="type-action mt-phi-2 border-b border-oxford/10 pb-0.5 transition-colors hover:text-oxford btn-interaction disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            >
+              {cancelLabel}
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={onConfirm}
+              disabled={busy}
+              initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(10px)' }}
+              animate={{ opacity: 1, transform: 'translateY(0px)' }}
+              transition={{ duration: 0.45, ease: EASE, delay: 0.25 }}
+              className="w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {busy ? 'Working…' : confirmLabel}
+            </motion.button>
+          </div>
         </motion.div>
       ) : null}
     </AnimatePresence>,

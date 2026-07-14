@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import RoomHeader from '../components/RoomHeader';
+import Reveal from '../components/Reveal';
 import { workspaceLayout } from '../design-system/workspaceLayout';
-import { usePrefersReducedMotion } from '../hooks';
+import { usePrefersReducedMotion, useCountUp } from '../hooks';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup, SignalItem } from '../types/startup';
 import { isDealHumanResolved } from '../lib/dealState';
@@ -15,16 +16,17 @@ function recOf(s: Startup): string | null {
   return typeof r === 'string' && r ? r.toUpperCase() : null;
 }
 
-/** Instrument readout — a number with its label, no box. */
-function Readout({ label, value, tone }: { label: string; value: string; tone?: 'escalation' }) {
+/** Instrument readout — a number with its label, no box. Counts up on arrival. */
+function Readout({ label, value, tone }: { label: string; value: number; tone?: 'escalation' }) {
+  const shown = useCountUp(value);
   return (
     <div className="flex flex-col gap-phi-1">
       <span
-        className={`type-data text-[clamp(22px,2vw,30px)] leading-none ${
+        className={`type-data text-[clamp(22px,2vw,30px)] leading-none tabular-nums ${
           tone === 'escalation' ? 'text-escalation' : 'text-oxford'
         }`}
       >
-        {value}
+        {shown.toLocaleString()}
       </span>
       <span className="type-label-section">{label}</span>
     </div>
@@ -97,7 +99,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
   const recentSignals = (data.signals ?? []).slice(0, 20);
 
   return (
-    <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop} ${workspaceLayout.pageBottom}`}>
         {/* ── Header: place + book composition in one line of sight ── */}
         <RoomHeader
@@ -106,19 +108,20 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           title="Portfolio"
           readouts={
             <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
-              <Readout label="Conviction" value={track.investCount.toLocaleString()} />
-              <Readout label="Monitor" value={track.monitorCount.toLocaleString()} />
-              <Readout label="Watchlist" value={data.watchlistAnalytics.total.toLocaleString()} />
-              <Readout label="Ruled" value={track.humanRuledCount.toLocaleString()} />
+              <Readout label="Conviction" value={track.investCount} />
+              <Readout label="Monitor" value={track.monitorCount} />
+              <Readout label="Watchlist" value={data.watchlistAnalytics.total} />
+              <Readout label="Ruled" value={track.humanRuledCount} />
               <Readout
                 label="Need ruling"
-                value={(data.pendingEscalationCount ?? 0).toLocaleString()}
+                value={data.pendingEscalationCount ?? 0}
                 tone={data.pendingEscalationCount > 0 ? 'escalation' : undefined}
               />
             </div>
           }
         />
 
+        <Reveal delay={0.22} y={12}>
         <div className="grid grid-cols-1 gap-x-phi-7 gap-y-phi-6 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
           {/* ── Conviction book ── */}
           <div className="flex min-w-0 flex-col gap-phi-6">
@@ -144,9 +147,9 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                         <button
                           type="button"
                           onClick={() => openDeal(s.id)}
-                          className={`flex w-full items-center gap-phi-4 border-b border-oxford/[0.06] py-phi-3 text-left transition-colors hover:bg-registerTint btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${BOOK_GRID}`}
+                          className={`group flex w-full items-center gap-phi-4 border-b border-oxford/[0.06] py-phi-3 text-left transition-colors hover:bg-oxford/[0.05] btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${BOOK_GRID}`}
                         >
-                          <span className="min-w-0 flex-1">
+                          <span className="min-w-0 flex-1 transition-transform duration-200 group-hover:translate-x-[2px]">
                             <span className="block truncate type-body-emphasis text-oxford">{s.scout.name}</span>
                             <span className="block truncate type-meta text-oxford/60 lg:hidden">
                               {[s.scout.sector, s.scout.funding_stage, isDealHumanResolved(s) ? 'Ruled' : null]
@@ -160,7 +163,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           <span className="hidden min-w-0 truncate type-meta text-oxford/60 lg:block">
                             {s.scout.funding_stage || '—'}
                           </span>
-                          <span className="type-data shrink-0 text-right text-oxford/70">
+                          <span className="type-data shrink-0 text-right text-oxford/70 transition-colors group-hover:text-oxford">
                             {s.review?.overall_score != null ? Number(s.review.overall_score).toFixed(1) : '—'}
                           </span>
                           <span className="type-status hidden shrink-0 text-right lg:block">
@@ -218,19 +221,19 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
               ) : (
                 <ul className="mt-phi-2 flex flex-col">
                   {watchlistEntries.slice(0, 20).map((e, i) => (
-                    <li key={e.startup_id ?? i}>
+                    <li key={e.startup_id ?? i} className="border-b border-oxford/[0.06]">
                       <button
                         type="button"
                         onClick={() => e.startup_id && openDeal(e.startup_id)}
                         disabled={!e.startup_id}
-                        className="flex w-full items-center justify-between gap-phi-3 border-b border-oxford/[0.06] py-phi-2 text-left transition-colors hover:bg-registerTint disabled:cursor-default btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                        className="group -mx-phi-3 flex w-[calc(100%+2*var(--space-3))] items-center justify-between gap-phi-3 px-phi-3 py-phi-2 text-left transition-colors hover:bg-oxford/[0.05] disabled:cursor-default btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
                       >
                         <span className="min-w-0 truncate type-body-sm text-oxford">
                           {e.startup_name ?? (e.startup_id ? startupNameById.get(e.startup_id) : null) ?? 'Unknown'}
                         </span>
                         <span
-                          className={`type-data shrink-0 ${
-                            e.stale_warning ? 'text-escalation' : 'text-oxford/60'
+                          className={`type-data shrink-0 transition-colors ${
+                            e.stale_warning ? 'text-escalation' : 'text-oxford/60 group-hover:text-oxford'
                           }`}
                         >
                           {e.days_on_watchlist != null ? `${e.days_on_watchlist}d` : '—'}
@@ -273,7 +276,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           <button
                             type="button"
                             onClick={() => openDeal(sig.startup_id!)}
-                            className="block w-full py-phi-3 text-left transition-colors hover:bg-registerTint btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                            className="group block w-full py-phi-3 text-left transition-colors hover:bg-oxford/[0.05] btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
                           >
                             {body}
                           </button>
@@ -288,6 +291,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
             </section>
           </div>
         </div>
+        </Reveal>
       </div>
     </div>
   );
