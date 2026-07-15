@@ -265,9 +265,13 @@ class ScoutEngine:
 
                     if self.storage:
                         try:
-                            await asyncio.to_thread(
+                            persisted_id = await asyncio.to_thread(
                                 self.storage.add_discovery, result, pipeline_run_id=pipeline_run_id
                             )
+                            result["persisted_startup_id"] = str(
+                                persisted_id or result.get("id") or ""
+                            )
+                            result["pipeline_run_id"] = pipeline_run_id
                         except Exception as e:
                             self.logger.error(
                                 f"Failed to persist discovery {result.get('id')}: {e}"

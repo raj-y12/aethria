@@ -27,6 +27,7 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
 
         async def run_cycle(self, **kwargs):
             order.append("scout")
+            return []
 
     class Reviewer:
         last_cycle_stats = {}
@@ -118,4 +119,3 @@ def test_reference_prune_keeps_operator_lookup_rows(tmp_path):
 
     assert storage.remove_startups_without_references() == 1
     assert [startup.startup_id for startup in storage.get_all_startups()] == ["lookup"]
-

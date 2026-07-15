@@ -52,6 +52,7 @@ async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
         job.user_id,
         manual_one_shot=payload.manual_one_shot,
         pipeline_run_id=job.pipeline_run_id,
+        identity_repository=IdentityRepository(repository.pool),
     )
     await _checkpoint(repository, job, "pipeline_cycle", "succeeded", {})
 

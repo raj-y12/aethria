@@ -1103,6 +1103,24 @@ class SupabaseStartupsStorage:
         """Alias for get_startup (explicit API for callers)."""
         return self.get_startup(startup_id)
 
+    def remove_startup(self, startup_id: str) -> bool:
+        """Delete one tenant-scoped compatibility row blocked by identity review."""
+        sid = str(startup_id or "").strip()
+        if not sid:
+            return False
+        try:
+            response = (
+                self._client.table(TABLE)
+                .delete(returning="representation")
+                .eq("user_id", self._user_id)
+                .eq("startup_id", sid)
+                .execute()
+            )
+        except Exception as exc:
+            self.logger.error("remove_startup failed for %s: %s", sid, exc)
+            raise
+        return bool(getattr(response, "data", None) or [])
+
     def get_all_startups(self, skip_invalid: bool = False) -> List[Startup]:
         raw = self._fetch_all_raw()
         out: List[Startup] = []

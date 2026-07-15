@@ -54,6 +54,9 @@ from fund_thesis import (
     _bootstrap_default_thesis_or_raise,
     get_active_thesis,
 )
+from identity.acquisition import observation_from_scout_discovery
+from identity.projection import link_admission_projection
+from identity.service import IdentityService
 
 logger = logging.getLogger("pipeline_runner")
 _visible_logger = logging.getLogger("uvicorn.error")
@@ -285,6 +288,58 @@ async def _prune_unreferenced_startups(
     return removed
 
 
+async def _admit_autonomous_discoveries(
+    *,
+    user_id: str,
+    discoveries: list[Dict[str, Any]],
+    storage: Any,
+    identity_repository: Any,
+    identity_service: Optional[Any] = None,
+) -> list[Any]:
+    """Admit only reference-gated rows and quarantine ambiguous projections."""
+
+    if identity_repository is None:
+        return []
+    service = identity_service or IdentityService(identity_repository)
+    admissions = []
+    for discovery in discoveries:
+        startup_id = str(
+            discovery.get("persisted_startup_id") or discovery.get("id") or ""
+        ).strip()
+        if not startup_id:
+            continue
+        # The reference prune is authoritative for compatibility survival. A raw
+        # Scout result that no longer has a row must never create institutional
+        # state after the fact.
+        if await asyncio.to_thread(storage.get_startup, startup_id) is None:
+            continue
+        observation = observation_from_scout_discovery(
+            user_id=user_id, discovery=discovery
+        )
+        admission = await service.admit(observation)
+        admissions.append(admission)
+        if admission.blocks_evaluation or not admission.opportunity_id:
+            remover = getattr(storage, "remove_startup", None)
+            if not callable(remover):
+                raise RuntimeError(
+                    "Identity-blocked discovery cannot be removed from review queue"
+                )
+            await asyncio.to_thread(remover, startup_id)
+            logger.info(
+                "[%s] Identity review blocked discovery startup_id=%s case_id=%s",
+                user_id[:12],
+                startup_id,
+                admission.identity_case_id,
+            )
+            continue
+        await link_admission_projection(
+            identity_repository,
+            admission=admission,
+            legacy_startup_id=startup_id,
+        )
+    return admissions
+
+
 async def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str) -> None:
     lid = (lookup_id or "").strip()
     if not lid or not user_id or not str(user_id).strip():
@@ -383,6 +438,7 @@ async def run_one_pipeline_cycle(
     *,
     manual_one_shot: bool = False,
     pipeline_run_id: Optional[str] = None,
+    identity_repository: Optional[Any] = None,
 ) -> None:
     """Run one cycle of scout, reviewer, partner, portfolio, and meta for the given user."""
     if not user_id or not user_id.strip():
@@ -394,6 +450,7 @@ async def run_one_pipeline_cycle(
             user_id,
             manual_one_shot=manual_one_shot,
             pipeline_run_id=pipeline_run_id,
+            identity_repository=identity_repository,
         )
 
 
@@ -402,6 +459,7 @@ async def _run_one_pipeline_cycle_inner(
     *,
     manual_one_shot: bool = False,
     pipeline_run_id: Optional[str] = None,
+    identity_repository: Optional[Any] = None,
 ) -> None:
     tenant = TenantContext(user_id=user_id)
     logger.info(
@@ -514,9 +572,10 @@ async def _run_one_pipeline_cycle_inner(
             _activity_startups_before = total_startups_before
         except Exception as e:
             logger.debug("[%s] startups_before count unavailable: %s", user_id[:12], e)
+        discoveries = []
         if scouts_enabled:
             agents_executed += len(getattr(scout_engine, "scouts", []) or [])
-            await scout_engine.run_cycle(pipeline_run_id=pipeline_run_id)
+            discoveries = await scout_engine.run_cycle(pipeline_run_id=pipeline_run_id)
             _notify_startups_changed(user_id, "scout")
         else:
             logger.info("[%s] Scout stage skipped (disabled in settings)", user_id[:12])
@@ -525,6 +584,14 @@ async def _run_one_pipeline_cycle_inner(
         # external references must not reach reviewer/partner stages. Existing
         # on-demand lookup and resolution-status guards live in storage.
         await _prune_unreferenced_startups(storage, user_id)
+
+        if scouts_enabled and identity_repository is not None:
+            await _admit_autonomous_discoveries(
+                user_id=user_id,
+                discoveries=discoveries,
+                storage=storage,
+                identity_repository=identity_repository,
+            )
 
         _activity_reviewed_count = 0
         _activity_decided_count = 0
