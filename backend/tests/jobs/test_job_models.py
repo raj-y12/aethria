@@ -149,3 +149,22 @@ def test_agent_job_round_trips_structured_block_fields():
     )
 
     assert jobs.AgentJob.model_validate(job.model_dump()) == job
+
+
+def test_evidence_refresh_job_uses_typed_tenant_payload():
+    jobs = _jobs()
+    payload = jobs.EvidenceRefreshPayload(
+        user_id="user-a",
+        opportunity_id="opportunity-1",
+        reason="human_request",
+        budget_reservation_id="reservation-1",
+    )
+    job = jobs.AgentJob(
+        user_id="user-a",
+        job_type=jobs.JobType.EVIDENCE_REFRESH,
+        idempotency_key="refresh:opportunity-1:1",
+        payload=payload,
+    )
+
+    restored = jobs.AgentJob.model_validate(job.model_dump(mode="json"))
+    assert isinstance(restored.payload, jobs.EvidenceRefreshPayload)

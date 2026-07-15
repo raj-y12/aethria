@@ -42,6 +42,7 @@ class JobExecutionBlocked(RuntimeError):
 class JobType(str, Enum):
     PIPELINE_CYCLE = "pipeline_cycle"
     COMPANY_LOOKUP = "company_lookup"
+    EVIDENCE_REFRESH = "evidence_refresh"
 
 
 class JobStatus(str, Enum):
@@ -95,7 +96,14 @@ class CompanyLookupPayload(_TenantPayload):
         return normalized
 
 
-JobPayload = Union[PipelineCyclePayload, CompanyLookupPayload]
+class EvidenceRefreshPayload(_TenantPayload):
+    opportunity_id: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    budget_reservation_id: str = Field(min_length=1)
+    evidence_plan_id: Optional[str] = None
+
+
+JobPayload = Union[PipelineCyclePayload, CompanyLookupPayload, EvidenceRefreshPayload]
 
 
 class AgentJob(BaseModel):
@@ -123,6 +131,25 @@ class AgentJob(BaseModel):
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _parse_payload_for_job_type(cls, data):
+        if not isinstance(data, dict):
+            return data
+        payload = data.get("payload")
+        if not isinstance(payload, dict):
+            return data
+        kind = getattr(data.get("job_type"), "value", data.get("job_type"))
+        model = {
+            JobType.PIPELINE_CYCLE.value: PipelineCyclePayload,
+            JobType.COMPANY_LOOKUP.value: CompanyLookupPayload,
+            JobType.EVIDENCE_REFRESH.value: EvidenceRefreshPayload,
+        }.get(str(kind))
+        if model is not None:
+            data = dict(data)
+            data["payload"] = model.model_validate(payload)
+        return data
+
     @field_validator("user_id")
     @classmethod
     def _valid_user_id(cls, value: str) -> str:
@@ -148,6 +175,10 @@ class AgentJob(BaseModel):
             self.payload, CompanyLookupPayload
         ):
             raise ValueError("payload type does not match company_lookup")
+        if self.job_type is JobType.EVIDENCE_REFRESH and not isinstance(
+            self.payload, EvidenceRefreshPayload
+        ):
+            raise ValueError("payload type does not match evidence_refresh")
         if self.attempts > self.max_attempts:
             raise ValueError("attempts cannot exceed max_attempts")
         return self

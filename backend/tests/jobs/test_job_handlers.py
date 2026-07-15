@@ -5,6 +5,7 @@ import pytest
 from jobs.models import (
     AgentJob,
     CompanyLookupPayload,
+    EvidenceRefreshPayload,
     JobExecutionCancelled,
     JobStatus,
     JobType,
@@ -139,3 +140,48 @@ async def test_lookup_handler_observes_cancellation_between_checkpoints(monkeypa
 
     with pytest.raises(JobExecutionCancelled):
         await handlers.company_lookup_handler(repository, job)
+
+
+@pytest.mark.asyncio
+async def test_evidence_refresh_stops_after_cheap_no_change_check(monkeypatch):
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository()
+    settled = []
+
+    class MonitoringRepository:
+        def __init__(self, pool):
+            pass
+
+        async def check_material_change(self, **kwargs):
+            return {
+                "material_change": False,
+                "previous_snapshot_hash": "same",
+                "current_snapshot_hash": "same",
+            }
+
+        async def settle(self, **kwargs):
+            settled.append(kwargs)
+
+    monkeypatch.setattr(handlers, "MonitoringRepository", MonitoringRepository)
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.EVIDENCE_REFRESH,
+        idempotency_key="refresh-1",
+        payload=EvidenceRefreshPayload(
+            user_id="user-a",
+            opportunity_id="opportunity-1",
+            reason="monitor_due",
+            budget_reservation_id="reservation-1",
+        ),
+        attempts=1,
+        status="running",
+    )
+
+    await handlers.evidence_refresh_handler(repository, job)
+
+    assert settled[0]["actual_cost_usd"] == 0
+    assert [item["stage"] for item in repository.checkpoints] == [
+        "material_change",
+        "material_change",
+        "refresh_result",
+    ]

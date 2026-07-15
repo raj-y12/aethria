@@ -248,6 +248,10 @@ REGISTRY: List[EnvVar] = [
     EnvVar("IDENTITY_AUTO_RESOLVE_CONFIDENCE", "float", "0.85", "Canonical identity",
            "Minimum deterministic confidence for one picker candidate to be eligible for automatic identity resolution."),
 
+    # --- Attention-triggered enrichment ------------------------------------
+    EnvVar("MONITOR_DAILY_BUDGET_USD", "float", "10", "Monitoring",
+           "Maximum per-tenant daily reserved plus settled evidence-refresh cost."),
+
     # --- Scoring / retrieval / misc -----------------------------------------
     EnvVar("USE_STRUCTURED_SCORING", "bool", "true", "Scoring / misc", "Use the deterministic structured scoring engine."),
     EnvVar("SKIP_READ_ENRICH_SCORES", "bool", "", "Scoring / misc", "Skip score enrichment on read (perf)."),

@@ -12,12 +12,16 @@ from identity.service import IdentityService
 from jobs.models import (
     AgentJob,
     CompanyLookupPayload,
+    EvidenceRefreshPayload,
     JobExecutionBlocked,
     JobExecutionCancelled,
     JobStatus,
     JobType,
     PipelineCyclePayload,
 )
+from evidence.repository import EvidenceRepository
+from monitoring.models import RefreshReason
+from monitoring.repository import MonitoringRepository
 from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
 from resolver.company_resolver import CompanyResolution, resolve_company
 
@@ -201,8 +205,74 @@ async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
         raise RuntimeError("Company lookup completed without a startup record")
 
 
+async def evidence_refresh_handler(repository: Any, job: AgentJob) -> None:
+    payload = EvidenceRefreshPayload.model_validate(job.payload)
+    reason = RefreshReason(payload.reason)
+    monitoring = MonitoringRepository(repository.pool)
+    await _checkpoint(repository, job, "material_change", "started", {"reason": reason.value})
+    check = await monitoring.check_material_change(
+        user_id=job.user_id,
+        opportunity_id=payload.opportunity_id,
+        job_id=job.job_id,
+        reason=reason,
+    )
+    await _checkpoint(
+        repository,
+        job,
+        "material_change",
+        "succeeded",
+        {
+            "material_change": check["material_change"],
+            "previous_snapshot_hash": check.get("previous_snapshot_hash"),
+            "current_snapshot_hash": check.get("current_snapshot_hash"),
+        },
+    )
+    reasons_requiring_plan = {
+        RefreshReason.HUMAN_REQUEST,
+        RefreshReason.MISSING_POLICY_EVIDENCE,
+        RefreshReason.STALE_DECISIVE_EVIDENCE,
+        RefreshReason.POLICY_CHANGE,
+        RefreshReason.CLAIM_CORRECTION,
+    }
+    if not check["material_change"] and reason not in reasons_requiring_plan:
+        await monitoring.settle(
+            user_id=job.user_id,
+            budget_reservation_id=payload.budget_reservation_id,
+            actual_cost_usd=0,
+        )
+        await _checkpoint(repository, job, "refresh_result", "succeeded", {"result": "no_material_change"})
+        return
+
+    missing = await monitoring.current_missing_evidence(
+        user_id=job.user_id,
+        opportunity_id=payload.opportunity_id,
+    )
+    plan = await EvidenceRepository(repository.pool).create_plan(
+        user_id=job.user_id,
+        opportunity_id=payload.opportunity_id,
+        trigger_type=reason.value,
+        missing_evidence=missing,
+        search_questions=[f"What verifiable evidence resolves: {item}?" for item in missing[:10]],
+        max_artifacts=5,
+        budget_usd=0,
+    )
+    await _checkpoint(
+        repository,
+        job,
+        "refresh_plan",
+        "succeeded",
+        {"evidence_plan_id": plan.evidence_plan_id, "missing_evidence_count": len(missing)},
+    )
+    await monitoring.settle(
+        user_id=job.user_id,
+        budget_reservation_id=payload.budget_reservation_id,
+        actual_cost_usd=0,
+    )
+
+
 def build_handlers(repository: Any):
     return {
         JobType.PIPELINE_CYCLE: partial(pipeline_cycle_handler, repository),
         JobType.COMPANY_LOOKUP: partial(company_lookup_handler, repository),
+        JobType.EVIDENCE_REFRESH: partial(evidence_refresh_handler, repository),
     }

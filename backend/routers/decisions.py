@@ -1,5 +1,6 @@
 """Authenticated ruling and workflow-action controls."""
 
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -25,7 +26,7 @@ class RulingBody(BaseModel):
 
 class ActionBody(BaseModel):
     action_type: WorkflowActionType
-    due_at: Optional[str] = None
+    due_at: Optional[datetime] = None
     external_destination: Optional[str] = Field(default=None, max_length=500)
 
 
@@ -59,14 +60,12 @@ async def create_ruling(request: Request, opportunity_id: str, body: RulingBody)
 
 @router.post("/api/opportunities/{opportunity_id}/actions")
 async def create_action(request: Request, opportunity_id: str, body: ActionBody):
-    from datetime import datetime
     validate_route_id(opportunity_id, field_name="opportunity_id")
     user_id = require_authenticated_user(request)
-    due_at = datetime.fromisoformat(body.due_at.replace("Z", "+00:00")) if body.due_at else None
     try:
         record = await _repository(request).create_action(
             user_id=user_id, opportunity_id=opportunity_id,
-            action_type=body.action_type, due_at=due_at,
+            action_type=body.action_type, due_at=body.due_at,
             external_destination=body.external_destination,
         )
     except LookupError as exc:
