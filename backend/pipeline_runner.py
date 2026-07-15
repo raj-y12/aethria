@@ -378,17 +378,31 @@ async def _mark_lookup_pipeline_failed(
     )
 
 
-async def run_one_pipeline_cycle(user_id: str, *, manual_one_shot: bool = False) -> None:
+async def run_one_pipeline_cycle(
+    user_id: str,
+    *,
+    manual_one_shot: bool = False,
+    pipeline_run_id: Optional[str] = None,
+) -> None:
     """Run one cycle of scout, reviewer, partner, portfolio, and meta for the given user."""
     if not user_id or not user_id.strip():
         logger.warning("run_one_pipeline_cycle: skipped (empty user_id)")
         return
     user_id = user_id.strip()
     async with pipeline_execution_slot(user_id):
-        await _run_one_pipeline_cycle_inner(user_id, manual_one_shot=manual_one_shot)
+        await _run_one_pipeline_cycle_inner(
+            user_id,
+            manual_one_shot=manual_one_shot,
+            pipeline_run_id=pipeline_run_id,
+        )
 
 
-async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool = False) -> None:
+async def _run_one_pipeline_cycle_inner(
+    user_id: str,
+    *,
+    manual_one_shot: bool = False,
+    pipeline_run_id: Optional[str] = None,
+) -> None:
     tenant = TenantContext(user_id=user_id)
     logger.info(
         "event=tenant_context user_id=%s module=pipeline_cycle",
@@ -486,7 +500,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
     total_startups_before: Optional[int] = None
     total_startups_after: Optional[int] = None
     try:
-        pipeline_run_id = str(uuid4())
+        pipeline_run_id = (pipeline_run_id or "").strip() or str(uuid4())
         logger.info(
             "[%s] pipeline_run_id=%s module=pipeline_cycle rss_mb_start=%.1f",
             user_id[:12],
