@@ -12,6 +12,7 @@ from identity.service import IdentityService
 from outcomes.models import ImportCandidate, ImportSource, OutcomeInput, OutcomeRecord
 from outcomes.service import build_outcome_interpretation, validate_outcome
 from tenant_context import require_user_id
+from utils.db_rows import db_row
 
 
 def _json(value: Any, default: Any) -> Any:
@@ -26,7 +27,7 @@ def _json(value: Any, default: Any) -> Any:
 
 
 def _row(row: Any) -> Dict[str, Any]:
-    payload = dict(row)
+    payload = db_row(row)
     for key, default in (("field_mapping", {}),):
         if key in payload:
             payload[key] = _json(payload[key], default)
@@ -245,7 +246,7 @@ class ChannelOutcomeRepository:
                     artifacts = await conn.fetch(
                         """
                         select artifact_id from public.evidence_artifacts
-                        where user_id=$1 and artifact_id=any($2::uuid[])
+                        where user_id=$1 and artifact_id::text=any($2::text[])
                         """,
                         uid, outcome.evidence_artifact_ids,
                     )
@@ -280,7 +281,7 @@ class ChannelOutcomeRepository:
                     event_type="outcome_observation.created",
                     payload={"outcome_observation_id": outcome_id, "company_id": outcome.company_id, "verification_state": outcome.verification_state.value},
                 )
-                payload = dict(row)
+                payload = db_row(row)
                 payload["evidence_artifact_ids"] = list(outcome.evidence_artifact_ids)
                 for key in ("outcome_observation_id", "company_id", "opportunity_id", "supersedes_outcome_id"):
                     if payload.get(key) is not None:
@@ -309,7 +310,7 @@ class ChannelOutcomeRepository:
             )
         outcomes = []
         for row in rows:
-            payload = dict(row)
+            payload = db_row(row)
             payload["evidence_artifact_ids"] = [str(item) for item in _json(payload["evidence_artifact_ids"], [])]
             for key in ("outcome_observation_id", "company_id", "opportunity_id", "supersedes_outcome_id"):
                 if payload.get(key) is not None:

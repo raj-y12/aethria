@@ -19,6 +19,7 @@ from evidence.models import (
 )
 from evidence.service import validate_claim_standard
 from tenant_context import require_user_id
+from utils.db_rows import db_row
 
 
 def _json(value: Any, default: Any) -> Any:
@@ -101,7 +102,7 @@ class EvidenceRepository:
                     )
                 if row is None:
                     raise RuntimeError("Artifact insert returned no row")
-                artifact_payload = dict(row)
+                artifact_payload = db_row(row)
                 stored_artifact = EvidenceArtifactRecord.model_validate(artifact_payload)
                 stored_items: List[EvidenceItemRecord] = []
                 for item in items:
@@ -123,7 +124,7 @@ class EvidenceRepository:
                         item.extraction_confidence, item.extractor_version,
                         item.operator_attribution,
                     )
-                    payload = dict(item_row)
+                    payload = db_row(item_row)
                     payload["normalized_value"] = _json(payload.get("normalized_value"), {})
                     stored_items.append(EvidenceItemRecord.model_validate(payload))
                 await self._outbox(
@@ -202,7 +203,7 @@ class EvidenceRepository:
                     event_type="claim.created",
                     payload={"claim_id": claim_id, "opportunity_id": claim.opportunity_id},
                 )
-                payload = dict(row)
+                payload = db_row(row)
                 payload["normalized_value"] = _json(payload.get("normalized_value"), {})
                 return payload
 

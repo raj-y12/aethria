@@ -19,6 +19,7 @@ from decisions.service import (
     ruling_to_opportunity_state,
 )
 from tenant_context import require_user_id
+from utils.db_rows import db_row
 
 
 def _json(value: Any, default: Any):
@@ -167,7 +168,7 @@ class DecisionRepository:
             trigger_id, status.value, json.dumps(generated), json.dumps(missing_evidence),
             requires_approval, due_at, external_destination,
         )
-        payload = dict(row)
+        payload = db_row(row)
         payload["generated_content"] = _json(payload.get("generated_content"), {})
         payload["approved_content"] = _json(payload.get("approved_content"), None)
         payload["missing_evidence"] = _json(payload.get("missing_evidence"), [])
@@ -244,7 +245,7 @@ class DecisionRepository:
                 )
                 if row is None:
                     raise LookupError("Pending action not found for tenant")
-                payload = dict(row)
+                payload = db_row(row)
                 payload["generated_content"] = _json(payload.get("generated_content"), {})
                 payload["approved_content"] = _json(payload.get("approved_content"), None)
                 payload["missing_evidence"] = _json(payload.get("missing_evidence"), [])
@@ -273,7 +274,7 @@ class DecisionRepository:
             )
         output = []
         for row in rows:
-            payload = dict(row)
+            payload = db_row(row)
             payload["generated_content"] = _json(payload.get("generated_content"), {})
             payload["approved_content"] = _json(payload.get("approved_content"), None)
             payload["missing_evidence"] = _json(payload.get("missing_evidence"), [])

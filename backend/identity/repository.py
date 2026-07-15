@@ -20,6 +20,7 @@ from identity.models import (
 )
 from identity.normalization import normalize_alias, normalize_domain
 from tenant_context import require_user_id
+from utils.db_rows import db_row
 
 
 class IdentityConflictError(RuntimeError):
@@ -40,7 +41,7 @@ def _json_value(value: Any, default: Any) -> Any:
 def _observation_from_row(row: Any) -> Optional[SourceObservationRecord]:
     if row is None:
         return None
-    payload = dict(row)
+    payload = db_row(row)
     payload["source_metadata"] = _json_value(payload.get("source_metadata"), {})
     payload["resolution_payload"] = _json_value(
         payload.get("resolution_payload"), None
@@ -53,20 +54,20 @@ def _observation_from_row(row: Any) -> Optional[SourceObservationRecord]:
 def _company_from_row(row: Any) -> Optional[CompanyRecord]:
     if row is None:
         return None
-    payload = dict(row)
+    payload = db_row(row)
     payload["metadata"] = _json_value(payload.get("metadata"), {})
     payload.pop("merged_into_company_id", None)
     return CompanyRecord.model_validate(payload)
 
 
 def _opportunity_from_row(row: Any) -> Optional[OpportunityRecord]:
-    return OpportunityRecord.model_validate(dict(row)) if row is not None else None
+    return OpportunityRecord.model_validate(db_row(row)) if row is not None else None
 
 
 def _case_from_row(row: Any) -> Optional[IdentityResolutionCaseRecord]:
     if row is None:
         return None
-    payload = dict(row)
+    payload = db_row(row)
     payload["candidates"] = _json_value(payload.get("candidates"), [])
     return IdentityResolutionCaseRecord.model_validate(payload)
 

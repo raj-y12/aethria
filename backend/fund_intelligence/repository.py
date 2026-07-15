@@ -14,6 +14,7 @@ from fund_intelligence.models import (
 )
 from fund_intelligence.service import build_override_pattern, can_publish, override_attribution
 from tenant_context import require_user_id
+from utils.db_rows import db_row
 
 
 def _json(value: Any, default: Any) -> Any:
@@ -28,7 +29,7 @@ def _json(value: Any, default: Any) -> Any:
 
 
 def _public_row(row: Any) -> Dict[str, Any]:
-    payload = dict(row)
+    payload = db_row(row)
     for key, default in (
         ("detail", {}),
         ("limitations", []),

@@ -17,6 +17,7 @@ from jobs.models import (
 )
 from tenant_context import require_user_id
 from utils.timeutil import utcnow
+from utils.db_rows import db_row
 
 
 def _json_payload(value: Any) -> Any:
@@ -31,7 +32,7 @@ def _json_payload(value: Any) -> Any:
 def _job_from_row(row: Any) -> Optional[AgentJob]:
     if row is None:
         return None
-    payload = dict(row)
+    payload = db_row(row)
     payload["payload"] = _json_payload(payload.get("payload"))
     return AgentJob.model_validate(payload)
 
@@ -39,7 +40,7 @@ def _job_from_row(row: Any) -> Optional[AgentJob]:
 def _checkpoint_from_row(row: Any) -> Optional[JobCheckpoint]:
     if row is None:
         return None
-    payload = dict(row)
+    payload = db_row(row)
     payload["output_metadata"] = _json_payload(payload.get("output_metadata"))
     return JobCheckpoint.model_validate(payload)
 
@@ -47,7 +48,7 @@ def _checkpoint_from_row(row: Any) -> Optional[JobCheckpoint]:
 def _outbox_from_row(row: Any) -> Optional[DomainOutboxEvent]:
     if row is None:
         return None
-    payload = dict(row)
+    payload = db_row(row)
     payload["payload"] = _json_payload(payload.get("payload"))
     return DomainOutboxEvent.model_validate(payload)
 

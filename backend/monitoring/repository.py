@@ -20,6 +20,7 @@ from monitoring.models import (
 from monitoring.service import can_auto_refresh, material_change
 from tenant_context import require_user_id
 from utils.timeutil import utcnow
+from utils.db_rows import db_row
 
 
 class RefreshBudgetExceeded(RuntimeError):
@@ -42,13 +43,13 @@ def _json(value: Any, default: Any) -> Any:
 
 
 def _job(row: Any) -> AgentJob:
-    payload = dict(row)
+    payload = db_row(row)
     payload["payload"] = _json(payload.get("payload"), {})
     return AgentJob.model_validate(payload)
 
 
 def _reservation(row: Any) -> BudgetReservationRecord:
-    payload = dict(row)
+    payload = db_row(row)
     payload["providers"] = _json(payload.get("providers"), [])
     return BudgetReservationRecord.model_validate(payload)
 
