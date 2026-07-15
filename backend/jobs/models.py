@@ -24,6 +24,21 @@ class JobExecutionCancelled(RuntimeError):
     """Cooperative stop observed between durable execution checkpoints."""
 
 
+class JobExecutionBlocked(RuntimeError):
+    """Execution cannot continue until an explicit operator action is complete."""
+
+    def __init__(self, *, code: str, detail: str, recovery_action: str):
+        normalized_code = str(code or "").strip().lower()
+        if not normalized_code or not normalized_code.replace("_", "a").isalnum():
+            raise ValueError("blocked job code must be lowercase snake_case")
+        self.code = normalized_code[:80]
+        self.detail = str(detail or "").strip()[:1000]
+        self.recovery_action = str(recovery_action or "").strip()[:1000]
+        if not self.recovery_action:
+            raise ValueError("blocked job recovery_action is required")
+        super().__init__(f"{self.code}: {self.detail or self.recovery_action}")
+
+
 class JobType(str, Enum):
     PIPELINE_CYCLE = "pipeline_cycle"
     COMPANY_LOOKUP = "company_lookup"
@@ -99,6 +114,9 @@ class AgentJob(BaseModel):
     next_attempt_at: datetime = Field(default_factory=utcnow)
     pipeline_run_id: str = Field(default_factory=lambda: str(uuid4()))
     last_error: Optional[str] = None
+    block_code: Optional[str] = None
+    block_detail: Optional[str] = None
+    recovery_action: Optional[str] = None
     accepted_at: datetime = Field(default_factory=utcnow)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

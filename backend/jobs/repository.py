@@ -181,7 +181,10 @@ class DurableJobRepository:
                         lease_expires_at = now() + ($2 * interval '1 second'),
                         heartbeat_at = now(),
                         started_at = coalesce(jobs.started_at, now()),
-                        last_error = null
+                        last_error = null,
+                        block_code = null,
+                        block_detail = null,
+                        recovery_action = null
                     from candidate
                     where jobs.job_id = candidate.job_id
                     returning jobs.*
@@ -404,6 +407,70 @@ class DurableJobRepository:
             )
             return _job_from_row(row)
 
+    async def block(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        worker_id: str,
+        code: str,
+        detail: str,
+        recovery_action: str,
+    ) -> Optional[AgentJob]:
+        uid = require_user_id(user_id, context="DurableJobRepository.block")
+        safe_code = str(code or "").strip().lower()[:80]
+        if not safe_code or not safe_code.replace("_", "a").isalnum():
+            raise ValueError("block code must be lowercase snake_case")
+        safe_detail = str(detail or "").strip()[:1000]
+        safe_recovery = str(recovery_action or "").strip()[:1000]
+        if not safe_recovery:
+            raise ValueError("recovery_action is required")
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    update public.agent_jobs
+                    set status = 'blocked',
+                        attempts = greatest(attempts - 1, 0),
+                        block_code = $4,
+                        block_detail = $5,
+                        recovery_action = $6,
+                        last_error = null,
+                        completed_at = null,
+                        lease_owner = null,
+                        lease_expires_at = null,
+                        heartbeat_at = now()
+                    where job_id = $1 and user_id = $2 and lease_owner = $3
+                      and status = 'running'
+                    returning *
+                    """,
+                    job_id,
+                    uid,
+                    worker_id,
+                    safe_code,
+                    safe_detail,
+                    safe_recovery,
+                )
+                job = _job_from_row(row)
+                if job is None:
+                    return None
+                await self._insert_outbox(
+                    conn,
+                    user_id=uid,
+                    aggregate_id=job_id,
+                    event_type="agent_job.blocked",
+                    payload={
+                        "job_id": job_id,
+                        "status": "blocked",
+                        "code": safe_code,
+                        "recovery_action": safe_recovery,
+                    },
+                )
+                metrics.inc_durable_job(
+                    job_type=job.job_type.value, transition="blocked"
+                )
+                return job
+
     async def cancel(self, *, user_id: str, job_id: str) -> Optional[AgentJob]:
         uid = require_user_id(user_id, context="DurableJobRepository.cancel")
         async with self.pool.acquire() as conn:
@@ -453,6 +520,9 @@ class DurableJobRepository:
                         max_attempts = greatest(max_attempts, attempts + 1),
                         next_attempt_at = now(),
                         last_error = null,
+                        block_code = null,
+                        block_detail = null,
+                        recovery_action = null,
                         completed_at = null,
                         lease_owner = null,
                         lease_expires_at = null,

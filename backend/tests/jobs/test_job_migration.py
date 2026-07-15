@@ -5,6 +5,10 @@ MIGRATION = (
     Path(__file__).parents[3]
     / "supabase/migrations/20260715193000_durable_agent_jobs.sql"
 )
+BLOCK_DETAILS_MIGRATION = (
+    Path(__file__).parents[3]
+    / "supabase/migrations/20260715220000_agent_job_block_details.sql"
+)
 
 
 def test_durable_job_migration_defines_all_transactional_tables():
@@ -66,3 +70,13 @@ def test_durable_job_migration_updates_timestamps_without_editing_old_migrations
     assert "create or replace function public.touch_durable_job_updated_at" in sql
     assert "before update on public.agent_jobs" in sql
     assert "before update on public.agent_job_checkpoints" in sql
+
+
+def test_block_details_migration_adds_safe_operator_recovery_contract():
+    sql = BLOCK_DETAILS_MIGRATION.read_text().lower()
+
+    assert "add column if not exists block_code text" in sql
+    assert "add column if not exists block_detail text" in sql
+    assert "add column if not exists recovery_action text" in sql
+    assert "agent_jobs_block_code_shape" in sql
+    assert "where status = 'blocked'" in sql

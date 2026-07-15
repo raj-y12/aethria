@@ -10,7 +10,7 @@ from collections import defaultdict
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 import metrics
-from jobs.models import AgentJob, JobExecutionCancelled, JobType
+from jobs.models import AgentJob, JobExecutionBlocked, JobExecutionCancelled, JobType
 from jobs.postgres import database_dsn
 from utils.timeutil import utcnow
 
@@ -113,6 +113,16 @@ class DurableJobWorker:
                     raise
                 except JobExecutionCancelled:
                     outcome = "cancelled"
+                except JobExecutionBlocked as exc:
+                    await self.repository.block(
+                        user_id=job.user_id,
+                        job_id=job.job_id,
+                        worker_id=self.worker_id,
+                        code=exc.code,
+                        detail=exc.detail,
+                        recovery_action=exc.recovery_action,
+                    )
+                    outcome = "blocked"
                 except Exception as exc:
                     await self.repository.retry(
                         user_id=job.user_id,

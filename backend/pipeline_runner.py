@@ -681,6 +681,7 @@ async def run_on_demand_lookup(
     checkpoint: Optional[
         Callable[[str, str, Dict[str, Any]], Awaitable[None]]
     ] = None,
+    institutional_context: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
     """
     Run scout -> reviewer -> partner for one explicit company name.
@@ -716,6 +717,7 @@ async def run_on_demand_lookup(
             resolution=resolution,
             pipeline_run_id=pipeline_run_id,
             checkpoint=checkpoint,
+            institutional_context=institutional_context,
         )
 
 
@@ -757,6 +759,7 @@ async def _run_on_demand_lookup_inner(
     checkpoint: Optional[
         Callable[[str, str, Dict[str, Any]], Awaitable[None]]
     ] = None,
+    institutional_context: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
     tenant = TenantContext(user_id=user_id)
     logger.info(
@@ -855,7 +858,13 @@ async def _run_on_demand_lookup_inner(
     lookup_outcome: Dict[str, Any] = {}
     try:
         lookup_run_id = (pipeline_run_id or "").strip() or str(uuid4())
-        await emit("accepted", "succeeded", lookup_id=lid, pipeline_run_id=lookup_run_id)
+        await emit(
+            "accepted",
+            "succeeded",
+            lookup_id=lid,
+            pipeline_run_id=lookup_run_id,
+            **(institutional_context or {}),
+        )
         logger.info(
             "[%s] on_demand_lookup pipeline_run_id=%s rss_mb_start=%.1f",
             user_id[:12],

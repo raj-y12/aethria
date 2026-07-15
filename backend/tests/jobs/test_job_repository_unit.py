@@ -281,6 +281,39 @@ async def test_manual_requeue_adds_one_attempt_without_changing_job_identity():
 
 
 @pytest.mark.asyncio
+async def test_block_is_structured_tenant_scoped_and_preserves_retry_budget():
+    repository_module = importlib.import_module("jobs.repository")
+    connection = _Connection(
+        fetchrows=[
+            _row(
+                status="blocked",
+                attempts=0,
+                block_code="identity_review_required",
+                block_detail="Ambiguous company identity.",
+                recovery_action="Resolve identity case and retry.",
+            )
+        ]
+    )
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    result = await repository.block(
+        user_id="user-a",
+        job_id=_job().job_id,
+        worker_id="worker-a",
+        code="identity_review_required",
+        detail="Ambiguous company identity.",
+        recovery_action="Resolve identity case and retry.",
+    )
+
+    assert result.status is JobStatus.BLOCKED
+    assert result.block_code == "identity_review_required"
+    sql = connection.calls[0][1].lower()
+    assert "attempts = greatest(attempts - 1, 0)" in sql
+    assert "user_id = $2" in sql
+    assert any("agent_job.blocked" in str(call) for call in connection.calls)
+
+
+@pytest.mark.asyncio
 async def test_create_pool_requires_direct_dsn_and_uses_bounded_sizes(monkeypatch):
     postgres = importlib.import_module("jobs.postgres")
     monkeypatch.delenv("DATABASE_URL", raising=False)

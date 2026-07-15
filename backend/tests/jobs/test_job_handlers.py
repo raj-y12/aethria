@@ -13,6 +13,8 @@ from jobs.models import (
 
 
 class _Repository:
+    pool = object()
+
     def __init__(self):
         self.checkpoints = []
 
@@ -60,12 +62,40 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
     repository = _Repository()
     calls = []
 
+    class IdentityRepository:
+        async def get_opportunity_by_legacy_projection(self, **kwargs):
+            return None
+
+        async def link_legacy_projection(self, **kwargs):
+            return object()
+
+    class IdentityService:
+        def __init__(self, repository):
+            pass
+
+        async def admit(self, observation):
+            return type(
+                "Admission",
+                (),
+                {
+                    "observation_id": "observation-1",
+                    "status": type("Status", (), {"value": "resolved"})(),
+                    "company_id": "company-1",
+                    "opportunity_id": "opportunity-1",
+                    "identity_case_id": None,
+                    "confidence": 1.0,
+                    "blocks_evaluation": False,
+                },
+            )()
+
     async def run(user_id, company_name, **kwargs):
         calls.append((user_id, company_name, kwargs))
         await kwargs["checkpoint"]("scout", "succeeded", {"startup_id": "s1"})
         return "s1"
 
     monkeypatch.setattr(handlers, "run_on_demand_lookup", run)
+    monkeypatch.setattr(handlers, "IdentityRepository", lambda pool: IdentityRepository())
+    monkeypatch.setattr(handlers, "IdentityService", IdentityService)
     job = AgentJob(
         user_id="user-a",
         job_type=JobType.COMPANY_LOOKUP,
@@ -86,7 +116,8 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
     assert calls[0][0:2] == ("user-a", "Acme")
     assert calls[0][2]["pipeline_run_id"] == job.pipeline_run_id
     assert calls[0][2]["resolution"].canonical_name == "Acme"
-    assert repository.checkpoints[0]["stage"] == "scout"
+    assert repository.checkpoints[0]["stage"] == "identity"
+    assert repository.checkpoints[1]["stage"] == "scout"
     assert repository.checkpoints[-1]["stage"] == "lookup_result"
 
 

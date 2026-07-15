@@ -120,3 +120,32 @@ def test_lease_fields_validate_attempt_and_expiry_shape():
             lease_owner="worker-a",
             lease_expires_at=now,
         )
+
+
+def test_blocked_execution_has_machine_code_and_operator_recovery_action():
+    jobs = _jobs()
+    error = jobs.JobExecutionBlocked(
+        code="identity_review_required",
+        detail="Two verified company identities matched.",
+        recovery_action="Resolve the identity case, then retry the job.",
+    )
+
+    assert error.code == "identity_review_required"
+    assert "Resolve" in error.recovery_action
+    assert "identity_review_required" in str(error)
+
+
+def test_agent_job_round_trips_structured_block_fields():
+    jobs = _jobs()
+    job = jobs.AgentJob(
+        user_id="user-a",
+        job_type=jobs.JobType.PIPELINE_CYCLE,
+        idempotency_key="cycle:block",
+        payload=jobs.PipelineCyclePayload(user_id="user-a"),
+        status=jobs.JobStatus.BLOCKED,
+        block_code="identity_review_required",
+        block_detail="Operator decision required.",
+        recovery_action="Resolve case and retry.",
+    )
+
+    assert jobs.AgentJob.model_validate(job.model_dump()) == job

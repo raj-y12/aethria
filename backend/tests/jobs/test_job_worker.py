@@ -3,7 +3,13 @@ import importlib
 
 import pytest
 
-from jobs.models import AgentJob, JobExecutionCancelled, JobType, PipelineCyclePayload
+from jobs.models import (
+    AgentJob,
+    JobExecutionBlocked,
+    JobExecutionCancelled,
+    JobType,
+    PipelineCyclePayload,
+)
 
 
 def _job(user_id="user-a"):
@@ -23,6 +29,7 @@ class _Repository:
         self.job = job
         self.succeeded = []
         self.retried = []
+        self.blocked = []
         self.heartbeats = []
 
     async def claim_next(self, **kwargs):
@@ -39,6 +46,10 @@ class _Repository:
 
     async def retry(self, **kwargs):
         self.retried.append(kwargs)
+        return None
+
+    async def block(self, **kwargs):
+        self.blocked.append(kwargs)
         return None
 
 
@@ -106,6 +117,31 @@ async def test_worker_does_not_retry_a_cooperatively_cancelled_job():
     assert await worker.process_one() is True
     assert repository.succeeded == []
     assert repository.retried == []
+
+
+@pytest.mark.asyncio
+async def test_worker_blocks_operator_action_without_retrying():
+    worker_module = importlib.import_module("jobs.worker")
+    repository = _Repository(_job())
+
+    async def handler(job):
+        raise JobExecutionBlocked(
+            code="identity_review_required",
+            detail="Ambiguous company identity.",
+            recovery_action="Resolve the identity case and retry.",
+        )
+
+    worker = worker_module.DurableJobWorker(
+        repository,
+        handlers={JobType.PIPELINE_CYCLE: handler},
+        worker_id="worker-a",
+        heartbeat_seconds=60,
+    )
+
+    assert await worker.process_one() is True
+    assert repository.retried == []
+    assert repository.succeeded == []
+    assert repository.blocked[0]["code"] == "identity_review_required"
 
 
 @pytest.mark.asyncio

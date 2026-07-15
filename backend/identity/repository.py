@@ -849,6 +849,26 @@ class IdentityRepository:
             )
         return _opportunity_from_row(row)
 
+    async def get_opportunity_by_legacy_projection(
+        self, *, user_id: str, legacy_startup_id: str
+    ) -> Optional[OpportunityRecord]:
+        uid = require_user_id(
+            user_id,
+            context="IdentityRepository.get_opportunity_by_legacy_projection",
+        )
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                select * from public.opportunities
+                where legacy_startup_id = $1::uuid and user_id = $2
+                order by updated_at desc
+                limit 1
+                """,
+                legacy_startup_id,
+                uid,
+            )
+        return _opportunity_from_row(row)
+
     async def list_cases(
         self, *, user_id: str, status: str = "open", limit: int = 100
     ) -> List[IdentityResolutionCaseRecord]:
