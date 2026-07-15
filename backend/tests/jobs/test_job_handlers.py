@@ -2,7 +2,14 @@ import importlib
 
 import pytest
 
-from jobs.models import AgentJob, CompanyLookupPayload, JobType, PipelineCyclePayload
+from jobs.models import (
+    AgentJob,
+    CompanyLookupPayload,
+    JobExecutionCancelled,
+    JobStatus,
+    JobType,
+    PipelineCyclePayload,
+)
 
 
 class _Repository:
@@ -81,3 +88,25 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
     assert calls[0][2]["resolution"].canonical_name == "Acme"
     assert repository.checkpoints[0]["stage"] == "scout"
     assert repository.checkpoints[-1]["stage"] == "lookup_result"
+
+
+@pytest.mark.asyncio
+async def test_lookup_handler_observes_cancellation_between_checkpoints(monkeypatch):
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository()
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup:user-a:cancelled",
+        payload=CompanyLookupPayload(user_id="user-a", company_name="Acme"),
+        attempts=1,
+        status=JobStatus.RUNNING,
+    )
+
+    async def get_job(**kwargs):
+        return job.model_copy(update={"status": JobStatus.CANCELLED})
+
+    repository.get_job = get_job
+
+    with pytest.raises(JobExecutionCancelled):
+        await handlers.company_lookup_handler(repository, job)

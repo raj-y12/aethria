@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from collections import defaultdict
 from typing import Any, Awaitable, Callable, Dict, Optional
 
-from jobs.models import AgentJob, JobType
+import metrics
+from jobs.models import AgentJob, JobExecutionCancelled, JobType
 from jobs.postgres import database_dsn
+from utils.timeutil import utcnow
 
 
 logger = logging.getLogger("jobs.worker")
@@ -61,17 +64,25 @@ class DurableJobWorker:
     async def _heartbeat(self, job: AgentJob) -> None:
         while True:
             await asyncio.sleep(self.heartbeat_seconds)
-            alive = await self.repository.heartbeat(
-                user_id=job.user_id,
-                job_id=job.job_id,
-                worker_id=self.worker_id,
-                lease_seconds=self.lease_seconds,
-            )
+            try:
+                alive = await self.repository.heartbeat(
+                    user_id=job.user_id,
+                    job_id=job.job_id,
+                    worker_id=self.worker_id,
+                    lease_seconds=self.lease_seconds,
+                )
+            except Exception:
+                metrics.inc_durable_heartbeat_failure(job_type=job.job_type.value)
+                logger.exception("Lease heartbeat failed for job %s", job.job_id)
+                return
             if not alive:
+                metrics.inc_durable_heartbeat_failure(job_type=job.job_type.value)
                 logger.warning("Lease heartbeat rejected for job %s", job.job_id)
                 return
 
     async def execute(self, job: AgentJob) -> None:
+        run_started = time.perf_counter()
+        outcome = "error"
         handler = self.handlers.get(job.job_type)
         if handler is None:
             await self.repository.retry(
@@ -79,6 +90,11 @@ class DurableJobWorker:
                 job_id=job.job_id,
                 worker_id=self.worker_id,
                 error=f"No handler registered for {job.job_type.value}",
+            )
+            metrics.observe_durable_job_run(
+                job_type=job.job_type.value,
+                outcome="retry",
+                seconds=time.perf_counter() - run_started,
             )
             return
         async with self._global:
@@ -91,8 +107,12 @@ class DurableJobWorker:
                         job_id=job.job_id,
                         worker_id=self.worker_id,
                     )
+                    outcome = "success"
                 except asyncio.CancelledError:
+                    outcome = "cancelled"
                     raise
+                except JobExecutionCancelled:
+                    outcome = "cancelled"
                 except Exception as exc:
                     await self.repository.retry(
                         user_id=job.user_id,
@@ -100,20 +120,35 @@ class DurableJobWorker:
                         worker_id=self.worker_id,
                         error=str(exc),
                     )
+                    outcome = "retry"
                 finally:
                     heartbeat.cancel()
                     try:
                         await heartbeat
                     except asyncio.CancelledError:
                         pass
+                    metrics.observe_durable_job_run(
+                        job_type=job.job_type.value,
+                        outcome=outcome,
+                        seconds=time.perf_counter() - run_started,
+                    )
 
     async def process_one(self) -> bool:
+        recover_exhausted = getattr(
+            self.repository, "dead_letter_exhausted_leases", None
+        )
+        if recover_exhausted is not None:
+            await recover_exhausted()
         job = await self.repository.claim_next(
             worker_id=self.worker_id,
             lease_seconds=self.lease_seconds,
         )
         if job is None:
             return False
+        metrics.observe_durable_job_wait(
+            job_type=job.job_type.value,
+            seconds=max(0.0, (utcnow() - job.accepted_at).total_seconds()),
+        )
         await self.execute(job)
         return True
 

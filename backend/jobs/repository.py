@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
+import metrics
 from jobs.models import (
     AgentJob,
     CheckpointStatus,
@@ -146,6 +147,9 @@ class DurableJobRepository:
                     await conn.execute(
                         "select pg_notify('aethria_agent_jobs', $1)", accepted.job_id
                     )
+                    metrics.inc_durable_job(
+                        job_type=accepted.job_type.value, transition="accepted"
+                    )
                 return accepted
 
     async def claim_next(
@@ -185,7 +189,48 @@ class DurableJobRepository:
                     worker_id,
                     max(1, int(lease_seconds)),
                 )
-                return _job_from_row(row)
+                claimed = _job_from_row(row)
+                if claimed is not None:
+                    metrics.inc_durable_job(
+                        job_type=claimed.job_type.value, transition="claimed"
+                    )
+                return claimed
+
+    async def dead_letter_exhausted_leases(self) -> int:
+        """Close final-attempt jobs whose worker died after the lease expired."""
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                rows = await conn.fetch(
+                    """
+                    update public.agent_jobs
+                    set status = 'dead_letter', completed_at = now(),
+                        lease_owner = null, lease_expires_at = null,
+                        last_error = coalesce(
+                          last_error,
+                          'Worker lease expired after the final attempt'
+                        )
+                    where status = 'running'
+                      and lease_expires_at <= now()
+                      and attempts >= max_attempts
+                    returning job_id, user_id, job_type
+                    """
+                )
+                for row in rows:
+                    await self._insert_outbox(
+                        conn,
+                        user_id=str(row["user_id"]),
+                        aggregate_id=str(row["job_id"]),
+                        event_type="agent_job.dead_lettered",
+                        payload={
+                            "job_id": str(row["job_id"]),
+                            "status": "dead_letter",
+                        },
+                    )
+                    metrics.inc_durable_job(
+                        job_type=str(row["job_type"]),
+                        transition="dead_lettered",
+                    )
+                return len(rows)
 
     async def heartbeat(
         self,
@@ -283,6 +328,9 @@ class DurableJobRepository:
                     event_type="agent_job.succeeded",
                     payload={"job_id": job_id, "status": "succeeded"},
                 )
+                metrics.inc_durable_job(
+                    job_type=str(row["job_type"]), transition="completed"
+                )
                 return True
 
     async def retry(
@@ -325,6 +373,13 @@ class DurableJobRepository:
                         aggregate_id=job_id,
                         event_type="agent_job.dead_lettered",
                         payload={"job_id": job_id, "status": "dead_letter"},
+                    )
+                    metrics.inc_durable_job(
+                        job_type=job.job_type.value, transition="dead_lettered"
+                    )
+                elif job is not None:
+                    metrics.inc_durable_job(
+                        job_type=job.job_type.value, transition="retried"
                     )
                 return job
 
@@ -381,6 +436,50 @@ class DurableJobRepository:
                         event_type="agent_job.cancelled",
                         payload={"job_id": job_id, "status": "cancelled"},
                     )
+                    metrics.inc_durable_job(
+                        job_type=job.job_type.value, transition="cancelled"
+                    )
+                return job
+
+    async def requeue(self, *, user_id: str, job_id: str) -> Optional[AgentJob]:
+        """Grant one explicit operator retry on the same accepted job."""
+        uid = require_user_id(user_id, context="DurableJobRepository.requeue")
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    update public.agent_jobs
+                    set status = 'queued',
+                        max_attempts = greatest(max_attempts, attempts + 1),
+                        next_attempt_at = now(),
+                        last_error = null,
+                        completed_at = null,
+                        lease_owner = null,
+                        lease_expires_at = null,
+                        heartbeat_at = null
+                    where job_id = $1 and user_id = $2
+                      and status in ('failed', 'dead_letter', 'blocked', 'retry_wait')
+                    returning *
+                    """,
+                    job_id,
+                    uid,
+                )
+                job = _job_from_row(row)
+                if job is None:
+                    return None
+                await self._insert_outbox(
+                    conn,
+                    user_id=uid,
+                    aggregate_id=job_id,
+                    event_type="agent_job.requeued",
+                    payload={"job_id": job_id, "status": "queued"},
+                )
+                await conn.execute(
+                    "select pg_notify('aethria_agent_jobs', $1)", job_id
+                )
+                metrics.inc_durable_job(
+                    job_type=job.job_type.value, transition="retried"
+                )
                 return job
 
     async def get_job(self, *, user_id: str, job_id: str) -> Optional[AgentJob]:
@@ -390,6 +489,26 @@ class DurableJobRepository:
                 "select * from public.agent_jobs where job_id = $1 and user_id = $2",
                 job_id,
                 uid,
+            )
+            return _job_from_row(row)
+
+    async def get_by_idempotency_key(
+        self, *, user_id: str, idempotency_key: str
+    ) -> Optional[AgentJob]:
+        uid = require_user_id(
+            user_id, context="DurableJobRepository.get_by_idempotency_key"
+        )
+        key = str(idempotency_key or "").strip()
+        if not key:
+            raise ValueError("idempotency_key is required")
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                select * from public.agent_jobs
+                where user_id = $1 and idempotency_key = $2
+                """,
+                uid,
+                key,
             )
             return _job_from_row(row)
 
@@ -423,6 +542,11 @@ class DurableJobRepository:
                 from public.agent_jobs
                 where status in ('queued', 'running', 'retry_wait', 'blocked', 'dead_letter')
                 group by job_type, status
+                union all
+                select 'outbox' as job_type, 'pending' as status,
+                       count(*)::integer as count
+                from public.domain_outbox
+                where published_at is null
                 """
             )
             return {

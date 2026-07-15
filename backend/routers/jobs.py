@@ -1,0 +1,140 @@
+"""Tenant-scoped status, retry, and cancellation controls for durable work."""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
+
+from jobs.models import AgentJob, JobStatus
+from security.request_guards import require_authenticated_user, validate_route_id
+
+
+router = APIRouter(prefix="/api/jobs", tags=["jobs"])
+
+_RETRYABLE = {
+    JobStatus.FAILED,
+    JobStatus.DEAD_LETTER,
+    JobStatus.BLOCKED,
+    JobStatus.RETRY_WAIT,
+}
+
+
+def _repository(request: Request):
+    repository = getattr(request.app.state, "durable_job_repository", None)
+    if repository is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "unavailable",
+                "reason": "durable_job_store_unavailable",
+            },
+        )
+    return repository
+
+
+def _public_status(status: JobStatus) -> str:
+    return "accepted" if status is JobStatus.QUEUED else status.value
+
+
+def _safe_error(status: JobStatus) -> Optional[str]:
+    if status is JobStatus.DEAD_LETTER:
+        return "Execution failed after all retry attempts."
+    if status is JobStatus.FAILED:
+        return "Execution failed."
+    if status is JobStatus.BLOCKED:
+        return "Execution is blocked and requires operator review."
+    return None
+
+
+def _serialize(job: AgentJob) -> Dict[str, Any]:
+    lookup_id = getattr(job.payload, "lookup_id", None)
+    return {
+        "job_id": job.job_id,
+        "job_type": job.job_type.value,
+        "status": _public_status(job.status),
+        "attempts": job.attempts,
+        "max_attempts": job.max_attempts,
+        "pipeline_run_id": job.pipeline_run_id,
+        "lookup_id": lookup_id,
+        "accepted_at": job.accepted_at.isoformat(),
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+        "next_attempt_at": job.next_attempt_at.isoformat(),
+        "error": _safe_error(job.status),
+    }
+
+
+def _parse_statuses(raw: Optional[str]) -> Optional[List[JobStatus]]:
+    if not raw:
+        return None
+    values: List[JobStatus] = []
+    for item in raw.split(","):
+        normalized = item.strip().lower()
+        if not normalized:
+            continue
+        if normalized == "accepted":
+            normalized = JobStatus.QUEUED.value
+        try:
+            values.append(JobStatus(normalized))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Invalid job status filter") from exc
+    return values or None
+
+
+@router.get("")
+async def list_jobs(
+    request: Request,
+    status: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=200),
+):
+    user_id = require_authenticated_user(request)
+    jobs = await _repository(request).list_jobs(
+        user_id=user_id,
+        statuses=_parse_statuses(status),
+        limit=limit,
+    )
+    return {"jobs": [_serialize(job) for job in jobs]}
+
+
+@router.get("/{job_id}")
+async def get_job(request: Request, job_id: str):
+    validate_route_id(job_id, field_name="job_id")
+    user_id = require_authenticated_user(request)
+    job = await _repository(request).get_job(user_id=user_id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return _serialize(job)
+
+
+@router.post("/{job_id}/retry")
+async def retry_job(request: Request, job_id: str):
+    validate_route_id(job_id, field_name="job_id")
+    user_id = require_authenticated_user(request)
+    repository = _repository(request)
+    current = await repository.get_job(user_id=user_id, job_id=job_id)
+    if current is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if current.status not in _RETRYABLE:
+        raise HTTPException(status_code=409, detail="Job is not retryable in its current state")
+    job = await repository.requeue(user_id=user_id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=409, detail="Job state changed; refresh before retrying")
+    return JSONResponse(status_code=202, content=_serialize(job))
+
+
+@router.post("/{job_id}/cancel")
+async def cancel_job(request: Request, job_id: str):
+    validate_route_id(job_id, field_name="job_id")
+    user_id = require_authenticated_user(request)
+    repository = _repository(request)
+    current = await repository.get_job(user_id=user_id, job_id=job_id)
+    if current is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if current.status is JobStatus.SUCCEEDED:
+        raise HTTPException(status_code=409, detail="A succeeded job cannot be cancelled")
+    job = await repository.cancel(user_id=user_id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=409, detail="Job state changed; refresh before cancelling")
+    return JSONResponse(status_code=202, content=_serialize(job))

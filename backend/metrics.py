@@ -108,6 +108,49 @@ if ENABLED:
         "Pending jobs in the on-demand lookup queue.",
         registry=REGISTRY,
     )
+    DURABLE_JOB_TRANSITIONS = Counter(
+        "aethria_durable_jobs_total",
+        "Durable job transitions by bounded job type and transition.",
+        ["job_type", "transition"],
+        registry=REGISTRY,
+    )
+    DURABLE_JOB_WAIT = Histogram(
+        "aethria_durable_job_wait_seconds",
+        "Time from durable acceptance to claim.",
+        ["job_type"],
+        buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 300),
+        registry=REGISTRY,
+    )
+    DURABLE_JOB_RUN = Histogram(
+        "aethria_durable_job_run_seconds",
+        "Durable handler execution duration by outcome.",
+        ["job_type", "outcome"],
+        buckets=(0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300, 600),
+        registry=REGISTRY,
+    )
+    DURABLE_JOB_HEARTBEAT_FAILURES = Counter(
+        "aethria_durable_job_heartbeat_failures_total",
+        "Rejected or failed durable lease heartbeats.",
+        ["job_type"],
+        registry=REGISTRY,
+    )
+    DURABLE_JOB_QUEUE_DEPTH = Gauge(
+        "aethria_durable_job_queue_depth",
+        "Durable job counts by bounded job type and status.",
+        ["job_type", "status"],
+        registry=REGISTRY,
+    )
+    OUTBOX_PUBLICATIONS = Counter(
+        "aethria_outbox_publications_total",
+        "Transactional outbox publication attempts by outcome.",
+        ["outcome"],
+        registry=REGISTRY,
+    )
+    OUTBOX_BACKLOG = Gauge(
+        "aethria_outbox_backlog",
+        "Unpublished transactional outbox events.",
+        registry=REGISTRY,
+    )
     PERSISTENT_LOOPS = Gauge(
         "aethria_persistent_agent_loops",
         "Active per-user persistent agent loops.",
@@ -182,6 +225,25 @@ def observe_pipeline_stage(
 _DECISION_READY_COHORTS = {"manual_lookup", "autonomous_discovery"}
 _EVALUATION_PATHS = {"manual_lookup", "autonomous_discovery", "rerun"}
 _OUTCOMES = {"success", "error", "incomplete"}
+_JOB_TYPES = {"pipeline_cycle", "company_lookup"}
+_JOB_TRANSITIONS = {
+    "accepted",
+    "claimed",
+    "completed",
+    "retried",
+    "dead_lettered",
+    "cancelled",
+}
+_JOB_STATUSES = {
+    "queued",
+    "running",
+    "retry_wait",
+    "blocked",
+    "succeeded",
+    "failed",
+    "dead_letter",
+    "cancelled",
+}
 
 
 def _allowlisted(value: str, allowed: set[str]) -> str:
@@ -228,6 +290,79 @@ def inc_evaluation_manifest(*, path: str, outcome: str) -> None:
         ).inc()
     except Exception as e:  # pragma: no cover
         logger.debug("inc_evaluation_manifest failed: %s", e)
+
+
+def inc_durable_job(*, job_type: str, transition: str) -> None:
+    if not ENABLED:
+        return
+    try:
+        DURABLE_JOB_TRANSITIONS.labels(
+            job_type=_allowlisted(job_type, _JOB_TYPES),
+            transition=_allowlisted(transition, _JOB_TRANSITIONS),
+        ).inc()
+    except Exception as e:  # pragma: no cover
+        logger.debug("inc_durable_job failed: %s", e)
+
+
+def observe_durable_job_wait(*, job_type: str, seconds: float) -> None:
+    if not ENABLED or seconds < 0:
+        return
+    try:
+        DURABLE_JOB_WAIT.labels(
+            job_type=_allowlisted(job_type, _JOB_TYPES)
+        ).observe(seconds)
+    except Exception as e:  # pragma: no cover
+        logger.debug("observe_durable_job_wait failed: %s", e)
+
+
+def observe_durable_job_run(*, job_type: str, outcome: str, seconds: float) -> None:
+    if not ENABLED or seconds < 0:
+        return
+    try:
+        DURABLE_JOB_RUN.labels(
+            job_type=_allowlisted(job_type, _JOB_TYPES),
+            outcome=_allowlisted(outcome, {"success", "retry", "cancelled", "error"}),
+        ).observe(seconds)
+    except Exception as e:  # pragma: no cover
+        logger.debug("observe_durable_job_run failed: %s", e)
+
+
+def inc_durable_heartbeat_failure(*, job_type: str) -> None:
+    if not ENABLED:
+        return
+    try:
+        DURABLE_JOB_HEARTBEAT_FAILURES.labels(
+            job_type=_allowlisted(job_type, _JOB_TYPES)
+        ).inc()
+    except Exception as e:  # pragma: no cover
+        logger.debug("inc_durable_heartbeat_failure failed: %s", e)
+
+
+def inc_outbox_publication(*, outcome: str) -> None:
+    if not ENABLED:
+        return
+    try:
+        OUTBOX_PUBLICATIONS.labels(
+            outcome=_allowlisted(outcome, {"published", "failed"})
+        ).inc()
+    except Exception as e:  # pragma: no cover
+        logger.debug("inc_outbox_publication failed: %s", e)
+
+
+def set_durable_depths(depths: dict[str, int]) -> None:
+    if not ENABLED:
+        return
+    try:
+        for key, count in depths.items():
+            job_type, _, status = str(key).partition(":")
+            if job_type == "outbox" and status == "pending":
+                OUTBOX_BACKLOG.set(max(0, int(count)))
+            elif job_type in _JOB_TYPES and status in _JOB_STATUSES:
+                DURABLE_JOB_QUEUE_DEPTH.labels(
+                    job_type=job_type, status=status
+                ).set(max(0, int(count)))
+    except Exception as e:  # pragma: no cover
+        logger.debug("set_durable_depths failed: %s", e)
 
 
 def set_event_loop_lag(seconds: float) -> None:

@@ -3,7 +3,7 @@ import importlib
 
 import pytest
 
-from jobs.models import AgentJob, JobType, PipelineCyclePayload
+from jobs.models import AgentJob, JobExecutionCancelled, JobType, PipelineCyclePayload
 
 
 def _job(user_id="user-a"):
@@ -86,6 +86,26 @@ async def test_worker_retries_handler_failure_and_stops_heartbeat():
     assert len(repository.retried) == 1
     assert "provider unavailable" in repository.retried[0]["error"]
     assert repository.heartbeats
+
+
+@pytest.mark.asyncio
+async def test_worker_does_not_retry_a_cooperatively_cancelled_job():
+    worker_module = importlib.import_module("jobs.worker")
+    repository = _Repository(_job())
+
+    async def handler(job):
+        raise JobExecutionCancelled("cancelled between checkpoints")
+
+    worker = worker_module.DurableJobWorker(
+        repository,
+        handlers={JobType.PIPELINE_CYCLE: handler},
+        worker_id="worker-a",
+        heartbeat_seconds=60,
+    )
+
+    assert await worker.process_one() is True
+    assert repository.succeeded == []
+    assert repository.retried == []
 
 
 @pytest.mark.asyncio

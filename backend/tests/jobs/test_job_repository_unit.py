@@ -127,6 +127,33 @@ async def test_claim_uses_skip_locked_and_recovers_expired_leases():
 
 
 @pytest.mark.asyncio
+async def test_exhausted_expired_lease_is_dead_lettered_instead_of_sticking_running():
+    repository_module = importlib.import_module("jobs.repository")
+    connection = _Connection(
+        fetches=[
+            [
+                {
+                    "job_id": _job().job_id,
+                    "user_id": "user-a",
+                    "job_type": "pipeline_cycle",
+                }
+            ]
+        ]
+    )
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    recovered = await repository.dead_letter_exhausted_leases()
+
+    assert recovered == 1
+    sql = connection.calls[0][1].lower()
+    assert "status = 'running'" in sql
+    assert "lease_expires_at <= now()" in sql
+    assert "attempts >= max_attempts" in sql
+    assert "status = 'dead_letter'" in sql
+    assert any("domain_outbox" in call[1].lower() for call in connection.calls)
+
+
+@pytest.mark.asyncio
 async def test_heartbeat_and_stale_completion_require_current_lease_owner():
     repository_module = importlib.import_module("jobs.repository")
     connection = _Connection(fetchrows=[{"job_id": _job().job_id}, None])
@@ -225,6 +252,32 @@ async def test_repeated_cancel_does_not_publish_a_second_outbox_event():
         call[0] == "execute" and "domain_outbox" in call[1].lower()
         for call in connection.calls
     )
+
+
+@pytest.mark.asyncio
+async def test_manual_requeue_adds_one_attempt_without_changing_job_identity():
+    repository_module = importlib.import_module("jobs.repository")
+    connection = _Connection(
+        fetchrows=[
+            _row(
+                status="queued",
+                attempts=3,
+                max_attempts=4,
+                last_error=None,
+                completed_at=None,
+            )
+        ]
+    )
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    result = await repository.requeue(user_id="user-a", job_id=_job().job_id)
+
+    assert result.job_id == _job().job_id
+    assert result.status is JobStatus.QUEUED
+    assert result.max_attempts == 4
+    sql = connection.calls[0][1].lower()
+    assert "status in ('failed', 'dead_letter', 'blocked', 'retry_wait')" in sql
+    assert "max_attempts = greatest(max_attempts, attempts + 1)" in sql
 
 
 @pytest.mark.asyncio

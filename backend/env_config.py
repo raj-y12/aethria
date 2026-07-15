@@ -224,6 +224,26 @@ REGISTRY: List[EnvVar] = [
            "Fallback Postgres connection string for the backplane (used if "
            "DATABASE_URL is unset)."),
 
+    # --- Durable jobs -------------------------------------------------------
+    EnvVar("DURABLE_JOB_DB_POOL_MIN", "int", "1", "Durable jobs",
+           "Minimum direct-Postgres connections reserved for durable jobs."),
+    EnvVar("DURABLE_JOB_DB_POOL_MAX", "int", "4", "Durable jobs",
+           "Maximum direct-Postgres connections used by durable jobs."),
+    EnvVar("DURABLE_JOB_DB_COMMAND_TIMEOUT_SECONDS", "float", "30", "Durable jobs",
+           "Database command timeout for durable job operations."),
+    EnvVar("DURABLE_JOB_POLL_SECONDS", "float", "2", "Durable jobs",
+           "Timed polling backstop when no job notification arrives."),
+    EnvVar("DURABLE_JOB_LEASE_SECONDS", "int", "90", "Durable jobs",
+           "Duration of an execution lease before another worker may recover it."),
+    EnvVar("DURABLE_JOB_HEARTBEAT_SECONDS", "float", "20", "Durable jobs",
+           "Heartbeat cadence for extending an active execution lease."),
+    EnvVar("DURABLE_JOB_GLOBAL_CONCURRENCY", "int", "2", "Durable jobs",
+           "Maximum durable jobs executing concurrently in one API process."),
+    EnvVar("DURABLE_JOB_TENANT_CONCURRENCY", "int", "1", "Durable jobs",
+           "Maximum durable jobs executing concurrently for one tenant."),
+    EnvVar("DURABLE_OUTBOX_POLL_SECONDS", "float", "2", "Durable jobs",
+           "Polling cadence for transactional outbox publication."),
+
     # --- Scoring / retrieval / misc -----------------------------------------
     EnvVar("USE_STRUCTURED_SCORING", "bool", "true", "Scoring / misc", "Use the deterministic structured scoring engine."),
     EnvVar("SKIP_READ_ENRICH_SCORES", "bool", "", "Scoring / misc", "Skip score enrichment on read (perf)."),

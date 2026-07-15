@@ -20,6 +20,10 @@ def _validated_user_id(value: str, *, context: str) -> str:
         raise ValueError(str(exc)) from exc
 
 
+class JobExecutionCancelled(RuntimeError):
+    """Cooperative stop observed between durable execution checkpoints."""
+
+
 class JobType(str, Enum):
     PIPELINE_CYCLE = "pipeline_cycle"
     COMPANY_LOOKUP = "company_lookup"

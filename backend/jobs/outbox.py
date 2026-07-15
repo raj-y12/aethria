@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Awaitable, Callable, Optional
 
+import metrics
 from event_bus import publish as event_publish
 
 
@@ -36,11 +37,13 @@ class OutboxPublisher:
             try:
                 await self.publish(event.user_id, event.event_type, event.payload)
             except Exception as exc:
+                metrics.inc_outbox_publication(outcome="failed")
                 await self.repository.mark_outbox_failed(
                     event_id=event.event_id, error=str(exc)
                 )
                 continue
             await self.repository.mark_outbox_published(event_id=event.event_id)
+            metrics.inc_outbox_publication(outcome="published")
             published += 1
         return published
 

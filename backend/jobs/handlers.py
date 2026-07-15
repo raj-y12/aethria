@@ -5,12 +5,29 @@ from __future__ import annotations
 from functools import partial
 from typing import Any, Dict
 
-from jobs.models import AgentJob, CompanyLookupPayload, JobType, PipelineCyclePayload
+from jobs.models import (
+    AgentJob,
+    CompanyLookupPayload,
+    JobExecutionCancelled,
+    JobStatus,
+    JobType,
+    PipelineCyclePayload,
+)
 from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
 from resolver.company_resolver import CompanyResolution
 
 
+async def _raise_if_cancelled(repository: Any, job: AgentJob) -> None:
+    getter = getattr(repository, "get_job", None)
+    if getter is None:
+        return
+    current = await getter(user_id=job.user_id, job_id=job.job_id)
+    if current is not None and current.status is JobStatus.CANCELLED:
+        raise JobExecutionCancelled(f"Job {job.job_id} was cancelled")
+
+
 async def _checkpoint(repository, job, stage, status, metadata):
+    await _raise_if_cancelled(repository, job)
     await repository.write_checkpoint(
         user_id=job.user_id,
         job_id=job.job_id,
@@ -20,6 +37,7 @@ async def _checkpoint(repository, job, stage, status, metadata):
         status=status,
         output_metadata=metadata,
     )
+    await _raise_if_cancelled(repository, job)
 
 
 async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
@@ -35,6 +53,7 @@ async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
 
 async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
     payload = CompanyLookupPayload.model_validate(job.payload)
+    await _raise_if_cancelled(repository, job)
     resolution = CompanyResolution.model_validate(payload.resolution) if payload.resolution else None
 
     async def checkpoint(stage: str, status: str, metadata: Dict[str, Any]) -> None:
