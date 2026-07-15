@@ -36,6 +36,7 @@ import {
 import { findPrecedentCandidates } from '../lib/institutionalConviction';
 import { getNextStepText, parseNextStepItems } from '../lib/memoText';
 import { formatDate } from '../lib/dates';
+import OpportunityIntelligence from './institutional/OpportunityIntelligence';
 const MEMO_POLL_INITIAL_MS = 2000;
 const MEMO_POLL_MAX_MS = 15000;
 const MEMO_POLL_MAX_ATTEMPTS = 60;
@@ -1266,6 +1267,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </ol>
               </MemoDisclosureSection>
             )}
+            <OpportunityIntelligence startupId={displayStartup.id} readOnly={readOnly} />
             </div>
 
 
