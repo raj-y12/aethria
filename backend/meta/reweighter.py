@@ -125,19 +125,4 @@ class ScoutReweighter:
     def apply(self, updates: List[Dict]) -> None:
         if not updates:
             return
-        new_weights = {u["scout_type"]: u["new_weight"] for u in updates}
-        doc_set(_WEIGHTS_TABLE, new_weights, user_id=self.user_id)
-        for u in updates:
-            list_append_only(
-                _MUTATION_LOG_TABLE,
-                {
-                    "type": "scout_weight_update",
-                    "agent_target": u["scout_type"],
-                    "cycle_number": u["cycle_number"],
-                    "applied_at": u["applied_at"],
-                    "previous_weight": u["previous_weight"],
-                    "new_weight": u["new_weight"],
-                    "reasoning": u["reasoning"],
-                },
-                user_id=self.user_id,
-            )
+        raise RuntimeError("Scout reweighting is proposal-only; publish through Fund Intelligence")

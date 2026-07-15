@@ -166,31 +166,4 @@ class ThresholdCalibrator:
     def apply(self, changes: List[Dict]) -> None:
         if not changes:
             return
-        state = load_calibration_state(self.user_id)
-        for change in changes:
-            param = change["parameter"]
-            new_val = change["new_value"]
-            if param == "confidence_threshold":
-                state["confidence_threshold_override"] = new_val
-            elif param == "reviewer_weak_threshold":
-                state["reviewer_weak_threshold_override"] = new_val
-            elif param == "reviewer_strong_threshold":
-                state["reviewer_strong_threshold_override"] = new_val
-
-            state["calibration_history"].append(change)
-            list_append_only(
-                _MUTATION_LOG_TABLE,
-                {
-                    "type": "calibration",
-                    "agent_target": param,
-                    "cycle_number": change["cycle_number"],
-                    "applied_at": change["applied_at"],
-                    "direction": change["direction"],
-                    "reasoning": change["reasoning"],
-                },
-                user_id=self.user_id,
-            )
-
-        state["last_calibrated_at"] = utcnow().isoformat()
-        state["last_calibrated_cycle"] = changes[0]["cycle_number"] if changes else 0
-        doc_set(_CALIBRATION_TABLE, state, user_id=self.user_id)
+        raise RuntimeError("Threshold calibration is proposal-only; publish through Fund Intelligence")
