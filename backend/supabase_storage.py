@@ -13,7 +13,7 @@ import random
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from models import Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
+from models import EvaluationManifest, Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
 from pipeline_state import get_pipeline_state_row, pipeline_stage_log, upsert_pipeline_state
 from agent_trace import (
     build_partner_trace,
@@ -387,6 +387,29 @@ class SupabaseStartupsStorage:
                 e,
             )
             return False
+
+    def record_evaluation_manifest(
+        self,
+        startup_id: str,
+        manifest: EvaluationManifest,
+    ) -> bool:
+        """Merge one portable evaluation manifest into the startup's agent trace."""
+        if not startup_id:
+            return False
+        st = self.get_startup(startup_id)
+        if st is None:
+            self.logger.error("Startup %s not found for evaluation manifest", startup_id)
+            return False
+        validated = EvaluationManifest.model_validate(manifest)
+        trace = dict(st.agent_trace) if isinstance(st.agent_trace, dict) else {}
+        trace["evaluation_manifest"] = validated.model_dump(mode="json")
+        st.agent_trace = trace
+        st.update_timestamp()
+        self._update_startup_columns(
+            startup_id,
+            self._changed_row_columns(st, ("agent_trace", "updated_at")),
+        )
+        return True
 
     def _update_startup_columns(self, startup_id: str, columns: dict) -> None:
         """Targeted UPDATE of specific columns on one row.
@@ -985,6 +1008,28 @@ class SupabaseStartupsStorage:
                 settings=self._settings_for_trace(),
             ),
         )
+        if pr:
+            from evaluation.manifest import build_evaluation_manifest
+
+            if str(getattr(st.scout_info, "operator_context", None) or "").strip():
+                evaluation_path = "rerun"
+            elif getattr(st.scout_info, "origin_type", None) == "on_demand_lookup":
+                evaluation_path = "manual_lookup"
+            else:
+                evaluation_path = "autonomous_discovery"
+            manifest = build_evaluation_manifest(
+                st,
+                pipeline_run_id=pr,
+                evaluation_path=evaluation_path,
+                model_metadata={
+                    "scout": os.getenv("SCOUT_MODEL", "gpt-5-nano"),
+                    "reviewer": os.getenv("REVIEWER_MODEL", "gpt-5-nano"),
+                    "partner": os.getenv("PARTNER_MODEL", "gpt-5-nano"),
+                },
+            )
+            trace = dict(st.agent_trace) if isinstance(st.agent_trace, dict) else {}
+            trace["evaluation_manifest"] = manifest.model_dump(mode="json")
+            st.agent_trace = trace
         st.unresolved_at = partner_info.partnered_at if partner_info.human_review_required else None
         st.queue_reason, st.priority_reason = _queue_reasons_for_startup(st)
         cols = ["partner_info", "agent_trace", "unresolved_at", "queue_reason", "priority_reason", "updated_at"]
