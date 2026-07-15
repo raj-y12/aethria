@@ -164,6 +164,21 @@ async def get_opportunity(request: Request, opportunity_id: str):
     return _opportunity(record)
 
 
+@router.get("/api/startups/{legacy_startup_id}/opportunity")
+async def get_opportunity_by_legacy_startup(request: Request, legacy_startup_id: str):
+    """Resolve the compatibility startup projection to its canonical opportunity."""
+
+    validate_route_id(legacy_startup_id, field_name="legacy_startup_id")
+    user_id = require_authenticated_user(request)
+    record = await _repository(request).get_opportunity_by_legacy_projection(
+        user_id=user_id,
+        legacy_startup_id=legacy_startup_id,
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    return _opportunity(record)
+
+
 @router.get("/api/observations")
 async def list_observations(
     request: Request,

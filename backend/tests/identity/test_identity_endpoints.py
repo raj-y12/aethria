@@ -15,6 +15,7 @@ from utils.timeutil import utcnow
 
 
 NOW = utcnow()
+LEGACY_STARTUP_ID = "d3d44fa8-6f39-4d8c-bcf4-f979a0fc0cf1"
 
 
 class _Repository:
@@ -42,6 +43,7 @@ class _Repository:
             company_id=self.company.company_id,
             first_observation_id=self.observation.observation_id,
             latest_observation_id=self.observation.observation_id,
+            legacy_startup_id=LEGACY_STARTUP_ID,
         )
         self.case = IdentityResolutionCaseRecord(
             identity_case_id="5fefdc39-aef8-4993-b356-95cb927027ef",
@@ -66,6 +68,11 @@ class _Repository:
 
     async def get_opportunity(self, *, user_id, opportunity_id):
         return self.opportunity if user_id == self.opportunity.user_id and opportunity_id == self.opportunity.opportunity_id else None
+
+    async def get_opportunity_by_legacy_projection(self, *, user_id, legacy_startup_id):
+        if user_id != self.opportunity.user_id or legacy_startup_id != self.opportunity.legacy_startup_id:
+            return None
+        return self.opportunity
 
     async def list_observations(self, *, user_id, status=None, limit=100):
         return [self.observation] if user_id == "user-a" else []
@@ -154,6 +161,23 @@ def test_company_and_opportunity_reads_are_tenant_scoped_and_safe(monkeypatch):
         f"/api/companies/{repository.company.company_id}",
         headers={"Authorization": "Bearer t"},
     )
+    assert other.status_code == 404
+
+
+def test_legacy_startup_resolves_to_tenant_scoped_canonical_opportunity(monkeypatch):
+    repository = _Repository()
+    own = _client(monkeypatch, repository).get(
+        f"/api/startups/{LEGACY_STARTUP_ID}/opportunity",
+        headers={"Authorization": "Bearer t"},
+    )
+    other = _client(monkeypatch, repository, user_id="user-b").get(
+        f"/api/startups/{LEGACY_STARTUP_ID}/opportunity",
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert own.status_code == 200
+    assert own.json()["opportunity_id"] == repository.opportunity.opportunity_id
+    assert own.json()["legacy_startup_id"] == LEGACY_STARTUP_ID
     assert other.status_code == 404
 
 

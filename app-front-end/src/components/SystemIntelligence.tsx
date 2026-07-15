@@ -10,6 +10,7 @@ import type { FundThesisRuntime } from '../api/fundThesis';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import { type FundConfiguration } from '../lib/fundConfiguration';
+import IdentityReviewQueue from './identity/IdentityReviewQueue';
 
 /**
  * The five facets of the instrument, ordered by how an investor reads it:
@@ -141,7 +142,10 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
             />
           )}
           {activeTab === 'calibration' && (
-            <CalibrationTab startups={props.startups} fundConfiguration={props.fundConfiguration} />
+            <div className="space-y-phi-6">
+              <IdentityReviewQueue compact />
+              <CalibrationTab startups={props.startups} fundConfiguration={props.fundConfiguration} />
+            </div>
           )}
           {activeTab === 'thesis' && (
             <InstitutionalMandateTab

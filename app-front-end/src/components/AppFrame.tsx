@@ -24,6 +24,7 @@ import MobileHeader from './MobileHeader';
 import AgentLogoutModal from './AgentLogoutModal';
 import DispatchCommandBar from './DispatchCommandBar';
 import LookupReadyToast from './LookupReadyToast';
+import IdentityReviewCenter from './identity/IdentityReviewCenter';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import { tokens } from '../design-system/tokens';
 import { transitionOrReduced } from '../design-system/motion';
@@ -316,6 +317,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   return (
     <AppFrameContext.Provider value={contextValue}>
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
+        <IdentityReviewCenter />
         <LookupReadyToast
           name={dispatch.lookupReady?.scout?.name ?? null}
           recommendation={dispatch.lookupReady?.partner?.recommendation ?? null}
