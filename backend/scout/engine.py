@@ -257,7 +257,10 @@ class ScoutEngine:
 
                     if self.cost_controller:
                         self.cost_controller.record_usage(
-                            "scout", scout.scout_type, scout._last_token_usage
+                            "scout",
+                            scout.scout_type,
+                            scout._last_token_usage,
+                            model=self.model,
                         )
 
                     if self.storage:

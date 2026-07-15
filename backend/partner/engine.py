@@ -293,7 +293,12 @@ class PartnerEngine:
                         tokens_used = total
                     else:
                         tokens_used = int(usage.get("prompt_tokens", 0) or 0) + int(usage.get("completion_tokens", 0) or 0)
-            self.cost_controller.record_usage("partner", "partner", tokens_used=tokens_used)
+            self.cost_controller.record_usage(
+                "partner",
+                "partner",
+                tokens_used=tokens_used,
+                model=getattr(self.decision_engine, "model", "unknown"),
+            )
 
         from utils.adapters import partner_output_to_partner_info
 

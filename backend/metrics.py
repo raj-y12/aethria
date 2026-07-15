@@ -61,6 +61,32 @@ if ENABLED:
         buckets=(0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 30, 60, 120),
         registry=REGISTRY,
     )
+    DECISION_READY_COST = Histogram(
+        "aethria_decision_ready_cost_usd",
+        "Measured model/search cost for a decision-ready current-pipeline opportunity.",
+        ["cohort"],
+        buckets=(0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2),
+        registry=REGISTRY,
+    )
+    DECISION_READY_TOKENS = Histogram(
+        "aethria_decision_ready_tokens",
+        "Measured tokens for a decision-ready current-pipeline opportunity.",
+        ["cohort"],
+        buckets=(100, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000),
+        registry=REGISTRY,
+    )
+    MODEL_PROVIDER_TOKENS = Counter(
+        "aethria_model_provider_tokens_total",
+        "Recorded model tokens by bounded stage, model, and provider dimensions.",
+        ["stage", "model", "provider"],
+        registry=REGISTRY,
+    )
+    EVALUATION_MANIFESTS = Counter(
+        "aethria_evaluation_manifest_total",
+        "Evaluation manifest writes by path and outcome.",
+        ["path", "outcome"],
+        registry=REGISTRY,
+    )
     LOOKUPS = Counter(
         "aethria_lookups_total",
         "On-demand lookups, by outcome.",
@@ -151,6 +177,57 @@ def observe_pipeline_stage(
         ).observe(duration_seconds)
     except Exception as e:  # pragma: no cover
         logger.debug("observe_pipeline_stage failed: %s", e)
+
+
+_DECISION_READY_COHORTS = {"manual_lookup", "autonomous_discovery"}
+_EVALUATION_PATHS = {"manual_lookup", "autonomous_discovery", "rerun"}
+_OUTCOMES = {"success", "error", "incomplete"}
+
+
+def _allowlisted(value: str, allowed: set[str]) -> str:
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in allowed else "unknown"
+
+
+def observe_decision_ready_usage(*, cohort: str, cost_usd: float, tokens: int) -> None:
+    if not ENABLED:
+        return
+    try:
+        label = _allowlisted(cohort, _DECISION_READY_COHORTS)
+        DECISION_READY_COST.labels(cohort=label).observe(max(0.0, float(cost_usd)))
+        DECISION_READY_TOKENS.labels(cohort=label).observe(max(0, int(tokens)))
+    except Exception as e:  # pragma: no cover
+        logger.debug("observe_decision_ready_usage failed: %s", e)
+
+
+def observe_model_provider_usage(
+    *, stage: str, model: str, provider: str, tokens: int
+) -> None:
+    if not ENABLED or tokens <= 0:
+        return
+    try:
+        stage_label = _allowlisted(stage, {"scout", "reviewer", "partner"})
+        provider_label = _allowlisted(provider, {"openai", "tavily", "unknown"})
+        model_label = str(model or "unknown").strip()[:80] or "unknown"
+        MODEL_PROVIDER_TOKENS.labels(
+            stage=stage_label,
+            model=model_label,
+            provider=provider_label,
+        ).inc(max(0, int(tokens)))
+    except Exception as e:  # pragma: no cover
+        logger.debug("observe_model_provider_usage failed: %s", e)
+
+
+def inc_evaluation_manifest(*, path: str, outcome: str) -> None:
+    if not ENABLED:
+        return
+    try:
+        EVALUATION_MANIFESTS.labels(
+            path=_allowlisted(path, _EVALUATION_PATHS),
+            outcome=_allowlisted(outcome, _OUTCOMES),
+        ).inc()
+    except Exception as e:  # pragma: no cover
+        logger.debug("inc_evaluation_manifest failed: %s", e)
 
 
 def set_event_loop_lag(seconds: float) -> None:

@@ -13,7 +13,7 @@ import resource
 import time
 from datetime import datetime, timezone
 from utils.timeutil import utcnow
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional
 from uuid import uuid4
 
@@ -68,6 +68,8 @@ class _PipelineEngines:
     reviewer_engine: ReviewerEngine
     partner_engine: PartnerEngine
     portfolio_store: PortfolioStore
+    cost_controller: Optional[CostController] = None
+    model_metadata: Dict[str, str] = field(default_factory=dict)
 
 
 def _build_pipeline_engines(
@@ -80,7 +82,10 @@ def _build_pipeline_engines(
     use_resource_fund_thesis_fallback: bool = True,
 ) -> _PipelineEngines:
     cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
-    cost_controller = CostController(user_id=user_id) if cost_budget_enabled else None
+    cost_controller = CostController(
+        user_id=user_id,
+        enforce_limits=cost_budget_enabled,
+    )
     deal_memory = DealMemory(user_id=user_id)
     model = os.getenv("SCOUT_MODEL", DEFAULT_SCOUT_MODEL)
     reviewer_model = os.getenv("REVIEWER_MODEL", DEFAULT_REVIEWER_MODEL)
@@ -127,6 +132,15 @@ def _build_pipeline_engines(
         reviewer_engine=reviewer_engine,
         partner_engine=partner_engine,
         portfolio_store=portfolio_store,
+        cost_controller=cost_controller,
+        model_metadata={
+            "scout": model,
+            "reviewer": reviewer_model,
+            "partner": getattr(
+                getattr(partner_engine, "decision_engine", None), "model", None
+            )
+            or os.getenv("PARTNER_MODEL", "gpt-5-nano"),
+        },
     )
 
 
@@ -146,6 +160,31 @@ def _close_pipeline_engines(*engines: object) -> None:
             close()
         except Exception as exc:  # pragma: no cover - defensive
             logger.debug("Engine close failed (%s): %s", type(engine).__name__, exc)
+
+
+def _observe_decision_ready_usage(
+    cost_controller: Optional[CostController],
+    *,
+    before: Dict[str, Any],
+    cohort: str,
+    decision_count: int = 1,
+) -> None:
+    """Observe per-decision usage from one tenant-local cumulative delta."""
+    if cost_controller is None or decision_count <= 0:
+        return
+    after = cost_controller.snapshot_usage()
+    delta = cost_controller.usage_delta(before, after)
+    metrics.observe_decision_ready_usage(
+        cohort=cohort,
+        cost_usd=round(float(delta["cost_usd"]) / decision_count, 8),
+        tokens=int(round(int(delta["tokens"]) / decision_count)),
+    )
+
+
+def _usage_snapshot(cost_controller: Optional[CostController]) -> Dict[str, Any]:
+    if cost_controller is None:
+        return {"calls": 0, "tokens": 0, "cost_usd": 0.0}
+    return cost_controller.snapshot_usage()
 
 
 def _build_storage_sync(user_id: str) -> SupabaseStartupsStorage:
@@ -440,6 +479,7 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
     reviewer_engine = engines.reviewer_engine
     partner_engine = engines.partner_engine
     portfolio_store = engines.portfolio_store
+    cycle_usage_before = _usage_snapshot(engines.cost_controller)
 
     started_at = time.perf_counter()
     agents_executed = 0
@@ -515,6 +555,17 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
                 )
             decided_count = await partner_engine.run_cycle(pipeline_run_id=pipeline_run_id)
             _activity_decided_count = decided_count or 0
+            if _activity_decided_count > 0:
+                _observe_decision_ready_usage(
+                    engines.cost_controller,
+                    before=cycle_usage_before,
+                    cohort="autonomous_discovery",
+                    decision_count=_activity_decided_count,
+                )
+                for _ in range(_activity_decided_count):
+                    metrics.inc_evaluation_manifest(
+                        path="autonomous_discovery", outcome="success"
+                    )
             _activity_escalations_count = getattr(partner_engine, "last_cycle_escalations", 0)
             if _activity_decided_count > 0 or _activity_escalations_count > 0:
                 _notify_startups_changed(user_id, "partner")
@@ -770,6 +821,7 @@ async def _run_on_demand_lookup_inner(
     scout_engine = engines.scout_engine
     reviewer_engine = engines.reviewer_engine
     partner_engine = engines.partner_engine
+    lookup_usage_before = _usage_snapshot(engines.cost_controller)
 
     startup_id: Optional[str] = None
     lookup_outcome: Dict[str, Any] = {}
@@ -960,6 +1012,13 @@ async def _run_on_demand_lookup_inner(
                     startup_id=startup_id,
                     message=lookup_outcome.get("message"),
                 )
+        evaluation_path = "rerun" if replace_startup_id else "manual_lookup"
+        _observe_decision_ready_usage(
+            engines.cost_controller,
+            before=lookup_usage_before,
+            cohort="manual_lookup",
+        )
+        metrics.inc_evaluation_manifest(path=evaluation_path, outcome="success")
         logger.info(
             "[%s] On-demand lookup completed for %s (%s) rss_mb_end=%.1f",
             user_id[:12],

@@ -783,7 +783,9 @@ class ReviewerEngine:
                         + int(getattr(self.skeptical_reviewer, "_last_token_usage", 0) or 0)
                         + int(getattr(self.opportunist_reviewer, "_last_token_usage", 0) or 0)
                     )
-                    self.cost_controller.record_usage("reviewer", self.agent_id, total_tok)
+                    self.cost_controller.record_usage(
+                        "reviewer", self.agent_id, total_tok, model=self.model
+                    )
                 
                 # Compute consensus across all successful results
                 consensus = self._compute_consensus(successful_results)
@@ -1018,7 +1020,9 @@ class ReviewerEngine:
                     + int(getattr(self.skeptical_reviewer, "_last_token_usage", 0) or 0)
                     + int(getattr(self.opportunist_reviewer, "_last_token_usage", 0) or 0)
                 )
-                self.cost_controller.record_usage("reviewer", self.agent_id, total_tok)
+                self.cost_controller.record_usage(
+                    "reviewer", self.agent_id, total_tok, model=self.model
+                )
             gap_urls = [
                 str(u).strip()
                 for u in (scout_for_llm.get("_reviewer_gap_reference_urls") or [])
