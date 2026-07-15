@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import RoomHeader from '../components/RoomHeader';
@@ -10,6 +10,7 @@ import type { Startup, SignalItem } from '../types/startup';
 import { isDealHumanResolved } from '../lib/dealState';
 import { buildTrackRecord } from '../lib/trackRecord';
 import { formatDateTime } from '../lib/dates';
+import OutcomePanel from '../components/institutional/OutcomePanel';
 
 function recOf(s: Startup): string | null {
   const r = s.partner?.recommendation;
@@ -63,6 +64,7 @@ const BOOK_GRID = 'lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1.1fr)_minmax(
 export default function PortfolioPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
   const reduceMotion = usePrefersReducedMotion();
+  const [selectedOutcomeStartupId, setSelectedOutcomeStartupId] = useState('');
   const openDeal = (id: string) => navigate(`/v1/flow?open=${id}`);
 
   const track = useMemo(
@@ -85,6 +87,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
         .sort((a, b) => (b.timestamps?.partnered_at ?? '').localeCompare(a.timestamps?.partnered_at ?? '')),
     [data.startups],
   );
+  const outcomeStartupId = selectedOutcomeStartupId || convictionBook[0]?.id || data.startups[0]?.id || '';
 
   const sectorRows = useMemo(() => {
     const entries = Object.entries(data.concentrationAnalytics.by_sector ?? {});
@@ -292,6 +295,18 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           </div>
         </div>
         </Reveal>
+
+        <section className="mt-phi-7" aria-label="Outcome learning workspace">
+          <div className="flex flex-wrap items-end justify-between gap-phi-4 border-t border-oxford/[0.075] pt-phi-4">
+            <div><h2 className="type-label-section text-oxford/[0.72]">Outcome learning</h2><p className="type-body-sm mt-phi-2 max-w-2xl text-oxford/55">Track what eventually happened after investments, passes, monitors, and overrides.</p></div>
+            {data.startups.length ? <label className="type-action">Company
+              <select aria-label="Outcome company" value={outcomeStartupId} onChange={(event) => setSelectedOutcomeStartupId(event.target.value)} className="ml-phi-2 border border-oxford/15 bg-paper px-3 py-2 text-oxford">
+                {data.startups.map((startup) => <option key={startup.id} value={startup.id}>{startup.scout.name}</option>)}
+              </select>
+            </label> : null}
+          </div>
+          {outcomeStartupId ? <div className="mt-phi-4"><OutcomePanel startupId={outcomeStartupId} /></div> : <QuietEmpty>Outcome learning begins once a company enters the canonical deal record.</QuietEmpty>}
+        </section>
       </div>
     </div>
   );
