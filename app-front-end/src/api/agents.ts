@@ -16,6 +16,10 @@ export interface TriggerResult {
   status: TriggerStatus | string;
   reason?: string;
   user_id?: string;
+  job_id?: string;
+  accepted_at?: string;
+  pipeline_run_id?: string;
+  loop_status?: string;
 }
 
 export interface AgentsStatus {
