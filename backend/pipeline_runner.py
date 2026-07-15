@@ -14,7 +14,7 @@ import time
 from datetime import datetime, timezone
 from utils.timeutil import utcnow
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 from uuid import uuid4
 
 try:
@@ -663,6 +663,10 @@ async def run_on_demand_lookup(
     additional_context: Optional[str] = None,
     replace_startup_id: Optional[str] = None,
     resolution: Optional[Any] = None,
+    pipeline_run_id: Optional[str] = None,
+    checkpoint: Optional[
+        Callable[[str, str, Dict[str, Any]], Awaitable[None]]
+    ] = None,
 ) -> Optional[str]:
     """
     Run scout -> reviewer -> partner for one explicit company name.
@@ -696,6 +700,8 @@ async def run_on_demand_lookup(
             additional_context=additional_context,
             replace_startup_id=replace_startup_id,
             resolution=resolution,
+            pipeline_run_id=pipeline_run_id,
+            checkpoint=checkpoint,
         )
 
 
@@ -733,6 +739,10 @@ async def _run_on_demand_lookup_inner(
     additional_context: Optional[str] = None,
     replace_startup_id: Optional[str] = None,
     resolution: Optional[Any] = None,
+    pipeline_run_id: Optional[str] = None,
+    checkpoint: Optional[
+        Callable[[str, str, Dict[str, Any]], Awaitable[None]]
+    ] = None,
 ) -> Optional[str]:
     tenant = TenantContext(user_id=user_id)
     logger.info(
@@ -740,6 +750,10 @@ async def _run_on_demand_lookup_inner(
         tenant.user_id[:24],
     )
     lid = (lookup_id or "").strip() or None
+
+    async def emit(stage: str, status: str, **metadata: Any) -> None:
+        if checkpoint is not None:
+            await checkpoint(stage, status, metadata)
 
     def cancelled() -> bool:
         try:
@@ -826,7 +840,8 @@ async def _run_on_demand_lookup_inner(
     startup_id: Optional[str] = None
     lookup_outcome: Dict[str, Any] = {}
     try:
-        lookup_run_id = str(uuid4())
+        lookup_run_id = (pipeline_run_id or "").strip() or str(uuid4())
+        await emit("accepted", "succeeded", lookup_id=lid, pipeline_run_id=lookup_run_id)
         logger.info(
             "[%s] on_demand_lookup pipeline_run_id=%s rss_mb_start=%.1f",
             user_id[:12],
@@ -896,31 +911,27 @@ async def _run_on_demand_lookup_inner(
             await _record_lookup_failure(user_id, lid, message)
             metrics.inc_lookup("not_found")
             return None
+        await emit("scout", "succeeded", startup_id=startup_id)
         # The scout persisted a row — nudge the UI so the card appears at once.
         _notify_startups_changed(user_id, "lookup_scout")
+        handoff_startup = getattr(scout_engine, "last_lookup_startup", None)
+        if handoff_startup is None:
+            # Existing-company and rerun paths load the pre-existing record once.
+            get_startup = getattr(storage, "get_startup", None)
+            if callable(get_startup):
+                handoff_startup = await asyncio.to_thread(get_startup, startup_id)
         if cancelled():
             logger.info("[%s] Lookup cancelled after scout: %s (%s)", user_id[:12], company, startup_id)
             return startup_id
-        # Supabase can be briefly stale right after insert; retry reviewer handoff once or twice.
         reviewer_stage_started = time.perf_counter()
-        reviewed = False
-        review_attempts = 3
-        for attempt in range(1, review_attempts + 1):
-            if cancelled():
-                logger.info("[%s] Lookup cancelled before review: %s (%s)", user_id[:12], company, startup_id)
-                return startup_id
-            reviewed = await reviewer_engine.run_startup(
-                startup_id,
-                ignore_confidence_threshold=True,
-                pipeline_run_id=lookup_run_id,
-                # Re-review must not short-circuit on a stale "already reviewed" read.
-                force_rerun=bool(replace_startup_id),
-                bypass_agent_enabled_gate=True,
-            )
-            if reviewed:
-                break
-            if attempt < review_attempts:
-                await asyncio.sleep(0.8 * attempt)
+        reviewed = await reviewer_engine.run_startup(
+            startup_id,
+            ignore_confidence_threshold=True,
+            pipeline_run_id=lookup_run_id,
+            force_rerun=bool(replace_startup_id),
+            bypass_agent_enabled_gate=True,
+            startup=handoff_startup,
+        )
         metrics.observe_pipeline_stage(
             time.perf_counter() - reviewer_stage_started,
             pipeline="lookup",
@@ -934,27 +945,19 @@ async def _run_on_demand_lookup_inner(
             await _record_lookup_failure(user_id, lid, message)
             metrics.inc_lookup("error")
             return startup_id
+        await emit("reviewer", "succeeded", startup_id=startup_id)
         _notify_startups_changed(user_id, "lookup_reviewer")
         if cancelled():
             logger.info("[%s] Lookup cancelled after review: %s (%s)", user_id[:12], company, startup_id)
             return startup_id
         partner_stage_started = time.perf_counter()
-        decided = False
-        partner_attempts = 2
-        for attempt in range(1, partner_attempts + 1):
-            if cancelled():
-                logger.info("[%s] Lookup cancelled before partner: %s (%s)", user_id[:12], company, startup_id)
-                return startup_id
-            decided = await partner_engine.run_startup(
-                startup_id,
-                pipeline_run_id=lookup_run_id,
-                force_rerun=bool(replace_startup_id),
-                bypass_agent_enabled_gate=True,
-            )
-            if decided:
-                break
-            if attempt < partner_attempts:
-                await asyncio.sleep(0.6 * attempt)
+        decided = await partner_engine.run_startup(
+            startup_id,
+            pipeline_run_id=lookup_run_id,
+            force_rerun=bool(replace_startup_id),
+            bypass_agent_enabled_gate=True,
+            startup=handoff_startup,
+        )
         metrics.observe_pipeline_stage(
             time.perf_counter() - partner_stage_started,
             pipeline="lookup",
@@ -969,6 +972,7 @@ async def _run_on_demand_lookup_inner(
             metrics.inc_lookup("error")
             return startup_id
         else:
+            await emit("partner", "succeeded", startup_id=startup_id)
             if replace_startup_id:
                 await asyncio.to_thread(
                     upsert_pipeline_state,
@@ -1019,6 +1023,7 @@ async def _run_on_demand_lookup_inner(
             cohort="manual_lookup",
         )
         metrics.inc_evaluation_manifest(path=evaluation_path, outcome="success")
+        await emit("completed", "succeeded", startup_id=startup_id)
         logger.info(
             "[%s] On-demand lookup completed for %s (%s) rss_mb_end=%.1f",
             user_id[:12],

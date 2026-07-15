@@ -440,6 +440,7 @@ class PartnerEngine:
         force_rerun: bool = False,
         *,
         bypass_agent_enabled_gate: bool = False,
+        startup=None,
     ) -> bool:
         """
         Make a partner decision for one specific startup id.
@@ -448,7 +449,8 @@ class PartnerEngine:
         bypass_agent_enabled_gate: when True, run even if partners are disabled in settings
         (used for occasional on-demand company lookup only).
         """
-        startup = await asyncio.to_thread(self.storage.get_startup, startup_id)
+        if startup is None:
+            startup = await asyncio.to_thread(self.storage.get_startup, startup_id)
         if startup is None:
             self.logger.warning("Startup not found for partner decision: %s", startup_id)
             return False
@@ -463,12 +465,17 @@ class PartnerEngine:
             self.logger.info("Startup is not ready for partner decision: %s", startup_id)
             return False
         try:
-            success, _ = await self._decide_and_save(
+            success, decision = await self._decide_and_save(
                 startup_id,
                 entry["scout"],
                 entry["review"],
                 pipeline_run_id,
             )
+            if success and decision:
+                from utils.adapters import partner_output_to_partner_info
+
+                startup.partner_info = partner_output_to_partner_info(decision)
+                startup.update_timestamp()
             return bool(success)
         except Exception as e:
             self.logger.error("Error making partner decision for %s: %s", startup_id, e, exc_info=True)

@@ -315,6 +315,7 @@ class ScoutEngine:
         """
         company = (company_name or "").strip()
         self.last_lookup_outcome = None
+        self.last_lookup_startup = None
         if not company:
             return None
         selected = next((s for s in self.scouts if s.scout_type == scout_type), None)
@@ -417,6 +418,14 @@ class ScoutEngine:
             payload["lookup_website"] = (website or "").strip() or None
             if lookup_id and str(lookup_id).strip():
                 payload["lookup_id"] = str(lookup_id).strip()
+            from models import Startup
+            from utils.adapters import financials_from_scout_output, scout_output_to_scout_info
+
+            handoff_startup = Startup(
+                startup_id=str(payload.get("id") or ""),
+                scout_info=scout_output_to_scout_info(payload),
+                financials=financials_from_scout_output(payload),
+            )
             pr = (pipeline_run_id or "").strip() or None
             persisted_id = str(payload.get("id") or "")
             if self.storage:
@@ -426,6 +435,10 @@ class ScoutEngine:
                     pipeline_run_id=pr,
                 )
             already_exists = bool(persisted_id and persisted_id != str(payload.get("id") or ""))
+            if not already_exists and persisted_id:
+                handoff_startup.startup_id = persisted_id
+                handoff_startup.scout_info.startup_id = persisted_id
+                self.last_lookup_startup = handoff_startup
             self.last_lookup_outcome = {
                 "status": (
                     "ALREADY_IN_DEAL_FLOW"

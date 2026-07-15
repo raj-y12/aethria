@@ -891,6 +891,7 @@ class ReviewerEngine:
         force_rerun: bool = False,
         *,
         bypass_agent_enabled_gate: bool = False,
+        startup=None,
     ) -> bool:
         """
         Review one specific startup id.
@@ -899,7 +900,8 @@ class ReviewerEngine:
         bypass_agent_enabled_gate: when True, run even if reviewers are disabled in settings
         (used for occasional on-demand company lookup only).
         """
-        startup = await asyncio.to_thread(self.storage.get_startup, startup_id)
+        if startup is None:
+            startup = await asyncio.to_thread(self.storage.get_startup, startup_id)
         if startup is None:
             self.logger.warning("Startup not found for review: %s", startup_id)
             return False
@@ -1028,7 +1030,7 @@ class ReviewerEngine:
                 for u in (scout_for_llm.get("_reviewer_gap_reference_urls") or [])
                 if isinstance(u, str) and str(u).strip()
             ]
-            return bool(
+            saved = bool(
                 await asyncio.to_thread(
                     self.storage.add_review,
                     startup_id,
@@ -1038,6 +1040,10 @@ class ReviewerEngine:
                     enrichment_gap_reference_urls=gap_urls or None,
                 )
             )
+            if saved:
+                startup.review_info = review_info
+                startup.update_timestamp()
+            return saved
         except Exception as e:
             self.logger.error("Error reviewing startup %s: %s", startup_id, e, exc_info=True)
             return False

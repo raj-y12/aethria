@@ -210,7 +210,7 @@ async def test_on_demand_lookup_records_terminal_failure_when_review_exhausts_re
     startup_id = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-review-fail")
 
     assert startup_id == "startup-1"
-    assert _FakeReviewerEngine.calls == 3
+    assert _FakeReviewerEngine.calls == 1
     assert _FakePartnerEngine.calls == 0
     assert recorded and recorded[0][:2] == ("user_123", "lookup-review-fail")
     assert "review" in recorded[0][2].lower()
@@ -236,7 +236,7 @@ async def test_on_demand_lookup_records_terminal_failure_when_partner_exhausts_r
 
     assert startup_id == "startup-1"
     assert _FakeReviewerEngine.calls == 1
-    assert _FakePartnerEngine.calls == 2
+    assert _FakePartnerEngine.calls == 1
     assert recorded and recorded[0][:2] == ("user_123", "lookup-partner-fail")
     assert "decision" in recorded[0][2].lower()
     assert states[-1]["startup_id"] == "startup-1"
@@ -325,3 +325,36 @@ async def test_duplicate_lookup_persists_terminal_existing_startup_outcome(monke
             "user_123",
         )
     ]
+
+
+@pytest.mark.asyncio
+async def test_lookup_emits_durable_stage_checkpoints_without_handoff_sleeps(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+    checkpoints = []
+
+    async def checkpoint(stage, status, metadata):
+        checkpoints.append((stage, status, metadata))
+
+    async def no_sleep(*args, **kwargs):
+        pytest.fail("lookup stage handoff must not sleep for storage visibility")
+
+    monkeypatch.setattr("pipeline_runner.asyncio.sleep", no_sleep)
+
+    startup_id = await run_on_demand_lookup(
+        "user_123",
+        "Acme",
+        lookup_id="lookup-checkpoints-1",
+        pipeline_run_id="fd1e14c8-b1c5-4c25-af07-ad0ac487b5be",
+        checkpoint=checkpoint,
+    )
+
+    assert startup_id == "startup-1"
+    assert [(stage, status) for stage, status, _ in checkpoints] == [
+        ("accepted", "succeeded"),
+        ("scout", "succeeded"),
+        ("reviewer", "succeeded"),
+        ("partner", "succeeded"),
+        ("completed", "succeeded"),
+    ]
+    assert all("startup" not in metadata for _, _, metadata in checkpoints)
