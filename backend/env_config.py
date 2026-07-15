@@ -244,6 +244,10 @@ REGISTRY: List[EnvVar] = [
     EnvVar("DURABLE_OUTBOX_POLL_SECONDS", "float", "2", "Durable jobs",
            "Polling cadence for transactional outbox publication."),
 
+    # --- Canonical identity -------------------------------------------------
+    EnvVar("IDENTITY_AUTO_RESOLVE_CONFIDENCE", "float", "0.85", "Canonical identity",
+           "Minimum deterministic confidence for one picker candidate to be eligible for automatic identity resolution."),
+
     # --- Scoring / retrieval / misc -----------------------------------------
     EnvVar("USE_STRUCTURED_SCORING", "bool", "true", "Scoring / misc", "Use the deterministic structured scoring engine."),
     EnvVar("SKIP_READ_ENRICH_SCORES", "bool", "", "Scoring / misc", "Skip score enrichment on read (perf)."),
