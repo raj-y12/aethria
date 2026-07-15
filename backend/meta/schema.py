@@ -15,6 +15,7 @@ class PromptMutation(TypedDict, total=False):
     applied_at: str
     cycle_number: int
     promoted: bool
+    activation_status: str
 
 
 class ScoutWeightUpdate(TypedDict):
@@ -41,8 +42,12 @@ class MetaCycleReport(TypedDict, total=False):
     cycle_number: int
     ran_at: str
     signal_summary: dict
+    analysis_only: bool
+    production_mutations_applied: int
     prompt_proposals: List[PromptMutation]
     mutations_applied: List[PromptMutation]
+    weight_proposals: List[ScoutWeightUpdate]
+    calibration_proposals: List[CalibrationMutation]
     weight_updates: List[ScoutWeightUpdate]
     calibration_changes: List[CalibrationMutation]
     no_action_reasons: List[str]

@@ -160,9 +160,6 @@ class PromptMutator:
         self.api_key = os.getenv("OPENAI_API_KEY", "")
         self._client = None
         self._executor = ThreadPoolExecutor(max_workers=2)
-        self._auto_apply_prompts = (
-            os.getenv("META_AGENT_PROMPT_AUTO_APPLY", "false").lower() == "true"
-        )
 
     def _get_client(self):
         if self._client is None and self.api_key:
@@ -245,7 +242,7 @@ class PromptMutator:
         scout_engine,
         reviewer_engine,
     ) -> List[Dict]:
-        """Rewrite prompts via LLM; persist proposals (pending promotion). Optionally live-apply if META_AGENT_PROMPT_AUTO_APPLY=true."""
+        """Rewrite prompts via LLM and persist proposals pending operator promotion."""
         mutations = []
         for target in targets:
             try:
@@ -368,6 +365,7 @@ class PromptMutator:
             "applied_at": now,
             "cycle_number": self.cycle_number,
             "promoted": False,
+            "activation_status": "pending_operator_promotion",
         }
         _append_to_json_list(_MUTATION_LOG_PATH, mutation, self.user_id)
 
@@ -382,20 +380,11 @@ class PromptMutator:
         }
         _atomic_write(_PROMPT_LIBRARY_PATH, library, self.user_id)
 
-        if self._auto_apply_prompts:
-            self._set_agent_prompt(agent_name, new_prompt, scout_engine, reviewer_engine)
-            self.logger.info(
-                "[Mutator] Auto-applied (META_AGENT_PROMPT_AUTO_APPLY) %s: %s -> %s",
-                agent_name,
-                prev_hash,
-                new_hash,
-            )
-        else:
-            self.logger.info(
-                "[Mutator] Saved pending proposal for %s (%s); promote via API to use",
-                agent_name,
-                library_key,
-            )
+        self.logger.info(
+            "[Mutator] Saved pending proposal for %s (%s); promote via API to use",
+            agent_name,
+            library_key,
+        )
 
         return mutation
 
