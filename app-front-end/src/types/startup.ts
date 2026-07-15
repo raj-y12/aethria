@@ -573,9 +573,15 @@ export interface MetaCycleReport {
   cycle_number: number;
   ran_at: string;
   next_cycle_at: string;
+  /** True when the cycle only analyses signals and creates reviewable proposals. */
+  analysis_only?: boolean;
+  /** Count of changes explicitly promoted into production during this cycle. */
+  production_mutations_applied?: number;
   mutations_applied: PromptMutationSummary[];
-  /** Gated meta-agent prompt proposals (same items as mutations_applied when using new backend). */
+  /** Gated prompt proposals. Compatibility `mutations_applied` must be read as proposals when analysis_only. */
   prompt_proposals?: PromptMutationSummary[];
+  weight_proposals?: WeightUpdateSummary[];
+  calibration_proposals?: CalibrationChangeSummary[];
   weight_updates: WeightUpdateSummary[];
   calibration_changes: CalibrationChangeSummary[];
   no_action_reasons: string[];
@@ -593,8 +599,12 @@ export interface MetaInsightsPayload {
     next_cycle_at?: string;
   } | null;
   what_changed: {
+    analysis_only?: boolean;
+    production_mutations_applied?: number;
     mutations_applied?: unknown[];
     prompt_proposals?: unknown[];
+    weight_proposals?: unknown[];
+    calibration_proposals?: unknown[];
     weight_updates?: unknown[];
     calibration_changes?: unknown[];
   } | null;

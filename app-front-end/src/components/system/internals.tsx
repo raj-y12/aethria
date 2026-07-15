@@ -23,6 +23,7 @@ import DecisionBadge, { DECISION_BADGE_LABEL, type DecisionBadgeVariant } from '
 import { buildFundIntelligenceSnapshot } from '../../lib/institutionalConviction';
 import { formatDate, formatDateTime } from '../../lib/dates';
 import { createDefaultFundConfiguration, type FundConfiguration } from '../../lib/fundConfiguration';
+import ProposalInbox from '../institutional/ProposalInbox';
 
 export function mandateTagList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -611,13 +612,14 @@ export function RunCycleButton({ triggering, onTrigger }: { triggering: boolean;
   );
 }
 
-export function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSet, insights }: {
+export function MetaCommandTab({ reports, weights, calibration, promptState, metaEvalSet, insights, fundConfiguration }: {
   reports: MetaCycleReport[];
   weights: ScoutWeights;
   calibration: CalibrationState;
   promptState: MetaPromptState;
   metaEvalSet: MetaEvalSet;
   insights: MetaInsightsPayload | null;
+  fundConfiguration?: FundConfiguration;
 }) {
   const queryClient = useQueryClient();
   const [triggering, setTriggering] = useState(false);
@@ -649,7 +651,9 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
     lastReport?.prompt_proposals?.length ?? 0,
     lastReport?.mutations_applied?.length ?? 0,
   );
-  const calibrationCount = lastReport?.calibration_changes?.length ?? 0;
+  const weightProposalCount = (lastReport?.weight_proposals ?? lastReport?.weight_updates ?? []).length;
+  const calibrationCount = (lastReport?.calibration_proposals ?? lastReport?.calibration_changes ?? []).length;
+  const productionAppliedCount = lastReport?.production_mutations_applied ?? 0;
 
   const agentFromLibraryKey = (libraryKey: string) => libraryKey.split(':')[0] ?? '';
 
@@ -662,8 +666,8 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
 
   const wc = insights?.what_changed;
   const insightPromptCount = Math.max(wc?.mutations_applied?.length ?? 0, wc?.prompt_proposals?.length ?? 0);
-  const insightWeightCount = wc?.weight_updates?.length ?? 0;
-  const insightCalibrationCount = wc?.calibration_changes?.length ?? 0;
+  const insightWeightCount = Math.max(wc?.weight_proposals?.length ?? 0, wc?.weight_updates?.length ?? 0);
+  const insightCalibrationCount = Math.max(wc?.calibration_proposals?.length ?? 0, wc?.calibration_changes?.length ?? 0);
   const whatChangedTotal = insightPromptCount + insightWeightCount + insightCalibrationCount;
   const insightMutations = (
     (wc?.mutations_applied?.length ? wc.mutations_applied : wc?.prompt_proposals) ?? []
@@ -679,7 +683,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
   const cycleNumber = useInsight ? insights?.latest?.cycle_number : lastReport?.cycle_number;
   const cycleRanAt = (useInsight ? insights?.latest?.ran_at : lastReport?.ran_at) ?? null;
   const cyclePromptCount = useInsight ? insightPromptCount : proposalCount;
-  const cycleWeightCount = useInsight ? insightWeightCount : (lastReport?.weight_updates ?? []).length;
+  const cycleWeightCount = useInsight ? insightWeightCount : weightProposalCount;
   const cycleCalibrationCount = useInsight ? insightCalibrationCount : calibrationCount;
   const whyLines = (insights?.why?.length ? insights.why : lastReport?.no_action_reasons) ?? [];
 
@@ -687,13 +691,19 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
     <>
       <AnimatedTabBlock className="px-phi-4 pt-phi-4 pb-phi-5 border-b border-oxford/[0.06]">
         <p className="type-body text-oxford/65 leading-relaxed max-w-2xl">
-          The correction cycle rewrites the instrument: it proposes updates to scout prompts, reviewer
-          thresholds, and scoring weights, folding in your Invest / Pass / Monitor rulings so the system
-          drifts toward how you actually decide.
+          The correction cycle analyses attributed rulings and outcomes, then proposes updates to prompts,
+          thresholds, and scoring weights. Proposals stay out of production until an operator previews,
+          reviews, and publishes a governed policy version.
+        </p>
+        <p className="type-status mt-phi-3">
+          {lastReport?.analysis_only === false ? 'Governed promotion recorded' : 'Analysis only · production unchanged'}
         </p>
         {humanFbLine && (
           <p className="type-note max-w-2xl mt-phi-3 text-oxford/60">{humanFbLine}</p>
         )}
+      </AnimatedTabBlock>
+      <AnimatedTabBlock className="border-b border-oxford/[0.06] px-phi-4 py-phi-5">
+        <ProposalInbox fundConfig={(fundConfiguration ?? createDefaultFundConfiguration()) as unknown as Record<string, unknown>} />
       </AnimatedTabBlock>
       {/* One cycle section — readouts, what changed, why. The old page rendered
           "Latest insight" and "Last Cycle" as near-duplicates stacked. */}
@@ -701,9 +711,10 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
         <TabSection title="Correction cycle" label={cycleRanAt ? formatDate(cycleRanAt) : undefined}>
           <div className="flex flex-wrap gap-phi-6">
             {typeof cycleNumber === 'number' && <MetaReadout label="Cycle" value={cycleNumber} />}
-            <MetaReadout label="Prompts" value={cyclePromptCount} />
-            <MetaReadout label="Weights" value={cycleWeightCount} />
-            <MetaReadout label="Calibration" value={cycleCalibrationCount} />
+            <MetaReadout label="Prompt proposals" value={cyclePromptCount} />
+            <MetaReadout label="Weight proposals" value={cycleWeightCount} />
+            <MetaReadout label="Calibration proposals" value={cycleCalibrationCount} />
+            <MetaReadout label="Applied" value={productionAppliedCount} />
           </div>
           {useInsight && whatChangedTotal > 0 && (
             <div className="mt-phi-3 flex max-w-[44rem] flex-col">

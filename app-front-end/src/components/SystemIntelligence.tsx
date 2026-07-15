@@ -162,6 +162,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
               promptState={props.metaPromptState}
               metaEvalSet={props.metaEvalSet}
               insights={props.metaInsights}
+              fundConfiguration={props.fundConfiguration}
             />
           )}
       </motion.div>
