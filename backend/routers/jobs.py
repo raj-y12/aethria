@@ -63,6 +63,10 @@ def _serialize(job: AgentJob) -> Dict[str, Any]:
         "completed_at": job.completed_at.isoformat() if job.completed_at else None,
         "next_attempt_at": job.next_attempt_at.isoformat(),
         "error": _safe_error(job.status),
+        "block_code": job.block_code if job.status is JobStatus.BLOCKED else None,
+        "recovery_action": (
+            job.recovery_action if job.status is JobStatus.BLOCKED else None
+        ),
     }
 
 

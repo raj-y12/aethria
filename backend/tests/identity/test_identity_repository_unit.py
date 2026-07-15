@@ -335,6 +335,45 @@ async def test_verified_identifier_conflict_fails_closed():
         )
 
 
+@pytest.mark.asyncio
+async def test_operator_create_from_case_is_one_transactional_resolution():
+    case_row = {
+        "identity_case_id": "5fefdc39-aef8-4993-b356-95cb927027ef",
+        "user_id": "fund-a",
+        "observation_id": _observation_row()["observation_id"],
+        "status": "open",
+        "reason_code": "insufficient_verified_identifier",
+        "candidates": json.dumps([]),
+        "selected_company_id": None,
+        "resolution_note": None,
+        "resolved_by": None,
+        "resolved_at": None,
+        "created_at": _input().observed_at,
+        "updated_at": _input().observed_at,
+    }
+    connection = _Connection(
+        fetchrows=[case_row, _observation_row(identity_status="ambiguous"), _company_row(), _opportunity_row()]
+    )
+    repository = IdentityRepository(_Pool(connection))
+
+    result = await repository.create_company_from_case(
+        user_id="fund-a",
+        identity_case_id=case_row["identity_case_id"],
+        canonical_name="Acme",
+        canonical_domain="https://acme.com",
+        resolved_by="operator-1",
+    )
+
+    assert result.status is IdentityStatus.RESOLVED
+    sql = "\n".join(call[1].lower() for call in connection.calls)
+    assert "for update" in sql
+    assert "insert into public.companies" in sql
+    assert "verification_status" in sql
+    assert "insert into public.opportunities" in sql
+    assert "update public.identity_resolution_cases" in sql
+    assert "identity_case.resolved" in str(connection.calls)
+
+
 class _ConflictInsertConnection:
     def __init__(self, connection):
         self.connection = connection

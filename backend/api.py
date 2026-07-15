@@ -131,6 +131,7 @@ from jobs.outbox import OutboxPublisher
 from jobs.postgres import create_pool as create_durable_job_pool
 from jobs.repository import DurableJobRepository
 from jobs.worker import DurableJobWorker
+from identity.repository import IdentityRepository
 from pipeline_runner import (
     _rss_mb as _pipeline_rss_mb,
     _record_lookup_failure,
@@ -809,6 +810,9 @@ async def _start_durable_job_services(app: FastAPI) -> None:
         _durable_job_error = error_name
     app.state.durable_job_repository = _durable_job_repository
     app.state.durable_job_error = _durable_job_error
+    app.state.identity_repository = (
+        IdentityRepository(_durable_job_pool) if _durable_job_pool is not None else None
+    )
 
 
 async def _stop_durable_job_services(app: FastAPI) -> None:
@@ -833,6 +837,7 @@ async def _stop_durable_job_services(app: FastAPI) -> None:
     _durable_job_worker = None
     _durable_outbox_publisher = None
     app.state.durable_job_repository = None
+    app.state.identity_repository = None
 
 
 @asynccontextmanager
@@ -902,6 +907,7 @@ async def _lifespan(app: FastAPI):
     else:
         app.state.durable_job_repository = None
         app.state.durable_job_error = None
+        app.state.identity_repository = None
     # Resume persistent per-user loops for users that had agents enabled before restart
     await _resume_all_user_loops()
     yield
@@ -965,6 +971,9 @@ app.include_router(_analytics_router.router)
 from routers import jobs as _jobs_router  # noqa: E402
 
 app.include_router(_jobs_router.router)
+from routers import identity as _identity_router  # noqa: E402
+
+app.include_router(_identity_router.router)
 
 # CORS: localhost for dev; extend with ALLOWED_ORIGINS (comma-separated) for production domain
 _cors_origins = [

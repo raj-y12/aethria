@@ -114,6 +114,24 @@ def test_list_jobs_maps_queued_to_accepted_and_filters_status(monkeypatch):
     }
 
 
+def test_blocked_job_exposes_safe_machine_code_and_recovery_action(monkeypatch):
+    blocked = _job(status=JobStatus.BLOCKED).model_copy(
+        update={
+            "block_code": "identity_review_required",
+            "block_detail": "postgres://secret@host/raw ambiguity payload",
+            "recovery_action": "Resolve the identity case, then retry this job.",
+        }
+    )
+    response = _client(monkeypatch, _Repository([blocked])).get(
+        f"/api/jobs/{blocked.job_id}", headers={"Authorization": "Bearer t"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["block_code"] == "identity_review_required"
+    assert "Resolve the identity case" in response.json()["recovery_action"]
+    assert "secret" not in response.text
+
+
 def test_retry_reuses_same_job_and_adds_one_safe_attempt(monkeypatch):
     repository = _Repository([_job()])
     response = _client(monkeypatch, repository).post(

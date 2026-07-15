@@ -915,6 +915,272 @@ class IdentityRepository:
             )
         return [case for row in rows if (case := _case_from_row(row)) is not None]
 
+    async def get_case(
+        self, *, user_id: str, identity_case_id: str
+    ) -> Optional[IdentityResolutionCaseRecord]:
+        uid = require_user_id(user_id, context="IdentityRepository.get_case")
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                select * from public.identity_resolution_cases
+                where identity_case_id = $1 and user_id = $2
+                """,
+                identity_case_id,
+                uid,
+            )
+        return _case_from_row(row)
+
+    async def list_observations(
+        self,
+        *,
+        user_id: str,
+        status: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[SourceObservationRecord]:
+        uid = require_user_id(user_id, context="IdentityRepository.list_observations")
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                select * from public.source_observations
+                where user_id = $1
+                  and ($2::text is null or identity_status = $2)
+                order by observed_at desc, observation_id desc
+                limit $3
+                """,
+                uid,
+                status,
+                max(1, min(int(limit), 500)),
+            )
+        return [
+            observation
+            for row in rows
+            if (observation := _observation_from_row(row)) is not None
+        ]
+
+    async def _transition_case(
+        self,
+        *,
+        user_id: str,
+        identity_case_id: str,
+        status: str,
+        resolved_by: str,
+        resolution_note: Optional[str],
+    ) -> IdentityResolutionCaseRecord:
+        uid = require_user_id(user_id, context="IdentityRepository.transition_case")
+        if status not in {"deferred", "rejected"}:
+            raise ValueError("Unsupported identity case transition")
+        actor = str(resolved_by or "").strip()
+        if not actor:
+            raise ValueError("resolved_by is required")
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    update public.identity_resolution_cases
+                    set status = $3, resolution_note = $4, resolved_by = $5,
+                        resolved_at = now(), updated_at = now()
+                    where identity_case_id = $1 and user_id = $2 and status = 'open'
+                    returning *
+                    """,
+                    identity_case_id,
+                    uid,
+                    status,
+                    (str(resolution_note or "").strip() or None),
+                    actor,
+                )
+                case = _case_from_row(row)
+                if case is None:
+                    raise LookupError("Open identity case not found for tenant")
+                observation_status = "deferred" if status == "deferred" else "rejected"
+                await conn.execute(
+                    """
+                    update public.source_observations
+                    set identity_status = $3, updated_at = now()
+                    where observation_id = $1 and user_id = $2
+                      and identity_status = 'ambiguous'
+                    """,
+                    case.observation_id,
+                    uid,
+                    observation_status,
+                )
+                await self._insert_outbox(
+                    conn,
+                    user_id=uid,
+                    aggregate_type="identity_resolution_case",
+                    aggregate_id=identity_case_id,
+                    event_type=f"identity_case.{status}",
+                    payload={
+                        "identity_case_id": identity_case_id,
+                        "observation_id": case.observation_id,
+                        "status": status,
+                        "resolved_by": actor,
+                    },
+                )
+                return case
+
+    async def defer_case(self, **kwargs: Any) -> IdentityResolutionCaseRecord:
+        return await self._transition_case(status="deferred", **kwargs)
+
+    async def reject_case(self, **kwargs: Any) -> IdentityResolutionCaseRecord:
+        return await self._transition_case(status="rejected", **kwargs)
+
+    async def create_company_from_case(
+        self,
+        *,
+        user_id: str,
+        identity_case_id: str,
+        canonical_name: str,
+        canonical_domain: str,
+        resolved_by: str,
+        resolution_note: Optional[str] = None,
+        context_key: str = "primary",
+    ) -> IdentityAdmission:
+        """Atomically create/converge a company and resolve an ambiguity case."""
+
+        uid = require_user_id(
+            user_id, context="IdentityRepository.create_company_from_case"
+        )
+        name = str(canonical_name or "").strip()
+        domain = normalize_domain(canonical_domain)
+        actor = str(resolved_by or "").strip()
+        if not name or not domain or not actor:
+            raise ValueError("canonical name, domain, and resolved_by are required")
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                case_row = await conn.fetchrow(
+                    """
+                    select * from public.identity_resolution_cases
+                    where identity_case_id = $1 and user_id = $2 and status = 'open'
+                    for update
+                    """,
+                    identity_case_id,
+                    uid,
+                )
+                case = _case_from_row(case_row)
+                if case is None:
+                    raise LookupError("Open identity case not found for tenant")
+                observation_row = await conn.fetchrow(
+                    """
+                    select * from public.source_observations
+                    where observation_id = $1 and user_id = $2
+                      and identity_status = 'ambiguous'
+                    for update
+                    """,
+                    case.observation_id,
+                    uid,
+                )
+                observation = _observation_from_row(observation_row)
+                if observation is None:
+                    raise LookupError("Ambiguous observation not found for tenant")
+                company_row = await conn.fetchrow(
+                    """
+                    insert into public.companies (
+                      company_id, user_id, canonical_name, canonical_domain,
+                      identity_confidence, status, metadata, created_at, updated_at
+                    ) values ($1, $2, $3, $4, 1, 'active', '{}'::jsonb, now(), now())
+                    on conflict do nothing
+                    returning *
+                    """,
+                    str(uuid4()),
+                    uid,
+                    name,
+                    domain,
+                )
+                created = company_row is not None
+                if company_row is None:
+                    company_row = await conn.fetchrow(
+                        """
+                        select * from public.companies
+                        where user_id = $1 and canonical_domain = $2 and status = 'active'
+                        for update
+                        """,
+                        uid,
+                        domain,
+                    )
+                company = _company_from_row(company_row)
+                if company is None:
+                    raise RuntimeError("Canonical company create/converge returned no row")
+                identifier = NormalizedIdentifier(
+                    identifier_type="domain",
+                    normalized_value=domain,
+                    raw_value=canonical_domain,
+                    verification_status=VerificationStatus.VERIFIED,
+                    confidence=1,
+                    is_primary=True,
+                )
+                await self._store_identifiers(
+                    conn,
+                    user_id=uid,
+                    company_id=company.company_id,
+                    observation_id=case.observation_id,
+                    identifiers=[identifier],
+                )
+                await self._store_alias(
+                    conn,
+                    user_id=uid,
+                    company_id=company.company_id,
+                    observation_id=case.observation_id,
+                    alias=observation.observed_name,
+                )
+                await conn.execute(
+                    """
+                    update public.source_observations
+                    set company_id = $3, identity_status = 'resolved',
+                        identity_confidence = 1, updated_at = now()
+                    where observation_id = $1 and user_id = $2
+                    """,
+                    case.observation_id,
+                    uid,
+                    company.company_id,
+                )
+                opportunity = await self._upsert_opportunity(
+                    conn,
+                    user_id=uid,
+                    company_id=company.company_id,
+                    context_key=context_key,
+                    observation_id=case.observation_id,
+                    legacy_startup_id=observation.legacy_startup_id,
+                )
+                await conn.execute(
+                    """
+                    update public.identity_resolution_cases
+                    set status = 'resolved', selected_company_id = $3,
+                        resolution_note = $4, resolved_by = $5,
+                        resolved_at = now(), updated_at = now()
+                    where identity_case_id = $1 and user_id = $2
+                    """,
+                    identity_case_id,
+                    uid,
+                    company.company_id,
+                    (str(resolution_note or "").strip() or None),
+                    actor,
+                )
+                await self._insert_outbox(
+                    conn,
+                    user_id=uid,
+                    aggregate_type="identity_resolution_case",
+                    aggregate_id=identity_case_id,
+                    event_type="identity_case.resolved",
+                    payload={
+                        "identity_case_id": identity_case_id,
+                        "observation_id": case.observation_id,
+                        "company_id": company.company_id,
+                        "opportunity_id": opportunity.opportunity_id,
+                        "created": created,
+                        "resolved_by": actor,
+                    },
+                )
+                return IdentityAdmission(
+                    user_id=uid,
+                    observation_id=case.observation_id,
+                    status=IdentityStatus.RESOLVED,
+                    company_id=company.company_id,
+                    opportunity_id=opportunity.opportunity_id,
+                    identity_case_id=identity_case_id,
+                    confidence=1,
+                    created=created,
+                )
+
     async def reconciliation_counts(self, *, user_id: str) -> Dict[str, int]:
         uid = require_user_id(
             user_id, context="IdentityRepository.reconciliation_counts"
