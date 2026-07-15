@@ -1,0 +1,188 @@
+{
+  "version": "v1",
+  "description": "Redacted and synthetic current-pipeline snapshots. This corpus performs no retrieval or model calls and pins only Phase 0 invariants.",
+  "cases": [
+    {
+      "case_id": "strong_fit_strong_references",
+      "description": "Strong fund fit supported by multiple references.",
+      "snapshot": {
+        "resolver": {"outcome": "FOUND"},
+        "reference_validation": {"valid": true},
+        "review": {"market_score": 9, "product_score": 8, "technical_score": 8, "execution_score": 8, "defensibility_score": 7},
+        "partner": {"recommendation": "INVEST", "confidence": 0.88, "human_review_required": true},
+        "evaluation_manifest": {
+          "manifest_version": "evaluation-manifest-v1", "pipeline_run_id": "golden-v1-01", "evaluation_path": "manual_lookup",
+          "models": {"scout": "gpt-5-nano", "reviewer": "gpt-5-nano", "partner": "gpt-5-nano"},
+          "prompt_versions": {"scout": "s01", "reviewer.DefaultReviewer": "rd01", "reviewer.SkepticalReviewer": "rs01", "reviewer.OpportunistReviewer": "ro01", "partner": "p01"},
+          "policy_version_id": "golden-policy-v1", "policy_hash": "policy-hash-01", "rubric_version": "v1", "partner_rules_version": "1.2", "partner_rules_hash": "rules-hash-01", "created_at": "2026-07-15T00:00:00Z"
+        }
+      },
+      "expected": {
+        "resolver": {"outcome": "FOUND"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 9, "product_score": 8, "technical_score": 8, "execution_score": 8, "defensibility_score": 7},
+        "partner": {"recommendation": "INVEST", "confidence": {"min": 0.85, "max": 0.92}, "human_review_required": true},
+        "evaluation_manifest": {"complete": true}
+      }
+    },
+    {
+      "case_id": "strong_company_outside_mandate",
+      "description": "High company quality held by a weak mandate fit.",
+      "snapshot": {
+        "resolver": {"outcome": "FOUND"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 9, "product_score": 8, "technical_score": 8, "execution_score": 8, "defensibility_score": 8},
+        "partner": {"recommendation": "MONITOR", "confidence": 0.4, "human_review_required": true},
+        "evaluation_manifest": {
+          "manifest_version": "evaluation-manifest-v1", "pipeline_run_id": "golden-v1-02", "evaluation_path": "manual_lookup",
+          "models": {"scout": "gpt-5-nano", "reviewer": "gpt-5-nano", "partner": "gpt-5-nano"},
+          "prompt_versions": {"scout": "s02", "reviewer.DefaultReviewer": "rd02", "reviewer.SkepticalReviewer": "rs02", "reviewer.OpportunistReviewer": "ro02", "partner": "p02"},
+          "policy_version_id": "golden-policy-v1", "policy_hash": "policy-hash-02", "rubric_version": "v1", "partner_rules_version": "1.2", "partner_rules_hash": "rules-hash-02", "created_at": "2026-07-15T00:00:00Z"
+        }
+      },
+      "expected": {
+        "resolver": {"outcome": "FOUND"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 9, "product_score": 8, "technical_score": 8, "execution_score": 8, "defensibility_score": 8},
+        "partner": {"recommendation": "MONITOR", "confidence": {"min": 0.35, "max": 0.4}, "human_review_required": true}, "evaluation_manifest": {"complete": true}
+      }
+    },
+    {
+      "case_id": "weak_company_polished_materials",
+      "description": "Polished materials do not overcome weak execution evidence.",
+      "snapshot": {
+        "resolver": {"outcome": "FOUND"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 6, "product_score": 5, "technical_score": 5, "execution_score": 3, "defensibility_score": 3},
+        "partner": {"recommendation": "PASS", "confidence": 0.82, "human_review_required": false},
+        "evaluation_manifest": {
+          "manifest_version": "evaluation-manifest-v1", "pipeline_run_id": "golden-v1-03", "evaluation_path": "autonomous_discovery",
+          "models": {"scout": "gpt-5-nano", "reviewer": "gpt-5-nano", "partner": "gpt-5-nano"},
+          "prompt_versions": {"scout": "s03", "reviewer.DefaultReviewer": "rd03", "reviewer.SkepticalReviewer": "rs03", "reviewer.OpportunistReviewer": "ro03", "partner": "p03"},
+          "policy_version_id": "golden-policy-v1", "policy_hash": "policy-hash-03", "rubric_version": "v1", "partner_rules_version": "1.2", "partner_rules_hash": "rules-hash-03", "created_at": "2026-07-15T00:00:00Z"
+        }
+      },
+      "expected": {
+        "resolver": {"outcome": "FOUND"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 6, "product_score": 5, "technical_score": 5, "execution_score": 3, "defensibility_score": 3},
+        "partner": {"recommendation": "PASS", "confidence": {"min": 0.75, "max": 0.9}, "human_review_required": false}, "evaluation_manifest": {"complete": true}
+      }
+    },
+    {
+      "case_id": "sparse_preseed_evidence",
+      "description": "Sparse evidence stays visible and routes to monitoring.",
+      "snapshot": {
+        "resolver": {"outcome": "PARTIAL"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 6, "product_score": 6, "technical_score": 5, "execution_score": 4, "defensibility_score": 4},
+        "partner": {"recommendation": "MONITOR", "confidence": 0.46, "human_review_required": true},
+        "evaluation_manifest": {
+          "manifest_version": "evaluation-manifest-v1", "pipeline_run_id": "golden-v1-04", "evaluation_path": "manual_lookup",
+          "models": {"scout": "gpt-5-nano", "reviewer": "gpt-5-nano", "partner": "gpt-5-nano"},
+          "prompt_versions": {"scout": "s04", "reviewer.DefaultReviewer": "rd04", "reviewer.SkepticalReviewer": "rs04", "reviewer.OpportunistReviewer": "ro04", "partner": "p04"},
+          "policy_version_id": "golden-policy-v1", "policy_hash": "policy-hash-04", "rubric_version": "v1", "partner_rules_version": "1.2", "partner_rules_hash": "rules-hash-04", "created_at": "2026-07-15T00:00:00Z"
+        }
+      },
+      "expected": {
+        "resolver": {"outcome": "PARTIAL"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 6, "product_score": 6, "technical_score": 5, "execution_score": 4, "defensibility_score": 4},
+        "partner": {"recommendation": "MONITOR", "confidence": {"min": 0.4, "max": 0.5}, "human_review_required": true}, "evaluation_manifest": {"complete": true}
+      }
+    },
+    {
+      "case_id": "conflicting_founder_traction",
+      "description": "Conflicting founder and traction assertions trigger human review.",
+      "snapshot": {
+        "resolver": {"outcome": "FOUND"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 7, "product_score": 7, "technical_score": 6, "execution_score": 4, "defensibility_score": 5},
+        "partner": {"recommendation": "MONITOR", "confidence": 0.51, "human_review_required": true},
+        "evaluation_manifest": {
+          "manifest_version": "evaluation-manifest-v1", "pipeline_run_id": "golden-v1-05", "evaluation_path": "manual_lookup",
+          "models": {"scout": "gpt-5-nano", "reviewer": "gpt-5-nano", "partner": "gpt-5-nano"},
+          "prompt_versions": {"scout": "s05", "reviewer.DefaultReviewer": "rd05", "reviewer.SkepticalReviewer": "rs05", "reviewer.OpportunistReviewer": "ro05", "partner": "p05"},
+          "policy_version_id": "golden-policy-v1", "policy_hash": "policy-hash-05", "rubric_version": "v1", "partner_rules_version": "1.2", "partner_rules_hash": "rules-hash-05", "created_at": "2026-07-15T00:00:00Z"
+        }
+      },
+      "expected": {
+        "resolver": {"outcome": "FOUND"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 7, "product_score": 7, "technical_score": 6, "execution_score": 4, "defensibility_score": 5},
+        "partner": {"recommendation": "MONITOR", "confidence": {"min": 0.45, "max": 0.55}, "human_review_required": true}, "evaluation_manifest": {"complete": true}
+      }
+    },
+    {
+      "case_id": "ambiguous_identity",
+      "description": "A same-name company ambiguity must remain a review state.",
+      "snapshot": {
+        "resolver": {"outcome": "NEEDS_REVIEW"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 5, "product_score": 5, "technical_score": 5, "execution_score": 5, "defensibility_score": 5},
+        "partner": {"recommendation": "MONITOR", "confidence": 0.3, "human_review_required": true},
+        "evaluation_manifest": {
+          "manifest_version": "evaluation-manifest-v1", "pipeline_run_id": "golden-v1-06", "evaluation_path": "manual_lookup",
+          "models": {"scout": "gpt-5-nano", "reviewer": "gpt-5-nano", "partner": "gpt-5-nano"},
+          "prompt_versions": {"scout": "s06", "reviewer.DefaultReviewer": "rd06", "reviewer.SkepticalReviewer": "rs06", "reviewer.OpportunistReviewer": "ro06", "partner": "p06"},
+          "policy_version_id": "golden-policy-v1", "policy_hash": "policy-hash-06", "rubric_version": "v1", "partner_rules_version": "1.2", "partner_rules_hash": "rules-hash-06", "created_at": "2026-07-15T00:00:00Z"
+        }
+      },
+      "expected": {
+        "resolver": {"outcome": "NEEDS_REVIEW"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 5, "product_score": 5, "technical_score": 5, "execution_score": 5, "defensibility_score": 5},
+        "partner": {"recommendation": "MONITOR", "confidence": {"min": 0.25, "max": 0.35}, "human_review_required": true}, "evaluation_manifest": {"complete": true}
+      }
+    },
+    {
+      "case_id": "unsupported_founder_narrative",
+      "description": "A model-attractive but unsupported founder narrative is confidence-capped.",
+      "snapshot": {
+        "resolver": {"outcome": "PARTIAL"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 8, "product_score": 7, "technical_score": 6, "execution_score": 4, "defensibility_score": 5},
+        "partner": {"recommendation": "MONITOR", "confidence": 0.42, "human_review_required": true},
+        "evaluation_manifest": {
+          "manifest_version": "evaluation-manifest-v1", "pipeline_run_id": "golden-v1-07", "evaluation_path": "manual_lookup",
+          "models": {"scout": "gpt-5-nano", "reviewer": "gpt-5-nano", "partner": "gpt-5-nano"},
+          "prompt_versions": {"scout": "s07", "reviewer.DefaultReviewer": "rd07", "reviewer.SkepticalReviewer": "rs07", "reviewer.OpportunistReviewer": "ro07", "partner": "p07"},
+          "policy_version_id": "golden-policy-v1", "policy_hash": "policy-hash-07", "rubric_version": "v1", "partner_rules_version": "1.2", "partner_rules_hash": "rules-hash-07", "created_at": "2026-07-15T00:00:00Z"
+        }
+      },
+      "expected": {
+        "resolver": {"outcome": "PARTIAL"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 8, "product_score": 7, "technical_score": 6, "execution_score": 4, "defensibility_score": 5},
+        "partner": {"recommendation": "MONITOR", "confidence": {"min": 0.35, "max": 0.45}, "human_review_required": true}, "evaluation_manifest": {"complete": true}
+      }
+    },
+    {
+      "case_id": "hard_pass_human_review",
+      "description": "A hard exclusion passes while preserving an explicit strategic exception review.",
+      "snapshot": {
+        "resolver": {"outcome": "FOUND"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 8, "product_score": 7, "technical_score": 7, "execution_score": 6, "defensibility_score": 6},
+        "partner": {"recommendation": "PASS", "confidence": 0.79, "human_review_required": true},
+        "evaluation_manifest": {
+          "manifest_version": "evaluation-manifest-v1", "pipeline_run_id": "golden-v1-08", "evaluation_path": "autonomous_discovery",
+          "models": {"scout": "gpt-5-nano", "reviewer": "gpt-5-nano", "partner": "gpt-5-nano"},
+          "prompt_versions": {"scout": "s08", "reviewer.DefaultReviewer": "rd08", "reviewer.SkepticalReviewer": "rs08", "reviewer.OpportunistReviewer": "ro08", "partner": "p08"},
+          "policy_version_id": "golden-policy-v1", "policy_hash": "policy-hash-08", "rubric_version": "v1", "partner_rules_version": "1.2", "partner_rules_hash": "rules-hash-08", "created_at": "2026-07-15T00:00:00Z"
+        }
+      },
+      "expected": {
+        "resolver": {"outcome": "FOUND"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 8, "product_score": 7, "technical_score": 7, "execution_score": 6, "defensibility_score": 6},
+        "partner": {"recommendation": "PASS", "confidence": {"min": 0.7, "max": 0.85}, "human_review_required": true}, "evaluation_manifest": {"complete": true}
+      }
+    },
+    {
+      "case_id": "repeat_unchanged_snapshot",
+      "description": "An unchanged repeat snapshot preserves the current decision invariants.",
+      "snapshot": {
+        "resolver": {"outcome": "FOUND"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 7, "product_score": 7, "technical_score": 7, "execution_score": 6, "defensibility_score": 6},
+        "partner": {"recommendation": "MONITOR", "confidence": 0.66, "human_review_required": false},
+        "evaluation_manifest": {
+          "manifest_version": "evaluation-manifest-v1", "pipeline_run_id": "golden-v1-09", "evaluation_path": "rerun",
+          "models": {"scout": "gpt-5-nano", "reviewer": "gpt-5-nano", "partner": "gpt-5-nano"},
+          "prompt_versions": {"scout": "s09", "reviewer.DefaultReviewer": "rd09", "reviewer.SkepticalReviewer": "rs09", "reviewer.OpportunistReviewer": "ro09", "partner": "p09"},
+          "policy_version_id": "golden-policy-v1", "policy_hash": "policy-hash-09", "rubric_version": "v1", "partner_rules_version": "1.2", "partner_rules_hash": "rules-hash-09", "created_at": "2026-07-15T00:00:00Z"
+        }
+      },
+      "expected": {
+        "resolver": {"outcome": "FOUND"}, "reference_validation": {"valid": true},
+        "review": {"market_score": 7, "product_score": 7, "technical_score": 7, "execution_score": 6, "defensibility_score": 6},
+        "partner": {"recommendation": "MONITOR", "confidence": {"min": 0.6, "max": 0.7}, "human_review_required": false}, "evaluation_manifest": {"complete": true}
+      }
+    }
+  ]
+}

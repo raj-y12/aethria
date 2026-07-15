@@ -46,6 +46,8 @@ unused_components/
 data/portfolio/
 
 # Checked-in maintenance scripts
+!backend/scripts/
+!backend/scripts/**
 !app-front-end/scripts/
 !app-front-end/scripts/**
 !web-front-end/scripts/
