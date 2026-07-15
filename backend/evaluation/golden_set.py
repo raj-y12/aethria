@@ -25,7 +25,7 @@ class GoldenCorpus(BaseModel):
 
 def golden_set_path(version: str) -> Path:
     normalized = str(version or "").strip().lower()
-    if normalized not in {"v1", "v2"}:
+    if normalized not in {"v1", "v2", "v3", "v4", "v5", "v6", "v7"}:
         raise ValueError(f"Unknown golden-set version: {version!r}")
     return Path(__file__).resolve().parents[2] / "resources" / "evaluation" / "golden_set" / f"{normalized}.json"
 
@@ -92,6 +92,31 @@ def _manifest_complete(manifest: Any) -> bool:
 
 def _evaluate_case(case: GoldenCase) -> List[str]:
     failures: List[str] = []
+    institutional_markers = {
+        "claim_standard",
+        "evidence_contract",
+        "evaluation_contract",
+        "ruling_contract",
+        "workflow_contract",
+        "monitoring_contract",
+        "fund_intelligence",
+        "channel_contract",
+        "outcome_contract",
+    }
+    if institutional_markers & set(case.expected):
+        def compare(actual: Any, expected: Any, prefix: str = "") -> None:
+            if isinstance(expected, dict):
+                if not isinstance(actual, dict):
+                    failures.append(prefix or "snapshot")
+                    return
+                for key, value in expected.items():
+                    compare(actual.get(key), value, f"{prefix}.{key}".strip("."))
+                return
+            if actual != expected:
+                failures.append(prefix)
+
+        compare(case.snapshot, case.expected)
+        return failures
     if "identity" in case.expected:
         phase2_fields = (
             "source_observation.preserved",

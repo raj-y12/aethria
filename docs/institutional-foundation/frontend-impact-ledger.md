@@ -1,8 +1,8 @@
-# Frontend impact ledger — institutional foundation (Phases 0–2)
+# Frontend impact ledger — institutional evidence-and-decision platform (Phases 0–8)
 
 Date: 2026-07-15
 
-This ledger identifies frontend work created by the Phase 0–2 backend contracts. No frontend source was changed in the backend implementation stream. The existing UI can still submit work and read the legacy startup projection, but it does not yet present durable execution, canonical identity, source provenance, or operator resolution correctly.
+This ledger identifies frontend work created by the Phase 0–8 backend contracts. No frontend source was changed in the backend implementation stream. The existing UI can still submit work and read the legacy startup projection, but it does not yet present durable execution, canonical identity, evidence/claim provenance, immutable evaluations, human rulings, approval-gated actions, monitoring budgets, Fund Intelligence, channel imports, or outcomes correctly.
 
 ## 1. Typed API contracts — update first
 
@@ -184,9 +184,9 @@ Show the preserved channel timeline—manual lookup, autonomous discovery, inbou
 
 Add a stable route/query parameter for opening an identity case from Dispatch or System Intelligence. Preserve the selected case through authentication and drawer close/reopen. Do not create a second company lookup merely to navigate to a case.
 
-## 5. Memo and trace surfaces — follow-on once exposed
+## 5. Memo and trace surfaces
 
-The backend records evaluation manifests, but the current frontend does not yet have a dedicated manifest/readiness API. Once exposed, update:
+The backend now exposes the current evidence ledger, immutable evaluation/recommendation, human ruling/action, and monitoring projections. Update:
 
 - `app-front-end/src/components/InvestmentMemoContent.tsx`;
 - `app-front-end/src/components/memo/MemoEvidenceLedger.tsx`;
@@ -194,6 +194,138 @@ The backend records evaluation manifests, but the current frontend does not yet 
 - `app-front-end/src/types/startup.ts`.
 
 Show model/prompt/policy/rubric/rules versions as an audit disclosure. Do not crowd the primary recommendation; use a collapsible “Evaluation dependencies” section.
+
+## 6. Evidence, evaluation, ruling, and action clients — required
+
+### Create `app-front-end/src/api/evidence.ts`
+
+Type and implement:
+
+- `GET /api/opportunities/{opportunity_id}/evidence`;
+- `POST /api/opportunities/{opportunity_id}/evidence-plans`;
+- `POST /api/claims/{claim_id}/correct`;
+- `POST /api/opportunities/{opportunity_id}/confidential-artifacts`.
+
+Model artifacts, evidence items, claims, claim/evidence relationships, and evidence plans separately. Restricted storage references are never returned. Do not treat `founder_asserted`, `operator_asserted`, `model_inferred`, and `externally_verified` as equivalent certainty.
+
+### Create `app-front-end/src/api/evaluations.ts`
+
+Type and implement:
+
+- `GET /api/opportunities/{opportunity_id}/evaluation`;
+- `POST /api/opportunities/{opportunity_id}/evaluate`.
+
+The DTO must preserve null criterion scores. `score: null` means “Not scored”; it must not be coerced to zero or five. Include evidence sufficiency, confidence, supporting/contradicting claim IDs, missing evidence, quality flags, immutable snapshot hash, policy/rubric/rules versions, and recommendation change explanation.
+
+### Create `app-front-end/src/api/decisions.ts`
+
+Type and implement:
+
+- `POST /api/opportunities/{opportunity_id}/rulings`;
+- `GET/POST /api/opportunities/{opportunity_id}/actions`;
+- `POST /api/actions/{workflow_action_id}/approve`.
+
+Use the canonical ruling values `advance | monitor | pass | invest`. Keep a recommendation visually and semantically separate from a human ruling. Type override reasons and action approval states exactly. Approval responses explicitly do not prove an external CRM/email write occurred.
+
+### Create `app-front-end/src/api/monitoring.ts`
+
+Type and implement:
+
+- `POST /api/opportunities/{opportunity_id}/refresh`;
+- `PATCH /api/opportunities/{opportunity_id}/service-level`;
+- `GET /api/opportunities/{opportunity_id}/monitoring`.
+
+Model service levels 0–5, lifecycle reason, next review, resource envelope, budget reservation, material-change result, and linked durable job. A `429` is visible budget exhaustion; a `409` is a lifecycle-policy block.
+
+### Create `app-front-end/src/api/fundIntelligence.ts`
+
+Type and implement:
+
+- `POST /api/fund-intelligence/derive-overrides`;
+- `GET /api/fund-intelligence/proposals` and proposal detail;
+- proposal preview and review endpoints;
+- the separate governed policy-version publish endpoint.
+
+Never combine Accept and Publish in one client mutation. Acceptance produces `status: draft` and `production_policy_changed: false`. Publication is a second explicit action with its own confirmation and error recovery.
+
+### Create `app-front-end/src/api/channelsOutcomes.ts`
+
+Type and implement:
+
+- `POST /api/imports/csv` and `GET /api/imports/{import_batch_id}`;
+- `GET/POST /api/companies/{company_id}/outcomes`;
+- `GET /api/outcomes/coverage`.
+
+CSV intake is capped at 500 rows and 1 MB. Type row states `resolved | review_required | error`; never send or expect raw private CSV rows back. Outcome displays must retain verification, evidence artifact IDs, effective/observed dates, materiality, valence, coverage, and `causal_inference_supported: false`.
+
+## 7. Existing component changes for the evidence-and-decision product
+
+### `app-front-end/src/components/InvestmentMemoContent.tsx`
+
+Replace the legacy `resolveEscalation`/optimistic partner-decision path with the human-ruling API. The primary hierarchy should be:
+
+1. current system recommendation and confidence;
+2. decisive evidence, contradictions, and missing information;
+3. human ruling and rationale;
+4. next actions and approvals;
+5. audit dependencies and history.
+
+Remove unsupported founder superlatives from synthesized headings. Founder sections should show observable claims such as earned insight, domain history, execution speed, customer pull, prior projects, and interview observations with attribution.
+
+### `app-front-end/src/components/memo/MemoEvidenceLedger.tsx`
+
+Rebuild this component around claim → evidence relationships rather than the legacy flat reference list. Show assertion class, verification state, source/trust class, effective/freshness dates, support vs contradiction, and explicit missing evidence. Add a correction action for operator-authorized users.
+
+### `app-front-end/src/components/memo/MemoRulingSection.tsx`
+
+Render the recommendation as system advice and the ruling as the GP's authoritative action. Add rationale, risk acknowledgement, mandate exception, investor confidence, structured override reason, prior ruling history, and fast `ADVANCE / MONITOR / PASS` controls. `INVEST` should be reserved for the final commitment flow.
+
+### `app-front-end/src/components/scoring/AssessmentScorecard.tsx` and `ConfidenceIndicator.tsx`
+
+Support unscored criteria, partial/insufficient evidence, contradiction flags, and confidence caps. Never render missing evidence as a neutral score. Add a compact evaluation-version disclosure and recommendation-change summary.
+
+### `app-front-end/src/components/WorkGrid.tsx`
+
+Key rows by `opportunity_id`, display attention priority, service level/next-review status, source-channel count, current recommendation, and current ruling separately. Historical passes at service level 0 should not appear as actively monitored. Invalidate the row after ruling, service-level change, refresh acceptance, or claim correction.
+
+### `app-front-end/src/components/queue/DocketCaseRow.tsx`, `QueueAttentionBadge.tsx`, and `app-front-end/src/lib/queueAttentionDriver.ts`
+
+Use backend `attention_priority` and lifecycle data as the authoritative queue driver. Add explicit states for identity review, insufficient evidence, refresh blocked/budget exhausted, monitor due, and action awaiting approval. Do not derive institutional attention solely from the legacy reviewer score.
+
+### `app-front-end/src/components/SystemIntelligence.tsx` and `app-front-end/src/components/system/internals.tsx`
+
+Add a Fund Intelligence proposal inbox with pattern, attribution, sample size/period, supporting and contradicting examples, limitations, bounded preview, and Accept/Edit/Reject/Defer. After acceptance, show “Draft policy version created”; require a separate Publish button and confirmation. Preserve rejected/deferred history instead of hiding it.
+
+The existing Scout weights and calibration panels must be read as proposals/diagnostics. Remove any wording suggesting that automatic Meta cycles changed production.
+
+### `app-front-end/src/settings/SettingsPage.tsx`, `DecisionThresholdsPanel.tsx`, and `policyPublishRecovery.ts`
+
+Integrate governed draft publication without bypassing the existing policy compiler. Show active policy versus accepted draft, proposal provenance, validation errors, publish confirmation, and recovery if the policy publish succeeds but the UI loses the response. Add monitoring daily-budget and default service-level explanation, but do not let UI settings imply archived deals will refresh.
+
+### `app-front-end/src/pages/PortfolioPage.tsx`
+
+Add an outcome timeline and coverage disclosure. Financing, shutdown, acquisition, commercial milestones, and follow-on decisions are observations—not proof that an earlier recommendation was correct or mistaken. Always render the backend limitations near aggregate outcome analysis.
+
+### `app-front-end/src/pages/FlowPage.tsx`
+
+Add a bounded CSV intake entry point and import summary. Require column mapping, explicit confirmation before treating mapped domains as operator-confirmed identity, and a review queue link for ambiguous rows. A CRM CSV is an intake channel, not live bidirectional CRM sync.
+
+### `app-front-end/src/App.tsx`
+
+Add routes or stable query parameters for identity cases, opportunity detail tabs, Fund Intelligence proposal detail, import result, and outcome entry. Query invalidation should preserve the canonical opportunity selection rather than navigating through a legacy startup duplicate.
+
+## 8. New components to add
+
+- `components/evidence/ClaimEvidenceLedger.tsx` — claim/evidence graph rendered as an accessible ledger, with contradictions and corrections.
+- `components/evidence/FounderSignalsPanel.tsx` — allowed observable founder signals only, with interview/operator attribution.
+- `components/decisions/RecommendationPanel.tsx` — immutable system recommendation, drivers, risks, gaps, and change explanation.
+- `components/decisions/HumanRulingComposer.tsx` — rapid ruling and structured override capture.
+- `components/actions/WorkflowActionQueue.tsx` — generated questions, information requests, monitor reviews, decision packs, and approval status.
+- `components/monitoring/MonitoringControl.tsx` — service level, next review, refresh reason/envelope, reservation, and material-change history.
+- `components/fund-intelligence/ProposalInbox.tsx` and `ProposalReviewDrawer.tsx` — governed learning review and separate publication.
+- `components/imports/CsvImportDrawer.tsx` and `ImportResultPanel.tsx` — mapping, bounds, resolved/review/error rows, and identity links.
+- `components/outcomes/OutcomeTimeline.tsx`, `OutcomeComposer.tsx`, and `OutcomeCoverageDisclosure.tsx` — provenance-first outcomes without causal claims.
+- `components/evidence/ConfidentialArtifactIntake.tsx` — deck/email metadata registration, retention policy, and no storage-reference display.
 
 ## Recommended frontend implementation order
 
@@ -206,6 +338,13 @@ Show model/prompt/policy/rubric/rules versions as an audit disclosure. Do not cr
 7. Settings system-state block.
 8. System Intelligence Meta proposal language, identity queue, and execution health.
 9. Live feed wording.
-10. Memo manifest disclosure after the backend exposes a stable presentation DTO.
+10. Add evidence/evaluation/decision/monitoring API clients and opportunity detail queries.
+11. Replace the legacy memo decision path with `RecommendationPanel` + `HumanRulingComposer`.
+12. Rebuild `MemoEvidenceLedger` and scoring surfaces around claims, contradictions, unscored criteria, and versions.
+13. Add workflow-action and monitoring controls.
+14. Add the Fund Intelligence inbox, keeping Accept and Publish separate.
+15. Add bounded CSV/CRM CSV intake and import-result identity review links.
+16. Add outcome timeline and coverage disclosure.
+17. Add confidential deck/email metadata intake.
 
-This order first fixes correctness and recovery, then governance language, then deeper audit presentation.
+This order first fixes correctness and recovery, then the authoritative recommendation/ruling model, then governance, workflows, and broader channel coverage.

@@ -1,0 +1,19 @@
+{
+  "version": "v7",
+  "extends": "v6",
+  "description": "Bounded channel intake and non-causal outcome invariants.",
+  "cases": [
+    {
+      "case_id": "channel_import_reuses_canonical_identity",
+      "description": "A CRM CSV row becomes a source observation and does not retain unrelated raw columns.",
+      "snapshot": {"channel_contract": {"canonical_identity_used": true, "raw_row_retained": false, "row_limit": 500, "cross_channel_observation_preserved": true}},
+      "expected": {"channel_contract": {"canonical_identity_used": true, "raw_row_retained": false, "row_limit": 500, "cross_channel_observation_preserved": true}}
+    },
+    {
+      "case_id": "later_financing_is_not_proof_of_bad_pass",
+      "description": "A verified financing outcome remains context, not a causal judgment on the earlier ruling.",
+      "snapshot": {"outcome_contract": {"evidence_required_when_verified": true, "causal_inference_supported": false, "allowed_use": "context_and_monitoring", "coverage_disclosed": true}},
+      "expected": {"outcome_contract": {"evidence_required_when_verified": true, "causal_inference_supported": false, "allowed_use": "context_and_monitoring", "coverage_disclosed": true}}
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "version": "v4",
+  "extends": "v3",
+  "description": "Immutable evaluation and recommendation invariants.",
+  "cases": [
+    {
+      "case_id": "evaluation_missing_is_unscored",
+      "description": "Missing decisive evidence remains unscored instead of becoming neutral.",
+      "snapshot": {"evaluation_contract": {"missing_criterion_state": "unscored", "confidence_capped": true, "human_review_required": true}},
+      "expected": {"evaluation_contract": {"missing_criterion_state": "unscored", "confidence_capped": true, "human_review_required": true}}
+    },
+    {
+      "case_id": "failed_refresh_keeps_current_recommendation",
+      "description": "A failed refresh appends a failure but cannot replace the last successful recommendation.",
+      "snapshot": {"evaluation_contract": {"completed_run_mutable": false, "failed_refresh_replaced_current": false, "snapshot_hash_recorded": true}},
+      "expected": {"evaluation_contract": {"completed_run_mutable": false, "failed_refresh_replaced_current": false, "snapshot_hash_recorded": true}}
+    }
+  ]
+}
