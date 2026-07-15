@@ -30,13 +30,16 @@ describe('lookup resolution handoff', () => {
         }],
       }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        status: 'queued',
+        status: 'accepted',
         company_name: 'Acme',
         lookup_id: 'lookup-acme-123',
+        job_id: 'job-acme-123',
+        accepted_at: '2026-07-15T12:00:00Z',
+        pipeline_run_id: 'run-acme-123',
       }), { status: 202 }));
 
     const resolved = await resolveLookupCandidates('Acme');
-    await queueOnDemandLookup(
+    const queued = await queueOnDemandLookup(
       'Acme https://acme.example',
       'lookup-acme-123',
       undefined,
@@ -44,6 +47,12 @@ describe('lookup resolution handoff', () => {
     );
 
     expect(resolved.resolutionToken).toBe('resolution-token-123');
+    expect(queued).toMatchObject({
+      status: 'accepted',
+      jobId: 'job-acme-123',
+      acceptedAt: '2026-07-15T12:00:00Z',
+      pipelineRunId: 'run-acme-123',
+    });
     const request = authedFetch.mock.calls[1][1] as RequestInit;
     expect(JSON.parse(String(request.body))).toMatchObject({
       resolution_token: 'resolution-token-123',
