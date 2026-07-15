@@ -869,6 +869,34 @@ class IdentityRepository:
             )
         return _opportunity_from_row(row)
 
+    async def set_opportunity_state(
+        self,
+        *,
+        user_id: str,
+        opportunity_id: str,
+        decision_state: Any,
+    ) -> OpportunityRecord:
+        uid = require_user_id(
+            user_id, context="IdentityRepository.set_opportunity_state"
+        )
+        state = getattr(decision_state, "value", decision_state)
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                update public.opportunities
+                set decision_state = $3, updated_at = now()
+                where opportunity_id = $1 and user_id = $2
+                returning *
+                """,
+                opportunity_id,
+                uid,
+                str(state),
+            )
+        opportunity = _opportunity_from_row(row)
+        if opportunity is None:
+            raise LookupError("Opportunity not found for tenant")
+        return opportunity
+
     async def list_cases(
         self, *, user_id: str, status: str = "open", limit: int = 100
     ) -> List[IdentityResolutionCaseRecord]:

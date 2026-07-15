@@ -96,7 +96,10 @@ def _domain_is_verified(
     resolution_domain = normalize_domain(resolution.get("website"))
     if resolution_domain != normalized_domain:
         return False
-    if observation.channel is not SourceChannel.AUTONOMOUS_DISCOVERY:
+    if observation.channel not in {
+        SourceChannel.AUTONOMOUS_DISCOVERY,
+        SourceChannel.BACKFILL,
+    }:
         return False
     official_domains = {
         normalize_domain(item.get("url"))
