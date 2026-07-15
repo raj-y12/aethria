@@ -942,6 +942,7 @@ async def request_metrics_middleware(request: Request, call_next):
         # Route templates are available after routing; fall back to a bounded
         # endpoint family so startup IDs do not create unbounded metric labels.
         path = request.scope.get("route").path if request.scope.get("route") else request.url.path
+        path = re.sub(r"\{[^}]*id[^}]*\}", ":id", str(path), flags=re.IGNORECASE)
         path = re.sub(r"/[0-9a-fA-F-]{16,}", "/:id", str(path))
         metrics.observe_api_request(
             request.method,
