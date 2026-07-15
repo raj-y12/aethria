@@ -14,6 +14,12 @@ async def test_lookup_status_does_not_require_thesis(monkeypatch):
 
     monkeypatch.setattr("api._agent_queue", SimpleNamespace(qsize=lambda: 0))
     monkeypatch.setattr("api._lookup_queue", SimpleNamespace(qsize=lambda: 0))
+
+    class DurableRepository:
+        async def queue_depths(self):
+            return {}
+
+    monkeypatch.setattr("api._durable_job_repository", DurableRepository())
     monkeypatch.setattr("api.load_settings", lambda user_id: {"agent_config": {}})
     monkeypatch.setattr("api.get_service_client", lambda: SimpleNamespace())
     monkeypatch.setattr("api.get_active_thesis", lambda client, user_id: None)
