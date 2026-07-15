@@ -66,6 +66,7 @@ def test_phase2_enum_vocabulary_is_stable():
         "event",
         "portfolio_intro",
         "import",
+        "crm_import",
         "backfill",
     }
     assert {value.value for value in OpportunityState} == {

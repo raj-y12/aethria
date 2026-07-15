@@ -29,6 +29,7 @@ class SourceChannel(str, Enum):
     EVENT = "event"
     PORTFOLIO_INTRO = "portfolio_intro"
     IMPORT = "import"
+    CRM_IMPORT = "crm_import"
     BACKFILL = "backfill"
 
 
