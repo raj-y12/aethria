@@ -135,7 +135,7 @@ This direction makes canonical identity, claims, evidence, policy evaluation, re
 #### Negatives
 
 - Largest conceptual and data-model change.
-- Requires careful dual-write and backfill migration.
+- Requires careful authoritative-write, legacy-projection, and backfill migration.
 - Produces less immediate visual novelty than another autonomous agent.
 - Makes some current code transitional or obsolete.
 - Requires strict boundaries between extraction, verification, policy evaluation, and recommendation.
@@ -333,12 +333,25 @@ ClaimEvidenceLink records whether a specific evidence item supports, contradicts
 An EvaluationRun is an immutable evaluation of one opportunity using a specific evidence and policy snapshot. It records:
 
 - Trigger type and actor.
-- Evidence snapshot hash and claim set.
+- Evidence snapshot hash and immutable claim snapshot.
 - Thesis, scoring-policy, and partner-rule versions.
 - Model and prompt manifests.
 - Status and failure information.
 - Start and completion timestamps.
 - The prior evaluation it supersedes.
+
+The claim snapshot stores values rather than only live claim IDs. Each ClaimSnapshotItem contains:
+
+- claim_id;
+- subject, claim type, normalized value, unit, period, and display text;
+- status_at_snapshot;
+- assertion_class_at_snapshot;
+- confidence_at_snapshot;
+- supporting and contradicting evidence IDs;
+- claim-evidence relationship at snapshot;
+- evidence verification and freshness state used by the evaluation.
+
+The snapshot hash is computed from this canonical value representation. A later CURRENT → STALE or CURRENT → CONTRADICTED transition on the live claim cannot change the meaning of a completed EvaluationRun.
 
 CriterionAssessment stores a score when evidence permits one, confidence, evidence sufficiency, reasoning, supporting and contradicting claims, missing evidence, quality flags, and deterministic adjustments.
 
@@ -361,7 +374,7 @@ Recommendations are immutable and always reference one EvaluationRun.
 
 ### 7.11 HumanRuling and OverrideSignal
 
-A HumanRuling is the authoritative fund decision. It records decision, rationale, recommendation seen, risk acknowledgement, mandate exception, investor confidence, timestamp, and any prior ruling it supersedes.
+A HumanRuling is the authoritative fund decision. Triage rulings are ADVANCE, MONITOR, or PASS; a later final commitment can record INVEST. The ruling records decision, rationale, recommendation seen, risk acknowledgement, mandate exception, investor confidence, timestamp, and any prior ruling it supersedes.
 
 When the ruling materially differs from the recommendation, Aethria creates an OverrideSignal. Override types include evidence correction, missing private evidence, policy disagreement, founder judgment, market judgment, timing, strategic exception, relationship context, and confidence disagreement.
 
@@ -393,6 +406,47 @@ A PolicyProposal contains a detected pattern, supporting overrides or outcomes, 
 
 Statuses are DRAFT, READY_FOR_REVIEW, ACCEPTED, EDITED_AND_ACCEPTED, REJECTED, DEFERRED, and EXPIRED. No proposal can activate itself.
 
+### 7.15 Normative decision-enum compatibility
+
+The migration has one canonical vocabulary per new record type:
+
+- Recommendation: ADVANCE, MONITOR, PASS, or INSUFFICIENT_EVIDENCE.
+- HumanRuling: ADVANCE, MONITOR, PASS, or INVEST.
+- Opportunity decision state: UNRULED, ADVANCE, MONITOR, PASS, INVESTED, or ARCHIVED.
+
+Legacy values remain readable only through one compatibility adapter. The existing backend/utils/partner_codes.py is extended to own the complete mapping during migration; it may be renamed to decision_codes.py only after its imports migrate. At no point may two modules implement decision mapping. API projections, storage adapters, portfolio routing, memo generation, analytics, and frontend compatibility types call this adapter rather than maintaining local maps.
+
+#### Legacy to new
+
+| Legacy record | Legacy value | New record | New value | Migration note |
+|---|---|---|---|---|
+| partner_info.recommendation | INVEST | Recommendation | ADVANCE | The new system recommends further investment attention; it does not make the final investment ruling. |
+| partner_info.recommendation | MONITOR | Recommendation | MONITOR | Same label, but this is still a system recommendation rather than a human ruling. |
+| partner_info.recommendation | PASS | Recommendation | PASS | Exact intent mapping. |
+| partner_info.decision | YES | Recommendation | ADVANCE | Legacy compatibility fallback only when recommendation is absent. |
+| partner_info.decision | MAYBE | Recommendation | MONITOR | Legacy compatibility fallback only when recommendation is absent. |
+| partner_info.decision | NO | Recommendation | PASS | Legacy compatibility fallback only when recommendation is absent. |
+| human_resolution.decision | YES | HumanRuling | INVEST | Legacy YES is a portfolio-acceptance decision, not merely a diligence advance; set Opportunity decision_state to INVESTED. |
+| human_resolution.decision | MAYBE | HumanRuling | MONITOR | The new ruling activates lifecycle service level 3. |
+| human_resolution.decision | NO | HumanRuling | PASS | Exact intent mapping. |
+
+#### New to legacy compatibility projection
+
+| New record | New value | Legacy projection | Additional compatibility fields |
+|---|---|---|---|
+| Recommendation | ADVANCE | partner recommendation INVEST | None. |
+| Recommendation | MONITOR | partner recommendation MONITOR | None. |
+| Recommendation | PASS | partner recommendation PASS | None. |
+| Recommendation | INSUFFICIENT_EVIDENCE | partner recommendation MONITOR | human_review_required=true and compatibility_reason=insufficient_evidence; this projection is explicitly lossy. |
+| HumanRuling | INVEST | human decision YES | Exact portfolio-acceptance mapping. |
+| HumanRuling | ADVANCE | human decision MAYBE | compatibility_reason=advance and decision_state=ADVANCE; explicitly lossy, but cannot route diligence advancement into the legacy invested portfolio. |
+| HumanRuling | MONITOR | human decision MAYBE | Preserve monitor service level separately. |
+| HumanRuling | PASS | human decision NO | None. |
+
+New-world MONITOR is deliberately overloaded as a word but not as an object. Recommendation.MONITOR is system advice. HumanRuling.MONITOR is an investor decision that activates monitoring service level 3. Compatibility code must branch on record type before value.
+
+Contract tests cover every mapping in both directions, unknown values, the lossy INSUFFICIENT_EVIDENCE and ADVANCE projections, prevention of ADVANCE → legacy invested-portfolio routing, historical YES rows, list projections, detail projections, memo projections, and API round trips.
+
 ## 8. Record lifecycles
 
 ### 8.1 Autonomous discovery
@@ -419,7 +473,7 @@ The GP enters a company name, domain, and optional context. A cheap, LLM-free re
 
 New evidence creates or changes claims. If the evidence snapshot differs from the current EvaluationRun, the Opportunity is marked as having new evidence. Re-evaluation occurs only when trigger policy and cost budget allow it.
 
-The previous EvaluationRun remains valid as a historical statement of what Aethria knew at that time. A failed refresh leaves the last successful recommendation visible with a stale or refresh-failed indicator.
+The previous EvaluationRun remains valid as a historical statement of what Aethria knew at that time because it reads its immutable ClaimSnapshotItems rather than current claim status. A failed refresh leaves the last successful recommendation visible with a stale or refresh-failed indicator.
 
 ### 8.4 Human correction
 
@@ -573,7 +627,7 @@ Fund Intelligence aggregates signals only when attribution is clear. It produces
 The redesigned pipeline preserves Aethria's existing non-negotiable runtime gates:
 
 - An active, complete FundThesis must resolve before acquisition, evaluation, or recommendation work runs.
-- Production pipeline work requires Supabase storage; local file storage remains development-only.
+- During migration, the existing pipeline continues to require USE_SUPABASE_STORAGE=1; local file storage remains development-only. The new durable job repository uses direct PostgreSQL as specified in Phase 1. The Supabase gate is retired or renamed only through the separately approved plain-PostgreSQL storage migration.
 - Model-dependent work requires a configured OpenAI API key and fails visibly when it is absent.
 - Every search and model stage checks the tenant CostController before reserving work.
 - Mandatory reference and claim-evidence validation cannot be bypassed by later stages.
@@ -581,11 +635,52 @@ The redesigned pipeline preserves Aethria's existing non-negotiable runtime gate
 
 Jobs blocked by these gates persist a structured reason and safe recovery action. They do not silently return an empty successful result.
 
+### 9.13 Interactive latency budget and standing constraints
+
+The redesigned pipeline must not add one durable-queue polling interval between every stage. At Phase 4 parity, an eligible manual lookup with normal provider health targets:
+
+- first traceable recommendation at median no slower than 45 seconds;
+- p90 first recommendation no slower than 75 seconds;
+- identity-resolution preview returned before expensive enrichment begins;
+- progressive process and evidence state visible while the final recommendation is pending.
+
+The initial critical-path budgets are assumptions to validate with Phase 0 instrumentation:
+
+| Critical-path work | Median budget |
+|---|---:|
+| Admission and job claim | 1 second |
+| Reuse of picker identity result | 1 second |
+| Uncached identity resolution fallback | 8 seconds |
+| Evidence planning | 1 second |
+| Parallel retrieval and source probes | 12 seconds |
+| Extraction plus claim-evidence verification | 18 seconds |
+| Deterministic policy and recommendation | 4 seconds |
+| Durable checkpoints and first publish | 3 seconds |
+
+Some work overlaps, and the cached identity path is the expected manual-lookup path. Phase 0 replaces assumptions with histograms. A phase cannot promote if it regresses the current measured interactive path without an explicitly approved quality trade-off.
+
+The standing constraints from docs/2026-07-14-pipeline-latency-plan.md carry into the new design:
+
+- retrieval queries run concurrently behind a bounded semaphore and merge deterministically;
+- independent reference probes run concurrently;
+- the identity result produced by the lookup picker is reused rather than recomputed;
+- typed stage outputs pass in memory along the interactive path;
+- no stage reads a row merely to recover data the previous stage just wrote;
+- no correctness path sleeps around PostgREST read-after-write visibility;
+- interactive engine construction loads only the workers and policy state that lookup requires;
+- persistence creates a checkpoint but does not become an inter-stage transport mechanism.
+
 ## 10. Durable orchestration and failure recovery
 
 ### 10.1 Durable job model
 
-The current in-memory queues should be replaced by a Supabase-backed durable job system. Existing agent_job_schedules can continue to describe when recurring work is due, while a separate agent_jobs table represents actual work instances.
+The current in-memory queues should be replaced by a PostgreSQL-backed durable job system. Existing agent_job_schedules can continue to describe when recurring work is due, while a separate agent_jobs table represents actual work instances.
+
+The job repository uses a direct asyncpg connection and database transactions. asyncpg and a direct PostgreSQL event-backplane pattern already exist in the repository. Claim, lease, heartbeat, completion, and outbox semantics must not be implemented as a sequence of supabase-py/PostgREST table calls.
+
+Job claiming uses SELECT … FOR UPDATE SKIP LOCKED inside a short transaction, followed by a conditional status and lease update. LISTEN/NOTIFY wakes idle workers when eligible work is inserted; a low-frequency timed poll remains a missed-notification backstop. The design is deployment-neutral and must not hardcode Oracle, Coolify, Supabase, or another hosting vendor.
+
+Phase 1 coordinates this repository with the planned direct-PostgreSQL storage migration. Existing application data paths may remain on the service-role Supabase client until their own migration, but the job repository is a bounded direct-connection adapter. If a secure direct DATABASE_URL and pool cannot be supplied in an environment, durable workers fail closed rather than fall back to non-transactional lease polling through PostgREST.
 
 An AgentJob includes:
 
@@ -623,6 +718,8 @@ Retries must return the existing successful record where the key already complet
 ### 10.3 Leases and recovery
 
 Workers claim jobs with time-limited leases and heartbeat while model or provider work is active. An expired lease makes the job claimable after a safety interval. Job completion uses a conditional update so two workers cannot both publish authoritative results.
+
+The job transaction always includes user_id in the selected and updated row, even when job_id is globally unique. Worker roles receive only the database privileges required for job, checkpoint, and outbox operations.
 
 ### 10.4 Retry policy
 
@@ -674,6 +771,24 @@ Concurrency is limited at three levels:
 - Per-company and per-opportunity locks prevent overlapping authoritative evaluations.
 
 Search, model, and document parsing concurrency have separate limits because their resource and cost profiles differ.
+
+### 10.9 Interactive fast path
+
+Manual lookup uses one durable parent job but executes the eligible stage chain continuously in the claiming worker:
+
+    claim lookup job
+      → run identity or reuse picker result
+      → persist identity checkpoint
+      → plan and retrieve evidence
+      → persist evidence checkpoint
+      → extract and verify
+      → persist claim snapshot
+      → evaluate and recommend
+      → publish terminal or partial state
+
+This is durable checkpointing, not durable dispatch between stages. The worker passes typed results in memory after each successful checkpoint. If the process dies, a later worker acquires the expired lease and resumes from the most recent compatible checkpoint.
+
+Background discovery batches, monitor refreshes, retries after provider backoff, migration backfills, and Fund Intelligence work use the queued path. The interactive fast path uses the same domain services, schemas, evidence gates, and cost controls; it is not a lower-quality evaluation mode.
 
 ## 11. Evidence and founder-assessment standard
 
@@ -903,9 +1018,14 @@ Search popularity, press volume, or later financing alone are weak learning sign
 
 ### 14.2 MetaAgent transition
 
-Automatic prompt mutation, scout reweighting, and threshold activation are frozen before the new learning layer ships.
+Phase 0 changes the pieces that still self-apply:
 
-The current MetaAgent can continue to run in shadow mode to produce diagnostic comparisons, but its output cannot change production configuration. Existing mutation history remains available for audit.
+- ScoutReweighter may calculate proposed weights but ScoutReweighter.apply cannot update production weights.
+- ThresholdCalibrator may calculate proposed thresholds but ThresholdCalibrator.apply cannot update production calibration state.
+- META_AGENT_PROMPT_AUTO_APPLY is required to remain false; prompt proposals continue through the existing evaluation and promotion gate.
+- The existing atomic daily schedule claim remains the execution gate. The remediation already fixed the historical every-cycle overrun, so Phase 0 verifies that behaviour rather than rebuilding it.
+
+The current MetaAgent can continue to run in analysis-only mode to produce diagnostic comparisons and pending proposals. Its output cannot change production configuration. Existing mutation, reweighting, calibration, and schedule history remains available for audit.
 
 ### 14.3 Proposal thresholds
 
@@ -1024,7 +1144,7 @@ The main queue prioritizes attention. Each row shows:
 - current human ruling;
 - next action.
 
-The queue does not lead with a universal numerical score.
+The queue is ordered and led by attention priority and decision state. The existing policy-relative conviction score remains visible as secondary evidence; it is not removed. This deliberately changes the current docket hierarchy, where the number is visually dominant, and must ship behind a Phase 4 feature flag with GP-facing comparison before becoming the default. The product rejects a universal company score while preserving the fund-specific number as a useful scan aid.
 
 ### 16.2 Decision record
 
@@ -1201,6 +1321,8 @@ Targets should be validated against a representative evaluation set, but the ini
 - a failed refresh preserves the last successful recommendation;
 - no external action occurs without approval and an audit event.
 
+Phase 0 records the current median model-and-search cost per decision-ready Opportunity by comparable cohort, at minimum manual web lookup and autonomous discovery. At Phase 4 shadow parity, the new path's median cost for a comparable cohort must remain at or below 2× the measured current-pipeline baseline. A higher multiple blocks default promotion unless an explicit cost-versus-quality review approves a narrower premium service level. The target prevents per-artifact extraction and verification from multiplying spend invisibly.
+
 ## 20. Testing and institutional evaluation
 
 ### 20.1 Contract tests
@@ -1268,6 +1390,19 @@ Create a tenant-safe, redacted set of representative opportunities containing:
 
 Each case has expected invariants rather than one mandatory universal investment verdict. Invariants include which evidence is material, which criteria cannot be scored, which gates apply, and what must require human review.
 
+The corpus is assembled early, but its assertions are versioned by delivery phase:
+
+| Golden-set version | First required phase | Invariants it can legitimately pin |
+|---|---|---|
+| v1 | Phase 0 | Current resolver outcome, reference validity, current dimension scores, partner recommendation, confidence, and human-review flags. |
+| v2 | Phase 2 | Source-observation preservation, canonical company match, ambiguity outcome, and opportunity creation. |
+| v3 | Phase 3 | Claim extraction, assertion class, provenance, contradiction, freshness, materiality, and unsupported founder-label rejection. |
+| v4 | Phase 4 | Immutable claim snapshot, criterion scoreability, policy gates, recommendation, confidence cap, and change explanation. |
+| v5 | Phase 5 | Human ruling, enum compatibility, override classification, and next-action derivation. |
+| v6 | Phase 7 | Proposal attribution, sample disclosure, limitations, and no-self-activation behaviour. |
+
+Phase 0 is complete when v1 is executable. It is not blocked on claim or evidence-ledger invariants whose records do not yet exist. Each later phase must extend the same cases before promoting its new substrate.
+
 ### 20.6 Shadow-mode evaluation
 
 The new evaluation path runs alongside the current pipeline before becoming authoritative. Compare:
@@ -1317,14 +1452,51 @@ This document is the master product and architecture design. It is intentionally
 
 Each sub-project receives its own implementation plan, tests, migration boundary, rollout flag, and acceptance gate. The first implementation plan covers only Phase 0 and Phase 1. Later plans may refine their local design without violating this master architecture.
 
+### 21.2 Pre-phase audit-remediation preflight
+
+The 2026-07-14 audit's Bugs 1–3 are not deferred to this platform migration. The remediation record and current regression tests show that they have already been corrected:
+
+- rerun memo generation uses the current recommendation schema and persists the regenerated memo;
+- duplicate lookup returns the existing tenant-scoped startup with an already_in_deal_flow outcome;
+- portfolio watchlist decay reads signals through the storage abstraction and writes stale warnings idempotently.
+
+Before Phase 0 begins in any target environment:
+
+1. Run the focused rerun-memo, duplicate-lookup, and portfolio-signal regression tests.
+2. Confirm migrations 20260714192632 through 20260714192902 are applied in order.
+3. Run the normalized-name duplicate preflight required by 20260714192642 before applying it.
+4. Verify existing-company Dispatch offers the remediated open-existing or re-review path.
+
+If any check fails, it is handled as a current-product hotfix before platform work continues. Phase 2's canonical identity replaces the normalized-name stopgap; it does not assume the stopgap is missing or reimplement already-fixed Bugs 1–3.
+
+### 21.3 Frontend delivery by phase
+
+The institutional substrate is not considered shipped when only backend records exist. Each phase owns the minimum operator surface required to work its new states:
+
+| Phase | Existing surface extended | Required frontend delivery |
+|---|---|---|
+| 0 | Settings and System Intelligence | Show Meta analysis-only status, active mutation gates, manifest/version diagnostics, and evaluation-set run status. |
+| 1 | Dispatch and system status | Preserve current queued/progress states, add durable retry or blocked recovery, and distinguish accepted work from running work. |
+| 2 | Dispatch and Flow | IdentityResolutionCase queue with candidate evidence and actions to match, create, defer, or reject; show multiple source badges on one canonical company. |
+| 3 | Memo/decision detail | Evidence ledger with provenance, assertion class, freshness, contradiction, and materiality; link material conclusions to evidence. |
+| 4 | Flow queue and decision detail | Decision-record first slice, recommendation-change explanation, evaluation history, and feature-flag comparison of attention-led versus score-led docket hierarchy. |
+| 5 | Ruling and action surfaces | Fast ADVANCE/MONITOR/PASS ruling, structured override reason, diligence questions, information-request draft, and action status. |
+| 6 | Flow and Portfolio | Enrichment service level, refresh reason, next review, budget-blocked state, and material-change summary. |
+| 7 | Fund workspace | Fund Intelligence report and proposal inbox with examples, limitations, historical preview, and accept/edit/reject/defer controls. |
+| 8 | Dispatch and Settings | CSV or selected channel intake, integration state, confidential-artifact controls, and outcome provenance. |
+
+Phase 2 cannot promote without a workable identity-case UI. An ambiguity state that exists only in storage is an operational dead end.
+
 ### Phase 0 — institutional guardrails
 
 **Deliverables**
 
-- Disable automatic MetaAgent production mutations.
-- Preserve MetaAgent analysis in shadow mode.
-- Define the golden evaluation set.
-- Add quality and cost measurements.
+- Convert ScoutReweighter.apply and ThresholdCalibrator.apply to proposal-only paths that cannot update production configuration.
+- Enforce META_AGENT_PROMPT_AUTO_APPLY=false while retaining the existing prompt evaluation and promotion gate.
+- Verify the existing atomic daily MetaAgent schedule claim and required schedule migrations rather than reimplementing the fixed interval bug.
+- Preserve MetaAgent analysis and pending proposals in shadow mode.
+- Define and execute golden evaluation set v1 for current-pipeline behaviour.
+- Add quality measurements and cohort-specific current-pipeline cost baselines.
 - Formalize recommendation versus ruling semantics.
 - Record complete model, prompt, policy, and rule manifests for new evaluations.
 
@@ -1334,19 +1506,22 @@ Each sub-project receives its own implementation plan, tests, migration boundary
 
 **Exit criteria**
 
-- No automated configuration mutation.
-- Current pipeline can be measured against representative cases.
+- No automatic scout-weight or calibration-threshold activation, and no prompt activation outside the existing explicit promotion path.
+- Current pipeline can be measured against representative cases through golden set v1.
 - Evaluation and ruling versions are traceable.
 
 ### Phase 1 — durable execution foundation
 
 **Deliverables**
 
+- Direct PostgreSQL connection pool and transactional job repository using the existing asyncpg dependency.
 - Durable AgentJob table and minimal worker.
 - Leases, heartbeats, retries, dead letters, and idempotent completion.
+- SKIP LOCKED claims, LISTEN/NOTIFY wake-up, and timed polling backstop.
 - Pipeline-run and stage attribution.
 - Domain event outbox.
 - Migration of current cycle and lookup queues.
+- Interactive lookup fast path with durable checkpoints and in-memory stage handoffs.
 - Per-tenant and global concurrency protection.
 
 **Customer value**
@@ -1358,6 +1533,11 @@ Each sub-project receives its own implementation plan, tests, migration boundary
 - Restarting the API does not lose accepted work.
 - Duplicate jobs do not duplicate authoritative output.
 - Expired leases can recover without two successful publications.
+- Lease and heartbeat operations do not use client-side PostgREST read/update sequences.
+- Job and outbox transaction tests run against the target PostgreSQL version.
+- Interactive lookup incurs one job-claim wait, not one polling wait per stage.
+- Checkpoint persistence adds no read-what-was-just-written handoff.
+- Phase 0 histograms show no unexplained interactive latency regression.
 - Current cycle and lookup behaviour passes compatibility tests.
 
 ### Phase 2 — canonical identity and source observations
@@ -1367,7 +1547,8 @@ Each sub-project receives its own implementation plan, tests, migration boundary
 - Company, identifier, alias, source-observation, opportunity, and identity-case tables.
 - Domain-first resolver contract.
 - Ambiguity queue.
-- Dual-write from Scout and Dispatch.
+- Write-new/project-legacy migration: Scout and Dispatch commit the new observation, company, and opportunity records as authoritative; an outbox consumer maintains the legacy startups projection.
+- Transactional repository operation that commits the authoritative institutional records and their outbox event together.
 - Backfill existing startups conservatively.
 
 **Customer value**
@@ -1379,6 +1560,9 @@ Each sub-project receives its own implementation plan, tests, migration boundary
 - Scout and Dispatch converge on the same canonical company when appropriate.
 - Ambiguous matches do not auto-merge.
 - All new discoveries preserve channel attribution.
+- Partial failure cannot produce an authoritative legacy-only record.
+- Outbox replay repairs a stale legacy projection without duplicating new records.
+- A reconciliation check detects projection drift by tenant and source observation.
 
 ### Phase 3 — evidence and claim ledger
 
@@ -1420,6 +1604,7 @@ Each sub-project receives its own implementation plan, tests, migration boundary
 - Same immutable inputs produce the same deterministic result.
 - Failed refresh preserves the prior result.
 - Every recommendation can explain its evidence and policy versions.
+- Shadow-mode median cost per comparable decision-ready Opportunity is no more than 2× the Phase 0 baseline, or the phase remains non-default.
 
 ### Phase 5 — rulings and bounded orchestration
 
@@ -1536,6 +1721,7 @@ Each sub-project receives its own implementation plan, tests, migration boundary
 - Workflow begins with diligence questions and missing-information requests.
 - CRM integration begins as explicit outbound export.
 - Multi-user IC and enterprise workflow are deferred.
+- The queue leads with attention priority and decision state; the policy-relative conviction score remains visible but secondary, with a Phase 4 feature-flag validation before default rollout.
 
 ## 24. Future decisions deliberately deferred
 
