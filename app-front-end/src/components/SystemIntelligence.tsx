@@ -7,6 +7,7 @@ import type {
   SystemHealthSnapshot, MetaInsightsPayload,
 } from '../types/startup';
 import type { FundThesisRuntime } from '../api/fundThesis';
+import type { SystemStatus } from '../api/system';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import { type FundConfiguration } from '../lib/fundConfiguration';
@@ -80,6 +81,7 @@ interface SystemIntelligenceProps {
   watchlistAnalytics: WatchlistAnalytics;
   concentrationAnalytics: ConcentrationAnalytics;
   systemHealth: SystemHealthSnapshot | null;
+  systemStatus?: SystemStatus | null;
   metaReports: MetaCycleReport[];
   scoutWeights: ScoutWeights;
   calibrationState: CalibrationState;
@@ -132,6 +134,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
               watchlist={props.watchlistAnalytics}
               concentration={props.concentrationAnalytics}
               systemHealth={props.systemHealth}
+              systemStatus={props.systemStatus}
             />
           )}
           {activeTab === 'decisions' && (

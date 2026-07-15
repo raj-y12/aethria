@@ -43,6 +43,7 @@ import { buildMandateSummaryLine } from '../lib/railSummaries';
 import { isDealHumanResolved, isDealUnresolved } from '../lib/dealState';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
+import { deriveExecutionReadiness } from './institutional/ExecutionReadinessPanel';
 
 export interface InlineDispatchProps {
   input: string;
@@ -207,15 +208,20 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   const agentConfig = data.settings?.agent_config;
   const pipelineEnabled =
     !!agentConfig && !!(agentConfig.scouts_enabled || agentConfig.reviewers_enabled || agentConfig.partners_enabled);
-  const pipelineHealthIssue =
-    pipelineEnabled &&
-    agentsStatus != null &&
-    (
+  const executionReadiness = deriveExecutionReadiness(data.systemStatus);
+  const agentRuntimeIssue = agentsStatus != null && (
       !agentsStatus.worker_ready ||
       !agentsStatus.supabase_configured ||
       !agentsStatus.openai_configured ||
       !agentsStatus.agents_will_run ||
       agentsStatus.thesis_ready === false
+    );
+  const pipelineHealthIssue =
+    pipelineEnabled &&
+    (
+      agentRuntimeIssue ||
+      executionReadiness === 'blocked' ||
+      executionReadiness === 'degraded'
     );
   const pipelineStopping = Boolean(loopStatus?.loop_alive && loopStatus?.agents_enabled === false && !pipelineHealthIssue);
   const pipelineLoopAlive = Boolean(loopStatus?.loop_alive && agentsStatus?.agents_will_run === true && !pipelineHealthIssue);
@@ -237,6 +243,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
     humanRuledCount: startups.filter(isDealHumanResolved).length,
     newCount: startups.filter((s) => s.is_new_to_user).length,
     pipelineState,
+    executionReadiness,
   };
 
   // ── Mandate (spine block) ─────────────────────────────────────────────────

@@ -24,6 +24,8 @@ import { buildFundIntelligenceSnapshot } from '../../lib/institutionalConviction
 import { formatDate, formatDateTime } from '../../lib/dates';
 import { createDefaultFundConfiguration, type FundConfiguration } from '../../lib/fundConfiguration';
 import ProposalInbox from '../institutional/ProposalInbox';
+import ExecutionReadinessPanel from '../institutional/ExecutionReadinessPanel';
+import type { SystemStatus } from '../../api/system';
 
 export function mandateTagList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -332,9 +334,10 @@ export function PipelineStation({
 }
 
 /* ─── ANALYTICS ─── */
-export function AnalyticsTab({ rejection, watchlist, concentration, systemHealth }: {
+export function AnalyticsTab({ rejection, watchlist, concentration, systemHealth, systemStatus }: {
   rejection: RejectionAnalytics; watchlist: WatchlistAnalytics; concentration: ConcentrationAnalytics;
   systemHealth: SystemHealthSnapshot | null;
+  systemStatus?: SystemStatus | null;
 }) {
   const maxRedFlag = Math.max(...rejection.most_common_red_flags.map((r) => r.count), 1);
   const sectors = Object.entries(concentration.by_sector).sort((a, b) => b[1].count - a[1].count).slice(0, 8);
@@ -343,6 +346,9 @@ export function AnalyticsTab({ rejection, watchlist, concentration, systemHealth
 
   return (
     <>
+      <TabSection title="Execution readiness" label="Operational">
+        <ExecutionReadinessPanel status={systemStatus} />
+      </TabSection>
       {systemHealth && (
         <TabSection title="Pipeline" label="Live">
           {/* The pipeline as the pipeline: stations joined by flow marks, the

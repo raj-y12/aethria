@@ -104,6 +104,7 @@ export default function FundPage({ data }: { data: SystemData }) {
             watchlistAnalytics={data.watchlistAnalytics}
             concentrationAnalytics={data.concentrationAnalytics}
             systemHealth={data.systemHealth}
+            systemStatus={data.systemStatus}
             metaReports={data.metaReports}
             scoutWeights={data.scoutWeights}
             calibrationState={data.calibrationState}

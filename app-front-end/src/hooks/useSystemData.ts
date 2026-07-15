@@ -30,6 +30,7 @@ import type {
   SystemHealthSnapshot, MetaInsightsPayload,
 } from '../types/startup';
 import type { Settings } from '../api/settings';
+import { fetchSystemStatus, type SystemStatus } from '../api/system';
 
 const emptyRejection: RejectionAnalytics = {
   most_common_red_flags: [],
@@ -60,6 +61,7 @@ export interface SystemData {
   metaPromptState: MetaPromptState;
   metaEvalSet: MetaEvalSet;
   systemHealth: SystemHealthSnapshot | null;
+  systemStatus: SystemStatus | null;
   metaInsights: MetaInsightsPayload | null;
   fundThesisRuntime: FundThesisRuntime | null;
   fundThesisRuntimeLoading: boolean;
@@ -115,6 +117,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
       void queryClient.invalidateQueries({ queryKey: ['meta'] });
       void queryClient.invalidateQueries({ queryKey: ['analytics'] });
       void queryClient.invalidateQueries({ queryKey: ['analytics', 'system-health'] });
+      void queryClient.invalidateQueries({ queryKey: ['system', 'status'] });
       void queryClient.invalidateQueries({ queryKey: ['meta', 'insights'] });
       void queryClient.invalidateQueries({ queryKey: ['fund-thesis'] });
     }
@@ -241,6 +244,14 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     enabled: systemPanelOpen,
   });
 
+  const systemStatusQuery = useQuery({
+    queryKey: ['system', 'status'],
+    queryFn: fetchSystemStatus,
+    ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 30_000 }),
+    refetchInterval: isTabVisible ? 30_000 : false,
+    retry: 1,
+  });
+
   const metaInsightsQuery = useQuery({
     queryKey: ['meta', 'insights'],
     queryFn: fetchMetaInsights,
@@ -290,6 +301,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     metaPromptState: metaPromptStateQuery.data ?? { active: {}, active_detail: {}, pending: [] },
     metaEvalSet: metaEvalSetQuery.data ?? { startup_ids: [], count: 0, max: 50 },
     systemHealth: systemHealthQuery.data ?? null,
+    systemStatus: systemStatusQuery.data ?? null,
     metaInsights: metaInsightsQuery.data ?? null,
     fundThesisRuntime: fundThesisRuntimeQuery.data ?? null,
     fundThesisRuntimeLoading: fundThesisRuntimeQuery.isPending,

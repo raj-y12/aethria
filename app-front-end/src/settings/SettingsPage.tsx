@@ -8,6 +8,7 @@ import { workspaceLayout } from '../design-system/workspaceLayout';
 import { getQueryConfig } from '../lib/queryIntent';
 import { fetchSettings, patchSettings, publishPolicy, type Settings } from '../api/settings';
 import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
+import { fetchSystemStatus } from '../api/system';
 import {
   fetchFundThesisSummary,
   type FundThesisSummary,
@@ -20,6 +21,7 @@ import SettingsTopBar, { type SettingsStatusTone } from './SettingsTopBar';
 import SettingsRail from './SettingsRail';
 import SettingsMobileNav from './SettingsMobileNav';
 import OperationsStrip from './OperationsStrip';
+import ExecutionReadinessPanel from '../components/institutional/ExecutionReadinessPanel';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
   getDeploymentConfirmation,
@@ -337,6 +339,13 @@ export default function SettingsPage() {
     queryFn: () => fetchSettings().catch(() => null),
     ...getQueryConfig('STATIC'),
     refetchOnMount: 'always',
+  });
+  const systemStatusQuery = useQuery({
+    queryKey: ['system', 'status'],
+    queryFn: fetchSystemStatus,
+    ...getQueryConfig('SEMI_DYNAMIC', { pollIntervalMs: 30_000 }),
+    refetchInterval: 30_000,
+    retry: 1,
   });
 
   // Warm cache data gives an instant first paint, while the mount refetch above
@@ -1043,6 +1052,11 @@ export default function SettingsPage() {
                         </p>
                       </div>
                     )}
+                    <ExecutionReadinessPanel
+                      status={systemStatusQuery.data ?? null}
+                      loading={systemStatusQuery.isPending}
+                      compact
+                    />
                   </RoomSection>
             </div>
           </motion.main>

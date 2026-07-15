@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { SpineNavButton } from './SystemBar';
 import AgentLogoutModal from './AgentLogoutModal';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
+import type { ExecutionReadiness } from './institutional/ExecutionReadinessPanel';
 
 export type SpinePipelineState = 'Live' | 'Idle' | 'Off' | 'Issue' | 'Stopping';
 
@@ -16,6 +17,8 @@ export interface SpineTelemetry {
   humanRuledCount: number;
   newCount: number;
   pipelineState: SpinePipelineState;
+  /** Durable execution readiness is separate from whether pipeline agents are enabled. */
+  executionReadiness?: ExecutionReadiness;
 }
 
 export interface SpineMandate {
@@ -222,6 +225,15 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                     {telemetry.pipelineState}
                   </span>
                 </div>
+
+                {telemetry.executionReadiness ? (
+                  <div className="mt-phi-2 flex items-center justify-between gap-phi-2" aria-label="Execution readiness">
+                    <span className="type-meta type-meta-inverse">Execution</span>
+                    <span className={`type-status ${telemetry.executionReadiness === 'blocked' || telemetry.executionReadiness === 'degraded' ? 'text-escalation-bright' : 'text-white/60'}`}>
+                      {telemetry.executionReadiness.replace(/^./, (character) => character.toUpperCase())}
+                    </span>
+                  </div>
+                ) : null}
 
                 {telemetry.pipelineState === 'Issue' ? (
                   <Link

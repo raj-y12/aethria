@@ -20,6 +20,13 @@ export interface TriggerResult {
 
 export interface AgentsStatus {
   worker_ready: boolean;
+  lookup_worker_ready?: boolean;
+  agent_queue_size?: number | null;
+  lookup_queue_size?: number | null;
+  durable_jobs_required?: boolean;
+  durable_jobs_ready?: boolean;
+  durable_job_error?: string | null;
+  durable_job_counts?: Record<string, number>;
   supabase_configured: boolean;
   openai_configured: boolean;
   agents_will_run: boolean;
