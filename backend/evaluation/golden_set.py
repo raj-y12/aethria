@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -19,18 +19,34 @@ class GoldenCase(BaseModel):
 class GoldenCorpus(BaseModel):
     version: str
     description: str
+    extends_version: Optional[str] = Field(default=None, alias="extends")
     cases: List[GoldenCase] = Field(min_length=1)
 
 
 def golden_set_path(version: str) -> Path:
     normalized = str(version or "").strip().lower()
-    if normalized not in {"v1"}:
+    if normalized not in {"v1", "v2"}:
         raise ValueError(f"Unknown golden-set version: {version!r}")
     return Path(__file__).resolve().parents[2] / "resources" / "evaluation" / "golden_set" / f"{normalized}.json"
 
 
 def load_golden_set(version: str) -> GoldenCorpus:
-    return GoldenCorpus.model_validate_json(golden_set_path(version).read_text())
+    corpus = GoldenCorpus.model_validate_json(golden_set_path(version).read_text())
+    if corpus.extends_version:
+        parent = load_golden_set(corpus.extends_version)
+        duplicate_ids = {case.case_id for case in parent.cases} & {
+            case.case_id for case in corpus.cases
+        }
+        if duplicate_ids:
+            raise ValueError(
+                f"Golden-set extension duplicates case ids: {sorted(duplicate_ids)}"
+            )
+        return GoldenCorpus(
+            version=corpus.version,
+            description=corpus.description,
+            cases=[*parent.cases, *corpus.cases],
+        )
+    return corpus
 
 
 def _get(payload: Dict[str, Any], dotted: str) -> Any:
@@ -76,6 +92,26 @@ def _manifest_complete(manifest: Any) -> bool:
 
 def _evaluate_case(case: GoldenCase) -> List[str]:
     failures: List[str] = []
+    if "identity" in case.expected:
+        phase2_fields = (
+            "source_observation.preserved",
+            "source_observation.channel",
+            "source_observation.count",
+            "identity.status",
+            "identity.canonical_company_id",
+            "identity.company_count",
+            "opportunity.opportunity_id",
+            "opportunity.count",
+            "opportunity.created",
+            "opportunity.blocks_evaluation",
+            "projection.legacy_startup_linked",
+            "evaluation.started",
+        )
+        for dotted in phase2_fields:
+            if _get(case.snapshot, dotted) != _get(case.expected, dotted):
+                failures.append(dotted)
+        return failures
+
     exact_fields = (
         "resolver.outcome",
         "reference_validation.valid",
