@@ -133,6 +133,7 @@ from jobs.repository import DurableJobRepository
 from jobs.worker import DurableJobWorker
 from identity.repository import IdentityRepository
 from evidence.repository import EvidenceRepository
+from evaluation_v2.repository import EvaluationRepository
 from pipeline_runner import (
     _rss_mb as _pipeline_rss_mb,
     _record_lookup_failure,
@@ -817,6 +818,9 @@ async def _start_durable_job_services(app: FastAPI) -> None:
     app.state.evidence_repository = (
         EvidenceRepository(_durable_job_pool) if _durable_job_pool is not None else None
     )
+    app.state.evaluation_repository = (
+        EvaluationRepository(_durable_job_pool) if _durable_job_pool is not None else None
+    )
 
 
 async def _stop_durable_job_services(app: FastAPI) -> None:
@@ -843,6 +847,7 @@ async def _stop_durable_job_services(app: FastAPI) -> None:
     app.state.durable_job_repository = None
     app.state.identity_repository = None
     app.state.evidence_repository = None
+    app.state.evaluation_repository = None
 
 
 @asynccontextmanager
@@ -914,6 +919,7 @@ async def _lifespan(app: FastAPI):
         app.state.durable_job_error = None
         app.state.identity_repository = None
         app.state.evidence_repository = None
+        app.state.evaluation_repository = None
     # Resume persistent per-user loops for users that had agents enabled before restart
     await _resume_all_user_loops()
     yield
@@ -983,6 +989,9 @@ app.include_router(_identity_router.router)
 from routers import evidence as _evidence_router  # noqa: E402
 
 app.include_router(_evidence_router.router)
+from routers import evaluations as _evaluations_router  # noqa: E402
+
+app.include_router(_evaluations_router.router)
 
 # CORS: localhost for dev; extend with ALLOWED_ORIGINS (comma-separated) for production domain
 _cors_origins = [
