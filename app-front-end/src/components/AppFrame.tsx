@@ -466,6 +466,9 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                       onClearMessage={dispatch.clearMessage}
                       lookupPhase={dispatch.phaseLabel}
                       progress={dispatch.progress}
+                      execution={dispatch.execution}
+                      onRetryJob={() => void dispatch.retryDurableJob()}
+                      onOpenIdentityReview={dispatch.openIdentityReview}
                       chips={dispatch.chips}
                       onFocusChip={dispatch.focusChip}
                       failure={dispatch.failure}

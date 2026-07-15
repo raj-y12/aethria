@@ -1,8 +1,14 @@
-export const DISPATCH_LOOKUP_STORAGE_VERSION = 1;
+import type { JobStatus } from '../api/jobs';
+
+export const DISPATCH_LOOKUP_STORAGE_VERSION = 2;
 export const DISPATCH_LOOKUP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const DISPATCH_LOOKUP_STORAGE_PREFIX = 'aethria.dispatch.lookups.v1';
+const DISPATCH_LOOKUP_STORAGE_PREFIX = 'aethria.dispatch.lookups.v2';
 const LOOKUP_ID_RE = /^[a-zA-Z0-9_-]{8,128}$/;
+const JOB_ID_RE = /^[a-zA-Z0-9_-]{8,128}$/;
 const MAX_BACKGROUND_LOOKUPS = 8;
+const JOB_STATUSES = new Set<JobStatus>([
+  'accepted', 'running', 'retry_wait', 'blocked', 'succeeded', 'failed', 'dead_letter', 'cancelled',
+]);
 
 export type PersistedDispatchLookup = {
   lookupId: string;
@@ -13,6 +19,11 @@ export type PersistedDispatchLookup = {
    * Required in the normalized shape; legacy stored payloads without it load as false.
    */
   isRerun: boolean;
+  /** Durable execution identity. Lookup and job IDs intentionally remain distinct. */
+  jobId?: string;
+  acceptedAt?: string;
+  pipelineRunId?: string;
+  durableStatus?: JobStatus;
 };
 
 export type DispatchLookupSnapshot = {
@@ -39,11 +50,27 @@ function normalizeLookup(value: unknown): PersistedDispatchLookup | null {
   const lookupId = typeof value.lookupId === 'string' ? value.lookupId.trim() : '';
   const queryLabel = typeof value.queryLabel === 'string' ? value.queryLabel.trim() : '';
   if (!LOOKUP_ID_RE.test(lookupId) || !queryLabel) return null;
+  const jobId = typeof value.jobId === 'string' && JOB_ID_RE.test(value.jobId.trim())
+    ? value.jobId.trim()
+    : undefined;
+  const acceptedAt = typeof value.acceptedAt === 'string' && Number.isFinite(Date.parse(value.acceptedAt))
+    ? value.acceptedAt
+    : undefined;
+  const pipelineRunId = typeof value.pipelineRunId === 'string' && value.pipelineRunId.trim()
+    ? value.pipelineRunId.trim()
+    : undefined;
+  const durableStatus = typeof value.durableStatus === 'string' && JOB_STATUSES.has(value.durableStatus as JobStatus)
+    ? value.durableStatus as JobStatus
+    : undefined;
   return {
     lookupId,
     queryLabel,
     autoOpened: Boolean(value.autoOpened),
     isRerun: Boolean(value.isRerun),
+    ...(jobId ? { jobId } : {}),
+    ...(acceptedAt ? { acceptedAt } : {}),
+    ...(pipelineRunId ? { pipelineRunId } : {}),
+    ...(durableStatus ? { durableStatus } : {}),
   };
 }
 
