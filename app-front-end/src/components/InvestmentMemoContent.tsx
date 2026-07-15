@@ -14,23 +14,16 @@ import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import AssessmentScorecard from './scoring/AssessmentScorecard';
 import MemoMasthead from './memo/MemoMasthead';
-import MemoRulingSection from './memo/MemoRulingSection';
 import MemoPrecedentStrip from './memo/MemoPrecedentStrip';
 import MemoPortfolioContext from './memo/MemoPortfolioContext';
 import MemoSectionTitle from './memo/MemoSectionTitle';
 import MemoDossierOpening from './memo/MemoDossierOpening';
 import { DECISION_BADGE_LABEL } from './DecisionBadge';
 import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
-import { resolveEscalation } from '../api/escalations';
-import {
-  buildOptimisticResolution,
-  isDealDecided,
-  type RulingDecision,
-} from '../lib/dealState';
+import { isDealDecided } from '../lib/dealState';
 import { extractAdverseRegister, type AdverseRegisterItem } from '../lib/adverseRegister';
 import {
   createDefaultFundConfiguration,
-  shouldGateRisk,
   type FundConfiguration,
 } from '../lib/fundConfiguration';
 import { findPrecedentCandidates } from '../lib/institutionalConviction';
@@ -207,7 +200,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     embedded = false,
     readOnly = false,
     onMemoPipelineReady,
-    onDecisionResolved,
     fundConfiguration,
     peerStartups = [],
     portfolioSignals = [],
@@ -217,11 +209,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const config = fundConfiguration ?? createDefaultFundConfiguration();
   const reduceMotion = usePrefersReducedMotion();
   const wrapperCls = embedded ? 'memoPanel memoPanel--embedded' : 'memoPanel';
-  const [risksReviewed, setRisksReviewed] = useState(false);
-  const [rulingDecision, setRulingDecision] = useState<RulingDecision | null>(null);
-  const [rulingNotes, setRulingNotes] = useState('');
-  const [rulingSaving, setRulingSaving] = useState(false);
-  const [rulingError, setRulingError] = useState<string | null>(null);
   const [memoPartial, setMemoPartial] = useState<MemoPartialPayload | null>(null);
   const [memoPipeline, setMemoPipeline] = useState<'idle' | 'generating' | 'ready' | 'failed'>('idle');
   const [memoGateError, setMemoGateError] = useState<string | null>(null);
@@ -370,11 +357,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     () => uniqueRiskItems(displayStartup),
     [displayStartup]
   );
-  const hasHighAdverse = adverseRegister.some((item) => item.severity === 'high');
   const isAlreadyDecided = displayStartup ? isDealDecided(displayStartup) : false;
-  const needsRiskAcknowledgement = Boolean(
-    displayStartup && shouldGateRisk(config, hasHighAdverse, adverseRegister.length > 0, isAlreadyDecided)
-  );
   const coverRulingHeadline = showJudgment
     ? decisionHeadline
     : pipelineBadgeVariant
@@ -394,50 +377,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         : !showJudgment
           ? 'Pipeline assembling recommendation'
           : null;
-  const riskReviewOutstanding = needsRiskAcknowledgement && !risksReviewed;
   const convictionHistory = displayStartup?.conviction_state?.decision_history ?? [];
   const precedentCandidates = useMemo(
     () => (displayStartup ? findPrecedentCandidates(displayStartup, peerStartups) : []),
     [displayStartup, peerStartups]
   );
-
-  useEffect(() => {
-    setRisksReviewed(false);
-    setRulingDecision(null);
-    setRulingNotes('');
-    setRulingError(null);
-  }, [config.memo.deepDiveCollapsed, startup?.id]);
-
-  useEffect(() => {
-    if (!displayStartup || rulingDecision) return;
-    const rec = displayStartup.partner?.recommendation;
-    if (rec === 'INVEST') setRulingDecision('YES');
-    else if (rec === 'PASS') setRulingDecision('NO');
-    else if (rec === 'MONITOR') setRulingDecision('MAYBE');
-  }, [displayStartup, rulingDecision]);
-
-  const handleRulingSubmit = useCallback(async () => {
-    if (!displayStartup || !rulingDecision || rulingNotes.trim().length < 5) return;
-    const previous = displayStartup;
-    const optimistic = buildOptimisticResolution(displayStartup, rulingDecision, rulingNotes.trim());
-    setRulingSaving(true);
-    setRulingError(null);
-    onDecisionResolved?.(optimistic);
-    try {
-      await resolveEscalation(displayStartup.id, rulingDecision, rulingNotes.trim(), risksReviewed);
-      setRulingSaving(false);
-    } catch {
-      onDecisionResolved?.(previous);
-      setRulingSaving(false);
-      setRulingError('Ruling did not save. Retry once the API is reachable.');
-    }
-  }, [
-    displayStartup,
-    onDecisionResolved,
-    risksReviewed,
-    rulingDecision,
-    rulingNotes,
-  ]);
 
   const structuredScoring = useMemo(
     () => normalizeStructuredScoring(displayStartup?.review ?? null),
@@ -977,22 +921,8 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </section>
             )}
 
-            {/* ── Your ruling ── */}
-            {!readOnly && !isAlreadyDecided && showJudgment && (
-              <MemoRulingSection
-                rulingDecision={rulingDecision}
-                rulingNotes={rulingNotes}
-                rulingSaving={rulingSaving}
-                rulingError={rulingError}
-                needsRiskAcknowledgement={needsRiskAcknowledgement}
-                risksReviewed={risksReviewed}
-                riskReviewOutstanding={riskReviewOutstanding}
-                onSelectDecision={setRulingDecision}
-                onNotesChange={setRulingNotes}
-                onAcknowledgeRisks={() => setRisksReviewed(true)}
-                onSubmit={() => void handleRulingSubmit()}
-              />
-            )}
+            {/* Canonical evidence, recommendation, human ruling, actions, and monitoring. */}
+            <OpportunityIntelligence startupId={displayStartup.id} readOnly={readOnly} />
 
             {/* ── Appendix (sits under the ruling) ── */}
             <div className="memoDiscGroup">
@@ -1267,7 +1197,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 </ol>
               </MemoDisclosureSection>
             )}
-            <OpportunityIntelligence startupId={displayStartup.id} readOnly={readOnly} />
             </div>
 
 
