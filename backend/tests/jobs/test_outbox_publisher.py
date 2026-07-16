@@ -5,10 +5,11 @@ import pytest
 
 
 class _Repository:
-    def __init__(self, events):
+    def __init__(self, events, governed_projection=None):
         self.events = events
         self.published = []
         self.failed = []
+        self.governed_projection = governed_projection
 
     async def claim_outbox_batch(self, **kwargs):
         events, self.events = self.events, []
@@ -21,6 +22,9 @@ class _Repository:
     async def mark_outbox_failed(self, **kwargs):
         self.failed.append(kwargs)
         return True
+
+    async def get_current_governed_policy_projection(self, *, user_id):
+        return self.governed_projection
 
 
 @pytest.mark.asyncio
@@ -85,7 +89,15 @@ async def test_governed_policy_projects_exact_config_before_marking_outbox(monke
         event_type="governed_policy_version.published",
         payload={"fund_config": {"rubric": []}, "policy_hash": "hash-1"},
     )
-    repository = _Repository([event])
+    repository = _Repository(
+        [event],
+        governed_projection={
+            "governed_policy_version_id": "version-1",
+            "published_policy_id": "version-1",
+            "fund_config": {"rubric": []},
+            "policy_hash": "hash-1",
+        },
+    )
     delivered = []
 
     async def publish(user_id, event_type, payload):
@@ -97,3 +109,37 @@ async def test_governed_policy_projects_exact_config_before_marking_outbox(monke
     assert projected == [("user-a", {"rubric": []})]
     assert delivered == ["governed_policy_version.published"]
     assert repository.published == [{"event_id": "event-policy-1"}]
+
+
+@pytest.mark.asyncio
+async def test_stale_policy_event_projects_the_current_authoritative_version(monkeypatch):
+    outbox = importlib.import_module("jobs.outbox")
+    policy_store = importlib.import_module("services.scoring.policy_store")
+    projected = []
+
+    def publish_policy(user_id, fund_config):
+        projected.append(fund_config)
+        return {"policy_hash": "hash-2"}
+
+    monkeypatch.setattr(policy_store, "publish_policy", publish_policy)
+    stale_event = SimpleNamespace(
+        event_id="event-policy-old",
+        user_id="user-a",
+        event_type="governed_policy_version.published",
+        payload={"governed_policy_version_id": "version-1"},
+    )
+    repository = _Repository(
+        [stale_event],
+        governed_projection={
+            "governed_policy_version_id": "version-2",
+            "published_policy_id": "version-2",
+            "fund_config": {"scoringWeights": [{"key": "market", "weight": 30}]},
+            "policy_hash": "hash-2",
+        },
+    )
+
+    assert await outbox.OutboxPublisher(repository).publish_once() == 1
+    assert projected == [
+        {"scoringWeights": [{"key": "market", "weight": 30}]}
+    ]
+    assert repository.published == [{"event_id": "event-policy-old"}]

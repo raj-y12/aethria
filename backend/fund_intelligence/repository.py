@@ -486,3 +486,60 @@ class FundIntelligenceRepository:
         if row is None:
             raise LookupError("Published governed policy not found for tenant")
         return _public_row(row)
+
+    async def publish_settings_policy(
+        self,
+        *,
+        user_id: str,
+        actor_id: str,
+        fund_config: Dict[str, Any],
+        policy_hash: str,
+    ) -> Dict[str, Any]:
+        """Atomically publish an operator Settings policy into the same authority."""
+        uid = require_user_id(
+            user_id,
+            context="FundIntelligenceRepository.publish_settings_policy",
+        )
+        version_id = str(uuid4())
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute("select pg_advisory_xact_lock(hashtext($1))", uid)
+                await conn.execute(
+                    """
+                    update public.governed_policy_versions set status='superseded'
+                    where user_id=$1 and status='published'
+                    """,
+                    uid,
+                )
+                row = await conn.fetchrow(
+                    """
+                    insert into public.governed_policy_versions (
+                      governed_policy_version_id,user_id,policy_proposal_id,
+                      publication_source,policy_patch,policy_hash,status,created_by,
+                      published_by,published_policy_id,published_policy_hash,
+                      created_at,published_at
+                    ) values (
+                      $1,$2,null,'settings',$3::jsonb,$4,'published',$5,$5,$1,$4,
+                      now(),now()
+                    ) returning *
+                    """,
+                    version_id,
+                    uid,
+                    json.dumps(fund_config),
+                    str(policy_hash),
+                    actor_id,
+                )
+                await self._outbox(
+                    conn,
+                    user_id=uid,
+                    aggregate_id=version_id,
+                    event_type="governed_policy_version.published",
+                    payload={
+                        "governed_policy_version_id": version_id,
+                        "published_by": actor_id,
+                        "published_policy_id": version_id,
+                        "policy_hash": str(policy_hash),
+                        "fund_config": fund_config,
+                    },
+                )
+                return _public_row(row)

@@ -601,6 +601,15 @@ export default function SettingsPage() {
       const liveSettings = refreshed ?? persistedSettings ?? settings;
       setSettings(liveSettings);
       let liveConfig = liveSettings.fund_config ?? checkpoint.fundConfig;
+      if (policyResult.policy?.policy_version_id && policyResult.policy.policy_hash) {
+        liveConfig = {
+          ...liveConfig,
+          activePolicyVersionId: policyResult.policy.policy_version_id,
+          publishedPolicyHash: policyResult.policy.policy_hash,
+          draftPolicyHash: policyResult.policy.policy_hash,
+          lastPublishedAt: policyResult.policy.published_at ?? new Date().toISOString(),
+        };
+      }
       if (summary?.active_version_number != null) {
         setThesisSummary(summary);
         liveConfig = applyThesisVersionMetadata(liveConfig, summary.active_version_number);

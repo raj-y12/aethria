@@ -679,6 +679,35 @@ class DurableJobRepository:
                     event for row in rows if (event := _outbox_from_row(row)) is not None
                 ]
 
+    async def get_current_governed_policy_projection(
+        self, *, user_id: str
+    ) -> Optional[Dict[str, Any]]:
+        uid = require_user_id(
+            user_id,
+            context="DurableJobRepository.get_current_governed_policy_projection",
+        )
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                select governed_policy_version_id,policy_hash,policy_patch
+                from public.governed_policy_versions
+                where user_id=$1 and status='published'
+                order by published_at desc limit 1
+                """,
+                uid,
+            )
+        if row is None:
+            return None
+        payload = db_row(row)
+        return {
+            "governed_policy_version_id": str(
+                payload["governed_policy_version_id"]
+            ),
+            "published_policy_id": str(payload["governed_policy_version_id"]),
+            "policy_hash": str(payload["policy_hash"]),
+            "fund_config": _json_payload(payload.get("policy_patch")),
+        }
+
     async def mark_outbox_published(self, *, event_id: str) -> bool:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(

@@ -124,3 +124,31 @@ async def test_accepted_draft_persists_the_exact_previewed_config_and_hash():
         "scoringWeights": [{"key": "market", "weight": 30}]
     }
     assert insert[2][4] == "hash-1"
+
+
+@pytest.mark.asyncio
+async def test_settings_publication_commits_governed_authority_and_outbox_together():
+    published = {
+        "governed_policy_version_id": "version-settings-1",
+        "user_id": "user-a",
+        "policy_proposal_id": None,
+        "publication_source": "settings",
+        "policy_patch": json.dumps({"scoringWeights": []}),
+        "policy_hash": "hash-settings",
+        "status": "published",
+    }
+    connection = _Connection([published])
+    repository = FundIntelligenceRepository(_Pool(connection))
+
+    result = await repository.publish_settings_policy(
+        user_id="user-a",
+        actor_id="user-a",
+        fund_config={"scoringWeights": []},
+        policy_hash="hash-settings",
+    )
+
+    assert result["publication_source"] == "settings"
+    sql = "\n".join(call[1].lower() for call in connection.calls)
+    assert "pg_advisory_xact_lock" in sql
+    assert "publication_source" in sql
+    assert "governed_policy_version.published" in str(connection.calls)

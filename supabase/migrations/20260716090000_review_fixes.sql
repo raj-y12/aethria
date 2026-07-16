@@ -51,6 +51,17 @@ alter table public.governed_policy_versions
   add column if not exists policy_hash text;
 
 alter table public.governed_policy_versions
+  alter column policy_proposal_id drop not null;
+
+alter table public.governed_policy_versions
+  add column if not exists publication_source text not null default 'proposal';
+
+alter table public.governed_policy_versions
+  add constraint governed_policy_versions_source_check
+  check (publication_source in ('proposal','settings'))
+  not valid;
+
+alter table public.governed_policy_versions
   add constraint governed_policy_versions_policy_hash_present
   check (policy_hash is not null and length(btrim(policy_hash)) > 0)
   not valid;

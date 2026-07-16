@@ -64,6 +64,18 @@ async def test_repository_preview_review_and_publication_are_hash_bound():
         assert published["status"] == "published"
         assert active["governed_policy_version_id"] == version_id
         assert active["policy_hash"] == "hash-bound"
+        settings_published = await repository.publish_settings_policy(
+            user_id=user_id,
+            actor_id=user_id,
+            fund_config={"scoringWeights": [{"key": "market", "weight": 40}]},
+            policy_hash="hash-settings",
+        )
+        active = await repository.get_active_published_policy(user_id=user_id)
+        assert settings_published["publication_source"] == "settings"
+        assert active["governed_policy_version_id"] == settings_published[
+            "governed_policy_version_id"
+        ]
+        assert active["policy_hash"] == "hash-settings"
     finally:
         async with pool.acquire() as connection:
             await connection.execute(

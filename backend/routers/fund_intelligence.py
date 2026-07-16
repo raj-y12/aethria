@@ -77,17 +77,30 @@ async def _canonical_policy_result(
         patch = _restricted_policy_patch(edited_policy_patch)
     else:
         raise ValueError("Only acceptance actions can preview a policy result")
-    settings = await asyncio.to_thread(load_settings, user_id, use_cache=False)
-    current = (
-        dict(settings.get("fund_config"))
-        if isinstance(settings.get("fund_config"), dict)
-        else {}
-    )
+    current: Dict[str, Any]
+    current_hash: str
+    active_reader = getattr(_repository(request), "get_active_published_policy", None)
+    governed = None
+    if callable(active_reader):
+        try:
+            governed = await active_reader(user_id=user_id)
+        except LookupError:
+            governed = None
+    if governed is not None:
+        current = dict(governed.get("policy_patch") or {})
+        current_hash = str(governed.get("policy_hash") or "").strip()
+    else:
+        settings = await asyncio.to_thread(load_settings, user_id, use_cache=False)
+        current = (
+            dict(settings.get("fund_config"))
+            if isinstance(settings.get("fund_config"), dict)
+            else {}
+        )
+        current_hash = str(current.get("publishedPolicyHash") or "").strip()
     result = {**current, **patch}
     compiled = await asyncio.to_thread(
         compile_policy_from_fund_config, result, require_publish_ready=True
     )
-    current_hash = str(current.get("publishedPolicyHash") or "").strip()
     if compiled["policy_hash"] == current_hash:
         raise ValueError("The edited proposal does not change the published scoring policy")
     return result, compiled, _config_hash(result)

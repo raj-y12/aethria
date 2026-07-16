@@ -115,7 +115,6 @@ from meta.evaluator import run_prompt_evaluation
 from reviewer.engine import ReviewerEngine
 from reviewer.aethria_view import polish_aethria_view_for_api
 from services.scoring.policy_compiler import PolicyValidationError, compile_policy_from_fund_config
-from services.scoring.policy_store import publish_policy
 from services.scoring.presentation_layer import serialize_scoring_presentation
 from portfolio.store import PortfolioStore
 from portfolio.rejection import RejectionAnalyzer
@@ -2314,7 +2313,7 @@ def preview_settings_policy(request: Request, body: dict | None = None):
 
 
 @app.post("/api/settings/policy/publish")
-def publish_settings_policy(request: Request, body: dict | None = None):
+async def publish_settings_policy(request: Request, body: dict | None = None):
     """Publish the current or supplied fund_config draft as an immutable scoring policy version."""
     user_id = require_authenticated_user(request)
     limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
@@ -2323,13 +2322,44 @@ def publish_settings_policy(request: Request, body: dict | None = None):
     payload = body if isinstance(body, dict) else {}
     fund_config = payload.get("fund_config") if isinstance(payload.get("fund_config"), dict) else None
     try:
-        policy = publish_policy(user_id, fund_config=fund_config)
+        if fund_config is None:
+            settings = await asyncio.to_thread(load_settings, user_id, use_cache=False)
+            fund_config = (
+                settings.get("fund_config")
+                if isinstance(settings.get("fund_config"), dict)
+                else {}
+            )
+        compiled = await asyncio.to_thread(
+            compile_policy_from_fund_config,
+            fund_config,
+            require_publish_ready=True,
+        )
+        repository = getattr(app.state, "fund_intelligence_repository", None)
+        if repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Governed policy store unavailable",
+            )
+        version = await repository.publish_settings_policy(
+            user_id=user_id,
+            actor_id=user_id,
+            fund_config=fund_config,
+            policy_hash=compiled["policy_hash"],
+        )
     except PolicyValidationError as exc:
         raise HTTPException(
             status_code=422,
             detail={"message": "Policy validation failed", "errors": exc.errors},
         ) from exc
-    return {"policy": policy}
+    return {
+        "policy": {
+            **compiled,
+            "policy_version_id": version["governed_policy_version_id"],
+            "published_at": version.get("published_at"),
+            "authoritative_store": "governed_policy_versions",
+            "legacy_projection": "pending",
+        }
+    }
 
 
 @app.get("/api/policy/active")

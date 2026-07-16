@@ -104,7 +104,8 @@ class PolicyProposalRecord(_TenantModel):
 
 class PolicyVersionRecord(_TenantModel):
     governed_policy_version_id: str = Field(default_factory=lambda: str(uuid4()))
-    policy_proposal_id: str
+    policy_proposal_id: Optional[str] = None
+    publication_source: str = "proposal"
     policy_patch: Dict[str, Any]
     status: PolicyVersionStatus = PolicyVersionStatus.DRAFT
     created_by: str

@@ -6,6 +6,7 @@ from security.rate_limiter import InMemorySecurityStore
 class _Repository:
     def __init__(self):
         self.calls = []
+        self.active_policy = None
 
     async def derive_override_patterns(self, **kwargs):
         self.calls.append(("derive", kwargs))
@@ -35,6 +36,19 @@ class _Repository:
             "signals": [],
             "impact_previews": [],
             "policy_versions": [],
+        }
+
+    async def get_active_published_policy(self, **kwargs):
+        if self.active_policy is None:
+            raise LookupError("No governed policy yet")
+        return self.active_policy
+
+    async def publish_settings_policy(self, **kwargs):
+        self.calls.append(("settings_publish", kwargs))
+        return {
+            "governed_policy_version_id": "settings-version-1",
+            "policy_hash": kwargs["policy_hash"],
+            "published_at": "2026-07-16T20:00:00Z",
         }
 
     async def get_publishable_version(self, **kwargs):
@@ -168,3 +182,61 @@ def test_descriptive_proposal_cannot_be_plain_accepted(monkeypatch):
     assert response.status_code == 409
     assert "unsupported field" in str(response.json()["detail"]).lower()
     assert not any(call[0] == "review" for call in repository.calls)
+
+
+def test_edit_is_applied_to_authoritative_governed_base_not_stale_legacy(monkeypatch):
+    import routers.fund_intelligence as routes
+
+    repository = _Repository()
+    repository.active_policy = {
+        "policy_patch": {
+            "rubric": [{"id": "authoritative"}],
+            "scoringWeights": [{"key": "market", "weight": 20}],
+        },
+        "policy_hash": "governed-hash",
+    }
+    monkeypatch.setattr(
+        routes,
+        "load_settings",
+        lambda *args, **kwargs: {
+            "fund_config": {"rubric": [{"id": "stale-legacy"}]}
+        },
+    )
+    monkeypatch.setattr(
+        routes,
+        "compile_policy_from_fund_config",
+        lambda config, require_publish_ready=True: {"policy_hash": "next-hash"},
+    )
+
+    response = _client(monkeypatch, repository).post(
+        "/api/fund-intelligence/proposals/proposal-1/review",
+        headers={"Authorization": "Bearer t"},
+        json={
+            "action": "edit_and_accept",
+            "rationale": "Apply to current governed base.",
+            "edited_policy_patch": {
+                "scoringWeights": [{"key": "market", "weight": 30}]
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    call = next(item for item in repository.calls if item[0] == "review")
+    assert call[1]["resulting_fund_config"]["rubric"] == [{"id": "authoritative"}]
+    assert call[1]["resulting_fund_config"]["scoringWeights"][0]["weight"] == 30
+
+
+def test_settings_publish_uses_the_governed_repository_not_legacy_store(monkeypatch):
+    repository = _Repository()
+    response = _client(monkeypatch, repository).post(
+        "/api/settings/policy/publish",
+        headers={"Authorization": "Bearer t"},
+        json={"fund_config": {"scoringWeights": [{"key": "market", "weight": 30}]}},
+    )
+
+    assert response.status_code == 200
+    call = next(item for item in repository.calls if item[0] == "settings_publish")
+    assert call[1]["user_id"] == "user-a"
+    assert call[1]["fund_config"]["scoringWeights"][0]["weight"] == 30
+    assert response.json()["policy"]["policy_version_id"] == "settings-version-1"
+    assert response.json()["policy"]["authoritative_store"] == "governed_policy_versions"

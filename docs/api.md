@@ -65,9 +65,9 @@ Base URL (local): `http://localhost:8000`
 
 - `POST /api/fund-intelligence/derive-overrides` -> derive attributed observations/proposals.
 - `GET /api/fund-intelligence/proposals` and `GET /api/fund-intelligence/proposals/{id}` -> proposal inbox/detail.
-- `POST /api/fund-intelligence/proposals/{id}/preview` -> bounded historical impact preview.
-- `POST /api/fund-intelligence/proposals/{id}/review` -> accept/edit/reject/defer; acceptance creates a draft only.
-- `POST /api/fund-intelligence/policy-versions/{id}/publish` -> separate authenticated production publication.
+- `POST /api/fund-intelligence/proposals/{id}/preview` -> bounded preview for a server-applied stored patch or a restricted `rubric`/`scoringWeights` edit; binds both policy and canonical-config hashes.
+- `POST /api/fund-intelligence/proposals/{id}/review` -> accept/edit/reject/defer; edited acceptance receives a restricted patch, never a client-supplied full fund configuration, and creates a draft only.
+- `POST /api/fund-intelligence/policy-versions/{id}/publish` -> atomically publishes the governed PostgreSQL version; legacy settings are projected idempotently through the outbox.
 
 ## Imports, Confidential Artifacts, and Outcomes
 

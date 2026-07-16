@@ -56,8 +56,41 @@ class OutboxPublisher:
         published = 0
         for event in events:
             try:
-                await self.project(event.user_id, event.event_type, event.payload)
-                await self.publish(event.user_id, event.event_type, event.payload)
+                payload = event.payload
+                projected_version_id = None
+                if event.event_type == "governed_policy_version.published":
+                    loader = getattr(
+                        self.repository,
+                        "get_current_governed_policy_projection",
+                        None,
+                    )
+                    if not callable(loader):
+                        raise RuntimeError(
+                            "Outbox repository cannot resolve authoritative policy projection"
+                        )
+                    projection = await loader(user_id=event.user_id)
+                    if projection is None:
+                        raise RuntimeError(
+                            "Published governed policy projection is unavailable"
+                        )
+                    payload = projection
+                    projected_version_id = projection[
+                        "governed_policy_version_id"
+                    ]
+                await self.project(event.user_id, event.event_type, payload)
+                if projected_version_id is not None:
+                    current = await self.repository.get_current_governed_policy_projection(
+                        user_id=event.user_id
+                    )
+                    if (
+                        current is None
+                        or current["governed_policy_version_id"]
+                        != projected_version_id
+                    ):
+                        raise RuntimeError(
+                            "Governed policy changed during legacy projection; retrying latest"
+                        )
+                await self.publish(event.user_id, event.event_type, payload)
             except Exception as exc:
                 metrics.inc_outbox_publication(outcome="failed")
                 await self.repository.mark_outbox_failed(

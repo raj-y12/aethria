@@ -341,6 +341,34 @@ async def test_global_queue_depths_are_explicitly_named_for_operator_metrics():
 
 
 @pytest.mark.asyncio
+async def test_governed_policy_projection_reads_only_the_tenant_active_version():
+    repository_module = importlib.import_module("jobs.repository")
+    connection = _Connection(
+        fetchrows=[
+            {
+                "governed_policy_version_id": "version-2",
+                "policy_hash": "hash-2",
+                "policy_patch": json.dumps({"scoringWeights": []}),
+            }
+        ]
+    )
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    projection = await repository.get_current_governed_policy_projection(
+        user_id="user-a"
+    )
+
+    assert projection == {
+        "governed_policy_version_id": "version-2",
+        "published_policy_id": "version-2",
+        "policy_hash": "hash-2",
+        "fund_config": {"scoringWeights": []},
+    }
+    sql = connection.calls[0][1].lower()
+    assert "where user_id=$1 and status='published'" in sql
+
+
+@pytest.mark.asyncio
 async def test_create_pool_requires_direct_dsn_and_uses_bounded_sizes(monkeypatch):
     postgres = importlib.import_module("jobs.postgres")
     monkeypatch.delenv("DATABASE_URL", raising=False)
