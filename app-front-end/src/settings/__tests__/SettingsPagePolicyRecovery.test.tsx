@@ -59,6 +59,10 @@ vi.mock('../../hooks', async () => {
   return { ...actual, usePrefersReducedMotion: () => true };
 });
 
+// These tests drive several render/fireEvent/waitFor cycles each and
+// legitimately take 2-3s; the 5s default flakes under CPU load.
+vi.setConfig({ testTimeout: 15000 });
+
 function createSettings(fundName = 'Original Fund'): Settings {
   const base: Settings = {
     fund_identity: {

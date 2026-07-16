@@ -63,6 +63,10 @@ vi.mock('../../api/fundThesis', async () => {
   };
 });
 
+// The "Settings safe draft actions" tests drive several render/fireEvent/waitFor
+// cycles each and legitimately take 2-3s; the 5s default flakes under CPU load.
+vi.setConfig({ testTimeout: 15000 });
+
 let liveConfiguration: FundConfiguration;
 
 vi.mock('../../hooks', async () => {
