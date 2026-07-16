@@ -7,9 +7,11 @@ import type {
   SystemHealthSnapshot, MetaInsightsPayload,
 } from '../types/startup';
 import type { FundThesisRuntime } from '../api/fundThesis';
+import type { SystemStatus } from '../api/system';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import { type FundConfiguration } from '../lib/fundConfiguration';
+import IdentityReviewQueue from './identity/IdentityReviewQueue';
 
 /**
  * The five facets of the instrument, ordered by how an investor reads it:
@@ -79,6 +81,7 @@ interface SystemIntelligenceProps {
   watchlistAnalytics: WatchlistAnalytics;
   concentrationAnalytics: ConcentrationAnalytics;
   systemHealth: SystemHealthSnapshot | null;
+  systemStatus?: SystemStatus | null;
   metaReports: MetaCycleReport[];
   scoutWeights: ScoutWeights;
   calibrationState: CalibrationState;
@@ -131,6 +134,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
               watchlist={props.watchlistAnalytics}
               concentration={props.concentrationAnalytics}
               systemHealth={props.systemHealth}
+              systemStatus={props.systemStatus}
             />
           )}
           {activeTab === 'decisions' && (
@@ -141,7 +145,10 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
             />
           )}
           {activeTab === 'calibration' && (
-            <CalibrationTab startups={props.startups} fundConfiguration={props.fundConfiguration} />
+            <div className="space-y-phi-6">
+              <IdentityReviewQueue compact />
+              <CalibrationTab startups={props.startups} fundConfiguration={props.fundConfiguration} />
+            </div>
           )}
           {activeTab === 'thesis' && (
             <InstitutionalMandateTab
@@ -158,6 +165,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
               promptState={props.metaPromptState}
               metaEvalSet={props.metaEvalSet}
               insights={props.metaInsights}
+              fundConfiguration={props.fundConfiguration}
             />
           )}
       </motion.div>

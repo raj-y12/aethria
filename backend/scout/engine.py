@@ -151,7 +151,12 @@ class ScoutEngine:
         except ImportError:
             return self.scouts
     
-    async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> List[ScoutOutput]:
+    async def run_cycle(
+        self,
+        pipeline_run_id: Optional[str] = None,
+        *,
+        persist_discoveries: bool = True,
+    ) -> List[ScoutOutput]:
         """
         Run one discovery cycle with all Scouts in parallel.
         
@@ -250,6 +255,7 @@ class ScoutEngine:
                         result = dict(result)
 
                     discoveries.append(result)
+                    result["pipeline_run_id"] = pipeline_run_id
                     self.logger.info(
                         f"[{scout.scout_type}] Discovered: {result['name']} "
                         f"(confidence: {result['confidence']:.2f})"
@@ -257,13 +263,19 @@ class ScoutEngine:
 
                     if self.cost_controller:
                         self.cost_controller.record_usage(
-                            "scout", scout.scout_type, scout._last_token_usage
+                            "scout",
+                            scout.scout_type,
+                            scout._last_token_usage,
+                            model=self.model,
                         )
 
-                    if self.storage:
+                    if self.storage and persist_discoveries:
                         try:
-                            await asyncio.to_thread(
+                            persisted_id = await asyncio.to_thread(
                                 self.storage.add_discovery, result, pipeline_run_id=pipeline_run_id
+                            )
+                            result["persisted_startup_id"] = str(
+                                persisted_id or result.get("id") or ""
                             )
                         except Exception as e:
                             self.logger.error(
@@ -312,6 +324,7 @@ class ScoutEngine:
         """
         company = (company_name or "").strip()
         self.last_lookup_outcome = None
+        self.last_lookup_startup = None
         if not company:
             return None
         selected = next((s for s in self.scouts if s.scout_type == scout_type), None)
@@ -414,6 +427,14 @@ class ScoutEngine:
             payload["lookup_website"] = (website or "").strip() or None
             if lookup_id and str(lookup_id).strip():
                 payload["lookup_id"] = str(lookup_id).strip()
+            from models import Startup
+            from utils.adapters import financials_from_scout_output, scout_output_to_scout_info
+
+            handoff_startup = Startup(
+                startup_id=str(payload.get("id") or ""),
+                scout_info=scout_output_to_scout_info(payload),
+                financials=financials_from_scout_output(payload),
+            )
             pr = (pipeline_run_id or "").strip() or None
             persisted_id = str(payload.get("id") or "")
             if self.storage:
@@ -423,6 +444,10 @@ class ScoutEngine:
                     pipeline_run_id=pr,
                 )
             already_exists = bool(persisted_id and persisted_id != str(payload.get("id") or ""))
+            if not already_exists and persisted_id:
+                handoff_startup.startup_id = persisted_id
+                handoff_startup.scout_info.startup_id = persisted_id
+                self.last_lookup_startup = handoff_startup
             self.last_lookup_outcome = {
                 "status": (
                     "ALREADY_IN_DEAL_FLOW"

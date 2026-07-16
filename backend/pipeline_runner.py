@@ -13,8 +13,8 @@ import resource
 import time
 from datetime import datetime, timezone
 from utils.timeutil import utcnow
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Awaitable, Callable, Dict, Optional
 from uuid import uuid4
 
 try:
@@ -54,6 +54,10 @@ from fund_thesis import (
     _bootstrap_default_thesis_or_raise,
     get_active_thesis,
 )
+from identity.acquisition import observation_from_scout_discovery
+from identity.projection import link_admission_projection
+from identity.service import IdentityService
+from utils.reference_validation import is_generic_reference
 
 logger = logging.getLogger("pipeline_runner")
 _visible_logger = logging.getLogger("uvicorn.error")
@@ -68,6 +72,8 @@ class _PipelineEngines:
     reviewer_engine: ReviewerEngine
     partner_engine: PartnerEngine
     portfolio_store: PortfolioStore
+    cost_controller: Optional[CostController] = None
+    model_metadata: Dict[str, str] = field(default_factory=dict)
 
 
 def _build_pipeline_engines(
@@ -80,7 +86,10 @@ def _build_pipeline_engines(
     use_resource_fund_thesis_fallback: bool = True,
 ) -> _PipelineEngines:
     cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
-    cost_controller = CostController(user_id=user_id) if cost_budget_enabled else None
+    cost_controller = CostController(
+        user_id=user_id,
+        enforce_limits=cost_budget_enabled,
+    )
     deal_memory = DealMemory(user_id=user_id)
     model = os.getenv("SCOUT_MODEL", DEFAULT_SCOUT_MODEL)
     reviewer_model = os.getenv("REVIEWER_MODEL", DEFAULT_REVIEWER_MODEL)
@@ -127,6 +136,15 @@ def _build_pipeline_engines(
         reviewer_engine=reviewer_engine,
         partner_engine=partner_engine,
         portfolio_store=portfolio_store,
+        cost_controller=cost_controller,
+        model_metadata={
+            "scout": model,
+            "reviewer": reviewer_model,
+            "partner": getattr(
+                getattr(partner_engine, "decision_engine", None), "model", None
+            )
+            or os.getenv("PARTNER_MODEL", "gpt-5-nano"),
+        },
     )
 
 
@@ -146,6 +164,31 @@ def _close_pipeline_engines(*engines: object) -> None:
             close()
         except Exception as exc:  # pragma: no cover - defensive
             logger.debug("Engine close failed (%s): %s", type(engine).__name__, exc)
+
+
+def _observe_decision_ready_usage(
+    cost_controller: Optional[CostController],
+    *,
+    before: Dict[str, Any],
+    cohort: str,
+    decision_count: int = 1,
+) -> None:
+    """Observe per-decision usage from one tenant-local cumulative delta."""
+    if cost_controller is None or decision_count <= 0:
+        return
+    after = cost_controller.snapshot_usage()
+    delta = cost_controller.usage_delta(before, after)
+    metrics.observe_decision_ready_usage(
+        cohort=cohort,
+        cost_usd=round(float(delta["cost_usd"]) / decision_count, 8),
+        tokens=int(round(int(delta["tokens"]) / decision_count)),
+    )
+
+
+def _usage_snapshot(cost_controller: Optional[CostController]) -> Dict[str, Any]:
+    if cost_controller is None:
+        return {"calls": 0, "tokens": 0, "cost_usd": 0.0}
+    return cost_controller.snapshot_usage()
 
 
 def _build_storage_sync(user_id: str) -> SupabaseStartupsStorage:
@@ -246,6 +289,88 @@ async def _prune_unreferenced_startups(
     return removed
 
 
+async def _admit_autonomous_discoveries(
+    *,
+    user_id: str,
+    discoveries: list[Dict[str, Any]],
+    storage: Any,
+    identity_repository: Any,
+    identity_service: Optional[Any] = None,
+    discoveries_are_persisted: bool = True,
+) -> list[Any]:
+    """Admit only reference-gated rows and quarantine ambiguous projections."""
+
+    if identity_repository is None:
+        return []
+    service = identity_service or IdentityService(identity_repository)
+    admissions = []
+    for discovery in discoveries:
+        startup_id = str(
+            discovery.get("persisted_startup_id") or discovery.get("id") or ""
+        ).strip()
+        if not startup_id:
+            continue
+        if discoveries_are_persisted:
+            # The reference prune is authoritative for compatibility survival. A
+            # raw Scout result that no longer has a row must never create state.
+            if await asyncio.to_thread(storage.get_startup, startup_id) is None:
+                continue
+        else:
+            references = discovery.get("references")
+            valid_references = [
+                item
+                for item in references or []
+                if isinstance(item, str)
+                and item.strip()
+                and not is_generic_reference(item)
+            ]
+            if not valid_references:
+                continue
+        observation = observation_from_scout_discovery(
+            user_id=user_id,
+            discovery=discovery,
+            include_legacy_projection=discoveries_are_persisted,
+        )
+        admission = await service.admit(observation)
+        admissions.append(admission)
+        if admission.blocks_evaluation or not admission.opportunity_id:
+            if not discoveries_are_persisted:
+                logger.info(
+                    "[%s] Identity review blocked unpersisted discovery startup_id=%s case_id=%s",
+                    user_id[:12],
+                    startup_id,
+                    admission.identity_case_id,
+                )
+                continue
+            remover = getattr(storage, "remove_startup", None)
+            if not callable(remover):
+                raise RuntimeError(
+                    "Identity-blocked discovery cannot be removed from review queue"
+                )
+            await asyncio.to_thread(remover, startup_id)
+            logger.info(
+                "[%s] Identity review blocked discovery startup_id=%s case_id=%s",
+                user_id[:12],
+                startup_id,
+                admission.identity_case_id,
+            )
+            continue
+        if not discoveries_are_persisted:
+            persisted_id = await asyncio.to_thread(
+                storage.add_discovery,
+                discovery,
+                pipeline_run_id=discovery.get("pipeline_run_id"),
+            )
+            startup_id = str(persisted_id or startup_id)
+            discovery["persisted_startup_id"] = startup_id
+        await link_admission_projection(
+            identity_repository,
+            admission=admission,
+            legacy_startup_id=startup_id,
+        )
+    return admissions
+
+
 async def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str) -> None:
     lid = (lookup_id or "").strip()
     if not lid or not user_id or not str(user_id).strip():
@@ -339,17 +464,34 @@ async def _mark_lookup_pipeline_failed(
     )
 
 
-async def run_one_pipeline_cycle(user_id: str, *, manual_one_shot: bool = False) -> None:
+async def run_one_pipeline_cycle(
+    user_id: str,
+    *,
+    manual_one_shot: bool = False,
+    pipeline_run_id: Optional[str] = None,
+    identity_repository: Optional[Any] = None,
+) -> None:
     """Run one cycle of scout, reviewer, partner, portfolio, and meta for the given user."""
     if not user_id or not user_id.strip():
         logger.warning("run_one_pipeline_cycle: skipped (empty user_id)")
         return
     user_id = user_id.strip()
     async with pipeline_execution_slot(user_id):
-        await _run_one_pipeline_cycle_inner(user_id, manual_one_shot=manual_one_shot)
+        await _run_one_pipeline_cycle_inner(
+            user_id,
+            manual_one_shot=manual_one_shot,
+            pipeline_run_id=pipeline_run_id,
+            identity_repository=identity_repository,
+        )
 
 
-async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool = False) -> None:
+async def _run_one_pipeline_cycle_inner(
+    user_id: str,
+    *,
+    manual_one_shot: bool = False,
+    pipeline_run_id: Optional[str] = None,
+    identity_repository: Optional[Any] = None,
+) -> None:
     tenant = TenantContext(user_id=user_id)
     logger.info(
         "event=tenant_context user_id=%s module=pipeline_cycle",
@@ -440,13 +582,14 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
     reviewer_engine = engines.reviewer_engine
     partner_engine = engines.partner_engine
     portfolio_store = engines.portfolio_store
+    cycle_usage_before = _usage_snapshot(engines.cost_controller)
 
     started_at = time.perf_counter()
     agents_executed = 0
     total_startups_before: Optional[int] = None
     total_startups_after: Optional[int] = None
     try:
-        pipeline_run_id = str(uuid4())
+        pipeline_run_id = (pipeline_run_id or "").strip() or str(uuid4())
         logger.info(
             "[%s] pipeline_run_id=%s module=pipeline_cycle rss_mb_start=%.1f",
             user_id[:12],
@@ -460,10 +603,18 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
             _activity_startups_before = total_startups_before
         except Exception as e:
             logger.debug("[%s] startups_before count unavailable: %s", user_id[:12], e)
-        if scouts_enabled:
+        discoveries = []
+        if scouts_enabled and identity_repository is not None:
             agents_executed += len(getattr(scout_engine, "scouts", []) or [])
-            await scout_engine.run_cycle(pipeline_run_id=pipeline_run_id)
-            _notify_startups_changed(user_id, "scout")
+            discoveries = await scout_engine.run_cycle(
+                pipeline_run_id=pipeline_run_id,
+                persist_discoveries=False,
+            )
+        elif scouts_enabled:
+            logger.error(
+                "[%s] Scout stage skipped: canonical identity store unavailable",
+                user_id[:12],
+            )
         else:
             logger.info("[%s] Scout stage skipped (disabled in settings)", user_id[:12])
 
@@ -472,10 +623,28 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
         # on-demand lookup and resolution-status guards live in storage.
         await _prune_unreferenced_startups(storage, user_id)
 
+        if scouts_enabled and identity_repository is not None:
+            await _admit_autonomous_discoveries(
+                user_id=user_id,
+                discoveries=discoveries,
+                storage=storage,
+                identity_repository=identity_repository,
+                discoveries_are_persisted=False,
+            )
+            _notify_startups_changed(user_id, "scout")
+
+        eligible_startup_ids: set[str] = set()
+        if identity_repository is not None:
+            eligible_startup_ids = set(
+                await identity_repository.list_linked_legacy_startup_ids(
+                    user_id=user_id
+                )
+            )
+
         _activity_reviewed_count = 0
         _activity_decided_count = 0
         _activity_escalations_count = 0
-        if reviewers_enabled:
+        if reviewers_enabled and identity_repository is not None:
             agents_executed += 3
             unreviewed_before = await asyncio.to_thread(_safe_stage_count, storage, "count_unreviewed", user_id)
             if (unreviewed_before or 0) > 0:
@@ -484,7 +653,10 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
                     user_id[:12],
                     unreviewed_before,
                 )
-            reviewed_count = await reviewer_engine.run_cycle(pipeline_run_id=pipeline_run_id)
+            reviewed_count = await reviewer_engine.run_cycle(
+                pipeline_run_id=pipeline_run_id,
+                eligible_startup_ids=eligible_startup_ids,
+            )
             _activity_reviewed_count = reviewed_count or 0
             if _activity_reviewed_count > 0:
                 _notify_startups_changed(user_id, "reviewer")
@@ -502,9 +674,13 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
                     reviewer_stats.get("reason"),
                 )
         else:
-            logger.info("[%s] Reviewer stage skipped (disabled in settings)", user_id[:12])
+            logger.info(
+                "[%s] Reviewer stage skipped (%s)",
+                user_id[:12],
+                "disabled in settings" if not reviewers_enabled else "canonical identity store unavailable",
+            )
 
-        if partners_enabled:
+        if partners_enabled and identity_repository is not None:
             agents_executed += 1
             undecided_before = await asyncio.to_thread(_safe_stage_count, storage, "count_undecided", user_id)
             if (undecided_before or 0) > 0:
@@ -513,8 +689,22 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
                     user_id[:12],
                     undecided_before,
                 )
-            decided_count = await partner_engine.run_cycle(pipeline_run_id=pipeline_run_id)
+            decided_count = await partner_engine.run_cycle(
+                pipeline_run_id=pipeline_run_id,
+                eligible_startup_ids=eligible_startup_ids,
+            )
             _activity_decided_count = decided_count or 0
+            if _activity_decided_count > 0:
+                _observe_decision_ready_usage(
+                    engines.cost_controller,
+                    before=cycle_usage_before,
+                    cohort="autonomous_discovery",
+                    decision_count=_activity_decided_count,
+                )
+                for _ in range(_activity_decided_count):
+                    metrics.inc_evaluation_manifest(
+                        path="autonomous_discovery", outcome="success"
+                    )
             _activity_escalations_count = getattr(partner_engine, "last_cycle_escalations", 0)
             if _activity_decided_count > 0 or _activity_escalations_count > 0:
                 _notify_startups_changed(user_id, "partner")
@@ -527,7 +717,11 @@ async def _run_one_pipeline_cycle_inner(user_id: str, *, manual_one_shot: bool =
                     undecided_after,
                 )
         else:
-            logger.info("[%s] Partner stage skipped (disabled in settings)", user_id[:12])
+            logger.info(
+                "[%s] Partner stage skipped (%s)",
+                user_id[:12],
+                "disabled in settings" if not partners_enabled else "canonical identity store unavailable",
+            )
 
         portfolio_engine = PortfolioEngine(
             discovery_storage=storage,
@@ -612,6 +806,11 @@ async def run_on_demand_lookup(
     additional_context: Optional[str] = None,
     replace_startup_id: Optional[str] = None,
     resolution: Optional[Any] = None,
+    pipeline_run_id: Optional[str] = None,
+    checkpoint: Optional[
+        Callable[[str, str, Dict[str, Any]], Awaitable[None]]
+    ] = None,
+    institutional_context: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
     """
     Run scout -> reviewer -> partner for one explicit company name.
@@ -645,6 +844,9 @@ async def run_on_demand_lookup(
             additional_context=additional_context,
             replace_startup_id=replace_startup_id,
             resolution=resolution,
+            pipeline_run_id=pipeline_run_id,
+            checkpoint=checkpoint,
+            institutional_context=institutional_context,
         )
 
 
@@ -682,6 +884,11 @@ async def _run_on_demand_lookup_inner(
     additional_context: Optional[str] = None,
     replace_startup_id: Optional[str] = None,
     resolution: Optional[Any] = None,
+    pipeline_run_id: Optional[str] = None,
+    checkpoint: Optional[
+        Callable[[str, str, Dict[str, Any]], Awaitable[None]]
+    ] = None,
+    institutional_context: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
     tenant = TenantContext(user_id=user_id)
     logger.info(
@@ -689,6 +896,10 @@ async def _run_on_demand_lookup_inner(
         tenant.user_id[:24],
     )
     lid = (lookup_id or "").strip() or None
+
+    async def emit(stage: str, status: str, **metadata: Any) -> None:
+        if checkpoint is not None:
+            await checkpoint(stage, status, metadata)
 
     def cancelled() -> bool:
         try:
@@ -770,11 +981,19 @@ async def _run_on_demand_lookup_inner(
     scout_engine = engines.scout_engine
     reviewer_engine = engines.reviewer_engine
     partner_engine = engines.partner_engine
+    lookup_usage_before = _usage_snapshot(engines.cost_controller)
 
     startup_id: Optional[str] = None
     lookup_outcome: Dict[str, Any] = {}
     try:
-        lookup_run_id = str(uuid4())
+        lookup_run_id = (pipeline_run_id or "").strip() or str(uuid4())
+        await emit(
+            "accepted",
+            "succeeded",
+            lookup_id=lid,
+            pipeline_run_id=lookup_run_id,
+            **(institutional_context or {}),
+        )
         logger.info(
             "[%s] on_demand_lookup pipeline_run_id=%s rss_mb_start=%.1f",
             user_id[:12],
@@ -844,31 +1063,27 @@ async def _run_on_demand_lookup_inner(
             await _record_lookup_failure(user_id, lid, message)
             metrics.inc_lookup("not_found")
             return None
+        await emit("scout", "succeeded", startup_id=startup_id)
         # The scout persisted a row — nudge the UI so the card appears at once.
         _notify_startups_changed(user_id, "lookup_scout")
+        handoff_startup = getattr(scout_engine, "last_lookup_startup", None)
+        if handoff_startup is None:
+            # Existing-company and rerun paths load the pre-existing record once.
+            get_startup = getattr(storage, "get_startup", None)
+            if callable(get_startup):
+                handoff_startup = await asyncio.to_thread(get_startup, startup_id)
         if cancelled():
             logger.info("[%s] Lookup cancelled after scout: %s (%s)", user_id[:12], company, startup_id)
             return startup_id
-        # Supabase can be briefly stale right after insert; retry reviewer handoff once or twice.
         reviewer_stage_started = time.perf_counter()
-        reviewed = False
-        review_attempts = 3
-        for attempt in range(1, review_attempts + 1):
-            if cancelled():
-                logger.info("[%s] Lookup cancelled before review: %s (%s)", user_id[:12], company, startup_id)
-                return startup_id
-            reviewed = await reviewer_engine.run_startup(
-                startup_id,
-                ignore_confidence_threshold=True,
-                pipeline_run_id=lookup_run_id,
-                # Re-review must not short-circuit on a stale "already reviewed" read.
-                force_rerun=bool(replace_startup_id),
-                bypass_agent_enabled_gate=True,
-            )
-            if reviewed:
-                break
-            if attempt < review_attempts:
-                await asyncio.sleep(0.8 * attempt)
+        reviewed = await reviewer_engine.run_startup(
+            startup_id,
+            ignore_confidence_threshold=True,
+            pipeline_run_id=lookup_run_id,
+            force_rerun=bool(replace_startup_id),
+            bypass_agent_enabled_gate=True,
+            startup=handoff_startup,
+        )
         metrics.observe_pipeline_stage(
             time.perf_counter() - reviewer_stage_started,
             pipeline="lookup",
@@ -882,27 +1097,19 @@ async def _run_on_demand_lookup_inner(
             await _record_lookup_failure(user_id, lid, message)
             metrics.inc_lookup("error")
             return startup_id
+        await emit("reviewer", "succeeded", startup_id=startup_id)
         _notify_startups_changed(user_id, "lookup_reviewer")
         if cancelled():
             logger.info("[%s] Lookup cancelled after review: %s (%s)", user_id[:12], company, startup_id)
             return startup_id
         partner_stage_started = time.perf_counter()
-        decided = False
-        partner_attempts = 2
-        for attempt in range(1, partner_attempts + 1):
-            if cancelled():
-                logger.info("[%s] Lookup cancelled before partner: %s (%s)", user_id[:12], company, startup_id)
-                return startup_id
-            decided = await partner_engine.run_startup(
-                startup_id,
-                pipeline_run_id=lookup_run_id,
-                force_rerun=bool(replace_startup_id),
-                bypass_agent_enabled_gate=True,
-            )
-            if decided:
-                break
-            if attempt < partner_attempts:
-                await asyncio.sleep(0.6 * attempt)
+        decided = await partner_engine.run_startup(
+            startup_id,
+            pipeline_run_id=lookup_run_id,
+            force_rerun=bool(replace_startup_id),
+            bypass_agent_enabled_gate=True,
+            startup=handoff_startup,
+        )
         metrics.observe_pipeline_stage(
             time.perf_counter() - partner_stage_started,
             pipeline="lookup",
@@ -917,6 +1124,7 @@ async def _run_on_demand_lookup_inner(
             metrics.inc_lookup("error")
             return startup_id
         else:
+            await emit("partner", "succeeded", startup_id=startup_id)
             if replace_startup_id:
                 await asyncio.to_thread(
                     upsert_pipeline_state,
@@ -960,6 +1168,14 @@ async def _run_on_demand_lookup_inner(
                     startup_id=startup_id,
                     message=lookup_outcome.get("message"),
                 )
+        evaluation_path = "rerun" if replace_startup_id else "manual_lookup"
+        _observe_decision_ready_usage(
+            engines.cost_controller,
+            before=lookup_usage_before,
+            cohort="manual_lookup",
+        )
+        metrics.inc_evaluation_manifest(path=evaluation_path, outcome="success")
+        await emit("completed", "succeeded", startup_id=startup_id)
         logger.info(
             "[%s] On-demand lookup completed for %s (%s) rss_mb_end=%.1f",
             user_id[:12],

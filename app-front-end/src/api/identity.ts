@@ -1,0 +1,130 @@
+import { apiRequest, encodedId } from './client';
+
+export type IdentityStatus = 'unresolved' | 'resolved' | 'needs_review' | 'rejected';
+export type IdentityCaseStatus = 'open' | 'resolved' | 'deferred' | 'rejected';
+
+export interface Company {
+  company_id: string;
+  canonical_name: string;
+  canonical_domain: string;
+  identity_confidence: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Opportunity {
+  opportunity_id: string;
+  company_id: string;
+  context_key: string;
+  decision_state: string;
+  service_level: number;
+  first_observation_id?: string | null;
+  latest_observation_id?: string | null;
+  legacy_startup_id?: string | null;
+  current_evaluation_id?: string | null;
+  current_recommendation_id?: string | null;
+  current_ruling_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SourceObservation {
+  observation_id: string;
+  channel: string;
+  observed_name: string;
+  observed_domain?: string | null;
+  external_event_key?: string | null;
+  lookup_id?: string | null;
+  legacy_startup_id?: string | null;
+  company_id?: string | null;
+  identity_status: IdentityStatus | string;
+  identity_confidence: number;
+  observed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IdentityCandidate {
+  company_id: string;
+  canonical_name: string;
+  canonical_domain: string;
+  confidence: number;
+  evidence_urls: string[];
+  reason: string;
+}
+
+export interface IdentityResolutionCase {
+  identity_case_id: string;
+  observation_id: string;
+  status: IdentityCaseStatus | string;
+  reason_code: string;
+  candidates: IdentityCandidate[];
+  selected_company_id?: string | null;
+  resolution_note?: string | null;
+  resolved_by?: string | null;
+  resolved_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IdentityAdmission {
+  observation_id: string;
+  status: string;
+  company_id?: string | null;
+  opportunity_id?: string | null;
+  identity_case_id?: string | null;
+  confidence?: number | null;
+  blocks_evaluation: boolean;
+  created: boolean;
+}
+
+export type IdentityResolutionInput =
+  | { action: 'match'; selected_company_id: string; resolution_note?: string }
+  | { action: 'create'; canonical_name: string; canonical_domain: string; resolution_note?: string }
+  | { action: 'defer' | 'reject'; resolution_note?: string };
+
+export function fetchCompany(companyId: string): Promise<Company> {
+  return apiRequest(`/api/companies/${encodedId(companyId, 'companyId')}`);
+}
+
+export function fetchOpportunity(opportunityId: string): Promise<Opportunity> {
+  return apiRequest(`/api/opportunities/${encodedId(opportunityId, 'opportunityId')}`);
+}
+
+export function fetchOpportunityByLegacyStartup(startupId: string): Promise<Opportunity | null> {
+  return apiRequest<Opportunity>(`/api/startups/${encodedId(startupId, 'startupId')}/opportunity`)
+    .catch((error: unknown) => {
+      if (error && typeof error === 'object' && 'status' in error && error.status === 404) return null;
+      throw error;
+    });
+}
+
+export async function fetchObservations(
+  status?: IdentityStatus,
+  limit = 100,
+): Promise<SourceObservation[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (status) params.set('status', status);
+  const result = await apiRequest<{ observations?: SourceObservation[] }>(`/api/observations?${params}`);
+  return Array.isArray(result.observations) ? result.observations : [];
+}
+
+export async function fetchIdentityCases(
+  status: IdentityCaseStatus = 'open',
+  limit = 100,
+): Promise<IdentityResolutionCase[]> {
+  const params = new URLSearchParams({ status, limit: String(limit) });
+  const result = await apiRequest<{ cases?: IdentityResolutionCase[] }>(`/api/identity-cases?${params}`);
+  return Array.isArray(result.cases) ? result.cases : [];
+}
+
+export function resolveIdentityCase(
+  identityCaseId: string,
+  input: IdentityResolutionInput,
+): Promise<IdentityAdmission | IdentityResolutionCase> {
+  return apiRequest(`/api/identity-cases/${encodedId(identityCaseId, 'identityCaseId')}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}

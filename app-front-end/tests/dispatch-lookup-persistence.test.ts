@@ -35,20 +35,40 @@ describe('dispatch lookup persistence', () => {
     const key = getDispatchLookupStorageKey('user_123');
     const now = Date.parse('2026-06-02T12:00:00.000Z');
 
-    assert.equal(key, 'aethria.dispatch.lookups.v1:user_123');
+    assert.equal(key, 'aethria.dispatch.lookups.v2:user_123');
 
     saveDispatchLookupSnapshot(storage, key, {
-      pendingLookup: { lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false, isRerun: true },
+      pendingLookup: {
+        lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false, isRerun: true,
+        jobId: 'job-active-123', acceptedAt: '2026-06-02T12:00:00Z', pipelineRunId: 'run-active-123',
+        durableStatus: 'retry_wait',
+      },
       backgroundLookups: [
-        { lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false, isRerun: false },
-        { lookupId: 'lookup-active-1', queryLabel: 'Duplicate', autoOpened: false, isRerun: false },
+        {
+          lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false, isRerun: false,
+          jobId: 'job-background-123', acceptedAt: '2026-06-02T12:00:01Z', pipelineRunId: 'run-background-123',
+          durableStatus: 'accepted',
+        },
+        {
+          lookupId: 'lookup-active-1', queryLabel: 'Duplicate', autoOpened: false, isRerun: false,
+          jobId: 'job-duplicate-123', acceptedAt: '2026-06-02T12:00:02Z', pipelineRunId: 'run-duplicate-123',
+          durableStatus: 'accepted',
+        },
       ],
     }, now);
 
     assert.deepEqual(loadDispatchLookupSnapshot(storage, key, now + 5_000), {
-      pendingLookup: { lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false, isRerun: true },
+      pendingLookup: {
+        lookupId: 'lookup-active-1', queryLabel: 'Perplexity AI', autoOpened: false, isRerun: true,
+        jobId: 'job-active-123', acceptedAt: '2026-06-02T12:00:00Z', pipelineRunId: 'run-active-123',
+        durableStatus: 'retry_wait',
+      },
       backgroundLookups: [
-        { lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false, isRerun: false },
+        {
+          lookupId: 'lookup-background-1', queryLabel: 'Aethria', autoOpened: false, isRerun: false,
+          jobId: 'job-background-123', acceptedAt: '2026-06-02T12:00:01Z', pipelineRunId: 'run-background-123',
+          durableStatus: 'accepted',
+        },
       ],
     });
 
@@ -82,20 +102,20 @@ describe('dispatch lookup persistence', () => {
     assert.equal(storage.getItem(key), null);
   });
 
-  it('migrates legacy stored payloads without isRerun to isRerun: false', () => {
+  it('invalidates the pre-durable v1 snapshot instead of inferring execution', () => {
     const storage = new MemoryStorage();
     const key = getDispatchLookupStorageKey('user_123')!;
     const now = Date.parse('2026-06-02T12:00:00.000Z');
 
     storage.setItem(key, JSON.stringify({
-      version: DISPATCH_LOOKUP_STORAGE_VERSION,
+      version: 1,
       updatedAt: now,
       pendingLookup: { lookupId: 'legacy-lookup-1', queryLabel: 'Legacy Co', autoOpened: false },
       backgroundLookups: [],
     }));
 
     assert.deepEqual(loadDispatchLookupSnapshot(storage, key, now + 1_000), {
-      pendingLookup: { lookupId: 'legacy-lookup-1', queryLabel: 'Legacy Co', autoOpened: false, isRerun: false },
+      pendingLookup: null,
       backgroundLookups: [],
     });
   });

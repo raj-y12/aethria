@@ -11,6 +11,7 @@ import {
   resolveLookupCandidates,
   type LookupCandidate,
 } from '../api/startups';
+import { cancelJob, fetchJob, retryJob, type DurableJob } from '../api/jobs';
 import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 import { resolveLookupFailure } from '../lib/lookupFailure';
@@ -103,7 +104,16 @@ export function useDispatchLookup({
       setCandidates([]);
       setRefining(false);
       setNeedsWebsite(false);
-      setPendingLookup({ lookupId: queued.lookupId, queryLabel: value, autoOpened: false, isRerun: false });
+      setPendingLookup({
+        lookupId: queued.lookupId,
+        queryLabel: value,
+        autoOpened: false,
+        isRerun: false,
+        ...(queued.jobId ? { jobId: queued.jobId } : {}),
+        ...(queued.acceptedAt ? { acceptedAt: queued.acceptedAt } : {}),
+        ...(queued.pipelineRunId ? { pipelineRunId: queued.pipelineRunId } : {}),
+        ...(queued.jobId ? { durableStatus: 'accepted' as const } : {}),
+      });
       setMessage(
         `Lookup queued for ${queued.companyName}. We are now finding and validating the company profile.`,
       );
@@ -259,7 +269,16 @@ export function useDispatchLookup({
         if (current && !current.autoOpened && current.lookupId !== queued.lookupId) {
           setBackgroundLookups((bg) => [current, ...bg.filter((l) => l.lookupId !== current.lookupId)]);
         }
-        setPendingLookup({ lookupId: queued.lookupId, queryLabel: target.scout.name, autoOpened: false, isRerun: true });
+        setPendingLookup({
+          lookupId: queued.lookupId,
+          queryLabel: target.scout.name,
+          autoOpened: false,
+          isRerun: true,
+          ...(queued.jobId ? { jobId: queued.jobId } : {}),
+          ...(queued.acceptedAt ? { acceptedAt: queued.acceptedAt } : {}),
+          ...(queued.pipelineRunId ? { pipelineRunId: queued.pipelineRunId } : {}),
+          ...(queued.jobId ? { durableStatus: 'accepted' as const } : {}),
+        });
         setRerunTarget(null);
         setMessage(
           `Re-review queued for ${target.scout.name}. The added context is being folded into the evidence.`,
@@ -281,8 +300,14 @@ export function useDispatchLookup({
     ].filter((id): id is string => Boolean(id?.trim()));
     setCancelPending(true);
     setMessage('Cancellation requested. Waiting for the worker to acknowledge it...');
+    const jobIds = Array.from(new Set([
+      pendingLookup?.jobId,
+      ...backgroundLookups.map((lookup) => lookup.jobId),
+    ].filter((id): id is string => Boolean(id?.trim()))));
+    const jobResults = await Promise.allSettled(jobIds.map((jobId) => cancelJob(jobId)));
+    const jobCancellationRejected = jobResults.some((result) => result.status === 'rejected');
     const acknowledged = await cancelOnDemandLookups(lookupIds);
-    if (!acknowledged) {
+    if (!acknowledged && (jobIds.length === 0 || jobCancellationRejected)) {
       setCancelPending(false);
       setMessage('Cancellation could not be confirmed. The lookup remains visible until it is safe to clear.');
       return;
@@ -320,6 +345,32 @@ export function useDispatchLookup({
       backgroundLookups,
     });
   }, [backgroundLookups, storageKey, hydratedStorageKey, pendingLookup]);
+
+  const durableJobQuery = useQuery({
+    queryKey: ['jobs', 'detail', pendingLookup?.jobId ?? ''],
+    queryFn: () => fetchJob(pendingLookup!.jobId!),
+    enabled: Boolean(pendingLookup?.jobId && !pendingLookup.autoOpened),
+    staleTime: 0,
+    refetchInterval: (query) => {
+      if (!liveGate.tabVisible) return false;
+      const job = query.state.data as DurableJob | undefined;
+      if (!job) return 3_000;
+      if (job.status === 'succeeded' || job.status === 'cancelled' || job.status === 'dead_letter' || job.status === 'failed') {
+        return false;
+      }
+      return job.status === 'retry_wait' ? 5_000 : 3_000;
+    },
+    retry: 1,
+  });
+
+  useEffect(() => {
+    const status = durableJobQuery.data?.status;
+    if (!status) return;
+    setPendingLookup((current) => {
+      if (!current || current.jobId !== durableJobQuery.data?.job_id || current.durableStatus === status) return current;
+      return { ...current, durableStatus: status };
+    });
+  }, [durableJobQuery.data?.job_id, durableJobQuery.data?.status]);
 
   const lookupFailureQuery = useQuery({
     queryKey: ['startups', 'lookup-status', pendingLookup?.lookupId ?? ''],
@@ -363,6 +414,10 @@ export function useDispatchLookup({
 
   useEffect(() => {
     if (!pendingLookup || pendingLookup.autoOpened) return;
+    const durableStatus = durableJobQuery.data?.status ?? pendingLookup.durableStatus;
+    if (durableStatus === 'retry_wait' || durableStatus === 'blocked' || durableStatus === 'dead_letter' || durableStatus === 'failed') {
+      return;
+    }
     const statusMessage = resolveLookupFailure({
       hasMatchedStartup: Boolean(pendingLookupMatch),
       memoStatus: memoStatusQuery.data,
@@ -379,7 +434,7 @@ export function useDispatchLookup({
     setPendingLookup(null);
     // Surface the fail page even if the analyst had closed the takeover.
     setCommandBarOpen(true);
-  }, [pendingLookup, pendingLookupMatch, lookupFailureQuery.data, memoStatusQuery.data]);
+  }, [durableJobQuery.data?.status, pendingLookup, pendingLookupMatch, lookupFailureQuery.data, memoStatusQuery.data]);
 
   // Keep the startups list fresh for the WHOLE in-flight lookup — not just until
   // the scout row first appears. Stopping at row-appearance left review→decide to
@@ -537,6 +592,49 @@ export function useDispatchLookup({
   // Leave the failure view (e.g. "Try again" → back to compose, or close).
   const dismissFailure = useCallback(() => setFailure(null), []);
 
+  const retryDurableJob = useCallback(async () => {
+    const jobId = pendingLookup?.jobId;
+    if (!jobId) return;
+    setBusy(true);
+    setFailure(null);
+    setDispatching(true);
+    setMessage('Retry accepted. Waiting for execution to resume...');
+    try {
+      const job = await retryJob(jobId);
+      setPendingLookup((current) => current?.jobId === jobId
+        ? { ...current, durableStatus: job.status }
+        : current);
+      await durableJobQuery.refetch();
+    } catch {
+      setMessage('The job could not be retried in its current state. Refresh and try again.');
+    } finally {
+      setBusy(false);
+    }
+  }, [durableJobQuery, pendingLookup?.jobId]);
+
+  const openIdentityReview = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('aethria:open-identity-review', {
+      detail: { jobId: pendingLookup?.jobId ?? null },
+    }));
+  }, [pendingLookup?.jobId]);
+
+  const execution = useMemo(() => {
+    const tracked = pendingLookup;
+    if (!tracked?.jobId) return null;
+    const job = durableJobQuery.data;
+    return {
+      status: job?.status ?? tracked.durableStatus ?? 'accepted' as const,
+      acceptedAt: job?.accepted_at ?? tracked.acceptedAt ?? null,
+      attempts: job?.attempts ?? 0,
+      maxAttempts: job?.max_attempts ?? 3,
+      nextAttemptAt: job?.next_attempt_at ?? null,
+      error: job?.error ?? null,
+      blockCode: job?.block_code ?? null,
+      recoveryAction: job?.recovery_action ?? null,
+    };
+  }, [durableJobQuery.data, pendingLookup]);
+
   // Resolve a tracked lookup's startup row (status from the live list).
   const findLookupMatch = useCallback(
     (id: string) => findTrackedLookupStartup(startups, {
@@ -630,5 +728,8 @@ export function useDispatchLookup({
     pickCandidate,
     refineWithWebsite,
     refining,
+    execution,
+    retryDurableJob,
+    openIdentityReview,
   };
 }

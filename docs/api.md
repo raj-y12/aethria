@@ -36,6 +36,47 @@ Base URL (local): `http://localhost:8000`
 - `GET /api/startups/lookup-status?lookup_id=<id>`
   - Reports failed lookup jobs when worker records outcome.
 
+## Durable Jobs and Canonical Identity
+
+- `GET /api/jobs`, `GET /api/jobs/{job_id}` -> tenant-scoped accepted/running/retry/blocked/final state.
+- `POST /api/jobs/{job_id}/retry`, `POST /api/jobs/{job_id}/cancel` -> explicit recovery controls.
+- `GET /api/companies/{company_id}`, `GET /api/opportunities/{opportunity_id}` -> canonical records.
+- `GET /api/observations`, `GET /api/identity-cases` -> bounded source and ambiguity queues.
+- `POST /api/identity-cases/{identity_case_id}/resolve` -> explicit match/create/defer/reject ruling.
+
+## Evidence, Evaluation, and Human Decisions
+
+- `GET /api/opportunities/{opportunity_id}/evidence` -> redacted artifact/claim/evidence ledger.
+- `POST /api/opportunities/{opportunity_id}/evidence-plans` -> bounded diligence plan.
+- `POST /api/claims/{claim_id}/correct` -> append an operator correction.
+- `GET /api/opportunities/{opportunity_id}/evaluation` -> current immutable evaluation and recommendation.
+- `POST /api/opportunities/{opportunity_id}/evaluate` -> explicit operator refresh.
+- `POST /api/opportunities/{opportunity_id}/rulings` -> authoritative human ruling.
+- `GET/POST /api/opportunities/{opportunity_id}/actions` -> workflow actions and drafts.
+- `POST /api/actions/{workflow_action_id}/approve` -> approval record; does not itself claim an external write.
+
+## Monitoring and Refresh Budgets
+
+- `POST /api/opportunities/{opportunity_id}/refresh` -> reserve a resource/cost envelope and accept a durable refresh job.
+- `PATCH /api/opportunities/{opportunity_id}/service-level` -> set service level 0–5 with lifecycle reason.
+- `GET /api/opportunities/{opportunity_id}/monitoring` -> lifecycle, reservations, and material-change checks.
+
+## Fund Intelligence
+
+- `POST /api/fund-intelligence/derive-overrides` -> derive attributed observations/proposals.
+- `GET /api/fund-intelligence/proposals` and `GET /api/fund-intelligence/proposals/{id}` -> proposal inbox/detail.
+- `POST /api/fund-intelligence/proposals/{id}/preview` -> bounded preview for a server-applied stored patch or a restricted `rubric`/`scoringWeights` edit; binds both policy and canonical-config hashes.
+- `POST /api/fund-intelligence/proposals/{id}/review` -> accept/edit/reject/defer; edited acceptance receives a restricted patch, never a client-supplied full fund configuration, and creates a draft only.
+- `POST /api/fund-intelligence/policy-versions/{id}/publish` -> atomically publishes the governed PostgreSQL version; legacy settings are projected idempotently through the outbox.
+
+## Imports, Confidential Artifacts, and Outcomes
+
+- `POST /api/imports/csv` -> bounded CSV/CRM CSV/event/referral intake through canonical identity.
+- `GET /api/imports/{import_batch_id}` -> resolved/review-required/error row status without raw CSV data.
+- `POST /api/opportunities/{opportunity_id}/confidential-artifacts` -> pitch-deck/email metadata registration with confidential access and retention policy.
+- `GET/POST /api/companies/{company_id}/outcomes` -> immutable, evidence-backed later observations.
+- `GET /api/outcomes/coverage` -> coverage/valence disclosure with causal inference explicitly unsupported.
+
 ## Settings and Policy
 
 - `GET /api/settings`

@@ -1,0 +1,151 @@
+{
+  "version": "v2",
+  "extends": "v1",
+  "description": "Phase 2 identity snapshots extend all v1 decision cases without claiming later evidence-ledger semantics.",
+  "cases": [
+    {
+      "case_id": "identity_manual_verified_create",
+      "description": "A confirmed manual domain creates one observation, company, opportunity, and projection link.",
+      "snapshot": {
+        "source_observation": {"preserved": true, "channel": "manual_lookup"},
+        "identity": {"status": "resolved", "canonical_company_id": "company-acme", "company_count": 1},
+        "opportunity": {"opportunity_id": "opportunity-acme", "count": 1, "created": true, "blocks_evaluation": false},
+        "projection": {"legacy_startup_linked": true},
+        "evaluation": {"started": true}
+      },
+      "expected": {
+        "source_observation": {"preserved": true, "channel": "manual_lookup"},
+        "identity": {"status": "resolved", "canonical_company_id": "company-acme", "company_count": 1},
+        "opportunity": {"opportunity_id": "opportunity-acme", "count": 1, "created": true, "blocks_evaluation": false},
+        "projection": {"legacy_startup_linked": true},
+        "evaluation": {"started": true}
+      }
+    },
+    {
+      "case_id": "identity_cross_channel_dedup",
+      "description": "Inbound manual and autonomous observations with the same verified domain converge.",
+      "snapshot": {
+        "source_observation": {"preserved": true, "channel": "autonomous_discovery", "count": 2},
+        "identity": {"status": "resolved", "canonical_company_id": "company-acme", "company_count": 1},
+        "opportunity": {"opportunity_id": "opportunity-acme", "count": 1, "created": false, "blocks_evaluation": false},
+        "projection": {"legacy_startup_linked": true},
+        "evaluation": {"started": true}
+      },
+      "expected": {
+        "source_observation": {"preserved": true, "channel": "autonomous_discovery", "count": 2},
+        "identity": {"status": "resolved", "canonical_company_id": "company-acme", "company_count": 1},
+        "opportunity": {"opportunity_id": "opportunity-acme", "count": 1, "created": false, "blocks_evaluation": false},
+        "projection": {"legacy_startup_linked": true},
+        "evaluation": {"started": true}
+      }
+    },
+    {
+      "case_id": "identity_same_name_distinct_domains",
+      "description": "Same normalized name with distinct verified domains remains two companies.",
+      "snapshot": {
+        "source_observation": {"preserved": true, "channel": "manual_lookup", "count": 2},
+        "identity": {"status": "resolved", "canonical_company_id": "company-beacon-health", "company_count": 2},
+        "opportunity": {"opportunity_id": "opportunity-beacon-health", "count": 2, "created": true, "blocks_evaluation": false},
+        "projection": {"legacy_startup_linked": true},
+        "evaluation": {"started": true}
+      },
+      "expected": {
+        "source_observation": {"preserved": true, "channel": "manual_lookup", "count": 2},
+        "identity": {"status": "resolved", "canonical_company_id": "company-beacon-health", "company_count": 2},
+        "opportunity": {"opportunity_id": "opportunity-beacon-health", "count": 2, "created": true, "blocks_evaluation": false},
+        "projection": {"legacy_startup_linked": true},
+        "evaluation": {"started": true}
+      }
+    },
+    {
+      "case_id": "identity_ambiguity_blocks_evaluation",
+      "description": "Multiple strong candidates preserve a case and create no evaluable opportunity.",
+      "snapshot": {
+        "source_observation": {"preserved": true, "channel": "manual_lookup", "count": 1},
+        "identity": {"status": "ambiguous", "canonical_company_id": "none", "company_count": 0},
+        "opportunity": {"opportunity_id": "none", "count": 0, "created": false, "blocks_evaluation": true},
+        "projection": {"legacy_startup_linked": false},
+        "evaluation": {"started": false}
+      },
+      "expected": {
+        "source_observation": {"preserved": true, "channel": "manual_lookup", "count": 1},
+        "identity": {"status": "ambiguous", "canonical_company_id": "none", "company_count": 0},
+        "opportunity": {"opportunity_id": "none", "count": 0, "created": false, "blocks_evaluation": true},
+        "projection": {"legacy_startup_linked": false},
+        "evaluation": {"started": false}
+      }
+    },
+    {
+      "case_id": "identity_repeat_idempotency",
+      "description": "Repeating the same source event returns the same institutional records.",
+      "snapshot": {
+        "source_observation": {"preserved": true, "channel": "manual_lookup", "count": 1},
+        "identity": {"status": "resolved", "canonical_company_id": "company-acme", "company_count": 1},
+        "opportunity": {"opportunity_id": "opportunity-acme", "count": 1, "created": false, "blocks_evaluation": false},
+        "projection": {"legacy_startup_linked": true},
+        "evaluation": {"started": true}
+      },
+      "expected": {
+        "source_observation": {"preserved": true, "channel": "manual_lookup", "count": 1},
+        "identity": {"status": "resolved", "canonical_company_id": "company-acme", "company_count": 1},
+        "opportunity": {"opportunity_id": "opportunity-acme", "count": 1, "created": false, "blocks_evaluation": false},
+        "projection": {"legacy_startup_linked": true},
+        "evaluation": {"started": true}
+      }
+    },
+    {
+      "case_id": "identity_reference_pruned",
+      "description": "A discovery removed by mandatory reference validation creates no identity state.",
+      "snapshot": {
+        "source_observation": {"preserved": false, "channel": "autonomous_discovery", "count": 0},
+        "identity": {"status": "not_admitted", "canonical_company_id": "none", "company_count": 0},
+        "opportunity": {"opportunity_id": "none", "count": 0, "created": false, "blocks_evaluation": true},
+        "projection": {"legacy_startup_linked": false},
+        "evaluation": {"started": false}
+      },
+      "expected": {
+        "source_observation": {"preserved": false, "channel": "autonomous_discovery", "count": 0},
+        "identity": {"status": "not_admitted", "canonical_company_id": "none", "company_count": 0},
+        "opportunity": {"opportunity_id": "none", "count": 0, "created": false, "blocks_evaluation": true},
+        "projection": {"legacy_startup_linked": false},
+        "evaluation": {"started": false}
+      }
+    },
+    {
+      "case_id": "identity_backfill_verified_merge",
+      "description": "Legacy rows merge only when preserved resolver evidence verifies the exact domain.",
+      "snapshot": {
+        "source_observation": {"preserved": true, "channel": "backfill", "count": 2},
+        "identity": {"status": "resolved", "canonical_company_id": "company-acme", "company_count": 1},
+        "opportunity": {"opportunity_id": "opportunity-acme", "count": 1, "created": false, "blocks_evaluation": false},
+        "projection": {"legacy_startup_linked": true},
+        "evaluation": {"started": true}
+      },
+      "expected": {
+        "source_observation": {"preserved": true, "channel": "backfill", "count": 2},
+        "identity": {"status": "resolved", "canonical_company_id": "company-acme", "company_count": 1},
+        "opportunity": {"opportunity_id": "opportunity-acme", "count": 1, "created": false, "blocks_evaluation": false},
+        "projection": {"legacy_startup_linked": true},
+        "evaluation": {"started": true}
+      }
+    },
+    {
+      "case_id": "identity_backfill_name_only",
+      "description": "Name-only legacy rows remain distinct observations requiring identity review.",
+      "snapshot": {
+        "source_observation": {"preserved": true, "channel": "backfill", "count": 2},
+        "identity": {"status": "ambiguous", "canonical_company_id": "none", "company_count": 0},
+        "opportunity": {"opportunity_id": "none", "count": 0, "created": false, "blocks_evaluation": true},
+        "projection": {"legacy_startup_linked": false},
+        "evaluation": {"started": false}
+      },
+      "expected": {
+        "source_observation": {"preserved": true, "channel": "backfill", "count": 2},
+        "identity": {"status": "ambiguous", "canonical_company_id": "none", "company_count": 0},
+        "opportunity": {"opportunity_id": "none", "count": 0, "created": false, "blocks_evaluation": true},
+        "projection": {"legacy_startup_linked": false},
+        "evaluation": {"started": false}
+      }
+    }
+  ]
+}

@@ -115,11 +115,28 @@ from meta.evaluator import run_prompt_evaluation
 from reviewer.engine import ReviewerEngine
 from reviewer.aethria_view import polish_aethria_view_for_api
 from services.scoring.policy_compiler import PolicyValidationError, compile_policy_from_fund_config
-from services.scoring.policy_store import publish_policy
 from services.scoring.presentation_layer import serialize_scoring_presentation
 from portfolio.store import PortfolioStore
 from portfolio.rejection import RejectionAnalyzer
 from portfolio.cost_control import CostController
+from jobs.handlers import build_handlers
+from jobs.models import (
+    AgentJob,
+    CompanyLookupPayload,
+    JobType,
+    PipelineCyclePayload,
+)
+from jobs.outbox import OutboxPublisher
+from jobs.postgres import create_pool as create_durable_job_pool
+from jobs.repository import DurableJobRepository
+from jobs.worker import DurableJobWorker
+from identity.repository import IdentityRepository
+from evidence.repository import EvidenceRepository
+from evaluation_v2.repository import EvaluationRepository
+from decisions.repository import DecisionRepository
+from monitoring.repository import MonitoringRepository
+from fund_intelligence.repository import FundIntelligenceRepository
+from outcomes.repository import ChannelOutcomeRepository
 from pipeline_runner import (
     _rss_mb as _pipeline_rss_mb,
     _record_lookup_failure,
@@ -149,6 +166,13 @@ _agent_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _agent_worker_task: Optional[asyncio.Task] = None
 _lookup_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _lookup_worker_tasks: List[asyncio.Task] = []
+_durable_job_pool: Any = None
+_durable_job_repository: Optional[DurableJobRepository] = None
+_durable_job_worker: Optional[DurableJobWorker] = None
+_durable_outbox_publisher: Optional[OutboxPublisher] = None
+_durable_job_error: Optional[str] = None
+_durable_depth_snapshot: Dict[str, int] = {}
+_durable_depth_sampler_task: Optional[asyncio.Task] = None
 _cancelled_lookup_ids: OrderedDict[str, None] = OrderedDict()
 _logger_agents = logging.getLogger("api.agents")
 _logger_visible = logging.getLogger("uvicorn.error")
@@ -193,6 +217,107 @@ def _mark_lookup_cancelled(user_id: str, lookup_id: str) -> None:
     while len(_cancelled_lookup_ids) >= _CANCELLED_LOOKUP_MAX:
         _cancelled_lookup_ids.remove(next(iter(_cancelled_lookup_ids)))
     _cancelled_lookup_ids.add(key)
+
+
+def _durable_jobs_required() -> bool:
+    """Production storage accepts work only after PostgreSQL commits the job."""
+    return env_config.use_supabase_storage()
+
+
+def _durable_store_unavailable() -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            "status": "unavailable",
+            "reason": "durable_job_store_unavailable",
+        },
+    )
+
+
+def _job_response_fields(job: AgentJob) -> Dict[str, Any]:
+    return {
+        "status": "accepted",
+        "job_id": job.job_id,
+        "accepted_at": job.accepted_at.isoformat(),
+        "pipeline_run_id": job.pipeline_run_id,
+    }
+
+
+def _lookup_idempotency_key(user_id: str, lookup_id: str) -> str:
+    return f"lookup:{user_id}:{lookup_id}"
+
+
+def _cycle_idempotency_key(user_id: str) -> str:
+    interval = max(1, AGENT_LOOP_INTERVAL_SECONDS)
+    return f"pipeline-cycle:{user_id}:{int(time.time() // interval)}"
+
+
+async def _enqueue_pipeline_cycle(
+    user_id: str,
+    *,
+    manual_one_shot: bool,
+    source: str,
+) -> AgentJob:
+    repository = _durable_job_repository
+    if repository is None:
+        raise RuntimeError("durable_job_store_unavailable")
+    job = AgentJob(
+        user_id=user_id,
+        job_type=JobType.PIPELINE_CYCLE,
+        idempotency_key=_cycle_idempotency_key(user_id),
+        payload=PipelineCyclePayload(
+            user_id=user_id,
+            manual_one_shot=manual_one_shot,
+            source=source,
+        ),
+    )
+    accepted = await repository.enqueue(job)
+    if _durable_job_worker is not None:
+        _durable_job_worker.notify()
+    return accepted
+
+
+async def _enqueue_company_lookup(
+    user_id: str,
+    *,
+    company_name: str,
+    website: Optional[str],
+    lookup_query: Optional[str],
+    lookup_input_type: Optional[str],
+    lookup_id: str,
+    additional_context: Optional[str],
+    replace_startup_id: Optional[str] = None,
+    resolution: Any = None,
+) -> AgentJob:
+    repository = _durable_job_repository
+    if repository is None:
+        raise RuntimeError("durable_job_store_unavailable")
+    if resolution is None:
+        serialized_resolution = None
+    elif hasattr(resolution, "model_dump"):
+        serialized_resolution = resolution.model_dump(mode="json")
+    else:
+        serialized_resolution = dict(resolution)
+    job = AgentJob(
+        user_id=user_id,
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key=_lookup_idempotency_key(user_id, lookup_id),
+        payload=CompanyLookupPayload(
+            user_id=user_id,
+            company_name=company_name,
+            website=website,
+            lookup_query=lookup_query,
+            lookup_input_type=lookup_input_type,
+            lookup_id=lookup_id,
+            additional_context=additional_context,
+            replace_startup_id=replace_startup_id,
+            resolution=serialized_resolution,
+        ),
+    )
+    accepted = await repository.enqueue(job)
+    if _durable_job_worker is not None:
+        _durable_job_worker.notify()
+    return accepted
 
 # Per-user persistent agent loops: user_id -> asyncio.Task
 # Protected by _loops_lock to prevent duplicate tasks per user.
@@ -424,9 +549,23 @@ async def _user_agent_loop(user_id: str) -> None:
                 _pipeline_rss_mb(),
             )
             try:
-                await run_one_pipeline_cycle(user_id)
+                if _durable_jobs_required():
+                    accepted_job = await _enqueue_pipeline_cycle(
+                        user_id,
+                        manual_one_shot=False,
+                        source="scheduled_loop",
+                    )
+                    _logger_agents.info(
+                        "[AGENT LOOP] Durable cycle accepted user=%s job_id=%s",
+                        user_id[:12],
+                        accepted_job.job_id,
+                    )
+                else:
+                    # Local-only development seam. Production/Supabase execution
+                    # is always committed to the durable repository first.
+                    await run_one_pipeline_cycle(user_id)
                 _logger_agents.info(
-                    "[AGENT LOOP] Cycle completed user=%s duration_s=%.2f rss_mb_after=%.1f",
+                    "[AGENT LOOP] Cycle dispatched user=%s duration_s=%.2f rss_mb_after=%.1f",
                     user_id[:12],
                     time.perf_counter() - cycle_started_at,
                     _pipeline_rss_mb(),
@@ -620,24 +759,141 @@ async def _resume_all_user_loops() -> None:
 # Lifespan
 # ---------------------------------------------------------------------------
 
+async def _durable_depth_sampler() -> None:
+    global _durable_depth_snapshot
+    while True:
+        try:
+            if _durable_job_repository is not None:
+                _durable_depth_snapshot = await _durable_job_repository.global_queue_depths()
+                metrics.set_durable_depths(_durable_depth_snapshot)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            _logger_agents.warning("Durable job depth sampling failed: %s", type(exc).__name__)
+        await asyncio.sleep(5)
+
+
+async def _start_durable_job_services(app: FastAPI) -> None:
+    global _durable_job_pool, _durable_job_repository, _durable_job_worker
+    global _durable_outbox_publisher, _durable_job_error, _durable_depth_sampler_task
+
+    try:
+        _durable_job_pool = await create_durable_job_pool()
+        _durable_job_repository = DurableJobRepository(_durable_job_pool)
+        _durable_job_worker = DurableJobWorker(
+            _durable_job_repository,
+            handlers=build_handlers(_durable_job_repository),
+            worker_id=f"api-{os.getpid()}-{uuid4().hex[:8]}",
+            poll_interval_seconds=float(os.getenv("DURABLE_JOB_POLL_SECONDS", "2")),
+            lease_seconds=int(os.getenv("DURABLE_JOB_LEASE_SECONDS", "90")),
+            heartbeat_seconds=float(os.getenv("DURABLE_JOB_HEARTBEAT_SECONDS", "20")),
+            global_concurrency=int(os.getenv("DURABLE_JOB_GLOBAL_CONCURRENCY", "2")),
+            per_tenant_concurrency=int(os.getenv("DURABLE_JOB_TENANT_CONCURRENCY", "1")),
+        )
+        _durable_outbox_publisher = OutboxPublisher(
+            _durable_job_repository,
+            poll_interval_seconds=float(os.getenv("DURABLE_OUTBOX_POLL_SECONDS", "2")),
+        )
+        await _durable_job_worker.start()
+        await _durable_outbox_publisher.start()
+        _durable_depth_sampler_task = asyncio.create_task(_durable_depth_sampler())
+        _durable_job_error = None
+        _logger_agents.info("Durable agent job worker and outbox publisher started")
+    except Exception as exc:
+        error_name = type(exc).__name__
+        _logger_agents.error(
+            "Durable job store unavailable; accepted-work endpoints will fail closed: %s",
+            error_name,
+        )
+        try:
+            await _stop_durable_job_services(app)
+        except Exception as cleanup_exc:
+            _logger_agents.warning(
+                "Partial durable service cleanup failed: %s",
+                type(cleanup_exc).__name__,
+            )
+        _durable_job_error = error_name
+    app.state.durable_job_repository = _durable_job_repository
+    app.state.durable_job_error = _durable_job_error
+    app.state.identity_repository = (
+        IdentityRepository(_durable_job_pool) if _durable_job_pool is not None else None
+    )
+    app.state.evidence_repository = (
+        EvidenceRepository(_durable_job_pool) if _durable_job_pool is not None else None
+    )
+    app.state.evaluation_repository = (
+        EvaluationRepository(_durable_job_pool) if _durable_job_pool is not None else None
+    )
+    app.state.decision_repository = (
+        DecisionRepository(_durable_job_pool) if _durable_job_pool is not None else None
+    )
+    app.state.monitoring_repository = (
+        MonitoringRepository(_durable_job_pool) if _durable_job_pool is not None else None
+    )
+    app.state.fund_intelligence_repository = (
+        FundIntelligenceRepository(_durable_job_pool) if _durable_job_pool is not None else None
+    )
+    app.state.channel_outcome_repository = (
+        ChannelOutcomeRepository(_durable_job_pool) if _durable_job_pool is not None else None
+    )
+
+
+async def _stop_durable_job_services(app: FastAPI) -> None:
+    global _durable_job_pool, _durable_job_repository, _durable_job_worker
+    global _durable_outbox_publisher, _durable_depth_sampler_task
+
+    if _durable_depth_sampler_task is not None:
+        _durable_depth_sampler_task.cancel()
+        try:
+            await _durable_depth_sampler_task
+        except asyncio.CancelledError:
+            pass
+        _durable_depth_sampler_task = None
+    if _durable_job_worker is not None:
+        await _durable_job_worker.stop()
+    if _durable_outbox_publisher is not None:
+        await _durable_outbox_publisher.stop()
+    if _durable_job_pool is not None:
+        await _durable_job_pool.close()
+    _durable_job_pool = None
+    _durable_job_repository = None
+    _durable_job_worker = None
+    _durable_outbox_publisher = None
+    app.state.durable_job_repository = None
+    app.state.identity_repository = None
+    app.state.evidence_repository = None
+    app.state.evaluation_repository = None
+    app.state.decision_repository = None
+    app.state.monitoring_repository = None
+    app.state.fund_intelligence_repository = None
+    app.state.channel_outcome_repository = None
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     global _agent_queue, _agent_worker_task, _lookup_queue, _lookup_worker_tasks, _loops_lock
     global _rss_sampler_task
     _loops_lock = asyncio.Lock()
-    _agent_queue = asyncio.Queue()
-    _lookup_queue = asyncio.Queue()
-    _agent_worker_task = asyncio.create_task(_agent_worker())
-    _lookup_worker_tasks = [
-        asyncio.create_task(_lookup_worker()) for _ in range(_lookup_worker_count())
-    ]
+    if _durable_jobs_required():
+        _agent_queue = None
+        _lookup_queue = None
+        _agent_worker_task = None
+        _lookup_worker_tasks = []
+    else:
+        _agent_queue = asyncio.Queue()
+        _lookup_queue = asyncio.Queue()
+        _agent_worker_task = asyncio.create_task(_agent_worker())
+        _lookup_worker_tasks = [
+            asyncio.create_task(_lookup_worker()) for _ in range(_lookup_worker_count())
+        ]
     _rss_sampler_task = asyncio.create_task(_rss_sampler())
     global _loop_lag_sampler_task
     _loop_lag_sampler_task = asyncio.create_task(_event_loop_lag_sampler())
-    _logger_agents.info(
-        "Pipeline agent worker + %d on-demand lookup workers started",
-        len(_lookup_worker_tasks),
-    )
+    if _lookup_worker_tasks:
+        _logger_agents.info(
+            "Local development agent worker + %d lookup workers started",
+            len(_lookup_worker_tasks),
+        )
     # Surface unapplied migrations loudly at startup. The storage write path
     # tolerates missing columns by dropping fields and retrying — convenient, but
     # it hides drift. This makes it a single visible signal instead.
@@ -675,10 +931,21 @@ async def _lifespan(app: FastAPI):
             if production and not allow_process_local:
                 raise
             _logger_agents.warning("event_bus backplane failed to start: %s", e)
+    if _durable_jobs_required():
+        await _start_durable_job_services(app)
+    else:
+        app.state.durable_job_repository = None
+        app.state.durable_job_error = None
+        app.state.identity_repository = None
+        app.state.evidence_repository = None
+        app.state.evaluation_repository = None
+        app.state.decision_repository = None
+        app.state.monitoring_repository = None
+        app.state.fund_intelligence_repository = None
+        app.state.channel_outcome_repository = None
     # Resume persistent per-user loops for users that had agents enabled before restart
     await _resume_all_user_loops()
     yield
-    await event_bus.stop_backplane()
     # Cancel all per-user loops first
     loop_tasks = list(_per_user_loops.values())
     for t in loop_tasks:
@@ -688,6 +955,8 @@ async def _lifespan(app: FastAPI):
             await t
         except asyncio.CancelledError:
             pass
+    await _stop_durable_job_services(app)
+    await event_bus.stop_backplane()
     # Cancel queue workers + memory/loop-lag samplers
     for t in (*_lookup_worker_tasks, _agent_worker_task, _rss_sampler_task, _loop_lag_sampler_task):
         if t:
@@ -696,7 +965,7 @@ async def _lifespan(app: FastAPI):
                 await t
             except asyncio.CancelledError:
                 pass
-    _logger_agents.info("Pipeline agent worker + on-demand lookup worker stopped")
+    _logger_agents.info("Pipeline job services stopped")
 
 
 app = FastAPI(title="Aethria API", lifespan=_lifespan)
@@ -714,6 +983,7 @@ async def request_metrics_middleware(request: Request, call_next):
         # Route templates are available after routing; fall back to a bounded
         # endpoint family so startup IDs do not create unbounded metric labels.
         path = request.scope.get("route").path if request.scope.get("route") else request.url.path
+        path = re.sub(r"\{[^}]*id[^}]*\}", ":id", str(path), flags=re.IGNORECASE)
         path = re.sub(r"/[0-9a-fA-F-]{16,}", "/:id", str(path))
         metrics.observe_api_request(
             request.method,
@@ -733,6 +1003,30 @@ app.include_router(_fund_thesis_router.router)
 from routers import analytics as _analytics_router  # noqa: E402
 
 app.include_router(_analytics_router.router)
+from routers import jobs as _jobs_router  # noqa: E402
+
+app.include_router(_jobs_router.router)
+from routers import identity as _identity_router  # noqa: E402
+
+app.include_router(_identity_router.router)
+from routers import evidence as _evidence_router  # noqa: E402
+
+app.include_router(_evidence_router.router)
+from routers import evaluations as _evaluations_router  # noqa: E402
+
+app.include_router(_evaluations_router.router)
+from routers import decisions as _decisions_router  # noqa: E402
+
+app.include_router(_decisions_router.router)
+from routers import monitoring as _monitoring_router  # noqa: E402
+
+app.include_router(_monitoring_router.router)
+from routers import fund_intelligence as _fund_intelligence_router  # noqa: E402
+
+app.include_router(_fund_intelligence_router.router)
+from routers import channels_outcomes as _channels_outcomes_router  # noqa: E402
+
+app.include_router(_channels_outcomes_router.router)
 
 # CORS: localhost for dev; extend with ALLOWED_ORIGINS (comma-separated) for production domain
 _cors_origins = [
@@ -1691,6 +1985,36 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/system/status")
+async def system_status(request: Request):
+    """Authenticated execution-plane status without secrets or raw exceptions."""
+    user_id = require_authenticated_user(request)
+    counts: Dict[str, int]
+    if _durable_job_repository is not None:
+        try:
+            counts = await _durable_job_repository.tenant_queue_depths(user_id=user_id)
+        except Exception as exc:
+            _logger_agents.warning(
+                "Durable system status read failed: %s", type(exc).__name__
+            )
+            counts = {}
+    else:
+        counts = {
+            "pipeline_cycle:queued": _agent_queue.qsize() if _agent_queue is not None else 0,
+            "company_lookup:queued": _lookup_queue.qsize() if _lookup_queue is not None else 0,
+            "outbox:pending": 0,
+        }
+    return {
+        "status": "ok",
+        "durable_jobs": {
+            "required": _durable_jobs_required(),
+            "ready": _durable_job_repository is not None,
+            "error": _durable_job_error if _durable_jobs_required() else None,
+            "counts": counts,
+        },
+    }
+
+
 @app.get("/metrics")
 def prometheus_metrics(request: Request):
     """Prometheus exposition: pipeline throughput/latency, lookup outcomes, queue
@@ -1714,8 +2038,20 @@ def prometheus_metrics(request: Request):
         presented = auth[7:].strip() if auth.startswith("Bearer ") else ""
         if presented != token:
             raise HTTPException(status_code=401, detail="Missing or invalid metrics token")
-    agent_depth = _agent_queue.qsize() if _agent_queue is not None else 0
-    lookup_depth = _lookup_queue.qsize() if _lookup_queue is not None else 0
+    if _durable_job_repository is not None:
+        agent_depth = sum(
+            count
+            for key, count in _durable_depth_snapshot.items()
+            if key.startswith("pipeline_cycle:")
+        )
+        lookup_depth = sum(
+            count
+            for key, count in _durable_depth_snapshot.items()
+            if key.startswith("company_lookup:")
+        )
+    else:
+        agent_depth = _agent_queue.qsize() if _agent_queue is not None else 0
+        lookup_depth = _lookup_queue.qsize() if _lookup_queue is not None else 0
     body = metrics.render(
         sse_subscribers=event_bus.total_subscribers(),
         agent_queue_depth=agent_depth,
@@ -1977,7 +2313,7 @@ def preview_settings_policy(request: Request, body: dict | None = None):
 
 
 @app.post("/api/settings/policy/publish")
-def publish_settings_policy(request: Request, body: dict | None = None):
+async def publish_settings_policy(request: Request, body: dict | None = None):
     """Publish the current or supplied fund_config draft as an immutable scoring policy version."""
     user_id = require_authenticated_user(request)
     limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
@@ -1986,13 +2322,44 @@ def publish_settings_policy(request: Request, body: dict | None = None):
     payload = body if isinstance(body, dict) else {}
     fund_config = payload.get("fund_config") if isinstance(payload.get("fund_config"), dict) else None
     try:
-        policy = publish_policy(user_id, fund_config=fund_config)
+        if fund_config is None:
+            settings = await asyncio.to_thread(load_settings, user_id, use_cache=False)
+            fund_config = (
+                settings.get("fund_config")
+                if isinstance(settings.get("fund_config"), dict)
+                else {}
+            )
+        compiled = await asyncio.to_thread(
+            compile_policy_from_fund_config,
+            fund_config,
+            require_publish_ready=True,
+        )
+        repository = getattr(app.state, "fund_intelligence_repository", None)
+        if repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Governed policy store unavailable",
+            )
+        version = await repository.publish_settings_policy(
+            user_id=user_id,
+            actor_id=user_id,
+            fund_config=fund_config,
+            policy_hash=compiled["policy_hash"],
+        )
     except PolicyValidationError as exc:
         raise HTTPException(
             status_code=422,
             detail={"message": "Policy validation failed", "errors": exc.errors},
         ) from exc
-    return {"policy": policy}
+    return {
+        "policy": {
+            **compiled,
+            "policy_version_id": version["governed_policy_version_id"],
+            "published_at": version.get("published_at"),
+            "authoritative_store": "governed_policy_versions",
+            "legacy_projection": "pending",
+        }
+    }
 
 
 @app.get("/api/policy/active")
@@ -2036,25 +2403,55 @@ async def agents_status(request: Request):
         thesis_error,
         user_agents_enabled,
     ) = await asyncio.to_thread(_agents_status_reads_sync, user_id, supabase_configured)
+    durable_counts: Dict[str, int] = {}
+    if _durable_job_repository is not None:
+        try:
+            durable_counts = await _durable_job_repository.tenant_queue_depths(
+                user_id=user_id
+            )
+        except Exception:
+            durable_counts = {}
+    worker_ready = (
+        _durable_job_repository is not None
+        if _durable_jobs_required()
+        else _agent_queue is not None
+    )
+    lookup_worker_ready = (
+        _durable_job_repository is not None
+        if _durable_jobs_required()
+        else _lookup_queue is not None
+    )
     return {
-        "worker_ready": _agent_queue is not None,
-        "lookup_worker_ready": _lookup_queue is not None,
-        "agent_queue_size": _agent_queue.qsize() if _agent_queue is not None else None,
-        "lookup_queue_size": _lookup_queue.qsize() if _lookup_queue is not None else None,
+        "worker_ready": worker_ready,
+        "lookup_worker_ready": lookup_worker_ready,
+        "agent_queue_size": (
+            sum(v for k, v in durable_counts.items() if k.startswith("pipeline_cycle:"))
+            if _durable_jobs_required()
+            else (_agent_queue.qsize() if _agent_queue is not None else None)
+        ),
+        "lookup_queue_size": (
+            sum(v for k, v in durable_counts.items() if k.startswith("company_lookup:"))
+            if _durable_jobs_required()
+            else (_lookup_queue.qsize() if _lookup_queue is not None else None)
+        ),
+        "durable_jobs_required": _durable_jobs_required(),
+        "durable_jobs_ready": _durable_job_repository is not None,
+        "durable_job_error": _durable_job_error if _durable_jobs_required() else None,
+        "durable_job_counts": durable_counts,
         "supabase_configured": supabase_configured,
         "openai_configured": openai_configured,
         "user_agents_enabled": user_agents_enabled,
         "agents_will_run": (
             supabase_configured
             and openai_configured
-            and _agent_queue is not None
+            and worker_ready
             and user_agents_enabled
             and thesis_ready
         ),
         "lookup_will_run": (
             supabase_configured
             and openai_configured
-            and _lookup_queue is not None
+            and lookup_worker_ready
         ),
         "thesis_ready": thesis_ready,
         "mandate_published": mandate_published,
@@ -2133,7 +2530,7 @@ async def trigger_agents(request: Request):
             content={"status": "skipped", "reason": "settings_unavailable"},
         )
     agents_enabled = _agents_enabled_from_settings(settings)
-    if agents_enabled and _is_user_loop_alive(user_id):
+    if agents_enabled and _is_user_loop_alive(user_id) and not _durable_jobs_required():
         _logger_agents.info(
             "trigger_agents ignored user=%s reason=loop_already_running",
             user_id[:12],
@@ -2143,7 +2540,7 @@ async def trigger_agents(request: Request):
             status_code=202,
             content={"status": "loop_running", "user_id": user_id},
         )
-    if agents_enabled and _loops_lock is None:
+    if agents_enabled and _loops_lock is None and not _is_user_loop_alive(user_id):
         _logger_agents.warning(
             "trigger_agents unavailable user=%s reason=loop_registry_not_ready",
             user_id[:12],
@@ -2152,7 +2549,13 @@ async def trigger_agents(request: Request):
             status_code=503,
             content={"status": "unavailable", "reason": "loop_registry_not_ready"},
         )
-    if not agents_enabled and _agent_queue is None:
+    if _durable_jobs_required() and _durable_job_repository is None:
+        _logger_agents.warning(
+            "trigger_agents unavailable user=%s reason=durable_job_store_unavailable",
+            user_id[:12],
+        )
+        return _durable_store_unavailable()
+    if not _durable_jobs_required() and not agents_enabled and _agent_queue is None:
         _logger_agents.warning(
             "trigger_agents unavailable user=%s reason=worker_not_ready",
             user_id[:12],
@@ -2200,6 +2603,38 @@ async def trigger_agents(request: Request):
     except Exception:
         _release_security_lock(lock_key)
         raise
+    if _durable_jobs_required():
+        try:
+            accepted_job = await _enqueue_pipeline_cycle(
+                user_id,
+                manual_one_shot=not agents_enabled,
+                source="login_trigger" if agents_enabled else "manual_one_shot",
+            )
+        except Exception as exc:
+            _logger_agents.error(
+                "trigger_agents durable enqueue failed user=%s error=%s",
+                user_id[:12],
+                type(exc).__name__,
+            )
+            _release_security_lock(lock_key)
+            return _durable_store_unavailable()
+        _release_security_lock(lock_key)
+        loop_status = None
+        if agents_enabled:
+            started = await _ensure_user_loop(user_id)
+            loop_status = "loop_started" if started else "loop_running"
+        content = {
+            **_job_response_fields(accepted_job),
+            "user_id": user_id,
+            "loop_status": loop_status,
+        }
+        _logger_agents.info(
+            "trigger_agents accepted durable cycle user=%s job_id=%s",
+            user_id[:12],
+            accepted_job.job_id,
+        )
+        return JSONResponse(status_code=202, content=content)
+
     if agents_enabled:
         _release_security_lock(lock_key)
         started = await _ensure_user_loop(user_id)
@@ -2372,7 +2807,9 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
     company_name = str(parsed.get("company_name") or "").strip()
     if not company_name:
         raise HTTPException(status_code=422, detail="Could not derive company name from lookup_input")
-    if _lookup_queue is None:
+    if _durable_jobs_required() and _durable_job_repository is None:
+        return _durable_store_unavailable()
+    if not _durable_jobs_required() and _lookup_queue is None:
         return JSONResponse(
             status_code=503,
             content={"status": "unavailable", "reason": "lookup_worker_not_ready"},
@@ -2396,23 +2833,47 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
         user_id,
         str(body.get("resolution_token") or "").strip() or None,
     )
-    await _lookup_queue.put(
-        {
-            "user_id": user_id,
-            "company_name": company_name,
-            "website": parsed.get("website"),
-            "lookup_query": parsed.get("lookup_query"),
-            "lookup_input_type": parsed.get("lookup_input_type"),
-            "lookup_id": lookup_id,
-            "lock_key": lock_key,
-            "additional_context": additional_context,
-            "resolution": resolution,
-        }
-    )
+    if _durable_jobs_required():
+        try:
+            accepted_job = await _enqueue_company_lookup(
+                user_id,
+                company_name=company_name,
+                website=parsed.get("website"),
+                lookup_query=parsed.get("lookup_query"),
+                lookup_input_type=parsed.get("lookup_input_type"),
+                lookup_id=lookup_id,
+                additional_context=additional_context,
+                resolution=resolution,
+            )
+        except Exception as exc:
+            _logger_agents.error(
+                "lookup durable enqueue failed user=%s error=%s",
+                user_id[:12],
+                type(exc).__name__,
+            )
+            _release_security_lock(lock_key)
+            return _durable_store_unavailable()
+        _release_security_lock(lock_key)
+        job_fields = _job_response_fields(accepted_job)
+    else:
+        await _lookup_queue.put(
+            {
+                "user_id": user_id,
+                "company_name": company_name,
+                "website": parsed.get("website"),
+                "lookup_query": parsed.get("lookup_query"),
+                "lookup_input_type": parsed.get("lookup_input_type"),
+                "lookup_id": lookup_id,
+                "lock_key": lock_key,
+                "additional_context": additional_context,
+                "resolution": resolution,
+            }
+        )
+        job_fields = {"status": "queued"}
     return JSONResponse(
         status_code=202,
         content={
-            "status": "queued",
+            **job_fields,
             "user_id": user_id,
             "lookup_id": lookup_id,
             "lookup_input": lookup_input,
@@ -2470,7 +2931,9 @@ async def rerun_startup_lookup(request: Request, startup_id: str, body: Dict[str
         or str((scout_info.get("company_resolution") or {}).get("website") or "").strip()
         or None
     )
-    if _lookup_queue is None:
+    if _durable_jobs_required() and _durable_job_repository is None:
+        return _durable_store_unavailable()
+    if not _durable_jobs_required() and _lookup_queue is None:
         return JSONResponse(
             status_code=503,
             content={"status": "unavailable", "reason": "lookup_worker_not_ready"},
@@ -2490,23 +2953,47 @@ async def rerun_startup_lookup(request: Request, startup_id: str, body: Dict[str
     if limited is not None:
         _release_security_lock(lock_key)
         return limited
-    await _lookup_queue.put(
-        {
-            "user_id": user_id,
-            "company_name": company_name,
-            "website": website,
-            "lookup_query": company_name,
-            "lookup_input_type": "company_name",
-            "lookup_id": lookup_id,
-            "lock_key": lock_key,
-            "additional_context": additional_context,
-            "replace_startup_id": startup_id,
-        }
-    )
+    if _durable_jobs_required():
+        try:
+            accepted_job = await _enqueue_company_lookup(
+                user_id,
+                company_name=company_name,
+                website=website,
+                lookup_query=company_name,
+                lookup_input_type="company_name",
+                lookup_id=lookup_id,
+                additional_context=additional_context,
+                replace_startup_id=startup_id,
+            )
+        except Exception as exc:
+            _logger_agents.error(
+                "rerun durable enqueue failed user=%s error=%s",
+                user_id[:12],
+                type(exc).__name__,
+            )
+            _release_security_lock(lock_key)
+            return _durable_store_unavailable()
+        _release_security_lock(lock_key)
+        job_fields = _job_response_fields(accepted_job)
+    else:
+        await _lookup_queue.put(
+            {
+                "user_id": user_id,
+                "company_name": company_name,
+                "website": website,
+                "lookup_query": company_name,
+                "lookup_input_type": "company_name",
+                "lookup_id": lookup_id,
+                "lock_key": lock_key,
+                "additional_context": additional_context,
+                "replace_startup_id": startup_id,
+            }
+        )
+        job_fields = {"status": "queued"}
     return JSONResponse(
         status_code=202,
         content={
-            "status": "queued",
+            **job_fields,
             "user_id": user_id,
             "lookup_id": lookup_id,
             "startup_id": startup_id,
@@ -2588,6 +3075,7 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
         raise HTTPException(status_code=422, detail="lookup_ids is required")
 
     cancelled: List[str] = []
+    cancelled_job_ids: List[str] = []
     restored_startup_ids: List[str] = []
     storage = None
     if env_config.use_supabase_storage():
@@ -2599,6 +3087,18 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
         lookup_id = _coerce_lookup_id(raw)
         _mark_lookup_cancelled(user_id, lookup_id)
         cancelled.append(lookup_id)
+        if _durable_job_repository is not None:
+            job = await _durable_job_repository.get_by_idempotency_key(
+                user_id=user_id,
+                idempotency_key=_lookup_idempotency_key(user_id, lookup_id),
+            )
+            if job is not None:
+                cancelled_job = await _durable_job_repository.cancel(
+                    user_id=user_id,
+                    job_id=job.job_id,
+                )
+                if cancelled_job is not None:
+                    cancelled_job_ids.append(job.job_id)
         if isinstance(storage, SupabaseStartupsStorage):
             restored = await asyncio.to_thread(storage.mark_existing_rerun_cancelled, lookup_id)
             if restored:
@@ -2607,7 +3107,12 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
 
     return JSONResponse(
         status_code=202,
-        content={"status": "cancelled", "cancelled": cancelled, "restored_startup_ids": restored_startup_ids},
+        content={
+            "status": "cancelled",
+            "cancelled": cancelled,
+            "job_ids": cancelled_job_ids,
+            "restored_startup_ids": restored_startup_ids,
+        },
     )
 
 

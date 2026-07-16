@@ -27,11 +27,13 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
 
         async def run_cycle(self, **kwargs):
             order.append("scout")
+            return []
 
     class Reviewer:
         last_cycle_stats = {}
 
         async def run_cycle(self, **kwargs):
+            assert kwargs["eligible_startup_ids"] == set()
             order.append("reviewer")
             return 0
 
@@ -89,7 +91,13 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
     monkeypatch.setattr(pipeline_runner, "MetaAgent", Meta)
     monkeypatch.setattr(pipeline_runner, "get_service_client", lambda: SimpleNamespace())
 
-    await pipeline_runner._run_one_pipeline_cycle_inner("user-prune-order")
+    class IdentityRepository:
+        async def list_linked_legacy_startup_ids(self, *, user_id):
+            return []
+
+    await pipeline_runner._run_one_pipeline_cycle_inner(
+        "user-prune-order", identity_repository=IdentityRepository()
+    )
 
     assert order[:3] == ["scout", "prune", "reviewer"]
 
@@ -118,4 +126,3 @@ def test_reference_prune_keeps_operator_lookup_rows(tmp_path):
 
     assert storage.remove_startups_without_references() == 1
     assert [startup.startup_id for startup in storage.get_all_startups()] == ["lookup"]
-

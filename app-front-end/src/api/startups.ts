@@ -170,7 +170,15 @@ export async function queueOnDemandLookup(
   additionalContext?: string,
   /** Opaque, short-lived server token returned by resolveLookupCandidates. */
   resolutionToken?: string | null,
-): Promise<{ status: string; companyName: string; lookupId: string; lookupInputType?: string }> {
+): Promise<{
+  status: string;
+  companyName: string;
+  lookupId: string;
+  lookupInputType?: string;
+  jobId?: string;
+  acceptedAt?: string;
+  pipelineRunId?: string;
+}> {
   const input = lookupInput.trim();
   const id = lookupId.trim();
   if (!input) {
@@ -203,6 +211,9 @@ export async function queueOnDemandLookup(
     companyName: typeof data?.company_name === 'string' ? data.company_name : input,
     lookupId: resolvedId,
     lookupInputType: typeof data?.lookup_input_type === 'string' ? data.lookup_input_type : undefined,
+    jobId: typeof data?.job_id === 'string' ? data.job_id : undefined,
+    acceptedAt: typeof data?.accepted_at === 'string' ? data.accepted_at : undefined,
+    pipelineRunId: typeof data?.pipeline_run_id === 'string' ? data.pipeline_run_id : undefined,
   };
 }
 
@@ -211,7 +222,14 @@ export async function queueLookupRerun(
   startupId: string,
   lookupId: string,
   additionalContext: string
-): Promise<{ status: string; companyName: string; lookupId: string }> {
+): Promise<{
+  status: string;
+  companyName: string;
+  lookupId: string;
+  jobId?: string;
+  acceptedAt?: string;
+  pipelineRunId?: string;
+}> {
   const id = lookupId.trim();
   const context = additionalContext.trim().slice(0, 2000);
   if (!startupId.trim()) throw new Error('startupId is required');
@@ -233,6 +251,9 @@ export async function queueLookupRerun(
     status: typeof data?.status === 'string' ? data.status : 'queued',
     companyName: typeof data?.company_name === 'string' ? data.company_name : '',
     lookupId: typeof data?.lookup_id === 'string' ? data.lookup_id : id,
+    jobId: typeof data?.job_id === 'string' ? data.job_id : undefined,
+    acceptedAt: typeof data?.accepted_at === 'string' ? data.accepted_at : undefined,
+    pipelineRunId: typeof data?.pipeline_run_id === 'string' ? data.pipeline_run_id : undefined,
   };
 }
 

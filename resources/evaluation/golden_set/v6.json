@@ -1,0 +1,19 @@
+{
+  "version": "v6",
+  "extends": "v5",
+  "description": "Cost-aware monitoring and governed Fund Intelligence invariants.",
+  "cases": [
+    {
+      "case_id": "archived_opportunity_has_no_recurring_spend",
+      "description": "Archive service level blocks scheduled refreshes and releases future reservations.",
+      "snapshot": {"monitoring_contract": {"service_level": 0, "monitor_due_allowed": false, "budget_reserved": false}},
+      "expected": {"monitoring_contract": {"service_level": 0, "monitor_due_allowed": false, "budget_reserved": false}}
+    },
+    {
+      "case_id": "fund_intelligence_cannot_self_activate",
+      "description": "A supported pattern creates a reviewable proposal and acceptance creates only a draft policy version.",
+      "snapshot": {"fund_intelligence": {"sample_disclosed": true, "limitations_disclosed": true, "accepted_version_status": "draft", "automatic_activation": false}},
+      "expected": {"fund_intelligence": {"sample_disclosed": true, "limitations_disclosed": true, "accepted_version_status": "draft", "automatic_activation": false}}
+    }
+  ]
+}

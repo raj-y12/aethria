@@ -5,6 +5,7 @@ import DispatchDotPulse from './DispatchDotPulse';
 import Reveal from './Reveal';
 import { useFocusTrap } from '../hooks';
 import type { LookupCandidate } from '../api/startups';
+import type { JobStatus } from '../api/jobs';
 
 export interface LookupProgress {
   query: string;
@@ -29,6 +30,17 @@ export interface LookupChip {
 export interface LookupFailure {
   query: string;
   message: string;
+}
+
+export interface LookupExecution {
+  status: JobStatus;
+  acceptedAt?: string | null;
+  attempts: number;
+  maxAttempts: number;
+  nextAttemptAt?: string | null;
+  error?: string | null;
+  blockCode?: string | null;
+  recoveryAction?: string | null;
 }
 
 interface DispatchCommandBarProps {
@@ -61,6 +73,10 @@ interface DispatchCommandBarProps {
   /** Re-review of an existing memo: company is fixed, only private context is asked for. */
   rerun?: { name: string; sector?: string | null } | null;
   onSubmitRerun?: (context: string) => void;
+  /** Authoritative durable execution state, separate from domain progress. */
+  execution?: LookupExecution | null;
+  onRetryJob?: () => void;
+  onOpenIdentityReview?: () => void;
 }
 
 type StepState = 'done' | 'active' | 'pending';
@@ -119,6 +135,99 @@ function ProgressSteps({ progress }: { progress: LookupProgress }) {
   );
 }
 
+const EXECUTION_LABELS: Record<JobStatus, string> = {
+  accepted: 'Accepted',
+  running: 'Running',
+  retry_wait: 'Recovering automatically',
+  blocked: 'Blocked',
+  succeeded: 'Execution complete',
+  failed: 'Execution failed',
+  dead_letter: 'Needs intervention',
+  cancelled: 'Cancelled',
+};
+
+function formatExecutionTime(value?: string | null): string | null {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(timestamp);
+}
+
+function ExecutionStatusCard({
+  execution,
+  onRetry,
+  onOpenIdentityReview,
+}: {
+  execution: LookupExecution;
+  onRetry?: () => void;
+  onOpenIdentityReview?: () => void;
+}) {
+  const identityBlocked = execution.status === 'blocked' && execution.blockCode === 'identity_review_required';
+  const retryable = execution.status === 'failed' || execution.status === 'dead_letter' || execution.status === 'blocked';
+  const acceptedTime = formatExecutionTime(execution.acceptedAt);
+  const nextAttemptTime = formatExecutionTime(execution.nextAttemptAt);
+  return (
+    <section className="w-full max-w-md border-y border-oxford/10 py-phi-3" aria-label="Execution status">
+      <div className="flex items-start justify-between gap-phi-4">
+        <div>
+          <p className="type-label-section">
+            {identityBlocked ? 'Identity review required' : EXECUTION_LABELS[execution.status]}
+          </p>
+          <p className="type-meta mt-1 text-oxford/55">
+            Attempt {execution.attempts} of {execution.maxAttempts}
+            {acceptedTime ? ` · accepted ${acceptedTime}` : ''}
+          </p>
+        </div>
+        <span
+          className={`mt-1 h-2 w-2 shrink-0 ${
+            execution.status === 'running' || execution.status === 'retry_wait'
+              ? 'bg-oxford signal-dot-breathe'
+              : execution.status === 'accepted'
+                ? 'border border-oxford/40 bg-transparent'
+                : execution.status === 'succeeded'
+                  ? 'bg-oxford'
+                  : 'bg-signal'
+          }`}
+          aria-hidden
+        />
+      </div>
+      {execution.status === 'retry_wait' ? (
+        <p className="type-body mt-phi-2 text-oxford/60">
+          The job is waiting for its next automatic attempt{nextAttemptTime ? ` at ${nextAttemptTime}` : ''}.
+        </p>
+      ) : null}
+      {execution.recoveryAction || execution.error ? (
+        <p className="type-body mt-phi-2 text-oxford/60">
+          {execution.recoveryAction || execution.error}
+        </p>
+      ) : null}
+      {retryable ? (
+        <div className="mt-phi-3 flex flex-wrap gap-phi-2">
+          {identityBlocked && onOpenIdentityReview ? (
+            <button
+              type="button"
+              onClick={onOpenIdentityReview}
+              className="type-action border border-oxford/15 bg-oxford px-3 py-2 text-paper"
+            >
+              Review identity
+            </button>
+          ) : null}
+          {onRetry ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={identityBlocked}
+              className="type-action border border-oxford/15 px-3 py-2 text-oxford disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              Retry job
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 type DispatchFooterAction = { label: string; onClick: () => void };
 
 function DispatchFooterBar({ actions }: { actions: DispatchFooterAction[] }) {
@@ -169,6 +278,9 @@ export default function DispatchCommandBar({
   onRefineWebsite,
   rerun,
   onSubmitRerun,
+  execution,
+  onRetryJob,
+  onOpenIdentityReview,
 }: DispatchCommandBarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(open, containerRef);
@@ -433,6 +545,13 @@ export default function DispatchCommandBar({
                 </p>
               ) : null}
               <ProgressSteps progress={progress!} />
+              {execution ? (
+                <ExecutionStatusCard
+                  execution={execution}
+                  onRetry={onRetryJob}
+                  onOpenIdentityReview={onOpenIdentityReview}
+                />
+              ) : null}
               {message ? (
                 <p className="type-body max-w-[40ch] text-center text-oxford/60" aria-live="polite">
                   {message}

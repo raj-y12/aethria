@@ -12,6 +12,22 @@ from uuid import uuid4
 RulingDecision = Literal["YES", "NO", "MAYBE"]
 
 
+class EvaluationManifest(BaseModel):
+    """Portable dependency manifest for one completed current-pipeline evaluation."""
+
+    manifest_version: Literal["evaluation-manifest-v1"] = "evaluation-manifest-v1"
+    pipeline_run_id: str
+    evaluation_path: Literal["manual_lookup", "autonomous_discovery", "rerun"]
+    models: Dict[str, str]
+    prompt_versions: Dict[str, str]
+    policy_version_id: Optional[str] = None
+    policy_hash: Optional[str] = None
+    rubric_version: Optional[str] = None
+    partner_rules_version: str
+    partner_rules_hash: str
+    created_at: datetime = Field(default_factory=utcnow)
+
+
 class ScoreBandConfig(BaseModel):
     id: str
     min: float

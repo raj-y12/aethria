@@ -325,6 +325,22 @@ class Storage:
                     return None
         return None
 
+    def remove_startup(self, startup_id: str) -> bool:
+        """Remove one compatibility row after an institutional identity block."""
+        removed: List[bool] = [False]
+
+        def updater(data: List[dict]) -> List[dict]:
+            kept = []
+            for item in data:
+                if item.get("startup_id") == startup_id:
+                    removed[0] = True
+                else:
+                    kept.append(item)
+            return kept
+
+        self._atomic_update(updater)
+        return removed[0]
+
     def get_all_startups(self, skip_invalid: bool = False) -> List[Startup]:
         """
         Get all startups with full Pydantic validation.

@@ -8,6 +8,7 @@ import { workspaceLayout } from '../design-system/workspaceLayout';
 import { getQueryConfig } from '../lib/queryIntent';
 import { fetchSettings, patchSettings, publishPolicy, type Settings } from '../api/settings';
 import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
+import { fetchSystemStatus } from '../api/system';
 import {
   fetchFundThesisSummary,
   type FundThesisSummary,
@@ -20,6 +21,7 @@ import SettingsTopBar, { type SettingsStatusTone } from './SettingsTopBar';
 import SettingsRail from './SettingsRail';
 import SettingsMobileNav from './SettingsMobileNav';
 import OperationsStrip from './OperationsStrip';
+import ExecutionReadinessPanel from '../components/institutional/ExecutionReadinessPanel';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
   getDeploymentConfirmation,
@@ -338,6 +340,13 @@ export default function SettingsPage() {
     ...getQueryConfig('STATIC'),
     refetchOnMount: 'always',
   });
+  const systemStatusQuery = useQuery({
+    queryKey: ['system', 'status'],
+    queryFn: fetchSystemStatus,
+    ...getQueryConfig('SEMI_DYNAMIC', { pollIntervalMs: 30_000 }),
+    refetchInterval: 30_000,
+    retry: 1,
+  });
 
   // Warm cache data gives an instant first paint, while the mount refetch above
   // reconciles it with the server. Incoming data may replace a clean draft, but
@@ -592,6 +601,15 @@ export default function SettingsPage() {
       const liveSettings = refreshed ?? persistedSettings ?? settings;
       setSettings(liveSettings);
       let liveConfig = liveSettings.fund_config ?? checkpoint.fundConfig;
+      if (policyResult.policy?.policy_version_id && policyResult.policy.policy_hash) {
+        liveConfig = {
+          ...liveConfig,
+          activePolicyVersionId: policyResult.policy.policy_version_id,
+          publishedPolicyHash: policyResult.policy.policy_hash,
+          draftPolicyHash: policyResult.policy.policy_hash,
+          lastPublishedAt: policyResult.policy.published_at ?? new Date().toISOString(),
+        };
+      }
       if (summary?.active_version_number != null) {
         setThesisSummary(summary);
         liveConfig = applyThesisVersionMetadata(liveConfig, summary.active_version_number);
@@ -1043,6 +1061,11 @@ export default function SettingsPage() {
                         </p>
                       </div>
                     )}
+                    <ExecutionReadinessPanel
+                      status={systemStatusQuery.data ?? null}
+                      loading={systemStatusQuery.isPending}
+                      compact
+                    />
                   </RoomSection>
             </div>
           </motion.main>

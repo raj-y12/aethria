@@ -112,15 +112,22 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
     // Meta-agent cycle events
     (metaReports ?? []).forEach((r) => {
       if (r.ran_at) {
-        const mutCount = r.mutations_applied?.length ?? 0;
-        const targets = r.mutations_applied?.map((m) => m.agent_target).join(', ') ?? '';
+        const promptProposals = r.prompt_proposals?.length
+          ? r.prompt_proposals
+          : r.mutations_applied ?? [];
+        const proposalCount = promptProposals.length
+          + (r.weight_proposals ?? r.weight_updates ?? []).length
+          + (r.calibration_proposals ?? r.calibration_changes ?? []).length;
+        const appliedCount = r.production_mutations_applied ?? 0;
         out.push({
           id: `meta-${r.cycle_number}`,
           iso: r.ran_at,
           timestamp: feedStamp(r.ran_at),
-          message: mutCount > 0
-            ? `Meta-Agent · Cycle ${r.cycle_number} · ${mutCount} mutations (${targets})`
-            : `Meta-Agent · Cycle ${r.cycle_number} · System stable`,
+          message: appliedCount > 0
+            ? `Fund Intelligence · Cycle ${r.cycle_number} · ${appliedCount} governed change${appliedCount === 1 ? '' : 's'} published`
+            : proposalCount > 0
+              ? `Fund Intelligence · Cycle ${r.cycle_number} · ${proposalCount} proposal${proposalCount === 1 ? '' : 's'} · production unchanged`
+              : `Fund Intelligence · Cycle ${r.cycle_number} · Analysis complete · no proposal`,
           kind: 'meta_cycle',
         });
       }

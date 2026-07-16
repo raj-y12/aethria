@@ -4,7 +4,35 @@ recommendations (INVEST/PASS/MONITOR). Single source of truth for cross-layer co
 """
 from __future__ import annotations
 
+from enum import Enum
 from typing import Dict, Optional
+
+from pydantic import BaseModel
+
+
+class RecommendationCode(str, Enum):
+    """Institutional system recommendation; it is not a human fund ruling."""
+
+    ADVANCE = "ADVANCE"
+    MONITOR = "MONITOR"
+    PASS = "PASS"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+
+
+class HumanRulingCode(str, Enum):
+    """Explicit operator/fund ruling."""
+
+    ADVANCE = "ADVANCE"
+    MONITOR = "MONITOR"
+    PASS = "PASS"
+    INVEST = "INVEST"
+
+
+class LegacyProjection(BaseModel):
+    """A deliberately visible, potentially lossy legacy projection."""
+
+    value: str
+    compatibility_reason: Optional[str] = None
 
 LEGACY_TO_RECOMMENDATION: Dict[str, str] = {
     "YES": "INVEST",
@@ -17,6 +45,79 @@ RECOMMENDATION_TO_LEGACY: Dict[str, str] = {
     "PASS": "NO",
     "MONITOR": "MAYBE",
 }
+
+LEGACY_PARTNER_TO_INSTITUTIONAL: Dict[str, RecommendationCode] = {
+    "INVEST": RecommendationCode.ADVANCE,
+    "MONITOR": RecommendationCode.MONITOR,
+    "PASS": RecommendationCode.PASS,
+}
+
+LEGACY_RULING_TO_INSTITUTIONAL: Dict[str, HumanRulingCode] = {
+    "YES": HumanRulingCode.INVEST,
+    "MAYBE": HumanRulingCode.MONITOR,
+    "NO": HumanRulingCode.PASS,
+}
+
+
+def _required_code(value: Optional[str], *, label: str) -> str:
+    normalized = str(value or "").strip().upper()
+    if not normalized:
+        raise ValueError(f"Unknown {label}: {value!r}")
+    return normalized
+
+
+def institutional_recommendation_from_legacy_partner(
+    recommendation: str,
+) -> RecommendationCode:
+    normalized = _required_code(recommendation, label="legacy partner recommendation")
+    try:
+        return LEGACY_PARTNER_TO_INSTITUTIONAL[normalized]
+    except KeyError as exc:
+        raise ValueError(
+            f"Unknown legacy partner recommendation: {recommendation!r}"
+        ) from exc
+
+
+def legacy_partner_from_institutional_recommendation(
+    recommendation: str,
+) -> LegacyProjection:
+    normalized = _required_code(recommendation, label="institutional recommendation")
+    try:
+        code = RecommendationCode(normalized)
+    except ValueError as exc:
+        raise ValueError(
+            f"Unknown institutional recommendation: {recommendation!r}"
+        ) from exc
+    if code is RecommendationCode.ADVANCE:
+        return LegacyProjection(value="MONITOR", compatibility_reason="advance")
+    if code is RecommendationCode.INSUFFICIENT_EVIDENCE:
+        return LegacyProjection(
+            value="MONITOR", compatibility_reason="insufficient_evidence"
+        )
+    return LegacyProjection(value=code.value)
+
+
+def institutional_ruling_from_legacy(ruling: str) -> HumanRulingCode:
+    normalized = _required_code(ruling, label="legacy human ruling")
+    try:
+        return LEGACY_RULING_TO_INSTITUTIONAL[normalized]
+    except KeyError as exc:
+        raise ValueError(f"Unknown legacy human ruling: {ruling!r}") from exc
+
+
+def legacy_ruling_from_institutional(ruling: str) -> LegacyProjection:
+    normalized = _required_code(ruling, label="institutional human ruling")
+    try:
+        code = HumanRulingCode(normalized)
+    except ValueError as exc:
+        raise ValueError(f"Unknown institutional human ruling: {ruling!r}") from exc
+    if code is HumanRulingCode.ADVANCE:
+        return LegacyProjection(value="MAYBE", compatibility_reason="advance")
+    if code is HumanRulingCode.MONITOR:
+        return LegacyProjection(value="MAYBE")
+    if code is HumanRulingCode.PASS:
+        return LegacyProjection(value="NO")
+    return LegacyProjection(value="YES")
 
 
 def recommendation_from_legacy(

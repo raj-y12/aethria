@@ -26,11 +26,18 @@ class CostController:
     Enforces cost discipline across all agents.
     """
     
-    def __init__(self, budget_file: str = "data/portfolio/budgets.json", user_id: Optional[str] = None):
+    def __init__(
+        self,
+        budget_file: str = "data/portfolio/budgets.json",
+        user_id: Optional[str] = None,
+        *,
+        enforce_limits: bool = True,
+    ):
         self.budget_file = Path(budget_file)
         self.budget_file.parent.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("cost.controller")
         self.user_id = (user_id or "").strip() or None
+        self.enforce_limits = bool(enforce_limits)
         if env_config.use_supabase_storage() and not self.user_id:
             raise RuntimeError("CostController requires explicit user_id when Supabase storage is enabled")
         self.default_budgets = {
@@ -146,6 +153,9 @@ class CostController:
         
         if agent_type not in self.default_budgets:
             return False, f"Unknown agent type: {agent_type}"
+
+        if not self.enforce_limits:
+            return True, None
         
         budget = self.budgets.get(agent_type, {})
         default = self.default_budgets[agent_type]
@@ -243,11 +253,22 @@ class CostController:
         agent_type: str,
         agent_id: str,
         tokens_used: int = 0,
+        *,
+        model: str = "unknown",
+        provider: str = "openai",
     ):
         """
         Simpler usage recording wrapper around record_call.
         """
         self.record_call(agent_type, agent_id, tokens_used)
+        import metrics
+
+        metrics.observe_model_provider_usage(
+            stage=agent_type,
+            model=model,
+            provider=provider,
+            tokens=max(0, int(tokens_used or 0)),
+        )
 
     def get_budget_status(self, agent_type: str) -> Dict[str, Any]:
         """Get current budget status for agent type."""
@@ -276,3 +297,37 @@ class CostController:
         for agent_type in self.default_budgets:
             result[agent_type] = self.get_budget_status(agent_type)
         return result
+
+    def snapshot_usage(self) -> Dict[str, Any]:
+        """Return a tenant-local cumulative usage snapshot for delta measurement."""
+        self._reset_daily_budgets()
+        calls = 0
+        tokens = 0
+        cost = 0.0
+        for value in self.budgets.values():
+            if not isinstance(value, dict):
+                continue
+            calls += max(0, int(value.get("calls_today", 0) or 0))
+            tokens += max(0, int(value.get("tokens_today", 0) or 0))
+            cost += max(0.0, float(value.get("cost_today", 0.0) or 0.0))
+        return {
+            "calls": calls,
+            "tokens": tokens,
+            "cost_usd": round(cost, 8),
+        }
+
+    @staticmethod
+    def usage_delta(before: Dict[str, Any], after: Dict[str, Any]) -> Dict[str, Any]:
+        """Calculate a non-negative delta between two cumulative usage snapshots."""
+        return {
+            "calls": max(0, int(after.get("calls", 0) or 0) - int(before.get("calls", 0) or 0)),
+            "tokens": max(0, int(after.get("tokens", 0) or 0) - int(before.get("tokens", 0) or 0)),
+            "cost_usd": round(
+                max(
+                    0.0,
+                    float(after.get("cost_usd", 0.0) or 0.0)
+                    - float(before.get("cost_usd", 0.0) or 0.0),
+                ),
+                8,
+            ),
+        }

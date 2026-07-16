@@ -70,10 +70,11 @@ def test_mutator_apply_one_skips_set_prompt_without_auto_apply(monkeypatch):
     assert out is not None
     assert out.get("type") == "prompt_proposal"
     assert out.get("promoted") is False
+    assert out.get("activation_status") == "pending_operator_promotion"
     set_prompt.assert_not_called()
 
 
-def test_mutator_apply_one_calls_set_prompt_when_auto_apply(monkeypatch):
+def test_mutator_apply_one_ignores_auto_apply_environment_switch(monkeypatch):
     monkeypatch.setenv("META_AGENT_PROMPT_AUTO_APPLY", "true")
     signal = {"pipeline_health": {}}
     with patch(
@@ -99,5 +100,7 @@ def test_mutator_apply_one_calls_set_prompt_when_auto_apply(monkeypatch):
             with patch("meta.mutator._append_to_json_list"):
                 with patch("meta.mutator._read_json_dict", return_value={}):
                     with patch("meta.mutator._atomic_write"):
-                        mutator._apply_one(target, mock_engine, None)
-    set_prompt.assert_called_once()
+                        out = mutator._apply_one(target, mock_engine, None)
+    assert out is not None
+    assert out["activation_status"] == "pending_operator_promotion"
+    set_prompt.assert_not_called()

@@ -558,7 +558,12 @@ class ReviewerEngine:
             return default
         return max(0.0, min(1.0, value))
 
-    async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> int:
+    async def run_cycle(
+        self,
+        pipeline_run_id: Optional[str] = None,
+        *,
+        eligible_startup_ids: Optional[set[str]] = None,
+    ) -> int:
         """
         Run one review cycle.
         Processes up to batch_size unreviewed entries.
@@ -652,6 +657,12 @@ class ReviewerEngine:
             500,
         )
         unreviewed_startups = await asyncio.to_thread(self.storage.get_unreviewed, limit=lookahead_limit)
+        if eligible_startup_ids is not None:
+            unreviewed_startups = [
+                startup
+                for startup in unreviewed_startups
+                if startup.startup_id in eligible_startup_ids
+            ]
 
         if not unreviewed_startups:
             self.logger.info("No unreviewed entries found")
@@ -783,7 +794,9 @@ class ReviewerEngine:
                         + int(getattr(self.skeptical_reviewer, "_last_token_usage", 0) or 0)
                         + int(getattr(self.opportunist_reviewer, "_last_token_usage", 0) or 0)
                     )
-                    self.cost_controller.record_usage("reviewer", self.agent_id, total_tok)
+                    self.cost_controller.record_usage(
+                        "reviewer", self.agent_id, total_tok, model=self.model
+                    )
                 
                 # Compute consensus across all successful results
                 consensus = self._compute_consensus(successful_results)
@@ -889,6 +902,7 @@ class ReviewerEngine:
         force_rerun: bool = False,
         *,
         bypass_agent_enabled_gate: bool = False,
+        startup=None,
     ) -> bool:
         """
         Review one specific startup id.
@@ -897,7 +911,8 @@ class ReviewerEngine:
         bypass_agent_enabled_gate: when True, run even if reviewers are disabled in settings
         (used for occasional on-demand company lookup only).
         """
-        startup = await asyncio.to_thread(self.storage.get_startup, startup_id)
+        if startup is None:
+            startup = await asyncio.to_thread(self.storage.get_startup, startup_id)
         if startup is None:
             self.logger.warning("Startup not found for review: %s", startup_id)
             return False
@@ -1018,13 +1033,15 @@ class ReviewerEngine:
                     + int(getattr(self.skeptical_reviewer, "_last_token_usage", 0) or 0)
                     + int(getattr(self.opportunist_reviewer, "_last_token_usage", 0) or 0)
                 )
-                self.cost_controller.record_usage("reviewer", self.agent_id, total_tok)
+                self.cost_controller.record_usage(
+                    "reviewer", self.agent_id, total_tok, model=self.model
+                )
             gap_urls = [
                 str(u).strip()
                 for u in (scout_for_llm.get("_reviewer_gap_reference_urls") or [])
                 if isinstance(u, str) and str(u).strip()
             ]
-            return bool(
+            saved = bool(
                 await asyncio.to_thread(
                     self.storage.add_review,
                     startup_id,
@@ -1034,6 +1051,10 @@ class ReviewerEngine:
                     enrichment_gap_reference_urls=gap_urls or None,
                 )
             )
+            if saved:
+                startup.review_info = review_info
+                startup.update_timestamp()
+            return saved
         except Exception as e:
             self.logger.error("Error reviewing startup %s: %s", startup_id, e, exc_info=True)
             return False

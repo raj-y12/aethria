@@ -1,0 +1,19 @@
+{
+  "version": "v3",
+  "extends": "v2",
+  "description": "Evidence and claim-ledger invariants.",
+  "cases": [
+    {
+      "case_id": "evidence_blocks_unsupported_founder_label",
+      "description": "A model cannot assert a personality label without operator attribution.",
+      "snapshot": {"claim_standard": {"label": "magnetic founder", "model_assertion_allowed": false, "observable_signal_required": true}},
+      "expected": {"claim_standard": {"label": "magnetic founder", "model_assertion_allowed": false, "observable_signal_required": true}}
+    },
+    {
+      "case_id": "evidence_preserves_provenance_and_confidentiality",
+      "description": "A material claim retains evidence relationships while storage references remain private.",
+      "snapshot": {"evidence_contract": {"claim_has_provenance": true, "missing_evidence_visible": true, "storage_reference_public": false}},
+      "expected": {"evidence_contract": {"claim_has_provenance": true, "missing_evidence_visible": true, "storage_reference_public": false}}
+    }
+  ]
+}

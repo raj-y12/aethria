@@ -1,4 +1,10 @@
-from services.scoring.policy_store import publish_policy
+import pytest
+
+from services.scoring.policy_store import (
+    PolicyNotPublishedError,
+    load_published_policy,
+    publish_policy,
+)
 
 
 def _valid_fund_config():
@@ -48,3 +54,36 @@ def test_publish_policy_deduplicates_same_hash(monkeypatch):
     assert first["policy_hash"] == second["policy_hash"]
     assert len(versions) == 1
     assert saved[-1]["fund_config"]["activePolicyVersionId"] == first["policy_version_id"]
+
+
+def test_load_published_policy_fails_closed_without_an_active_published_version(monkeypatch):
+    import services.scoring.policy_store as store_mod
+
+    monkeypatch.setattr(store_mod, "load_settings", lambda user_id: {"fund_config": _valid_fund_config()})
+    monkeypatch.setattr(store_mod, "list_get_all", lambda table, user_id: [])
+
+    with pytest.raises(PolicyNotPublishedError):
+        load_published_policy("user_1")
+
+
+def test_load_published_policy_returns_only_the_hash_bound_active_version(monkeypatch):
+    import services.scoring.policy_store as store_mod
+
+    published = {
+        "policy_version_id": "policy-live",
+        "policy_hash": "hash-live",
+        "dimensions": {},
+    }
+    monkeypatch.setattr(
+        store_mod,
+        "load_settings",
+        lambda user_id: {
+            "fund_config": {
+                "activePolicyVersionId": "policy-live",
+                "publishedPolicyHash": "hash-live",
+            }
+        },
+    )
+    monkeypatch.setattr(store_mod, "list_get_all", lambda table, user_id: [published])
+
+    assert load_published_policy("user_1") == published

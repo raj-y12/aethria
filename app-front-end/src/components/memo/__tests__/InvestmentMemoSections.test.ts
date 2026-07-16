@@ -10,4 +10,12 @@ describe('Investment memo section order', () => {
       /<MemoSectionTitle number="06" id="memo-risk-register">Risks<\/MemoSectionTitle>/,
     );
   });
+
+  it('uses the canonical opportunity workspace as the only human ruling path', () => {
+    expect(memoSource).not.toContain('resolveEscalation');
+    expect(memoSource).not.toContain('<MemoRulingSection');
+    expect(memoSource.indexOf('<OpportunityIntelligence')).toBeLessThan(
+      memoSource.indexOf('memoAppendixLabel'),
+    );
+  });
 });

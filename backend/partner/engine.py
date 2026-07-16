@@ -293,7 +293,12 @@ class PartnerEngine:
                         tokens_used = total
                     else:
                         tokens_used = int(usage.get("prompt_tokens", 0) or 0) + int(usage.get("completion_tokens", 0) or 0)
-            self.cost_controller.record_usage("partner", "partner", tokens_used=tokens_used)
+            self.cost_controller.record_usage(
+                "partner",
+                "partner",
+                tokens_used=tokens_used,
+                model=getattr(self.decision_engine, "model", "unknown"),
+            )
 
         from utils.adapters import partner_output_to_partner_info
 
@@ -327,7 +332,12 @@ class PartnerEngine:
 
         return success, decision
 
-    async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> int:
+    async def run_cycle(
+        self,
+        pipeline_run_id: Optional[str] = None,
+        *,
+        eligible_startup_ids: Optional[set[str]] = None,
+    ) -> int:
         """
         Run one decision cycle.
         Processes all undecided entries.
@@ -350,8 +360,18 @@ class PartnerEngine:
             self.logger.warning("Partner runtime limits unavailable, using batch max: %s", e)
             cycle_limit = self.batch_max
         effective_batch_max = min(self.batch_max, max(1, cycle_limit))
-        limit = min(effective_batch_max, undecided_count) if undecided_count else None
+        limit = (
+            min(500, undecided_count)
+            if eligible_startup_ids is not None and undecided_count
+            else min(effective_batch_max, undecided_count)
+            if undecided_count
+            else None
+        )
         undecided = await asyncio.to_thread(self._get_undecided_entries, limit=limit)
+        if eligible_startup_ids is not None:
+            undecided = [
+                entry for entry in undecided if entry["id"] in eligible_startup_ids
+            ][:effective_batch_max]
         
         if not undecided:
             self.logger.info("No undecided entries found")
@@ -435,6 +455,7 @@ class PartnerEngine:
         force_rerun: bool = False,
         *,
         bypass_agent_enabled_gate: bool = False,
+        startup=None,
     ) -> bool:
         """
         Make a partner decision for one specific startup id.
@@ -443,7 +464,8 @@ class PartnerEngine:
         bypass_agent_enabled_gate: when True, run even if partners are disabled in settings
         (used for occasional on-demand company lookup only).
         """
-        startup = await asyncio.to_thread(self.storage.get_startup, startup_id)
+        if startup is None:
+            startup = await asyncio.to_thread(self.storage.get_startup, startup_id)
         if startup is None:
             self.logger.warning("Startup not found for partner decision: %s", startup_id)
             return False
@@ -458,12 +480,17 @@ class PartnerEngine:
             self.logger.info("Startup is not ready for partner decision: %s", startup_id)
             return False
         try:
-            success, _ = await self._decide_and_save(
+            success, decision = await self._decide_and_save(
                 startup_id,
                 entry["scout"],
                 entry["review"],
                 pipeline_run_id,
             )
+            if success and decision:
+                from utils.adapters import partner_output_to_partner_info
+
+                startup.partner_info = partner_output_to_partner_info(decision)
+                startup.update_timestamp()
             return bool(success)
         except Exception as e:
             self.logger.error("Error making partner decision for %s: %s", startup_id, e, exc_info=True)

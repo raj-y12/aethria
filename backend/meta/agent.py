@@ -111,14 +111,10 @@ class MetaAgent:
                 else:
                     self._no_action_reasons.append("No prompt mutations needed")
 
-                if weight_updates:
-                    reweighter.apply(weight_updates)
-                else:
+                if not weight_updates:
                     self._no_action_reasons.append("Scout weights stable")
 
-                if calibrations:
-                    calibrator.apply(calibrations)
-                else:
+                if not calibrations:
                     self._no_action_reasons.append("No calibration changes needed")
             finally:
                 mutator.close()
@@ -128,8 +124,14 @@ class MetaAgent:
             "cycle_number": cycle_number,
             "ran_at": now.isoformat(),
             "signal_summary": signal,
+            "analysis_only": True,
+            "production_mutations_applied": 0,
             "prompt_proposals": mutations,
-            "mutations_applied": mutations,
+            "mutations_applied": [],
+            "weight_proposals": weight_updates,
+            "calibration_proposals": calibrations,
+            # Compatibility aliases for existing report readers. These are proposals,
+            # not proof that production state changed.
             "weight_updates": weight_updates,
             "calibration_changes": calibrations,
             "no_action_reasons": self._no_action_reasons,

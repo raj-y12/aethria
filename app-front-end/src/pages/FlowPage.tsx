@@ -26,6 +26,7 @@ import { getQueryConfig } from '../lib/queryIntent';
 import { isDealUnresolved } from '../lib/dealState';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
+import CsvImportDrawer from '../components/institutional/CsvImportDrawer';
 
 /**
  * A readout that is also the instrument's control: the numeral reads the queue
@@ -96,6 +97,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const restoreRef = useRef<HTMLElement | null>(null);
   const memoContentRef = useRef<InvestmentMemoContentHandle | null>(null);
   const initialMemoRevealHandledRef = useRef(false);
@@ -244,6 +246,13 @@ export default function FlowPage({ data }: { data: SystemData }) {
                 active={queueView === 'STALE'}
                 onClick={() => selectView('STALE')}
               />
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                className="type-action border border-oxford/15 px-3 py-2 text-oxford transition-colors hover:border-oxford/35"
+              >
+                Import CSV
+              </button>
             </div>
           }
         />
@@ -334,6 +343,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
           />
         )}
       </AnimatePresence>
+      <CsvImportDrawer open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );
 }

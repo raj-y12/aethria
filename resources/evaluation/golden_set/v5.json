@@ -1,0 +1,19 @@
+{
+  "version": "v5",
+  "extends": "v4",
+  "description": "Human ruling and approval-gated workflow invariants.",
+  "cases": [
+    {
+      "case_id": "recommendation_is_not_human_ruling",
+      "description": "The system recommendation remains separate from the authoritative GP ruling.",
+      "snapshot": {"ruling_contract": {"recommendation_authoritative": false, "human_ruling_append_only": true, "override_attributed": true}},
+      "expected": {"ruling_contract": {"recommendation_authoritative": false, "human_ruling_append_only": true, "override_attributed": true}}
+    },
+    {
+      "case_id": "external_action_requires_approval",
+      "description": "Generated CRM or communication content cannot perform an external write before approval.",
+      "snapshot": {"workflow_contract": {"draft_generated": true, "approval_required": true, "external_write_performed": false}},
+      "expected": {"workflow_contract": {"draft_generated": true, "approval_required": true, "external_write_performed": false}}
+    }
+  ]
+}
