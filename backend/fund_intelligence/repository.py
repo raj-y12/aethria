@@ -519,7 +519,7 @@ class FundIntelligenceRepository:
                       published_by,published_policy_id,published_policy_hash,
                       created_at,published_at
                     ) values (
-                      $1,$2,null,'settings',$3::jsonb,$4,'published',$5,$5,$1,$4,
+                      $1,$2,null,'settings',$3::jsonb,$4,'published',$5,$5,$6,$4,
                       now(),now()
                     ) returning *
                     """,
@@ -528,6 +528,7 @@ class FundIntelligenceRepository:
                     json.dumps(fund_config),
                     str(policy_hash),
                     actor_id,
+                    version_id,
                 )
                 await self._outbox(
                     conn,

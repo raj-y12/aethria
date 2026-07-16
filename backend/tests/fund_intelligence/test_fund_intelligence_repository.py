@@ -152,3 +152,35 @@ async def test_settings_publication_commits_governed_authority_and_outbox_togeth
     assert "pg_advisory_xact_lock" in sql
     assert "publication_source" in sql
     assert "governed_policy_version.published" in str(connection.calls)
+
+
+@pytest.mark.asyncio
+async def test_settings_publication_binds_uuid_and_text_ids_separately():
+    published = {
+        "governed_policy_version_id": "version-settings-1",
+        "user_id": "user-a",
+        "policy_proposal_id": None,
+        "publication_source": "settings",
+        "policy_patch": json.dumps({"scoringWeights": []}),
+        "policy_hash": "hash-settings",
+        "status": "published",
+    }
+    connection = _Connection([published])
+    repository = FundIntelligenceRepository(_Pool(connection))
+
+    await repository.publish_settings_policy(
+        user_id="user-a",
+        actor_id="user-a",
+        fund_config={"scoringWeights": []},
+        policy_hash="hash-settings",
+    )
+
+    insert = next(
+        call
+        for call in connection.calls
+        if call[0] == "fetchrow"
+        and "insert into public.governed_policy_versions" in call[1].lower()
+    )
+    assert "$6" in insert[1]
+    assert len(insert[2]) == 6
+    assert insert[2][0] == insert[2][5]
