@@ -30,7 +30,7 @@ describe('ProposalInbox governance', () => {
     Object.values(api).forEach((mock) => mock.mockReset());
     api.fetchPolicyProposals.mockResolvedValue([proposal]);
     api.fetchPolicyProposal.mockResolvedValue({ proposal, signals: [], impact_previews: [], policy_versions: [] });
-    api.previewPolicyProposal.mockResolvedValue({ affected_opportunity_count: 5, estimated_effect: { automatic_rescore: false }, limitations: [] });
+    api.previewPolicyProposal.mockResolvedValue({ affected_opportunity_count: 5, estimated_effect: { automatic_rescore: false, policy_hash: 'hash-1' }, limitations: [] });
     api.reviewPolicyProposal.mockResolvedValue({
       proposal: { ...proposal, status: 'accepted' },
       policy_version: { governed_policy_version_id: 'version-1', status: 'draft' },
@@ -58,9 +58,26 @@ describe('ProposalInbox governance', () => {
 
     await waitFor(() => expect(api.reviewPolicyProposal).toHaveBeenCalledWith('proposal-1', {
       action: 'accept', rationale: 'The pattern is attributable and material across the reviewed cohort.',
+      resulting_fund_config: { stage: 'pre_seed' },
     }));
     expect(await screen.findByText(/Production policy is unchanged/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Publish policy version' }));
-    await waitFor(() => expect(api.publishGovernedPolicy).toHaveBeenCalledWith('version-1', { stage: 'pre_seed' }));
+    await waitFor(() => expect(api.publishGovernedPolicy).toHaveBeenCalledWith('version-1'));
+    expect(api.previewPolicyProposal).toHaveBeenCalledWith('proposal-1', { stage: 'pre_seed' });
+  });
+
+  it('recovers an accepted draft after reload and keeps publication available', async () => {
+    const accepted = { ...proposal, status: 'accepted' as const, resulting_policy_version_id: 'version-1' };
+    api.fetchPolicyProposals.mockResolvedValue([accepted]);
+    api.fetchPolicyProposal.mockResolvedValue({
+      proposal: accepted, signals: [], impact_previews: [],
+      policy_versions: [{ governed_policy_version_id: 'version-1', status: 'draft', policy_hash: 'hash-1', policy_patch: { stage: 'pre_seed' } }],
+    });
+    renderInbox();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Review proposal' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish policy version' }));
+
+    await waitFor(() => expect(api.publishGovernedPolicy).toHaveBeenCalledWith('version-1'));
   });
 });

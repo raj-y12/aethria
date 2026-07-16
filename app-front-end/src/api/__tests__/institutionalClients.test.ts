@@ -76,10 +76,17 @@ describe('institutional API clients', () => {
 
   it('reads the evidence ledger and sends an explicit claim correction', async () => {
     authedFetch
-      .mockResolvedValueOnce(new Response(JSON.stringify({ artifacts: [], claims: [], links: [], plans: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        artifacts: [], evidence_items: [], claims: [],
+        claim_evidence_links: [{ link_id: 'link-1', claim_id: 'claim-1', evidence_item_id: 'item-1', relationship: 'supports', support_strength: 0.8, rationale: 'Direct evidence.' }],
+        evidence_plans: [{ evidence_plan_id: 'plan-1', opportunity_id: 'opportunity-1', trigger_type: 'human_request', status: 'planned', missing_evidence: [], search_questions: [], max_artifacts: 5, budget_usd: 0, created_at: '2026-07-15T12:00:00Z' }],
+      }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ claim_id: 'claim-1', status: 'withdrawn' }), { status: 200 }));
 
-    await fetchEvidenceLedger('opportunity-1');
+    await expect(fetchEvidenceLedger('opportunity-1')).resolves.toMatchObject({
+      links: [{ link_id: 'link-1' }],
+      plans: [{ evidence_plan_id: 'plan-1' }],
+    });
     await correctClaim('claim-1', { action: 'withdraw', rationale: 'Founder corrected this statement.' });
 
     expect(authedFetch).toHaveBeenLastCalledWith(
@@ -121,7 +128,10 @@ describe('institutional API clients', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ import_batch_id: 'batch-1', status: 'completed' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ outcome_id: 'outcome-1' }), { status: 200 }));
 
-    await reviewPolicyProposal('proposal-1', { action: 'accept', rationale: 'Validated on the preview cohort.' });
+    await reviewPolicyProposal('proposal-1', {
+      action: 'accept', rationale: 'Validated on the preview cohort.',
+      resulting_fund_config: { stage: 'pre_seed' },
+    });
     await importCsv({ idempotency_key: 'import-12345678', csv_text: 'company_name,website\nAcme,acme.test' });
     await createOutcome('company-1', {
       outcome_type: 'financing', valence: 'positive', summary: 'Closed the seed round.', materiality: 4,

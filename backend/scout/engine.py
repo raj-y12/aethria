@@ -151,7 +151,12 @@ class ScoutEngine:
         except ImportError:
             return self.scouts
     
-    async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> List[ScoutOutput]:
+    async def run_cycle(
+        self,
+        pipeline_run_id: Optional[str] = None,
+        *,
+        persist_discoveries: bool = True,
+    ) -> List[ScoutOutput]:
         """
         Run one discovery cycle with all Scouts in parallel.
         
@@ -250,6 +255,7 @@ class ScoutEngine:
                         result = dict(result)
 
                     discoveries.append(result)
+                    result["pipeline_run_id"] = pipeline_run_id
                     self.logger.info(
                         f"[{scout.scout_type}] Discovered: {result['name']} "
                         f"(confidence: {result['confidence']:.2f})"
@@ -263,7 +269,7 @@ class ScoutEngine:
                             model=self.model,
                         )
 
-                    if self.storage:
+                    if self.storage and persist_discoveries:
                         try:
                             persisted_id = await asyncio.to_thread(
                                 self.storage.add_discovery, result, pipeline_run_id=pipeline_run_id
@@ -271,7 +277,6 @@ class ScoutEngine:
                             result["persisted_startup_id"] = str(
                                 persisted_id or result.get("id") or ""
                             )
-                            result["pipeline_run_id"] = pipeline_run_id
                         except Exception as e:
                             self.logger.error(
                                 f"Failed to persist discovery {result.get('id')}: {e}"

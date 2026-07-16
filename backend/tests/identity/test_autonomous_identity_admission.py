@@ -47,6 +47,7 @@ class _Storage:
     def __init__(self, surviving):
         self.surviving = set(surviving)
         self.removed = []
+        self.persisted = []
 
     def get_startup(self, startup_id):
         return object() if startup_id in self.surviving else None
@@ -55,6 +56,12 @@ class _Storage:
         self.removed.append(startup_id)
         self.surviving.discard(startup_id)
         return True
+
+    def add_discovery(self, discovery, *, pipeline_run_id=None):
+        self.persisted.append((dict(discovery), pipeline_run_id))
+        startup_id = str(discovery["id"])
+        self.surviving.add(startup_id)
+        return startup_id
 
 
 class _Service:
@@ -158,3 +165,46 @@ async def test_ambiguous_discovery_is_removed_from_legacy_review_queue():
 
     assert results[0].blocks_evaluation is True
     assert storage.removed == ["startup-1"]
+
+
+@pytest.mark.asyncio
+async def test_new_discovery_is_admitted_before_legacy_persistence_and_linking():
+    events = []
+    storage = _Storage(set())
+
+    class Service:
+        async def admit(self, observation):
+            events.append("identity")
+            assert observation.legacy_startup_id is None
+            return IdentityAdmission(
+                user_id="fund-a",
+                observation_id="observation-1",
+                status=IdentityStatus.RESOLVED,
+                company_id="company-1",
+                opportunity_id="opportunity-1",
+                confidence=1,
+            )
+
+    original_add = storage.add_discovery
+
+    def add(discovery, *, pipeline_run_id=None):
+        events.append("persist")
+        return original_add(discovery, pipeline_run_id=pipeline_run_id)
+
+    storage.add_discovery = add
+
+    class Repository:
+        async def link_legacy_projection(self, **kwargs):
+            events.append("link")
+
+    await pipeline_runner._admit_autonomous_discoveries(
+        user_id="fund-a",
+        discoveries=[_discovery("startup-1")],
+        storage=storage,
+        identity_repository=Repository(),
+        identity_service=Service(),
+        discoveries_are_persisted=False,
+    )
+
+    assert events == ["identity", "persist", "link"]
+    assert storage.persisted[0][0]["persisted_startup_id"] == "startup-1"

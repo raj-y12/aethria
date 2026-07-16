@@ -63,3 +63,18 @@ def test_identity_migration_keeps_later_phase_pointers_nullable_and_unbound():
     assert "current_recommendation_id uuid" in sql
     assert "current_ruling_id uuid" in sql
     assert "references public.evaluation_runs" not in sql
+
+
+def test_review_fix_migration_adds_stable_observation_opportunity_link():
+    migration = (
+        Path(__file__).resolve().parents[3]
+        / "supabase"
+        / "migrations"
+        / "20260716090000_review_fixes.sql"
+    )
+    sql = migration.read_text().lower()
+
+    assert "add column if not exists opportunity_id uuid" in sql
+    assert "source_observations_opportunity_fk" in sql
+    assert "foreign key (user_id, opportunity_id)" in sql
+    assert "references public.opportunities (user_id, opportunity_id)" in sql

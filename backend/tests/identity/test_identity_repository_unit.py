@@ -88,6 +88,7 @@ def _observation_row(**overrides):
         "lookup_id": "lookup-1",
         "legacy_startup_id": None,
         "company_id": None,
+        "opportunity_id": None,
         "identity_status": "pending",
         "identity_confidence": 0,
         "provider_identifiers": json.dumps({}),
@@ -184,9 +185,32 @@ async def test_company_admission_commits_identity_opportunity_and_outbox_togethe
     assert "insert into public.company_identifiers" in sql
     assert "insert into public.company_aliases" in sql
     assert "insert into public.opportunities" in sql
+    assert "set opportunity_id = $3" in sql
     assert "update public.source_observations" in sql
     assert "insert into public.domain_outbox" in sql
     assert "observation_resolved" in str(connection.calls)
+
+
+@pytest.mark.asyncio
+async def test_admission_replay_uses_stable_observation_opportunity_link():
+    admission_row = _observation_row(
+        company_id=_company_row()["company_id"],
+        opportunity_id=_opportunity_row()["opportunity_id"],
+        identity_status="resolved",
+        identity_confidence=1,
+    )
+    connection = _Connection(fetchrows=[admission_row])
+    repository = IdentityRepository(_Pool(connection))
+
+    result = await repository.get_admission_for_observation(
+        user_id="fund-a", observation_id=_observation_row()["observation_id"]
+    )
+
+    assert result is not None
+    assert result.opportunity_id == _opportunity_row()["opportunity_id"]
+    sql = connection.calls[0][1].lower()
+    assert "p.opportunity_id = o.opportunity_id" in sql
+    assert "p.latest_observation_id = o.observation_id" not in sql
 
 
 @pytest.mark.asyncio
@@ -275,6 +299,19 @@ async def test_cross_tenant_company_read_returns_none():
         user_id="fund-b", company_id=_company_row()["company_id"]
     ) is None
     assert "user_id = $2" in connection.calls[0][1].lower()
+
+
+@pytest.mark.asyncio
+async def test_linked_legacy_projection_ids_are_tenant_scoped():
+    connection = _Connection(
+        fetches=[[{"legacy_startup_id": "11111111-1111-4111-8111-111111111111"}]]
+    )
+    repository = IdentityRepository(_Pool(connection))
+
+    result = await repository.list_linked_legacy_startup_ids(user_id="fund-a")
+
+    assert result == ["11111111-1111-4111-8111-111111111111"]
+    assert "where user_id=$1" in connection.calls[0][1].lower()
 
 
 @pytest.mark.asyncio

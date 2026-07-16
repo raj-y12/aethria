@@ -226,8 +226,8 @@ class MonitoringRepository:
                 if opportunity.get("current_evaluation_id"):
                     previous_hash = await conn.fetchval(
                         """
-                        select claim_snapshot_hash from public.evaluation_runs
-                        where user_id=$1 and evaluation_run_id=$2
+                        select evidence_snapshot_hash from public.evaluation_runs
+                        where user_id=$1 and evaluation_id=$2
                         """,
                         uid,
                         opportunity["current_evaluation_id"],

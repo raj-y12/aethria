@@ -28,7 +28,8 @@ class _Repository:
                 return job.model_copy(update={"status": JobStatus.CANCELLED})
         return None
 
-    async def queue_depths(self):
+    async def tenant_queue_depths(self, *, user_id):
+        assert user_id == "user_a"
         return {
             "pipeline_cycle:queued": 2,
             "company_lookup:running": 1,
@@ -36,6 +37,9 @@ class _Repository:
             "company_lookup:dead_letter": 1,
             "outbox:pending": 4,
         }
+
+    async def global_queue_depths(self):
+        return await self.tenant_queue_depths(user_id="user_a")
 
 
 def _configure_auth(monkeypatch, api):

@@ -197,6 +197,59 @@ jobs:
       - name: Run tests
         run: python -m pytest tests/ -v -o asyncio_mode=auto
 
+  backend-postgres-contracts:
+    name: Backend PostgreSQL contracts
+    needs: backend-deps
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aethria
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aethria"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/aethria
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.lock pytest pytest-asyncio
+      - name: Apply institutional migrations
+        run: |
+          psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -c "create role anon; create role authenticated; create role service_role;"
+          for migration in \
+            supabase/migrations/20260715193000_durable_agent_jobs.sql \
+            supabase/migrations/20260715210000_canonical_identity.sql \
+            supabase/migrations/20260715220000_agent_job_block_details.sql \
+            supabase/migrations/20260715230000_evidence_claim_ledger.sql \
+            supabase/migrations/20260715240000_immutable_evaluations.sql \
+            supabase/migrations/20260715250000_rulings_and_actions.sql \
+            supabase/migrations/20260715260000_attention_enrichment.sql \
+            supabase/migrations/20260715270000_fund_intelligence.sql \
+            supabase/migrations/20260715280000_channels_outcomes.sql \
+            supabase/migrations/20260716090000_review_fixes.sql
+          do
+            psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done
+      - name: Run migrated PostgreSQL scenarios
+        working-directory: backend
+        run: >-
+          python -m pytest
+          tests/jobs/test_job_repository_postgres.py
+          tests/identity/test_identity_repository_postgres.py
+          tests/fund_intelligence/test_fund_intelligence_postgres.py
+          -v -o asyncio_mode=auto
+
   backend-docker:
     name: Backend Docker image
     runs-on: ubuntu-latest

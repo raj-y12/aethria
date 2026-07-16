@@ -233,7 +233,12 @@ class FundIntelligenceRepository:
         }
 
     async def preview_impact(
-        self, *, user_id: str, policy_proposal_id: str, actor_id: str
+        self,
+        *,
+        user_id: str,
+        policy_proposal_id: str,
+        actor_id: str,
+        policy_hash: str,
     ) -> Dict[str, Any]:
         uid = require_user_id(user_id, context="FundIntelligenceRepository.preview_impact")
         async with self.pool.acquire() as conn:
@@ -271,7 +276,7 @@ class FundIntelligenceRepository:
                     """,
                     str(uuid4()), uid, policy_proposal_id, int(proposal["sample_size"]),
                     len(examples), json.dumps([dict(item) for item in examples], default=str),
-                    json.dumps({"mode": "bounded_replay", "result": "flag_for_operator_review", "automatic_rescore": False}),
+                    json.dumps({"mode": "bounded_replay", "result": "flag_for_operator_review", "automatic_rescore": False, "policy_hash": policy_hash}),
                     json.dumps(_json(proposal["limitations"], [])),
                     actor_id,
                 )
@@ -285,7 +290,8 @@ class FundIntelligenceRepository:
         actor_id: str,
         action: ProposalReviewAction | str,
         rationale: str,
-        edited_policy_patch: Optional[Dict[str, Any]] = None,
+        resulting_fund_config: Optional[Dict[str, Any]] = None,
+        policy_hash: Optional[str] = None,
     ) -> Dict[str, Any]:
         uid = require_user_id(user_id, context="FundIntelligenceRepository.review_proposal")
         review = ProposalReviewAction(action)
@@ -295,8 +301,12 @@ class FundIntelligenceRepository:
             ProposalReviewAction.REJECT: PolicyProposalStatus.REJECTED,
             ProposalReviewAction.DEFER: PolicyProposalStatus.DEFERRED,
         }[review]
-        if review is ProposalReviewAction.EDIT_AND_ACCEPT and not edited_policy_patch:
-            raise ValueError("edited_policy_patch is required for edit_and_accept")
+        accepting = status in {
+            PolicyProposalStatus.ACCEPTED,
+            PolicyProposalStatus.EDITED_AND_ACCEPTED,
+        }
+        if accepting and (not resulting_fund_config or not str(policy_hash or "").strip()):
+            raise ValueError("resulting_fund_config and policy_hash are required for acceptance")
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 proposal = await conn.fetchrow(
@@ -315,27 +325,43 @@ class FundIntelligenceRepository:
                     PolicyProposalStatus.DEFERRED,
                 }:
                     raise RuntimeError("Proposal has already received a terminal review")
-                patch = edited_policy_patch or _json(proposal["proposed_policy_patch"], {})
                 version = None
-                if status in {PolicyProposalStatus.ACCEPTED, PolicyProposalStatus.EDITED_AND_ACCEPTED}:
+                if accepting:
+                    preview = await conn.fetchrow(
+                        """
+                        select estimated_effect from public.policy_impact_previews
+                        where user_id=$1 and policy_proposal_id=$2
+                        order by created_at desc limit 1
+                        """,
+                        uid,
+                        policy_proposal_id,
+                    )
+                    preview_effect = _json(
+                        preview.get("estimated_effect") if preview else None, {}
+                    )
+                    if preview_effect.get("policy_hash") != policy_hash:
+                        raise RuntimeError(
+                            "Acceptance requires a current impact preview for the exact resulting policy"
+                        )
                     version = await conn.fetchrow(
                         """
                         insert into public.governed_policy_versions (
                           governed_policy_version_id,user_id,policy_proposal_id,policy_patch,
-                          status,created_by,created_at
-                        ) values ($1,$2,$3,$4::jsonb,'draft',$5,now()) returning *
+                          policy_hash,status,created_by,created_at
+                        ) values ($1,$2,$3,$4::jsonb,$5,'draft',$6,now()) returning *
                         """,
-                        str(uuid4()), uid, policy_proposal_id, json.dumps(patch), actor_id,
+                        str(uuid4()), uid, policy_proposal_id,
+                        json.dumps(resulting_fund_config), policy_hash, actor_id,
                     )
                 row = await conn.fetchrow(
                     """
                     update public.policy_proposals
                     set status=$3,reviewer_rationale=$4,reviewed_by=$5,reviewed_at=now(),
-                        proposed_policy_patch=$6::jsonb,resulting_policy_version_id=$7,updated_at=now()
+                        resulting_policy_version_id=$6,updated_at=now()
                     where user_id=$1 and policy_proposal_id=$2 returning *
                     """,
                     uid, policy_proposal_id, status.value, rationale, actor_id,
-                    json.dumps(patch), version["governed_policy_version_id"] if version else None,
+                    version["governed_policy_version_id"] if version else None,
                 )
                 await self._outbox(
                     conn, user_id=uid, aggregate_id=policy_proposal_id,

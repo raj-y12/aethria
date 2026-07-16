@@ -181,8 +181,7 @@ class IdentityRepository:
                 from public.source_observations o
                 left join public.opportunities p
                   on p.user_id = o.user_id
-                 and p.company_id = o.company_id
-                 and p.latest_observation_id = o.observation_id
+                 and p.opportunity_id = o.opportunity_id
                 left join public.identity_resolution_cases c
                   on c.user_id = o.user_id and c.observation_id = o.observation_id
                 where o.observation_id = $1 and o.user_id = $2
@@ -385,6 +384,16 @@ class IdentityRepository:
         opportunity = _opportunity_from_row(row)
         if opportunity is None:
             raise RuntimeError("Opportunity upsert returned no row")
+        await conn.execute(
+            """
+            update public.source_observations
+            set opportunity_id = $3, updated_at = now()
+            where observation_id = $1 and user_id = $2
+            """,
+            observation_id,
+            user_id,
+            opportunity.opportunity_id,
+        )
         return opportunity
 
     async def create_company_admission(
@@ -869,6 +878,22 @@ class IdentityRepository:
                 uid,
             )
         return _opportunity_from_row(row)
+
+    async def list_linked_legacy_startup_ids(self, *, user_id: str) -> List[str]:
+        uid = require_user_id(
+            user_id,
+            context="IdentityRepository.list_linked_legacy_startup_ids",
+        )
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                select legacy_startup_id from public.opportunities
+                where user_id=$1 and legacy_startup_id is not null
+                order by updated_at desc
+                """,
+                uid,
+            )
+        return [str(row["legacy_startup_id"]) for row in rows]
 
     async def set_opportunity_state(
         self,

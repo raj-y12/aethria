@@ -605,7 +605,33 @@ class DurableJobRepository:
             )
             return [job for row in rows if (job := _job_from_row(row)) is not None]
 
-    async def queue_depths(self) -> Dict[str, int]:
+    async def tenant_queue_depths(self, *, user_id: str) -> Dict[str, int]:
+        uid = require_user_id(
+            user_id, context="DurableJobRepository.tenant_queue_depths"
+        )
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                select job_type, status, count(*)::integer as count
+                from public.agent_jobs
+                where user_id = $1
+                  and status in ('queued', 'running', 'retry_wait', 'blocked', 'dead_letter')
+                group by job_type, status
+                union all
+                select 'outbox' as job_type, 'pending' as status,
+                       count(*)::integer as count
+                from public.domain_outbox
+                where user_id = $1 and published_at is null
+                """,
+                uid,
+            )
+            return {
+                f"{row['job_type']}:{row['status']}": int(row["count"])
+                for row in rows
+            }
+
+    async def global_queue_depths(self) -> Dict[str, int]:
+        """Operator-only aggregate depths for internal metrics, never tenant APIs."""
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """

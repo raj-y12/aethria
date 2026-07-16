@@ -16,7 +16,8 @@ async def test_lookup_status_does_not_require_thesis(monkeypatch):
     monkeypatch.setattr("api._lookup_queue", SimpleNamespace(qsize=lambda: 0))
 
     class DurableRepository:
-        async def queue_depths(self):
+        async def tenant_queue_depths(self, *, user_id):
+            assert user_id == "user_123"
             return {}
 
     monkeypatch.setattr("api._durable_job_repository", DurableRepository())

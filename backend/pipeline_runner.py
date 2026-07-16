@@ -57,6 +57,7 @@ from fund_thesis import (
 from identity.acquisition import observation_from_scout_discovery
 from identity.projection import link_admission_projection
 from identity.service import IdentityService
+from utils.reference_validation import is_generic_reference
 
 logger = logging.getLogger("pipeline_runner")
 _visible_logger = logging.getLogger("uvicorn.error")
@@ -295,6 +296,7 @@ async def _admit_autonomous_discoveries(
     storage: Any,
     identity_repository: Any,
     identity_service: Optional[Any] = None,
+    discoveries_are_persisted: bool = True,
 ) -> list[Any]:
     """Admit only reference-gated rows and quarantine ambiguous projections."""
 
@@ -308,17 +310,38 @@ async def _admit_autonomous_discoveries(
         ).strip()
         if not startup_id:
             continue
-        # The reference prune is authoritative for compatibility survival. A raw
-        # Scout result that no longer has a row must never create institutional
-        # state after the fact.
-        if await asyncio.to_thread(storage.get_startup, startup_id) is None:
-            continue
+        if discoveries_are_persisted:
+            # The reference prune is authoritative for compatibility survival. A
+            # raw Scout result that no longer has a row must never create state.
+            if await asyncio.to_thread(storage.get_startup, startup_id) is None:
+                continue
+        else:
+            references = discovery.get("references")
+            valid_references = [
+                item
+                for item in references or []
+                if isinstance(item, str)
+                and item.strip()
+                and not is_generic_reference(item)
+            ]
+            if not valid_references:
+                continue
         observation = observation_from_scout_discovery(
-            user_id=user_id, discovery=discovery
+            user_id=user_id,
+            discovery=discovery,
+            include_legacy_projection=discoveries_are_persisted,
         )
         admission = await service.admit(observation)
         admissions.append(admission)
         if admission.blocks_evaluation or not admission.opportunity_id:
+            if not discoveries_are_persisted:
+                logger.info(
+                    "[%s] Identity review blocked unpersisted discovery startup_id=%s case_id=%s",
+                    user_id[:12],
+                    startup_id,
+                    admission.identity_case_id,
+                )
+                continue
             remover = getattr(storage, "remove_startup", None)
             if not callable(remover):
                 raise RuntimeError(
@@ -332,6 +355,14 @@ async def _admit_autonomous_discoveries(
                 admission.identity_case_id,
             )
             continue
+        if not discoveries_are_persisted:
+            persisted_id = await asyncio.to_thread(
+                storage.add_discovery,
+                discovery,
+                pipeline_run_id=discovery.get("pipeline_run_id"),
+            )
+            startup_id = str(persisted_id or startup_id)
+            discovery["persisted_startup_id"] = startup_id
         await link_admission_projection(
             identity_repository,
             admission=admission,
@@ -573,10 +604,17 @@ async def _run_one_pipeline_cycle_inner(
         except Exception as e:
             logger.debug("[%s] startups_before count unavailable: %s", user_id[:12], e)
         discoveries = []
-        if scouts_enabled:
+        if scouts_enabled and identity_repository is not None:
             agents_executed += len(getattr(scout_engine, "scouts", []) or [])
-            discoveries = await scout_engine.run_cycle(pipeline_run_id=pipeline_run_id)
-            _notify_startups_changed(user_id, "scout")
+            discoveries = await scout_engine.run_cycle(
+                pipeline_run_id=pipeline_run_id,
+                persist_discoveries=False,
+            )
+        elif scouts_enabled:
+            logger.error(
+                "[%s] Scout stage skipped: canonical identity store unavailable",
+                user_id[:12],
+            )
         else:
             logger.info("[%s] Scout stage skipped (disabled in settings)", user_id[:12])
 
@@ -591,12 +629,22 @@ async def _run_one_pipeline_cycle_inner(
                 discoveries=discoveries,
                 storage=storage,
                 identity_repository=identity_repository,
+                discoveries_are_persisted=False,
+            )
+            _notify_startups_changed(user_id, "scout")
+
+        eligible_startup_ids: set[str] = set()
+        if identity_repository is not None:
+            eligible_startup_ids = set(
+                await identity_repository.list_linked_legacy_startup_ids(
+                    user_id=user_id
+                )
             )
 
         _activity_reviewed_count = 0
         _activity_decided_count = 0
         _activity_escalations_count = 0
-        if reviewers_enabled:
+        if reviewers_enabled and identity_repository is not None:
             agents_executed += 3
             unreviewed_before = await asyncio.to_thread(_safe_stage_count, storage, "count_unreviewed", user_id)
             if (unreviewed_before or 0) > 0:
@@ -605,7 +653,10 @@ async def _run_one_pipeline_cycle_inner(
                     user_id[:12],
                     unreviewed_before,
                 )
-            reviewed_count = await reviewer_engine.run_cycle(pipeline_run_id=pipeline_run_id)
+            reviewed_count = await reviewer_engine.run_cycle(
+                pipeline_run_id=pipeline_run_id,
+                eligible_startup_ids=eligible_startup_ids,
+            )
             _activity_reviewed_count = reviewed_count or 0
             if _activity_reviewed_count > 0:
                 _notify_startups_changed(user_id, "reviewer")
@@ -623,9 +674,13 @@ async def _run_one_pipeline_cycle_inner(
                     reviewer_stats.get("reason"),
                 )
         else:
-            logger.info("[%s] Reviewer stage skipped (disabled in settings)", user_id[:12])
+            logger.info(
+                "[%s] Reviewer stage skipped (%s)",
+                user_id[:12],
+                "disabled in settings" if not reviewers_enabled else "canonical identity store unavailable",
+            )
 
-        if partners_enabled:
+        if partners_enabled and identity_repository is not None:
             agents_executed += 1
             undecided_before = await asyncio.to_thread(_safe_stage_count, storage, "count_undecided", user_id)
             if (undecided_before or 0) > 0:
@@ -634,7 +689,10 @@ async def _run_one_pipeline_cycle_inner(
                     user_id[:12],
                     undecided_before,
                 )
-            decided_count = await partner_engine.run_cycle(pipeline_run_id=pipeline_run_id)
+            decided_count = await partner_engine.run_cycle(
+                pipeline_run_id=pipeline_run_id,
+                eligible_startup_ids=eligible_startup_ids,
+            )
             _activity_decided_count = decided_count or 0
             if _activity_decided_count > 0:
                 _observe_decision_ready_usage(
@@ -659,7 +717,11 @@ async def _run_one_pipeline_cycle_inner(
                     undecided_after,
                 )
         else:
-            logger.info("[%s] Partner stage skipped (disabled in settings)", user_id[:12])
+            logger.info(
+                "[%s] Partner stage skipped (%s)",
+                user_id[:12],
+                "disabled in settings" if not partners_enabled else "canonical identity store unavailable",
+            )
 
         portfolio_engine = PortfolioEngine(
             discovery_storage=storage,

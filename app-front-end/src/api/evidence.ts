@@ -74,6 +74,14 @@ export interface EvidenceLedger {
   plans: EvidencePlan[];
 }
 
+interface EvidenceLedgerResponse {
+  artifacts: EvidenceArtifact[];
+  evidence_items?: EvidenceItem[];
+  claims: Claim[];
+  claim_evidence_links?: ClaimEvidenceLink[];
+  evidence_plans?: EvidencePlan[];
+}
+
 export interface EvidencePlanInput {
   trigger_type: string;
   missing_evidence: string[];
@@ -87,8 +95,17 @@ export type ClaimCorrectionInput = {
   rationale: string;
 };
 
-export function fetchEvidenceLedger(opportunityId: string): Promise<EvidenceLedger> {
-  return apiRequest(`/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/evidence`);
+export async function fetchEvidenceLedger(opportunityId: string): Promise<EvidenceLedger> {
+  const response = await apiRequest<EvidenceLedgerResponse>(
+    `/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/evidence`,
+  );
+  return {
+    artifacts: response.artifacts ?? [],
+    evidence_items: response.evidence_items ?? [],
+    claims: response.claims ?? [],
+    links: response.claim_evidence_links ?? [],
+    plans: response.evidence_plans ?? [],
+  };
 }
 
 export function createEvidencePlan(opportunityId: string, input: EvidencePlanInput): Promise<EvidencePlan> {
@@ -102,4 +119,3 @@ export function correctClaim(claimId: string, input: ClaimCorrectionInput): Prom
     method: 'POST', body: JSON.stringify(input),
   });
 }
-

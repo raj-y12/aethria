@@ -20,3 +20,9 @@ def test_proposal_status_has_no_automatic_active_state():
     sql = MIGRATION.read_text().lower()
     assert "auto_activate" not in sql
     assert "status in ('draft','ready_for_review','accepted','edited_and_accepted','rejected','deferred','expired')" in sql
+
+
+def test_review_fix_migration_binds_governed_version_to_policy_hash():
+    review_fix = Path(__file__).parents[3] / "supabase/migrations/20260716090000_review_fixes.sql"
+    sql = review_fix.read_text().lower()
+    assert "add column if not exists policy_hash text" in sql

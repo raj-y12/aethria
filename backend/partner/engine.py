@@ -332,7 +332,12 @@ class PartnerEngine:
 
         return success, decision
 
-    async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> int:
+    async def run_cycle(
+        self,
+        pipeline_run_id: Optional[str] = None,
+        *,
+        eligible_startup_ids: Optional[set[str]] = None,
+    ) -> int:
         """
         Run one decision cycle.
         Processes all undecided entries.
@@ -355,8 +360,18 @@ class PartnerEngine:
             self.logger.warning("Partner runtime limits unavailable, using batch max: %s", e)
             cycle_limit = self.batch_max
         effective_batch_max = min(self.batch_max, max(1, cycle_limit))
-        limit = min(effective_batch_max, undecided_count) if undecided_count else None
+        limit = (
+            min(500, undecided_count)
+            if eligible_startup_ids is not None and undecided_count
+            else min(effective_batch_max, undecided_count)
+            if undecided_count
+            else None
+        )
         undecided = await asyncio.to_thread(self._get_undecided_entries, limit=limit)
+        if eligible_startup_ids is not None:
+            undecided = [
+                entry for entry in undecided if entry["id"] in eligible_startup_ids
+            ][:effective_batch_max]
         
         if not undecided:
             self.logger.info("No undecided entries found")

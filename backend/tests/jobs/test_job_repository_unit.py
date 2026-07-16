@@ -314,6 +314,33 @@ async def test_block_is_structured_tenant_scoped_and_preserves_retry_budget():
 
 
 @pytest.mark.asyncio
+async def test_tenant_queue_depths_scope_jobs_and_outbox_to_the_authenticated_user():
+    repository_module = importlib.import_module("jobs.repository")
+    connection = _Connection(
+        fetches=[[{"job_type": "pipeline_cycle", "status": "queued", "count": 2}]]
+    )
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    counts = await repository.tenant_queue_depths(user_id="user-a")
+
+    assert counts == {"pipeline_cycle:queued": 2}
+    sql = connection.calls[0][1].lower()
+    assert sql.count("user_id = $1") == 2
+    assert connection.calls[0][2] == ("user-a",)
+
+
+@pytest.mark.asyncio
+async def test_global_queue_depths_are_explicitly_named_for_operator_metrics():
+    repository_module = importlib.import_module("jobs.repository")
+    connection = _Connection(fetches=[[]])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    await repository.global_queue_depths()
+
+    assert connection.calls[0][2] == ()
+
+
+@pytest.mark.asyncio
 async def test_create_pool_requires_direct_dsn_and_uses_bounded_sizes(monkeypatch):
     postgres = importlib.import_module("jobs.postgres")
     monkeypatch.delenv("DATABASE_URL", raising=False)

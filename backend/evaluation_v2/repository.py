@@ -15,23 +15,8 @@ from evaluation_v2.service import (
 from tenant_context import require_user_id
 
 
-def default_policy() -> EvaluationPolicy:
-    from evaluation_v2.models import CriterionRule
-
-    return EvaluationPolicy(
-        policy_version_id="institutional-default-v1",
-        policy_hash="institutional-default-v1",
-        rubric_version="evidence-rubric-v1",
-        partner_rules_version="1.2",
-        partner_rules_hash="partner-rules-v1.2",
-        criteria=[
-            CriterionRule(criterion="market", claim_types=["market", "market_quality"], weight=0.2),
-            CriterionRule(criterion="product", claim_types=["product", "customer_pull"], weight=0.2),
-            CriterionRule(criterion="technical", claim_types=["technical", "technical_moat"], weight=0.2),
-            CriterionRule(criterion="execution", claim_types=["execution", "speed_of_execution", "founder_history"], weight=0.2),
-            CriterionRule(criterion="defensibility", claim_types=["defensibility", "moat"], weight=0.2),
-        ],
-    )
+class EvaluationLifecycleError(RuntimeError):
+    """The opportunity lifecycle does not currently permit evaluation."""
 
 
 class EvaluationRepository:
@@ -57,15 +42,40 @@ class EvaluationRepository:
         opportunity_id: str,
         actor_id: str,
         trigger_type: str,
-        policy: Optional[EvaluationPolicy] = None,
+        policy: EvaluationPolicy,
         thesis_version_id: Optional[str] = None,
         model_manifest: Optional[Dict[str, Any]] = None,
         prompt_manifest: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         uid = require_user_id(user_id, context="EvaluationRepository.evaluate")
-        policy = policy or default_policy()
         async with self.pool.acquire() as conn:
             async with conn.transaction(isolation="repeatable_read"):
+                previous = await conn.fetchrow(
+                    """
+                    select o.service_level, o.decision_state, r.*
+                    from public.opportunities o
+                    left join public.recommendations r
+                      on r.user_id = o.user_id
+                     and r.recommendation_id = o.current_recommendation_id
+                    where o.user_id = $1 and o.opportunity_id = $2
+                    for update of o
+                    """,
+                    uid,
+                    opportunity_id,
+                )
+                if previous is None:
+                    raise LookupError("Opportunity not found for tenant")
+                if int(previous.get("service_level") or 0) <= 0:
+                    raise EvaluationLifecycleError(
+                        "Evaluation is paused for this opportunity"
+                    )
+                if str(previous.get("decision_state") or "") == "archived":
+                    raise EvaluationLifecycleError(
+                        "Archived opportunities cannot be evaluated"
+                    )
+                previous_payload = (
+                    dict(previous) if previous.get("recommendation_id") else None
+                )
                 claims = [
                     dict(row)
                     for row in await conn.fetch(
@@ -95,19 +105,6 @@ class EvaluationRepository:
                 ]
                 snapshot, digest = snapshot_claims(claims, links)
                 result = evaluate_snapshot(snapshot, policy)
-                previous = await conn.fetchrow(
-                    """
-                    select r.* from public.opportunities o
-                    left join public.recommendations r
-                      on r.user_id = o.user_id and r.recommendation_id = o.current_recommendation_id
-                    where o.user_id = $1 and o.opportunity_id = $2
-                    for update of o
-                    """,
-                    uid, opportunity_id,
-                )
-                if previous is None:
-                    raise LookupError("Opportunity not found for tenant")
-                previous_payload = dict(previous) if previous.get("recommendation_id") else None
                 evaluation_id = str(uuid4())
                 await conn.execute(
                     """
@@ -241,13 +238,12 @@ class EvaluationRepository:
         actor_id: str,
         trigger_type: str,
         failure_code: str,
-        policy: Optional[EvaluationPolicy] = None,
+        policy: EvaluationPolicy,
     ) -> str:
         """Append a failed attempt without replacing current successful pointers."""
         uid = require_user_id(
             user_id, context="EvaluationRepository.record_failed_refresh"
         )
-        policy = policy or default_policy()
         evaluation_id = str(uuid4())
         safe_code = str(failure_code or "evaluation_failed").strip()[:100]
         async with self.pool.acquire() as conn:

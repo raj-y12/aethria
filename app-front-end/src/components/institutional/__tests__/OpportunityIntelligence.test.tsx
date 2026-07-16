@@ -55,8 +55,18 @@ function seedApi() {
     plans: [],
   });
   api.fetchCurrentEvaluation.mockResolvedValue({
-    evaluation: { evaluation_id: 'evaluation-1', model_id: 'gpt-5-nano', prompt_version: 'prompt-a', policy_version_id: 'policy-v3', rubric_version: 'rubric-v2' },
-    recommendation: { recommendation_id: 'recommendation-1', decision: 'monitor', rationale: 'Customer pull is promising; retention evidence remains missing.', confidence: 0.68 },
+    evaluation: {
+      evaluation_id: 'evaluation-1', policy_version_id: 'policy-v3', policy_hash: 'policy-hash-v3', rubric_version: 'rubric-v2',
+      partner_rules_version: 'rules-v1', partner_rules_hash: 'rules-hash-v1',
+      model_manifest: { model_id: 'gpt-5-nano' }, prompt_manifest: { prompt_version: 'prompt-a' },
+    },
+    criteria: [],
+    recommendation: {
+      recommendation_id: 'recommendation-1', recommended_state: 'monitor',
+      decision_drivers: ['Customer pull is promising.'], principal_risks: ['Retention evidence remains missing.'],
+      mandate_conflicts: [], missing_information: ['Net retention'], change_conditions: ['Verify three-month retention.'],
+      human_review_required: true, confidence: 0.68,
+    },
   });
   api.listWorkflowActions.mockResolvedValue([{ workflow_action_id: 'action-1', opportunity_id: 'opportunity-1', action_type: 'draft_information_request', status: 'pending_approval', generated_content: { subject: 'Information request' }, missing_evidence: ['retention'], requires_approval: true, created_at: '2026-07-15T12:00:00Z', updated_at: '2026-07-15T12:00:00Z' }]);
   api.fetchMonitoringStatus.mockResolvedValue({ service_level: 3, recent_reservations: [] });
@@ -87,7 +97,8 @@ describe('OpportunityIntelligence', () => {
   it('discloses immutable evaluation dependencies beside the recommendation', async () => {
     renderWorkspace();
     fireEvent.click(await screen.findByRole('tab', { name: 'Decision' }));
-    expect(await screen.findByText('Customer pull is promising; retention evidence remains missing.')).toBeInTheDocument();
+    expect(await screen.findByText('Customer pull is promising.')).toBeInTheDocument();
+    expect(screen.getByText('Retention evidence remains missing.')).toBeInTheDocument();
     expect(screen.getByText('gpt-5-nano')).toBeInTheDocument();
     expect(screen.getByText('policy-v3')).toBeInTheDocument();
   });

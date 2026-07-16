@@ -40,7 +40,10 @@ def _provider_type(url: str) -> Optional[str]:
 
 
 def observation_from_scout_discovery(
-    *, user_id: str, discovery: Dict[str, Any]
+    *,
+    user_id: str,
+    discovery: Dict[str, Any],
+    include_legacy_projection: bool = True,
 ) -> SourceObservationInput:
     """Build a conservative observation without performing another retrieval pass."""
 
@@ -98,7 +101,7 @@ def observation_from_scout_discovery(
         observed_domain=observed_domain,
         provider_identifiers=provider_identifiers,
         external_event_key=f"discovery:{startup_id}:{scout_type}",
-        legacy_startup_id=startup_id or None,
+        legacy_startup_id=(startup_id or None) if include_legacy_projection else None,
         source_metadata={
             "source": "scout_engine",
             "scout_type": scout_type,

@@ -166,7 +166,7 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                     missing=sorted(required_versions - versions),
                 )
             )
-        depths = await DurableJobRepository(pool).queue_depths()
+        depths = await DurableJobRepository(pool).global_queue_depths()
         checks.append(
             _check(
                 "durable_job_depths",

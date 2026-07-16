@@ -558,7 +558,12 @@ class ReviewerEngine:
             return default
         return max(0.0, min(1.0, value))
 
-    async def run_cycle(self, pipeline_run_id: Optional[str] = None) -> int:
+    async def run_cycle(
+        self,
+        pipeline_run_id: Optional[str] = None,
+        *,
+        eligible_startup_ids: Optional[set[str]] = None,
+    ) -> int:
         """
         Run one review cycle.
         Processes up to batch_size unreviewed entries.
@@ -652,6 +657,12 @@ class ReviewerEngine:
             500,
         )
         unreviewed_startups = await asyncio.to_thread(self.storage.get_unreviewed, limit=lookahead_limit)
+        if eligible_startup_ids is not None:
+            unreviewed_startups = [
+                startup
+                for startup in unreviewed_startups
+                if startup.startup_id in eligible_startup_ids
+            ]
 
         if not unreviewed_startups:
             self.logger.info("No unreviewed entries found")

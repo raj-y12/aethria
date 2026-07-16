@@ -765,7 +765,7 @@ async def _durable_depth_sampler() -> None:
     while True:
         try:
             if _durable_job_repository is not None:
-                _durable_depth_snapshot = await _durable_job_repository.queue_depths()
+                _durable_depth_snapshot = await _durable_job_repository.global_queue_depths()
                 metrics.set_durable_depths(_durable_depth_snapshot)
         except asyncio.CancelledError:
             raise
@@ -1989,17 +1989,16 @@ def health():
 @app.get("/api/system/status")
 async def system_status(request: Request):
     """Authenticated execution-plane status without secrets or raw exceptions."""
-    require_authenticated_user(request)
+    user_id = require_authenticated_user(request)
     counts: Dict[str, int]
     if _durable_job_repository is not None:
         try:
-            counts = await _durable_job_repository.queue_depths()
-            metrics.set_durable_depths(counts)
+            counts = await _durable_job_repository.tenant_queue_depths(user_id=user_id)
         except Exception as exc:
             _logger_agents.warning(
                 "Durable system status read failed: %s", type(exc).__name__
             )
-            counts = dict(_durable_depth_snapshot)
+            counts = {}
     else:
         counts = {
             "pipeline_cycle:queued": _agent_queue.qsize() if _agent_queue is not None else 0,
@@ -2377,9 +2376,11 @@ async def agents_status(request: Request):
     durable_counts: Dict[str, int] = {}
     if _durable_job_repository is not None:
         try:
-            durable_counts = await _durable_job_repository.queue_depths()
+            durable_counts = await _durable_job_repository.tenant_queue_depths(
+                user_id=user_id
+            )
         except Exception:
-            durable_counts = dict(_durable_depth_snapshot)
+            durable_counts = {}
     worker_ready = (
         _durable_job_repository is not None
         if _durable_jobs_required()
