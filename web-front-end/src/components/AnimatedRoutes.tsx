@@ -1,13 +1,11 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import SystemAccessPage from './SystemAccessPage';
 import HomePage from '../HomePage';
 
 const DURATION = 0.3;
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 const PAPER = '#f4f1ea';
-const OXFORD = '#001433';
 
 // Private routes: any file in src/private/*.tsx is exposed at /<filename-lowercase>.
 // Delete the file to remove that route at build time.
@@ -37,8 +35,7 @@ export default function AnimatedRoutes() {
   }, [pathname, location.search, navigate]);
 
   let element: React.ReactNode = null;
-  if (pathname === '/') element = <SystemAccessPage />;
-  else if (pathname === '/home') element = <HomePage />;
+  if (pathname === '/' || pathname === '/home') element = <HomePage />;
   else if (pathname === '/request-access') element = null; // mid-redirect, see effect above
   else if (privateRoutes[pathname]) {
     const PrivateComponent = privateRoutes[pathname];
@@ -56,12 +53,11 @@ export default function AnimatedRoutes() {
   }, [pathname, navigate, element]);
 
   useEffect(() => {
-    const themeColor = pathname === '/' ? OXFORD : PAPER;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', themeColor);
-    document.documentElement.style.backgroundColor = themeColor;
-    document.body.style.backgroundColor = themeColor;
-  }, [pathname]);
+    if (meta) meta.setAttribute('content', PAPER);
+    document.documentElement.style.backgroundColor = PAPER;
+    document.body.style.backgroundColor = PAPER;
+  }, []);
 
   if (element === null) return null;
 

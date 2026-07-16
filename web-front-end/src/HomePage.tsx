@@ -179,7 +179,8 @@ export default function HomePage() {
               <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.08em] text-[var(--text-subtle)]">
                 B2B Infrastructure · Series A · London
               </p>
-              <span className="mt-4 inline-block border border-solid border-[var(--color-accent)] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-accent)]">
+              {/* Same fill/ink as the product's INVEST chip (app-front-end verdictBadgeTokens) */}
+              <span className="mt-4 inline-block bg-[#bfe3cc] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[#17442d]">
                 Invest
               </span>
               <div className="mt-5 flex gap-6 font-mono text-[10.5px]">
