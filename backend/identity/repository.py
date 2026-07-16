@@ -176,7 +176,7 @@ class IdentityRepository:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                select o.*, p.opportunity_id, c.identity_case_id,
+                select o.*, p.opportunity_id as linked_opportunity_id, c.identity_case_id,
                        c.candidates as identity_case_candidates
                 from public.source_observations o
                 left join public.opportunities p
@@ -203,17 +203,25 @@ class IdentityRepository:
             status=status,
             company_id=str(row["company_id"]) if row.get("company_id") else None,
             opportunity_id=(
-                str(row["opportunity_id"]) if row.get("opportunity_id") else None
+                str(row["linked_opportunity_id"])
+                if row.get("linked_opportunity_id")
+                else None
             ),
             identity_case_id=(
                 str(row["identity_case_id"]) if row.get("identity_case_id") else None
             ),
             confidence=float(row.get("identity_confidence") or 0),
-            blocks_evaluation=status in {
-                IdentityStatus.AMBIGUOUS,
-                IdentityStatus.DEFERRED,
-                IdentityStatus.REJECTED,
-            },
+            blocks_evaluation=(
+                status in {
+                    IdentityStatus.AMBIGUOUS,
+                    IdentityStatus.DEFERRED,
+                    IdentityStatus.REJECTED,
+                }
+                or (
+                    status is IdentityStatus.RESOLVED
+                    and not row.get("linked_opportunity_id")
+                )
+            ),
             candidates=candidates,
             created=False,
         )
@@ -1217,7 +1225,8 @@ class IdentityRepository:
                 select
                   count(*) filter (where o.identity_status = 'pending') as pending,
                   count(*) filter (
-                    where o.identity_status = 'resolved' and p.opportunity_id is null
+                    where o.identity_status = 'resolved'
+                      and (o.opportunity_id is null or p.opportunity_id is null)
                   ) as resolved_without_opportunity,
                   count(*) filter (
                     where o.legacy_startup_id is not null and p.legacy_startup_id is null
@@ -1227,7 +1236,8 @@ class IdentityRepository:
                   ) as ambiguous_without_case
                 from public.source_observations o
                 left join public.opportunities p
-                  on p.user_id = o.user_id and p.company_id = o.company_id
+                  on p.user_id = o.user_id
+                 and p.opportunity_id = o.opportunity_id
                 left join public.identity_resolution_cases c
                   on c.user_id = o.user_id and c.observation_id = o.observation_id
                  and c.status = 'open'

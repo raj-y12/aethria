@@ -72,8 +72,9 @@ async def test_acceptance_requires_a_current_preview_for_the_exact_policy_hash()
             actor_id="user-a",
             action="accept",
             rationale="Repeated attributable pattern.",
-            resulting_fund_config={"stage": "pre_seed"},
+            resulting_fund_config={"scoringWeights": [{"key": "market", "weight": 30}]},
             policy_hash="hash-1",
+            config_hash="config-1",
         )
 
     assert not any(
@@ -87,14 +88,14 @@ async def test_accepted_draft_persists_the_exact_previewed_config_and_hash():
     version = {
         "governed_policy_version_id": "version-1",
         "status": "draft",
-        "policy_patch": json.dumps({"stage": "pre_seed"}),
+        "policy_patch": json.dumps({"scoringWeights": [{"key": "market", "weight": 30}]}),
         "policy_hash": "hash-1",
     }
     reviewed = _proposal(status="accepted")
     connection = _Connection(
         [
             _proposal(),
-            {"estimated_effect": json.dumps({"policy_hash": "hash-1"})},
+            {"estimated_effect": json.dumps({"policy_hash": "hash-1", "config_hash": "config-1"})},
             version,
             reviewed,
         ]
@@ -105,16 +106,21 @@ async def test_accepted_draft_persists_the_exact_previewed_config_and_hash():
         user_id="user-a",
         policy_proposal_id="proposal-1",
         actor_id="user-a",
-        action="accept",
+        action="edit_and_accept",
         rationale="Repeated attributable pattern.",
-        resulting_fund_config={"stage": "pre_seed"},
+        resulting_fund_config={"scoringWeights": [{"key": "market", "weight": 30}]},
         policy_hash="hash-1",
+        config_hash="config-1",
     )
 
-    assert result["policy_version"]["policy_patch"] == {"stage": "pre_seed"}
+    assert result["policy_version"]["policy_patch"] == {
+        "scoringWeights": [{"key": "market", "weight": 30}]
+    }
     insert = next(
         call for call in connection.calls
         if "insert into public.governed_policy_versions" in call[1].lower()
     )
-    assert json.loads(insert[2][3]) == {"stage": "pre_seed"}
+    assert json.loads(insert[2][3]) == {
+        "scoringWeights": [{"key": "market", "weight": 30}]
+    }
     assert insert[2][4] == "hash-1"

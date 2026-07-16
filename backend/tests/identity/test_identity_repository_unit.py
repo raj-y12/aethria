@@ -196,6 +196,7 @@ async def test_admission_replay_uses_stable_observation_opportunity_link():
     admission_row = _observation_row(
         company_id=_company_row()["company_id"],
         opportunity_id=_opportunity_row()["opportunity_id"],
+        linked_opportunity_id=_opportunity_row()["opportunity_id"],
         identity_status="resolved",
         identity_confidence=1,
     )
@@ -211,6 +212,27 @@ async def test_admission_replay_uses_stable_observation_opportunity_link():
     sql = connection.calls[0][1].lower()
     assert "p.opportunity_id = o.opportunity_id" in sql
     assert "p.latest_observation_id = o.observation_id" not in sql
+
+
+@pytest.mark.asyncio
+async def test_resolved_historical_observation_without_stable_link_blocks_replay():
+    admission_row = _observation_row(
+        company_id=_company_row()["company_id"],
+        opportunity_id=None,
+        linked_opportunity_id=None,
+        identity_status="resolved",
+        identity_confidence=1,
+    )
+    repository = IdentityRepository(_Pool(_Connection(fetchrows=[admission_row])))
+
+    result = await repository.get_admission_for_observation(
+        user_id="fund-a", observation_id=_observation_row()["observation_id"]
+    )
+
+    assert result is not None
+    assert result.status is IdentityStatus.RESOLVED
+    assert result.opportunity_id is None
+    assert result.blocks_evaluation is True
 
 
 @pytest.mark.asyncio

@@ -22,7 +22,9 @@ const proposal = {
 
 function renderInbox() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}><ProposalInbox fundConfig={{ stage: 'pre_seed' }} /></QueryClientProvider>);
+  return render(<QueryClientProvider client={queryClient}><ProposalInbox fundConfig={{
+    scoringWeights: [{ key: 'market', weight: 20 }],
+  }} /></QueryClientProvider>);
 }
 
 describe('ProposalInbox governance', () => {
@@ -50,20 +52,26 @@ describe('ProposalInbox governance', () => {
     renderInbox();
     fireEvent.click(await screen.findByRole('button', { name: 'Review proposal' }));
 
-    expect(screen.getByRole('button', { name: 'Accept proposal' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Accept edited proposal' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Edited scoring policy patch'), { target: { value: JSON.stringify({
+      scoringWeights: [{ key: 'market', weight: 30 }],
+    }) } });
     fireEvent.click(screen.getByRole('button', { name: 'Run impact preview' }));
     expect(await screen.findByText(/5 opportunities/i)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Review rationale'), { target: { value: 'The pattern is attributable and material across the reviewed cohort.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Accept proposal' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Accept edited proposal' }));
 
     await waitFor(() => expect(api.reviewPolicyProposal).toHaveBeenCalledWith('proposal-1', {
-      action: 'accept', rationale: 'The pattern is attributable and material across the reviewed cohort.',
-      resulting_fund_config: { stage: 'pre_seed' },
+      action: 'edit_and_accept', rationale: 'The pattern is attributable and material across the reviewed cohort.',
+      edited_policy_patch: { scoringWeights: [{ key: 'market', weight: 30 }] },
     }));
     expect(await screen.findByText(/Production policy is unchanged/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Publish policy version' }));
     await waitFor(() => expect(api.publishGovernedPolicy).toHaveBeenCalledWith('version-1'));
-    expect(api.previewPolicyProposal).toHaveBeenCalledWith('proposal-1', { stage: 'pre_seed' });
+    expect(api.previewPolicyProposal).toHaveBeenCalledWith('proposal-1', {
+      action: 'edit_and_accept',
+      edited_policy_patch: { scoringWeights: [{ key: 'market', weight: 30 }] },
+    });
   });
 
   it('recovers an accepted draft after reload and keeps publication available', async () => {

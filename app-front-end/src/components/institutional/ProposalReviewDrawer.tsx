@@ -14,6 +14,14 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? value as Record<string, unknown> : {};
 }
 
+function editablePolicy(config: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    ['rubric', 'scoringWeights']
+      .filter((key) => Array.isArray(config[key]))
+      .map((key) => [key, config[key]]),
+  );
+}
+
 export default function ProposalReviewDrawer({
   proposal,
   fundConfig,
@@ -24,9 +32,9 @@ export default function ProposalReviewDrawer({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [action, setAction] = useState<ProposalReviewAction>('accept');
+  const [action, setAction] = useState<ProposalReviewAction>('edit_and_accept');
   const [rationale, setRationale] = useState('');
-  const [editedConfig, setEditedConfig] = useState(JSON.stringify(fundConfig, null, 2));
+  const [editedPatch, setEditedPatch] = useState(JSON.stringify(editablePolicy(fundConfig), null, 2));
   const [reviewResult, setReviewResult] = useState<PolicyReviewResult | null>(null);
   const detail = useQuery({
     queryKey: ['fund-intelligence', 'proposal', proposal.policy_proposal_id],
@@ -36,25 +44,30 @@ export default function ProposalReviewDrawer({
   const configError = useMemo(() => {
     if (action !== 'edit_and_accept') return null;
     try {
-      const parsed = JSON.parse(editedConfig);
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? null : 'Fund configuration must be a JSON object.';
+      const parsed = JSON.parse(editedPatch);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return 'Policy patch must be a JSON object.';
+      const keys = Object.keys(parsed);
+      if (!keys.length) return 'Change rubric or scoringWeights before previewing.';
+      if (keys.some((key) => !['rubric', 'scoringWeights'].includes(key))) return 'Only rubric and scoringWeights can be changed here.';
+      return keys.every((key) => Array.isArray((parsed as Record<string, unknown>)[key])) ? null : 'Policy fields must be arrays.';
     } catch {
-      return 'Fund configuration is not valid JSON.';
+      return 'Policy patch is not valid JSON.';
     }
-  }, [action, editedConfig]);
-  const resultingFundConfig = action === 'edit_and_accept'
-    ? (configError ? null : JSON.parse(editedConfig) as Record<string, unknown>)
-    : fundConfig;
+  }, [action, editedPatch]);
+  const parsedPatch = action === 'edit_and_accept' && !configError
+    ? JSON.parse(editedPatch) as Record<string, unknown>
+    : null;
   const preview = useMutation({
-    mutationFn: () => previewPolicyProposal(proposal.policy_proposal_id, resultingFundConfig!),
+    mutationFn: () => previewPolicyProposal(proposal.policy_proposal_id, {
+      action: action as 'accept' | 'edit_and_accept',
+      ...(action === 'edit_and_accept' ? { edited_policy_patch: parsedPatch! } : {}),
+    }),
   });
   const review = useMutation({
     mutationFn: () => reviewPolicyProposal(proposal.policy_proposal_id, {
       action,
       rationale: rationale.trim(),
-      ...((action === 'accept' || action === 'edit_and_accept')
-        ? { resulting_fund_config: resultingFundConfig! }
-        : {}),
+      ...(action === 'edit_and_accept' ? { edited_policy_patch: parsedPatch! } : {}),
     }),
     onSuccess: async (result) => {
       setReviewResult(result);
@@ -75,7 +88,7 @@ export default function ProposalReviewDrawer({
       ]);
     },
   });
-  const acceptanceAction = action === 'accept' || action === 'edit_and_accept';
+  const acceptanceAction = action === 'edit_and_accept';
   const canReview = rationale.trim().length >= 3
     && !configError
     && (!acceptanceAction || preview.isSuccess)
@@ -119,7 +132,7 @@ export default function ProposalReviewDrawer({
         <div className="mt-phi-6 border-y border-oxford/10 py-phi-4">
           <div className="flex flex-wrap items-center justify-between gap-phi-3">
             <div><p className="type-label-section">Impact preview</p><p className="type-body mt-1 text-oxford/55">Bounded replay only; it does not rescore or change production.</p></div>
-            <button type="button" onClick={() => preview.mutate()} disabled={preview.isPending} className="type-action border border-oxford/15 px-3 py-2 text-oxford disabled:opacity-35">Run impact preview</button>
+            <button type="button" onClick={() => preview.mutate()} disabled={preview.isPending || action !== 'edit_and_accept' || Boolean(configError)} className="type-action border border-oxford/15 px-3 py-2 text-oxford disabled:opacity-35">Run impact preview</button>
           </div>
           {preview.isSuccess ? <p role="status" className="type-body mt-phi-3 text-oxford/65">Preview complete · {previewCount} opportunities affected · automatic rescore disabled.</p> : null}
           {preview.isError ? <p role="alert" className="type-body mt-phi-3 text-signal">Impact preview failed. Acceptance remains disabled.</p> : null}
@@ -128,12 +141,12 @@ export default function ProposalReviewDrawer({
         {!reviewRecorded ? (
           <div className="mt-phi-5">
             <div className="flex flex-wrap gap-phi-2" role="group" aria-label="Proposal disposition">
-              {([['accept', 'Accept'], ['edit_and_accept', 'Edit + accept'], ['defer', 'Defer'], ['reject', 'Reject']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={action === value} onClick={() => setAction(value)} className={`type-action border px-3 py-2 ${action === value ? 'border-oxford bg-oxford text-paper' : 'border-oxford/15 text-oxford'}`}>{label}</button>)}
+              {([['edit_and_accept', 'Edit + accept'], ['defer', 'Defer'], ['reject', 'Reject']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={action === value} onClick={() => { setAction(value); preview.reset(); }} className={`type-action border px-3 py-2 ${action === value ? 'border-oxford bg-oxford text-paper' : 'border-oxford/15 text-oxford'}`}>{label}</button>)}
             </div>
-            {action === 'edit_and_accept' ? <><textarea aria-label="Resulting fund configuration" value={editedConfig} onChange={(event) => { setEditedConfig(event.target.value); preview.reset(); }} rows={8} className="mt-phi-3 w-full resize-y border border-oxford/15 bg-transparent p-3 font-mono text-xs leading-relaxed text-oxford" />{configError ? <p role="alert" className="type-body mt-phi-2 text-signal">{configError}</p> : null}</> : null}
+            {action === 'edit_and_accept' ? <><textarea aria-label="Edited scoring policy patch" value={editedPatch} onChange={(event) => { setEditedPatch(event.target.value); preview.reset(); }} rows={8} className="mt-phi-3 w-full resize-y border border-oxford/15 bg-transparent p-3 font-mono text-xs leading-relaxed text-oxford" />{configError ? <p role="alert" className="type-body mt-phi-2 text-signal">{configError}</p> : null}</> : null}
             <textarea aria-label="Review rationale" value={rationale} onChange={(event) => setRationale(event.target.value)} rows={3} placeholder="Attribution, sample quality, limitations, and judgment" className="mt-phi-3 w-full resize-none border border-oxford/15 bg-transparent p-3 text-sm leading-relaxed text-oxford" />
             <button type="button" onClick={() => review.mutate()} disabled={!canReview} className="type-action mt-phi-3 bg-oxford px-4 py-3 text-paper disabled:cursor-not-allowed disabled:opacity-35">
-              {action === 'accept' ? 'Accept proposal' : action === 'edit_and_accept' ? 'Accept edited proposal' : action === 'defer' ? 'Defer proposal' : 'Reject proposal'}
+              {action === 'edit_and_accept' ? 'Accept edited proposal' : action === 'defer' ? 'Defer proposal' : 'Reject proposal'}
             </button>
           </div>
         ) : (

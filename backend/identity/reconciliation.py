@@ -45,6 +45,15 @@ async def reconcile_identity(
                ) duplicate_identifiers) as duplicate_verified_identifiers,
               (select count(*) from public.identity_resolution_cases c
                 where c.user_id = $1 and c.status = 'open') as open_cases,
+              (select count(*) from public.source_observations o
+                where o.user_id = $1 and o.identity_status = 'resolved'
+                  and (
+                    o.opportunity_id is null or not exists (
+                      select 1 from public.opportunities p
+                      where p.user_id = o.user_id
+                        and p.opportunity_id = o.opportunity_id
+                    )
+                  )) as resolved_without_stable_opportunity,
               ((select count(*) from public.opportunities p
                   where p.user_id = $1 and not exists (
                     select 1 from public.companies c
@@ -74,6 +83,7 @@ async def reconcile_identity(
         "duplicate_verified_identifiers",
         "tenant_drift",
         "authoritative_legacy_only_after_activation",
+        "resolved_without_stable_opportunity",
     )
     violations = [key for key in guarded if counts.get(key, 0) > 0]
     return IdentityReconciliationReport(

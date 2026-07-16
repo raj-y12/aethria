@@ -59,16 +59,16 @@ export function fetchPolicyProposal(proposalId: string): Promise<PolicyProposalD
 
 export function previewPolicyProposal(
   proposalId: string,
-  resultingFundConfig: Record<string, unknown>,
+  input: { action: Extract<ProposalReviewAction, 'accept' | 'edit_and_accept'>; edited_policy_patch?: Record<string, unknown> },
 ): Promise<Record<string, unknown>> {
   return apiRequest(`/api/fund-intelligence/proposals/${encodedId(proposalId, 'proposalId')}/preview`, {
-    method: 'POST', body: JSON.stringify({ resulting_fund_config: resultingFundConfig }),
+    method: 'POST', body: JSON.stringify(input),
   });
 }
 
 export function reviewPolicyProposal(
   proposalId: string,
-  input: { action: ProposalReviewAction; rationale: string; resulting_fund_config?: Record<string, unknown> },
+  input: { action: ProposalReviewAction; rationale: string; edited_policy_patch?: Record<string, unknown> },
 ): Promise<PolicyReviewResult> {
   return apiRequest(`/api/fund-intelligence/proposals/${encodedId(proposalId, 'proposalId')}/review`, {
     method: 'POST', body: JSON.stringify(input),

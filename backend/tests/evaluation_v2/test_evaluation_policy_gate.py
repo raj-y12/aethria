@@ -67,6 +67,13 @@ async def test_evaluate_endpoint_uses_active_thesis_and_published_policy(monkeyp
             assert kwargs["policy"] == policy
             return {"evaluation_id": "evaluation-1"}
 
+        async def get_current(self, **kwargs):
+            return {
+                "evaluation": {"evaluation_id": "evaluation-1"},
+                "criteria": [],
+                "recommendation": {"recommended_state": "monitor"},
+            }
+
     monkeypatch.setattr(route, "get_service_client", lambda: object())
     monkeypatch.setattr(route, "get_active_thesis", lambda client, user_id: thesis)
     monkeypatch.setattr(route, "load_published_policy", lambda user_id: _compiled_policy())
@@ -78,7 +85,11 @@ async def test_evaluate_endpoint_uses_active_thesis_and_published_policy(monkeyp
 
     result = await route.evaluate_opportunity(request, "opportunity-1")
 
-    assert result == {"evaluation_id": "evaluation-1"}
+    assert result == {
+        "evaluation": {"evaluation_id": "evaluation-1"},
+        "criteria": [],
+        "recommendation": {"recommended_state": "monitor"},
+    }
 
 
 @pytest.mark.asyncio

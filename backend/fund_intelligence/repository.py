@@ -239,6 +239,7 @@ class FundIntelligenceRepository:
         policy_proposal_id: str,
         actor_id: str,
         policy_hash: str,
+        config_hash: str,
     ) -> Dict[str, Any]:
         uid = require_user_id(user_id, context="FundIntelligenceRepository.preview_impact")
         async with self.pool.acquire() as conn:
@@ -276,7 +277,7 @@ class FundIntelligenceRepository:
                     """,
                     str(uuid4()), uid, policy_proposal_id, int(proposal["sample_size"]),
                     len(examples), json.dumps([dict(item) for item in examples], default=str),
-                    json.dumps({"mode": "bounded_replay", "result": "flag_for_operator_review", "automatic_rescore": False, "policy_hash": policy_hash}),
+                    json.dumps({"mode": "bounded_replay", "result": "flag_for_operator_review", "automatic_rescore": False, "policy_hash": policy_hash, "config_hash": config_hash}),
                     json.dumps(_json(proposal["limitations"], [])),
                     actor_id,
                 )
@@ -292,6 +293,7 @@ class FundIntelligenceRepository:
         rationale: str,
         resulting_fund_config: Optional[Dict[str, Any]] = None,
         policy_hash: Optional[str] = None,
+        config_hash: Optional[str] = None,
     ) -> Dict[str, Any]:
         uid = require_user_id(user_id, context="FundIntelligenceRepository.review_proposal")
         review = ProposalReviewAction(action)
@@ -305,8 +307,14 @@ class FundIntelligenceRepository:
             PolicyProposalStatus.ACCEPTED,
             PolicyProposalStatus.EDITED_AND_ACCEPTED,
         }
-        if accepting and (not resulting_fund_config or not str(policy_hash or "").strip()):
-            raise ValueError("resulting_fund_config and policy_hash are required for acceptance")
+        if accepting and (
+            not resulting_fund_config
+            or not str(policy_hash or "").strip()
+            or not str(config_hash or "").strip()
+        ):
+            raise ValueError(
+                "resulting_fund_config, policy_hash, and config_hash are required for acceptance"
+            )
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 proposal = await conn.fetchrow(
@@ -339,7 +347,10 @@ class FundIntelligenceRepository:
                     preview_effect = _json(
                         preview.get("estimated_effect") if preview else None, {}
                     )
-                    if preview_effect.get("policy_hash") != policy_hash:
+                    if (
+                        preview_effect.get("policy_hash") != policy_hash
+                        or preview_effect.get("config_hash") != config_hash
+                    ):
                         raise RuntimeError(
                             "Acceptance requires a current impact preview for the exact resulting policy"
                         )
@@ -400,38 +411,78 @@ class FundIntelligenceRepository:
         user_id: str,
         governed_policy_version_id: str,
         actor_id: str,
-        published_policy_id: str,
-        published_policy_hash: str,
     ) -> Dict[str, Any]:
         uid = require_user_id(user_id, context="FundIntelligenceRepository.mark_published")
         async with self.pool.acquire() as conn:
             async with conn.transaction():
-                row = await conn.fetchrow(
+                await conn.execute("select pg_advisory_xact_lock(hashtext($1))", uid)
+                publishable = await conn.fetchrow(
                     """
-                    update public.governed_policy_versions v
-                    set status='published',published_by=$3,published_policy_id=$4,
-                        published_policy_hash=$5,published_at=now()
-                    from public.policy_proposals p
+                    select v.governed_policy_version_id
+                    from public.governed_policy_versions v
+                    join public.policy_proposals p
+                      on p.user_id=v.user_id
+                     and p.policy_proposal_id=v.policy_proposal_id
                     where v.user_id=$1 and v.governed_policy_version_id=$2
-                      and p.user_id=v.user_id and p.policy_proposal_id=v.policy_proposal_id
-                      and v.status='draft' and p.status in ('accepted','edited_and_accepted')
-                    returning v.*
+                      and v.status='draft'
+                      and p.status in ('accepted','edited_and_accepted')
+                    for update of v
                     """,
-                    uid, governed_policy_version_id, actor_id,
-                    published_policy_id, published_policy_hash,
+                    uid,
+                    governed_policy_version_id,
                 )
-                if row is None:
+                if publishable is None:
                     raise RuntimeError("Policy version is no longer publishable")
                 await conn.execute(
                     """
                     update public.governed_policy_versions set status='superseded'
-                    where user_id=$1 and governed_policy_version_id<>$2 and status='published'
+                    where user_id=$1 and governed_policy_version_id<>$2
+                      and status='published'
                     """,
-                    uid, governed_policy_version_id,
+                    uid,
+                    governed_policy_version_id,
                 )
+                row = await conn.fetchrow(
+                    """
+                    update public.governed_policy_versions
+                    set status='published',published_by=$3,published_policy_id=$4,
+                        published_policy_hash=policy_hash,published_at=now()
+                    where user_id=$1 and governed_policy_version_id=$2
+                      and status='draft'
+                    returning *
+                    """,
+                    uid, governed_policy_version_id, actor_id,
+                    governed_policy_version_id,
+                )
+                if row is None:
+                    raise RuntimeError("Policy version is no longer publishable")
                 await self._outbox(
                     conn, user_id=uid, aggregate_id=governed_policy_version_id,
                     event_type="governed_policy_version.published",
-                    payload={"governed_policy_version_id": governed_policy_version_id, "published_by": actor_id, "published_policy_id": published_policy_id},
+                    payload={
+                        "governed_policy_version_id": governed_policy_version_id,
+                        "published_by": actor_id,
+                        "published_policy_id": governed_policy_version_id,
+                        "policy_hash": str(row["policy_hash"]),
+                        "fund_config": _json(row["policy_patch"], {}),
+                    },
                 )
                 return _public_row(row)
+
+    async def get_active_published_policy(self, *, user_id: str) -> Dict[str, Any]:
+        uid = require_user_id(
+            user_id,
+            context="FundIntelligenceRepository.get_active_published_policy",
+        )
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                select * from public.governed_policy_versions
+                where user_id=$1 and status='published'
+                order by published_at desc limit 1
+                """,
+                uid,
+            )
+        if row is None:
+            raise LookupError("Published governed policy not found for tenant")
+        return _public_row(row)

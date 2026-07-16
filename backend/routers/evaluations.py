@@ -51,14 +51,39 @@ async def evaluate_opportunity(request: Request, opportunity_id: str):
                 status_code=409,
                 detail="An active fund thesis is required before evaluation",
             )
-        compiled_policy, partner_rules = await asyncio.gather(
-            asyncio.to_thread(load_published_policy, user_id),
-            asyncio.to_thread(get_partner_rules),
+        fund_repository = getattr(
+            request.app.state, "fund_intelligence_repository", None
         )
+        compiled_policy = None
+        if fund_repository is not None:
+            try:
+                governed = await fund_repository.get_active_published_policy(
+                    user_id=user_id
+                )
+                from services.scoring.policy_compiler import (
+                    compile_policy_from_fund_config,
+                )
+
+                compiled_policy = await asyncio.to_thread(
+                    compile_policy_from_fund_config,
+                    governed["policy_patch"],
+                    require_publish_ready=True,
+                )
+                if compiled_policy["policy_hash"] != governed["policy_hash"]:
+                    raise RuntimeError("Governed policy hash is inconsistent")
+                compiled_policy["policy_version_id"] = governed[
+                    "governed_policy_version_id"
+                ]
+            except LookupError:
+                compiled_policy = None
+        if compiled_policy is None:
+            compiled_policy = await asyncio.to_thread(load_published_policy, user_id)
+        partner_rules = await asyncio.to_thread(get_partner_rules)
         policy = evaluation_policy_from_compiled(
             compiled_policy, partner_rules=partner_rules
         )
-        return await _repository(request).evaluate(
+        repository = _repository(request)
+        await repository.evaluate(
             user_id=user_id,
             opportunity_id=opportunity_id,
             actor_id=user_id,
@@ -66,6 +91,12 @@ async def evaluate_opportunity(request: Request, opportunity_id: str):
             policy=policy,
             thesis_version_id=thesis.version_id,
         )
+        current = await repository.get_current(
+            user_id=user_id, opportunity_id=opportunity_id
+        )
+        if current is None:
+            raise RuntimeError("Completed evaluation projection is unavailable")
+        return current
     except PolicyNotPublishedError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except FundThesisError as exc:

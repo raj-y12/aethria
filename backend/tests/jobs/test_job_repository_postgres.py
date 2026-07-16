@@ -1,5 +1,5 @@
+import asyncio
 import os
-from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -37,51 +37,42 @@ async def test_target_postgres_supports_transactional_skip_locked_contract():
 @pytest.mark.asyncio
 async def test_target_postgres_skip_locked_claims_distinct_tenant_jobs():
     import asyncpg
+    from jobs.models import AgentJob, JobType
+    from jobs.repository import DurableJobRepository
 
     dsn = os.environ["TEST_DATABASE_URL"]
-    setup = await asyncpg.connect(dsn)
-    first = await asyncpg.connect(dsn)
-    second = await asyncpg.connect(dsn)
+    pool = await asyncpg.create_pool(dsn, min_size=1, max_size=4)
+    repository = DurableJobRepository(pool)
     user_id = f"contract-{uuid4()}"
-    job_ids = [uuid4(), uuid4()]
+    jobs = [
+        AgentJob(
+            user_id=user_id,
+            job_type=JobType.PIPELINE_CYCLE,
+            idempotency_key=f"contract:{index}:{uuid4()}",
+            payload={"user_id": user_id, "manual_one_shot": True},
+        )
+        for index in range(2)
+    ]
     try:
-        await setup.executemany(
-            """
-            insert into public.agent_jobs (
-              job_id,user_id,job_type,idempotency_key,payload,status,
-              pipeline_run_id,created_at
-            ) values ($1,$2,'pipeline_cycle',$3,'{}'::jsonb,'queued',$4,$5)
-            """,
-            [
-                (job_ids[0], user_id, "first", uuid4(), datetime(2026, 1, 1, tzinfo=timezone.utc)),
-                (job_ids[1], user_id, "second", uuid4(), datetime(2026, 1, 1, 0, 0, 1, tzinfo=timezone.utc)),
-            ],
+        accepted = await asyncio.gather(
+            *(repository.enqueue(job) for job in jobs)
         )
-        first_tx = first.transaction()
-        second_tx = second.transaction()
-        await first_tx.start()
-        await second_tx.start()
-        claimed_first = await first.fetchval(
-            """
-            select job_id from public.agent_jobs
-            where user_id=$1 and status='queued'
-            order by created_at for update skip locked limit 1
-            """,
-            user_id,
+        claimed = await asyncio.gather(
+            repository.claim_next(worker_id="worker-1", lease_seconds=60),
+            repository.claim_next(worker_id="worker-2", lease_seconds=60),
         )
-        claimed_second = await second.fetchval(
-            """
-            select job_id from public.agent_jobs
-            where user_id=$1 and status='queued'
-            order by created_at for update skip locked limit 1
-            """,
-            user_id,
-        )
-        assert {claimed_first, claimed_second} == set(job_ids)
-        await second_tx.rollback()
-        await first_tx.rollback()
+        assert {job.job_id for job in accepted} == {job.job_id for job in jobs}
+        assert {job.job_id for job in claimed if job is not None} == {
+            job.job_id for job in jobs
+        }
+        tenant_depths = await repository.tenant_queue_depths(user_id=user_id)
+        assert tenant_depths["pipeline_cycle:running"] == 2
+        async with pool.acquire() as connection:
+            await connection.execute(
+                "delete from public.domain_outbox where user_id=$1", user_id
+            )
+            await connection.execute(
+                "delete from public.agent_jobs where user_id=$1", user_id
+            )
     finally:
-        await setup.execute("delete from public.agent_jobs where user_id=$1", user_id)
-        await first.close()
-        await second.close()
-        await setup.close()
+        await pool.close()

@@ -26,3 +26,4 @@ def test_review_fix_migration_binds_governed_version_to_policy_hash():
     review_fix = Path(__file__).parents[3] / "supabase/migrations/20260716090000_review_fixes.sql"
     sql = review_fix.read_text().lower()
     assert "add column if not exists policy_hash text" in sql
+    assert "governed_policy_one_published_idx" in sql

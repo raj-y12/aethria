@@ -129,8 +129,8 @@ describe('institutional API clients', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ outcome_id: 'outcome-1' }), { status: 200 }));
 
     await reviewPolicyProposal('proposal-1', {
-      action: 'accept', rationale: 'Validated on the preview cohort.',
-      resulting_fund_config: { stage: 'pre_seed' },
+      action: 'edit_and_accept', rationale: 'Validated on the preview cohort.',
+      edited_policy_patch: { scoringWeights: [] },
     });
     await importCsv({ idempotency_key: 'import-12345678', csv_text: 'company_name,website\nAcme,acme.test' });
     await createOutcome('company-1', {

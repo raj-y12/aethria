@@ -10,10 +10,29 @@ from event_bus import publish as event_publish
 
 
 Publish = Callable[[str, str, dict], Awaitable[None]]
+Project = Callable[[str, str, dict], Awaitable[None]]
 
 
 async def _publish_to_event_bus(user_id: str, event_type: str, payload: dict) -> None:
     event_publish(user_id, {"type": event_type, **payload})
+
+
+async def _project_legacy_read_models(
+    user_id: str, event_type: str, payload: dict
+) -> None:
+    if event_type != "governed_policy_version.published":
+        return
+    from services.scoring.policy_store import publish_policy
+
+    fund_config = payload.get("fund_config")
+    expected_hash = str(payload.get("policy_hash") or "").strip()
+    if not isinstance(fund_config, dict) or not expected_hash:
+        raise ValueError("Governed policy outbox event is missing its exact projection")
+    projected = await asyncio.to_thread(
+        publish_policy, user_id, fund_config=fund_config
+    )
+    if projected.get("policy_hash") != expected_hash:
+        raise RuntimeError("Legacy policy projection hash mismatch")
 
 
 class OutboxPublisher:
@@ -22,10 +41,12 @@ class OutboxPublisher:
         repository: Any,
         *,
         publish: Publish = _publish_to_event_bus,
+        project: Project = _project_legacy_read_models,
         poll_interval_seconds: float = 2.0,
     ):
         self.repository = repository
         self.publish = publish
+        self.project = project
         self.poll_interval_seconds = max(0.05, float(poll_interval_seconds))
         self._stopping = asyncio.Event()
         self._runner: Optional[asyncio.Task] = None
@@ -35,6 +56,7 @@ class OutboxPublisher:
         published = 0
         for event in events:
             try:
+                await self.project(event.user_id, event.event_type, event.payload)
                 await self.publish(event.user_id, event.event_type, event.payload)
             except Exception as exc:
                 metrics.inc_outbox_publication(outcome="failed")

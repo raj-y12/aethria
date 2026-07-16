@@ -54,3 +54,21 @@ alter table public.governed_policy_versions
   add constraint governed_policy_versions_policy_hash_present
   check (policy_hash is not null and length(btrim(policy_hash)) > 0)
   not valid;
+
+with ranked as (
+  select governed_policy_version_id,
+         row_number() over (
+           partition by user_id order by published_at desc nulls last, created_at desc
+         ) as publication_rank
+  from public.governed_policy_versions
+  where status = 'published'
+)
+update public.governed_policy_versions v
+set status = 'superseded'
+from ranked
+where v.governed_policy_version_id = ranked.governed_policy_version_id
+  and ranked.publication_rank > 1;
+
+create unique index if not exists governed_policy_one_published_idx
+  on public.governed_policy_versions (user_id)
+  where status = 'published';

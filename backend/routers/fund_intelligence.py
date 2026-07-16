@@ -1,6 +1,8 @@
 """Governed Fund Intelligence proposal inbox and explicit publication API."""
 
 import asyncio
+import hashlib
+import json
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -12,7 +14,7 @@ from services.scoring.policy_compiler import (
     PolicyValidationError,
     compile_policy_from_fund_config,
 )
-from services.scoring.policy_store import publish_policy
+from utils.settings_loader import load_settings
 
 
 router = APIRouter(prefix="/api/fund-intelligence", tags=["fund-intelligence"])
@@ -21,11 +23,74 @@ router = APIRouter(prefix="/api/fund-intelligence", tags=["fund-intelligence"])
 class ReviewBody(BaseModel):
     action: ProposalReviewAction
     rationale: str = Field(min_length=3, max_length=2000)
-    resulting_fund_config: Optional[Dict[str, Any]] = None
+    edited_policy_patch: Optional[Dict[str, Any]] = None
 
 
 class PreviewBody(BaseModel):
-    resulting_fund_config: Dict[str, Any]
+    action: ProposalReviewAction
+    edited_policy_patch: Optional[Dict[str, Any]] = None
+
+
+_EDITABLE_POLICY_KEYS = {"rubric", "scoringWeights"}
+
+
+def _config_hash(config: Dict[str, Any]) -> str:
+    canonical = json.dumps(
+        config, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _restricted_policy_patch(value: Any) -> Dict[str, Any]:
+    if not isinstance(value, dict) or not value:
+        raise ValueError("A non-empty scoring policy patch is required")
+    unsupported = sorted(set(value) - _EDITABLE_POLICY_KEYS)
+    if unsupported:
+        raise ValueError(
+            "Policy patch contains unsupported field(s): " + ", ".join(unsupported)
+        )
+    patch = dict(value)
+    for key, item in patch.items():
+        if not isinstance(item, list):
+            raise ValueError(f"{key} must be a list")
+    return patch
+
+
+async def _canonical_policy_result(
+    request: Request,
+    *,
+    user_id: str,
+    policy_proposal_id: str,
+    action: ProposalReviewAction,
+    edited_policy_patch: Optional[Dict[str, Any]],
+) -> tuple[Dict[str, Any], Dict[str, Any], str]:
+    detail = await _repository(request).get_proposal(
+        user_id=user_id, policy_proposal_id=policy_proposal_id
+    )
+    if detail is None:
+        raise LookupError("Proposal not found for tenant")
+    if action is ProposalReviewAction.ACCEPT:
+        patch = _restricted_policy_patch(
+            detail["proposal"].get("proposed_policy_patch")
+        )
+    elif action is ProposalReviewAction.EDIT_AND_ACCEPT:
+        patch = _restricted_policy_patch(edited_policy_patch)
+    else:
+        raise ValueError("Only acceptance actions can preview a policy result")
+    settings = await asyncio.to_thread(load_settings, user_id, use_cache=False)
+    current = (
+        dict(settings.get("fund_config"))
+        if isinstance(settings.get("fund_config"), dict)
+        else {}
+    )
+    result = {**current, **patch}
+    compiled = await asyncio.to_thread(
+        compile_policy_from_fund_config, result, require_publish_ready=True
+    )
+    current_hash = str(current.get("publishedPolicyHash") or "").strip()
+    if compiled["policy_hash"] == current_hash:
+        raise ValueError("The edited proposal does not change the published scoring policy")
+    return result, compiled, _config_hash(result)
 
 
 def _repository(request: Request):
@@ -73,16 +138,19 @@ async def preview_proposal(
     validate_route_id(policy_proposal_id, field_name="policy_proposal_id")
     user_id = require_authenticated_user(request)
     try:
-        compiled = await asyncio.to_thread(
-            compile_policy_from_fund_config,
-            body.resulting_fund_config,
-            require_publish_ready=True,
+        _, compiled, config_hash = await _canonical_policy_result(
+            request,
+            user_id=user_id,
+            policy_proposal_id=policy_proposal_id,
+            action=body.action,
+            edited_policy_patch=body.edited_policy_patch,
         )
         return await _repository(request).preview_impact(
             user_id=user_id,
             policy_proposal_id=policy_proposal_id,
             actor_id=user_id,
             policy_hash=compiled["policy_hash"],
+            config_hash=config_hash,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Policy proposal not found") from exc
@@ -103,13 +171,15 @@ async def review_proposal(request: Request, policy_proposal_id: str, body: Revie
             ProposalReviewAction.EDIT_AND_ACCEPT,
         }
         compiled = None
+        resulting_fund_config = None
+        config_hash = None
         if accepting:
-            if body.resulting_fund_config is None:
-                raise ValueError("resulting_fund_config is required for acceptance")
-            compiled = await asyncio.to_thread(
-                compile_policy_from_fund_config,
-                body.resulting_fund_config,
-                require_publish_ready=True,
+            resulting_fund_config, compiled, config_hash = await _canonical_policy_result(
+                request,
+                user_id=user_id,
+                policy_proposal_id=policy_proposal_id,
+                action=body.action,
+                edited_policy_patch=body.edited_policy_patch,
             )
         return await _repository(request).review_proposal(
             user_id=user_id,
@@ -117,8 +187,9 @@ async def review_proposal(request: Request, policy_proposal_id: str, body: Revie
             actor_id=user_id,
             action=body.action,
             rationale=body.rationale,
-            resulting_fund_config=body.resulting_fund_config,
+            resulting_fund_config=resulting_fund_config,
             policy_hash=compiled["policy_hash"] if compiled else None,
+            config_hash=config_hash,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Policy proposal not found") from exc
@@ -139,20 +210,10 @@ async def publish_governed_policy(
     user_id = require_authenticated_user(request)
     repository = _repository(request)
     try:
-        publishable = await repository.get_publishable_version(
-            user_id=user_id, governed_policy_version_id=governed_policy_version_id
-        )
-        published = await asyncio.to_thread(
-            publish_policy, user_id, fund_config=publishable["policy_patch"]
-        )
-        if published["policy_hash"] != publishable["policy_hash"]:
-            raise RuntimeError("Published policy hash does not match the accepted draft")
         version = await repository.mark_published(
             user_id=user_id,
             governed_policy_version_id=governed_policy_version_id,
             actor_id=user_id,
-            published_policy_id=published["policy_version_id"],
-            published_policy_hash=published["policy_hash"],
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Policy version not found") from exc
@@ -163,4 +224,12 @@ async def publish_governed_policy(
         ) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return {"policy_version": version, "published_policy": published}
+    return {
+        "policy_version": version,
+        "published_policy": {
+            "policy_version_id": version["governed_policy_version_id"],
+            "policy_hash": version["policy_hash"],
+            "authoritative_store": "governed_policy_versions",
+        },
+        "legacy_projection": "pending",
+    }

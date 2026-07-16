@@ -46,6 +46,7 @@ async def test_reconciliation_reports_counts_only_and_flags_authoritative_drift(
                 "unlinked_projections": 2,
                 "duplicate_verified_identifiers": 0,
                 "open_cases": 2,
+                "resolved_without_stable_opportunity": 3,
                 "tenant_drift": 0,
                 "authoritative_legacy_only_after_activation": 1,
             }
@@ -59,6 +60,7 @@ async def test_reconciliation_reports_counts_only_and_flags_authoritative_drift(
     assert report.counts["companies"] == 18
     assert report.has_violations is True
     assert "authoritative_legacy_only_after_activation" in report.violations
+    assert "resolved_without_stable_opportunity" in report.violations
     assert "user_id = $1" in connection.calls[0][0].lower()
     assert "scout_info" not in report.model_dump(mode="json")
 
@@ -73,6 +75,7 @@ async def test_reconciliation_passes_when_constraints_and_linkage_are_clean():
         "unlinked_projections": 0,
         "duplicate_verified_identifiers": 0,
         "open_cases": 0,
+        "resolved_without_stable_opportunity": 0,
         "tenant_drift": 0,
         "authoritative_legacy_only_after_activation": 0,
     }
