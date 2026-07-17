@@ -45,10 +45,54 @@ export interface EvaluationRecord {
   recommendation: RecommendationRecord | null;
 }
 
-export function fetchCurrentEvaluation(opportunityId: string): Promise<EvaluationRecord> {
-  return apiRequest(`/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/evaluation`);
+function parseJson(value: unknown, fallback: unknown): unknown {
+  if (typeof value !== 'string') return value ?? fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
 }
 
-export function evaluateOpportunity(opportunityId: string): Promise<EvaluationRecord> {
-  return apiRequest(`/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/evaluate`, { method: 'POST' });
+function stringArray(value: unknown): string[] {
+  const parsed = parseJson(value, []);
+  return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  const parsed = parseJson(value, {});
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {};
+}
+
+function normalizeEvaluation(result: EvaluationRecord): EvaluationRecord {
+  const recommendation = result.recommendation;
+  return {
+    ...result,
+    evaluation: {
+      ...result.evaluation,
+      model_manifest: objectValue(result.evaluation.model_manifest),
+      prompt_manifest: objectValue(result.evaluation.prompt_manifest),
+    },
+    criteria: (result.criteria ?? []).map((criterion) => ({
+      ...criterion,
+      missing_evidence: stringArray(criterion.missing_evidence),
+    })),
+    recommendation: recommendation ? {
+      ...recommendation,
+      decision_drivers: stringArray(recommendation.decision_drivers),
+      principal_risks: stringArray(recommendation.principal_risks),
+      mandate_conflicts: stringArray(recommendation.mandate_conflicts),
+      missing_information: stringArray(recommendation.missing_information),
+      change_conditions: stringArray(recommendation.change_conditions),
+    } : null,
+  };
+}
+
+export async function fetchCurrentEvaluation(opportunityId: string): Promise<EvaluationRecord> {
+  const result = await apiRequest<EvaluationRecord>(
+    `/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/evaluation`,
+  );
+  return normalizeEvaluation(result);
 }

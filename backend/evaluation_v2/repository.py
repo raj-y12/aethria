@@ -15,6 +15,17 @@ from evaluation_v2.service import (
 from tenant_context import require_user_id
 
 
+def _json(value: Any, default: Any) -> Any:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return default
+    return value
+
+
 class EvaluationLifecycleError(RuntimeError):
     """The opportunity lifecycle does not currently permit evaluation."""
 
@@ -224,10 +235,43 @@ class EvaluationRepository:
                 "select * from public.recommendations where user_id=$1 and evaluation_id=$2",
                 uid, str(evaluation["evaluation_id"]),
             )
+        evaluation_payload = dict(evaluation)
+        for key, default in (
+            ("claim_snapshot", []),
+            ("model_manifest", {}),
+            ("prompt_manifest", {}),
+        ):
+            evaluation_payload[key] = _json(evaluation_payload.get(key), default)
+
+        criteria_payload = []
+        for row in criteria:
+            payload = dict(row)
+            for key, default in (
+                ("supporting_claim_ids", []),
+                ("contradicting_claim_ids", []),
+                ("missing_evidence", []),
+                ("quality_flags", []),
+                ("deterministic_adjustments", {}),
+            ):
+                payload[key] = _json(payload.get(key), default)
+            criteria_payload.append(payload)
+
+        recommendation_payload = dict(recommendation) if recommendation else None
+        if recommendation_payload is not None:
+            for key in (
+                "decision_drivers",
+                "principal_risks",
+                "mandate_conflicts",
+                "missing_information",
+                "change_conditions",
+            ):
+                recommendation_payload[key] = _json(
+                    recommendation_payload.get(key), []
+                )
         return {
-            "evaluation": dict(evaluation),
-            "criteria": [dict(row) for row in criteria],
-            "recommendation": dict(recommendation) if recommendation else None,
+            "evaluation": evaluation_payload,
+            "criteria": criteria_payload,
+            "recommendation": recommendation_payload,
         }
 
     async def record_failed_refresh(

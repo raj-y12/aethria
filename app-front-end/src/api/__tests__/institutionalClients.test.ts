@@ -7,8 +7,8 @@ vi.mock('../auth', () => ({ authedFetch }));
 import { fetchJob, retryJob } from '../jobs';
 import { fetchIdentityCases, resolveIdentityCase } from '../identity';
 import { correctClaim, fetchEvidenceLedger } from '../evidence';
-import { createHumanRuling, listWorkflowActions } from '../decisions';
-import { requestEvidenceRefresh } from '../monitoring';
+import { createHumanRuling, listHumanRulings } from '../decisions';
+import { fetchCurrentEvaluation } from '../evaluations';
 import { reviewPolicyProposal } from '../fundIntelligence';
 import { createOutcome, importCsv } from '../channelsOutcomes';
 
@@ -95,31 +95,46 @@ describe('institutional API clients', () => {
     );
   });
 
-  it('creates human rulings and reads approval-gated actions', async () => {
-    authedFetch
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ruling_id: 'ruling-1', decision: 'invest' }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ actions: [] }), { status: 200 }));
+  it('normalizes stringified evaluation JSON from an older backend during rollout', async () => {
+    authedFetch.mockResolvedValueOnce(new Response(JSON.stringify({
+      evaluation: {
+        evaluation_id: 'evaluation-1',
+        model_manifest: '{"model_id":"gpt-5-nano"}',
+        prompt_manifest: '{"prompt_version":"prompt-a"}',
+      },
+      criteria: [{ criterion: 'market', missing_evidence: '["retention"]' }],
+      recommendation: {
+        recommendation_id: 'recommendation-1',
+        recommended_state: 'insufficient_evidence',
+        decision_drivers: '[]',
+        principal_risks: '["Retention is unverified."]',
+        mandate_conflicts: '[]',
+        missing_information: '["Net retention"]',
+        change_conditions: '["Verify three-month retention."]',
+      },
+    }), { status: 200 }));
 
-    await createHumanRuling('opportunity-1', {
-      decision: 'invest', rationale: 'Customer evidence clears the core risk.', investor_confidence: 0.8,
-    });
-    await listWorkflowActions('opportunity-1');
+    const result = await fetchCurrentEvaluation('opportunity-1');
 
-    expect(authedFetch.mock.calls[0][0]).toContain('/api/opportunities/opportunity-1/rulings');
-    expect(authedFetch.mock.calls[1][0]).toContain('/api/opportunities/opportunity-1/actions');
+    expect(result.evaluation.model_manifest).toEqual({ model_id: 'gpt-5-nano' });
+    expect(result.criteria[0].missing_evidence).toEqual(['retention']);
+    expect(result.recommendation?.decision_drivers).toEqual([]);
+    expect(result.recommendation?.principal_risks).toEqual(['Retention is unverified.']);
+    expect(result.recommendation?.change_conditions).toEqual(['Verify three-month retention.']);
   });
 
-  it('returns the refresh budget reservation with its durable job', async () => {
-    authedFetch.mockResolvedValueOnce(new Response(JSON.stringify({
-      status: 'accepted', job_id: 'job-refresh-1', pipeline_run_id: 'run-refresh-1',
-      accepted_at: '2026-07-15T12:00:00Z', budget_reservation: { amount_usd: 0.24 },
-    }), { status: 202 }));
+  it('creates human rulings and reads their history', async () => {
+    authedFetch
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ruling_id: 'ruling-1', decision: 'invest' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ rulings: [{ ruling_id: 'ruling-1', decision: 'invest' }] }), { status: 200 }));
 
-    const result = await requestEvidenceRefresh('opportunity-1', {
-      reason: 'human_request', request_key: 'refresh-12345678', envelope: {},
+    await createHumanRuling('opportunity-1', {
+      decision: 'invest', rationale: 'Customer evidence clears the core risk.',
     });
+    await expect(listHumanRulings('opportunity-1')).resolves.toMatchObject([{ ruling_id: 'ruling-1' }]);
 
-    expect(result.budget_reservation).toEqual({ amount_usd: 0.24 });
+    expect(authedFetch.mock.calls[0][0]).toContain('/api/opportunities/opportunity-1/rulings');
+    expect(authedFetch.mock.calls[1][0]).toContain('/api/opportunities/opportunity-1/rulings?limit=');
   });
 
   it('reviews proposals and imports channel data with explicit idempotency', async () => {

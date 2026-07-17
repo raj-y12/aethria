@@ -1,32 +1,15 @@
-import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  fetchCompany,
-  fetchObservations,
-  fetchOpportunityByLegacyStartup,
-} from '../../api/identity';
+import { useQuery } from '@tanstack/react-query';
+import { fetchOpportunityByLegacyStartup } from '../../api/identity';
 import { fetchEvidenceLedger } from '../../api/evidence';
-import { evaluateOpportunity, fetchCurrentEvaluation } from '../../api/evaluations';
-import { listWorkflowActions } from '../../api/decisions';
-import { fetchMonitoringStatus } from '../../api/monitoring';
-import CompanyIdentityPanel from '../identity/CompanyIdentityPanel';
-import SourceObservationsPanel from '../identity/SourceObservationsPanel';
+import { fetchCurrentEvaluation } from '../../api/evaluations';
+import {
+  listHumanRulings,
+  type HumanRuling,
+  type HumanRulingDecision,
+} from '../../api/decisions';
 import ClaimEvidenceLedger from './ClaimEvidenceLedger';
-import ConfidentialArtifactIntake from './ConfidentialArtifactIntake';
 import HumanRulingComposer from './HumanRulingComposer';
-import MonitoringControl from './MonitoringControl';
 import RecommendationPanel from './RecommendationPanel';
-import WorkflowActionQueue from './WorkflowActionQueue';
-
-type WorkspaceTab = 'evidence' | 'decision' | 'actions' | 'monitoring' | 'identity';
-
-const TABS: Array<{ id: WorkspaceTab; label: string }> = [
-  { id: 'evidence', label: 'Evidence' },
-  { id: 'decision', label: 'Decision' },
-  { id: 'actions', label: 'Actions' },
-  { id: 'monitoring', label: 'Monitoring' },
-  { id: 'identity', label: 'Identity' },
-];
 
 function nestedString(value: unknown, key: string): string | null {
   if (!value || typeof value !== 'object') return null;
@@ -34,29 +17,89 @@ function nestedString(value: unknown, key: string): string | null {
   return typeof candidate === 'string' ? candidate : null;
 }
 
-export default function OpportunityIntelligence({ startupId, readOnly = false }: { startupId: string; readOnly?: boolean }) {
-  const [tab, setTab] = useState<WorkspaceTab>('evidence');
-  const queryClient = useQueryClient();
+function decisionLabel(decision: HumanRulingDecision): string {
+  return decision.charAt(0).toUpperCase() + decision.slice(1);
+}
+
+function plainLabel(value: string): string {
+  const words = value.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function rulingDate(value?: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+}
+
+function RulingHistory({ rulings }: { rulings: HumanRuling[] }) {
+  if (rulings.length === 0) return null;
+  const [latest, ...earlier] = rulings;
+  return (
+    <section className="memoDecisionHistory" aria-label="Ruling history">
+      <div className="memoDecisionHistoryHead">
+        <p className="memoDecisionEyebrow">Latest recorded ruling</p>
+        <p className="memoDecisionHistoryDecision">{decisionLabel(latest.decision)}</p>
+      </div>
+      <p className="memoDecisionHistoryRationale">{latest.rationale}</p>
+      <p className="memoDecisionMeta">
+        {rulingDate(latest.created_at) ?? 'Recorded'}
+        {typeof latest.investor_confidence === 'number'
+          ? ` · ${Math.round(latest.investor_confidence * 100)}% confidence`
+          : ''}
+      </p>
+      {latest.override_type ? (
+        <p className="memoDecisionOverride">Why it differs <span>{plainLabel(latest.override_type)}</span></p>
+      ) : null}
+      {earlier.length > 0 ? (
+        <details className="memoDecisionDisclosure memoDecisionDisclosure--compact">
+          <summary>View earlier rulings ({earlier.length})</summary>
+          <ol className="memoDecisionHistoryList">
+            {earlier.map((ruling) => (
+              <li key={ruling.ruling_id}>
+                <span>{decisionLabel(ruling.decision)}</span>
+                <p>{ruling.rationale}</p>
+                {ruling.override_type ? <em>Why it differs: {plainLabel(ruling.override_type)}</em> : null}
+                <small>{rulingDate(ruling.created_at) ?? 'Recorded'}</small>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
+    </section>
+  );
+}
+
+function RulingState({ message, unavailable = false }: { message: string; unavailable?: boolean }) {
+  return (
+    <section
+      className="memoDocSection memoRulingControls memoDecisionWorkspace"
+      aria-label={unavailable ? 'Your ruling unavailable' : 'Your ruling'}
+    >
+      <h2 className="memoDocSectionHead">Your ruling</h2>
+      <p className="memoDecisionIntro">{message}</p>
+    </section>
+  );
+}
+
+export default function OpportunityIntelligence({
+  startupId,
+  readOnly = false,
+}: {
+  startupId: string;
+  readOnly?: boolean;
+}) {
   const opportunity = useQuery({
     queryKey: ['institutional', 'opportunity', 'legacy', startupId],
     queryFn: () => fetchOpportunityByLegacyStartup(startupId),
     staleTime: 30_000,
   });
   const opportunityId = opportunity.data?.opportunity_id;
-  const companyId = opportunity.data?.company_id;
-
-  const company = useQuery({
-    queryKey: ['institutional', 'company', companyId],
-    queryFn: () => fetchCompany(companyId!),
-    enabled: Boolean(companyId),
-    staleTime: 30_000,
-  });
-  const observations = useQuery({
-    queryKey: ['institutional', 'observations', companyId],
-    queryFn: () => fetchObservations(undefined, 200),
-    enabled: Boolean(companyId && tab === 'identity'),
-    staleTime: 30_000,
-  });
   const evidence = useQuery({
     queryKey: ['institutional', 'evidence', opportunityId],
     queryFn: () => fetchEvidenceLedger(opportunityId!),
@@ -70,119 +113,76 @@ export default function OpportunityIntelligence({ startupId, readOnly = false }:
     retry: false,
     staleTime: 15_000,
   });
-  const actions = useQuery({
-    queryKey: ['institutional', 'actions', opportunityId],
-    queryFn: () => listWorkflowActions(opportunityId!),
+  const rulings = useQuery({
+    queryKey: ['institutional', 'rulings', opportunityId],
+    queryFn: () => listHumanRulings(opportunityId!),
     enabled: Boolean(opportunityId),
     staleTime: 10_000,
   });
-  const monitoring = useQuery({
-    queryKey: ['institutional', 'monitoring', opportunityId],
-    queryFn: () => fetchMonitoringStatus(opportunityId!),
-    enabled: Boolean(opportunityId && tab === 'monitoring'),
-    staleTime: 10_000,
-  });
-  const evaluate = useMutation({
-    mutationFn: () => evaluateOpportunity(opportunityId!),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['institutional', 'evaluation', opportunityId] }),
-        queryClient.invalidateQueries({ queryKey: ['institutional', 'opportunity', 'legacy', startupId] }),
-      ]);
-    },
-  });
 
-  const companyObservations = useMemo(
-    () => (observations.data ?? []).filter((item) => item.company_id === companyId),
-    [companyId, observations.data],
-  );
   const recommendationId = opportunity.data?.current_recommendation_id
     ?? nestedString(evaluation.data?.recommendation, 'recommendation_id');
+  const recommendationState: string | undefined = evaluation.data?.recommendation?.recommended_state;
+  const recommendedDecision: HumanRulingDecision | null =
+    recommendationState === 'invest'
+      || recommendationState === 'monitor'
+      || recommendationState === 'pass'
+      || recommendationState === 'advance'
+      ? recommendationState
+      : null;
+
+  // A recommendation only earns the panel when it actually gives reasons —
+  // insufficient-evidence husks (0% confidence, no drivers, no risks) stay hidden.
+  const recommendation = evaluation.data?.recommendation;
+  const hasRecommendation = Boolean(
+    recommendation && (recommendation.decision_drivers.length > 0 || recommendation.principal_risks.length > 0),
+  );
+  const hasClaims = Boolean(evidence.data?.claims.some((claim) => claim.status === 'current'));
 
   if (opportunity.isLoading) {
-    return <section className="mt-phi-8 border-y border-oxford/10 py-phi-6" aria-label="Opportunity intelligence"><p className="type-label-section">Institutional record</p><p className="type-body mt-phi-2 text-oxford/55">Resolving the canonical opportunity…</p></section>;
+    return <RulingState message="Preparing the recommendation and decision record…" />;
   }
   if (opportunity.isError || !opportunity.data) {
     return (
-      <section className="mt-phi-8 border-y border-oxford/10 py-phi-6" aria-label="Opportunity intelligence unavailable">
-        <p className="type-label-section">Institutional record unavailable</p>
-        <p className="type-body mt-phi-2 text-oxford/55">
-          This legacy memo has not been linked to a canonical opportunity. Existing memo evidence remains visible; institutional rulings and orchestration stay disabled until reconciliation completes.
-        </p>
-      </section>
+      <RulingState
+        unavailable
+        message="This memo is still being connected to its decision record. The ruling controls will appear when that link is complete."
+      />
     );
   }
 
   return (
-    <section className="mt-phi-8 border-t-2 border-oxford pt-phi-6" aria-label="Opportunity intelligence">
-      <div className="flex flex-wrap items-start justify-between gap-phi-4">
-        <div>
-          <p className="type-label-section">Opportunity intelligence</p>
-          <h2 className="mt-phi-2 font-display text-3xl font-medium leading-tight text-oxford">
-            Evidence, judgment, and action
-          </h2>
-          <p className="type-body mt-phi-2 max-w-2xl text-oxford/55">
-            Canonical record · immutable evaluation · attributed human rulings · approval-gated workflow.
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="type-status">{opportunity.data.decision_state.replace(/_/g, ' ')}</p>
-          <p className="type-meta mt-1 text-oxford/45">{opportunity.data.opportunity_id}</p>
-        </div>
-      </div>
+    <section className="memoDocSection memoRulingControls memoDecisionWorkspace" aria-labelledby="opportunity-final-ruling">
+      <h2 className="memoDocSectionHead" id="opportunity-final-ruling">Your ruling</h2>
+      <p className="memoDecisionIntro">
+        {hasRecommendation
+          ? 'See why Aethria leans this way, review the evidence that matters, then make the call for your fund.'
+          : 'The memo above is the case. Record the call for your fund.'}
+      </p>
 
-      <nav className="mt-phi-6 flex gap-phi-5 overflow-x-auto border-b border-oxford/10" role="tablist" aria-label="Opportunity intelligence views">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            onClick={() => setTab(item.id)}
-            className={`type-label-tab shrink-0 border-b pb-phi-3 ${tab === item.id ? 'border-oxford text-oxford' : 'border-transparent text-oxford/50'}`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      {/* The reasoning and claim ledger appear only once the institutional pipeline
+          actually produces them; an always-empty panel is noise, not transparency. */}
+      {hasRecommendation ? <RecommendationPanel evaluation={evaluation.data ?? null} /> : null}
 
-      <div className="py-phi-6">
-        {tab === 'evidence' ? (
-          evidence.isLoading ? <p className="type-body text-oxford/55">Loading the claim ledger…</p>
-            : evidence.isError || !evidence.data ? <p role="alert" className="type-body text-signal">The evidence ledger is unavailable. No claims were inferred from the memo fallback.</p>
-              : <><ClaimEvidenceLedger ledger={evidence.data} readOnly={readOnly} />{!readOnly ? <ConfidentialArtifactIntake opportunityId={opportunity.data.opportunity_id} /> : null}</>
-        ) : null}
+      {hasClaims ? (
+        <details className="memoDecisionDisclosure">
+          <summary>Review supporting evidence</summary>
+          <div className="memoDecisionDisclosureBody">
+            <ClaimEvidenceLedger ledger={evidence.data!} readOnly={readOnly} />
+          </div>
+        </details>
+      ) : null}
 
-        {tab === 'decision' ? (
-          <>
-            <RecommendationPanel evaluation={evaluation.data ?? null} />
-            {!readOnly ? (
-              <button type="button" onClick={() => evaluate.mutate()} disabled={evaluate.isPending} className="type-action mt-phi-4 border border-oxford/15 px-3 py-2 text-oxford disabled:opacity-35">
-                {evaluate.isPending ? 'Evaluating…' : 'Create new immutable evaluation'}
-              </button>
-            ) : null}
-            <HumanRulingComposer opportunityId={opportunity.data.opportunity_id} recommendationId={recommendationId} readOnly={readOnly} />
-          </>
-        ) : null}
+      {rulings.isError ? (
+        <p role="alert" className="memoDecisionMuted">Earlier rulings could not be loaded.</p>
+      ) : <RulingHistory rulings={rulings.data ?? []} />}
 
-        {tab === 'actions' ? (
-          actions.isLoading ? <p className="type-body text-oxford/55">Loading workflow actions…</p>
-            : actions.isError ? <p role="alert" className="type-body text-signal">Workflow actions are unavailable.</p>
-              : <WorkflowActionQueue opportunityId={opportunity.data.opportunity_id} actions={actions.data ?? []} readOnly={readOnly} />
-        ) : null}
-
-        {tab === 'monitoring' ? (
-          monitoring.isLoading ? <p className="type-body text-oxford/55">Loading monitoring state…</p>
-            : monitoring.isError || !monitoring.data ? <p role="alert" className="type-body text-signal">Monitoring state is unavailable.</p>
-              : <MonitoringControl opportunityId={opportunity.data.opportunity_id} status={monitoring.data} serviceLevel={opportunity.data.service_level} readOnly={readOnly} />
-        ) : null}
-
-        {tab === 'identity' ? (
-          company.isLoading ? <p className="type-body text-oxford/55">Loading canonical company…</p>
-            : company.isError || !company.data ? <p role="alert" className="type-body text-signal">Canonical company identity is unavailable.</p>
-              : <div className="space-y-phi-6"><CompanyIdentityPanel company={company.data} opportunity={opportunity.data} /><SourceObservationsPanel observations={companyObservations} /></div>
-        ) : null}
-      </div>
+      <HumanRulingComposer
+        opportunityId={opportunity.data.opportunity_id}
+        recommendationId={recommendationId}
+        recommendedDecision={recommendedDecision}
+        readOnly={readOnly}
+      />
     </section>
   );
 }

@@ -652,21 +652,55 @@ export function useDispatchLookup({
     return all.map((l) => {
       const m = findLookupMatch(l.lookupId);
       const isActive = l.lookupId === pendingLookup?.lookupId;
+      const hasPartner = Boolean(m?.partner?.recommendation);
+      const hasReview = Boolean(m?.review);
       const status = lookupChipStatus({
         isRerun: l.isRerun,
         isActive,
         lookupDecided: isActive && lookupDecided,
-        hasPartner: Boolean(m?.partner?.recommendation),
-        hasReview: Boolean(m?.review),
+        hasPartner,
+        hasReview,
       });
+      const stage = isActive
+        ? l.isRerun
+          ? rerunDecisionComplete
+            ? 'Memo'
+            : pendingLookupMatch?.review
+              ? 'Decide'
+              : 'Review'
+          : !progress?.resolved
+            ? 'Identify'
+            : !progress.found
+              ? 'Discover'
+              : !progress.reviewed
+                ? 'Review'
+                : 'Decide'
+        : l.isRerun
+          ? hasReview
+            ? 'Decide'
+            : 'Review'
+          : hasPartner
+            ? 'Decide'
+            : hasReview
+              ? 'Review'
+              : 'Discover';
       return {
         id: l.lookupId,
         label: m?.scout?.name || l.queryLabel,
+        stage,
         status,
         active: isActive,
       };
     });
-  }, [pendingLookup, backgroundLookups, findLookupMatch, lookupDecided]);
+  }, [
+    pendingLookup,
+    backgroundLookups,
+    findLookupMatch,
+    lookupDecided,
+    pendingLookupMatch?.review,
+    progress,
+    rerunDecisionComplete,
+  ]);
 
   // Focus a backgrounded lookup: swap it into active, demote the current one.
   const focusChip = useCallback(

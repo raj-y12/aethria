@@ -74,6 +74,61 @@ def test_strong_identity_is_found(monkeypatch):
     assert res.description
 
 
+def test_profile_from_different_company_is_not_attached_or_used_for_founders(monkeypatch):
+    sources = [
+        {
+            "title": "Aethria — AI deal flow",
+            "url": "https://aethria.co",
+            "snippet": "Aethria builds software for venture capital deal flow.",
+        },
+        {
+            "title": "Aethria Solutions | LinkedIn",
+            "url": "https://www.linkedin.com/company/aethriasolutions",
+            "snippet": "Aethria Solutions was founded by Arjuna Jayasinghe.",
+        },
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+
+    res = resolve_company("Aethria", user_id=USER, website_hint="aethria.co")
+
+    assert res.linkedin_url is None
+    assert "Arjuna Jayasinghe" not in res.founder_names
+    assert "Arjuna Jayasinghe" not in (res.description or "")
+
+
+def test_attached_yc_profile_is_extracted_for_founders(monkeypatch):
+    sources = [
+        {
+            "title": "Acme Robotics — Home",
+            "url": "https://acmerobotics.com",
+            "snippet": "Acme Robotics builds warehouse automation robots.",
+        },
+        {
+            "title": "Acme Robotics | Y Combinator",
+            "url": "https://www.ycombinator.com/companies/acme-robotics",
+            "snippet": "Acme Robotics is a YC company.",
+        },
+    ]
+    extracted = []
+
+    def fake_extract(urls):
+        extracted.extend(urls)
+        return [
+            {
+                "url": urls[0],
+                "content": "Acme Robotics was founded by Jane Smith and John Doe.",
+            }
+        ]
+
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(cr, "tavily_extract", fake_extract)
+
+    res = resolve_company("Acme Robotics", user_id=USER)
+
+    assert extracted == ["https://www.ycombinator.com/companies/acme-robotics"]
+    assert res.founder_names == ["Jane Smith", "John Doe"]
+
+
 def test_weak_evidence_is_partial_or_low_confidence_not_dropped(monkeypatch):
     sources = [
         {

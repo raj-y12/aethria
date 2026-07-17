@@ -64,6 +64,16 @@ export function memoSourceRows(startup: Startup) {
     }));
 }
 
+/**
+ * The operator's typed re-review notes, without the fetched-link content blocks
+ * the backend appends after them. Used to prefill the next re-review so context
+ * carries forward instead of being silently overwritten.
+ */
+export function operatorTypedContext(startup: Startup | null | undefined): string {
+  const raw = startup?.scout.operator_context ?? '';
+  return raw.split('\n\n[Content of operator-provided link ')[0].trim();
+}
+
 export function analystContextSections(startup: Startup | null | undefined): Array<{ title: string; body: string }> {
   const raw = startup?.scout.operator_context?.trim();
   if (!raw) return [];

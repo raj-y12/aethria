@@ -638,6 +638,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               nextMove={coverAction}
             />
 
+            {/* The decision surface belongs beside the opening recommendation, before the supporting memo. */}
+            <OpportunityIntelligence startupId={displayStartup.id} readOnly={readOnly} />
+
             {(showJudgment && precedentCandidates.length > 0) || portfolioSignals.length > 0 ? (
               <div className="memoDossierContext">
                 {showJudgment && precedentCandidates.length > 0 ? (
@@ -920,9 +923,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 )}
               </section>
             )}
-
-            {/* Canonical evidence, recommendation, human ruling, actions, and monitoring. */}
-            <OpportunityIntelligence startupId={displayStartup.id} readOnly={readOnly} />
 
             {/* ── Appendix (sits under the ruling) ── */}
             <div className="memoDiscGroup">

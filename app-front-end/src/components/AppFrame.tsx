@@ -44,6 +44,7 @@ import { isDealHumanResolved, isDealUnresolved } from '../lib/dealState';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
 import { deriveExecutionReadiness } from './institutional/ExecutionReadinessPanel';
+import { operatorTypedContext } from './memo/memoContentHelpers';
 
 export interface InlineDispatchProps {
   input: string;
@@ -491,6 +492,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                           ? {
                               name: dispatch.rerunTarget.scout.name,
                               sector: dispatch.rerunTarget.scout.sector ?? null,
+                              previousContext: operatorTypedContext(dispatch.rerunTarget) || null,
                             }
                           : null
                       }

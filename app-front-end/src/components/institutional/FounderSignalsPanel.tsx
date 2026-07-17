@@ -24,8 +24,8 @@ export default function FounderSignalsPanel({
   return (
     <section className="border-y border-oxford/10 py-phi-4" aria-label="Evidence-backed founder signals">
       <div className="flex items-baseline justify-between gap-phi-4">
-        <p className="type-label-section">Founder signals</p>
-        <span className="type-meta text-oxford/50">Observable evidence only</span>
+        <p className="type-label-section">Founder evidence</p>
+        <span className="type-meta text-oxford/50">Only claims tied to a recorded source</span>
       </div>
       {signals.length === 0 ? (
         <p className="type-body mt-phi-3 text-oxford/55">
@@ -42,9 +42,6 @@ export default function FounderSignalsPanel({
               <li key={claim.claim_id} className="grid gap-phi-2 sm:grid-cols-[132px_1fr]">
                 <div>
                   <p className="type-status">{claim.claim_type.replace(/_/g, ' ')}</p>
-                  <p className="type-meta mt-1 text-oxford/50">
-                    {claim.assertion_class.replace(/_/g, ' ')} · {Math.round(claim.confidence * 100)}%
-                  </p>
                 </div>
                 <div>
                   <p className="type-body font-medium text-oxford/80">{claim.display_text}</p>
@@ -65,4 +62,3 @@ export default function FounderSignalsPanel({
     </section>
   );
 }
-

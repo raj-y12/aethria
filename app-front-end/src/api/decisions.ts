@@ -25,54 +25,15 @@ export interface HumanRuling extends HumanRulingInput {
   created_at?: string;
 }
 
-export type WorkflowActionType =
-  | 'prepare_diligence_questions' | 'draft_information_request' | 'refresh_evidence'
-  | 'schedule_monitor_review' | 'export_to_crm' | 'generate_decision_pack' | 'resolve_identity';
-
-export interface WorkflowAction {
-  workflow_action_id: string;
-  opportunity_id: string;
-  action_type: WorkflowActionType;
-  status: string;
-  generated_content: Record<string, unknown>;
-  approved_content?: Record<string, unknown> | null;
-  missing_evidence: string[];
-  requires_approval: boolean;
-  due_at?: string | null;
-  external_destination?: string | null;
-  failure_code?: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export function createHumanRuling(opportunityId: string, input: HumanRulingInput): Promise<HumanRuling> {
   return apiRequest(`/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/rulings`, {
     method: 'POST', body: JSON.stringify(input),
   });
 }
 
-export async function listWorkflowActions(opportunityId: string, limit = 100): Promise<WorkflowAction[]> {
-  const result = await apiRequest<{ actions?: WorkflowAction[] }>(
-    `/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/actions?limit=${limit}`,
+export async function listHumanRulings(opportunityId: string, limit = 50): Promise<HumanRuling[]> {
+  const result = await apiRequest<{ rulings?: HumanRuling[] }>(
+    `/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/rulings?limit=${limit}`,
   );
-  return Array.isArray(result.actions) ? result.actions : [];
+  return Array.isArray(result.rulings) ? result.rulings : [];
 }
-
-export function createWorkflowAction(
-  opportunityId: string,
-  input: { action_type: WorkflowActionType; due_at?: string; external_destination?: string },
-): Promise<WorkflowAction> {
-  return apiRequest(`/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/actions`, {
-    method: 'POST', body: JSON.stringify(input),
-  });
-}
-
-export function approveWorkflowAction(
-  actionId: string,
-  approvedContent?: Record<string, unknown>,
-): Promise<WorkflowAction> {
-  return apiRequest(`/api/actions/${encodedId(actionId, 'actionId')}/approve`, {
-    method: 'POST', body: JSON.stringify({ approved_content: approvedContent ?? null }),
-  });
-}
-
