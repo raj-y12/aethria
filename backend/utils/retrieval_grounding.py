@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import ssl
+from html import unescape
 from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 from urllib.request import Request, urlopen
 from typing import Any, Dict, List, Set
@@ -24,27 +25,62 @@ def _fallback_search(query: str, max_results: int) -> List[Dict[str, str]]:
     """Small no-key fallback for provider outages; results stay reference-validated."""
     if os.getenv("RETRIEVAL_FALLBACK_ENABLED", "1").strip().lower() in {"0", "false", "no"}:
         return []
-    url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
-    request = Request(url, headers={"User-Agent": "AethriaResearch/1.0"})
+    # DDG's /html endpoint increasingly serves an anti-bot challenge to cloud
+    # IPs. The lightweight /lite endpoint is intended for simple clients and
+    # returns stable result-link markup without JavaScript.
+    urls = (
+        f"https://lite.duckduckgo.com/lite/?q={quote_plus(query)}",
+        f"https://html.duckduckgo.com/html/?q={quote_plus(query)}",
+    )
+    request_headers = {"User-Agent": "Mozilla/5.0 (compatible; AethriaResearch/1.0)"}
+    html = ""
     try:
-        with urlopen(request, timeout=8.0, context=ssl.create_default_context(cafile=certifi.where())) as response:
-            html = response.read().decode("utf-8", errors="replace")
+        context = ssl.create_default_context(cafile=certifi.where())
+        for url in urls:
+            try:
+                request = Request(url, headers=request_headers)
+                with urlopen(request, timeout=8.0, context=context) as response:
+                    candidate = response.read().decode("utf-8", errors="replace")
+                # Do not parse DDG's challenge page as an empty successful search.
+                if "challenge-form" in candidate or "anomaly.js" in candidate:
+                    continue
+                html = candidate
+                break
+            except Exception as exc:
+                logger.debug("retrieval fallback endpoint failed (%s): %s", url, exc)
     except Exception as exc:
         logger.warning("retrieval fallback failed: %s", exc)
         return []
+    if not html:
+        logger.warning("retrieval fallback returned no usable results")
+        return []
+
     rows: List[Dict[str, str]] = []
-    pattern = re.compile(
-        r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
-        re.IGNORECASE | re.DOTALL,
+    # Lite currently emits class='result-link'; retain support for the older
+    # /html result__a markup in case that endpoint becomes available again.
+    patterns = (
+        re.compile(
+            r"<a[^>]+href=['\"]([^'\"]+)['\"][^>]+class=['\"]result-link['\"][^>]*>(.*?)</a>",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        re.compile(
+            r'<a[^>]+class=[\"\']result__a[\"\'][^>]+href=[\"\']([^\"\']+)[\"\'][^>]*>(.*?)</a>',
+            re.IGNORECASE | re.DOTALL,
+        ),
     )
-    for href, title_html in pattern.findall(html):
-        clean_url = href.strip()
+    matches = []
+    for pattern in patterns:
+        matches = pattern.findall(html)
+        if matches:
+            break
+    for href, title_html in matches:
+        clean_url = unescape(href.strip())
         if clean_url.startswith("//"):
             clean_url = f"https:{clean_url}"
         parsed = urlparse(clean_url)
         if "duckduckgo.com" in parsed.netloc and parsed.path.startswith("/l/"):
             clean_url = unquote(parse_qs(parsed.query).get("uddg", [""])[0]).strip()
-        title = re.sub(r"<[^>]+>", "", title_html).strip()
+        title = unescape(re.sub(r"<[^>]+>", "", title_html)).strip()
         if not clean_url.startswith(("http://", "https://")) or not title:
             continue
         rows.append({"title": title, "url": clean_url, "snippet": ""})
