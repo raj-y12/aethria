@@ -58,6 +58,22 @@ async def create_ruling(request: Request, opportunity_id: str, body: RulingBody)
         raise HTTPException(status_code=404, detail="Opportunity or recommendation not found") from exc
 
 
+@router.get("/api/opportunities/{opportunity_id}/rulings")
+async def list_rulings(
+    request: Request,
+    opportunity_id: str,
+    limit: int = Query(default=50, ge=1, le=100),
+):
+    validate_route_id(opportunity_id, field_name="opportunity_id")
+    user_id = require_authenticated_user(request)
+    records = await _repository(request).list_rulings(
+        user_id=user_id,
+        opportunity_id=opportunity_id,
+        limit=limit,
+    )
+    return {"rulings": [record.model_dump(mode="json") for record in records]}
+
+
 @router.post("/api/opportunities/{opportunity_id}/actions")
 async def create_action(request: Request, opportunity_id: str, body: ActionBody):
     validate_route_id(opportunity_id, field_name="opportunity_id")

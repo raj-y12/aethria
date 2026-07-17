@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from tenant_context import require_user_id
 from utils.reference_verify import hostname_from_user_hint, registrable_domain
 from utils.retrieval_grounding import retrieve_source_pack_merged
+from utils.tavily_client import tavily_extract
 
 logger = logging.getLogger("resolver.company")
 
@@ -344,6 +345,111 @@ def _classify_source(url: str) -> str:
     return "official_site_candidate"
 
 
+def _profile_slug(url: str) -> str:
+    """Return the platform's company slug from a supported profile URL."""
+    from urllib.parse import unquote, urlparse
+
+    path = unquote(urlparse(url).path).strip("/")
+    parts = [part for part in path.split("/") if part]
+    if not parts:
+        return ""
+    for marker in ("company", "organization", "companies"):
+        lowered = [part.lower() for part in parts]
+        if marker in lowered:
+            index = lowered.index(marker)
+            if index + 1 < len(parts):
+                return parts[index + 1]
+    return parts[-1]
+
+
+def _profile_matches_anchor(
+    source: EvidenceSource,
+    *,
+    company: str,
+    anchor_host: Optional[str],
+) -> bool:
+    """Require a platform profile's own slug to match the identity anchor.
+
+    Search-result titles are intentionally not sufficient: a page titled
+    "Aethria Solutions" still contains the queried token "Aethria". Profile
+    slugs are the stable cross-source identifier available without fetching a
+    page, and exact normalized equality avoids substring collisions.
+    """
+    if source.source_type not in {"linkedin", "crunchbase", "dealroom", "yc"}:
+        return True
+    target = registrable_domain(_host_of(anchor_host or "")) if anchor_host else ""
+    target_slug = target.split(".", 1)[0] if target else _compact_name(company)
+    profile_slug = _compact_name(_profile_slug(source.url))
+    if not target_slug or not profile_slug:
+        return False
+    if profile_slug == _compact_name(target_slug):
+        return True
+    # A result can corroborate the anchor when the page explicitly names the
+    # anchored domain, even if the platform chose a non-identical slug.
+    if anchor_host:
+        text = f"{source.title} {source.snippet}".lower()
+        return anchor_host.lower() in text or f"www.{anchor_host.lower()}" in text
+    return False
+
+
+def _founder_sources(
+    sources: List[EvidenceSource],
+    *,
+    company: str,
+    anchor_host: Optional[str],
+) -> List[EvidenceSource]:
+    """Keep only identity-correlated sources eligible to name founders."""
+    return [
+        source
+        for source in sources
+        if source.match_score >= 0.34
+        and _profile_matches_anchor(source, company=company, anchor_host=anchor_host)
+    ]
+
+
+def _extract_attached_profile(
+    resolution: CompanyResolution,
+    sources: List[EvidenceSource],
+    *,
+    company: str,
+    anchor_host: Optional[str],
+) -> None:
+    """Best-effort fetch of one attached profile to recover structured facts."""
+    attached_urls = [
+        resolution.yc_url,
+        resolution.linkedin_url,
+        resolution.crunchbase_url,
+        resolution.dealroom_url,
+    ]
+    url = next((candidate for candidate in attached_urls if candidate), None)
+    if not url:
+        return
+    attached = next(
+        (
+            source
+            for source in sources
+            if source.url.lower().rstrip("/") == url.lower().rstrip("/")
+            and _profile_matches_anchor(source, company=company, anchor_host=anchor_host)
+        ),
+        None,
+    )
+    if attached is None:
+        return
+    try:
+        extracted = tavily_extract([url])
+    except Exception as exc:
+        logger.warning("resolver profile extraction failed url=%s: %s", url, exc)
+        return
+    for page in extracted:
+        content = str(page.get("content") or "").strip()
+        if content:
+            attached.snippet = content[:12000]
+            resolution.notes.append(
+                f"Founder evidence extracted from attached {attached.source_type} profile."
+            )
+            return
+
+
 def _build_queries(company: str, *, phase: int, website_hint: Optional[str]) -> List[str]:
     """Layered fallback queries. Phase 1 = identity, phase 2 = corroboration."""
     c = company.strip()
@@ -544,7 +650,10 @@ def _assign_identity_fields(
             )
     resolution.alternative_matches = resolution.alternative_matches[:4]
 
+    profile_anchor = anchor_host or (_host_of(resolution.website) if resolution.website else None)
     for s in sources:
+        if not _profile_matches_anchor(s, company=company, anchor_host=profile_anchor):
+            continue
         if s.source_type == "linkedin" and not resolution.linkedin_url and s.match_score >= 0.34:
             resolution.linkedin_url = s.url
         elif s.source_type == "crunchbase" and not resolution.crunchbase_url and s.match_score >= 0.34:
@@ -787,7 +896,9 @@ def resolve_company(
             anchors = [
                 s for s in all_sources if s.source_type in ("official_site", "linkedin", "crunchbase")
             ]
-            if len(strong) >= 3 and anchors and _extract_founders(all_sources):
+            if len(strong) >= 3 and anchors and _extract_founders(
+                _founder_sources(all_sources, company=company, anchor_host=anchor_host)
+            ):
                 _log_stage(
                     resolution,
                     stage="search_phase_2",
@@ -808,10 +919,27 @@ def resolve_company(
         anchor_host=anchor_host,
         website_hint=website_hint,
     )
-    resolution.founder_names = _extract_founders(
-        [s for s in resolution.evidence_sources if s.match_score >= 0.34]
+    profile_anchor = anchor_host or (_host_of(resolution.website) if resolution.website else None)
+    _extract_attached_profile(
+        resolution,
+        resolution.evidence_sources,
+        company=company,
+        anchor_host=profile_anchor,
     )
-    resolution.description = _pick_description(resolution.evidence_sources)
+    resolution.founder_names = _extract_founders(
+        _founder_sources(
+            resolution.evidence_sources,
+            company=company,
+            anchor_host=profile_anchor,
+        )
+    )
+    resolution.description = _pick_description(
+        _founder_sources(
+            resolution.evidence_sources,
+            company=company,
+            anchor_host=profile_anchor,
+        )
+    )
     resolution.confidence = _compute_confidence(resolution, website_hint=website_hint)
     resolution.missing_fields = _compute_missing_fields(resolution)
     resolution.resolution_status = _assign_status(resolution, website_hint=website_hint)

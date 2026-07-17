@@ -14,8 +14,10 @@ describe('Investment memo section order', () => {
   it('uses the canonical opportunity workspace as the only human ruling path', () => {
     expect(memoSource).not.toContain('resolveEscalation');
     expect(memoSource).not.toContain('<MemoRulingSection');
-    expect(memoSource.indexOf('<OpportunityIntelligence')).toBeLessThan(
-      memoSource.indexOf('memoAppendixLabel'),
-    );
+    const opening = memoSource.indexOf('<MemoDossierOpening');
+    const ruling = memoSource.indexOf('<OpportunityIntelligence');
+    const snapshot = memoSource.indexOf('memoSnapshotSection');
+    expect(ruling).toBeGreaterThan(opening);
+    expect(ruling).toBeLessThan(snapshot);
   });
 });

@@ -23,6 +23,7 @@ export interface LookupProgress {
 export interface LookupChip {
   id: string;
   label: string;
+  stage: 'Identify' | 'Discover' | 'Review' | 'Decide' | 'Memo';
   status: 'scouting' | 'reviewing' | 'decided';
   active: boolean;
 }
@@ -71,7 +72,7 @@ interface DispatchCommandBarProps {
   onPickCandidate?: (candidate: LookupCandidate) => void;
   onRefineWebsite?: (websiteHint: string) => void;
   /** Re-review of an existing memo: company is fixed, only private context is asked for. */
-  rerun?: { name: string; sector?: string | null } | null;
+  rerun?: { name: string; sector?: string | null; previousContext?: string | null } | null;
   onSubmitRerun?: (context: string) => void;
   /** Authoritative durable execution state, separate from domain progress. */
   execution?: LookupExecution | null;
@@ -164,7 +165,6 @@ function ExecutionStatusCard({
 }) {
   const identityBlocked = execution.status === 'blocked' && execution.blockCode === 'identity_review_required';
   const retryable = execution.status === 'failed' || execution.status === 'dead_letter' || execution.status === 'blocked';
-  const acceptedTime = formatExecutionTime(execution.acceptedAt);
   const nextAttemptTime = formatExecutionTime(execution.nextAttemptAt);
   return (
     <section className="w-full max-w-md border-y border-oxford/10 py-phi-3" aria-label="Execution status">
@@ -172,10 +172,6 @@ function ExecutionStatusCard({
         <div>
           <p className="type-label-section">
             {identityBlocked ? 'Identity review required' : EXECUTION_LABELS[execution.status]}
-          </p>
-          <p className="type-meta mt-1 text-oxford/55">
-            Attempt {execution.attempts} of {execution.maxAttempts}
-            {acceptedTime ? ` · accepted ${acceptedTime}` : ''}
           </p>
         </div>
         <span
@@ -293,6 +289,12 @@ export default function DispatchCommandBar({
       setRerunContext('');
     }
   }, [open]);
+  // The backend replaces stored context wholesale on each re-review, so start
+  // from the previous notes — the operator edits the full record, not a delta.
+  const previousContext = rerun?.previousContext ?? '';
+  useEffect(() => {
+    if (open && previousContext) setRerunContext(previousContext);
+  }, [open, previousContext]);
 
   const view: 'result' | 'failure' | 'progress' | 'compose' | 'rerun' = compose
     ? 'compose'
@@ -412,37 +414,48 @@ export default function DispatchCommandBar({
       <DispatchDotPulse active={lookupRunning} />
       <div className="relative z-10 flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7">
         {showChips ? (
-          <Reveal delay={0.02} y={-6} className="mb-phi-7 flex flex-wrap items-center justify-center gap-phi-2">
-            {chips.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => {
-                  onFocusChip?.(c.id);
-                  setCompose(false);
-                }}
-                aria-label={c.active ? `Resume active analysis for ${c.label}` : `Open analysis for ${c.label}`}
-                aria-pressed={c.active}
-                className={`type-action inline-flex min-h-9 items-center gap-phi-2 border px-phi-4 py-phi-2 transition-colors btn-interaction ${
-                  c.active
-                    ? 'border-oxford/30 bg-oxford/[0.06] text-oxford'
-                    : 'border-oxford/[0.12] text-oxford/60 hover:border-oxford/25 hover:text-oxford/70'
-                }`}
-              >
-                <span
-                  className={`h-1.5 w-1.5 shrink-0 rounded-none ${
-                    c.status === 'decided'
-                      ? 'bg-oxford'
-                      : c.status === 'reviewing'
-                        ? 'bg-oxford signal-dot-breathe'
-                        : 'bg-oxford/30 signal-dot-breathe'
-                  }`}
-                  aria-hidden
-                />
-                <span className="max-w-[14ch] truncate">{c.label}</span>
-                {c.status === 'decided' ? <span className="text-oxford/60" aria-hidden>✓</span> : null}
-              </button>
-            ))}
+          <Reveal delay={0.02} y={-6} className="mb-phi-7 w-full max-w-3xl">
+            <section aria-label="Active dispatches" className="border-y border-oxford/[0.1] py-phi-3">
+              <div className="mb-phi-2 flex items-center justify-between gap-phi-3">
+                <p className="type-label-section">Active dispatches</p>
+                <p className="type-meta text-oxford/45">{chips.length}</p>
+              </div>
+              <div className="flex gap-phi-2 overflow-x-auto pb-1" role="list">
+                {chips.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      onFocusChip?.(c.id);
+                      setCompose(false);
+                    }}
+                    aria-label={c.active ? `Resume active analysis for ${c.label}` : `Open analysis for ${c.label}`}
+                    aria-pressed={c.active}
+                    className={`group inline-flex min-h-10 min-w-[150px] shrink-0 items-center justify-between gap-phi-3 border px-phi-3 py-phi-2 text-left transition-colors btn-interaction ${
+                      c.active
+                        ? 'border-oxford/30 bg-oxford/[0.06] text-oxford'
+                        : 'border-oxford/[0.12] text-oxford/60 hover:border-oxford/25 hover:text-oxford/80'
+                    }`}
+                  >
+                    <span className="flex min-w-0 items-center gap-phi-2">
+                      <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-none ${
+                          c.status === 'decided'
+                            ? 'bg-oxford'
+                            : c.status === 'reviewing'
+                              ? 'bg-oxford signal-dot-breathe'
+                              : 'bg-oxford/30 signal-dot-breathe'
+                        }`}
+                        aria-hidden
+                      />
+                      <span className="max-w-[14ch] truncate type-action">{c.label}</span>
+                    </span>
+                    <span className="type-meta shrink-0 text-oxford/50 group-hover:text-oxford/70">{c.stage}</span>
+                    {c.status === 'decided' ? <span className="text-oxford/60" aria-hidden>✓</span> : null}
+                  </button>
+                ))}
+              </div>
+            </section>
           </Reveal>
         ) : null}
 
@@ -469,8 +482,9 @@ export default function DispatchCommandBar({
                 </p>
               ) : null}
               <p className="type-body max-w-[38ch] text-center text-oxford/60">
-                Add private context or a source link. The reviewer will fold it into the
-                existing memo and send the case back through decision.
+                {previousContext
+                  ? 'Your earlier notes are below — edit or add to them. The re-review uses exactly what you submit.'
+                  : 'Add private context or a source link. The reviewer will fold it into the existing memo and send the case back through decision.'}
               </p>
               <div className="w-full">
                 <label
@@ -538,25 +552,27 @@ export default function DispatchCommandBar({
               </article>
             </Reveal>
           ) : view === 'progress' ? (
-            <Reveal delay={0.24} className="mt-phi-3 flex flex-col items-center gap-phi-5">
-              {progress!.sector ? (
-                <p className="type-status">
-                  {progress!.sector}
-                </p>
-              ) : null}
-              <ProgressSteps progress={progress!} />
-              {execution ? (
-                <ExecutionStatusCard
-                  execution={execution}
-                  onRetry={onRetryJob}
-                  onOpenIdentityReview={onOpenIdentityReview}
-                />
-              ) : null}
-              {message ? (
-                <p className="type-body max-w-[40ch] text-center text-oxford/60" aria-live="polite">
-                  {message}
-                </p>
-              ) : null}
+            <>
+              <Reveal delay={0.24} className="mt-phi-3 flex flex-col items-center gap-phi-5">
+                {progress!.sector ? (
+                  <p className="type-status">
+                    {progress!.sector}
+                  </p>
+                ) : null}
+                <ProgressSteps progress={progress!} />
+                {execution ? (
+                  <ExecutionStatusCard
+                    execution={execution}
+                    onRetry={onRetryJob}
+                    onOpenIdentityReview={onOpenIdentityReview}
+                  />
+                ) : null}
+                {message ? (
+                  <p className="type-body max-w-[40ch] text-center text-oxford/60" aria-live="polite">
+                    {message}
+                  </p>
+                ) : null}
+              </Reveal>
               {(candidates && candidates.length > 0) || needsWebsite ? (
                 onPickCandidate && onRefineWebsite ? (
                   <div className="w-full max-w-md text-left">
@@ -574,7 +590,7 @@ export default function DispatchCommandBar({
                   </div>
                 ) : null
               ) : null}
-            </Reveal>
+            </>
           ) : (
             <>
               <Reveal delay={0.24} className="mt-phi-3">

@@ -686,6 +686,316 @@
   text-transform: uppercase;
 }
 
+/* The decision record is one continuous version of the original washed
+   ruling surface. Evidence and actions support the call instead of behaving
+   like separate application tabs. */
+
+.memoDecisionIntro {
+  max-width: 42rem;
+  margin: 10px 0 0;
+  color: var(--memo-ink-muted);
+  font-size: var(--memo-body-size);
+  line-height: var(--memo-body-leading);
+}
+
+.memoDecisionEyebrow,
+.memoDecisionMeta {
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: 0.625rem;
+  line-height: 1.45;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.memoDecisionEyebrow {
+  color: var(--memo-ink);
+}
+
+.memoDecisionMeta {
+  color: var(--memo-ink-faint);
+}
+
+.memoDecisionReasoning {
+  margin-top: 30px;
+  padding: 22px 0 26px;
+  border-top: 1px solid var(--memo-rule-strong);
+  border-bottom: 1px solid var(--memo-rule);
+}
+
+.memoDecisionReasoningHead,
+.memoDecisionCallHead,
+.memoDecisionActionsHead,
+.memoDecisionHistoryHead,
+.memoDecisionActionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.memoDecisionReasoningGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(24px, 5cqi, 46px);
+  margin-top: 22px;
+}
+
+.memoDecisionReasoningGrid h3,
+.memoDecisionAction h3 {
+  margin: 0;
+  color: var(--memo-ink);
+  font-family: var(--memo-font-sans);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.memoDecisionReasonList {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memoDecisionReasonList li {
+  position: relative;
+  margin-top: 8px;
+  padding-left: 16px;
+  color: var(--memo-ink-body);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.memoDecisionReasonList li::before {
+  position: absolute;
+  left: 0;
+  content: '·';
+}
+
+.memoDecisionChangeCondition {
+  margin: 22px 0 0;
+  padding-left: 16px;
+  border-left: 1px solid var(--memo-rule-strong);
+  color: var(--memo-ink-body);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.memoDecisionChangeCondition span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--memo-ink-faint);
+  font-family: var(--memo-font-mono);
+  font-size: 0.5625rem;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.memoDecisionMuted {
+  margin: 12px 0 0;
+  color: var(--memo-ink-muted);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.memoDecisionDisclosure {
+  border-bottom: 1px solid var(--memo-rule);
+}
+
+.memoDecisionDisclosure summary {
+  padding: 16px 0;
+  color: var(--memo-ink-muted);
+  font-family: var(--memo-font-mono);
+  font-size: 0.625rem;
+  line-height: 1.45;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.memoDecisionDisclosureBody {
+  padding: 10px 0 28px;
+}
+
+.memoDecisionHistory {
+  margin-top: 28px;
+  padding: 18px 0;
+  border-top: 1px solid var(--memo-rule);
+  border-bottom: 1px solid var(--memo-rule);
+}
+
+.memoDecisionHistoryDecision {
+  margin: 0;
+  color: var(--memo-ink);
+  font-family: var(--memo-font-display);
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.memoDecisionHistoryRationale {
+  max-width: 42rem;
+  margin: 13px 0 8px;
+  color: var(--memo-ink-body);
+  font-size: 0.8125rem;
+  line-height: 1.62;
+}
+
+.memoDecisionOverride {
+  margin: 12px 0 0;
+  color: var(--memo-ink-faint);
+  font-family: var(--memo-font-mono);
+  font-size: 0.5625rem;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+
+.memoDecisionOverride span {
+  display: inline-block;
+  margin-left: 8px;
+  color: var(--memo-ink);
+}
+
+.memoDecisionDisclosure--compact {
+  margin-top: 12px;
+  border-top: 1px solid var(--memo-rule);
+  border-bottom: 0;
+}
+
+.memoDecisionHistoryList {
+  margin: 0;
+  padding: 0 0 10px;
+  list-style: none;
+}
+
+.memoDecisionHistoryList li {
+  padding: 13px 0;
+  border-top: 1px solid var(--memo-rule);
+}
+
+.memoDecisionHistoryList span,
+.memoDecisionHistoryList small,
+.memoDecisionHistoryList em {
+  font-family: var(--memo-font-mono);
+  font-size: 0.5625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.memoDecisionHistoryList em {
+  display: block;
+  margin: 5px 0;
+  color: var(--memo-ink-muted);
+  font-style: normal;
+}
+
+.memoDecisionHistoryList p {
+  margin: 5px 0;
+  color: var(--memo-ink-body);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.memoDecisionHistoryList small {
+  color: var(--memo-ink-faint);
+}
+
+.memoDecisionCall,
+.memoDecisionActions {
+  margin-top: 34px;
+  padding-top: 22px;
+  border-top: 1px solid var(--memo-rule-strong);
+}
+
+.memoDecisionNextSteps {
+  margin-top: 38px;
+}
+
+.memoDecisionActionCreate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 18px;
+}
+
+.memoDecisionActionCreate select,
+.memoDecisionActionCreate button,
+.memoDecisionApprove {
+  min-height: 42px;
+  border-radius: 0;
+  font-family: var(--memo-font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+
+.memoDecisionActionCreate select {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--memo-rule-strong);
+  background: var(--memo-paper);
+  color: var(--memo-ink);
+}
+
+.memoDecisionActionCreate button {
+  padding: 10px 16px;
+  border: 1px solid var(--color-oxford);
+  background: var(--color-oxford);
+  color: var(--memo-paper);
+  cursor: pointer;
+}
+
+.memoDecisionActionCreate button:disabled,
+.memoDecisionApprove:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.memoDecisionActionList {
+  margin-top: 18px;
+  border-top: 1px solid var(--memo-rule);
+}
+
+.memoDecisionAction {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--memo-rule);
+}
+
+.memoDecisionActionHead p,
+.memoDecisionActionHead span {
+  margin: 4px 0 0;
+  color: var(--memo-ink-faint);
+  font-family: var(--memo-font-mono);
+  font-size: 0.5625rem;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+
+.memoDecisionActionGap,
+.memoDecisionActionDraft p {
+  margin: 10px 0 0;
+  color: var(--memo-ink-body);
+  font-size: 0.8125rem;
+  line-height: 1.58;
+}
+
+.memoDecisionActionDraft {
+  margin-top: 12px;
+  padding-left: 15px;
+  border-left: 1px solid var(--memo-rule-strong);
+}
+
+.memoDecisionActionDraft p:first-child {
+  margin-top: 0;
+}
+
+.memoDecisionApprove {
+  margin-top: 14px;
+  padding: 9px 13px;
+  border: 1px solid var(--memo-rule-strong);
+  background: transparent;
+  color: var(--memo-ink);
+  cursor: pointer;
+}
+
 .memoList,
 .memoCaseList,
 .memoKillerList,
@@ -1592,6 +1902,24 @@
   .memoThesisSection > :not(.memoDocSectionTitle),
   .memoRiskRegisterSection > :not(.memoDocSectionTitle) {
     margin-left: 40px;
+  }
+
+  .memoDecisionReasoningGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .memoDecisionReasoningHead,
+  .memoDecisionCallHead,
+  .memoDecisionActionsHead,
+  .memoDecisionHistoryHead,
+  .memoDecisionActionHead {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .memoDecisionActionCreate {
+    grid-template-columns: 1fr;
   }
 
   .memoSnapshotRow {

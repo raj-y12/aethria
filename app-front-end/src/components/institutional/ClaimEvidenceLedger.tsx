@@ -53,42 +53,37 @@ export default function ClaimEvidenceLedger({ ledger, readOnly = false }: { ledg
   return (
     <div className="space-y-phi-6">
       <FounderSignalsPanel claims={ledger.claims} links={ledger.links} items={items} />
-      <section aria-label="Claim evidence ledger">
-        <div className="flex items-baseline justify-between gap-phi-4">
-          <p className="type-label-section">Claim ledger</p>
-          <span className="type-meta text-oxford/50">{currentClaims.length} current · {ledger.artifacts.length} artifacts</span>
-        </div>
-        {ledger.claims.length === 0 ? (
-          <p className="type-body mt-phi-3 text-oxford/55">No structured claims have been recorded for this opportunity.</p>
+      <section aria-label="Supporting claims">
+        <p className="type-label-section">Supporting claims</p>
+        {currentClaims.length === 0 ? (
+          <p className="type-body mt-phi-3 text-oxford/55">No supporting claim has been recorded yet.</p>
         ) : (
           <div className="mt-phi-3 divide-y divide-oxford/10 border-y border-oxford/10">
-            {ledger.claims.map((claim) => {
+            {currentClaims.map((claim) => {
               const sources = sourceForClaim(ledger, claim);
               return (
                 <article key={claim.claim_id} className="py-phi-4">
                   <div className="flex flex-wrap items-start justify-between gap-phi-3">
                     <div className="max-w-2xl">
-                      <p className="type-status">{claim.claim_type.replace(/_/g, ' ')} · {claim.status}</p>
+                      <p className="type-status">{claim.claim_type.replace(/_/g, ' ')}</p>
                       <p className="type-body mt-1 font-medium text-oxford/80">{claim.display_text}</p>
                     </div>
                     {!readOnly && claim.status === 'current' ? (
-                      <button type="button" onClick={() => setCorrectingClaimId(claim.claim_id)} className="type-action border-b border-oxford/15">Correct</button>
+                      <button type="button" onClick={() => setCorrectingClaimId(claim.claim_id)} className="type-action border-b border-oxford/15">Correct evidence</button>
                     ) : null}
                   </div>
                   <div className="mt-phi-3 space-y-phi-2">
                     {sources.map(({ link, item, artifact }) => (
-                      <div key={link.link_id} className="grid gap-phi-2 border-l border-oxford/15 pl-phi-3 sm:grid-cols-[110px_1fr]">
-                        <span className="type-meta text-oxford/50">{link.relationship.replace(/_/g, ' ')}</span>
+                      <div key={link.link_id} className="border-l border-oxford/15 pl-phi-3">
                         <div>
                           <p className="type-body text-oxford/65">{item?.display_excerpt || link.rationale}</p>
                           <p className="type-meta mt-1 text-oxford/45">
                             {artifact?.title || artifact?.artifact_type?.replace(/_/g, ' ') || 'Source unavailable'}
-                            {artifact?.trust_class ? ` · ${artifact.trust_class}` : ''}
                           </p>
                         </div>
                       </div>
                     ))}
-                    {sources.length === 0 ? <p className="type-meta text-signal">No evidence link recorded.</p> : null}
+                    {sources.length === 0 ? <p className="type-meta text-signal">No supporting source is linked yet.</p> : null}
                   </div>
                   {correctingClaimId === claim.claim_id ? <ClaimCorrection claim={claim} onDone={() => setCorrectingClaimId(null)} /> : null}
                 </article>
@@ -98,11 +93,11 @@ export default function ClaimEvidenceLedger({ ledger, readOnly = false }: { ledg
         )}
         {ledger.plans.length ? (
           <div className="mt-phi-5">
-            <p className="type-label-section">Open evidence plans</p>
+            <p className="type-label-section">What is still missing</p>
             <ul className="mt-phi-2 space-y-phi-2">
               {ledger.plans.map((plan) => (
                 <li key={plan.evidence_plan_id} className="type-body text-oxford/60">
-                  {plan.trigger_type.replace(/_/g, ' ')} · {plan.missing_evidence.join(', ') || 'No named gap'} · {plan.status}
+                  {plan.missing_evidence.join(', ') || 'No specific evidence gap was named.'}
                 </li>
               ))}
             </ul>
@@ -112,4 +107,3 @@ export default function ClaimEvidenceLedger({ ledger, readOnly = false }: { ledg
     </div>
   );
 }
-

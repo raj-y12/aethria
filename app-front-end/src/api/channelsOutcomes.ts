@@ -100,23 +100,3 @@ export async function fetchOutcomes(companyId: string, limit = 100): Promise<Out
 export function fetchOutcomeCoverage(): Promise<OutcomeCoverage> {
   return apiRequest('/api/outcomes/coverage');
 }
-
-export interface ConfidentialArtifactInput {
-  artifact_type: 'pitch_deck' | 'email';
-  content_hash: string;
-  storage_reference: string;
-  title?: string;
-  source_uri?: string;
-  retention_policy: string;
-  published_at?: string;
-  effective_at?: string;
-}
-
-export function registerConfidentialArtifact(
-  opportunityId: string,
-  input: ConfidentialArtifactInput,
-): Promise<Record<string, unknown>> {
-  return apiRequest(`/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/confidential-artifacts`, {
-    method: 'POST', body: JSON.stringify(input),
-  });
-}

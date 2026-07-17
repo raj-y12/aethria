@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from decisions.models import (
     HumanRulingInput,
+    HumanRulingRecord,
     WorkflowActionRecord,
     WorkflowActionStatus,
     WorkflowActionType,
@@ -133,6 +134,30 @@ class DecisionRepository:
                 payload = dict(row)
                 payload["override_type"] = override.value if override else None
                 return payload
+
+    async def list_rulings(
+        self,
+        *,
+        user_id: str,
+        opportunity_id: str,
+        limit: int = 50,
+    ) -> list[HumanRulingRecord]:
+        uid = require_user_id(user_id, context="DecisionRepository.list_rulings")
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                select hr.*, os.override_type, os.note as override_note
+                from public.human_rulings hr
+                left join public.override_signals os
+                  on os.user_id=hr.user_id and os.ruling_id=hr.ruling_id
+                where hr.user_id=$1 and hr.opportunity_id=$2
+                order by hr.created_at desc limit $3
+                """,
+                uid,
+                opportunity_id,
+                max(1, min(int(limit), 100)),
+            )
+        return [HumanRulingRecord.model_validate(db_row(row)) for row in rows]
 
     async def _insert_action(
         self,

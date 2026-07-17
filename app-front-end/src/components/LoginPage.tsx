@@ -253,13 +253,13 @@ export default function LoginPage() {
     .toUpperCase();
 
   return (
-    <div className="paper-dot-grid flex h-[100dvh] flex-col overflow-hidden bg-paper">
+    <div className="paper-dot-grid flex min-h-[100dvh] flex-col overflow-hidden bg-paper">
       <div
         className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-hidden"
-        style={{ padding: 'clamp(24px, 5vw, 56px)' }}
+        style={{ padding: 'clamp(28px, 6vw, 72px)' }}
       >
       <motion.div
-        className="w-full max-w-[40rem] flex flex-col items-center"
+        className="w-full max-w-[42rem] flex flex-col items-center"
         animate={
           entering
             ? reduceMotion
@@ -344,7 +344,7 @@ export default function LoginPage() {
               <p className="type-label-section m-0 mb-phi-5 text-center tabular-nums">
                 {dateline}
               </p>
-              <h1 className="font-wordmark text-center text-[clamp(48px,8vw,80px)] font-medium text-oxford leading-[0.9] m-0 tracking-normal">
+              <h1 className="font-wordmark text-center text-[clamp(56px,9vw,96px)] font-medium text-oxford leading-[0.9] m-0 tracking-[-0.02em]">
                 Aethria<span className="wordmark-dot">.</span>
               </h1>
               <p className="type-label-section mt-phi-4">
@@ -432,7 +432,7 @@ export default function LoginPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12, transition: { duration: 0.28, ease: EASE } }}
               transition={{ duration: 0.6, ease: EASE, delay: 0.2 }}
-              className="w-full max-w-[400px]"
+              className="w-full max-w-[420px]"
             >
               <form
                 onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
