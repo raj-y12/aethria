@@ -1,7 +1,7 @@
 # Institutional Authority and Funnel Cutover Design
 
-**Status:** Approved working design  
-**Date:** 2026-07-20  
+**Status:** Approved working design
+**Date:** 2026-07-20
 **Branch:** `codex/institutional-authority-cutover`
 
 ## 1. Decision
@@ -692,4 +692,3 @@ The program is complete only when:
 9. All certification scenarios and target readiness checks pass with current
    evidence.
 10. Rollback has been rehearsed without losing canonical or legacy records.
-

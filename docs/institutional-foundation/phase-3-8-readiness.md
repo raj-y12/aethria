@@ -20,7 +20,11 @@ The product authority model is now explicit: agents discover, extract, evaluate,
 
 ### Evaluation and recommendation
 
-- Evaluation runs snapshot claims and relationships under deterministic hashes and record policy, rubric, partner-rule, model, and prompt dependencies.
+- Evaluation runs snapshot claims and relationships under deterministic hashes and records policy, rubric, partner-rule, model, and prompt dependencies.
+- Governed Reviewer and Partner runs require one tenant-bound, complete structured-scoring trace with the exact published policy version and hash; environment flags cannot disable that path.
+- Published policy identity covers the normalized dimensions, decision thresholds, and score bands actually consumed. The immutable manifest records the already-consumed dependency identity without reloading mutable settings or global rules.
+- Governed score precision remains lossless through review aggregation, persistence adapters, and Partner boundaries, including immediately around pass and advance thresholds.
+- The active v3 Partner policy is compiled once into an immutable, extra-forbid typed contract; missing, malformed, unknown, or inconsistent decision fields fail closed rather than activating Python defaults.
 - Criterion assessments and recommendations are immutable after completion.
 - Missing evidence produces an unscored criterion, confidence reduction, review requirement, or diligence gap—not an invented neutral fact.
 - A failed refresh appends a failure and leaves the last successful recommendation current.
@@ -36,7 +40,7 @@ The product authority model is now explicit: agents discover, extract, evaluate,
 
 - Service levels 0–5 control enrichment attention. Archive level 0 cannot refresh automatically.
 - Every refresh carries a lifecycle reason, provider/resource/deadline envelope, and tenant cost reservation.
-- Scheduled refresh performs a cheap claim-snapshot materiality check before creating deeper work.
+- Scheduled refresh compares a clock-independent digest over the same enriched claim/evidence projection used by evaluation before creating deeper work. The immutable, clocked evaluation snapshot hash remains separate.
 - Downgrading service level releases reservations and cancels still-queued refresh jobs.
 
 ### Fund Intelligence
@@ -66,8 +70,9 @@ Apply the prior Phase 0–2 chain first, then:
 4. `20260715260000_attention_enrichment.sql`
 5. `20260715270000_fund_intelligence.sql`
 6. `20260715280000_channels_outcomes.sql`
+7. `20260720120000_materiality_digests.sql`
 
-Do not expose the new UI before all six migrations and Phase 0–2 dependencies are applied. The repositories intentionally fail closed when their direct PostgreSQL store is unavailable.
+Do not expose the new UI before all seven migrations and Phase 0–2 dependencies are applied. The repositories intentionally fail closed when their direct PostgreSQL store is unavailable.
 
 ## Verification commands
 
@@ -84,10 +89,10 @@ With `TEST_DATABASE_URL` configured, run the PostgreSQL-gated suites as part of 
 ## Current local evidence
 
 - Golden set v7: 27 passed, 0 failed.
-- Required final-review focused suite: 193 passed, 1 skipped.
-- Full backend suite: 882 passed, 10 skipped, 1 warning.
+- Required second final-review focused suite: 521 passed, 0 skipped.
+- Full backend suite: 1,193 passed, 10 skipped, 1 warning.
 - Decision-safety certification: all 18 cases ran and passed; no certification case was skipped.
-- Frontend: 58 test files and 259 tests passed; lint and production build passed.
+- Frontend: 58 test files and 271 tests passed; lint and production build passed.
 - Readiness code checks: golden set, migration presence, and proposal-only Meta mutation paths passed.
 - Direct database readiness: blocked by missing DSN (`ready: false`, expected in this workspace).
 - Target migration application, RLS enforcement, UUID/JSON codecs, triggers, foreign keys, and transactional race behavior: not certified locally.
@@ -128,20 +133,30 @@ Observed on 2026-07-20 from this worktree:
 
 ```bash
 cd backend && pytest -q tests/evaluation_v2 \
+  tests/test_evaluation_manifest.py \
+  tests/test_policy_compiler.py \
+  tests/test_policy_store.py \
+  tests/test_partner_decision_fallback.py \
   tests/test_on_demand_lookup_independent.py \
+  tests/test_pipeline_execution_contract.py \
+  tests/test_pipeline_execution_semantics.py \
   tests/test_api_worker_prerequisites.py \
   tests/jobs/test_job_handlers.py \
-  tests/test_partner_decision_fallback.py \
-  tests/test_partner_flow.py \
-  tests/test_policy_store.py \
-  tests/test_policy_compiler.py
-# 193 passed, 1 skipped in 2.36s
+  tests/monitoring/test_monitoring_repository_unit.py
+# 521 passed in 2.79s
 
 cd backend && pytest -q
-# 882 passed, 10 skipped, 1 warning in 10.22s
+# 1,193 passed, 10 skipped, 1 warning in 10.04s
+
+cd backend && pytest -q -rs
+# 1,193 passed, 10 environment-gated skips, 1 warning in 10.30s
+
+cd backend && pytest -q \
+  tests/evaluation_v2/test_decision_safety_certification.py -rs
+# 18 passed, 0 skipped in 0.09s
 
 cd app-front-end && npm test -- --run
-# 58 test files passed; 259 tests passed in 10.50s
+# 58 test files passed; 271 tests passed in 8.51s
 
 cd app-front-end && npm run lint
 # exit 0
@@ -156,9 +171,8 @@ cd backend && python3 scripts/check_phase8_readiness.py --json
 # code checks passed; direct_database_dsn blocked; ready=false; exit 1
 ```
 
-Skip inspection with `pytest -q -rs`: the one focused skip is the live
-`test_partner_flow.py` integration, which requires `OPENAI_API_KEY` and an
-explicit tenant. The 10 full-suite skips are six target-PostgreSQL cases (one
+Skip inspection with `pytest -q -rs`: the focused suite has no skips. The 10
+full-suite skips are six target-PostgreSQL cases (one
 Fund Intelligence repository case, two identity repository cases, two job
 repository cases, and the Phase 1 acceptance case) plus four live integrations
 (`test_end_to_end.py`, `test_partner_flow.py`, `test_portfolio_layer.py`, and
