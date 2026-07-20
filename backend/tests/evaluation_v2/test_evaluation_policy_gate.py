@@ -1,4 +1,6 @@
 from copy import deepcopy
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -75,50 +77,11 @@ def _decision_safety():
 
 
 def _partner_rules():
-    return {
-        "version": "rules-v3",
-        "score_thresholds": {
-            "min_avg_strong_yes": 8,
-            "min_avg_pass": 5.5,
-            "min_avg_medium_maybe": 7,
-            "min_avg_borderline_low": 5.5,
-            "max_avg_borderline_high": 7,
-            "grey_zone_min": 6.5,
-            "grey_zone_max": 7.5,
-            "boundary_semantics": {
-                "advance": "greater_than_or_equal",
-                "pass": "less_than",
-            },
-            "minimum_scored_weight": 0.5,
-        },
-        "decision_safety": _decision_safety(),
-        "critical_risk_keywords": ["regulatory ban"],
-        "red_flag_keywords": ["missing"],
-        "missing_qualitative_keywords": ["[missing]"],
-        "assumption_risk_keywords": ["unvalidated assumption"],
-        "next_actions": {
-            "critical_risks": "Pass - critical risk",
-            "low_scores": "Pass - low scores",
-            "default_no": "Pass - below criteria",
-            "request_cap_table": "Request cap table",
-            "request_cap_table_and_review": "Request cap table and review",
-            "monitor": "Monitor",
-            "human_review_monitor": "Human review",
-            "human_review_contradictions": "Human review contradictions",
-        },
-        "quality_labels": {
-            "STRONG": "Investment-grade",
-            "MEDIUM": "Promising",
-            "WEAK": "Unproven",
-        },
-        "verdict_rules": {"WEAK": {}, "MEDIUM": {}, "STRONG": {}},
-        "contradictory_scores": {
-            "min_gap": 4,
-            "high_threshold": 8,
-            "low_threshold": 4,
-        },
-        "llm_fallback_triggers": {"grey_zone_deep_dive": True},
-    }
+    path = (
+        Path(__file__).resolve().parents[3]
+        / "resources/config/partner_rules/v3.json"
+    )
+    return json.loads(path.read_text())
 
 
 def test_compiled_published_policy_maps_to_evidence_evaluation_contract():
@@ -129,9 +92,9 @@ def test_compiled_published_policy_maps_to_evidence_evaluation_contract():
 
     assert policy.policy_version_id == "policy-live"
     assert policy.policy_hash == "hash-live"
-    assert policy.partner_rules_version == "rules-v3"
+    assert policy.partner_rules_version == "3.0"
     assert policy.advance_threshold == 8
-    assert policy.pass_threshold == 5.5
+    assert policy.pass_threshold == 6
     assert sum(item.weight for item in policy.criteria) == pytest.approx(1)
     market = next(item for item in policy.criteria if item.criterion == "market")
     assert {"market", "market_quality", "tam", "urgency"}.issubset(market.claim_types)
@@ -144,8 +107,8 @@ def test_compiled_policy_carries_versioned_decision_safety_contract():
     )
 
     assert policy.decision_safety.evidence_eligibility.min_support_strength == 0.5
-    assert policy.decision_safety.critical_risk_claim_types == ["critical_risk"]
-    assert policy.hard_exclusion_claim_types == ["mandate_exclusion"]
+    assert "critical_risk" in policy.decision_safety.critical_risk_claim_types
+    assert "mandate_exclusion" in policy.hard_exclusion_claim_types
 
 
 def test_missing_decision_safety_config_fails_closed():
@@ -268,7 +231,7 @@ async def test_evaluate_endpoint_uses_active_thesis_and_published_policy(monkeyp
             thesis_context={"version_id": "thesis-live"},
             thesis_version_id="thesis-live",
             compiled_scoring_policy=_compiled_policy(),
-            partner_rules={"version": "rules-v2"},
+            partner_rules=_partner_rules(),
             fund_config={},
             policy=policy,
         )

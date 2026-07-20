@@ -2,6 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from core.policy_resolver import get_partner_rules
+from evaluation_v2.partner_rules import parse_partner_rules
 from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     EvaluationPrerequisites,
@@ -86,7 +88,7 @@ def _prerequisites(
             "policy_version_id": policy_version_id,
             "policy_hash": policy_hash,
         },
-        partner_rules={"version": "rules-live"},
+        partner_rules=parse_partner_rules(get_partner_rules()),
         fund_config={},
         policy=SimpleNamespace(
             policy_version_id=policy_version_id,

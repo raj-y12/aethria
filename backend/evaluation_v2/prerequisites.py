@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict
 
 from core.policy_resolver import get_partner_rules
 from evaluation_v2.models import EvaluationPolicy
+from evaluation_v2.partner_rules import PartnerRules, parse_partner_rules
 from evaluation_v2.policy import evaluation_policy_from_compiled
 from fund_thesis import (
     FundThesisError,
@@ -36,9 +37,18 @@ class EvaluationPrerequisites:
     thesis_context: Dict[str, Any]
     thesis_version_id: str
     compiled_scoring_policy: Dict[str, Any]
-    partner_rules: Dict[str, Any]
+    partner_rules: PartnerRules
     fund_config: Dict[str, Any]
     policy: EvaluationPolicy
+
+    def __post_init__(self) -> None:
+        # Direct construction is used by engine tests and adapters. Preserve the
+        # same parse-once invariant as the production loader at that boundary.
+        object.__setattr__(
+            self,
+            "partner_rules",
+            parse_partner_rules(self.partner_rules),
+        )
 
     @property
     def dependency_identity(self) -> Dict[str, str]:
@@ -230,7 +240,7 @@ async def load_evaluation_prerequisites(
     exact_fund_config = compiled["decision_inputs"]
 
     try:
-        rules = await resolve_rules()
+        rules = parse_partner_rules(await resolve_rules())
         policy = evaluation_policy_from_compiled(compiled, partner_rules=rules)
     except Exception as exc:
         raise EvaluationPrerequisiteError(

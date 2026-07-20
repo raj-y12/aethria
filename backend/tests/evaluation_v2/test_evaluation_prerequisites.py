@@ -8,6 +8,7 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     load_evaluation_prerequisites,
 )
+from evaluation_v2.partner_rules import partner_rules_document
 from fund_thesis import FundThesisMissingError
 from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.scoring.policy_store import PolicyNotPublishedError
@@ -97,7 +98,7 @@ async def test_prerequisites_retain_exact_tenant_bound_execution_inputs():
     assert prerequisites.thesis_version_id == "thesis-live"
     assert prerequisites.thesis_context == thesis_context
     assert prerequisites.compiled_scoring_policy == compiled
-    assert prerequisites.partner_rules == rules
+    assert partner_rules_document(prerequisites.partner_rules) == rules
     assert prerequisites.fund_config == compiled["decision_inputs"]
     prerequisites.require_tenant(" user-a ", context="test handoff")
     with pytest.raises(RuntimeError, match="tenant"):

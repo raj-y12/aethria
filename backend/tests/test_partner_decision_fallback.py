@@ -2,6 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from evaluation_v2.partner_rules import parse_partner_rules, partner_rules_document
+
 from partner.decision import PartnerDecisionEngine
 
 
@@ -225,26 +227,14 @@ def test_invalid_critical_risk_policy_fails_closed_before_score_decision(
     policy_present, policy_value
 ):
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
-    engine._rules = dict(engine._rules)
+    rules = partner_rules_document(engine._rules)
     if policy_present:
-        engine._rules["critical_risk_keywords"] = policy_value
+        rules["critical_risk_keywords"] = policy_value
     else:
-        engine._rules.pop("critical_risk_keywords", None)
-    review = _base_review()
-    review.update(
-        {
-            "verdict": "STRONG",
-            "market_score": 9,
-            "product_score": 9,
-            "technical_score": 9,
-            "execution_score": 9,
-            "defensibility_score": 9,
-            "key_risks": ["Regulatory ban risk in primary market"],
-        }
-    )
+        rules.pop("critical_risk_keywords", None)
 
     with pytest.raises(ValueError, match="critical_risk_keywords"):
-        engine.decide(_base_scout(), review)
+        parse_partner_rules(rules)
 
 
 def test_monitor_and_invest_paths_use_consistent_professional_tone():
@@ -464,8 +454,7 @@ def test_missing_critical_qualitative_triggers_llm():
 
 def test_reviewer_disagreement_trigger_llm():
     engine = PartnerDecisionEngine(use_llm_fallback=True, api_key=None)
-    # Ensure policy enables this trigger for the test.
-    engine._rules.setdefault("llm_fallback_triggers", {})["reviewer_disagreement"] = True
+    assert engine._rules.llm_fallback_triggers.reviewer_disagreement is True
     review = _base_review()
     review["reviewer_disagreement"] = True
 
@@ -628,7 +617,9 @@ def test_scout_biggest_unknown_alone_does_not_trigger_llm_escalation():
     engine = PartnerDecisionEngine(use_llm_fallback=True, api_key=None)
     # Disable grey-zone deep dive so the test only validates the biggest_unknown behaviour,
     # not the new grey-zone trigger (avg_score=7.0 would otherwise sit inside [6.5, 7.5]).
-    engine._rules.setdefault("llm_fallback_triggers", {})["grey_zone_deep_dive"] = False
+    rules = partner_rules_document(engine._rules)
+    rules["llm_fallback_triggers"]["grey_zone_deep_dive"] = False
+    engine._rules = parse_partner_rules(rules)
     scout = {**_base_scout(), "biggest_unknown": "Enterprise sales cycle length unproven"}
     review = _base_review()
     review.update(

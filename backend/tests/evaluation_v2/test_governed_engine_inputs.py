@@ -401,6 +401,7 @@ def test_governed_partner_uses_same_explicit_decisive_boundaries_as_canonical_po
     rules = _partner_rules()
     rules["score_thresholds"]["min_avg_pass"] = 5.5
     rules["score_thresholds"]["min_avg_strong_yes"] = 7.7
+    rules["verdict_rules"]["STRONG"]["min_avg_for_yes"] = 7.7
     rules["decision_safety"]["claim_confidence"][
         "score_cap_below_full_confidence"
     ] = 7.69

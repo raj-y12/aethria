@@ -243,8 +243,16 @@ def test_attributed_operator_claim_is_score_eligible_when_policy_allows_it():
         claim["assertion_class"] = "operator_asserted"
         claim["operator_attribution"] = "investment-committee-review-2026-07-20"
     policy = _policy()
-    policy.decision_safety.evidence_eligibility.allowed_assertion_classes.append(
-        "operator_asserted"
+    eligibility = policy.decision_safety.evidence_eligibility.model_copy(
+        update={
+            "allowed_assertion_classes": (
+                *policy.decision_safety.evidence_eligibility.allowed_assertion_classes,
+                "operator_asserted",
+            )
+        }
+    )
+    policy.decision_safety = policy.decision_safety.model_copy(
+        update={"evidence_eligibility": eligibility}
     )
     snapshot, _ = snapshot_claims(claims, links=[])
 
@@ -257,8 +265,16 @@ def test_unattributed_operator_claim_is_unscored():
     claims = _claims()
     claims[0]["assertion_class"] = "operator_asserted"
     policy = _policy()
-    policy.decision_safety.evidence_eligibility.allowed_assertion_classes.append(
-        "operator_asserted"
+    eligibility = policy.decision_safety.evidence_eligibility.model_copy(
+        update={
+            "allowed_assertion_classes": (
+                *policy.decision_safety.evidence_eligibility.allowed_assertion_classes,
+                "operator_asserted",
+            )
+        }
+    )
+    policy.decision_safety = policy.decision_safety.model_copy(
+        update={"evidence_eligibility": eligibility}
     )
     snapshot, _ = snapshot_claims(claims, links=[])
 
@@ -297,7 +313,9 @@ def test_hard_exclusion_is_deterministic_pass_with_driver():
         }
     ]
     policy = _policy()
-    policy.decision_safety.hard_exclusion_claim_types = ["excluded_sector"]
+    policy.decision_safety = policy.decision_safety.model_copy(
+        update={"hard_exclusion_claim_types": ["excluded_sector"]}
+    )
     snapshot, _ = snapshot_claims(claims, links=[_verified_link("claim-exclusion")])
 
     result = evaluate_snapshot(snapshot, policy)
@@ -322,7 +340,9 @@ def test_grounded_critical_risk_forces_pass_despite_high_supported_scores():
     for claim in claims[:2]:
         claim["normalized_value"] = {"criterion_score": 9.0}
     policy = _policy()
-    policy.decision_safety.critical_risk_claim_types = ["critical_risk"]
+    policy.decision_safety = policy.decision_safety.model_copy(
+        update={"critical_risk_claim_types": ["critical_risk"]}
+    )
     snapshot, _ = snapshot_claims(
         claims,
         links=[
@@ -354,7 +374,9 @@ def test_ungrounded_critical_risk_is_uncertainty_not_an_automatic_pass():
     for claim in claims[:2]:
         claim["normalized_value"] = {"criterion_score": 9.0}
     policy = _policy()
-    policy.decision_safety.critical_risk_claim_types = ["critical_risk"]
+    policy.decision_safety = policy.decision_safety.model_copy(
+        update={"critical_risk_claim_types": ["critical_risk"]}
+    )
     snapshot, _ = snapshot_claims(
         claims,
         links=[_verified_link("claim-market"), _verified_link("claim-execution")],

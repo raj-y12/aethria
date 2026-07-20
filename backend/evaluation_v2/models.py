@@ -3,9 +3,25 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictFloat,
+    StrictInt,
+    StringConstraints,
+    model_validator,
+)
+
+
+_PolicyNumber = StrictInt | StrictFloat
+_PolicyString = Annotated[
+    str,
+    StringConstraints(strict=True, strip_whitespace=True, min_length=1),
+]
 
 
 class RecommendationState(str, Enum):
@@ -23,19 +39,25 @@ class CriterionRule(BaseModel):
 
 
 class EvidenceEligibilityPolicy(BaseModel):
-    allowed_assertion_classes: List[str] = Field(min_length=1)
-    allowed_relationships: List[str] = Field(min_length=1)
-    require_verified_evidence: bool
-    min_support_strength: float = Field(ge=0, le=1)
-    min_source_quality: float = Field(ge=0, le=1)
-    blocked_trust_classes: List[str] = Field(min_length=1)
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    allowed_assertion_classes: tuple[_PolicyString, ...] = Field(min_length=1)
+    allowed_relationships: tuple[_PolicyString, ...] = Field(min_length=1)
+    require_verified_evidence: StrictBool
+    min_support_strength: _PolicyNumber = Field(ge=0, le=1)
+    min_source_quality: _PolicyNumber = Field(ge=0, le=1)
+    blocked_trust_classes: tuple[_PolicyString, ...] = Field(min_length=1)
 
 
 class ClaimConfidencePolicy(BaseModel):
-    minimum_eligible: float = Field(gt=0, le=1)
-    full_confidence_at: float = Field(gt=0, le=1)
-    score_cap_below_full_confidence: float = Field(ge=0, le=10)
-    recommendation_confidence_cap_below_full_confidence: float = Field(ge=0, lt=1)
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    minimum_eligible: _PolicyNumber = Field(gt=0, le=1)
+    full_confidence_at: _PolicyNumber = Field(gt=0, le=1)
+    score_cap_below_full_confidence: _PolicyNumber = Field(ge=0, le=10)
+    recommendation_confidence_cap_below_full_confidence: _PolicyNumber = Field(
+        ge=0, lt=1
+    )
     zero_confidence_ineligible: Literal[True]
 
     @model_validator(mode="after")
@@ -46,19 +68,25 @@ class ClaimConfidencePolicy(BaseModel):
 
 
 class FreshnessPolicy(BaseModel):
-    max_age_days: int = Field(gt=0)
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    max_age_days: StrictInt = Field(gt=0)
     expired_action: Literal["ineligible"]
     undated_action: Literal["ineligible"]
     future_dated_action: Literal["ineligible"]
     stale_action: Literal["cap"]
-    stale_score_cap: float = Field(ge=0, le=10)
-    stale_confidence_cap: float = Field(ge=0, lt=1)
+    stale_score_cap: _PolicyNumber = Field(ge=0, le=10)
+    stale_confidence_cap: _PolicyNumber = Field(ge=0, lt=1)
 
 
 class SourceQualityPolicy(BaseModel):
-    full_confidence_at: float = Field(ge=0, le=1)
-    score_cap_below_full_quality: float = Field(ge=0, le=10)
-    recommendation_confidence_cap_below_full_quality: float = Field(ge=0, lt=1)
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    full_confidence_at: _PolicyNumber = Field(ge=0, le=1)
+    score_cap_below_full_quality: _PolicyNumber = Field(ge=0, le=10)
+    recommendation_confidence_cap_below_full_quality: _PolicyNumber = Field(
+        ge=0, lt=1
+    )
 
 
 class ScoreEligibility(BaseModel):
@@ -69,9 +97,11 @@ class ScoreEligibility(BaseModel):
 
 
 class DecisionSafetyPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
     evidence_eligibility: EvidenceEligibilityPolicy
-    critical_risk_claim_types: List[str] = Field(min_length=1)
-    hard_exclusion_claim_types: List[str] = Field(min_length=1)
+    critical_risk_claim_types: tuple[_PolicyString, ...] = Field(min_length=1)
+    hard_exclusion_claim_types: tuple[_PolicyString, ...] = Field(min_length=1)
     claim_confidence: ClaimConfidencePolicy
     freshness: FreshnessPolicy
     source_quality: SourceQualityPolicy
