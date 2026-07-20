@@ -89,6 +89,14 @@ def test_evaluation_v2_compatibility_delegates_to_canonical_mapping():
     assert "RecommendationState.PASS" not in source
 
 
+def test_insufficient_evidence_compatibility_requires_human_review():
+    assert compatibility.recommendation_to_legacy("insufficient_evidence") == {
+        "recommendation": "MONITOR",
+        "human_review_required": True,
+        "compatibility_reason": "insufficient_evidence",
+    }
+
+
 @pytest.mark.parametrize(
     "adapter,value",
     [

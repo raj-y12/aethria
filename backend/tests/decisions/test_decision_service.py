@@ -32,6 +32,14 @@ def test_no_recommendation_cannot_be_overridden():
     ) is None
 
 
+def test_blank_recommendation_cannot_be_overridden():
+    assert classify_override(
+        recommendation="   ",
+        ruling=HumanRulingDecision.PASS,
+        requested=OverrideType.TIMING,
+    ) is None
+
+
 def test_advance_to_invest_is_lifecycle_progression_not_override():
     assert classify_override(
         recommendation="advance",

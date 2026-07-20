@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RecommendationState } from '../../../api/evaluations';
 
 const api = vi.hoisted(() => ({ createHumanRuling: vi.fn() }));
 
@@ -11,18 +12,35 @@ vi.mock('../../../api/decisions', async (original) => ({
 
 import HumanRulingComposer from '../HumanRulingComposer';
 
-function renderComposer(recommendedDecision?: 'advance' | 'monitor' | 'pass' | 'invest') {
-  const queryClient = new QueryClient({
+type ComposerProps = {
+  opportunityId: string;
+  recommendationId: string | null;
+  recommendedDecision?: RecommendationState | null;
+};
+
+const initialProps: ComposerProps = {
+  opportunityId: 'opportunity-1',
+  recommendationId: 'recommendation-1',
+};
+
+function createQueryClient() {
+  return new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+}
+
+function composer(props: ComposerProps, queryClient: QueryClient) {
+  return (
     <QueryClientProvider client={queryClient}>
-      <HumanRulingComposer
-        opportunityId="opportunity-1"
-        recommendationId="recommendation-1"
-        recommendedDecision={recommendedDecision}
-      />
-    </QueryClientProvider>,
+      <HumanRulingComposer {...props} />
+    </QueryClientProvider>
+  );
+}
+
+function renderComposer(recommendedDecision?: RecommendationState) {
+  const queryClient = createQueryClient();
+  return render(
+    composer({ ...initialProps, recommendedDecision }, queryClient),
   );
 }
 
@@ -60,5 +78,40 @@ describe('HumanRulingComposer', () => {
 
     expect(screen.getByRole('button', { name: 'Advance' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Commit ruling' })).toBeDisabled();
+  });
+
+  it.each([
+    ['opportunity identity', { opportunityId: 'opportunity-2' }, 'Advance'],
+    ['recommendation identity', { recommendationId: 'recommendation-2' }, 'Advance'],
+    ['recommendation state', { recommendedDecision: 'monitor' as const }, 'Monitor'],
+  ])('clears draft state at the %s boundary', (_boundary, changedProps, expectedDecision) => {
+    const queryClient = createQueryClient();
+    const props: ComposerProps = { ...initialProps, recommendedDecision: 'advance' };
+    const view = render(composer(props, queryClient));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pass' }));
+    fireEvent.change(screen.getByLabelText('Ruling rationale'), {
+      target: { value: 'This rationale belongs only to opportunity A.' },
+    });
+    fireEvent.change(screen.getByLabelText('Override attribution'), {
+      target: { value: 'timing' },
+    });
+
+    view.rerender(composer({ ...props, ...changedProps }, queryClient));
+
+    expect(screen.getByRole('button', { name: expectedDecision })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('Ruling rationale')).toHaveValue('');
+    expect(screen.queryByLabelText('Override attribution')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pass' }));
+    expect(screen.getByLabelText('Override attribution')).toHaveValue('');
+  });
+
+  it('does not preselect a ruling for insufficient evidence', () => {
+    renderComposer('insufficient_evidence');
+
+    for (const label of ['Advance', 'Monitor', 'Pass', 'Invest']) {
+      expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'false');
+    }
   });
 });

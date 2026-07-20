@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchOpportunityByLegacyStartup } from '../../api/identity';
 import { fetchEvidenceLedger } from '../../api/evidence';
-import { fetchCurrentEvaluation } from '../../api/evaluations';
+import { fetchCurrentEvaluation, type RecommendationState } from '../../api/evaluations';
 import {
   listHumanRulings,
   type HumanRuling,
@@ -122,14 +122,8 @@ export default function OpportunityIntelligence({
 
   const recommendationId = opportunity.data?.current_recommendation_id
     ?? nestedString(evaluation.data?.recommendation, 'recommendation_id');
-  const recommendationState: string | undefined = evaluation.data?.recommendation?.recommended_state;
-  const recommendedDecision: HumanRulingDecision | null =
-    recommendationState === 'invest'
-      || recommendationState === 'monitor'
-      || recommendationState === 'pass'
-      || recommendationState === 'advance'
-      ? recommendationState
-      : null;
+  const recommendedDecision: RecommendationState | null =
+    evaluation.data?.recommendation?.recommended_state ?? null;
 
   // A recommendation only earns the panel when it actually gives reasons —
   // insufficient-evidence husks (0% confidence, no drivers, no risks) stay hidden.
