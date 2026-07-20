@@ -6,6 +6,7 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     EvaluationPrerequisites,
 )
+from fund_thesis import FundThesisMissingError
 from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
 
 
@@ -300,6 +301,71 @@ async def test_direct_pipeline_cycle_reuses_supplied_prerequisites(monkeypatch):
 
     assert calls[0][0] == "user_123"
     assert calls[0][1]["evaluation_prerequisites"] is prerequisites
+
+
+@pytest.mark.asyncio
+async def test_periodic_continuity_missing_thesis_remains_operator_correctable(
+    monkeypatch,
+):
+    prerequisites = EvaluationPrerequisites(
+        thesis_version_id="thesis-v1",
+        policy=SimpleNamespace(
+            policy_version_id="policy-live",
+            policy_hash="hash-live",
+        ),
+    )
+
+    def missing_thesis(_user_id):
+        raise FundThesisMissingError("active thesis disappeared")
+
+    monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "pipeline_runner.load_settings",
+        lambda user_id, *, use_cache=False: {
+            "agent_config": {"scouts_enabled": True}
+        },
+    )
+    monkeypatch.setattr("pipeline_runner._build_storage_sync", lambda user_id: object())
+    monkeypatch.setattr("pipeline_runner._load_active_thesis_sync", missing_thesis)
+
+    with pytest.raises(EvaluationPrerequisiteError) as exc:
+        await run_one_pipeline_cycle(
+            "user_123",
+            evaluation_prerequisites=prerequisites,
+        )
+
+    assert exc.value.code == "thesis_required"
+    assert "Settings" in exc.value.recovery_action
+
+
+@pytest.mark.asyncio
+async def test_lookup_continuity_missing_thesis_remains_operator_correctable(
+    monkeypatch,
+):
+    _wire_common_engines(monkeypatch)
+    prerequisites = EvaluationPrerequisites(
+        thesis_version_id="thesis-v1",
+        policy=SimpleNamespace(
+            policy_version_id="policy-live",
+            policy_hash="hash-live",
+        ),
+    )
+
+    def missing_thesis(_user_id):
+        raise FundThesisMissingError("active thesis disappeared")
+
+    monkeypatch.setattr("pipeline_runner._load_active_thesis_sync", missing_thesis)
+
+    with pytest.raises(EvaluationPrerequisiteError) as exc:
+        await run_on_demand_lookup(
+            "user_123",
+            "Acme",
+            evaluation_prerequisites=prerequisites,
+        )
+
+    assert exc.value.code == "thesis_required"
+    assert "Settings" in exc.value.recovery_action
 
 
 @pytest.mark.asyncio

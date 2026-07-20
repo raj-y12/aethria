@@ -583,6 +583,12 @@ async def _run_one_pipeline_cycle_inner(
                 logger.info("[%s] Backfilled active thesis embedding", user_id[:12])
     except EvaluationPrerequisiteError:
         raise
+    except FundThesisMissingError as exc:
+        raise EvaluationPrerequisiteError(
+            code="thesis_required",
+            detail="An active fund thesis is required before evaluation.",
+            recovery_action="Create and publish the fund thesis in Settings.",
+        ) from exc
     except FundThesisIncompleteError as exc:
         raise EvaluationPrerequisiteError(
             code="thesis_required",
@@ -981,6 +987,12 @@ async def _run_on_demand_lookup_inner(
     # use the exact active mandate admitted by the prerequisite gate.
     try:
         active = await asyncio.to_thread(_load_active_thesis_sync, user_id)
+    except FundThesisMissingError as exc:
+        raise EvaluationPrerequisiteError(
+            code="thesis_required",
+            detail="An active fund thesis is required before evaluation.",
+            recovery_action="Create and publish the fund thesis in Settings.",
+        ) from exc
     except FundThesisIncompleteError as exc:
         raise EvaluationPrerequisiteError(
             code="thesis_required",

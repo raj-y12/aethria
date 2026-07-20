@@ -116,6 +116,33 @@ async def test_governed_policy_uses_exact_hash_bound_version_without_legacy_fall
 
 
 @pytest.mark.asyncio
+async def test_governed_not_found_uses_legacy_published_policy():
+    calls = []
+
+    class Repository:
+        async def get_active_published_policy(self, *, user_id):
+            assert user_id == "user-a"
+            raise LookupError("no governed policy for tenant")
+
+    def legacy_policy(user_id):
+        calls.append(user_id)
+        return _compiled_policy()
+
+    prerequisites = await load_evaluation_prerequisites(
+        user_id="user-a",
+        fund_intelligence_repository=Repository(),
+        load_thesis=lambda _: SimpleNamespace(version_id="thesis-live"),
+        load_policy=legacy_policy,
+        load_partner_rules=_partner_rules,
+    )
+
+    assert calls == ["user-a"]
+    assert prerequisites.thesis_version_id == "thesis-live"
+    assert prerequisites.policy.policy_version_id == "policy-live"
+    assert prerequisites.policy.policy_hash == "hash-live"
+
+
+@pytest.mark.asyncio
 async def test_missing_thesis_has_operator_recovery():
     with pytest.raises(EvaluationPrerequisiteError) as exc:
         await load_evaluation_prerequisites(

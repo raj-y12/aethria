@@ -22,6 +22,9 @@ from supabase_client import get_service_client
 from tenant_context import require_user_id
 
 
+_GOVERNED_POLICY_NOT_FOUND = object()
+
+
 @dataclass(frozen=True)
 class EvaluationPrerequisites:
     thesis_version_id: str
@@ -102,6 +105,7 @@ async def load_evaluation_prerequisites(
 
     compiled: Dict[str, Any] | None = None
     if fund_intelligence_repository is not None:
+        governed: Any = _GOVERNED_POLICY_NOT_FOUND
         try:
             governed = (
                 await fund_intelligence_repository.get_active_published_policy(
@@ -109,7 +113,7 @@ async def load_evaluation_prerequisites(
                 )
             )
         except LookupError:
-            governed = None
+            pass
         except Exception as exc:
             raise EvaluationPrerequisiteError(
                 code="prerequisite_unavailable",
@@ -122,7 +126,7 @@ async def load_evaluation_prerequisites(
                 detail="The governed policy store returned an invalid response.",
                 recovery_action="Retry after the policy store is available.",
             )
-        if governed is not None:
+        if governed is not _GOVERNED_POLICY_NOT_FOUND:
             try:
                 compiled = await asyncio.to_thread(
                     compile_policy_from_fund_config,
