@@ -1,19 +1,17 @@
 """Executable safety certification over the canonical decision contracts."""
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Literal
 
 import pytest
 
 from decisions.models import HumanRulingDecision
 from decisions.service import classify_override
-from evaluation_v2.models import (
-    CriterionRule,
-    DecisionSafetyPolicy,
-    EvaluationPolicy,
-    EvidenceEligibilityPolicy,
-)
+from evaluation_v2.models import EvaluationPolicy
+from evaluation_v2.policy import evaluation_policy_from_compiled
 from evaluation_v2.service import evaluate_snapshot
 from utils.partner_codes import legacy_ruling_from_institutional
 
@@ -200,59 +198,27 @@ def _snapshot_for(name: str) -> list[dict[str, object]]:
 
 
 def _safety_policy() -> EvaluationPolicy:
-    eligibility = EvidenceEligibilityPolicy(
-        allowed_assertion_classes=["externally_verified", "operator_asserted"],
-        allowed_relationships=["supports", "partially_establishes"],
-        require_verified_evidence=True,
-        min_support_strength=0.5,
-        min_source_quality=0.4,
-        blocked_trust_classes=["model", "unknown"],
+    partner_rules_path = (
+        Path(__file__).resolve().parents[3]
+        / "resources/config/partner_rules/v3.json"
     )
-    safety = DecisionSafetyPolicy(
-        evidence_eligibility=eligibility,
-        critical_risk_claim_types=["critical_risk"],
-        hard_exclusion_claim_types=["mandate_exclusion"],
-        claim_confidence={
-            "minimum_eligible": 0.5,
-            "full_confidence_at": 0.8,
-            "score_cap_below_full_confidence": 7.49,
-            "recommendation_confidence_cap_below_full_confidence": 0.6,
-            "zero_confidence_ineligible": True,
+    partner_rules = json.loads(partner_rules_path.read_text())
+    return evaluation_policy_from_compiled(
+        {
+            "policy_version_id": "policy-safety-v1",
+            "policy_hash": "policy-safety-hash",
+            "dimensions": {
+                "market": {
+                    "weight": 0.6,
+                    "criteria": [{"id": "market", "source_components": []}],
+                },
+                "execution": {
+                    "weight": 0.4,
+                    "criteria": [{"id": "execution", "source_components": []}],
+                },
+            },
         },
-        freshness={
-            "max_age_days": 180,
-            "expired_action": "ineligible",
-            "undated_action": "ineligible",
-            "future_dated_action": "ineligible",
-            "stale_action": "cap",
-            "stale_score_cap": 7.49,
-            "stale_confidence_cap": 0.6,
-        },
-        source_quality={
-            "full_confidence_at": 0.8,
-            "score_cap_below_full_quality": 7.49,
-            "recommendation_confidence_cap_below_full_quality": 0.65,
-        },
-    )
-    return EvaluationPolicy(
-        policy_version_id="policy-safety-v1",
-        policy_hash="policy-safety-hash",
-        rubric_version="rubric-safety-v1",
-        partner_rules_version="2.0",
-        partner_rules_hash="partner-rules-v2-hash",
-        criteria=[
-            CriterionRule(criterion="market", claim_types=["market"], weight=0.6),
-            CriterionRule(
-                criterion="execution", claim_types=["execution"], weight=0.4
-            ),
-        ],
-        advance_threshold=7.5,
-        pass_threshold=4.0,
-        advance_comparison="greater_than_or_equal",
-        pass_comparison="less_than",
-        minimum_scored_weight=0.5,
-        hard_exclusion_claim_types=["mandate_exclusion"],
-        decision_safety=safety,
+        partner_rules=partner_rules,
     )
 
 
