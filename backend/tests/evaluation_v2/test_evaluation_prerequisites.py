@@ -14,30 +14,17 @@ from services.scoring.policy_store import PolicyNotPublishedError
 
 
 def _compiled_policy():
-    return {
-        "policy_version_id": "policy-live",
-        "policy_hash": "hash-live",
-        "dimensions": {
-            "market": {
-                "weight": 60,
-                "criteria": [
-                    {
-                        "id": "market_quality",
-                        "source_components": ["tam", "urgency"],
-                    }
-                ],
-            },
-            "execution": {
-                "weight": 40,
-                "criteria": [
-                    {
-                        "id": "founder_execution",
-                        "source_components": ["traction", "operational_velocity"],
-                    }
-                ],
-            },
+    compiled = compile_policy_from_fund_config(
+        {
+            "scoringWeights": [
+                {"key": "market", "weight": 60},
+                {"key": "execution", "weight": 40},
+            ],
         },
-    }
+        require_publish_ready=True,
+    )
+    compiled["policy_version_id"] = "policy-live"
+    return compiled
 
 
 def _partner_rules():
@@ -73,7 +60,7 @@ async def test_resolves_exact_active_thesis_and_legacy_published_policy():
     assert calls == [("thesis", "user-a"), ("policy", "user-a")]
     assert prerequisites.thesis_version_id == "thesis-live"
     assert prerequisites.policy.policy_version_id == "policy-live"
-    assert prerequisites.policy.policy_hash == "hash-live"
+    assert prerequisites.policy.policy_hash == _compiled_policy()["policy_hash"]
     assert prerequisites.policy.partner_rules_version == "rules-v3"
 
 
@@ -95,22 +82,15 @@ async def test_prerequisites_retain_exact_tenant_bound_execution_inputs():
     )
     compiled = _compiled_policy()
     rules = _partner_rules()
-    fund_config = {
-        "activePolicyVersionId": "policy-live",
-        "publishedPolicyHash": "hash-live",
-        "scoreBands": [
-            {"id": "pass", "min": 0, "max": 59, "label": "Pass"},
-            {"id": "invest", "min": 60, "max": 100, "label": "Invest"},
-        ],
-    }
-
     prerequisites = await load_evaluation_prerequisites(
         user_id=" user-a ",
         fund_intelligence_repository=None,
         load_thesis=lambda _user_id: thesis,
         load_policy=lambda _user_id: compiled,
         load_partner_rules=lambda: rules,
-        load_fund_config=lambda user_id: fund_config,
+        load_fund_config=lambda _user_id: (_ for _ in ()).throw(
+            AssertionError("published decisions must not reload a mutable draft")
+        ),
     )
 
     assert prerequisites.user_id == "user-a"
@@ -118,7 +98,7 @@ async def test_prerequisites_retain_exact_tenant_bound_execution_inputs():
     assert prerequisites.thesis_context == thesis_context
     assert prerequisites.compiled_scoring_policy == compiled
     assert prerequisites.partner_rules == rules
-    assert prerequisites.fund_config == fund_config
+    assert prerequisites.fund_config == compiled["decision_inputs"]
     prerequisites.require_tenant(" user-a ", context="test handoff")
     with pytest.raises(RuntimeError, match="tenant"):
         prerequisites.require_tenant("user-b", context="test handoff")
@@ -177,7 +157,7 @@ async def test_governed_not_found_uses_legacy_published_policy():
     assert calls == ["user-a"]
     assert prerequisites.thesis_version_id == "thesis-live"
     assert prerequisites.policy.policy_version_id == "policy-live"
-    assert prerequisites.policy.policy_hash == "hash-live"
+    assert prerequisites.policy.policy_hash == _compiled_policy()["policy_hash"]
 
 
 @pytest.mark.asyncio
@@ -229,8 +209,44 @@ async def test_production_legacy_loader_binds_exact_published_fund_config(monkey
         ("settings", "user-a", False),
         ("policy", "user-a", settings),
     ]
-    assert prerequisites.fund_config is fund_config
+    assert "decision_inputs" in compiled
+    assert prerequisites.fund_config == compiled["decision_inputs"]
     assert prerequisites.compiled_scoring_policy is compiled
+
+
+@pytest.mark.asyncio
+async def test_published_bundle_isolated_from_current_draft_mutation():
+    published = compile_policy_from_fund_config(
+        {
+            "thresholds": {
+                "autoPass": 39,
+                "monitor": 59,
+                "escalation": 75,
+                "partnerReview": 60,
+            },
+            "scoreBands": [
+                {"id": "pass", "min": 0, "max": 59, "label": "Pass"},
+                {"id": "invest", "min": 80, "max": 100, "label": "Invest"},
+            ],
+        },
+        require_publish_ready=True,
+    )
+    published["policy_version_id"] = "policy-live"
+    draft_loader_calls = []
+
+    prerequisites = await load_evaluation_prerequisites(
+        user_id="user-a",
+        fund_intelligence_repository=None,
+        load_thesis=lambda _: SimpleNamespace(version_id="thesis-live"),
+        load_policy=lambda _: published,
+        load_partner_rules=_partner_rules,
+        load_fund_config=lambda _: draft_loader_calls.append("called") or {
+            "thresholds": {"partnerReview": 99}
+        },
+    )
+
+    assert draft_loader_calls == []
+    assert prerequisites.fund_config == published["decision_inputs"]
 
 
 @pytest.mark.asyncio

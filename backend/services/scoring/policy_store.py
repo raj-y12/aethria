@@ -5,7 +5,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from services.scoring.policy_compiler import compile_policy_from_fund_config
+from services.scoring.policy_compiler import (
+    PolicyValidationError,
+    compile_policy_from_fund_config,
+    validate_compiled_policy_bundle,
+)
 from supabase_doc_store import list_append, list_get_all
 from utils.settings_loader import load_settings, save_settings
 
@@ -54,6 +58,14 @@ def load_published_policy(
         ).strip()
         candidate_hash = str(version.get("policy_hash") or "").strip()
         if candidate_id == active_id and candidate_hash == published_hash:
+            try:
+                validate_compiled_policy_bundle(dict(version))
+            except PolicyValidationError as exc:
+                detail = str(exc).lower()
+                reason = "hash" if "hash" in detail else "complete decision bundle"
+                raise PolicyNotPublishedError(
+                    f"The active published policy has an invalid {reason}"
+                ) from exc
             return dict(version)
     raise PolicyNotPublishedError(
         "The active published scoring policy could not be resolved"
@@ -67,6 +79,10 @@ def publish_policy(user_id: str, fund_config: Dict[str, Any] | None = None) -> D
     existing_versions = list_get_all(POLICY_TABLE, user_id=user_id)
     for version in existing_versions:
         if version.get("policy_hash") == compiled["policy_hash"]:
+            try:
+                validate_compiled_policy_bundle(dict(version))
+            except PolicyValidationError:
+                continue
             active = dict(version)
             _set_active_policy(settings, active, user_id, fund_config=fc)
             return active

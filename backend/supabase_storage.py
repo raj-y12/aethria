@@ -979,8 +979,13 @@ class SupabaseStartupsStorage:
         *,
         investment_memo_markdown: Optional[str] = None,
         pipeline_run_id: Optional[str] = None,
+        dependency_identity: Optional[Dict[str, str]] = None,
     ) -> bool:
         pr = (pipeline_run_id or "").strip() or None
+        if pr and dependency_identity is None:
+            raise ValueError(
+                "dependency_identity is required for evaluation manifest persistence"
+            )
         st = self.get_startup(startup_id)
         if st is None:
             self.logger.error("Startup %s not found for partner decision", startup_id)
@@ -1026,6 +1031,7 @@ class SupabaseStartupsStorage:
                     "reviewer": os.getenv("REVIEWER_MODEL", "gpt-5-nano"),
                     "partner": os.getenv("PARTNER_MODEL", "gpt-5-nano"),
                 },
+                dependency_identity=dependency_identity,
             )
             trace = dict(st.agent_trace) if isinstance(st.agent_trace, dict) else {}
             trace["evaluation_manifest"] = manifest.model_dump(mode="json")

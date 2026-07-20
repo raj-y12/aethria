@@ -87,6 +87,11 @@ class PartnerEngine:
                 )
             fund_thesis = evaluation_prerequisites.thesis_context
         self.evaluation_prerequisites = evaluation_prerequisites
+        self.evaluation_dependency_identity = (
+            evaluation_prerequisites.dependency_identity
+            if evaluation_prerequisites is not None
+            else None
+        )
         self.fund_thesis: Optional[Dict[str, Any]] = fund_thesis
         # Max undecided to process per cycle (ramp: process a solid batch when backlog is high)
         self.batch_max = int(os.getenv("PARTNER_BATCH_MAX", "20"))
@@ -322,11 +327,16 @@ class PartnerEngine:
         partner_info.partner_agent_id = self.agent_id
 
         try:
+            persist_kwargs: Dict[str, Any] = {"pipeline_run_id": pr}
+            if self.evaluation_dependency_identity is not None:
+                persist_kwargs["dependency_identity"] = (
+                    self.evaluation_dependency_identity
+                )
             success = await asyncio.to_thread(
                 self.storage.add_partner_decision,
                 entry_id,
                 partner_info,
-                pipeline_run_id=pr,
+                **persist_kwargs,
             )
         except Exception as e:
             self.logger.error("Partner persist failed for %s: %s", entry_id, e, exc_info=True)

@@ -20,6 +20,65 @@ def test_empty_rubric_compiles_default_policy():
         assert criterion["score_anchors"]["score3"]
 
 
+def _decision_config():
+    return {
+        "thresholds": {
+            "autoPass": 39,
+            "monitor": 59,
+            "escalation": 75,
+            "partnerReview": 60,
+        },
+        "scoreBands": [
+            {"id": "pass", "min": 0, "max": 59, "label": "Pass"},
+            {"id": "monitor", "min": 60, "max": 79, "label": "Monitor"},
+            {"id": "invest", "min": 80, "max": 100, "label": "Invest"},
+        ],
+    }
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda config: config["thresholds"].update({"partnerReview": 61}),
+        lambda config: config["scoreBands"][1].update({"max": 78}),
+        lambda config: config["scoreBands"][2].update({"label": "Proceed"}),
+    ],
+    ids=["threshold", "score-band-boundary", "score-band-outcome"],
+)
+def test_every_consumed_tenant_decision_input_changes_published_hash(mutation):
+    baseline = _decision_config()
+    changed = _decision_config()
+    mutation(changed)
+
+    original = compile_policy_from_fund_config(baseline)
+    modified = compile_policy_from_fund_config(changed)
+
+    assert original["policy_hash"] != modified["policy_hash"]
+    assert original["decision_inputs"] != modified["decision_inputs"]
+
+
+def test_decision_bundle_hash_is_order_and_numeric_format_deterministic():
+    baseline = _decision_config()
+    equivalent = {
+        "thresholds": {
+            "partnerReview": "60.0",
+            "escalation": 75.0,
+            "monitor": "59",
+            "autoPass": 39.0,
+        },
+        "scoreBands": list(reversed(baseline["scoreBands"])),
+        "memo": {"style": "detailed"},
+    }
+
+    original = compile_policy_from_fund_config(baseline)
+    reordered = compile_policy_from_fund_config(equivalent)
+
+    assert reordered.get("decision_inputs") is not None
+    assert original.get("decision_inputs") is not None
+    assert reordered["decision_inputs"] == original["decision_inputs"]
+    assert reordered["policy_hash"] == original["policy_hash"]
+
+
 def test_configured_rubric_compiles_to_dimension_criteria():
     policy = compile_policy_from_fund_config(
         {

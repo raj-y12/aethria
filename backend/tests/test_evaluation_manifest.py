@@ -1,6 +1,4 @@
-import hashlib
 import importlib
-import json
 from unittest.mock import MagicMock
 
 import models
@@ -86,6 +84,16 @@ def _manifest_module():
     return importlib.import_module("evaluation.manifest")
 
 
+def _dependency_identity():
+    return {
+        "policy_version_id": "policy-v7",
+        "policy_hash": "policy-hash-7",
+        "rubric_version": "rubric-v3",
+        "partner_rules_version": "3.0",
+        "partner_rules_hash": "partner-rules-hash-v3",
+    }
+
+
 def test_evaluation_manifest_model_is_the_pydantic_source_of_truth():
     manifest_model = getattr(models, "EvaluationManifest")
 
@@ -106,6 +114,7 @@ def test_manifest_builder_records_models_prompts_policy_and_partner_rules():
             "reviewer": "gpt-5-nano",
             "partner": "gpt-5-mini",
         },
+        dependency_identity=_dependency_identity(),
     )
 
     assert manifest.pipeline_run_id == "pipeline-run-1"
@@ -126,12 +135,40 @@ def test_manifest_builder_records_models_prompts_policy_and_partner_rules():
     assert manifest.policy_hash == "policy-hash-7"
     assert manifest.rubric_version == "rubric-v3"
 
-    rules_path = manifest_module.get_policy_file_path("partner_rules")
-    rules = json.loads(rules_path.read_text())
-    assert rules["version"] == "3.0"
-    assert manifest.partner_rules_version == rules["version"]
-    canonical = json.dumps(rules, sort_keys=True, separators=(",", ":"))
-    assert manifest.partner_rules_hash == hashlib.sha256(canonical.encode()).hexdigest()
+    assert manifest.partner_rules_version == "3.0"
+    assert manifest.partner_rules_hash == "partner-rules-hash-v3"
+
+
+def test_manifest_uses_explicit_consumed_dependency_identity_without_global_reload(
+    monkeypatch,
+):
+    manifest_module = _manifest_module()
+    policy_resolver = importlib.import_module("core.policy_resolver")
+    monkeypatch.setattr(
+        policy_resolver,
+        "get_partner_rules",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("manifest must not reload global rules")
+        ),
+    )
+    identity = {
+        "policy_version_id": "policy-consumed",
+        "policy_hash": "policy-hash-consumed",
+        "rubric_version": "rubric-consumed",
+        "partner_rules_version": "rules-consumed",
+        "partner_rules_hash": "rules-hash-consumed",
+    }
+
+    manifest = manifest_module.build_evaluation_manifest(
+        _startup(),
+        pipeline_run_id="pipeline-run-exact",
+        evaluation_path="manual_lookup",
+        model_metadata={"scout": "s", "reviewer": "r", "partner": "p"},
+        dependency_identity=identity,
+    )
+
+    for key, value in identity.items():
+        assert getattr(manifest, key) == value
 
 
 def test_manifest_represents_missing_prompt_versions_explicitly():
@@ -142,6 +179,7 @@ def test_manifest_represents_missing_prompt_versions_explicitly():
         pipeline_run_id="pipeline-run-2",
         evaluation_path="rerun",
         model_metadata={},
+        dependency_identity=_dependency_identity(),
     )
 
     assert manifest.models == {
@@ -163,6 +201,7 @@ def test_manifest_round_trips_without_tenant_identity():
         pipeline_run_id="pipeline-run-3",
         evaluation_path="autonomous_discovery",
         model_metadata={"scout": "a", "reviewer": "b", "partner": "c"},
+        dependency_identity=_dependency_identity(),
     )
 
     payload = manifest.model_dump(mode="json")
@@ -189,6 +228,7 @@ def test_storage_merges_manifest_into_trace_without_losing_stage_data(monkeypatc
         pipeline_run_id="pipeline-run-4",
         evaluation_path="manual_lookup",
         model_metadata={},
+        dependency_identity=_dependency_identity(),
     )
 
     assert storage.record_evaluation_manifest("startup-manifest-1", manifest) is True
@@ -219,6 +259,7 @@ def test_partner_persistence_records_manifest_in_the_same_trace_update(monkeypat
         startup.startup_id,
         _startup().partner_info,
         pipeline_run_id="8c24745e-1d48-4ea1-b2fd-f7835f64ad73",
+        dependency_identity=_dependency_identity(),
     ) is True
 
     assert len(updated) == 1

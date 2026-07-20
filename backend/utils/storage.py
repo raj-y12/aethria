@@ -229,6 +229,7 @@ class Storage:
         *,
         investment_memo_markdown: Optional[str] = None,
         pipeline_run_id: Optional[str] = None,
+        dependency_identity: Optional[Dict[str, str]] = None,
     ) -> bool:
         """Add partner decision (YES/NO/MAYBE, human_review_required, next_action, etc.). Updates updated_at."""
         found_ref: List[bool] = [False]

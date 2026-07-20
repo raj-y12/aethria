@@ -135,9 +135,19 @@ class ReviewerEngine:
 
     def _build_scoring_engine(self) -> Optional[DeterministicScoringEngine]:
         if self.evaluation_prerequisites is not None:
-            fc = self.evaluation_prerequisites.fund_config
-            dim_weights = dimension_weights_from_fund_config(fc)
             policy = self.evaluation_prerequisites.compiled_scoring_policy
+            dimensions = (
+                policy.get("dimensions")
+                if isinstance(policy.get("dimensions"), dict)
+                else {}
+            )
+            dim_weights = {
+                str(dimension): float(config["weight"])
+                for dimension, config in dimensions.items()
+                if isinstance(config, dict)
+                and not isinstance(config.get("weight"), bool)
+                and isinstance(config.get("weight"), (int, float))
+            }
             if dim_weights:
                 self.logger.info(
                     "reviewer_governed_policy user_id=%s policy_version_id=%s policy_hash=%s scoring_weights=%s",

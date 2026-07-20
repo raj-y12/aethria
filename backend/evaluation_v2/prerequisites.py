@@ -16,7 +16,11 @@ from fund_thesis import (
     FundThesisMissingError,
     get_active_thesis,
 )
-from services.scoring.policy_compiler import compile_policy_from_fund_config
+from services.scoring.policy_compiler import (
+    PolicyValidationError,
+    compile_policy_from_fund_config,
+    validate_compiled_policy_bundle,
+)
 from services.scoring.policy_store import PolicyNotPublishedError, load_published_policy
 from supabase_client import get_service_client
 from tenant_context import require_user_id
@@ -35,6 +39,16 @@ class EvaluationPrerequisites:
     partner_rules: Dict[str, Any]
     fund_config: Dict[str, Any]
     policy: EvaluationPolicy
+
+    @property
+    def dependency_identity(self) -> Dict[str, str]:
+        return {
+            "policy_version_id": self.policy.policy_version_id,
+            "policy_hash": self.policy.policy_hash,
+            "rubric_version": self.policy.rubric_version,
+            "partner_rules_version": self.policy.partner_rules_version,
+            "partner_rules_hash": self.policy.partner_rules_hash,
+        }
 
     def require_tenant(self, user_id: str, *, context: str) -> str:
         uid = require_user_id(user_id, context=context)
@@ -202,36 +216,18 @@ async def load_evaluation_prerequisites(
                 recovery_action="Retry after the policy store is available.",
             ) from exc
 
-    if exact_fund_config is None:
-        if resolved_legacy_settings is not None:
-            candidate = resolved_legacy_settings.get("fund_config")
-            if not isinstance(candidate, dict):
-                raise EvaluationPrerequisiteError(
-                    code="prerequisite_unavailable",
-                    detail="The published fund configuration is invalid.",
-                    recovery_action="Republish the fund scoring policy before retrying.",
-                )
-            exact_fund_config = candidate
-        elif load_fund_config is not None:
-            try:
-                value = load_fund_config(uid)
-                value = await value if inspect.isawaitable(value) else value
-                if not isinstance(value, dict):
-                    raise TypeError("published fund configuration must be an object")
-                exact_fund_config = value
-            except Exception as exc:
-                raise EvaluationPrerequisiteError(
-                    code="prerequisite_unavailable",
-                    detail="The published fund configuration could not be loaded.",
-                    recovery_action="Republish the fund scoring policy before retrying.",
-                ) from exc
-        else:
-            # Governed policies carry their exact accepted fund configuration. The
-            # legacy published-policy seam predates that field, so an injected
-            # loader may omit it; production legacy loading is tightened below by
-            # the shared settings bundle.
-            candidate = compiled.get("fund_config")
-            exact_fund_config = candidate if isinstance(candidate, dict) else {}
+    try:
+        validate_compiled_policy_bundle(compiled)
+    except PolicyValidationError as exc:
+        raise EvaluationPrerequisiteError(
+            code="prerequisite_unavailable",
+            detail="The published policy decision bundle is incomplete or hash-invalid.",
+            recovery_action="Republish the fund scoring policy before retrying.",
+        ) from exc
+    # The published normalized decision bundle is the only fund configuration a
+    # governed engine may consume. Current settings are a mutable draft and are
+    # intentionally ignored after the published policy has been resolved.
+    exact_fund_config = compiled["decision_inputs"]
 
     try:
         rules = await resolve_rules()

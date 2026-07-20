@@ -10,27 +10,23 @@ import pytest
 from evaluation_v2.policy import evaluation_policy_from_compiled
 from evaluation_v2.prerequisites import EvaluationPrerequisites
 from reviewer.engine import ReviewerEngine
+from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.reviewer_resolution import apply_resolution_to_primary
 from utils.adapters import reviewer_output_to_review_info
 
 
 def _compiled_policy():
-    return {
-        "policy_version_id": "policy-live",
-        "policy_hash": "hash-live",
-        "dimensions": {
-            "market": {
-                "weight": 60,
-                "criteria": [{"id": "market_quality", "source_components": ["tam"]}],
-            },
-            "execution": {
-                "weight": 40,
-                "criteria": [
-                    {"id": "execution_quality", "source_components": ["traction"]}
-                ],
-            },
+    compiled = compile_policy_from_fund_config(
+        {
+            "scoringWeights": [
+                {"key": "market", "weight": 70},
+                {"key": "execution", "weight": 30},
+            ],
         },
-    }
+        require_publish_ready=True,
+    )
+    compiled["policy_version_id"] = "policy-live"
+    return compiled
 
 
 def _partner_rules():
@@ -46,16 +42,6 @@ def _partner_rules():
 def _prerequisites(user_id="user-a"):
     compiled = _compiled_policy()
     rules = _partner_rules()
-    fund_config = {
-        "scoringWeights": [
-            {"key": "market", "weight": 70},
-            {"key": "execution", "weight": 30},
-        ],
-        "scoreBands": [
-            {"id": "pass", "min": 0, "max": 59, "label": "Pass"},
-            {"id": "invest", "min": 60, "max": 100, "label": "Invest"},
-        ],
-    }
     thesis = {
         "thesis_id": "thesis-a",
         "version_id": "thesis-live",
@@ -72,7 +58,7 @@ def _prerequisites(user_id="user-a"):
         thesis_version_id="thesis-live",
         compiled_scoring_policy=compiled,
         partner_rules=rules,
-        fund_config=fund_config,
+        fund_config=compiled["decision_inputs"],
         policy=evaluation_policy_from_compiled(compiled, partner_rules=rules),
     )
 
@@ -124,10 +110,8 @@ def test_governed_reviewer_consumes_exact_compiled_policy_without_reload(monkeyp
 
     assert reviewer.active_thesis is prerequisites.thesis_context
     assert reviewer.structured_scoring_engine.policy is prerequisites.compiled_scoring_policy
-    assert reviewer.structured_scoring_engine.dimension_weights == {
-        "market": 70.0,
-        "execution": 30.0,
-    }
+    assert reviewer.structured_scoring_engine.dimension_weights["market"] == 70.0
+    assert reviewer.structured_scoring_engine.dimension_weights["execution"] == 30.0
     assert reviewer.use_resource_fund_thesis_fallback is False
     assert all(
         persona._use_resource_fund_thesis_fallback is False
@@ -229,7 +213,7 @@ def _exact_trace(score: float) -> dict:
         "overall_score": score,
         "overall_confidence": 0.9,
         "policy_version_id": "policy-live",
-        "policy_hash": "hash-live",
+        "policy_hash": _compiled_policy()["policy_hash"],
     }
 
 

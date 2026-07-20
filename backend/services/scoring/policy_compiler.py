@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from config.scoring_config import DIMENSION_WEIGHTS, OVERALL_DIMENSION_WEIGHTS
 from services.scoring.extraction_layer import EXPECTED_COMPONENTS
@@ -16,6 +17,17 @@ from services.scoring.extraction_layer import EXPECTED_COMPONENTS
 PRODUCTION_DIMENSIONS = ("market", "product", "technical", "execution", "defensibility")
 REQUIRED_ANCHORS = ("score3", "score5", "score7", "score9")
 UI_ONLY_DIMENSIONS = {"traction", "timing", "fundFit", "fund_fit"}
+DEFAULT_DECISION_THRESHOLDS = {
+    "autoPass": 39.0,
+    "monitor": 59.0,
+    "escalation": 75.0,
+    "partnerReview": 60.0,
+}
+DEFAULT_SCORE_BANDS = (
+    {"id": "pass", "min": 0.0, "max": 59.0, "label": "Pass"},
+    {"id": "monitor", "min": 60.0, "max": 79.0, "label": "Monitor"},
+    {"id": "invest", "min": 80.0, "max": 100.0, "label": "Invest"},
+)
 
 
 class PolicyValidationError(ValueError):
@@ -43,11 +55,39 @@ class CompiledDimensionPolicy(BaseModel):
     criteria: List[CompiledCriterion]
 
 
+class CompiledDecisionThresholds(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    autoPass: float = Field(ge=0, le=100)
+    monitor: float = Field(ge=0, le=100)
+    escalation: float = Field(ge=0, le=100)
+    partnerReview: float = Field(ge=0, le=100)
+
+
+class CompiledScoreBand(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    min: float = Field(ge=0, le=100)
+    max: float = Field(ge=0, le=100)
+    label: str = Field(min_length=1)
+
+
+class CompiledDecisionInputs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    thresholds: CompiledDecisionThresholds
+    scoreBands: List[CompiledScoreBand] = Field(min_length=1)
+
+
 class CompiledScoringPolicy(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     policy_version_id: str
     policy_hash: str
     generated_at: str
     dimensions: Dict[str, CompiledDimensionPolicy]
+    decision_inputs: CompiledDecisionInputs
     warnings: List[str] = Field(default_factory=list)
 
 
@@ -86,6 +126,102 @@ def _dimension_weights(fund_config: Dict[str, Any]) -> Dict[str, float]:
         if weight > 0:
             weights[str(key)] = weight
     return weights
+
+
+def _normalize_decision_inputs(
+    fund_config: Dict[str, Any], errors: List[str]
+) -> Dict[str, Any]:
+    raw_thresholds = (
+        fund_config.get("thresholds")
+        if isinstance(fund_config.get("thresholds"), dict)
+        else {}
+    )
+    thresholds: Dict[str, float] = {}
+    for key, default in DEFAULT_DECISION_THRESHOLDS.items():
+        raw = raw_thresholds.get(key, default)
+        if isinstance(raw, bool):
+            errors.append(f"thresholds.{key} must be numeric")
+            raw = default
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            errors.append(f"thresholds.{key} must be numeric")
+            value = default
+        if not math.isfinite(value) or not 0 <= value <= 100:
+            errors.append(f"thresholds.{key} must be finite and between 0 and 100")
+            value = default
+        thresholds[key] = value
+    if thresholds["partnerReview"] > thresholds["escalation"]:
+        errors.append("thresholds.partnerReview must not exceed thresholds.escalation")
+
+    raw_bands = fund_config.get("scoreBands")
+    source_bands = raw_bands if isinstance(raw_bands, list) and raw_bands else DEFAULT_SCORE_BANDS
+    bands: List[Dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for index, raw in enumerate(source_bands):
+        if not isinstance(raw, dict):
+            errors.append(f"scoreBands[{index}] must be an object")
+            continue
+        band_id = str(raw.get("id") or "").strip()
+        label = str(raw.get("label") or "").strip()
+        try:
+            minimum = float(raw.get("min"))
+            maximum = float(raw.get("max"))
+        except (TypeError, ValueError):
+            errors.append(f"scoreBands[{index}] min/max must be numeric")
+            continue
+        if not band_id or not label:
+            errors.append(f"scoreBands[{index}] id and label are required")
+            continue
+        if band_id in seen_ids:
+            errors.append(f"scoreBands[{index}].id must be unique")
+        seen_ids.add(band_id)
+        if (
+            not math.isfinite(minimum)
+            or not math.isfinite(maximum)
+            or not 0 <= minimum <= maximum <= 100
+        ):
+            errors.append(
+                f"scoreBands[{index}] bounds must be finite and ordered within 0..100"
+            )
+            continue
+        bands.append(
+            {"id": band_id, "min": minimum, "max": maximum, "label": label}
+        )
+    bands.sort(key=lambda band: (band["min"], band["max"], band["id"]))
+    if not bands:
+        errors.append("scoreBands must contain at least one valid band")
+        bands = [dict(band) for band in DEFAULT_SCORE_BANDS]
+    return CompiledDecisionInputs.model_validate(
+        {"thresholds": thresholds, "scoreBands": bands}
+    ).model_dump()
+
+
+def policy_hash_for_bundle(
+    dimensions: Dict[str, Any], decision_inputs: Dict[str, Any]
+) -> str:
+    """Hash every normalized tenant input consumed by governed decisions."""
+    return _stable_hash(
+        {"dimensions": dimensions, "decision_inputs": decision_inputs}
+    )
+
+
+def validate_compiled_policy_bundle(policy: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate and hash-check a complete persisted policy record."""
+    try:
+        validated = CompiledScoringPolicy.model_validate(policy).model_dump()
+    except Exception as exc:
+        raise PolicyValidationError(
+            ["Published policy is missing its complete decision-input bundle"]
+        ) from exc
+    expected = policy_hash_for_bundle(
+        validated["dimensions"], validated["decision_inputs"]
+    )
+    if expected != validated["policy_hash"]:
+        raise PolicyValidationError(
+            ["Published policy hash does not match its complete decision-input bundle"]
+        )
+    return validated
 
 
 def _default_criterion(dimension: str) -> Dict[str, Any]:
@@ -192,14 +328,15 @@ def compile_policy_from_fund_config(
             "criteria": criteria_by_dimension[dim],
         }
 
-    canonical = {"dimensions": canonical_dimensions}
-    policy_hash = _stable_hash(canonical)
+    decision_inputs = _normalize_decision_inputs(fc, errors)
+    policy_hash = policy_hash_for_bundle(canonical_dimensions, decision_inputs)
     version_id = str(fc.get("activePolicyVersionId") or "").strip() or f"draft_{policy_hash}"
     payload = {
         "policy_version_id": version_id,
         "policy_hash": policy_hash,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "dimensions": canonical_dimensions,
+        "decision_inputs": decision_inputs,
         "warnings": warnings,
     }
 

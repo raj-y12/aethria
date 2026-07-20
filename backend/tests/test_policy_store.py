@@ -1,5 +1,6 @@
 import pytest
 
+from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.scoring.policy_store import (
     PolicyNotPublishedError,
     load_published_policy,
@@ -66,7 +67,7 @@ def test_load_published_policy_fails_closed_without_an_active_published_version(
         load_published_policy("user_1")
 
 
-def test_load_published_policy_returns_only_the_hash_bound_active_version(monkeypatch):
+def test_load_published_policy_rejects_old_partial_policy_record(monkeypatch):
     import services.scoring.policy_store as store_mod
 
     published = {
@@ -86,4 +87,29 @@ def test_load_published_policy_returns_only_the_hash_bound_active_version(monkey
     )
     monkeypatch.setattr(store_mod, "list_get_all", lambda table, user_id: [published])
 
-    assert load_published_policy("user_1") == published
+    with pytest.raises(PolicyNotPublishedError, match="complete"):
+        load_published_policy("user_1")
+
+
+def test_load_published_policy_recomputes_complete_bundle_hash(monkeypatch):
+    import services.scoring.policy_store as store_mod
+
+    published = compile_policy_from_fund_config(_valid_fund_config())
+    published["policy_version_id"] = "policy-live"
+    decision_inputs = published.get("decision_inputs")
+    assert isinstance(decision_inputs, dict)
+    decision_inputs["thresholds"]["partnerReview"] = 99
+    monkeypatch.setattr(
+        store_mod,
+        "load_settings",
+        lambda user_id: {
+            "fund_config": {
+                "activePolicyVersionId": "policy-live",
+                "publishedPolicyHash": published["policy_hash"],
+            }
+        },
+    )
+    monkeypatch.setattr(store_mod, "list_get_all", lambda table, user_id: [published])
+
+    with pytest.raises(PolicyNotPublishedError, match="hash"):
+        load_published_policy("user_1")
