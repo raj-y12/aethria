@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from partner.decision import PartnerDecisionEngine
 
 
@@ -207,6 +209,42 @@ def test_critical_risk_forces_pass_even_with_invest_scores():
     assert out["decision"] == "NO"
     assert out["human_review_required"] is True
     assert "critical" in out["next_action"].lower()
+
+
+@pytest.mark.parametrize(
+    ("policy_present", "policy_value"),
+    [
+        (False, None),
+        (True, []),
+        (True, "regulatory"),
+        (True, [123]),
+        (True, ["  "]),
+    ],
+)
+def test_invalid_critical_risk_policy_fails_closed_before_score_decision(
+    policy_present, policy_value
+):
+    engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
+    engine._rules = dict(engine._rules)
+    if policy_present:
+        engine._rules["critical_risk_keywords"] = policy_value
+    else:
+        engine._rules.pop("critical_risk_keywords", None)
+    review = _base_review()
+    review.update(
+        {
+            "verdict": "STRONG",
+            "market_score": 9,
+            "product_score": 9,
+            "technical_score": 9,
+            "execution_score": 9,
+            "defensibility_score": 9,
+            "key_risks": ["Regulatory ban risk in primary market"],
+        }
+    )
+
+    with pytest.raises(ValueError, match="critical_risk_keywords"):
+        engine.decide(_base_scout(), review)
 
 
 def test_monitor_and_invest_paths_use_consistent_professional_tone():

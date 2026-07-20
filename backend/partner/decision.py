@@ -1112,10 +1112,21 @@ class PartnerDecisionEngine:
 
     def _has_critical_risk(self, key_risks: List[str], rules: Dict[str, Any]) -> bool:
         """Check if any risk indicates regulatory or execution impossibility (from rules)."""
-        keywords = rules.get("critical_risk_keywords", [
-            "regulatory", "regulation", "legal impossibility", "execution impossibility",
-            "cannot be executed", "regulatory ban", "prohibited by law",
-        ])
+        keywords = rules.get("critical_risk_keywords")
+        valid_keywords = (
+            isinstance(keywords, list)
+            and bool(keywords)
+            and all(
+                isinstance(keyword, str) and bool(keyword.strip())
+                for keyword in keywords
+            )
+        )
+        if not valid_keywords:
+            raise ValueError(
+                "partner_rules.critical_risk_keywords must be a non-empty list "
+                "of non-empty strings"
+            )
+        keywords = [keyword.strip().lower() for keyword in keywords]
         risks_lower = [r.lower() for r in key_risks]
         for risk in risks_lower:
             for keyword in keywords:
