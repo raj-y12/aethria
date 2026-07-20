@@ -31,6 +31,22 @@ def _claims():
     ]
 
 
+def _verified_link(claim_id, **overrides):
+    link = {
+        "claim_id": claim_id,
+        "evidence_item_id": f"evidence-{claim_id}",
+        "relationship": "supports",
+        "support_strength": 0.9,
+        "verification_state": "verified",
+        "source_quality": 0.8,
+        "trust_class": "independent",
+        "untrusted_input": False,
+        "prompt_injection_detected": False,
+    }
+    link.update(overrides)
+    return link
+
+
 def _policy():
     return EvaluationPolicy(
         policy_version_id="policy-v1",
@@ -54,7 +70,10 @@ def _policy():
 
 
 def test_same_snapshot_and_policy_produce_same_deterministic_result():
-    snapshot, digest = snapshot_claims(_claims(), links=[])
+    snapshot, digest = snapshot_claims(
+        _claims(),
+        links=[_verified_link("claim-market"), _verified_link("claim-execution")],
+    )
     first = evaluate_snapshot(snapshot, _policy())
     second = evaluate_snapshot(snapshot, _policy())
 
@@ -81,6 +100,96 @@ def test_snapshot_hash_depends_on_values_not_future_live_status():
 
     assert original[0]["status_at_snapshot"] == "current"
     assert original_hash != changed_hash
+
+
+def test_snapshot_hash_changes_when_grounding_metadata_changes():
+    links = [_verified_link("claim-market")]
+    _, original_hash = snapshot_claims(_claims(), links)
+    changed_links = [_verified_link("claim-market", source_quality=0.2)]
+    _, changed_hash = snapshot_claims(_claims(), changed_links)
+
+    assert original_hash != changed_hash
+
+
+def test_ungrounded_external_claim_is_unscored_and_cannot_advance():
+    snapshot, _ = snapshot_claims(_claims(), links=[])
+
+    result = evaluate_snapshot(snapshot, _policy())
+
+    assert all(item.score is None for item in result.criteria)
+    assert result.recommendation.state is RecommendationState.INSUFFICIENT_EVIDENCE
+
+
+def test_model_inferred_claim_cannot_establish_decisive_criterion():
+    claims = _claims()
+    claims[0]["assertion_class"] = "model_inferred"
+    links = [_verified_link("claim-market")]
+    snapshot, _ = snapshot_claims(claims, links)
+
+    market = next(
+        item
+        for item in evaluate_snapshot(snapshot, _policy()).criteria
+        if item.criterion == "market"
+    )
+
+    assert market.score is None
+    assert "assertion_class_not_allowed" in market.quality_flags
+
+
+def test_verified_supported_claim_is_score_eligible():
+    links = [_verified_link("claim-market"), _verified_link("claim-execution")]
+    snapshot, _ = snapshot_claims(_claims(), links)
+
+    result = evaluate_snapshot(snapshot, _policy())
+
+    assert result.recommendation.state is RecommendationState.ADVANCE
+
+
+def test_attributed_operator_claim_is_score_eligible_when_policy_allows_it():
+    claims = _claims()
+    for claim in claims:
+        claim["assertion_class"] = "operator_asserted"
+        claim["operator_attribution"] = "investment-committee-review-2026-07-20"
+    policy = _policy()
+    policy.decision_safety.evidence_eligibility.allowed_assertion_classes.append(
+        "operator_asserted"
+    )
+    snapshot, _ = snapshot_claims(claims, links=[])
+
+    result = evaluate_snapshot(snapshot, policy)
+
+    assert result.recommendation.state is RecommendationState.ADVANCE
+
+
+def test_unattributed_operator_claim_is_unscored():
+    claims = _claims()
+    claims[0]["assertion_class"] = "operator_asserted"
+    policy = _policy()
+    policy.decision_safety.evidence_eligibility.allowed_assertion_classes.append(
+        "operator_asserted"
+    )
+    snapshot, _ = snapshot_claims(claims, links=[])
+
+    market = next(
+        item
+        for item in evaluate_snapshot(snapshot, policy).criteria
+        if item.criterion == "market"
+    )
+
+    assert market.score is None
+    assert "no_eligible_supporting_evidence" in market.quality_flags
+
+
+def test_untrusted_input_is_provenance_not_an_eligibility_filter():
+    links = [
+        _verified_link("claim-market", untrusted_input=True),
+        _verified_link("claim-execution", untrusted_input=True),
+    ]
+    snapshot, _ = snapshot_claims(_claims(), links)
+
+    result = evaluate_snapshot(snapshot, _policy())
+
+    assert result.recommendation.state is RecommendationState.ADVANCE
 
 
 def test_hard_exclusion_is_deterministic_pass_with_driver():

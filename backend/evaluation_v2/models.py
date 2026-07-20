@@ -33,6 +33,11 @@ class EvidenceEligibilityPolicy(BaseModel):
     )
 
 
+class ScoreEligibility(BaseModel):
+    eligible: bool
+    reason_codes: List[str] = Field(default_factory=list)
+
+
 class DecisionSafetyPolicy(BaseModel):
     evidence_eligibility: EvidenceEligibilityPolicy
     critical_risk_claim_types: List[str] = Field(default_factory=list)

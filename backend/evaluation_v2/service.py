@@ -8,10 +8,12 @@ from typing import Any, Dict, List, Sequence, Tuple
 
 from evaluation_v2.models import (
     CriterionResult,
+    EvidenceEligibilityPolicy,
     EvaluationPolicy,
     EvaluationResult,
     RecommendationResult,
     RecommendationState,
+    ScoreEligibility,
 )
 
 
@@ -35,6 +37,7 @@ def snapshot_claims(
                 "display_text": str(claim.get("display_text") or ""),
                 "status_at_snapshot": str(claim.get("status") or ""),
                 "assertion_class_at_snapshot": str(claim.get("assertion_class") or ""),
+                "operator_attribution_at_snapshot": claim.get("operator_attribution"),
                 "confidence_at_snapshot": float(claim.get("confidence") or 0),
                 "supporting_evidence_ids": sorted(
                     str(link.get("evidence_item_id"))
@@ -52,6 +55,13 @@ def snapshot_claims(
                             "evidence_item_id": str(link.get("evidence_item_id")),
                             "relationship": str(link.get("relationship")),
                             "support_strength": float(link.get("support_strength") or 0),
+                            "verification_state": str(link.get("verification_state") or ""),
+                            "source_quality": float(link.get("source_quality") or 0),
+                            "trust_class": str(link.get("trust_class") or ""),
+                            "untrusted_input": bool(link.get("untrusted_input")),
+                            "prompt_injection_detected": bool(
+                                link.get("prompt_injection_detected")
+                            ),
                         }
                         for link in claim_links
                     ],
@@ -62,6 +72,51 @@ def snapshot_claims(
     snapshot.sort(key=lambda item: item["claim_id"])
     canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
     return snapshot, hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def evaluate_claim_score_eligibility(
+    claim: Dict[str, Any], *, policy: EvidenceEligibilityPolicy
+) -> ScoreEligibility:
+    reasons: List[str] = []
+    assertion_class = claim.get("assertion_class_at_snapshot")
+    if assertion_class not in policy.allowed_assertion_classes:
+        reasons.append("assertion_class_not_allowed")
+
+    candidate_links = list(claim.get("evidence_relationships", []))
+    if (
+        assertion_class == "operator_asserted"
+        and "operator_asserted" in policy.allowed_assertion_classes
+        and str(claim.get("operator_attribution_at_snapshot") or "").strip()
+    ):
+        candidate_links.append(
+            {
+                "relationship": policy.allowed_relationships[0],
+                "support_strength": 1.0,
+                "source_quality": 1.0,
+                "trust_class": "operator",
+                "prompt_injection_detected": False,
+                "verification_state": "verified",
+            }
+        )
+
+    allowed_links = [
+        link
+        for link in candidate_links
+        if link.get("relationship") in policy.allowed_relationships
+        and float(link.get("support_strength") or 0) >= policy.min_support_strength
+        and float(link.get("source_quality") or 0) >= policy.min_source_quality
+        and link.get("trust_class") not in policy.blocked_trust_classes
+        and not bool(link.get("prompt_injection_detected"))
+    ]
+    if policy.require_verified_evidence:
+        allowed_links = [
+            link
+            for link in allowed_links
+            if link.get("verification_state") == "verified"
+        ]
+    if not allowed_links:
+        reasons.append("no_eligible_supporting_evidence")
+    return ScoreEligibility(eligible=not reasons, reason_codes=reasons)
 
 
 def _score(claim: Dict[str, Any]) -> float | None:
@@ -83,18 +138,36 @@ def evaluate_snapshot(
     total_weight = sum(rule.weight for rule in policy.criteria)
     missing = []
     conflicts = []
+    eligibility_policy = policy.decision_safety.evidence_eligibility
     for rule in policy.criteria:
-        eligible = [
+        criterion_claims = [
             claim
             for claim in snapshot
             if claim["claim_type"] in rule.claim_types
             and claim["status_at_snapshot"] in {"current", "contradicted"}
         ]
+        eligibility_results = [
+            (
+                claim,
+                evaluate_claim_score_eligibility(claim, policy=eligibility_policy),
+            )
+            for claim in criterion_claims
+        ]
+        eligible = [
+            claim for claim, eligibility in eligibility_results if eligibility.eligible
+        ]
+        eligibility_flags = sorted(
+            {
+                reason
+                for _, eligibility in eligibility_results
+                for reason in eligibility.reason_codes
+            }
+        )
         scored = [(claim, _score(claim)) for claim in eligible]
         scored = [(claim, score) for claim, score in scored if score is not None]
         contradicted = [
             claim["claim_id"]
-            for claim in eligible
+            for claim in criterion_claims
             if claim["status_at_snapshot"] == "contradicted"
             or claim["contradicting_evidence_ids"]
         ]
@@ -108,6 +181,7 @@ def evaluate_snapshot(
                     reasoning="No eligible scored claim was present in the immutable snapshot.",
                     missing_evidence=[rule.criterion],
                     contradicting_claim_ids=contradicted,
+                    quality_flags=eligibility_flags,
                 )
             )
             continue
@@ -134,7 +208,10 @@ def evaluate_snapshot(
                 reasoning="Deterministic confidence-weighted claim score.",
                 supporting_claim_ids=[claim["claim_id"] for claim, _ in scored],
                 contradicting_claim_ids=contradicted,
-                quality_flags=["contradiction_present"] if contradicted else [],
+                quality_flags=sorted(
+                    set(eligibility_flags)
+                    | ({"contradiction_present"} if contradicted else set())
+                ),
             )
         )
 
