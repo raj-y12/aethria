@@ -6,6 +6,7 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     load_evaluation_prerequisites,
 )
+from fund_thesis import FundThesisMissingError
 from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.scoring.policy_store import PolicyNotPublishedError
 
@@ -130,6 +131,24 @@ async def test_missing_thesis_has_operator_recovery():
 
 
 @pytest.mark.asyncio
+async def test_missing_thesis_error_is_operator_correctable_not_unavailable():
+    def missing_thesis(_user_id):
+        raise FundThesisMissingError("active thesis not found")
+
+    with pytest.raises(EvaluationPrerequisiteError) as exc:
+        await load_evaluation_prerequisites(
+            user_id="user-a",
+            fund_intelligence_repository=None,
+            load_thesis=missing_thesis,
+            load_policy=lambda _: _compiled_policy(),
+            load_partner_rules=_partner_rules,
+        )
+
+    assert exc.value.code == "thesis_required"
+    assert "Settings" in exc.value.recovery_action
+
+
+@pytest.mark.asyncio
 async def test_missing_published_policy_has_operator_recovery():
     def missing_policy(_user_id):
         raise PolicyNotPublishedError("not published")
@@ -198,6 +217,28 @@ async def test_transient_governed_policy_store_failure_does_not_fall_back_to_leg
 
     def legacy_policy(_user_id):
         raise AssertionError("transient governed failure must not look like no policy")
+
+    with pytest.raises(EvaluationPrerequisiteError) as exc:
+        await load_evaluation_prerequisites(
+            user_id="user-a",
+            fund_intelligence_repository=Repository(),
+            load_thesis=lambda _: SimpleNamespace(version_id="thesis-live"),
+            load_policy=legacy_policy,
+            load_partner_rules=_partner_rules,
+        )
+
+    assert exc.value.code == "prerequisite_unavailable"
+    assert "governed policy" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_none_governed_policy_response_is_unavailable_without_legacy_fallback():
+    class Repository:
+        async def get_active_published_policy(self, *, user_id):
+            return None
+
+    def legacy_policy(_user_id):
+        raise AssertionError("malformed governed response must not trigger fallback")
 
     with pytest.raises(EvaluationPrerequisiteError) as exc:
         await load_evaluation_prerequisites(

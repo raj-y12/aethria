@@ -44,6 +44,7 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
             return 0
 
     class Thesis:
+        version_id = "thesis-live"
         embedding = [0.1]
 
         def as_engine_context(self):
@@ -96,7 +97,9 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
             return []
 
     await pipeline_runner._run_one_pipeline_cycle_inner(
-        "user-prune-order", identity_repository=IdentityRepository()
+        "user-prune-order",
+        identity_repository=IdentityRepository(),
+        evaluation_prerequisites=SimpleNamespace(thesis_version_id="thesis-live"),
     )
 
     assert order[:3] == ["scout", "prune", "reviewer"]

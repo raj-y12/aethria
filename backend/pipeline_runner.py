@@ -31,7 +31,7 @@ if load_dotenv:
     else:
         load_dotenv()
 
-from tenant_context import TenantContext
+from tenant_context import TenantContext, require_user_id
 from event_bus import publish as _publish_event
 from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
@@ -475,18 +475,23 @@ async def run_one_pipeline_cycle(
     manual_one_shot: bool = False,
     pipeline_run_id: Optional[str] = None,
     identity_repository: Optional[Any] = None,
+    evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
+    fund_intelligence_repository: Optional[Any] = None,
 ) -> None:
     """Run one cycle of scout, reviewer, partner, portfolio, and meta for the given user."""
-    if not user_id or not user_id.strip():
-        logger.warning("run_one_pipeline_cycle: skipped (empty user_id)")
-        return
-    user_id = user_id.strip()
-    async with pipeline_execution_slot(user_id):
+    uid = require_user_id(user_id, context="run_one_pipeline_cycle")
+    if evaluation_prerequisites is None:
+        evaluation_prerequisites = await load_evaluation_prerequisites(
+            user_id=uid,
+            fund_intelligence_repository=fund_intelligence_repository,
+        )
+    async with pipeline_execution_slot(uid):
         await _run_one_pipeline_cycle_inner(
-            user_id,
+            uid,
             manual_one_shot=manual_one_shot,
             pipeline_run_id=pipeline_run_id,
             identity_repository=identity_repository,
+            evaluation_prerequisites=evaluation_prerequisites,
         )
 
 
@@ -496,6 +501,7 @@ async def _run_one_pipeline_cycle_inner(
     manual_one_shot: bool = False,
     pipeline_run_id: Optional[str] = None,
     identity_repository: Optional[Any] = None,
+    evaluation_prerequisites: EvaluationPrerequisites,
 ) -> None:
     tenant = TenantContext(user_id=user_id)
     logger.info(
@@ -551,9 +557,17 @@ async def _run_one_pipeline_cycle_inner(
     try:
         active = await asyncio.to_thread(_load_active_thesis_sync, user_id)
         if active is None:
-            logger.warning("[%s] Pipeline skipped (fund thesis): missing", user_id[:12])
-            _visible_logger.warning("[%s] Pipeline skipped: fund thesis missing — create one in Settings", user_id[:12])
-            return
+            raise EvaluationPrerequisiteError(
+                code="thesis_required",
+                detail="An active fund thesis is required before evaluation.",
+                recovery_action="Create and publish the fund thesis in Settings.",
+            )
+        if str(active.version_id) != evaluation_prerequisites.thesis_version_id:
+            raise EvaluationPrerequisiteError(
+                code="prerequisite_unavailable",
+                detail="The active fund thesis changed while the cycle was starting.",
+                recovery_action="Retry the cycle against the current thesis.",
+            )
         thesis_ctx = active.as_engine_context()
         # Opportunistic embedding backfill: a thesis bootstrapped without a key
         # stores an empty vector. Now that api_key is present, generate the active
@@ -567,10 +581,20 @@ async def _run_one_pipeline_cycle_inner(
                 lambda: ensure_active_thesis_embedding(get_service_client(), user_id, api_key)
             ):
                 logger.info("[%s] Backfilled active thesis embedding", user_id[:12])
-    except FundThesisIncompleteError as e:
-        logger.warning("[%s] Pipeline skipped (fund thesis): %s", user_id[:12], e)
-        _visible_logger.warning("[%s] Pipeline skipped: fund thesis incomplete — %s", user_id[:12], e)
-        return
+    except EvaluationPrerequisiteError:
+        raise
+    except FundThesisIncompleteError as exc:
+        raise EvaluationPrerequisiteError(
+            code="thesis_required",
+            detail="The active fund thesis is incomplete.",
+            recovery_action="Complete and publish the fund thesis in Settings.",
+        ) from exc
+    except Exception as exc:
+        raise EvaluationPrerequisiteError(
+            code="prerequisite_unavailable",
+            detail="The active fund thesis could not be loaded.",
+            recovery_action="Retry after the thesis store is available.",
+        ) from exc
 
     # Engine constructors do blocking I/O (DealMemory doc-store read,
     # ReviewerEngine settings/policy load, CostController budget state) —
@@ -817,6 +841,7 @@ async def run_on_demand_lookup(
     ] = None,
     institutional_context: Optional[Dict[str, Any]] = None,
     evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
+    fund_intelligence_repository: Optional[Any] = None,
 ) -> Optional[str]:
     """
     Run scout -> reviewer -> partner for one explicit company name.
@@ -828,24 +853,21 @@ async def run_on_demand_lookup(
     kept, the operator context (plus fetched content of any links it names) is
     stamped on the row, and only reviewer + partner run again.
     """
-    if not user_id or not user_id.strip():
-        logger.warning("run_on_demand_lookup: skipped (empty user_id)")
-        return None
+    uid = require_user_id(user_id, context="run_on_demand_lookup")
     company = (company_name or "").strip()
     if not company:
         logger.warning("run_on_demand_lookup: skipped (empty company name)")
         return None
 
-    user_id = user_id.strip()
     if evaluation_prerequisites is None:
         evaluation_prerequisites = await load_evaluation_prerequisites(
-            user_id=user_id,
-            fund_intelligence_repository=None,
+            user_id=uid,
+            fund_intelligence_repository=fund_intelligence_repository,
         )
     # Lookups use their own slot so they never wait behind a full periodic cycle.
-    async with lookup_execution_slot(user_id):
+    async with lookup_execution_slot(uid):
         return await _run_on_demand_lookup_inner(
-            user_id,
+            uid,
             company,
             website=website,
             lookup_query=lookup_query,

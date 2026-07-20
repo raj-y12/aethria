@@ -10,7 +10,12 @@ from typing import Any, Callable, Dict
 from core.policy_resolver import get_partner_rules
 from evaluation_v2.models import EvaluationPolicy
 from evaluation_v2.policy import evaluation_policy_from_compiled
-from fund_thesis import FundThesisError, FundThesisIncompleteError, get_active_thesis
+from fund_thesis import (
+    FundThesisError,
+    FundThesisIncompleteError,
+    FundThesisMissingError,
+    get_active_thesis,
+)
 from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.scoring.policy_store import PolicyNotPublishedError, load_published_policy
 from supabase_client import get_service_client
@@ -64,6 +69,12 @@ async def load_evaluation_prerequisites(
 
     try:
         thesis = await resolve_thesis()
+    except FundThesisMissingError as exc:
+        raise EvaluationPrerequisiteError(
+            code="thesis_required",
+            detail="An active fund thesis is required before evaluation.",
+            recovery_action="Create and publish the fund thesis in Settings.",
+        ) from exc
     except FundThesisIncompleteError as exc:
         raise EvaluationPrerequisiteError(
             code="thesis_required",
@@ -105,6 +116,12 @@ async def load_evaluation_prerequisites(
                 detail="The governed policy could not be loaded.",
                 recovery_action="Retry after the policy store is available.",
             ) from exc
+        if governed is None:
+            raise EvaluationPrerequisiteError(
+                code="prerequisite_unavailable",
+                detail="The governed policy store returned an invalid response.",
+                recovery_action="Retry after the policy store is available.",
+            )
         if governed is not None:
             try:
                 compiled = await asyncio.to_thread(

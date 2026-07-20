@@ -8,6 +8,7 @@ the asyncio.to_thread offloads in pipeline_runner regress.
 import asyncio
 import time
 import threading
+from types import SimpleNamespace
 
 import pytest
 
@@ -18,6 +19,7 @@ import pipeline_runner
 pytestmark = pytest.mark.asyncio
 
 BLOCK_S = 0.5
+_PREREQUISITES = SimpleNamespace(thesis_version_id="thesis-live")
 
 
 async def _max_heartbeat_gap(stop: asyncio.Event) -> float:
@@ -44,9 +46,15 @@ async def _run_cycle_with_heartbeat(expect_error: type[Exception] | None = None)
     try:
         if expect_error is not None:
             with pytest.raises(expect_error):
-                await pipeline_runner._run_one_pipeline_cycle_inner("user_loop_lag_test")
+                await pipeline_runner._run_one_pipeline_cycle_inner(
+                    "user_loop_lag_test",
+                    evaluation_prerequisites=_PREREQUISITES,
+                )
         else:
-            await pipeline_runner._run_one_pipeline_cycle_inner("user_loop_lag_test")
+            await pipeline_runner._run_one_pipeline_cycle_inner(
+                "user_loop_lag_test",
+                evaluation_prerequisites=_PREREQUISITES,
+            )
     finally:
         stop.set()
     return await heartbeat
@@ -78,6 +86,7 @@ class _EngineBuildReached(RuntimeError):
 
 
 class _FakeThesis:
+    version_id = "thesis-live"
     embedding = [0.1]  # non-empty -> skips the embedding backfill
 
     def as_engine_context(self):

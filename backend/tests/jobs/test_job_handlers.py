@@ -88,6 +88,7 @@ async def test_cycle_handler_passes_job_tenant_and_stable_pipeline_run(monkeypat
     assert calls[0][1]["manual_one_shot"] is True
     assert calls[0][1]["pipeline_run_id"] == job.pipeline_run_id
     assert calls[0][1]["identity_repository"].pool is repository.pool
+    assert calls[0][1]["evaluation_prerequisites"] == _prerequisites()
     assert [item["stage"] for item in repository.checkpoints] == [
         "pipeline_cycle",
         "pipeline_cycle",

@@ -422,6 +422,9 @@ async def _agent_worker() -> None:
                 await run_one_pipeline_cycle(
                     user_id,
                     manual_one_shot=bool(job.get("manual_one_shot")),
+                    fund_intelligence_repository=getattr(
+                        app.state, "fund_intelligence_repository", None
+                    ),
                 )
             except Exception as e:
                 _logger_agents.exception("Pipeline cycle error for user %s: %s", user_id[:12] if user_id else "?", e)
@@ -460,6 +463,9 @@ async def _lookup_worker() -> None:
                     additional_context=str(job.get("additional_context") or "").strip() or None,
                     replace_startup_id=str(job.get("replace_startup_id") or "").strip() or None,
                     resolution=job.get("resolution"),
+                    fund_intelligence_repository=getattr(
+                        app.state, "fund_intelligence_repository", None
+                    ),
                 )
             except Exception as e:
                 _logger_agents.exception(

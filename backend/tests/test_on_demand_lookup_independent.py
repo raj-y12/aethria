@@ -6,7 +6,7 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     EvaluationPrerequisites,
 )
-from pipeline_runner import run_on_demand_lookup
+from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
 
 
 class _FakeScoutEngine:
@@ -180,6 +180,126 @@ async def test_on_demand_lookup_blocks_when_no_mandate(monkeypatch):
     assert _FakeScoutEngine.calls == 0
     assert _FakeReviewerEngine.calls == 0
     assert _FakePartnerEngine.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_on_demand_lookup_rejects_empty_tenant_before_other_early_returns():
+    with pytest.raises(RuntimeError, match="Missing explicit user_id"):
+        await run_on_demand_lookup(" ", "")
+
+
+@pytest.mark.asyncio
+async def test_pipeline_cycle_rejects_empty_tenant_before_other_early_returns():
+    with pytest.raises(RuntimeError, match="Missing explicit user_id"):
+        await run_one_pipeline_cycle(" ")
+
+
+@pytest.mark.asyncio
+async def test_direct_lookup_selects_governed_repository(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr(
+        "pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis()
+    )
+    governed_repository = object()
+    calls = []
+    prerequisites = EvaluationPrerequisites(
+        thesis_version_id="thesis-v1",
+        policy=SimpleNamespace(
+            policy_version_id="governed-policy-live",
+            policy_hash="governed-hash-live",
+        ),
+    )
+
+    async def load_prerequisites(**kwargs):
+        calls.append(kwargs)
+        return prerequisites
+
+    monkeypatch.setattr(
+        "pipeline_runner.load_evaluation_prerequisites", load_prerequisites
+    )
+
+    startup_id = await run_on_demand_lookup(
+        "user_123",
+        "Acme",
+        lookup_id="lookup-governed",
+        fund_intelligence_repository=governed_repository,
+    )
+
+    assert startup_id == "startup-1"
+    assert calls == [
+        {
+            "user_id": "user_123",
+            "fund_intelligence_repository": governed_repository,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_direct_pipeline_cycle_gates_and_passes_governed_repository(monkeypatch):
+    governed_repository = object()
+    expected = EvaluationPrerequisiteError(
+        code="published_policy_required",
+        detail="A published policy is required.",
+        recovery_action="Publish the fund scoring policy in Settings.",
+    )
+    calls = []
+
+    async def load_prerequisites(**kwargs):
+        calls.append(kwargs)
+        raise expected
+
+    async def run_inner(*args, **kwargs):
+        raise AssertionError("periodic work must not start before the shared gate")
+
+    monkeypatch.setattr(
+        "pipeline_runner.load_evaluation_prerequisites", load_prerequisites
+    )
+    monkeypatch.setattr("pipeline_runner._run_one_pipeline_cycle_inner", run_inner)
+
+    with pytest.raises(EvaluationPrerequisiteError) as exc:
+        await run_one_pipeline_cycle(
+            "user_123",
+            fund_intelligence_repository=governed_repository,
+        )
+
+    assert exc.value is expected
+    assert calls == [
+        {
+            "user_id": "user_123",
+            "fund_intelligence_repository": governed_repository,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_direct_pipeline_cycle_reuses_supplied_prerequisites(monkeypatch):
+    prerequisites = EvaluationPrerequisites(
+        thesis_version_id="thesis-v1",
+        policy=SimpleNamespace(
+            policy_version_id="policy-live",
+            policy_hash="hash-live",
+        ),
+    )
+    calls = []
+
+    async def load_prerequisites(**kwargs):
+        raise AssertionError("supplied prerequisites must not load twice")
+
+    async def run_inner(user_id, **kwargs):
+        calls.append((user_id, kwargs))
+
+    monkeypatch.setattr(
+        "pipeline_runner.load_evaluation_prerequisites", load_prerequisites
+    )
+    monkeypatch.setattr("pipeline_runner._run_one_pipeline_cycle_inner", run_inner)
+
+    await run_one_pipeline_cycle(
+        "user_123",
+        evaluation_prerequisites=prerequisites,
+    )
+
+    assert calls[0][0] == "user_123"
+    assert calls[0][1]["evaluation_prerequisites"] is prerequisites
 
 
 @pytest.mark.asyncio

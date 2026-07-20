@@ -58,7 +58,7 @@ async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
     payload = PipelineCyclePayload.model_validate(job.payload)
     await _checkpoint(repository, job, "pipeline_cycle", "started", {})
     try:
-        await load_evaluation_prerequisites(
+        evaluation_prerequisites = await load_evaluation_prerequisites(
             user_id=job.user_id,
             fund_intelligence_repository=FundIntelligenceRepository(repository.pool),
         )
@@ -73,6 +73,7 @@ async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
         manual_one_shot=payload.manual_one_shot,
         pipeline_run_id=job.pipeline_run_id,
         identity_repository=IdentityRepository(repository.pool),
+        evaluation_prerequisites=evaluation_prerequisites,
     )
     await _checkpoint(repository, job, "pipeline_cycle", "succeeded", {})
 
