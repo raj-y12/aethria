@@ -1,8 +1,9 @@
 """Integration tests: wiring the evidence discount (1A) + gate (1B) into the engine.
 
-Calibration is opt-in. When off (default) the published scores are unchanged and the
-calibrated values are emitted in a `calibration` shadow block for offline comparison.
-When on, the discounted/gated values are published.
+Calibration is safe by default. Set
+`SCORING_EVIDENCE_CALIBRATION_ENABLED=false` for a controlled rollback: published
+scores then remain unchanged while calibrated values are emitted in a `calibration`
+shadow block for comparison.
 """
 from services.scoring.scoring_engine import DeterministicScoringEngine
 
