@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Any, Dict, Iterable
 
-from evaluation_v2.models import CriterionRule, EvaluationPolicy
+from evaluation_v2.models import CriterionRule, DecisionSafetyPolicy, EvaluationPolicy
 
 
 def _document_hash(document: Any) -> str:
@@ -70,6 +70,15 @@ def evaluation_policy_from_compiled(
     advance_threshold = float(thresholds.get("min_avg_strong_yes", 7.5))
     pass_threshold = float(thresholds.get("min_avg_pass", 4.0))
     rules_version = str(partner_rules.get("version") or "unknown").strip() or "unknown"
+    try:
+        decision_safety = DecisionSafetyPolicy.model_validate(
+            partner_rules.get("decision_safety")
+        )
+    except ValueError as exc:
+        raise ValueError(
+            "partner_rules.decision_safety is required and must be valid"
+        ) from exc
+
     return EvaluationPolicy(
         policy_version_id=version_id,
         policy_hash=policy_hash,
@@ -79,4 +88,6 @@ def evaluation_policy_from_compiled(
         criteria=criteria,
         advance_threshold=advance_threshold,
         pass_threshold=pass_threshold,
+        decision_safety=decision_safety,
+        hard_exclusion_claim_types=decision_safety.hard_exclusion_claim_types,
     )

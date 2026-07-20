@@ -22,6 +22,23 @@ class CriterionRule(BaseModel):
     required: bool = True
 
 
+class EvidenceEligibilityPolicy(BaseModel):
+    allowed_assertion_classes: List[str] = Field(min_length=1)
+    allowed_relationships: List[str] = Field(min_length=1)
+    require_verified_evidence: bool = True
+    min_support_strength: float = Field(default=0.5, ge=0, le=1)
+    min_source_quality: float = Field(default=0.4, ge=0, le=1)
+    blocked_trust_classes: List[str] = Field(
+        default_factory=lambda: ["model", "unknown"]
+    )
+
+
+class DecisionSafetyPolicy(BaseModel):
+    evidence_eligibility: EvidenceEligibilityPolicy
+    critical_risk_claim_types: List[str] = Field(default_factory=list)
+    hard_exclusion_claim_types: List[str] = Field(default_factory=list)
+
+
 class EvaluationPolicy(BaseModel):
     policy_version_id: str
     policy_hash: str
@@ -32,6 +49,7 @@ class EvaluationPolicy(BaseModel):
     advance_threshold: float = Field(default=7.5, ge=0, le=10)
     pass_threshold: float = Field(default=4.0, ge=0, le=10)
     minimum_scored_weight: float = Field(default=0.5, ge=0, le=1)
+    decision_safety: DecisionSafetyPolicy
     hard_exclusion_claim_types: List[str] = Field(default_factory=list)
 
 

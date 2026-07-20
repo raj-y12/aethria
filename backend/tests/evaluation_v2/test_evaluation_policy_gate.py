@@ -33,12 +33,28 @@ def _compiled_policy():
     }
 
 
+def _decision_safety():
+    return {
+        "evidence_eligibility": {
+            "allowed_assertion_classes": ["externally_verified", "operator_asserted"],
+            "allowed_relationships": ["supports", "partially_establishes"],
+            "require_verified_evidence": True,
+            "min_support_strength": 0.5,
+            "min_source_quality": 0.4,
+            "blocked_trust_classes": ["model", "unknown"],
+        },
+        "critical_risk_claim_types": ["critical_risk"],
+        "hard_exclusion_claim_types": ["mandate_exclusion"],
+    }
+
+
 def test_compiled_published_policy_maps_to_evidence_evaluation_contract():
     policy = evaluation_policy_from_compiled(
         _compiled_policy(),
         partner_rules={
             "version": "rules-v2",
             "score_thresholds": {"min_avg_strong_yes": 8, "min_avg_pass": 5.5},
+            "decision_safety": _decision_safety(),
         },
     )
 
@@ -52,13 +68,47 @@ def test_compiled_published_policy_maps_to_evidence_evaluation_contract():
     assert {"market", "market_quality", "tam", "urgency"}.issubset(market.claim_types)
 
 
+def test_compiled_policy_carries_versioned_decision_safety_contract():
+    policy = evaluation_policy_from_compiled(
+        _compiled_policy(),
+        partner_rules={
+            "version": "2.0",
+            "score_thresholds": {"min_avg_strong_yes": 8, "min_avg_pass": 5.5},
+            "decision_safety": {
+                "evidence_eligibility": {
+                    "allowed_assertion_classes": ["externally_verified", "operator_asserted"],
+                    "allowed_relationships": ["supports", "partially_establishes"],
+                    "require_verified_evidence": True,
+                    "min_support_strength": 0.5,
+                    "min_source_quality": 0.4,
+                    "blocked_trust_classes": ["model", "unknown"],
+                },
+                "critical_risk_claim_types": ["critical_risk"],
+                "hard_exclusion_claim_types": ["mandate_exclusion"],
+            },
+        },
+    )
+
+    assert policy.decision_safety.evidence_eligibility.min_support_strength == 0.5
+    assert policy.decision_safety.critical_risk_claim_types == ["critical_risk"]
+    assert policy.hard_exclusion_claim_types == ["mandate_exclusion"]
+
+
+def test_missing_decision_safety_config_fails_closed():
+    with pytest.raises(ValueError, match="decision_safety"):
+        evaluation_policy_from_compiled(
+            _compiled_policy(), partner_rules={"version": "2.0"}
+        )
+
+
 @pytest.mark.asyncio
 async def test_evaluate_endpoint_uses_active_thesis_and_published_policy(monkeypatch):
     import routers.evaluations as route
 
     thesis = SimpleNamespace(version_id="thesis-live")
     policy = evaluation_policy_from_compiled(
-        _compiled_policy(), partner_rules={"version": "rules-v2"}
+        _compiled_policy(),
+        partner_rules={"version": "rules-v2", "decision_safety": _decision_safety()},
     )
 
     class Repository:
@@ -77,7 +127,11 @@ async def test_evaluate_endpoint_uses_active_thesis_and_published_policy(monkeyp
     monkeypatch.setattr(route, "get_service_client", lambda: object())
     monkeypatch.setattr(route, "get_active_thesis", lambda client, user_id: thesis)
     monkeypatch.setattr(route, "load_published_policy", lambda user_id: _compiled_policy())
-    monkeypatch.setattr(route, "get_partner_rules", lambda: {"version": "rules-v2"})
+    monkeypatch.setattr(
+        route,
+        "get_partner_rules",
+        lambda: {"version": "rules-v2", "decision_safety": _decision_safety()},
+    )
     request = SimpleNamespace(
         state=SimpleNamespace(user_id="user-a"),
         app=SimpleNamespace(state=SimpleNamespace(evaluation_repository=Repository())),
