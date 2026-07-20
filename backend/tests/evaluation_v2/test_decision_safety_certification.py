@@ -21,6 +21,8 @@ class SafetyCase:
     name: str
     kind: Literal["evaluation", "override", "projection"]
     expected_state: str | None = None
+    expected_human_review: bool | None = None
+    expected_missing_information: str | None = None
     expected_override: str | None = None
     expected_projection: dict[str, str | None] | None = None
 
@@ -50,8 +52,19 @@ CASES = [
     SafetyCase("below_minimum_claim_confidence", "evaluation", expected_state="insufficient_evidence"),
     SafetyCase("minimum_claim_confidence_boundary", "evaluation", expected_state="monitor"),
     SafetyCase("high_claim_confidence", "evaluation", expected_state="advance"),
-    SafetyCase("exact_false_critical_risk", "evaluation", expected_state="advance"),
-    SafetyCase("malformed_critical_risk", "evaluation", expected_state="advance"),
+    SafetyCase(
+        "exact_false_critical_risk",
+        "evaluation",
+        expected_state="advance",
+        expected_human_review=False,
+    ),
+    SafetyCase(
+        "malformed_critical_risk",
+        "evaluation",
+        expected_state="advance",
+        expected_human_review=True,
+        expected_missing_information="critical risk",
+    ),
     SafetyCase("expired_evidence", "evaluation", expected_state="insufficient_evidence"),
     SafetyCase("undated_evidence", "evaluation", expected_state="insufficient_evidence"),
     SafetyCase("stale_evidence", "evaluation", expected_state="monitor"),
@@ -229,6 +242,15 @@ def test_decision_safety_case(case: SafetyCase) -> None:
             _snapshot_for(case.name), _safety_policy(), evaluation_at=EVALUATION_AT
         )
         assert result.recommendation.state.value == case.expected_state
+        if case.expected_human_review is not None:
+            assert (
+                result.recommendation.human_review_required
+                is case.expected_human_review
+            )
+        if case.expected_missing_information is not None:
+            assert case.expected_missing_information in (
+                item.lower() for item in result.recommendation.missing_information
+            )
     elif case.kind == "override":
         assert classify_override(
             recommendation="advance",
