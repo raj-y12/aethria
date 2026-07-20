@@ -18,18 +18,18 @@ _MISSING_RE = __import__("re").compile(r"^\s*\[?\s*missing(?::[^\]]*)?\]?\s*$", 
 
 
 def _has_concrete_evidence(comp: Dict[str, Any]) -> bool:
-    """True only when the component carries a real value/label, not a missing marker."""
+    """True only for a grounded component with a concrete value or label."""
+    evidence = str(comp.get("evidence") or "").strip()
+    reasoning = str(comp.get("reasoning") or "").strip()
+    grounded = bool(evidence) or bool(comp.get("rule"))
+    if not grounded and reasoning.lower() in {"", "speculative", "guess", "unknown"}:
+        return False
     for key in ("value", "label"):
         raw = comp.get(key)
-        if raw is None:
-            continue
-        if isinstance(raw, str):
-            text = raw.strip()
-            if not text or _MISSING_RE.match(text):
-                continue
-            return True
-        if raw not in ("", [], {}):
-            return True
+        if isinstance(raw, str) and raw.strip() and not _MISSING_RE.match(raw.strip()):
+            return grounded
+        if raw not in (None, "", [], {}):
+            return grounded
     return False
 
 
@@ -40,10 +40,10 @@ def compute_confidence(components: Dict[str, Dict[str, Any]]) -> float:
     present = 0
     total = len(components)
     for comp in components.values():
-        c = max(0.0, min(1.0, _to_float(comp.get("confidence"), 0.0)))
-        confidences.append(c)
         if _has_concrete_evidence(comp):
             present += 1
+            c = max(0.0, min(1.0, _to_float(comp.get("confidence"), 0.0)))
+            confidences.append(c)
     avg_conf = sum(confidences) / len(confidences) if confidences else 0.0
     completeness = present / total if total else 0.0
     return round(avg_conf * completeness, 4)

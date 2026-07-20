@@ -41,7 +41,8 @@ def test_pre_product_scores_end_to_end_instead_of_abstaining():
         "execution",
         "traction",
     )
-    assert comp["score"] == 2.0
+    # Default-on calibration regresses a 0.7-confidence score toward the 5.0 baseline.
+    assert comp["score"] == 2.5
     assert comp.get("unrecognized_label") is None
 
 

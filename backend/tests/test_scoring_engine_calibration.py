@@ -21,7 +21,10 @@ LOW_CONF_REVIEW = {
 THIN_COVERAGE_SCOUT = {"name": "OneSignalCo", "sector": "devtools", "solution": ""}
 THIN_COVERAGE_REVIEW = {
     "structured_signals": {
-        "defensibility": {"network_effects": {"label": "strong", "confidence": 0.9, "reasoning": "x"}}
+        "defensibility": {"network_effects": {
+            "label": "strong", "confidence": 0.9, "reasoning": "x",
+            "evidence": "Verified customer referral-loop evidence.",
+        }}
     }
 }
 

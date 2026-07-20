@@ -178,7 +178,7 @@ def test_structured_signals_missing_placeholders_do_not_leak():
         for component in result[dim]["components"].values():
             assert component.get("label") != "[MISSING]"
             assert component.get("value") != "[MISSING]"
-    assert 0.0 <= result["overall_score"] <= 10.0
+    assert result["overall_score"] is None
 
 
 def test_structured_signal_aliases_are_mapped_to_canonical_keys():

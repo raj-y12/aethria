@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Dict
 
 
@@ -22,10 +23,11 @@ EVIDENCE_DISCOUNT: Dict[str, float] = {"floor_conf": 0.2, "full_conf": 0.8}
 # "Strong" dimension score; the dimension is flagged `evidence_capped` for the memo.
 EVIDENCE_GATE: Dict[str, float] = {"min_completeness": 0.4, "min_avg_conf": 0.35, "cap": 6.0}
 
-# Master switch for the Issue-1 calibration. When False (default), scores are published
-# exactly as today and the new values are emitted only in shadow for comparison; flip to
-# True to publish the discounted/gated scores after validating the shadow diffs.
-EVIDENCE_CALIBRATION_ENABLED = False
+# Master switch for the Issue-1 calibration. Safe by default during the migration
+# window; it can be explicitly disabled for a controlled rollback.
+EVIDENCE_CALIBRATION_ENABLED = os.getenv(
+    "SCORING_EVIDENCE_CALIBRATION_ENABLED", "true"
+).strip().lower() in {"1", "true", "yes"}
 
 DIMENSION_WEIGHTS: Dict[str, Dict[str, float]] = {
     "market": {

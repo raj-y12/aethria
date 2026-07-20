@@ -444,20 +444,6 @@ class DeterministicScoringEngine:
             return 0.0
         return round(weighted_sum / weight_total, 4)
 
-    @staticmethod
-    def _component_has_evidence(component: Dict[str, Any]) -> bool:
-        value = component.get("value")
-        label = component.get("label")
-        if value is None and label is None:
-            return False
-        if isinstance(value, str) and DeterministicScoringEngine._is_missing_marker(value):
-            return False
-        if isinstance(label, str) and DeterministicScoringEngine._is_missing_marker(label):
-            return False
-        if value in ("", [], {}):
-            return label not in (None, "")
-        return True
-
     def _aggregate_policy_criteria(self, dimension: str, details: Dict[str, Any]) -> Dict[str, Any]:
         dim_policy = ((self.policy.get("dimensions") or {}).get(dimension) or {})
         criteria = dim_policy.get("criteria") if isinstance(dim_policy.get("criteria"), list) else []
@@ -482,16 +468,16 @@ class DeterministicScoringEngine:
             present = 0
             for name in source_components:
                 component = components.get(name) or {}
-                try:
-                    confidences.append(max(0.0, min(1.0, float(component.get("confidence", 0.0)))))
-                except (TypeError, ValueError):
-                    confidences.append(0.0)
                 # Only components with concrete evidence contribute to the criterion score.
                 # A missing component must NOT be folded in at its neutral 5.0 placeholder —
                 # that reintroduces the very leak aggregate_dimension excludes (audit C2 /
                 # Layer 3). Weights are renormalized over the evidenced components.
-                if self._component_has_evidence(component):
+                if _has_concrete_evidence(component):
                     present += 1
+                    try:
+                        confidences.append(max(0.0, min(1.0, float(component.get("confidence", 0.0)))))
+                    except (TypeError, ValueError):
+                        confidences.append(0.0)
                     component_weight = float(self.weights.get(dimension, {}).get(name, 1.0))
                     weighted_sum += float(component.get("score", DEFAULT_SCORE)) * component_weight
                     weight_total += component_weight
@@ -514,7 +500,7 @@ class DeterministicScoringEngine:
                 component = components.get(name) or {}
                 comp_reasoning = str(component.get("reasoning") or "").strip()
                 comp_score = float(component.get("score", DEFAULT_SCORE))
-                if not self._component_has_evidence(component):
+                if not _has_concrete_evidence(component):
                     missing_signal_names.append(name.replace("_", " "))
                 elif comp_reasoning and comp_score >= 7.0:
                     strong_signals.append(comp_reasoning)

@@ -88,12 +88,12 @@ def clamp_structured_signals_evidence(scout_output: Dict[str, Any], signals: Any
     """
     Return a deep-copied structured_signals dict with clamped components, or signals unchanged if disabled.
     """
-    if not _truthy("REVIEWER_SIGNALS_STRICT_EVIDENCE", "false"):
+    if not _truthy("REVIEWER_SIGNALS_STRICT_EVIDENCE", "true"):
         return signals
     if not isinstance(signals, dict):
         return signals
 
-    clear_labels = _truthy("REVIEWER_SIGNALS_STRICT_CLEAR", "false")
+    clear_labels = _truthy("REVIEWER_SIGNALS_STRICT_CLEAR", "true")
     allowed = _allowed_url_keys(scout_output)
     snippets = _scout_snippets(scout_output)
     out = copy.deepcopy(signals)
