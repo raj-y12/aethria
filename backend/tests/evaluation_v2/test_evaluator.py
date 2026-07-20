@@ -92,6 +92,50 @@ def test_missing_evidence_is_unscored_not_converted_to_zero():
     assert "execution" in result.recommendation.missing_information
 
 
+def test_required_unscored_criterion_forces_insufficient_evidence_despite_high_average():
+    claims = [_claims()[0]]
+    links = [_verified_link("claim-market")]
+    snapshot, _ = snapshot_claims(claims, links)
+
+    result = evaluate_snapshot(snapshot, _policy())
+
+    assert result.criteria[0].score == 8.0
+    assert next(
+        criterion
+        for criterion in result.criteria
+        if criterion.criterion == "execution"
+    ).score is None
+    assert result.recommendation.state is RecommendationState.INSUFFICIENT_EVIDENCE
+    assert "execution" in result.recommendation.missing_information
+    assert "Resolve missing evidence: execution" in result.recommendation.change_conditions
+    assert result.recommendation.human_review_required is True
+
+
+def test_optional_unscored_criterion_never_receives_numeric_placeholder():
+    policy = _policy().model_copy(deep=True)
+    policy.criteria[1].required = False
+    snapshot, _ = snapshot_claims([_claims()[0]], [_verified_link("claim-market")])
+
+    result = evaluate_snapshot(snapshot, policy)
+
+    execution = next(
+        criterion
+        for criterion in result.criteria
+        if criterion.criterion == "execution"
+    )
+    assert execution.score is None
+
+
+def test_all_unscored_criteria_have_zero_confidence_and_insufficient_evidence():
+    snapshot, _ = snapshot_claims(_claims(), links=[])
+
+    result = evaluate_snapshot(snapshot, _policy())
+
+    assert all(criterion.score is None for criterion in result.criteria)
+    assert result.recommendation.confidence == 0
+    assert result.recommendation.state is RecommendationState.INSUFFICIENT_EVIDENCE
+
+
 def test_snapshot_hash_depends_on_values_not_future_live_status():
     original, original_hash = snapshot_claims(_claims(), links=[])
     changed = _claims()

@@ -58,6 +58,7 @@ class _Pool:
 class _EvaluationConnection:
     def __init__(self):
         self.fetch_queries = []
+        self.execute_calls = []
 
     def transaction(self, **_kwargs):
         return _Acquire(self)
@@ -100,6 +101,7 @@ class _EvaluationConnection:
         raise AssertionError(f"Unexpected fetch query: {sql}")
 
     async def execute(self, _sql, *_args):
+        self.execute_calls.append((_sql, _args))
         return None
 
 
@@ -169,3 +171,36 @@ async def test_evaluation_link_projection_joins_grounding_metadata_tenant_safely
     assert "ea.trust_class" in normalized
     assert "ea.untrusted_input" in normalized
     assert "ea.prompt_injection_detected" in normalized
+
+
+@pytest.mark.asyncio
+async def test_evaluation_projection_preserves_unscored_criterion_as_null():
+    connection = _EvaluationConnection()
+    repository = EvaluationRepository(_Pool(connection))
+    policy = _evaluation_policy().model_copy(deep=True)
+    policy.criteria.append(
+        CriterionRule(criterion="execution", claim_types=["execution"], weight=0.5)
+    )
+    policy.criteria[0].weight = 0.5
+
+    result = await repository.evaluate(
+        user_id="user-a",
+        opportunity_id="opportunity-1",
+        actor_id="actor-a",
+        trigger_type="manual",
+        policy=policy,
+    )
+
+    execution = next(
+        criterion
+        for criterion in result["criteria"]
+        if criterion["criterion"] == "execution"
+    )
+    assert execution["score"] is None
+    assessment_inserts = [
+        args
+        for sql, args in connection.execute_calls
+        if "insert into public.criterion_assessments" in sql
+    ]
+    execution_insert = next(args for args in assessment_inserts if args[3] == "execution")
+    assert execution_insert[4] is None

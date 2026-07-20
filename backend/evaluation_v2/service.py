@@ -137,6 +137,7 @@ def evaluate_snapshot(
     weighted_total = 0.0
     total_weight = sum(rule.weight for rule in policy.criteria)
     missing = []
+    required_missing = []
     conflicts = []
     eligibility_policy = policy.decision_safety.evidence_eligibility
     for rule in policy.criteria:
@@ -173,6 +174,8 @@ def evaluate_snapshot(
         ]
         if not scored:
             missing.append(rule.criterion)
+            if rule.required:
+                required_missing.append(rule.criterion)
             criteria.append(
                 CriterionResult(
                     criterion=rule.criterion,
@@ -226,7 +229,7 @@ def evaluate_snapshot(
     average = weighted_total / scored_weight if scored_weight else 0
     if exclusion_claims:
         state = RecommendationState.PASS
-    elif coverage < policy.minimum_scored_weight:
+    elif required_missing or coverage < policy.minimum_scored_weight:
         state = RecommendationState.INSUFFICIENT_EVIDENCE
     elif average >= policy.advance_threshold:
         state = RecommendationState.ADVANCE
