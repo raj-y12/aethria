@@ -2,6 +2,10 @@ from types import SimpleNamespace
 
 import pytest
 
+from evaluation_v2.prerequisites import (
+    EvaluationPrerequisiteError,
+    EvaluationPrerequisites,
+)
 from pipeline_runner import run_on_demand_lookup
 
 
@@ -60,6 +64,7 @@ class _FakePartnerEngine:
 class _FakeThesis:
     """Stand-in for an active FundThesis; only as_engine_context() is exercised."""
 
+    version_id = "thesis-v1"
     CONTEXT = {"version_id": "thesis-v1", "mandate": "AI infra, seed/A"}
 
     def as_engine_context(self):
@@ -87,6 +92,21 @@ def _wire_common_engines(monkeypatch):
     monkeypatch.setattr("pipeline_runner.ReviewerEngine", _FakeReviewerEngine)
     monkeypatch.setattr("pipeline_runner.PartnerEngine", _FakePartnerEngine)
     monkeypatch.setattr("pipeline_runner.PortfolioStore", lambda *args, **kwargs: SimpleNamespace())
+    prerequisites = EvaluationPrerequisites(
+        thesis_version_id="thesis-v1",
+        policy=SimpleNamespace(
+            policy_version_id="policy-live",
+            policy_hash="hash-live",
+        ),
+    )
+
+    async def load_prerequisites(**kwargs):
+        assert kwargs["user_id"] == "user_123"
+        return prerequisites
+
+    monkeypatch.setattr(
+        "pipeline_runner.load_evaluation_prerequisites", load_prerequisites
+    )
 
 
 @pytest.mark.asyncio
@@ -137,23 +157,29 @@ async def test_on_demand_lookup_forwards_resolution_and_records_stage_timings(mo
 
 
 @pytest.mark.asyncio
-async def test_on_demand_lookup_runs_thesis_blind_when_no_mandate(monkeypatch):
-    """Lookup permission is open: a missing/un-bootstrappable thesis must NOT block
-    the search. Engines simply receive None and run thesis-blind."""
+async def test_on_demand_lookup_blocks_when_no_mandate(monkeypatch):
     _wire_common_engines(monkeypatch)
-    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: None)
 
-    def _failing_bootstrap(*a, **k):
-        raise RuntimeError("no default thesis available")
+    async def load_prerequisites(**kwargs):
+        raise EvaluationPrerequisiteError(
+            code="thesis_required",
+            detail="An active fund thesis is required before evaluation.",
+            recovery_action="Create and publish the fund thesis in Settings.",
+        )
 
-    monkeypatch.setattr("pipeline_runner._bootstrap_default_thesis_or_raise", _failing_bootstrap)
+    monkeypatch.setattr(
+        "pipeline_runner.load_evaluation_prerequisites", load_prerequisites
+    )
 
-    startup_id = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-123")
+    with pytest.raises(EvaluationPrerequisiteError) as exc:
+        await run_on_demand_lookup(
+            "user_123", "Perplexity AI", lookup_id="lookup-123"
+        )
 
-    assert startup_id == "startup-1"
-    assert _FakeScoutEngine.active_thesis is None
-    assert _FakeReviewerEngine.active_thesis is None
-    assert _FakePartnerEngine.fund_thesis is None
+    assert exc.value.code == "thesis_required"
+    assert _FakeScoutEngine.calls == 0
+    assert _FakeReviewerEngine.calls == 0
+    assert _FakePartnerEngine.calls == 0
 
 
 @pytest.mark.asyncio
@@ -358,3 +384,10 @@ async def test_lookup_emits_durable_stage_checkpoints_without_handoff_sleeps(mon
         ("completed", "succeeded"),
     ]
     assert all("startup" not in metadata for _, _, metadata in checkpoints)
+    assert checkpoints[0][2] == {
+        "lookup_id": "lookup-checkpoints-1",
+        "pipeline_run_id": "fd1e14c8-b1c5-4c25-af07-ad0ac487b5be",
+        "thesis_version_id": "thesis-v1",
+        "policy_version_id": "policy-live",
+        "policy_hash": "hash-live",
+    }

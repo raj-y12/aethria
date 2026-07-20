@@ -20,6 +20,11 @@ from jobs.models import (
     PipelineCyclePayload,
 )
 from evidence.repository import EvidenceRepository
+from evaluation_v2.prerequisites import (
+    EvaluationPrerequisiteError,
+    load_evaluation_prerequisites,
+)
+from fund_intelligence.repository import FundIntelligenceRepository
 from monitoring.models import RefreshReason
 from monitoring.repository import MonitoringRepository
 from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
@@ -52,6 +57,17 @@ async def _checkpoint(repository, job, stage, status, metadata):
 async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
     payload = PipelineCyclePayload.model_validate(job.payload)
     await _checkpoint(repository, job, "pipeline_cycle", "started", {})
+    try:
+        await load_evaluation_prerequisites(
+            user_id=job.user_id,
+            fund_intelligence_repository=FundIntelligenceRepository(repository.pool),
+        )
+    except EvaluationPrerequisiteError as exc:
+        raise JobExecutionBlocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
+        ) from exc
     await run_one_pipeline_cycle(
         job.user_id,
         manual_one_shot=payload.manual_one_shot,
@@ -157,6 +173,18 @@ async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
             ),
         )
 
+    try:
+        evaluation_prerequisites = await load_evaluation_prerequisites(
+            user_id=job.user_id,
+            fund_intelligence_repository=FundIntelligenceRepository(repository.pool),
+        )
+    except EvaluationPrerequisiteError as exc:
+        raise JobExecutionBlocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
+        ) from exc
+
     async def checkpoint(stage: str, status: str, metadata: Dict[str, Any]) -> None:
         await _checkpoint(repository, job, stage, status, metadata)
 
@@ -172,10 +200,14 @@ async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
         resolution=resolution,
         pipeline_run_id=job.pipeline_run_id,
         checkpoint=checkpoint,
+        evaluation_prerequisites=evaluation_prerequisites,
         institutional_context={
             "observation_id": admission.observation_id,
             "company_id": admission.company_id,
             "opportunity_id": admission.opportunity_id,
+            "thesis_version_id": evaluation_prerequisites.thesis_version_id,
+            "policy_version_id": evaluation_prerequisites.policy.policy_version_id,
+            "policy_hash": evaluation_prerequisites.policy.policy_hash,
         },
     )
     if startup_id is not None:

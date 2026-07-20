@@ -33,6 +33,11 @@ if load_dotenv:
 
 from tenant_context import TenantContext
 from event_bus import publish as _publish_event
+from evaluation_v2.prerequisites import (
+    EvaluationPrerequisiteError,
+    EvaluationPrerequisites,
+    load_evaluation_prerequisites,
+)
 from pipeline_concurrency import pipeline_execution_slot, lookup_execution_slot
 from supabase_doc_store import list_upsert
 from utils.settings_loader import load_settings, is_thesis_reprocess_agents_enabled
@@ -811,6 +816,7 @@ async def run_on_demand_lookup(
         Callable[[str, str, Dict[str, Any]], Awaitable[None]]
     ] = None,
     institutional_context: Optional[Dict[str, Any]] = None,
+    evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
 ) -> Optional[str]:
     """
     Run scout -> reviewer -> partner for one explicit company name.
@@ -831,6 +837,11 @@ async def run_on_demand_lookup(
         return None
 
     user_id = user_id.strip()
+    if evaluation_prerequisites is None:
+        evaluation_prerequisites = await load_evaluation_prerequisites(
+            user_id=user_id,
+            fund_intelligence_repository=None,
+        )
     # Lookups use their own slot so they never wait behind a full periodic cycle.
     async with lookup_execution_slot(user_id):
         return await _run_on_demand_lookup_inner(
@@ -847,6 +858,7 @@ async def run_on_demand_lookup(
             pipeline_run_id=pipeline_run_id,
             checkpoint=checkpoint,
             institutional_context=institutional_context,
+            evaluation_prerequisites=evaluation_prerequisites,
         )
 
 
@@ -889,6 +901,7 @@ async def _run_on_demand_lookup_inner(
         Callable[[str, str, Dict[str, Any]], Awaitable[None]]
     ] = None,
     institutional_context: Optional[Dict[str, Any]] = None,
+    evaluation_prerequisites: EvaluationPrerequisites,
 ) -> Optional[str]:
     tenant = TenantContext(user_id=user_id)
     logger.info(
@@ -942,26 +955,36 @@ async def _run_on_demand_lookup_inner(
         )
         return None
 
-    # On-demand lookup is intentionally OPEN: an analyst may look up any company,
-    # even one outside the fund's mandate. But evaluation must still be MANDATE-AWARE
-    # so the reviewer can score thesis alignment and the partner can frame fund fit
-    # ("strong company, weak mandate fit", "outside thesis but worth an exception").
-    # Unlike the periodic pipeline, a missing/incomplete thesis does NOT block the
-    # lookup — it just runs thesis-blind and we log that the fund lens is unavailable.
-    thesis_ctx = None
+    # Identity remains open to any company, but Scout/Reviewer/Partner work must
+    # use the exact active mandate admitted by the prerequisite gate.
     try:
-        active = await asyncio.to_thread(
-            _load_active_thesis_sync, user_id, tolerate_bootstrap_failure=True
+        active = await asyncio.to_thread(_load_active_thesis_sync, user_id)
+    except FundThesisIncompleteError as exc:
+        raise EvaluationPrerequisiteError(
+            code="thesis_required",
+            detail="The active fund thesis is incomplete.",
+            recovery_action="Complete and publish the fund thesis in Settings.",
+        ) from exc
+    except Exception as exc:
+        raise EvaluationPrerequisiteError(
+            code="prerequisite_unavailable",
+            detail="The active fund thesis could not be loaded.",
+            recovery_action="Retry after the thesis store is available.",
+        ) from exc
+    if active is None:
+        raise EvaluationPrerequisiteError(
+            code="thesis_required",
+            detail="An active fund thesis is required before evaluation.",
+            recovery_action="Create and publish the fund thesis in Settings.",
         )
-        if active is not None:
-            thesis_ctx = active.as_engine_context()
-            logger.info("[%s] Lookup will evaluate against active thesis", user_id[:12])
-        else:
-            logger.info("[%s] Lookup running thesis-blind (no active mandate)", user_id[:12])
-    except FundThesisIncompleteError as e:
-        logger.info("[%s] Lookup running thesis-blind (thesis incomplete): %s", user_id[:12], e)
-    except Exception as e:
-        logger.warning("[%s] Lookup: failed to load active thesis, running thesis-blind: %s", user_id[:12], e)
+    if str(active.version_id) != evaluation_prerequisites.thesis_version_id:
+        raise EvaluationPrerequisiteError(
+            code="prerequisite_unavailable",
+            detail="The active fund thesis changed while lookup was starting.",
+            recovery_action="Retry the lookup against the current thesis.",
+        )
+    thesis_ctx = active.as_engine_context()
+    logger.info("[%s] Lookup will evaluate against active thesis", user_id[:12])
 
     try:
         settings = await asyncio.to_thread(load_settings, user_id)
@@ -987,12 +1010,18 @@ async def _run_on_demand_lookup_inner(
     lookup_outcome: Dict[str, Any] = {}
     try:
         lookup_run_id = (pipeline_run_id or "").strip() or str(uuid4())
+        evaluation_context = {
+            **(institutional_context or {}),
+            "thesis_version_id": evaluation_prerequisites.thesis_version_id,
+            "policy_version_id": evaluation_prerequisites.policy.policy_version_id,
+            "policy_hash": evaluation_prerequisites.policy.policy_hash,
+        }
         await emit(
             "accepted",
             "succeeded",
             lookup_id=lid,
             pipeline_run_id=lookup_run_id,
-            **(institutional_context or {}),
+            **evaluation_context,
         )
         logger.info(
             "[%s] on_demand_lookup pipeline_run_id=%s rss_mb_start=%.1f",

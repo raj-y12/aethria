@@ -4,6 +4,10 @@ import pytest
 from fastapi import HTTPException
 
 from evaluation_v2.policy import evaluation_policy_from_compiled
+from evaluation_v2.prerequisites import (
+    EvaluationPrerequisiteError,
+    EvaluationPrerequisites,
+)
 
 
 def _compiled_policy():
@@ -105,7 +109,6 @@ def test_missing_decision_safety_config_fails_closed():
 async def test_evaluate_endpoint_uses_active_thesis_and_published_policy(monkeypatch):
     import routers.evaluations as route
 
-    thesis = SimpleNamespace(version_id="thesis-live")
     policy = evaluation_policy_from_compiled(
         _compiled_policy(),
         partner_rules={"version": "rules-v2", "decision_safety": _decision_safety()},
@@ -124,14 +127,14 @@ async def test_evaluate_endpoint_uses_active_thesis_and_published_policy(monkeyp
                 "recommendation": {"recommended_state": "monitor"},
             }
 
-    monkeypatch.setattr(route, "get_service_client", lambda: object())
-    monkeypatch.setattr(route, "get_active_thesis", lambda client, user_id: thesis)
-    monkeypatch.setattr(route, "load_published_policy", lambda user_id: _compiled_policy())
-    monkeypatch.setattr(
-        route,
-        "get_partner_rules",
-        lambda: {"version": "rules-v2", "decision_safety": _decision_safety()},
-    )
+    async def load(**kwargs):
+        assert kwargs["user_id"] == "user-a"
+        return EvaluationPrerequisites(
+            thesis_version_id="thesis-live",
+            policy=policy,
+        )
+
+    monkeypatch.setattr(route, "load_evaluation_prerequisites", load)
     request = SimpleNamespace(
         state=SimpleNamespace(user_id="user-a"),
         app=SimpleNamespace(state=SimpleNamespace(evaluation_repository=Repository())),
@@ -147,15 +150,31 @@ async def test_evaluate_endpoint_uses_active_thesis_and_published_policy(monkeyp
 
 
 @pytest.mark.asyncio
-async def test_evaluate_endpoint_fails_closed_when_thesis_is_missing(monkeypatch):
+@pytest.mark.parametrize(
+    ("code", "expected_status"),
+    [
+        ("thesis_required", 409),
+        ("published_policy_required", 409),
+        ("prerequisite_unavailable", 503),
+    ],
+)
+async def test_evaluate_endpoint_translates_prerequisite_failures(
+    monkeypatch, code, expected_status
+):
     import routers.evaluations as route
 
     class Repository:
         async def evaluate(self, **kwargs):
             raise AssertionError("repository must not run without a thesis")
 
-    monkeypatch.setattr(route, "get_service_client", lambda: object())
-    monkeypatch.setattr(route, "get_active_thesis", lambda client, user_id: None)
+    async def load(**kwargs):
+        raise EvaluationPrerequisiteError(
+            code=code,
+            detail=f"{code} detail",
+            recovery_action="Fix the prerequisite in Settings.",
+        )
+
+    monkeypatch.setattr(route, "load_evaluation_prerequisites", load)
     request = SimpleNamespace(
         state=SimpleNamespace(user_id="user-a"),
         app=SimpleNamespace(state=SimpleNamespace(evaluation_repository=Repository())),
@@ -164,5 +183,5 @@ async def test_evaluate_endpoint_fails_closed_when_thesis_is_missing(monkeypatch
     with pytest.raises(HTTPException) as exc:
         await route.evaluate_opportunity(request, "opportunity-1")
 
-    assert exc.value.status_code == 409
-    assert exc.value.detail == "An active fund thesis is required before evaluation"
+    assert exc.value.status_code == expected_status
+    assert exc.value.detail == f"{code} detail"

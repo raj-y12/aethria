@@ -1,19 +1,13 @@
 """Current immutable evaluation/recommendation projection and explicit trigger."""
 
-import asyncio
-
 from fastapi import APIRouter, HTTPException, Request
 
-from core.policy_resolver import get_partner_rules
-from evaluation_v2.policy import evaluation_policy_from_compiled
-from evaluation_v2.repository import EvaluationLifecycleError
-from fund_thesis import FundThesisError, get_active_thesis
-from security.request_guards import require_authenticated_user, validate_route_id
-from services.scoring.policy_store import (
-    PolicyNotPublishedError,
-    load_published_policy,
+from evaluation_v2.prerequisites import (
+    EvaluationPrerequisiteError,
+    load_evaluation_prerequisites,
 )
-from supabase_client import get_service_client
+from evaluation_v2.repository import EvaluationLifecycleError
+from security.request_guards import require_authenticated_user, validate_route_id
 
 
 router = APIRouter(tags=["evaluations"])
@@ -43,44 +37,11 @@ async def evaluate_opportunity(request: Request, opportunity_id: str):
     validate_route_id(opportunity_id, field_name="opportunity_id")
     user_id = require_authenticated_user(request)
     try:
-        thesis = await asyncio.to_thread(
-            get_active_thesis, get_service_client(), user_id
-        )
-        if thesis is None:
-            raise HTTPException(
-                status_code=409,
-                detail="An active fund thesis is required before evaluation",
-            )
-        fund_repository = getattr(
-            request.app.state, "fund_intelligence_repository", None
-        )
-        compiled_policy = None
-        if fund_repository is not None:
-            try:
-                governed = await fund_repository.get_active_published_policy(
-                    user_id=user_id
-                )
-                from services.scoring.policy_compiler import (
-                    compile_policy_from_fund_config,
-                )
-
-                compiled_policy = await asyncio.to_thread(
-                    compile_policy_from_fund_config,
-                    governed["policy_patch"],
-                    require_publish_ready=True,
-                )
-                if compiled_policy["policy_hash"] != governed["policy_hash"]:
-                    raise RuntimeError("Governed policy hash is inconsistent")
-                compiled_policy["policy_version_id"] = governed[
-                    "governed_policy_version_id"
-                ]
-            except LookupError:
-                compiled_policy = None
-        if compiled_policy is None:
-            compiled_policy = await asyncio.to_thread(load_published_policy, user_id)
-        partner_rules = await asyncio.to_thread(get_partner_rules)
-        policy = evaluation_policy_from_compiled(
-            compiled_policy, partner_rules=partner_rules
+        prerequisites = await load_evaluation_prerequisites(
+            user_id=user_id,
+            fund_intelligence_repository=getattr(
+                request.app.state, "fund_intelligence_repository", None
+            ),
         )
         repository = _repository(request)
         await repository.evaluate(
@@ -88,8 +49,8 @@ async def evaluate_opportunity(request: Request, opportunity_id: str):
             opportunity_id=opportunity_id,
             actor_id=user_id,
             trigger_type="operator_refresh",
-            policy=policy,
-            thesis_version_id=thesis.version_id,
+            policy=prerequisites.policy,
+            thesis_version_id=prerequisites.thesis_version_id,
         )
         current = await repository.get_current(
             user_id=user_id, opportunity_id=opportunity_id
@@ -97,10 +58,13 @@ async def evaluate_opportunity(request: Request, opportunity_id: str):
         if current is None:
             raise RuntimeError("Completed evaluation projection is unavailable")
         return current
-    except PolicyNotPublishedError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except FundThesisError as exc:
-        raise HTTPException(status_code=503, detail="Fund thesis is unavailable") from exc
+    except EvaluationPrerequisiteError as exc:
+        status_code = (
+            409
+            if exc.code in {"thesis_required", "published_policy_required"}
+            else 503
+        )
+        raise HTTPException(status_code=status_code, detail=exc.detail) from exc
     except EvaluationLifecycleError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except LookupError as exc:
