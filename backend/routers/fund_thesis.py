@@ -35,6 +35,7 @@ from fund_thesis_ops import (
     create_fund_thesis_version_for_user,
 )
 from pipeline_runner import reprocess_startups_missing_fund_thesis
+from pipeline_execution import PipelineExecutionState
 
 router = APIRouter()
 
@@ -347,26 +348,39 @@ async def api_post_fund_thesis_reprocess_missing(
     """
     _require_supabase_for_thesis()
     uid = request.state.user_id
-    client = get_service_client()
-
-    if not dry_run:
-        try:
-            thesis = await asyncio.to_thread(get_active_thesis, client, uid)
-            if thesis is None:
-                raise HTTPException(status_code=400, detail="No active thesis")
-        except FundThesisIncompleteError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        if not os.getenv("OPENAI_API_KEY", "").strip():
-            raise HTTPException(
-                status_code=503,
-                detail="OPENAI_API_KEY required for thesis reprocessing",
-            )
-
-    try:
-        result = await reprocess_startups_missing_fund_thesis(uid, dry_run=dry_run)
-    except RuntimeError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    return result
+    result = await reprocess_startups_missing_fund_thesis(
+        uid,
+        dry_run=dry_run,
+        fund_intelligence_repository=getattr(
+            request.app.state, "fund_intelligence_repository", None
+        ),
+    )
+    if result.state is PipelineExecutionState.BLOCKED:
+        status = (
+            409
+            if result.code in {"thesis_required", "published_policy_required"}
+            else 503
+        )
+        raise HTTPException(
+            status_code=status,
+            detail={
+                "code": result.code,
+                "detail": result.detail,
+                "recovery_action": result.recovery_action,
+            },
+        )
+    if result.state is PipelineExecutionState.FAILED_STAGE:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": result.code,
+                "detail": result.detail,
+                "recovery_action": result.recovery_action,
+                "failed_stage": result.failed_stage,
+            },
+        )
+    # Preserve the existing public count payload while runners use typed semantics.
+    return result.metadata
 
 
 @router.post("/api/fund-thesis/backfill-embeddings")

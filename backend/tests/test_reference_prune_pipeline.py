@@ -96,10 +96,17 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
         async def list_linked_legacy_startup_ids(self, *, user_id):
             return []
 
+    class Prerequisites:
+        thesis_version_id = "thesis-live"
+
+        def require_tenant(self, user_id, *, context):
+            assert user_id == "user-prune-order"
+            return user_id
+
     await pipeline_runner._run_one_pipeline_cycle_inner(
         "user-prune-order",
         identity_repository=IdentityRepository(),
-        evaluation_prerequisites=SimpleNamespace(thesis_version_id="thesis-live"),
+        evaluation_prerequisites=Prerequisites(),
     )
 
     assert order[:3] == ["scout", "prune", "reviewer"]

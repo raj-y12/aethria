@@ -144,6 +144,7 @@ from pipeline_runner import (
     run_one_pipeline_cycle,
     run_on_demand_lookup,
 )
+from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
 from fund_thesis import (
     FundThesisIncompleteError,
     FundThesisMissingError,
@@ -410,6 +411,17 @@ def _consume_lookup_resolution(user_id: str, token: Optional[str]) -> Any:
     return cached[2]
 
 
+def _agent_status_for_execution(result: PipelineExecutionResult) -> str:
+    if result.state in {
+        PipelineExecutionState.BLOCKED,
+        PipelineExecutionState.FAILED_STAGE,
+    }:
+        return "error"
+    if result.state is PipelineExecutionState.SKIPPED:
+        return "stopped"
+    return "running"
+
+
 async def _agent_worker() -> None:
     """Background worker: full scout/reviewer/partner cycles only (not on-demand lookup)."""
     if _agent_queue is None:
@@ -419,15 +431,26 @@ async def _agent_worker() -> None:
             job = await _agent_queue.get()
             user_id = str(job.get("user_id") or "").strip()
             try:
-                await run_one_pipeline_cycle(
+                result = await run_one_pipeline_cycle(
                     user_id,
                     manual_one_shot=bool(job.get("manual_one_shot")),
+                    identity_repository=getattr(
+                        app.state, "identity_repository", None
+                    ),
                     fund_intelligence_repository=getattr(
                         app.state, "fund_intelligence_repository", None
                     ),
                 )
+                if not isinstance(result, PipelineExecutionResult):
+                    raise RuntimeError("Pipeline runner returned an invalid execution result")
+                await _update_agent_run_status(
+                    user_id,
+                    _agent_status_for_execution(result),
+                    execution_result=result,
+                )
             except Exception as e:
                 _logger_agents.exception("Pipeline cycle error for user %s: %s", user_id[:12] if user_id else "?", e)
+                await _update_agent_run_status(user_id, "error")
             finally:
                 _release_security_lock(str(job.get("lock_key") or "").strip() or None)
                 _agent_queue.task_done()
@@ -452,7 +475,7 @@ async def _lookup_worker() -> None:
                         lookup_id,
                     )
                     continue
-                await run_on_demand_lookup(
+                result = await run_on_demand_lookup(
                     user_id,
                     str(job.get("company_name") or ""),
                     website=str(job.get("website") or "").strip() or None,
@@ -467,6 +490,16 @@ async def _lookup_worker() -> None:
                         app.state, "fund_intelligence_repository", None
                     ),
                 )
+                if not isinstance(result, PipelineExecutionResult):
+                    raise RuntimeError("Lookup runner returned an invalid execution result")
+                if result.state is not PipelineExecutionState.COMPLETED:
+                    _logger_agents.warning(
+                        "On-demand lookup finished state=%s code=%s user=%s lookup_id=%s",
+                        result.state.value,
+                        result.code,
+                        user_id[:12] if user_id else "?",
+                        lookup_id,
+                    )
             except Exception as e:
                 _logger_agents.exception(
                     "On-demand lookup error for user %s: %s",
@@ -520,12 +553,21 @@ def _is_user_loop_alive(user_id: str) -> bool:
     return task is not None and not task.done()
 
 
-async def _update_agent_run_status(user_id: str, status: str) -> None:
+async def _update_agent_run_status(
+    user_id: str,
+    status: str,
+    *,
+    execution_result: Optional[PipelineExecutionResult] = None,
+) -> None:
     """Best-effort: write agents_status (and last_started_at when running) into settings doc."""
     try:
         s = load_settings(user_id)
         ac = s.setdefault("agent_config", {})
         ac["agents_status"] = status
+        if execution_result is not None:
+            ac["agents_last_execution"] = execution_result.model_dump(
+                mode="json", exclude_none=True
+            )
         if status == "running":
             ac["agents_last_started_at"] = datetime.now(timezone.utc).isoformat()
         save_settings(s, user_id)
@@ -569,14 +611,42 @@ async def _user_agent_loop(user_id: str) -> None:
                 else:
                     # Local-only development seam. Production/Supabase execution
                     # is always committed to the durable repository first.
-                    await run_one_pipeline_cycle(user_id)
+                    result = await run_one_pipeline_cycle(
+                        user_id,
+                        identity_repository=getattr(
+                            app.state, "identity_repository", None
+                        ),
+                        fund_intelligence_repository=getattr(
+                            app.state, "fund_intelligence_repository", None
+                        ),
+                    )
+                    if not isinstance(result, PipelineExecutionResult):
+                        raise RuntimeError(
+                            "Pipeline runner returned an invalid execution result"
+                        )
+                    status = _agent_status_for_execution(result)
+                    if status == "error":
+                        await _update_agent_run_status(
+                            user_id, "error", execution_result=result
+                        )
+                        _logger_agents.warning(
+                            "[AGENT LOOP] Cycle state=%s code=%s user=%s",
+                            result.state.value,
+                            result.code,
+                            user_id[:12],
+                        )
+                    else:
+                        await _update_agent_run_status(
+                            user_id, status, execution_result=result
+                        )
                 _logger_agents.info(
                     "[AGENT LOOP] Cycle dispatched user=%s duration_s=%.2f rss_mb_after=%.1f",
                     user_id[:12],
                     time.perf_counter() - cycle_started_at,
                     _pipeline_rss_mb(),
                 )
-                await _update_agent_run_status(user_id, "running")
+                if _durable_jobs_required():
+                    await _update_agent_run_status(user_id, "running")
             except asyncio.CancelledError:
                 raise
             except Exception as exc:

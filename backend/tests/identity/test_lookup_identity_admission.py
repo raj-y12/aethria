@@ -9,6 +9,7 @@ from evaluation_v2.prerequisites import EvaluationPrerequisites
 from identity.models import IdentityAdmission, IdentityStatus, OpportunityRecord
 from jobs.models import AgentJob, CompanyLookupPayload, JobExecutionBlocked, JobType
 from utils.timeutil import utcnow
+from pipeline_execution import PipelineExecutionResult
 
 
 def _prerequisites():
@@ -132,7 +133,12 @@ async def test_identity_is_admitted_before_legacy_scout_and_projection_is_linked
     async def run(*args, **kwargs):
         order.append("legacy")
         captured["lookup_kwargs"] = kwargs
-        return "11111111-1111-4111-8111-111111111111"
+        return PipelineExecutionResult.completed(
+            code="lookup_completed",
+            detail="Lookup completed.",
+            startup_id="11111111-1111-4111-8111-111111111111",
+            projection_id="opportunity-1",
+        )
 
     monkeypatch.setattr(handlers, "IdentityRepository", lambda pool: identity_repository)
     monkeypatch.setattr(handlers, "IdentityService", _Service)
@@ -265,7 +271,12 @@ async def test_rerun_reuses_opportunity_already_linked_to_legacy_startup(monkeyp
             admitted = True
 
     async def run(*args, **kwargs):
-        return "11111111-1111-4111-8111-111111111111"
+        return PipelineExecutionResult.completed(
+            code="lookup_completed",
+            detail="Lookup completed.",
+            startup_id="11111111-1111-4111-8111-111111111111",
+            projection_id="opportunity-1",
+        )
 
     monkeypatch.setattr(handlers, "IdentityRepository", lambda pool: identity_repository)
     monkeypatch.setattr(handlers, "IdentityService", _Service)

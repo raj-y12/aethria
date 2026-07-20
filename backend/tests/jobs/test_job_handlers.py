@@ -1,6 +1,7 @@
 import importlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -19,6 +20,7 @@ from jobs.models import (
     JobType,
     PipelineCyclePayload,
 )
+from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
 
 
 def _prerequisites():
@@ -69,6 +71,9 @@ async def test_cycle_handler_passes_job_tenant_and_stable_pipeline_run(monkeypat
 
     async def run(user_id, **kwargs):
         calls.append((user_id, kwargs))
+        return PipelineExecutionResult.completed(
+            code="pipeline_cycle_completed", detail="Cycle completed."
+        )
 
     async def load(**kwargs):
         assert kwargs["user_id"] == "user-a"
@@ -134,7 +139,12 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
     async def run(user_id, company_name, **kwargs):
         calls.append((user_id, company_name, kwargs))
         await kwargs["checkpoint"]("scout", "succeeded", {"startup_id": "s1"})
-        return "s1"
+        return PipelineExecutionResult.completed(
+            code="lookup_completed",
+            detail="Lookup completed.",
+            startup_id="s1",
+            projection_id="opportunity-1",
+        )
 
     async def load(**kwargs):
         assert kwargs["user_id"] == "user-a"
@@ -176,6 +186,168 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
     assert repository.checkpoints[0]["stage"] == "identity"
     assert repository.checkpoints[1]["stage"] == "scout"
     assert repository.checkpoints[-1]["stage"] == "lookup_result"
+    assert repository.checkpoints[-1]["output_metadata"]["state"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_lookup_handler_links_produced_projection_but_never_succeeds_failed_stage(
+    monkeypatch,
+):
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository()
+    links = []
+
+    class IdentityRepository:
+        async def get_opportunity_by_legacy_projection(self, **_kwargs):
+            return None
+
+        async def link_legacy_projection(self, **kwargs):
+            links.append(kwargs)
+            return object()
+
+    class IdentityService:
+        def __init__(self, _repository):
+            pass
+
+        async def admit(self, _observation):
+            return SimpleNamespace(
+                observation_id="observation-1",
+                status=SimpleNamespace(value="resolved"),
+                company_id="company-1",
+                opportunity_id="opportunity-1",
+                identity_case_id=None,
+                confidence=1.0,
+                blocks_evaluation=False,
+            )
+
+    async def load(**_kwargs):
+        return _prerequisites()
+
+    async def run(*_args, **_kwargs):
+        return PipelineExecutionResult.stage_failure(
+            stage="reviewer",
+            code="reviewer_stage_failed",
+            detail="Reviewer could not complete.",
+            recovery_action="Inspect Reviewer logs and retry.",
+            startup_id="startup-1",
+        )
+
+    monkeypatch.setattr(handlers, "IdentityRepository", lambda _pool: IdentityRepository())
+    monkeypatch.setattr(handlers, "IdentityService", IdentityService)
+    monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
+    monkeypatch.setattr(handlers, "run_on_demand_lookup", run)
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup-reviewer-failed",
+        payload=CompanyLookupPayload(
+            user_id="user-a",
+            company_name="Acme",
+            website="https://acme.example",
+        ),
+        attempts=1,
+        status="running",
+    )
+
+    with pytest.raises(RuntimeError, match="reviewer_stage_failed"):
+        await handlers.company_lookup_handler(repository, job)
+
+    assert links == [
+        {
+            "user_id": "user-a",
+            "opportunity_id": "opportunity-1",
+            "legacy_startup_id": "startup-1",
+        }
+    ]
+    assert repository.checkpoints[-1]["stage"] == "lookup_result"
+    assert repository.checkpoints[-1]["status"] == "failed"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("result", "expected_exception"),
+    [
+        (
+            PipelineExecutionResult.blocked(
+                code="openai_api_key_required",
+                detail="OpenAI is not configured.",
+                recovery_action="Configure OPENAI_API_KEY and retry.",
+            ),
+            JobExecutionBlocked,
+        ),
+        (
+            PipelineExecutionResult.stage_failure(
+                stage="reviewer",
+                code="reviewer_stage_failed",
+                detail="Reviewer did not complete.",
+                recovery_action="Inspect Reviewer logs and retry.",
+            ),
+            RuntimeError,
+        ),
+    ],
+)
+async def test_cycle_handler_never_marks_blocked_or_failed_runner_result_succeeded(
+    monkeypatch, result, expected_exception
+):
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository()
+
+    async def load(**_kwargs):
+        return _prerequisites()
+
+    async def run(*_args, **_kwargs):
+        return result
+
+    monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
+    monkeypatch.setattr(handlers, "run_one_pipeline_cycle", run)
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.PIPELINE_CYCLE,
+        idempotency_key=f"cycle-{result.code}",
+        payload=PipelineCyclePayload(user_id="user-a"),
+        attempts=1,
+        status="running",
+    )
+
+    with pytest.raises(expected_exception):
+        await handlers.pipeline_cycle_handler(repository, job)
+
+    assert repository.checkpoints[-1]["status"] == "failed"
+    assert repository.checkpoints[-1]["output_metadata"]["state"] == result.state.value
+
+
+@pytest.mark.asyncio
+async def test_cycle_handler_records_intentional_skip_without_claiming_evaluation_completion(
+    monkeypatch,
+):
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository()
+
+    async def load(**_kwargs):
+        return _prerequisites()
+
+    async def run(*_args, **_kwargs):
+        return PipelineExecutionResult.skipped(
+            code="agents_disabled", detail="No agent stages are enabled."
+        )
+
+    monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
+    monkeypatch.setattr(handlers, "run_one_pipeline_cycle", run)
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.PIPELINE_CYCLE,
+        idempotency_key="cycle-skipped",
+        payload=PipelineCyclePayload(user_id="user-a"),
+        attempts=1,
+        status="running",
+    )
+
+    await handlers.pipeline_cycle_handler(repository, job)
+
+    terminal = repository.checkpoints[-1]
+    assert terminal["stage"] == "pipeline_cycle"
+    assert terminal["output_metadata"]["state"] == PipelineExecutionState.SKIPPED.value
+    assert terminal["output_metadata"]["code"] == "agents_disabled"
 
 
 @pytest.mark.asyncio
@@ -300,6 +472,40 @@ async def test_cycle_handler_blocks_before_legacy_cycle_when_policy_is_missing(m
 
     assert exc.value.code == "published_policy_required"
     assert [item["stage"] for item in repository.checkpoints] == ["pipeline_cycle"]
+
+
+@pytest.mark.asyncio
+async def test_cycle_handler_preserves_late_prerequisite_failure(monkeypatch):
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository()
+
+    async def load(**_kwargs):
+        return _prerequisites()
+
+    async def run(*_args, **_kwargs):
+        raise EvaluationPrerequisiteError(
+            code="certified_inputs_changed",
+            detail="Certified inputs changed before engine handoff.",
+            recovery_action="Reload prerequisites and retry the cycle.",
+        )
+
+    monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
+    monkeypatch.setattr(handlers, "run_one_pipeline_cycle", run)
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.PIPELINE_CYCLE,
+        idempotency_key="cycle-late-prerequisite-failure",
+        payload=PipelineCyclePayload(user_id="user-a"),
+        attempts=1,
+        status="running",
+    )
+
+    with pytest.raises(JobExecutionBlocked) as exc:
+        await handlers.pipeline_cycle_handler(repository, job)
+
+    assert exc.value.code == "certified_inputs_changed"
+    assert exc.value.detail == "Certified inputs changed before engine handoff."
+    assert exc.value.recovery_action == "Reload prerequisites and retry the cycle."
 
 
 @pytest.mark.asyncio

@@ -6,8 +6,8 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     EvaluationPrerequisites,
 )
-from fund_thesis import FundThesisMissingError
 from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
+from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
 
 
 class _FakeScoutEngine:
@@ -138,9 +138,10 @@ async def test_on_demand_lookup_evaluates_against_active_thesis(monkeypatch):
         lambda *a, **k: pytest.fail("should not bootstrap when an active thesis already exists"),
     )
 
-    startup_id = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-123")
+    result = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-123")
 
-    assert startup_id == "startup-1"
+    assert result.state is PipelineExecutionState.COMPLETED
+    assert result.startup_id == "startup-1"
     assert _FakeScoutEngine.active_thesis == _FakeThesis.CONTEXT
     assert _FakeReviewerEngine.active_thesis == _FakeThesis.CONTEXT
     assert _FakePartnerEngine.fund_thesis == _FakeThesis.CONTEXT
@@ -157,14 +158,15 @@ async def test_on_demand_lookup_forwards_resolution_and_records_stage_timings(mo
         lambda duration, **labels: observed.append(labels),
     )
 
-    startup_id = await run_on_demand_lookup(
+    result = await run_on_demand_lookup(
         "user_123",
         "Acme",
         lookup_id="lookup-timed-123",
         resolution=resolution,
     )
 
-    assert startup_id == "startup-1"
+    assert result.state is PipelineExecutionState.COMPLETED
+    assert result.startup_id == "startup-1"
     assert _FakeScoutEngine.resolution is resolution
     assert [(item["stage"], item["outcome"]) for item in observed] == [
         ("scout", "success"),
@@ -189,12 +191,12 @@ async def test_on_demand_lookup_blocks_when_no_mandate(monkeypatch):
         "pipeline_runner.load_evaluation_prerequisites", load_prerequisites
     )
 
-    with pytest.raises(EvaluationPrerequisiteError) as exc:
-        await run_on_demand_lookup(
-            "user_123", "Perplexity AI", lookup_id="lookup-123"
-        )
+    result = await run_on_demand_lookup(
+        "user_123", "Perplexity AI", lookup_id="lookup-123"
+    )
 
-    assert exc.value.code == "thesis_required"
+    assert result.state is PipelineExecutionState.BLOCKED
+    assert result.code == "thesis_required"
     assert _FakeScoutEngine.calls == 0
     assert _FakeReviewerEngine.calls == 0
     assert _FakePartnerEngine.calls == 0
@@ -233,14 +235,15 @@ async def test_direct_lookup_selects_governed_repository(monkeypatch):
         "pipeline_runner.load_evaluation_prerequisites", load_prerequisites
     )
 
-    startup_id = await run_on_demand_lookup(
+    result = await run_on_demand_lookup(
         "user_123",
         "Acme",
         lookup_id="lookup-governed",
         fund_intelligence_repository=governed_repository,
     )
 
-    assert startup_id == "startup-1"
+    assert result.state is PipelineExecutionState.COMPLETED
+    assert result.startup_id == "startup-1"
     assert calls == [
         {
             "user_id": "user_123",
@@ -271,13 +274,15 @@ async def test_direct_pipeline_cycle_gates_and_passes_governed_repository(monkey
     )
     monkeypatch.setattr("pipeline_runner._run_one_pipeline_cycle_inner", run_inner)
 
-    with pytest.raises(EvaluationPrerequisiteError) as exc:
-        await run_one_pipeline_cycle(
-            "user_123",
-            fund_intelligence_repository=governed_repository,
-        )
+    result = await run_one_pipeline_cycle(
+        "user_123",
+        fund_intelligence_repository=governed_repository,
+    )
 
-    assert exc.value is expected
+    assert result.state is PipelineExecutionState.BLOCKED
+    assert result.code == expected.code
+    assert result.detail == expected.detail
+    assert result.recovery_action == expected.recovery_action
     assert calls == [
         {
             "user_id": "user_123",
@@ -296,29 +301,30 @@ async def test_direct_pipeline_cycle_reuses_supplied_prerequisites(monkeypatch):
 
     async def run_inner(user_id, **kwargs):
         calls.append((user_id, kwargs))
+        return PipelineExecutionResult.completed(
+            code="pipeline_cycle_completed", detail="Cycle completed."
+        )
 
     monkeypatch.setattr(
         "pipeline_runner.load_evaluation_prerequisites", load_prerequisites
     )
     monkeypatch.setattr("pipeline_runner._run_one_pipeline_cycle_inner", run_inner)
 
-    await run_one_pipeline_cycle(
+    result = await run_one_pipeline_cycle(
         "user_123",
         evaluation_prerequisites=prerequisites,
     )
 
     assert calls[0][0] == "user_123"
     assert calls[0][1]["evaluation_prerequisites"] is prerequisites
+    assert result.state is PipelineExecutionState.COMPLETED
 
 
 @pytest.mark.asyncio
-async def test_periodic_continuity_missing_thesis_remains_operator_correctable(
+async def test_periodic_consumes_certified_thesis_without_reloading_active_thesis(
     monkeypatch,
 ):
     prerequisites = _prerequisites()
-
-    def missing_thesis(_user_id):
-        raise FundThesisMissingError("active thesis disappeared")
 
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
@@ -328,40 +334,105 @@ async def test_periodic_continuity_missing_thesis_remains_operator_correctable(
             "agent_config": {"scouts_enabled": True}
         },
     )
-    monkeypatch.setattr("pipeline_runner._build_storage_sync", lambda user_id: object())
-    monkeypatch.setattr("pipeline_runner._load_active_thesis_sync", missing_thesis)
+    storage = SimpleNamespace(remove_startups_without_references=lambda: 0)
+    monkeypatch.setattr("pipeline_runner._build_storage_sync", lambda user_id: storage)
+    monkeypatch.setattr(
+        "pipeline_runner._load_active_thesis_sync",
+        lambda _user_id: pytest.fail("certified thesis must not be reloaded"),
+    )
+    class Scout:
+        scouts = []
 
-    with pytest.raises(EvaluationPrerequisiteError) as exc:
-        await run_one_pipeline_cycle(
-            "user_123",
-            evaluation_prerequisites=prerequisites,
-        )
+        async def run_cycle(self, **_kwargs):
+            return []
 
-    assert exc.value.code == "thesis_required"
-    assert "Settings" in exc.value.recovery_action
+        def close(self):
+            return None
+
+    class Reviewer:
+        last_cycle_stats = {}
+
+        async def run_cycle(self, **_kwargs):
+            return 0
+
+        def close(self):
+            return None
+
+    class Partner:
+        last_cycle_escalations = 0
+
+        async def run_cycle(self, **_kwargs):
+            return 0
+
+        def close(self):
+            return None
+
+    engines = SimpleNamespace(
+        scout_engine=Scout(),
+        reviewer_engine=Reviewer(),
+        partner_engine=Partner(),
+        portfolio_store=SimpleNamespace(),
+        cost_controller=None,
+    )
+    monkeypatch.setattr("pipeline_runner._build_pipeline_engines", lambda **_kwargs: engines)
+    monkeypatch.setattr("pipeline_runner._prune_unreferenced_startups", lambda *_args: _async_none())
+    monkeypatch.setattr(
+        "pipeline_runner._admit_autonomous_discoveries",
+        lambda **_kwargs: _async_none(),
+    )
+    monkeypatch.setattr("pipeline_runner._count_startups_sync", lambda _user_id: 0)
+
+    class Portfolio:
+        async def run_cycle(self):
+            return None
+
+    class Meta:
+        async def run_cycle(self):
+            return None
+
+    monkeypatch.setattr("pipeline_runner.PortfolioEngine", lambda **_kwargs: Portfolio())
+    monkeypatch.setattr("pipeline_runner.MetaAgent", lambda **_kwargs: Meta())
+
+    identity_repository = SimpleNamespace(
+        list_linked_legacy_startup_ids=lambda **_kwargs: _async_empty_list()
+    )
+    result = await run_one_pipeline_cycle(
+        "user_123",
+        manual_one_shot=True,
+        identity_repository=identity_repository,
+        evaluation_prerequisites=prerequisites,
+    )
+
+    assert result.state is PipelineExecutionState.COMPLETED
+
+
+async def _async_none():
+    return None
+
+
+async def _async_empty_list():
+    return []
 
 
 @pytest.mark.asyncio
-async def test_lookup_continuity_missing_thesis_remains_operator_correctable(
+async def test_lookup_consumes_certified_thesis_without_reloading_active_thesis(
     monkeypatch,
 ):
     _wire_common_engines(monkeypatch)
     prerequisites = _prerequisites()
 
-    def missing_thesis(_user_id):
-        raise FundThesisMissingError("active thesis disappeared")
+    monkeypatch.setattr(
+        "pipeline_runner._load_active_thesis_sync",
+        lambda _user_id: pytest.fail("certified thesis must not be reloaded"),
+    )
 
-    monkeypatch.setattr("pipeline_runner._load_active_thesis_sync", missing_thesis)
+    result = await run_on_demand_lookup(
+        "user_123",
+        "Acme",
+        evaluation_prerequisites=prerequisites,
+    )
 
-    with pytest.raises(EvaluationPrerequisiteError) as exc:
-        await run_on_demand_lookup(
-            "user_123",
-            "Acme",
-            evaluation_prerequisites=prerequisites,
-        )
-
-    assert exc.value.code == "thesis_required"
-    assert "Settings" in exc.value.recovery_action
+    assert result.state is PipelineExecutionState.COMPLETED
 
 
 @pytest.mark.asyncio
@@ -369,14 +440,15 @@ async def test_on_demand_lookup_cancelled_before_scout_does_not_start(monkeypatc
     _wire_common_engines(monkeypatch)
     monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
 
-    startup_id = await run_on_demand_lookup(
+    result = await run_on_demand_lookup(
         "user_123",
         "Perplexity AI",
         lookup_id="lookup-123",
         is_cancelled=lambda: True,
     )
 
-    assert startup_id is None
+    assert result.state is PipelineExecutionState.SKIPPED
+    assert result.startup_id is None
     assert _FakeScoutEngine.calls == 0
     assert _FakeReviewerEngine.calls == 0
     assert _FakePartnerEngine.calls == 0
@@ -388,14 +460,15 @@ async def test_on_demand_lookup_cancelled_after_scout_stops_before_review(monkey
     monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
     checks = iter([False, False, True])
 
-    startup_id = await run_on_demand_lookup(
+    result = await run_on_demand_lookup(
         "user_123",
         "Perplexity AI",
         lookup_id="lookup-123",
         is_cancelled=lambda: next(checks, True),
     )
 
-    assert startup_id == "startup-1"
+    assert result.state is PipelineExecutionState.SKIPPED
+    assert result.startup_id == "startup-1"
     assert _FakeScoutEngine.calls == 1
     assert _FakeReviewerEngine.calls == 0
     assert _FakePartnerEngine.calls == 0
@@ -415,9 +488,11 @@ async def test_on_demand_lookup_records_terminal_failure_when_review_exhausts_re
     monkeypatch.setattr("pipeline_runner._record_lookup_failure", _record)
     monkeypatch.setattr("pipeline_runner.upsert_pipeline_state", lambda *a, **k: states.append(k))
 
-    startup_id = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-review-fail")
+    result = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-review-fail")
 
-    assert startup_id == "startup-1"
+    assert result.state is PipelineExecutionState.FAILED_STAGE
+    assert result.failed_stage == "reviewer"
+    assert result.startup_id == "startup-1"
     assert _FakeReviewerEngine.calls == 1
     assert _FakePartnerEngine.calls == 0
     assert recorded and recorded[0][:2] == ("user_123", "lookup-review-fail")
@@ -440,9 +515,11 @@ async def test_on_demand_lookup_records_terminal_failure_when_partner_exhausts_r
     monkeypatch.setattr("pipeline_runner._record_lookup_failure", _record)
     monkeypatch.setattr("pipeline_runner.upsert_pipeline_state", lambda *a, **k: states.append(k))
 
-    startup_id = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-partner-fail")
+    result = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-partner-fail")
 
-    assert startup_id == "startup-1"
+    assert result.state is PipelineExecutionState.FAILED_STAGE
+    assert result.failed_stage == "partner"
+    assert result.startup_id == "startup-1"
     assert _FakeReviewerEngine.calls == 1
     assert _FakePartnerEngine.calls == 1
     assert recorded and recorded[0][:2] == ("user_123", "lookup-partner-fail")
@@ -477,7 +554,7 @@ async def test_add_context_rerun_regenerates_and_persists_memo(monkeypatch):
     monkeypatch.setattr("pipeline_runner.MemoGenerator", _MemoGenerator)
     monkeypatch.setattr("pipeline_runner._build_rerun_operator_context", lambda context: context)
 
-    startup_id = await run_on_demand_lookup(
+    result = await run_on_demand_lookup(
         "user_123",
         "Acme",
         lookup_id="lookup-rerun-1",
@@ -485,7 +562,8 @@ async def test_add_context_rerun_regenerates_and_persists_memo(monkeypatch):
         replace_startup_id="startup-1",
     )
 
-    assert startup_id == "startup-1"
+    assert result.state is PipelineExecutionState.COMPLETED
+    assert result.startup_id == "startup-1"
     assert _FakeScoutEngine.calls == 0
     assert prepared[0][0] == "startup-1"
     assert patches == [
@@ -513,13 +591,14 @@ async def test_duplicate_lookup_persists_terminal_existing_startup_outcome(monke
 
     monkeypatch.setattr("pipeline_runner.list_upsert", record)
 
-    startup_id = await run_on_demand_lookup(
+    result = await run_on_demand_lookup(
         "user_123",
         "Acme",
         lookup_id="lookup-existing-1",
     )
 
-    assert startup_id == "startup-1"
+    assert result.state is PipelineExecutionState.COMPLETED
+    assert result.startup_id == "startup-1"
     assert outcomes == [
         (
             "lookup_job_outcomes",
@@ -549,7 +628,7 @@ async def test_lookup_emits_durable_stage_checkpoints_without_handoff_sleeps(mon
 
     monkeypatch.setattr("pipeline_runner.asyncio.sleep", no_sleep)
 
-    startup_id = await run_on_demand_lookup(
+    result = await run_on_demand_lookup(
         "user_123",
         "Acme",
         lookup_id="lookup-checkpoints-1",
@@ -557,7 +636,8 @@ async def test_lookup_emits_durable_stage_checkpoints_without_handoff_sleeps(mon
         checkpoint=checkpoint,
     )
 
-    assert startup_id == "startup-1"
+    assert result.state is PipelineExecutionState.COMPLETED
+    assert result.startup_id == "startup-1"
     assert [(stage, status) for stage, status, _ in checkpoints] == [
         ("accepted", "succeeded"),
         ("scout", "succeeded"),

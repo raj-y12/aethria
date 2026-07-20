@@ -28,6 +28,7 @@ from fund_intelligence.repository import FundIntelligenceRepository
 from monitoring.models import RefreshReason
 from monitoring.repository import MonitoringRepository
 from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
+from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
 from resolver.company_resolver import CompanyResolution, resolve_company
 
 
@@ -68,14 +69,34 @@ async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
             detail=exc.detail,
             recovery_action=exc.recovery_action,
         ) from exc
-    await run_one_pipeline_cycle(
-        job.user_id,
-        manual_one_shot=payload.manual_one_shot,
-        pipeline_run_id=job.pipeline_run_id,
-        identity_repository=IdentityRepository(repository.pool),
-        evaluation_prerequisites=evaluation_prerequisites,
-    )
-    await _checkpoint(repository, job, "pipeline_cycle", "succeeded", {})
+    try:
+        result = await run_one_pipeline_cycle(
+            job.user_id,
+            manual_one_shot=payload.manual_one_shot,
+            pipeline_run_id=job.pipeline_run_id,
+            identity_repository=IdentityRepository(repository.pool),
+            evaluation_prerequisites=evaluation_prerequisites,
+        )
+    except EvaluationPrerequisiteError as exc:
+        raise JobExecutionBlocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
+        ) from exc
+    if not isinstance(result, PipelineExecutionResult):
+        raise RuntimeError("Pipeline cycle runner returned an invalid execution result")
+    metadata = result.model_dump(mode="json", exclude_none=True)
+    if result.state is PipelineExecutionState.BLOCKED:
+        await _checkpoint(repository, job, "pipeline_cycle", "failed", metadata)
+        raise JobExecutionBlocked(
+            code=result.code,
+            detail=result.detail,
+            recovery_action=result.recovery_action or "Correct the prerequisite and retry.",
+        )
+    if result.state is PipelineExecutionState.FAILED_STAGE:
+        await _checkpoint(repository, job, "pipeline_cycle", "failed", metadata)
+        raise RuntimeError(f"{result.code}: {result.detail}")
+    await _checkpoint(repository, job, "pipeline_cycle", "succeeded", metadata)
 
 
 async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
@@ -189,29 +210,40 @@ async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
     async def checkpoint(stage: str, status: str, metadata: Dict[str, Any]) -> None:
         await _checkpoint(repository, job, stage, status, metadata)
 
-    startup_id = await run_on_demand_lookup(
-        job.user_id,
-        payload.company_name,
-        website=payload.website,
-        lookup_query=payload.lookup_query,
-        lookup_input_type=payload.lookup_input_type,
-        lookup_id=payload.lookup_id,
-        additional_context=payload.additional_context,
-        replace_startup_id=payload.replace_startup_id,
-        resolution=resolution,
-        pipeline_run_id=job.pipeline_run_id,
-        checkpoint=checkpoint,
-        evaluation_prerequisites=evaluation_prerequisites,
-        institutional_context={
-            "observation_id": admission.observation_id,
-            "company_id": admission.company_id,
-            "opportunity_id": admission.opportunity_id,
-            "thesis_version_id": evaluation_prerequisites.thesis_version_id,
-            "policy_version_id": evaluation_prerequisites.policy.policy_version_id,
-            "policy_hash": evaluation_prerequisites.policy.policy_hash,
-        },
-    )
-    if startup_id is not None:
+    try:
+        result = await run_on_demand_lookup(
+            job.user_id,
+            payload.company_name,
+            website=payload.website,
+            lookup_query=payload.lookup_query,
+            lookup_input_type=payload.lookup_input_type,
+            lookup_id=payload.lookup_id,
+            additional_context=payload.additional_context,
+            replace_startup_id=payload.replace_startup_id,
+            resolution=resolution,
+            pipeline_run_id=job.pipeline_run_id,
+            checkpoint=checkpoint,
+            evaluation_prerequisites=evaluation_prerequisites,
+            institutional_context={
+                "observation_id": admission.observation_id,
+                "company_id": admission.company_id,
+                "opportunity_id": admission.opportunity_id,
+                "thesis_version_id": evaluation_prerequisites.thesis_version_id,
+                "policy_version_id": evaluation_prerequisites.policy.policy_version_id,
+                "policy_hash": evaluation_prerequisites.policy.policy_hash,
+            },
+        )
+    except EvaluationPrerequisiteError as exc:
+        raise JobExecutionBlocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
+        ) from exc
+    if not isinstance(result, PipelineExecutionResult):
+        raise RuntimeError("Company lookup runner returned an invalid execution result")
+    result_metadata = result.model_dump(mode="json", exclude_none=True)
+    startup_id = result.startup_id
+    if startup_id:
         await identity_repository.link_legacy_projection(
             user_id=job.user_id,
             opportunity_id=admission.opportunity_id,
@@ -227,15 +259,20 @@ async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
                 "startup_id": startup_id,
             },
         )
-    await _checkpoint(
-        repository,
-        job,
-        "lookup_result",
-        "succeeded" if startup_id else "failed",
-        {"startup_id": startup_id} if startup_id else {},
-    )
-    if startup_id is None:
-        raise RuntimeError("Company lookup completed without a startup record")
+    if result.state is PipelineExecutionState.BLOCKED:
+        await _checkpoint(repository, job, "lookup_result", "failed", result_metadata)
+        raise JobExecutionBlocked(
+            code=result.code,
+            detail=result.detail,
+            recovery_action=result.recovery_action or "Correct the prerequisite and retry.",
+        )
+    if result.state is PipelineExecutionState.FAILED_STAGE:
+        await _checkpoint(repository, job, "lookup_result", "failed", result_metadata)
+        raise RuntimeError(f"{result.code}: {result.detail}")
+    if result.state is PipelineExecutionState.COMPLETED:
+        if not startup_id:
+            raise RuntimeError("Completed company lookup did not produce a startup record")
+    await _checkpoint(repository, job, "lookup_result", "succeeded", result_metadata)
 
 
 async def evidence_refresh_handler(repository: Any, job: AgentJob) -> None:

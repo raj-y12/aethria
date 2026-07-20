@@ -10,7 +10,6 @@ import argparse
 import asyncio
 import sys
 import os
-import env_config
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -26,18 +25,14 @@ else:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
-from utils.storage import Storage
-from utils.settings_loader import is_cost_budget_enabled
-from supabase_client import get_service_client
-from supabase_storage import SupabaseStartupsStorage
-from scout.engine import ScoutEngine
-from reviewer.engine import ReviewerEngine
-from partner.engine import PartnerEngine
-from portfolio.engine import PortfolioEngine
-from portfolio.cost_control import CostController
-from memory import DealMemory
+from fund_intelligence.repository import FundIntelligenceRepository
+from identity.repository import IdentityRepository
+from jobs.postgres import DurableJobConfigurationError, create_pool
+from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
+from pipeline_runner import run_one_pipeline_cycle
+from tenant_context import require_user_id
 
 
 class ColorFormatter(logging.Formatter):
@@ -91,11 +86,24 @@ def _parse_args():
         default=None,
         help="Clerk user ID (JWT 'sub') for this run. Required when USE_SUPABASE_STORAGE=1. Agents read/write this user's startups and settings.",
     )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Run one governed pipeline cycle and exit.",
+    )
     return parser.parse_args()
 
 
-async def run_system(user_id: Optional[str]):
-    """Run both Scout and Reviewer engines in parallel. user_id must be set when using Supabase."""
+async def run_system(
+    user_id: Optional[str],
+    *,
+    once: bool = False,
+    identity_repository: Any = None,
+    fund_intelligence_repository: Any = None,
+) -> PipelineExecutionResult:
+    """Run governed cycles through the same prerequisite boundary as every entry path."""
+    uid = require_user_id(user_id, context="run_system")
+
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
@@ -113,149 +121,76 @@ async def run_system(user_id: Optional[str]):
         )
     
     logger = logging.getLogger("system")
-    
-    # Get configuration from environment
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable is required")
-    
-    storage_path = os.getenv("STORAGE_PATH", "data/startups.json")
-    use_supabase = env_config.use_supabase_storage()
-    scout_interval = int(os.getenv("SCOUT_INTERVAL_SECONDS", "300"))
-    reviewer_interval = int(os.getenv("REVIEWER_INTERVAL_SECONDS", "60"))
-    partner_interval = int(os.getenv("PARTNER_INTERVAL_SECONDS", "30"))
-    model = os.getenv("SCOUT_MODEL", "gpt-5-nano")
-    reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-5-nano")
-    use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
-    
-    # User ID is required when using Supabase (no .env default; always dynamic)
-    if use_supabase and not (user_id and user_id.strip()):
-        raise ValueError(
-            "When USE_SUPABASE_STORAGE=1 you must pass --user-id=<clerk_user_id> "
-            "(the Clerk JWT 'sub'). From repo root: python backend/run_system.py --user-id=user_xxx. "
-            "Or set AETHRIA_AGENT_USER_ID in .env when using run.py (all-in-one)."
-        )
-    if user_id and user_id.strip():
-        logger.info("Run user_id=%s (explicit tenant for engines and storage)", user_id.strip())
+    logger.info("Starting governed AETHRIA pipeline user_id=%s", uid)
 
-    # Initialize shared storage: Supabase (service role + user_id) or file
-    if use_supabase and user_id:
-        storage = SupabaseStartupsStorage(get_service_client(), user_id.strip())
-        logger.info("Using storage: Supabase (startups table) — user_id=%s", user_id.strip())
-    else:
-        storage = Storage(file_path=storage_path)
-        logger.info("Using storage: file %s", storage_path)
-    # Remove startups without references (references are mandatory)
-    n_removed = storage.remove_startups_without_references()
-    if n_removed:
-        logger.info(f"Cleaned {n_removed} startup(s) without references from database")
-    
-    # Cost controller only when budget enforcement is enabled in settings
-    uid = (user_id or "").strip()
-    cost_controller = CostController(user_id=uid if uid else None) if is_cost_budget_enabled(uid if uid else None) else None
-
-    mem_uid = uid if uid else "local_agents"
-    deal_memory = DealMemory(user_id=mem_uid)
-
-    thesis_ctx = None
-    if use_supabase and uid:
-        from fund_thesis import FundThesisIncompleteError, FundThesisMissingError, get_active_thesis
-
-        try:
-            active = get_active_thesis(get_service_client(), uid)
-            if active is None:
-                raise ValueError("No active thesis")
-            thesis_ctx = active.as_engine_context()
-        except FundThesisIncompleteError as e:
-            raise ValueError(
-                "Could not load fund thesis when USE_SUPABASE_STORAGE=1. "
-                "Check Supabase connectivity and fund_thesis migrations."
-            ) from e
-
-    scout_engine = ScoutEngine(
-        api_key=api_key,
-        storage=storage,
-        interval_seconds=scout_interval,
-        model=model,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        tenant_user_id=uid or mem_uid,
-        active_thesis=thesis_ctx,
-    )
-
-    reviewer_engine = ReviewerEngine(
-        api_key=api_key,
-        storage=storage,
-        interval_seconds=reviewer_interval,
-        model=reviewer_model,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        tenant_user_id=uid or mem_uid,
-        active_thesis=thesis_ctx,
-    )
-
-    portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
-    from portfolio.store import PortfolioStore
-
-    portfolio_store = PortfolioStore(data_dir=portfolio_dir, user_id=uid if uid else None)
-
-    partner_engine = PartnerEngine(
-        storage=storage,
-        interval_seconds=partner_interval,
-        use_llm_fallback=use_llm_fallback,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        portfolio_store=portfolio_store,
-        tenant_user_id=uid or mem_uid,
-        fund_thesis=thesis_ctx,
-    )
-    portfolio_engine = PortfolioEngine(
-        discovery_storage=storage,
-        portfolio_store=portfolio_store,
-        execution_interval=10,
-        signal_interval=3600,
-        feedback_interval=86400,
-        health_interval=3600,
-    )
-    
-    # Create Meta-Agent
-    from meta.agent import MetaAgent
-    from meta.engine import MetaAgentEngine
-    meta_agent = MetaAgent(
-        scout_engine=scout_engine,
-        reviewer_engine=reviewer_engine,
-        user_id=uid or mem_uid,
-    )
-    meta_agent_engine = MetaAgentEngine(meta_agent)
-
-    logger.info("Starting AETHRIA system (Scout + Reviewer + Partner + Portfolio + Meta-Agent layers)")
-    logger.info(
-        f"Scout interval: {scout_interval}s, "
-        f"Reviewer interval: {reviewer_interval}s, "
-        f"Partner interval: {partner_interval}s"
-    )
-    logger.info(f"Partner LLM fallback: {use_llm_fallback}")
-    logger.info(f"Portfolio directory: {portfolio_dir}")
-    
-    # Run all engines in parallel
+    owned_pool = None
     try:
-        await asyncio.gather(
-            scout_engine.run_forever(),
-            reviewer_engine.run_forever(),
-            partner_engine.run_forever(),
-            portfolio_engine.run_forever(),
-            meta_agent_engine.run_forever(),
-        )
-    except KeyboardInterrupt:
-        logger.info("Received interrupt signal, shutting down...")
-        scout_engine.stop()
-        reviewer_engine.stop()
-        partner_engine.stop()
-        portfolio_engine.stop()
-        meta_agent_engine.stop()
-        logger.info("System stopped")
+        if identity_repository is None or fund_intelligence_repository is None:
+            try:
+                owned_pool = await create_pool()
+            except DurableJobConfigurationError as exc:
+                return PipelineExecutionResult.blocked(
+                    code="institutional_repository_required",
+                    detail=str(exc),
+                    recovery_action=(
+                        "Configure DATABASE_URL or SUPABASE_DB_URL before running "
+                        "the governed pipeline CLI."
+                    ),
+                )
+            except Exception as exc:
+                logger.error(
+                    "Institutional repository unavailable: %s", type(exc).__name__
+                )
+                return PipelineExecutionResult.blocked(
+                    code="institutional_repository_unavailable",
+                    detail="The institutional PostgreSQL repository is unavailable.",
+                    recovery_action=(
+                        "Restore database connectivity and retry the governed "
+                        "pipeline CLI."
+                    ),
+                )
+            identity_repository = identity_repository or IdentityRepository(owned_pool)
+            fund_intelligence_repository = (
+                fund_intelligence_repository
+                or FundIntelligenceRepository(owned_pool)
+            )
+
+        while True:
+            result = await run_one_pipeline_cycle(
+                uid,
+                manual_one_shot=True,
+                identity_repository=identity_repository,
+                fund_intelligence_repository=fund_intelligence_repository,
+            )
+            if not isinstance(result, PipelineExecutionResult):
+                raise RuntimeError("Pipeline runner returned an invalid execution result")
+            logger.info(
+                "Pipeline execution state=%s code=%s detail=%s recovery_action=%s",
+                result.state.value,
+                result.code,
+                result.detail,
+                result.recovery_action or "",
+            )
+            if once or result.state is not PipelineExecutionState.COMPLETED:
+                return result
+            await asyncio.sleep(max(1, int(os.getenv("SCOUT_INTERVAL_SECONDS", "300"))))
+    finally:
+        if owned_pool is not None:
+            await owned_pool.close()
+
+
+def _execution_exit_code(result: PipelineExecutionResult) -> int:
+    if result.state in {
+        PipelineExecutionState.COMPLETED,
+        PipelineExecutionState.SKIPPED,
+    }:
+        return 0
+    if result.state is PipelineExecutionState.BLOCKED:
+        return 2
+    return 1
 
 
 if __name__ == "__main__":
     args = _parse_args()
-    asyncio.run(run_system(user_id=args.user_id))
+    execution = asyncio.run(run_system(user_id=args.user_id, once=args.once))
+    raise SystemExit(_execution_exit_code(execution))

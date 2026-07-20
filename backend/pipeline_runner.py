@@ -38,6 +38,7 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisites,
     load_evaluation_prerequisites,
 )
+from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
 from pipeline_concurrency import pipeline_execution_slot, lookup_execution_slot
 from supabase_doc_store import list_upsert
 from utils.settings_loader import load_settings, is_thesis_reprocess_agents_enabled
@@ -464,6 +465,43 @@ async def _record_lookup_outcome(
         )
 
 
+async def _record_lookup_execution_result(
+    user_id: str,
+    lookup_id: Optional[str],
+    result: PipelineExecutionResult,
+) -> None:
+    """Persist an actionable non-completed direct-worker result for the UI."""
+    lid = (lookup_id or "").strip()
+    uid = (user_id or "").strip()
+    if not lid or not uid or not env_config.use_supabase_storage():
+        return
+    record = {
+        "id": lid,
+        "lookup_id": lid,
+        "status": result.state.value,
+        "code": result.code,
+        "message": result.detail[:500],
+        "recovery_action": result.recovery_action,
+        "failed_stage": result.failed_stage,
+        "startup_id": result.startup_id,
+    }
+    record = {key: value for key, value in record.items() if value is not None}
+    try:
+        await asyncio.to_thread(
+            list_upsert,
+            "lookup_job_outcomes",
+            record,
+            user_id=uid,
+        )
+    except Exception as exc:
+        logger.warning(
+            "[%s] Could not persist typed lookup result for %s: %s",
+            uid[:12],
+            lid[:16],
+            exc,
+        )
+
+
 async def _mark_lookup_pipeline_failed(
     storage: SupabaseStartupsStorage,
     startup_id: Optional[str],
@@ -495,21 +533,31 @@ async def run_one_pipeline_cycle(
     identity_repository: Optional[Any] = None,
     evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
     fund_intelligence_repository: Optional[Any] = None,
-) -> None:
+) -> PipelineExecutionResult:
     """Run one cycle of scout, reviewer, partner, portfolio, and meta for the given user."""
     uid = require_user_id(user_id, context="run_one_pipeline_cycle")
-    if evaluation_prerequisites is None:
-        evaluation_prerequisites = await load_evaluation_prerequisites(
-            user_id=uid,
-            fund_intelligence_repository=fund_intelligence_repository,
+    try:
+        if evaluation_prerequisites is None:
+            evaluation_prerequisites = await load_evaluation_prerequisites(
+                user_id=uid,
+                fund_intelligence_repository=fund_intelligence_repository,
+            )
+        evaluation_prerequisites.require_tenant(
+            uid, context="run_one_pipeline_cycle"
         )
-    async with pipeline_execution_slot(uid):
-        await _run_one_pipeline_cycle_inner(
-            uid,
-            manual_one_shot=manual_one_shot,
-            pipeline_run_id=pipeline_run_id,
-            identity_repository=identity_repository,
-            evaluation_prerequisites=evaluation_prerequisites,
+        async with pipeline_execution_slot(uid):
+            return await _run_one_pipeline_cycle_inner(
+                uid,
+                manual_one_shot=manual_one_shot,
+                pipeline_run_id=pipeline_run_id,
+                identity_repository=identity_repository,
+                evaluation_prerequisites=evaluation_prerequisites,
+            )
+    except EvaluationPrerequisiteError as exc:
+        return PipelineExecutionResult.blocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
         )
 
 
@@ -520,7 +568,10 @@ async def _run_one_pipeline_cycle_inner(
     pipeline_run_id: Optional[str] = None,
     identity_repository: Optional[Any] = None,
     evaluation_prerequisites: EvaluationPrerequisites,
-) -> None:
+) -> PipelineExecutionResult:
+    evaluation_prerequisites.require_tenant(
+        user_id, context="_run_one_pipeline_cycle_inner"
+    )
     tenant = TenantContext(user_id=user_id)
     logger.info(
         "event=tenant_context user_id=%s module=pipeline_cycle",
@@ -530,7 +581,11 @@ async def _run_one_pipeline_cycle_inner(
     use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
         logger.info("[%s] Skipping pipeline (USE_SUPABASE_STORAGE not set)", user_id[:12])
-        return
+        return PipelineExecutionResult.blocked(
+            code="supabase_storage_required",
+            detail="Pipeline execution requires Supabase storage.",
+            recovery_action="Set USE_SUPABASE_STORAGE=1 and configure Supabase, then retry.",
+        )
 
     try:
         # Read fresh settings at cycle boundaries so stage toggles apply immediately.
@@ -538,7 +593,11 @@ async def _run_one_pipeline_cycle_inner(
         settings = await asyncio.to_thread(load_settings, user_id, use_cache=False)
     except Exception as e:
         logger.warning("[%s] Pipeline skipped (settings unavailable): %s", user_id[:12], e)
-        return
+        return PipelineExecutionResult.blocked(
+            code="runtime_settings_unavailable",
+            detail="Tenant runtime settings could not be loaded.",
+            recovery_action="Restore the settings store and retry the pipeline cycle.",
+        )
     ac = settings.get("agent_config") or {}
     scouts_enabled = bool(ac.get("scouts_enabled", False))
     reviewers_enabled = bool(ac.get("reviewers_enabled", False))
@@ -551,7 +610,10 @@ async def _run_one_pipeline_cycle_inner(
             logger.info("[%s] Manual one-shot pipeline using all stages while Ops/Agents is off", user_id[:12])
         else:
             logger.info("[%s] Agents disabled in settings, skipping", user_id[:12])
-            return
+            return PipelineExecutionResult.skipped(
+                code="agents_disabled",
+                detail="No Scout, Reviewer, or Partner stage is enabled for this tenant.",
+            )
     logger.debug(
         "[%s] agent gates: scouts=%s reviewers=%s partners=%s",
         user_id[:12],
@@ -559,78 +621,62 @@ async def _run_one_pipeline_cycle_inner(
         reviewers_enabled,
         partners_enabled,
     )
+    if identity_repository is None:
+        logger.error(
+            "[%s] Pipeline blocked: canonical identity repository unavailable",
+            user_id[:12],
+        )
+        return PipelineExecutionResult.blocked(
+            code="institutional_identity_repository_required",
+            detail="Enabled pipeline stages require the canonical identity repository.",
+            recovery_action=(
+                "Restore the institutional PostgreSQL repository and retry the "
+                "pipeline cycle."
+            ),
+        )
 
     try:
         storage = await asyncio.to_thread(_build_storage_sync, user_id)
     except Exception as e:
         logger.warning("[%s] Failed to create storage: %s", user_id[:12], e)
-        return
+        return PipelineExecutionResult.blocked(
+            code="startup_storage_unavailable",
+            detail="Tenant startup storage could not be initialized.",
+            recovery_action="Restore Supabase connectivity and retry the pipeline cycle.",
+        )
 
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key:
         logger.warning("[%s] OPENAI_API_KEY missing, skipping pipeline", user_id[:12])
         _visible_logger.warning("[%s] Pipeline skipped: OPENAI_API_KEY not set", user_id[:12])
-        return
-
-    try:
-        active = await asyncio.to_thread(_load_active_thesis_sync, user_id)
-        if active is None:
-            raise EvaluationPrerequisiteError(
-                code="thesis_required",
-                detail="An active fund thesis is required before evaluation.",
-                recovery_action="Create and publish the fund thesis in Settings.",
-            )
-        if str(active.version_id) != evaluation_prerequisites.thesis_version_id:
-            raise EvaluationPrerequisiteError(
-                code="prerequisite_unavailable",
-                detail="The active fund thesis changed while the cycle was starting.",
-                recovery_action="Retry the cycle against the current thesis.",
-            )
-        thesis_ctx = active.as_engine_context()
-        # Opportunistic embedding backfill: a thesis bootstrapped without a key
-        # stores an empty vector. Now that api_key is present, generate the active
-        # version's vector once. ensure_active_thesis_embedding does blocking
-        # OpenAI + Supabase I/O, so run it off the event loop (to_thread) — never
-        # call it directly inside this coroutine. Best-effort.
-        if api_key and not (getattr(active, "embedding", None) or []):
-            from fund_thesis_ops import ensure_active_thesis_embedding
-
-            if await asyncio.to_thread(
-                lambda: ensure_active_thesis_embedding(get_service_client(), user_id, api_key)
-            ):
-                logger.info("[%s] Backfilled active thesis embedding", user_id[:12])
-    except EvaluationPrerequisiteError:
-        raise
-    except FundThesisMissingError as exc:
-        raise EvaluationPrerequisiteError(
-            code="thesis_required",
-            detail="An active fund thesis is required before evaluation.",
-            recovery_action="Create and publish the fund thesis in Settings.",
-        ) from exc
-    except FundThesisIncompleteError as exc:
-        raise EvaluationPrerequisiteError(
-            code="thesis_required",
-            detail="The active fund thesis is incomplete.",
-            recovery_action="Complete and publish the fund thesis in Settings.",
-        ) from exc
-    except Exception as exc:
-        raise EvaluationPrerequisiteError(
-            code="prerequisite_unavailable",
-            detail="The active fund thesis could not be loaded.",
-            recovery_action="Retry after the thesis store is available.",
-        ) from exc
+        return PipelineExecutionResult.blocked(
+            code="openai_api_key_required",
+            detail="OPENAI_API_KEY is required for pipeline evaluation.",
+            recovery_action="Configure OPENAI_API_KEY and retry the pipeline cycle.",
+        )
 
     # Engine constructors do blocking I/O (DealMemory doc-store read,
     # ReviewerEngine settings/policy load, CostController budget state) —
     # one thread hop for the whole build.
-    engines = await asyncio.to_thread(
-        _build_pipeline_engines,
-        user_id=user_id,
-        storage=storage,
-        api_key=api_key,
-        settings=settings,
-        evaluation_prerequisites=evaluation_prerequisites,
-    )
+    try:
+        engines = await asyncio.to_thread(
+            _build_pipeline_engines,
+            user_id=user_id,
+            storage=storage,
+            api_key=api_key,
+            settings=settings,
+            evaluation_prerequisites=evaluation_prerequisites,
+        )
+    except EvaluationPrerequisiteError:
+        raise
+    except Exception as exc:
+        logger.exception("[%s] Pipeline engine initialization failed: %s", user_id[:12], exc)
+        return PipelineExecutionResult.stage_failure(
+            stage="initialization",
+            code="pipeline_engine_initialization_failed",
+            detail="Pipeline engines could not be initialized from certified inputs.",
+            recovery_action="Inspect engine initialization logs, correct the runtime configuration, and retry.",
+        )
     scout_engine = engines.scout_engine
     reviewer_engine = engines.reviewer_engine
     partner_engine = engines.partner_engine
@@ -641,6 +687,7 @@ async def _run_one_pipeline_cycle_inner(
     agents_executed = 0
     total_startups_before: Optional[int] = None
     total_startups_after: Optional[int] = None
+    current_stage = "scout"
     try:
         pipeline_run_id = (pipeline_run_id or "").strip() or str(uuid4())
         logger.info(
@@ -698,6 +745,7 @@ async def _run_one_pipeline_cycle_inner(
         _activity_decided_count = 0
         _activity_escalations_count = 0
         if reviewers_enabled and identity_repository is not None:
+            current_stage = "reviewer"
             agents_executed += 3
             unreviewed_before = await asyncio.to_thread(_safe_stage_count, storage, "count_unreviewed", user_id)
             if (unreviewed_before or 0) > 0:
@@ -734,6 +782,7 @@ async def _run_one_pipeline_cycle_inner(
             )
 
         if partners_enabled and identity_repository is not None:
+            current_stage = "partner"
             agents_executed += 1
             undecided_before = await asyncio.to_thread(_safe_stage_count, storage, "count_undecided", user_id)
             if (undecided_before or 0) > 0:
@@ -776,6 +825,7 @@ async def _run_one_pipeline_cycle_inner(
                 "disabled in settings" if not partners_enabled else "canonical identity store unavailable",
             )
 
+        current_stage = "portfolio"
         portfolio_engine = PortfolioEngine(
             discovery_storage=storage,
             portfolio_store=portfolio_store,
@@ -788,6 +838,7 @@ async def _run_one_pipeline_cycle_inner(
         await portfolio_engine.run_cycle()
 
         try:
+            current_stage = "meta"
             meta_agent = MetaAgent(
                 scout_engine=scout_engine,
                 reviewer_engine=reviewer_engine,
@@ -839,10 +890,28 @@ async def _run_one_pipeline_cycle_inner(
             _activity_escalations_count,
             agents_executed,
         )
+        return PipelineExecutionResult.completed(
+            code="pipeline_cycle_completed",
+            detail="The pipeline cycle completed.",
+            metadata={
+                "startups_found": _activity_startups_found,
+                "reviewed": _activity_reviewed_count,
+                "decided": _activity_decided_count,
+                "escalations": _activity_escalations_count,
+                "agents_executed": agents_executed,
+            },
+        )
     except Exception as e:
         metrics.observe_pipeline_cycle(time.perf_counter() - started_at, outcome="error")
         logger.exception("[%s] Pipeline cycle error: %s", user_id[:12], e)
-        raise
+        if isinstance(e, EvaluationPrerequisiteError):
+            raise
+        return PipelineExecutionResult.stage_failure(
+            stage=current_stage,
+            code=f"{current_stage}_stage_failed",
+            detail=f"The {current_stage} stage did not complete.",
+            recovery_action="Inspect the pipeline stage logs, correct the failure, and retry.",
+        )
     finally:
         _close_pipeline_engines(scout_engine, reviewer_engine, partner_engine)
         gc.collect()
@@ -866,7 +935,7 @@ async def run_on_demand_lookup(
     institutional_context: Optional[Dict[str, Any]] = None,
     evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
     fund_intelligence_repository: Optional[Any] = None,
-) -> Optional[str]:
+) -> PipelineExecutionResult:
     """
     Run scout -> reviewer -> partner for one explicit company name.
     `additional_context` is optional operator-supplied background. Fresh lookups
@@ -881,31 +950,49 @@ async def run_on_demand_lookup(
     company = (company_name or "").strip()
     if not company:
         logger.warning("run_on_demand_lookup: skipped (empty company name)")
-        return None
+        return PipelineExecutionResult.skipped(
+            code="empty_company_name",
+            detail="The lookup was skipped because no company name was provided.",
+        )
 
-    if evaluation_prerequisites is None:
-        evaluation_prerequisites = await load_evaluation_prerequisites(
-            user_id=uid,
-            fund_intelligence_repository=fund_intelligence_repository,
+    try:
+        if evaluation_prerequisites is None:
+            evaluation_prerequisites = await load_evaluation_prerequisites(
+                user_id=uid,
+                fund_intelligence_repository=fund_intelligence_repository,
+            )
+        evaluation_prerequisites.require_tenant(
+            uid, context="run_on_demand_lookup"
         )
-    # Lookups use their own slot so they never wait behind a full periodic cycle.
-    async with lookup_execution_slot(uid):
-        return await _run_on_demand_lookup_inner(
-            uid,
-            company,
-            website=website,
-            lookup_query=lookup_query,
-            lookup_input_type=lookup_input_type,
-            lookup_id=lookup_id,
-            is_cancelled=is_cancelled,
-            additional_context=additional_context,
-            replace_startup_id=replace_startup_id,
-            resolution=resolution,
-            pipeline_run_id=pipeline_run_id,
-            checkpoint=checkpoint,
-            institutional_context=institutional_context,
-            evaluation_prerequisites=evaluation_prerequisites,
+        # Lookups use their own slot so they never wait behind a full periodic cycle.
+        async with lookup_execution_slot(uid):
+            result = await _run_on_demand_lookup_inner(
+                uid,
+                company,
+                website=website,
+                lookup_query=lookup_query,
+                lookup_input_type=lookup_input_type,
+                lookup_id=lookup_id,
+                is_cancelled=is_cancelled,
+                additional_context=additional_context,
+                replace_startup_id=replace_startup_id,
+                resolution=resolution,
+                pipeline_run_id=pipeline_run_id,
+                checkpoint=checkpoint,
+                institutional_context=institutional_context,
+                evaluation_prerequisites=evaluation_prerequisites,
+            )
+        if result.state is not PipelineExecutionState.COMPLETED:
+            await _record_lookup_execution_result(uid, lookup_id, result)
+        return result
+    except EvaluationPrerequisiteError as exc:
+        result = PipelineExecutionResult.blocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
         )
+        await _record_lookup_execution_result(uid, lookup_id, result)
+        return result
 
 
 _OPERATOR_URL_RE = re.compile(r"https?://[^\s)>\]}\"']+")
@@ -948,7 +1035,10 @@ async def _run_on_demand_lookup_inner(
     ] = None,
     institutional_context: Optional[Dict[str, Any]] = None,
     evaluation_prerequisites: EvaluationPrerequisites,
-) -> Optional[str]:
+) -> PipelineExecutionResult:
+    evaluation_prerequisites.require_tenant(
+        user_id, context="_run_on_demand_lookup_inner"
+    )
     tenant = TenantContext(user_id=user_id)
     logger.info(
         "event=tenant_context user_id=%s module=on_demand_lookup",
@@ -968,7 +1058,10 @@ async def _run_on_demand_lookup_inner(
 
     if cancelled():
         logger.info("[%s] Lookup cancelled before start: %s", user_id[:12], lid or company)
-        return None
+        return PipelineExecutionResult.skipped(
+            code="lookup_cancelled",
+            detail="The lookup was cancelled before evaluation started.",
+        )
 
     use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
@@ -978,7 +1071,11 @@ async def _run_on_demand_lookup_inner(
             lid,
             "On-demand lookup requires Supabase storage (USE_SUPABASE_STORAGE).",
         )
-        return None
+        return PipelineExecutionResult.blocked(
+            code="supabase_storage_required",
+            detail="On-demand lookup requires Supabase storage.",
+            recovery_action="Set USE_SUPABASE_STORAGE=1 and configure Supabase, then retry.",
+        )
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key:
         logger.warning("[%s] OPENAI_API_KEY missing, skipping lookup", user_id[:12])
@@ -988,7 +1085,11 @@ async def _run_on_demand_lookup_inner(
             lid,
             "OpenAI API key is not configured; lookup was not run.",
         )
-        return None
+        return PipelineExecutionResult.blocked(
+            code="openai_api_key_required",
+            detail="OPENAI_API_KEY is required for on-demand lookup.",
+            recovery_action="Configure OPENAI_API_KEY and retry the lookup.",
+        )
 
     try:
         storage = await asyncio.to_thread(_build_storage_sync, user_id)
@@ -999,60 +1100,46 @@ async def _run_on_demand_lookup_inner(
             lid,
             "Could not connect to storage for this lookup.",
         )
-        return None
+        return PipelineExecutionResult.blocked(
+            code="startup_storage_unavailable",
+            detail="Tenant startup storage could not be initialized for lookup.",
+            recovery_action="Restore Supabase connectivity and retry the lookup.",
+        )
 
-    # Identity remains open to any company, but Scout/Reviewer/Partner work must
-    # use the exact active mandate admitted by the prerequisite gate.
-    try:
-        active = await asyncio.to_thread(_load_active_thesis_sync, user_id)
-    except FundThesisMissingError as exc:
-        raise EvaluationPrerequisiteError(
-            code="thesis_required",
-            detail="An active fund thesis is required before evaluation.",
-            recovery_action="Create and publish the fund thesis in Settings.",
-        ) from exc
-    except FundThesisIncompleteError as exc:
-        raise EvaluationPrerequisiteError(
-            code="thesis_required",
-            detail="The active fund thesis is incomplete.",
-            recovery_action="Complete and publish the fund thesis in Settings.",
-        ) from exc
-    except Exception as exc:
-        raise EvaluationPrerequisiteError(
-            code="prerequisite_unavailable",
-            detail="The active fund thesis could not be loaded.",
-            recovery_action="Retry after the thesis store is available.",
-        ) from exc
-    if active is None:
-        raise EvaluationPrerequisiteError(
-            code="thesis_required",
-            detail="An active fund thesis is required before evaluation.",
-            recovery_action="Create and publish the fund thesis in Settings.",
-        )
-    if str(active.version_id) != evaluation_prerequisites.thesis_version_id:
-        raise EvaluationPrerequisiteError(
-            code="prerequisite_unavailable",
-            detail="The active fund thesis changed while lookup was starting.",
-            recovery_action="Retry the lookup against the current thesis.",
-        )
-    thesis_ctx = active.as_engine_context()
-    logger.info("[%s] Lookup will evaluate against active thesis", user_id[:12])
+    # Consume the exact immutable thesis context certified by the shared gate.
+    thesis_ctx = evaluation_prerequisites.thesis_context
+    logger.info("[%s] Lookup will evaluate against certified thesis", user_id[:12])
 
     try:
         settings = await asyncio.to_thread(load_settings, user_id)
     except Exception as e:
-        logger.warning("[%s] settings load failed during lookup; using defaults: %s", user_id[:12], e)
-        settings = {"cost_budget": {}}
+        logger.warning("[%s] settings load failed during lookup: %s", user_id[:12], e)
+        return PipelineExecutionResult.blocked(
+            code="runtime_settings_unavailable",
+            detail="Tenant runtime settings could not be loaded for lookup.",
+            recovery_action="Restore the settings store and retry the lookup.",
+        )
     # Same blocking-constructor offload as the periodic cycle path.
-    engines = await asyncio.to_thread(
-        _build_pipeline_engines,
-        user_id=user_id,
-        storage=storage,
-        api_key=api_key,
-        settings=settings,
-        evaluation_prerequisites=evaluation_prerequisites,
-        use_resource_fund_thesis_fallback=False,
-    )
+    try:
+        engines = await asyncio.to_thread(
+            _build_pipeline_engines,
+            user_id=user_id,
+            storage=storage,
+            api_key=api_key,
+            settings=settings,
+            evaluation_prerequisites=evaluation_prerequisites,
+            use_resource_fund_thesis_fallback=False,
+        )
+    except EvaluationPrerequisiteError:
+        raise
+    except Exception as exc:
+        logger.exception("[%s] Lookup engine initialization failed: %s", user_id[:12], exc)
+        return PipelineExecutionResult.stage_failure(
+            stage="initialization",
+            code="lookup_engine_initialization_failed",
+            detail="Lookup engines could not be initialized from certified inputs.",
+            recovery_action="Inspect engine initialization logs, correct the runtime configuration, and retry.",
+        )
     scout_engine = engines.scout_engine
     reviewer_engine = engines.reviewer_engine
     partner_engine = engines.partner_engine
@@ -1060,6 +1147,7 @@ async def _run_on_demand_lookup_inner(
 
     startup_id: Optional[str] = None
     lookup_outcome: Dict[str, Any] = {}
+    current_stage = "scout"
     try:
         lookup_run_id = (pipeline_run_id or "").strip() or str(uuid4())
         evaluation_context = {
@@ -1083,7 +1171,10 @@ async def _run_on_demand_lookup_inner(
         )
         if cancelled():
             logger.info("[%s] Lookup cancelled before scout: %s", user_id[:12], lid or company)
-            return None
+            return PipelineExecutionResult.skipped(
+                code="lookup_cancelled",
+                detail="The lookup was cancelled before Scout started.",
+            )
         if replace_startup_id:
             # Post-hoc re-review: the company is already resolved and scouted — do NOT
             # re-discover. Keep the existing profile/resolution/sources, fetch any links
@@ -1107,7 +1198,12 @@ async def _run_on_demand_lookup_inner(
                     "removed — run a fresh lookup.",
                 )
                 metrics.inc_lookup("not_found")
-                return None
+                return PipelineExecutionResult.stage_failure(
+                    stage="scout",
+                    code="rerun_target_not_found",
+                    detail="The original startup record for re-review was not found.",
+                    recovery_action="Run a fresh lookup or restore the original startup record.",
+                )
         else:
             scout_stage_started = time.perf_counter()
             startup_id = await scout_engine.run_named_lookup(
@@ -1143,7 +1239,12 @@ async def _run_on_demand_lookup_inner(
             )
             await _record_lookup_failure(user_id, lid, message)
             metrics.inc_lookup("not_found")
-            return None
+            return PipelineExecutionResult.stage_failure(
+                stage="scout",
+                code="scout_lookup_failed",
+                detail=message,
+                recovery_action="Retry with a canonical company name or verified website.",
+            )
         await emit("scout", "succeeded", startup_id=startup_id)
         # The scout persisted a row — nudge the UI so the card appears at once.
         _notify_startups_changed(user_id, "lookup_scout")
@@ -1155,7 +1256,12 @@ async def _run_on_demand_lookup_inner(
                 handoff_startup = await asyncio.to_thread(get_startup, startup_id)
         if cancelled():
             logger.info("[%s] Lookup cancelled after scout: %s (%s)", user_id[:12], company, startup_id)
-            return startup_id
+            return PipelineExecutionResult.skipped(
+                code="lookup_cancelled",
+                detail="The lookup was cancelled after Scout completed.",
+                startup_id=startup_id,
+            )
+        current_stage = "reviewer"
         reviewer_stage_started = time.perf_counter()
         reviewed = await reviewer_engine.run_startup(
             startup_id,
@@ -1177,12 +1283,23 @@ async def _run_on_demand_lookup_inner(
             await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
             await _record_lookup_failure(user_id, lid, message)
             metrics.inc_lookup("error")
-            return startup_id
+            return PipelineExecutionResult.stage_failure(
+                stage="reviewer",
+                code="reviewer_stage_failed",
+                detail=message,
+                recovery_action="Inspect Reviewer logs and retry the lookup.",
+                startup_id=startup_id,
+            )
         await emit("reviewer", "succeeded", startup_id=startup_id)
         _notify_startups_changed(user_id, "lookup_reviewer")
         if cancelled():
             logger.info("[%s] Lookup cancelled after review: %s (%s)", user_id[:12], company, startup_id)
-            return startup_id
+            return PipelineExecutionResult.skipped(
+                code="lookup_cancelled",
+                detail="The lookup was cancelled after Reviewer completed.",
+                startup_id=startup_id,
+            )
+        current_stage = "partner"
         partner_stage_started = time.perf_counter()
         decided = await partner_engine.run_startup(
             startup_id,
@@ -1203,7 +1320,13 @@ async def _run_on_demand_lookup_inner(
             await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
             await _record_lookup_failure(user_id, lid, message)
             metrics.inc_lookup("error")
-            return startup_id
+            return PipelineExecutionResult.stage_failure(
+                stage="partner",
+                code="partner_stage_failed",
+                detail=message,
+                recovery_action="Inspect Partner logs and retry the lookup.",
+                startup_id=startup_id,
+            )
         else:
             await emit("partner", "succeeded", startup_id=startup_id)
             if replace_startup_id:
@@ -1265,7 +1388,12 @@ async def _run_on_demand_lookup_inner(
             _rss_mb(),
         )
         metrics.inc_lookup("success")
-        return startup_id
+        return PipelineExecutionResult.completed(
+            code="lookup_completed",
+            detail="The company lookup and evaluation completed.",
+            startup_id=startup_id,
+            projection_id=str((institutional_context or {}).get("opportunity_id") or "").strip() or None,
+        )
     except Exception as e:
         metrics.inc_lookup("error")
         logger.exception("[%s] On-demand lookup error (%s): %s", user_id[:12], company, e)
@@ -1277,7 +1405,15 @@ async def _run_on_demand_lookup_inner(
             lid,
             message,
         )
-        return None
+        if isinstance(e, EvaluationPrerequisiteError):
+            raise
+        return PipelineExecutionResult.stage_failure(
+            stage=current_stage,
+            code=f"lookup_{current_stage}_failed",
+            detail=message,
+            recovery_action="Inspect lookup logs, correct the stage failure, and retry.",
+            startup_id=startup_id,
+        )
     finally:
         _close_pipeline_engines(scout_engine, reviewer_engine, partner_engine)
         gc.collect()
@@ -1288,88 +1424,124 @@ async def reprocess_startups_missing_fund_thesis(
     *,
     dry_run: bool = False,
     limit: int = 1000,
-) -> Dict[str, Any]:
+    evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
+    fund_intelligence_repository: Optional[Any] = None,
+) -> PipelineExecutionResult:
     """
     Re-run reviewer + partner only for startups that have review_info but no
     review_info.fund_thesis_version_id. Same startup rows; no scout.
     """
-    uid = (user_id or "").strip()
-    if not uid:
-        return {"dry_run": True, "eligible": 0} if dry_run else {"processed": 0, "skipped": 0, "failed": 0}
+    uid = require_user_id(
+        user_id, context="reprocess_startups_missing_fund_thesis"
+    )
+    try:
+        if evaluation_prerequisites is None:
+            evaluation_prerequisites = await load_evaluation_prerequisites(
+                user_id=uid,
+                fund_intelligence_repository=fund_intelligence_repository,
+            )
+        evaluation_prerequisites.require_tenant(
+            uid, context="reprocess_startups_missing_fund_thesis"
+        )
+    except EvaluationPrerequisiteError as exc:
+        return PipelineExecutionResult.blocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
+        )
 
     use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
-        return {"dry_run": True, "eligible": 0} if dry_run else {"processed": 0, "skipped": 0, "failed": 0}
+        return PipelineExecutionResult.blocked(
+            code="supabase_storage_required",
+            detail="Thesis reprocessing requires Supabase storage.",
+            recovery_action="Set USE_SUPABASE_STORAGE=1 and configure Supabase, then retry.",
+        )
 
     limit = max(1, min(int(limit), 1000))
-    storage = await asyncio.to_thread(_build_storage_sync, uid)
-    ids = await asyncio.to_thread(storage.get_startups_missing_thesis, limit=limit)
+    try:
+        storage = await asyncio.to_thread(_build_storage_sync, uid)
+        ids = await asyncio.to_thread(
+            storage.get_startups_missing_thesis, limit=limit
+        )
+    except Exception as exc:
+        logger.warning("[%s] Thesis reprocessing storage unavailable: %s", uid[:12], exc)
+        return PipelineExecutionResult.blocked(
+            code="startup_storage_unavailable",
+            detail="Tenant startup storage could not be loaded for thesis reprocessing.",
+            recovery_action="Restore Supabase connectivity and retry thesis reprocessing.",
+        )
 
     if dry_run:
         if not await asyncio.to_thread(is_thesis_reprocess_agents_enabled, uid):
-            raise RuntimeError(
-                "Thesis reprocessing requires Reviewers and Partners to be enabled in Settings (Pipeline)."
+            return PipelineExecutionResult.skipped(
+                code="reprocess_agents_disabled",
+                detail="Thesis reprocessing is disabled because Reviewer and Partner are not enabled.",
+                metadata={"dry_run": True, "eligible": len(ids)},
             )
-        return {"dry_run": True, "eligible": len(ids)}
+        return PipelineExecutionResult.completed(
+            code="reprocess_dry_run_completed",
+            detail="Thesis reprocessing eligibility was calculated.",
+            metadata={"dry_run": True, "eligible": len(ids)},
+        )
+
+    if not ids:
+        return PipelineExecutionResult.skipped(
+            code="reprocess_no_work",
+            detail="No startup required thesis reprocessing.",
+            metadata={"processed": 0, "skipped": 0, "failed": 0},
+        )
 
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key.strip():
-        raise RuntimeError("OPENAI_API_KEY required for thesis reprocessing")
+        return PipelineExecutionResult.blocked(
+            code="openai_api_key_required",
+            detail="OPENAI_API_KEY is required for thesis reprocessing.",
+            recovery_action="Configure OPENAI_API_KEY and retry thesis reprocessing.",
+        )
 
     if not await asyncio.to_thread(is_thesis_reprocess_agents_enabled, uid):
-        raise RuntimeError(
-            "Thesis reprocessing requires Reviewers and Partners to be enabled in Settings (Pipeline)."
+        return PipelineExecutionResult.skipped(
+            code="reprocess_agents_disabled",
+            detail="Thesis reprocessing is disabled because Reviewer and Partner are not enabled.",
+            metadata={"processed": 0, "skipped": len(ids), "failed": 0},
         )
 
     try:
-        active = await asyncio.to_thread(
-            lambda: get_active_thesis(get_service_client(), uid)
+        settings = await asyncio.to_thread(load_settings, uid, use_cache=False)
+    except Exception as exc:
+        logger.warning("[%s] Thesis reprocessing settings unavailable: %s", uid[:12], exc)
+        return PipelineExecutionResult.blocked(
+            code="runtime_settings_unavailable",
+            detail="Tenant runtime settings could not be loaded for thesis reprocessing.",
+            recovery_action="Restore the settings store and retry thesis reprocessing.",
         )
-        if active is None:
-            raise RuntimeError("No active thesis")
-        thesis_ctx = active.as_engine_context()
-    except FundThesisIncompleteError as e:
-        raise RuntimeError(str(e)) from e
-
     try:
-        settings = await asyncio.to_thread(load_settings, uid)
-    except Exception:
-        settings = {"cost_budget": {}}
-    def _build_reprocess_engines_sync():
-        """Blocking engine construction (DealMemory/CostController/policy reads)."""
-        cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
-        cost_controller = CostController(user_id=uid) if cost_budget_enabled else None
-        deal_memory = DealMemory(user_id=uid)
-        reviewer_model = os.getenv("REVIEWER_MODEL", DEFAULT_REVIEWER_MODEL)
-        use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
-        reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
-
-        reviewer = ReviewerEngine(
+        engines = await asyncio.to_thread(
+            _build_pipeline_engines,
+            user_id=uid,
+            storage=storage,
             api_key=api_key,
-            storage=storage,
-            interval_seconds=60,
-            model=reviewer_model,
-            batch_size=reviewer_batch_size,
-            cost_controller=cost_controller,
-            deal_memory=deal_memory,
-            tenant_user_id=uid,
-            active_thesis=thesis_ctx,
+            settings=settings,
+            evaluation_prerequisites=evaluation_prerequisites,
+            use_resource_fund_thesis_fallback=False,
         )
-        portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
-        portfolio_store = PortfolioStore(data_dir=portfolio_dir, user_id=uid)
-        partner = PartnerEngine(
-            storage=storage,
-            interval_seconds=30,
-            use_llm_fallback=use_llm_fallback,
-            cost_controller=cost_controller,
-            deal_memory=deal_memory,
-            portfolio_store=portfolio_store,
-            tenant_user_id=uid,
-            fund_thesis=thesis_ctx,
+    except EvaluationPrerequisiteError as exc:
+        return PipelineExecutionResult.blocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
         )
-        return reviewer, partner
-
-    reviewer_engine, partner_engine = await asyncio.to_thread(_build_reprocess_engines_sync)
+    except Exception as exc:
+        logger.exception("[%s] Thesis reprocessing engine initialization failed: %s", uid[:12], exc)
+        return PipelineExecutionResult.stage_failure(
+            stage="initialization",
+            code="reprocess_engine_initialization_failed",
+            detail="Reprocessing engines could not be initialized from certified inputs.",
+            recovery_action="Inspect engine initialization logs, correct the runtime configuration, and retry.",
+        )
+    reviewer_engine = engines.reviewer_engine
+    partner_engine = engines.partner_engine
 
     processed = 0
     skipped = 0
@@ -1409,7 +1581,9 @@ async def reprocess_startups_missing_fund_thesis(
                 logger.exception("[%s] ThesisBackfill failed for startup %s", uid[:12], sid)
                 failed += 1
     finally:
-        _close_pipeline_engines(reviewer_engine, partner_engine)
+        _close_pipeline_engines(
+            engines.scout_engine, reviewer_engine, partner_engine
+        )
 
     logger.info(
         "[ThesisBackfill] user_id=%s processed=%s skipped=%s failed=%s",
@@ -1418,4 +1592,23 @@ async def reprocess_startups_missing_fund_thesis(
         skipped,
         failed,
     )
-    return {"processed": processed, "skipped": skipped, "failed": failed}
+    counts = {"processed": processed, "skipped": skipped, "failed": failed}
+    if failed:
+        return PipelineExecutionResult.stage_failure(
+            stage="reprocess",
+            code="reprocess_stage_failed",
+            detail=f"Thesis reprocessing failed for {failed} startup(s).",
+            recovery_action="Inspect Reviewer and Partner logs, then retry the failed startups.",
+            metadata=counts,
+        )
+    if processed == 0:
+        return PipelineExecutionResult.skipped(
+            code="reprocess_no_work",
+            detail="No startup required thesis reprocessing.",
+            metadata=counts,
+        )
+    return PipelineExecutionResult.completed(
+        code="reprocess_completed",
+        detail=f"Thesis reprocessing completed for {processed} startup(s).",
+        metadata=counts,
+    )
