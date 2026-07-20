@@ -213,11 +213,11 @@ class SingleReview(BaseModel):
     Used by ReviewerEngine for multi-persona consensus and surfaced to the memo.
     """
     reviewer_type: Literal["DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer"]
-    market_score: Optional[int] = Field(default=None, ge=1, le=10)
-    product_score: Optional[int] = Field(default=None, ge=1, le=10)
-    technical_score: Optional[int] = Field(default=None, ge=1, le=10)
-    execution_score: Optional[int] = Field(default=None, ge=1, le=10)
-    defensibility_score: Optional[int] = Field(default=None, ge=1, le=10)
+    market_score: Optional[float] = Field(default=None, ge=0, le=10)
+    product_score: Optional[float] = Field(default=None, ge=0, le=10)
+    technical_score: Optional[float] = Field(default=None, ge=0, le=10)
+    execution_score: Optional[float] = Field(default=None, ge=0, le=10)
+    defensibility_score: Optional[float] = Field(default=None, ge=0, le=10)
     overall_summary: str
     key_risks: List[str]
     verdict: Literal["STRONG", "MEDIUM", "WEAK"]
@@ -263,11 +263,11 @@ class AethriaView(BaseModel):
 
 class ReviewInfo(BaseModel):
     """Reviewer evaluation information."""
-    market_score: Optional[int] = Field(default=None, ge=1, le=10)
-    product_score: Optional[int] = Field(default=None, ge=1, le=10)
-    technical_score: Optional[int] = Field(default=None, ge=1, le=10)
-    execution_score: Optional[int] = Field(default=None, ge=1, le=10)
-    defensibility_score: Optional[int] = Field(default=None, ge=1, le=10)  # Calculated by reviewer
+    market_score: Optional[float] = Field(default=None, ge=0, le=10)
+    product_score: Optional[float] = Field(default=None, ge=0, le=10)
+    technical_score: Optional[float] = Field(default=None, ge=0, le=10)
+    execution_score: Optional[float] = Field(default=None, ge=0, le=10)
+    defensibility_score: Optional[float] = Field(default=None, ge=0, le=10)  # Calculated by reviewer
     overall_summary: str
     key_risks: List[str]
     verdict: Literal["STRONG", "MEDIUM", "WEAK"]

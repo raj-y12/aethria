@@ -17,6 +17,7 @@ from utils.scoring import compute_overall_score
 from utils.settings_loader import load_settings, recommendation_for_score_from_fund_config
 from utils.partner_codes import legacy_from_recommendation, recommendation_from_legacy
 from evaluation_v2.prerequisites import EvaluationPrerequisites
+from evaluation_v2.governed_scoring import validate_governed_scoring_trace
 
 from partner.rationale import (
     compose_decision_rationale,
@@ -339,7 +340,11 @@ class PartnerDecisionEngine:
                 detail = structured.get(dimension)
                 if not isinstance(detail, dict) or bool(detail.get("unscored")):
                     continue
-            raw = review_output.get(f"{dimension}_score")
+            raw = (
+                structured[dimension].get("score")
+                if structured is not None
+                else review_output.get(f"{dimension}_score")
+            )
             try:
                 if raw is not None:
                     values.append(float(raw))
@@ -696,6 +701,11 @@ class PartnerDecisionEngine:
             Partner output dict with decision, conviction_level, rationale, next_action,
             human_review_required, assumption_risks.
         """
+        if self.evaluation_prerequisites is not None:
+            validate_governed_scoring_trace(
+                review_output.get("structured_scoring"),
+                self.evaluation_prerequisites,
+            )
         rules = self._get_rules()
         verdict_rules = rules.get("verdict_rules", {})
         score_thresholds = rules.get("score_thresholds", {})

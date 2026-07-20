@@ -9,6 +9,9 @@ import pytest
 
 from evaluation_v2.policy import evaluation_policy_from_compiled
 from evaluation_v2.prerequisites import EvaluationPrerequisites
+from reviewer.engine import ReviewerEngine
+from services.reviewer_resolution import apply_resolution_to_primary
+from utils.adapters import reviewer_output_to_review_info
 
 
 def _compiled_policy():
@@ -80,6 +83,7 @@ class _ReviewerPersona:
         self._use_resource_fund_thesis_fallback = kwargs.get(
             "use_resource_fund_thesis_fallback"
         )
+        self._structured_scoring_enabled = kwargs.get("structured_scoring_enabled")
 
     def set_fund_thesis(self, thesis):
         self.fund_thesis = thesis
@@ -135,6 +139,43 @@ def test_governed_reviewer_consumes_exact_compiled_policy_without_reload(monkeyp
     )
 
 
+def test_governed_reviewer_ignores_disabled_structured_scoring_environment(monkeypatch):
+    import reviewer.engine as reviewer_module
+
+    prerequisites = _prerequisites()
+    monkeypatch.setenv("USE_STRUCTURED_SCORING", "false")
+    monkeypatch.setattr(reviewer_module, "DefaultReviewer", _ReviewerPersona)
+    monkeypatch.setattr(reviewer_module, "SkepticalReviewer", _ReviewerPersona)
+    monkeypatch.setattr(reviewer_module, "OpportunistReviewer", _ReviewerPersona)
+
+    reviewer = reviewer_module.ReviewerEngine(
+        api_key="",
+        storage=SimpleNamespace(_user_id="user-a"),
+        tenant_user_id="user-a",
+        evaluation_prerequisites=prerequisites,
+    )
+
+    assert reviewer.use_structured_scoring is True
+    assert reviewer.structured_scoring_engine is not None
+    assert all(
+        persona._structured_scoring_enabled is True
+        for persona in (
+            reviewer.reviewer,
+            reviewer.skeptical_reviewer,
+            reviewer.opportunist_reviewer,
+        )
+    )
+
+
+def test_governed_reviewer_fails_closed_when_scorer_is_unavailable():
+    reviewer = ReviewerEngine.__new__(ReviewerEngine)
+    reviewer.evaluation_prerequisites = _prerequisites()
+    reviewer.structured_scoring_engine = None
+
+    with pytest.raises(RuntimeError, match="governed structured scoring"):
+        reviewer._apply_structured_scoring({}, {"market_score": 9})
+
+
 def test_governed_partner_consumes_exact_rules_and_fund_config_without_reload(monkeypatch):
     import partner.decision as partner_module
 
@@ -166,6 +207,140 @@ def test_governed_partner_consumes_exact_rules_and_fund_config_without_reload(mo
     assert partner.evaluation_policy.policy_version_id == "policy-live"
     assert partner.evaluation_policy.partner_rules_version == "rules-v3-exact"
     assert partner.use_resource_fund_thesis_fallback is False
+
+
+def _exact_trace(score: float) -> dict:
+    return {
+        **{
+            dimension: {
+                "score": score,
+                "confidence": 0.9,
+                "components": {"evidence": {"value": "verified"}},
+                "unscored": False,
+            }
+            for dimension in (
+                "market",
+                "product",
+                "technical",
+                "execution",
+                "defensibility",
+            )
+        },
+        "overall_score": score,
+        "overall_confidence": 0.9,
+        "policy_version_id": "policy-live",
+        "policy_hash": "hash-live",
+    }
+
+
+def _governed_review(score: float) -> dict:
+    class Scorer:
+        def score(self, _scout, _review):
+            return _exact_trace(score)
+
+    reviewer = ReviewerEngine.__new__(ReviewerEngine)
+    reviewer.evaluation_prerequisites = _prerequisites()
+    reviewer.structured_scoring_engine = Scorer()
+    raw = {
+        "market_score": 1,
+        "product_score": 1,
+        "technical_score": 1,
+        "execution_score": 1,
+        "defensibility_score": 1,
+        "overall_summary": "Governed precision handoff",
+        "key_risks": [],
+        "verdict": "MEDIUM",
+        "team_analysis": ["Experienced operating team"],
+        "business_model_analysis": ["Clear enterprise subscription model"],
+    }
+    persona_results = []
+    for reviewer_type in (
+        "DefaultReviewer",
+        "SkepticalReviewer",
+        "OpportunistReviewer",
+    ):
+        result = reviewer._apply_structured_scoring({}, raw)
+        result["reviewer_type"] = reviewer_type
+        persona_results.append(result)
+    primary = dict(persona_results[0])
+    reviewer._blend_numeric_scores_into_primary(primary, persona_results)
+    apply_resolution_to_primary(primary, persona_results)
+    reviewer._refresh_derived_after_dimension_changes(primary, persona_results)
+    reviewer._derive_verdict_from_scores(primary)
+    review_info = reviewer_output_to_review_info(primary)
+    review_info.reviews = reviewer._build_single_reviews(persona_results)
+    return review_info.model_dump(mode="json")
+
+
+def _governed_partner():
+    from partner.decision import PartnerDecisionEngine
+
+    return PartnerDecisionEngine(
+        use_llm_fallback=False,
+        tenant_user_id="user-a",
+        evaluation_prerequisites=_prerequisites(),
+    )
+
+
+def _decision_scout() -> dict:
+    return {
+        "name": "PrecisionCo",
+        "one_line": "Boundary precision fixture",
+        "sector": "Infrastructure",
+        "funding_stage": "Seed",
+        "confidence": 0.9,
+    }
+
+
+@pytest.mark.parametrize(
+    "trace",
+    [
+        None,
+        {},
+        {**_exact_trace(9), "policy_version_id": "wrong-version"},
+        {**_exact_trace(9), "policy_hash": "wrong-hash"},
+        {
+            **_exact_trace(9),
+            "execution": {"score": 9, "confidence": 0.9, "unscored": True},
+        },
+    ],
+    ids=["absent", "malformed", "wrong-version", "wrong-hash", "incomplete"],
+)
+def test_governed_partner_rejects_non_exact_structured_trace(trace):
+    review = _governed_review(9)
+    review["structured_scoring"] = trace
+
+    with pytest.raises(RuntimeError, match="structured scoring trace"):
+        _governed_partner().decide(_decision_scout(), review)
+
+
+def test_governed_partner_accepts_complete_exact_structured_trace():
+    decision = _governed_partner().decide(_decision_scout(), _governed_review(9))
+
+    assert decision["recommendation"] == "INVEST"
+
+
+@pytest.mark.parametrize(
+    ("score", "expected"),
+    [
+        (5.99, "PASS"),
+        (6.0, "MONITOR"),
+        (6.01, "MONITOR"),
+        (7.99, "MONITOR"),
+        (8.0, "INVEST"),
+        (8.01, "INVEST"),
+    ],
+)
+def test_governed_reviewer_persistence_partner_handoff_preserves_boundary_precision(
+    score, expected
+):
+    review = _governed_review(score)
+
+    assert review["market_score"] == score
+    assert review["reviews"][0]["market_score"] == score
+    assert review["structured_scoring"]["market"]["score"] == score
+    decision = _governed_partner().decide(_decision_scout(), review)
+    assert decision["recommendation"] == expected
 
 
 def test_governed_partner_uses_versioned_policy_boundaries_over_display_bands():

@@ -37,8 +37,8 @@ def apply_resolution_to_primary(primary: Dict[str, Any], all_results: List[Dict[
             continue
         mean_v = sum(vals) / len(vals)
         min_v = float(min(vals))
-        resolved = int(round((1.0 - _CONSERVATIVE_MIN_WEIGHT) * mean_v + _CONSERVATIVE_MIN_WEIGHT * min_v))
-        resolved = max(1, min(10, resolved))
+        resolved = (1.0 - _CONSERVATIVE_MIN_WEIGHT) * mean_v + _CONSERVATIVE_MIN_WEIGHT * min_v
+        resolved = max(0.0, min(10.0, resolved))
         old = primary.get(d)
         primary[d] = resolved
         notes.append(
@@ -53,8 +53,8 @@ def apply_resolution_to_primary(primary: Dict[str, Any], all_results: List[Dict[
         if spread >= _SPREAD_THRESHOLD:
             mean_v = sum(ds_vals) / len(ds_vals)
             min_v = float(min(ds_vals))
-            resolved = int(round((1.0 - _CONSERVATIVE_MIN_WEIGHT) * mean_v + _CONSERVATIVE_MIN_WEIGHT * min_v))
-            resolved = max(1, min(10, resolved))
+            resolved = (1.0 - _CONSERVATIVE_MIN_WEIGHT) * mean_v + _CONSERVATIVE_MIN_WEIGHT * min_v
+            resolved = max(0.0, min(10.0, resolved))
             old = primary.get("defensibility_score")
             primary["defensibility_score"] = resolved
             notes.append(
@@ -76,12 +76,12 @@ def apply_resolution_to_primary(primary: Dict[str, Any], all_results: List[Dict[
     return notes, disagreement_summary
 
 
-def _int_scores(results: List[Dict[str, Any]], key: str) -> List[int]:
-    out: List[int] = []
+def _int_scores(results: List[Dict[str, Any]], key: str) -> List[float]:
+    out: List[float] = []
     for r in results:
         v = r.get(key)
         if isinstance(v, bool):
             continue
         if isinstance(v, (int, float)):
-            out.append(int(round(float(v))))
+            out.append(float(v))
     return out

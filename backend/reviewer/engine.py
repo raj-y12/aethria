@@ -24,6 +24,10 @@ from services.reviewer_resolution import apply_resolution_to_primary
 from reviewer.aethria_view import build_aethria_view
 from utils.reviewer_gap_retrieval import enrich_scout_for_reviewer_llm
 from evaluation_v2.prerequisites import EvaluationPrerequisites
+from evaluation_v2.governed_scoring import (
+    GovernedScoringError,
+    validate_governed_scoring_trace,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -96,10 +100,9 @@ class ReviewerEngine:
         # Ramp-up: when unreviewed backlog is high, process more per cycle
         self.ramp_threshold = int(os.getenv("REVIEWER_RAMP_THRESHOLD", "5"))
         self.ramp_batch_max = int(os.getenv("REVIEWER_RAMP_BATCH_MAX", "5"))
-        self.use_structured_scoring = os.getenv("USE_STRUCTURED_SCORING", "true").lower() in (
-            "1",
-            "true",
-            "yes",
+        self.use_structured_scoring = evaluation_prerequisites is not None or (
+            os.getenv("USE_STRUCTURED_SCORING", "true").lower()
+            in ("1", "true", "yes")
         )
         self.structured_scoring_engine = self._build_scoring_engine() if self.use_structured_scoring else None
         
@@ -296,15 +299,18 @@ class ReviewerEngine:
             rev.set_prompt(prev_prompt)
 
     @staticmethod
-    def _mean_round_score(values: list) -> Optional[int]:
+    def _mean_round_score(values: list) -> Optional[float]:
         nums = [
-            int(v)
+            float(v)
             for v in values
             if not isinstance(v, bool) and isinstance(v, (int, float))
         ]
         if not nums:
             return None
-        return int(round(sum(nums) / len(nums)))
+        # Structured scores are emitted with bounded decimal precision. Keep a
+        # stable lossless compatibility projection instead of introducing
+        # binary averaging noise such as 5.99 -> 5.989999999999999.
+        return round(sum(nums) / len(nums), 6)
 
     def _blend_numeric_scores_into_primary(self, primary: dict, all_results: list) -> None:
         """Deterministic dimension scores: integer mean across reviewers.
@@ -483,26 +489,40 @@ class ReviewerEngine:
 
     def _apply_structured_scoring(self, scout_output: dict, reviewer_output: dict) -> dict:
         """Replace LLM-assigned numeric scores with deterministic weighted scores."""
+        prerequisites = getattr(self, "evaluation_prerequisites", None)
         if not self.structured_scoring_engine:
+            if prerequisites is not None:
+                raise GovernedScoringError(
+                    "governed structured scoring engine is unavailable"
+                )
             return reviewer_output
         from config.scoring_config import DEFAULT_SCORE
 
-        trace = self.structured_scoring_engine.score(scout_output, reviewer_output)
+        try:
+            trace = self.structured_scoring_engine.score(scout_output, reviewer_output)
+        except Exception as exc:
+            if prerequisites is not None:
+                raise GovernedScoringError(
+                    "governed structured scoring could not be applied"
+                ) from exc
+            raise
+        if prerequisites is not None:
+            validate_governed_scoring_trace(trace, prerequisites)
         # An unscored dimension is missing evidence, not a neutral score and not an
         # invitation to copy another dimension's score. Preserve that missingness in
         # the persisted compatibility projection so Partner cannot fabricate coverage.
-        def _dim_int(dim: str) -> Optional[int]:
+        def _dim_score(dim: str) -> Optional[float]:
             details = trace.get(dim) if isinstance(trace.get(dim), dict) else {}
             if details.get("unscored"):
                 return None
-            return int(round(float(details.get("score", DEFAULT_SCORE))))
+            return float(details.get("score", DEFAULT_SCORE))
 
         updated = dict(reviewer_output)
-        updated["market_score"] = _dim_int("market")
-        updated["product_score"] = _dim_int("product")
-        updated["technical_score"] = _dim_int("technical")
-        updated["execution_score"] = _dim_int("execution")
-        updated["defensibility_score"] = _dim_int("defensibility")
+        updated["market_score"] = _dim_score("market")
+        updated["product_score"] = _dim_score("product")
+        updated["technical_score"] = _dim_score("technical")
+        updated["execution_score"] = _dim_score("execution")
+        updated["defensibility_score"] = _dim_score("defensibility")
         updated["structured_scoring"] = trace
         updated["score_source"] = "Structured assessment framework"
         updated["score_reasoning"] = self._score_reasoning_from_structured_trace(trace)
