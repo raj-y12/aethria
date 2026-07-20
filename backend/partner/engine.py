@@ -19,6 +19,7 @@ from portfolio.store import PortfolioStore
 from pipeline_state import pipeline_stage_log, upsert_pipeline_state
 from agent_trace import handoff_quality_from_trace
 from evaluation_v2.prerequisites import EvaluationPrerequisites
+from pipeline_execution import StageExecutionResult
 
 
 logger = logging.getLogger(__name__)
@@ -363,18 +364,21 @@ class PartnerEngine:
         pipeline_run_id: Optional[str] = None,
         *,
         eligible_startup_ids: Optional[set[str]] = None,
-    ) -> int:
+    ) -> StageExecutionResult:
         """
         Run one decision cycle.
         Processes all undecided entries.
         
-        Returns:
-            Number of decisions made in this cycle
+        Returns a typed, lossless account of every candidate attempted.
         """
         self.logger.info(f"Starting decision cycle at {utcnow().isoformat()}")
         if not is_partners_enabled(self.tenant_user_id):
             self.logger.info("Decision cycle skipped (partners disabled in settings)")
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="partner",
+                code="partner_disabled",
+                detail="The Partner stage is disabled for this tenant.",
+            )
 
         # Ramp: process up to batch_max per cycle so we make progress without one huge cycle
         # Sync Supabase I/O off the serving event loop: a blocked loop stalls
@@ -401,11 +405,17 @@ class PartnerEngine:
         
         if not undecided:
             self.logger.info("No undecided entries found")
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="partner",
+                code="partner_no_eligible_work",
+                detail="No reviewed startup is eligible for the Partner stage.",
+            )
         
         self.logger.info(f"Found {len(undecided)} entries awaiting partner decision")
         
         decided_count = 0
+        failed_count = 0
+        blocked_count = 0
         self.last_cycle_escalations = 0
 
         # Process each entry
@@ -429,6 +439,7 @@ class PartnerEngine:
                         self.logger.warning(
                             f"Partner budget denied for entry {entry_id}: {reason}"
                         )
+                        blocked_count += 1
                         continue
 
                 success, decision = await self._decide_and_save(
@@ -458,21 +469,79 @@ class PartnerEngine:
                             self.logger.error(
                                 f"Failed to record successful thesis: {e}"
                             )
-                elif not success:
-                    self.logger.error(f"Failed to save decision for entry {entry_id}")
+                else:
+                    self.logger.error(
+                        "Partner decision did not persist a complete outcome for %s",
+                        entry_id,
+                    )
+                    failed_count += 1
                     
             except Exception as e:
                 self.logger.error(
                     f"Error making decision for entry {entry_id}: {e}",
                     exc_info=True
                 )
+                failed_count += 1
                 continue
         
         self.logger.info(
             f"Decision cycle complete: {decided_count}/{len(undecided)} decisions successful"
         )
         
-        return decided_count
+        attempted_count = len(undecided)
+        if failed_count:
+            return StageExecutionResult.failed_result(
+                stage="partner",
+                code="partner_candidate_failures",
+                detail=(
+                    f"Partner completed {decided_count} of {attempted_count} "
+                    "attempted candidates; one or more candidates failed."
+                ),
+                recovery_action=(
+                    "Inspect Partner decision and persistence logs, correct the "
+                    "failures, and retry the affected candidates."
+                ),
+                attempted=attempted_count,
+                succeeded=decided_count,
+                failed=failed_count,
+                blocked=blocked_count,
+            )
+        if blocked_count:
+            if decided_count:
+                return StageExecutionResult.failed_result(
+                    stage="partner",
+                    code="partner_partial_budget_block",
+                    detail=(
+                        f"Partner completed {decided_count} of {attempted_count} "
+                        "attempted candidates before the budget blocked remaining work."
+                    ),
+                    recovery_action=(
+                        "Increase the Partner budget or wait for the budget window "
+                        "to reset, then retry the blocked candidates."
+                    ),
+                    attempted=attempted_count,
+                    succeeded=decided_count,
+                    failed=0,
+                    blocked=blocked_count,
+                )
+            return StageExecutionResult.blocked_result(
+                stage="partner",
+                code="partner_budget_blocked",
+                detail="Partner budget denied all eligible work in this cycle.",
+                recovery_action=(
+                    "Increase the Partner budget or wait for the budget window "
+                    "to reset, then retry."
+                ),
+                attempted=attempted_count,
+                blocked=blocked_count,
+            )
+        return StageExecutionResult.completed(
+            stage="partner",
+            code="partner_completed",
+            detail=f"Partner completed {decided_count} eligible candidate(s).",
+            attempted=attempted_count,
+            succeeded=decided_count,
+        )
 
     async def run_startup(
         self,

@@ -52,3 +52,68 @@ def test_blocked_and_failed_results_require_actionable_recovery_data():
             detail="Reviewer did not complete.",
             recovery_action="Retry.",
         )
+
+
+def test_stage_execution_result_carries_typed_counts_and_stable_outcome():
+    from pipeline_execution import StageExecutionResult, StageExecutionState
+
+    completed = StageExecutionResult.completed(
+        stage="reviewer",
+        code="reviewer_completed",
+        detail="Reviewer completed eligible work.",
+        attempted=2,
+        succeeded=2,
+    )
+    failed = StageExecutionResult.failed_result(
+        stage="partner",
+        code="partner_candidate_failures",
+        detail="One Partner candidate failed.",
+        recovery_action="Inspect Partner logs and retry.",
+        attempted=2,
+        succeeded=1,
+        failed=1,
+    )
+    blocked = StageExecutionResult.blocked_result(
+        stage="reviewer",
+        code="reviewer_budget_blocked",
+        detail="Reviewer budget denied eligible work.",
+        recovery_action="Increase the Reviewer budget or wait for reset.",
+        attempted=3,
+        blocked=3,
+    )
+    no_work = StageExecutionResult.skipped_result(
+        stage="partner",
+        code="partner_no_eligible_work",
+        detail="No eligible Partner work was found.",
+    )
+
+    assert completed.state is StageExecutionState.COMPLETED
+    assert failed.state is StageExecutionState.FAILED
+    assert blocked.state is StageExecutionState.BLOCKED
+    assert no_work.state is StageExecutionState.SKIPPED
+    assert failed.model_dump()["failed"] == 1
+    assert blocked.model_dump()["blocked"] == 3
+
+
+def test_stage_execution_result_rejects_inconsistent_counts_and_recovery():
+    from pipeline_execution import StageExecutionResult
+
+    with pytest.raises(ValueError):
+        StageExecutionResult(
+            stage="reviewer",
+            state="completed",
+            code="reviewer_completed",
+            detail="Impossible clean result.",
+            attempted=1,
+            succeeded=0,
+            failed=1,
+        )
+    with pytest.raises(ValueError):
+        StageExecutionResult.failed_result(
+            stage="partner",
+            code="partner_candidate_failures",
+            detail="Missing recovery.",
+            recovery_action="",
+            attempted=1,
+            failed=1,
+        )

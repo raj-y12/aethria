@@ -76,7 +76,7 @@ async def test_end_to_end():
         batch_size=len(unreviewed),  # Review all unreviewed
     )
     
-    reviewed_count = await reviewer_engine.run_cycle()
+    reviewed_count = (await reviewer_engine.run_cycle()).succeeded
     print(f"✓ Reviewed {reviewed_count} entries")
     print()
     

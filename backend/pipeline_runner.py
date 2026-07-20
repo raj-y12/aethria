@@ -38,7 +38,12 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisites,
     load_evaluation_prerequisites,
 )
-from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
+from pipeline_execution import (
+    PipelineExecutionResult,
+    PipelineExecutionState,
+    StageExecutionResult,
+    StageExecutionState,
+)
 from pipeline_concurrency import pipeline_execution_slot, lookup_execution_slot
 from supabase_doc_store import list_upsert
 from utils.settings_loader import load_settings, is_thesis_reprocess_agents_enabled
@@ -744,6 +749,7 @@ async def _run_one_pipeline_cycle_inner(
         _activity_reviewed_count = 0
         _activity_decided_count = 0
         _activity_escalations_count = 0
+        stage_results: Dict[str, StageExecutionResult] = {}
         if reviewers_enabled and identity_repository is not None:
             current_stage = "reviewer"
             agents_executed += 3
@@ -754,20 +760,28 @@ async def _run_one_pipeline_cycle_inner(
                     user_id[:12],
                     unreviewed_before,
                 )
-            reviewed_count = await reviewer_engine.run_cycle(
+            reviewer_result = await reviewer_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
                 eligible_startup_ids=eligible_startup_ids,
             )
-            _activity_reviewed_count = reviewed_count or 0
+            if not isinstance(reviewer_result, StageExecutionResult):
+                raise RuntimeError(
+                    "Reviewer returned an invalid periodic stage result"
+                )
+            stage_results["reviewer"] = reviewer_result
+            _activity_reviewed_count = reviewer_result.succeeded
             if _activity_reviewed_count > 0:
                 _notify_startups_changed(user_id, "reviewer")
             reviewer_stats = getattr(reviewer_engine, "last_cycle_stats", {}) or {}
             unreviewed_after = await asyncio.to_thread(_safe_stage_count, storage, "count_unreviewed", user_id)
-            if reviewed_count > 0 or (unreviewed_before or 0) > 0 or (unreviewed_after or 0) > 0:
+            if _activity_reviewed_count > 0 or (unreviewed_before or 0) > 0 or (unreviewed_after or 0) > 0:
                 _visible_info(
-                    "[%s] Reviewer stage done: reviewed=%s unreviewed_after=%s threshold=%s candidates_seen=%s skipped_low_confidence=%s reason=%s",
+                    "[%s] Reviewer stage done: state=%s reviewed=%s failed=%s blocked=%s unreviewed_after=%s threshold=%s candidates_seen=%s skipped_low_confidence=%s reason=%s",
                     user_id[:12],
-                    reviewed_count,
+                    reviewer_result.state.value,
+                    reviewer_result.succeeded,
+                    reviewer_result.failed,
+                    reviewer_result.blocked,
                     unreviewed_after,
                     reviewer_stats.get("confidence_threshold"),
                     reviewer_stats.get("candidates_seen"),
@@ -775,6 +789,11 @@ async def _run_one_pipeline_cycle_inner(
                     reviewer_stats.get("reason"),
                 )
         else:
+            stage_results["reviewer"] = StageExecutionResult.skipped_result(
+                stage="reviewer",
+                code="reviewer_disabled",
+                detail="The Reviewer stage was disabled for this pipeline cycle.",
+            )
             logger.info(
                 "[%s] Reviewer stage skipped (%s)",
                 user_id[:12],
@@ -791,11 +810,16 @@ async def _run_one_pipeline_cycle_inner(
                     user_id[:12],
                     undecided_before,
                 )
-            decided_count = await partner_engine.run_cycle(
+            partner_result = await partner_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
                 eligible_startup_ids=eligible_startup_ids,
             )
-            _activity_decided_count = decided_count or 0
+            if not isinstance(partner_result, StageExecutionResult):
+                raise RuntimeError(
+                    "Partner returned an invalid periodic stage result"
+                )
+            stage_results["partner"] = partner_result
+            _activity_decided_count = partner_result.succeeded
             if _activity_decided_count > 0:
                 _observe_decision_ready_usage(
                     engines.cost_controller,
@@ -811,14 +835,22 @@ async def _run_one_pipeline_cycle_inner(
             if _activity_decided_count > 0 or _activity_escalations_count > 0:
                 _notify_startups_changed(user_id, "partner")
             undecided_after = await asyncio.to_thread(_safe_stage_count, storage, "count_undecided", user_id)
-            if decided_count > 0 or (undecided_before or 0) > 0 or (undecided_after or 0) > 0:
+            if _activity_decided_count > 0 or (undecided_before or 0) > 0 or (undecided_after or 0) > 0:
                 _visible_info(
-                    "[%s] Partner stage done: decided=%s undecided_after=%s",
+                    "[%s] Partner stage done: state=%s decided=%s failed=%s blocked=%s undecided_after=%s",
                     user_id[:12],
-                    decided_count,
+                    partner_result.state.value,
+                    partner_result.succeeded,
+                    partner_result.failed,
+                    partner_result.blocked,
                     undecided_after,
                 )
         else:
+            stage_results["partner"] = StageExecutionResult.skipped_result(
+                stage="partner",
+                code="partner_disabled",
+                detail="The Partner stage was disabled for this pipeline cycle.",
+            )
             logger.info(
                 "[%s] Partner stage skipped (%s)",
                 user_id[:12],
@@ -872,7 +904,6 @@ async def _run_one_pipeline_cycle_inner(
 
         gc.collect()
         _cycle_duration = time.perf_counter() - started_at
-        metrics.observe_pipeline_cycle(_cycle_duration, outcome="success")
         metrics.inc_stage("startups_found", _activity_startups_found)
         metrics.inc_stage("reviewed", _activity_reviewed_count)
         metrics.inc_stage("decided", _activity_decided_count)
@@ -890,16 +921,68 @@ async def _run_one_pipeline_cycle_inner(
             _activity_escalations_count,
             agents_executed,
         )
+        result_metadata = {
+            "startups_found": _activity_startups_found,
+            "reviewed": _activity_reviewed_count,
+            "decided": _activity_decided_count,
+            "escalations": _activity_escalations_count,
+            "agents_executed": agents_executed,
+            "stage_results": {
+                stage: result.model_dump(mode="json")
+                for stage, result in stage_results.items()
+            },
+        }
+        failed_result = next(
+            (
+                result
+                for result in stage_results.values()
+                if result.state is StageExecutionState.FAILED
+            ),
+            None,
+        )
+        if failed_result is not None:
+            metrics.observe_pipeline_cycle(_cycle_duration, outcome="error")
+            return PipelineExecutionResult.stage_failure(
+                stage=failed_result.stage,
+                code=failed_result.code,
+                detail=failed_result.detail,
+                recovery_action=failed_result.recovery_action
+                or "Inspect the failed stage and retry.",
+                metadata=result_metadata,
+            )
+        blocked_result = next(
+            (
+                result
+                for result in stage_results.values()
+                if result.state is StageExecutionState.BLOCKED
+            ),
+            None,
+        )
+        if blocked_result is not None:
+            metrics.observe_pipeline_cycle(_cycle_duration, outcome="blocked")
+            return PipelineExecutionResult.blocked(
+                code=blocked_result.code,
+                detail=blocked_result.detail,
+                recovery_action=blocked_result.recovery_action
+                or "Correct the stage block and retry.",
+                metadata=result_metadata,
+            )
+        if (
+            _activity_startups_found == 0
+            and _activity_reviewed_count == 0
+            and _activity_decided_count == 0
+        ):
+            metrics.observe_pipeline_cycle(_cycle_duration, outcome="no_work")
+            return PipelineExecutionResult.skipped(
+                code="pipeline_cycle_no_work",
+                detail="The pipeline cycle found no eligible evaluation work.",
+                metadata=result_metadata,
+            )
+        metrics.observe_pipeline_cycle(_cycle_duration, outcome="success")
         return PipelineExecutionResult.completed(
             code="pipeline_cycle_completed",
             detail="The pipeline cycle completed.",
-            metadata={
-                "startups_found": _activity_startups_found,
-                "reviewed": _activity_reviewed_count,
-                "decided": _activity_decided_count,
-                "escalations": _activity_escalations_count,
-                "agents_executed": agents_executed,
-            },
+            metadata=result_metadata,
         )
     except Exception as e:
         metrics.observe_pipeline_cycle(time.perf_counter() - started_at, outcome="error")

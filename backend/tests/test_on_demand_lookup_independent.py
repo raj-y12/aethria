@@ -403,7 +403,8 @@ async def test_periodic_consumes_certified_thesis_without_reloading_active_thesi
         evaluation_prerequisites=prerequisites,
     )
 
-    assert result.state is PipelineExecutionState.COMPLETED
+    assert result.state is PipelineExecutionState.SKIPPED
+    assert result.code == "pipeline_cycle_no_work"
 
 
 async def _async_none():

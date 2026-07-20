@@ -28,6 +28,7 @@ from evaluation_v2.governed_scoring import (
     GovernedScoringError,
     validate_governed_scoring_trace,
 )
+from pipeline_execution import StageExecutionResult
 
 
 logger = logging.getLogger(__name__)
@@ -654,14 +655,13 @@ class ReviewerEngine:
         pipeline_run_id: Optional[str] = None,
         *,
         eligible_startup_ids: Optional[set[str]] = None,
-    ) -> int:
+    ) -> StageExecutionResult:
         """
         Run one review cycle.
         Processes up to batch_size unreviewed entries.
         Runs all 3 reviewer personas in parallel for each startup.
         
-        Returns:
-            Number of entries reviewed in this cycle
+        Returns a typed, lossless account of every candidate attempted.
         """
         self.logger.info(f"Starting review cycle at {utcnow().isoformat()}")
         if not is_reviewers_enabled(self.tenant_user_id):
@@ -673,22 +673,12 @@ class ReviewerEngine:
                 "confidence_threshold": None,
                 "reason": "agents_disabled",
             }
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="reviewer",
+                code="reviewer_disabled",
+                detail="The Reviewer stage is disabled for this tenant.",
+            )
         self._sync_thesis_to_reviewers()
-
-        # Check budget before reviewing
-        if self.cost_controller:
-            allowed, reason = self.cost_controller.check_budget("reviewer", "reviewer_engine")
-            if not allowed:
-                self.logger.warning(f"Reviewer budget denied: {reason}")
-                self.last_cycle_stats = {
-                    "reviewed_count": 0,
-                    "skipped_low_confidence": 0,
-                    "candidates_seen": 0,
-                    "confidence_threshold": None,
-                    "reason": "budget_denied",
-                }
-                return 0
         
         # Ramp-up: process more per cycle when unreviewed backlog is high.
         # Sync Supabase I/O off the serving event loop: a blocked loop stalls
@@ -711,7 +701,11 @@ class ReviewerEngine:
                 "confidence_threshold": None,
                 "reason": "no_unreviewed",
             }
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="reviewer",
+                code="reviewer_no_eligible_work",
+                detail="No unreviewed startup is eligible for the Reviewer stage.",
+            )
         try:
             cycle_limit = int(get_runtime_limits(self.tenant_user_id).get("max_agents_per_run", effective_batch))
             effective_batch = min(effective_batch, max(1, cycle_limit))
@@ -764,7 +758,11 @@ class ReviewerEngine:
                 "confidence_threshold": confidence_threshold,
                 "reason": "no_candidates",
             }
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="reviewer",
+                code="reviewer_no_eligible_work",
+                detail="No unreviewed startup is eligible for the Reviewer stage.",
+            )
 
         # Sort by confidence_score descending (highest confidence first)
         unreviewed_startups.sort(
@@ -781,13 +779,50 @@ class ReviewerEngine:
             unreviewed_startups[-1].scout_info.confidence_score if unreviewed_startups else 0,
         )
 
+        eligible_count = sum(
+            1
+            for startup in unreviewed_startups
+            if startup.scout_info.confidence_score >= confidence_threshold
+        )
+        if self.cost_controller and eligible_count:
+            allowed, reason = self.cost_controller.check_budget(
+                "reviewer", "reviewer_engine"
+            )
+            if not allowed:
+                blocked_count = min(effective_batch, eligible_count)
+                self.logger.warning("Reviewer budget denied: %s", reason)
+                self.last_cycle_stats = {
+                    "attempted": blocked_count,
+                    "reviewed_count": 0,
+                    "failed": 0,
+                    "blocked": blocked_count,
+                    "skipped_low_confidence": 0,
+                    "candidates_seen": len(unreviewed_startups),
+                    "confidence_threshold": confidence_threshold,
+                    "reason": "budget_denied",
+                }
+                return StageExecutionResult.blocked_result(
+                    stage="reviewer",
+                    code="reviewer_budget_blocked",
+                    detail="Reviewer budget denied all eligible work in this cycle.",
+                    recovery_action=(
+                        "Increase the Reviewer budget or wait for the budget window "
+                        "to reset, then retry."
+                    ),
+                    attempted=blocked_count,
+                    blocked=blocked_count,
+                )
+
         reviewed_count = 0
+        failed_count = 0
         skipped_low_confidence = 0
+        attempted_count = 0
         
         # Process each startup
         for startup in unreviewed_startups:
             if reviewed_count >= effective_batch:
                 break
+            attempted_count += 1
             confidence_score = startup.scout_info.confidence_score
             if confidence_score < confidence_threshold:
                 skipped_low_confidence += 1
@@ -840,6 +875,7 @@ class ReviewerEngine:
                             status="failed",
                             error="all reviewers failed",
                         )
+                    failed_count += 1
                     continue
                 
                 # Primary narrative/summary: DefaultReviewer (types are set to class names above)
@@ -961,12 +997,14 @@ class ReviewerEngine:
                             )
                 else:
                     self.logger.error(f"Failed to save review for entry {entry_id}")
+                    failed_count += 1
                     
             except Exception as e:
                 self.logger.error(
                     f"Error reviewing entry {entry_id}: {e}",
                     exc_info=True
                 )
+                failed_count += 1
                 continue
         
         self.logger.info(
@@ -976,14 +1014,49 @@ class ReviewerEngine:
             len(unreviewed_startups),
         )
         self.last_cycle_stats = {
+            "attempted": attempted_count,
             "reviewed_count": reviewed_count,
+            "failed": failed_count,
+            "blocked": 0,
             "skipped_low_confidence": skipped_low_confidence,
             "candidates_seen": len(unreviewed_startups),
             "confidence_threshold": confidence_threshold,
             "reason": "ok",
         }
-        
-        return reviewed_count
+
+        if failed_count:
+            return StageExecutionResult.failed_result(
+                stage="reviewer",
+                code="reviewer_candidate_failures",
+                detail=(
+                    f"Reviewer completed {reviewed_count} of {attempted_count} "
+                    "attempted candidates; one or more candidates failed."
+                ),
+                recovery_action=(
+                    "Inspect Reviewer and persistence logs, correct the failures, "
+                    "and retry the affected candidates."
+                ),
+                attempted=attempted_count,
+                succeeded=reviewed_count,
+                failed=failed_count,
+                skipped=skipped_low_confidence,
+            )
+        if reviewed_count:
+            return StageExecutionResult.completed(
+                stage="reviewer",
+                code="reviewer_completed",
+                detail=f"Reviewer completed {reviewed_count} eligible candidate(s).",
+                attempted=attempted_count,
+                succeeded=reviewed_count,
+                skipped=skipped_low_confidence,
+            )
+        return StageExecutionResult.skipped_result(
+            stage="reviewer",
+            code="reviewer_no_eligible_work",
+            detail="No candidate met the Reviewer eligibility threshold.",
+            attempted=attempted_count,
+            skipped=skipped_low_confidence,
+        )
 
     async def run_startup(
         self,
