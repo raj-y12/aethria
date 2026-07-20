@@ -32,9 +32,11 @@ def load_active_policy(user_id: str) -> Dict[str, Any]:
     return compile_policy_from_fund_config(fund_config)
 
 
-def load_published_policy(user_id: str) -> Dict[str, Any]:
+def load_published_policy(
+    user_id: str, *, settings: Dict[str, Any] | None = None
+) -> Dict[str, Any]:
     """Load the exact active published policy, failing closed on draft fallback."""
-    settings = load_settings(user_id)
+    settings = settings if isinstance(settings, dict) else load_settings(user_id)
     fund_config = (
         settings.get("fund_config")
         if isinstance(settings.get("fund_config"), dict)

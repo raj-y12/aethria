@@ -10,15 +10,14 @@ from utils.timeutil import utcnow
 
 
 def _prerequisites():
-    policy = evaluation_policy_from_compiled(
-        {
-            "policy_version_id": "policy-live",
-            "policy_hash": "hash-live",
-            "dimensions": {
-                "market": {"weight": 100, "criteria": [{"id": "market"}]}
-            },
+    compiled = {
+        "policy_version_id": "policy-live",
+        "policy_hash": "hash-live",
+        "dimensions": {
+            "market": {"weight": 100, "criteria": [{"id": "market"}]}
         },
-        partner_rules={
+    }
+    partner_rules = {
             "version": "rules-v2",
             "decision_safety": {
                 "evidence_eligibility": {
@@ -32,9 +31,20 @@ def _prerequisites():
                 "critical_risk_claim_types": ["critical_risk"],
                 "hard_exclusion_claim_types": ["mandate_exclusion"],
             },
-        },
+        }
+    policy = evaluation_policy_from_compiled(
+        compiled,
+        partner_rules=partner_rules,
     )
-    return EvaluationPrerequisites(thesis_version_id="thesis-live", policy=policy)
+    return EvaluationPrerequisites(
+        user_id="user-a",
+        thesis_context={"version_id": "thesis-live"},
+        thesis_version_id="thesis-live",
+        compiled_scoring_policy=compiled,
+        partner_rules=partner_rules,
+        fund_config={},
+        policy=policy,
+    )
 
 
 @pytest.fixture(autouse=True)

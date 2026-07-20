@@ -18,6 +18,7 @@ from utils.settings_loader import get_runtime_limits, is_partners_enabled
 from portfolio.store import PortfolioStore
 from pipeline_state import pipeline_stage_log, upsert_pipeline_state
 from agent_trace import handoff_quality_from_trace
+from evaluation_v2.prerequisites import EvaluationPrerequisites
 
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ class PartnerEngine:
         tenant_user_id: str = "",
         fund_thesis: Optional[Dict[str, Any]] = None,
         use_resource_fund_thesis_fallback: bool = True,
+        evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
     ):
         """
         Initialize the Partner engine.
@@ -70,7 +72,21 @@ class PartnerEngine:
             portfolio_store=portfolio_store,
             tenant_user_id=self.tenant_user_id,
             use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
+            evaluation_prerequisites=evaluation_prerequisites,
         )
+        if evaluation_prerequisites is not None:
+            evaluation_prerequisites.require_tenant(
+                self.tenant_user_id, context="PartnerEngine"
+            )
+            if (
+                fund_thesis is not None
+                and fund_thesis != evaluation_prerequisites.thesis_context
+            ):
+                raise RuntimeError(
+                    "PartnerEngine: fund thesis does not match governed prerequisites"
+                )
+            fund_thesis = evaluation_prerequisites.thesis_context
+        self.evaluation_prerequisites = evaluation_prerequisites
         self.fund_thesis: Optional[Dict[str, Any]] = fund_thesis
         # Max undecided to process per cycle (ramp: process a solid batch when backlog is high)
         self.batch_max = int(os.getenv("PARTNER_BATCH_MAX", "20"))

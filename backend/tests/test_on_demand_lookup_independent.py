@@ -72,6 +72,29 @@ class _FakeThesis:
         return dict(self.CONTEXT)
 
 
+def _prerequisites(
+    user_id="user_123",
+    *,
+    policy_version_id="policy-live",
+    policy_hash="hash-live",
+):
+    return EvaluationPrerequisites(
+        user_id=user_id,
+        thesis_context=_FakeThesis.CONTEXT,
+        thesis_version_id="thesis-v1",
+        compiled_scoring_policy={
+            "policy_version_id": policy_version_id,
+            "policy_hash": policy_hash,
+        },
+        partner_rules={"version": "rules-live"},
+        fund_config={},
+        policy=SimpleNamespace(
+            policy_version_id=policy_version_id,
+            policy_hash=policy_hash,
+        ),
+    )
+
+
 def _wire_common_engines(monkeypatch):
     _FakeScoutEngine.calls = 0
     _FakeScoutEngine.outcome = None
@@ -93,13 +116,7 @@ def _wire_common_engines(monkeypatch):
     monkeypatch.setattr("pipeline_runner.ReviewerEngine", _FakeReviewerEngine)
     monkeypatch.setattr("pipeline_runner.PartnerEngine", _FakePartnerEngine)
     monkeypatch.setattr("pipeline_runner.PortfolioStore", lambda *args, **kwargs: SimpleNamespace())
-    prerequisites = EvaluationPrerequisites(
-        thesis_version_id="thesis-v1",
-        policy=SimpleNamespace(
-            policy_version_id="policy-live",
-            policy_hash="hash-live",
-        ),
-    )
+    prerequisites = _prerequisites()
 
     async def load_prerequisites(**kwargs):
         assert kwargs["user_id"] == "user_123"
@@ -203,12 +220,9 @@ async def test_direct_lookup_selects_governed_repository(monkeypatch):
     )
     governed_repository = object()
     calls = []
-    prerequisites = EvaluationPrerequisites(
-        thesis_version_id="thesis-v1",
-        policy=SimpleNamespace(
-            policy_version_id="governed-policy-live",
-            policy_hash="governed-hash-live",
-        ),
+    prerequisites = _prerequisites(
+        policy_version_id="governed-policy-live",
+        policy_hash="governed-hash-live",
     )
 
     async def load_prerequisites(**kwargs):
@@ -274,13 +288,7 @@ async def test_direct_pipeline_cycle_gates_and_passes_governed_repository(monkey
 
 @pytest.mark.asyncio
 async def test_direct_pipeline_cycle_reuses_supplied_prerequisites(monkeypatch):
-    prerequisites = EvaluationPrerequisites(
-        thesis_version_id="thesis-v1",
-        policy=SimpleNamespace(
-            policy_version_id="policy-live",
-            policy_hash="hash-live",
-        ),
-    )
+    prerequisites = _prerequisites()
     calls = []
 
     async def load_prerequisites(**kwargs):
@@ -307,13 +315,7 @@ async def test_direct_pipeline_cycle_reuses_supplied_prerequisites(monkeypatch):
 async def test_periodic_continuity_missing_thesis_remains_operator_correctable(
     monkeypatch,
 ):
-    prerequisites = EvaluationPrerequisites(
-        thesis_version_id="thesis-v1",
-        policy=SimpleNamespace(
-            policy_version_id="policy-live",
-            policy_hash="hash-live",
-        ),
-    )
+    prerequisites = _prerequisites()
 
     def missing_thesis(_user_id):
         raise FundThesisMissingError("active thesis disappeared")
@@ -344,13 +346,7 @@ async def test_lookup_continuity_missing_thesis_remains_operator_correctable(
     monkeypatch,
 ):
     _wire_common_engines(monkeypatch)
-    prerequisites = EvaluationPrerequisites(
-        thesis_version_id="thesis-v1",
-        policy=SimpleNamespace(
-            policy_version_id="policy-live",
-            policy_hash="hash-live",
-        ),
-    )
+    prerequisites = _prerequisites()
 
     def missing_thesis(_user_id):
         raise FundThesisMissingError("active thesis disappeared")

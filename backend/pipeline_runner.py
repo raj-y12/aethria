@@ -87,9 +87,25 @@ def _build_pipeline_engines(
     storage: SupabaseStartupsStorage,
     api_key: str,
     settings: Dict[str, Any],
-    thesis_ctx,
+    thesis_ctx=None,
+    evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
     use_resource_fund_thesis_fallback: bool = True,
 ) -> _PipelineEngines:
+    uid = require_user_id(user_id, context="_build_pipeline_engines")
+    if evaluation_prerequisites is not None:
+        evaluation_prerequisites.require_tenant(
+            uid, context="_build_pipeline_engines"
+        )
+        if (
+            thesis_ctx is not None
+            and thesis_ctx != evaluation_prerequisites.thesis_context
+        ):
+            raise RuntimeError(
+                "_build_pipeline_engines: thesis does not match governed prerequisites"
+            )
+        thesis_ctx = evaluation_prerequisites.thesis_context
+    if thesis_ctx is None:
+        raise RuntimeError("_build_pipeline_engines requires an exact thesis context")
     cost_budget_enabled = bool((settings.get("cost_budget") or {}).get("enabled", False))
     cost_controller = CostController(
         user_id=user_id,
@@ -122,6 +138,7 @@ def _build_pipeline_engines(
         tenant_user_id=user_id,
         active_thesis=thesis_ctx,
         use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
+        evaluation_prerequisites=evaluation_prerequisites,
     )
     portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
     portfolio_store = PortfolioStore(data_dir=portfolio_dir, user_id=user_id)
@@ -135,6 +152,7 @@ def _build_pipeline_engines(
         tenant_user_id=user_id,
         fund_thesis=thesis_ctx,
         use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
+        evaluation_prerequisites=evaluation_prerequisites,
     )
     return _PipelineEngines(
         scout_engine=scout_engine,
@@ -611,7 +629,7 @@ async def _run_one_pipeline_cycle_inner(
         storage=storage,
         api_key=api_key,
         settings=settings,
-        thesis_ctx=thesis_ctx,
+        evaluation_prerequisites=evaluation_prerequisites,
     )
     scout_engine = engines.scout_engine
     reviewer_engine = engines.reviewer_engine
@@ -1032,7 +1050,7 @@ async def _run_on_demand_lookup_inner(
         storage=storage,
         api_key=api_key,
         settings=settings,
-        thesis_ctx=thesis_ctx,
+        evaluation_prerequisites=evaluation_prerequisites,
         use_resource_fund_thesis_fallback=False,
     )
     scout_engine = engines.scout_engine

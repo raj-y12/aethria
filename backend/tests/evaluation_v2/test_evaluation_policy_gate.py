@@ -130,7 +130,12 @@ async def test_evaluate_endpoint_uses_active_thesis_and_published_policy(monkeyp
     async def load(**kwargs):
         assert kwargs["user_id"] == "user-a"
         return EvaluationPrerequisites(
+            user_id="user-a",
+            thesis_context={"version_id": "thesis-live"},
             thesis_version_id="thesis-live",
+            compiled_scoring_policy=_compiled_policy(),
+            partner_rules={"version": "rules-v2"},
+            fund_config={},
             policy=policy,
         )
 

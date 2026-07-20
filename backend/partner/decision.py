@@ -16,6 +16,7 @@ from utils.prompt_version import hash_prompt
 from utils.scoring import compute_overall_score
 from utils.settings_loader import load_settings, recommendation_for_score_from_fund_config
 from utils.partner_codes import legacy_from_recommendation, recommendation_from_legacy
+from evaluation_v2.prerequisites import EvaluationPrerequisites
 
 from partner.rationale import (
     compose_decision_rationale,
@@ -215,6 +216,7 @@ class PartnerDecisionEngine:
         portfolio_store=None,
         tenant_user_id: str = "",
         use_resource_fund_thesis_fallback: bool = True,
+        evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
     ):
         """
         Initialize the decision engine.
@@ -229,11 +231,22 @@ class PartnerDecisionEngine:
         self.use_llm_fallback = use_llm_fallback
         self.logger = logging.getLogger("partner.decision")
         self.tenant_user_id = (tenant_user_id or "").strip()
+        self.evaluation_prerequisites = evaluation_prerequisites
+        if evaluation_prerequisites is not None:
+            evaluation_prerequisites.require_tenant(
+                self.tenant_user_id, context="PartnerDecisionEngine"
+            )
         self.use_resource_fund_thesis_fallback = bool(use_resource_fund_thesis_fallback)
         self.llm_call_count = 0
-        self._rules: Dict[str, Any] = _load_partner_rules()
-        self._fund_config: Dict[str, Any] = {}
-        if self.tenant_user_id:
+        if evaluation_prerequisites is not None:
+            self._rules = evaluation_prerequisites.partner_rules
+            self._fund_config = evaluation_prerequisites.fund_config
+            self.evaluation_policy = evaluation_prerequisites.policy
+        else:
+            self._rules = _load_partner_rules()
+            self._fund_config = {}
+            self.evaluation_policy = None
+        if self.tenant_user_id and evaluation_prerequisites is None:
             try:
                 settings = load_settings(self.tenant_user_id)
                 fc = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
@@ -316,11 +329,24 @@ class PartnerDecisionEngine:
 
     @staticmethod
     def _avg_score_and_dims(review_output: Dict[str, Any]) -> Tuple[float, int]:
-        """Canonical mean of four core scores only (defensibility is separate)."""
-        canonical = compute_overall_score(review_output)
-        if canonical is None:
-            return 0.0, 4
-        return float(canonical), 4
+        """Mean only genuinely scored core dimensions; retain coverage count."""
+        values: List[float] = []
+        structured = review_output.get("structured_scoring")
+        structured = structured if isinstance(structured, dict) else None
+        for dimension in ("market", "product", "technical", "execution"):
+            if structured is not None:
+                detail = structured.get(dimension)
+                if not isinstance(detail, dict) or bool(detail.get("unscored")):
+                    continue
+            raw = review_output.get(f"{dimension}_score")
+            try:
+                if raw is not None:
+                    values.append(float(raw))
+            except (TypeError, ValueError):
+                continue
+        if not values:
+            return 0.0, 0
+        return sum(values) / len(values), len(values)
 
     def _canonical_recommendation(self, avg_score: float) -> str:
         if self._fund_config:
@@ -751,6 +777,53 @@ class PartnerDecisionEngine:
         )
         # Merged risks: key_risks + assumption_risks, deduplicated, max 5
         merged_risks: List[str] = _merge_risks(key_risks, assumption_risks)
+
+        if avg_dims < 4:
+            missing_dimensions = [
+                dimension
+                for dimension in ("market", "product", "technical", "execution")
+                if (
+                    not isinstance(review_output.get("structured_scoring"), dict)
+                    or not isinstance(
+                        review_output["structured_scoring"].get(dimension), dict
+                    )
+                    or review_output["structured_scoring"][dimension].get("unscored")
+                    or review_output.get(f"{dimension}_score") is None
+                )
+            ]
+            evidence_risk = (
+                "Insufficient evidence coverage for required dimensions: "
+                + ", ".join(missing_dimensions)
+            )
+            result = self._create_decision(
+                recommendation="MONITOR",
+                conviction=3,
+                decision_rationale=(
+                    "Required evaluation dimensions are unscored, so the available "
+                    "evidence cannot support an investment or pass recommendation."
+                ),
+                next_action=next_actions.get(
+                    "human_review_monitor",
+                    "Human review required - monitor closely",
+                ),
+                human_review_required=True,
+                thesis=n_thesis,
+                why_this_matters=n_why,
+                snapshot=n_snapshot,
+                market_insight=n_market,
+                product_edge=n_product,
+                traction_signals=n_traction,
+                risks=_merge_risks(merged_risks, [evidence_risk]),
+            )
+            result["decision_drivers"] = ["insufficient_evidence_coverage"]
+            result = self._apply_final_recommendation_fields(
+                result, "MONITOR", assumption_risks
+            )
+            result["risks"] = _merge_risks(merged_risks, [evidence_risk])
+            result["human_review_required"] = True
+            return self._finalize_thesis_and_mandate_gate(
+                result, review_output, scout_output, avg_score, avg_dims
+            )
 
         scout_confidence = scout_output.get("confidence", 0.5)
         if scout_confidence < 0.5:

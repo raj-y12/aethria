@@ -263,10 +263,10 @@ class AethriaView(BaseModel):
 
 class ReviewInfo(BaseModel):
     """Reviewer evaluation information."""
-    market_score: int = Field(ge=1, le=10)
-    product_score: int = Field(ge=1, le=10)
-    technical_score: int = Field(ge=1, le=10)
-    execution_score: int = Field(ge=1, le=10)
+    market_score: Optional[int] = Field(default=None, ge=1, le=10)
+    product_score: Optional[int] = Field(default=None, ge=1, le=10)
+    technical_score: Optional[int] = Field(default=None, ge=1, le=10)
+    execution_score: Optional[int] = Field(default=None, ge=1, le=10)
     defensibility_score: Optional[int] = Field(default=None, ge=1, le=10)  # Calculated by reviewer
     overall_summary: str
     key_risks: List[str]

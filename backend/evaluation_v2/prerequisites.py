@@ -20,6 +20,7 @@ from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.scoring.policy_store import PolicyNotPublishedError, load_published_policy
 from supabase_client import get_service_client
 from tenant_context import require_user_id
+from utils.settings_loader import load_settings
 
 
 _GOVERNED_POLICY_NOT_FOUND = object()
@@ -27,8 +28,22 @@ _GOVERNED_POLICY_NOT_FOUND = object()
 
 @dataclass(frozen=True)
 class EvaluationPrerequisites:
+    user_id: str
+    thesis_context: Dict[str, Any]
     thesis_version_id: str
+    compiled_scoring_policy: Dict[str, Any]
+    partner_rules: Dict[str, Any]
+    fund_config: Dict[str, Any]
     policy: EvaluationPolicy
+
+    def require_tenant(self, user_id: str, *, context: str) -> str:
+        uid = require_user_id(user_id, context=context)
+        if uid != self.user_id:
+            raise RuntimeError(
+                f"{context}: evaluation prerequisite tenant mismatch "
+                f"({uid!r} != {self.user_id!r})"
+            )
+        return uid
 
 
 class EvaluationPrerequisiteError(RuntimeError):
@@ -46,9 +61,11 @@ async def load_evaluation_prerequisites(
     load_thesis: Callable[[str], Any] | None = None,
     load_policy: Callable[[str], Dict[str, Any]] | None = None,
     load_partner_rules: Callable[[], Dict[str, Any]] | None = None,
+    load_fund_config: Callable[[str], Dict[str, Any]] | None = None,
 ) -> EvaluationPrerequisites:
     """Resolve one tenant's exact thesis, published policy, and Partner rules."""
     uid = require_user_id(user_id, context="load_evaluation_prerequisites")
+    resolved_legacy_settings: Dict[str, Any] | None = None
 
     async def resolve_thesis() -> Any:
         if load_thesis is not None:
@@ -59,10 +76,16 @@ async def load_evaluation_prerequisites(
         )
 
     async def resolve_policy() -> Dict[str, Any]:
+        nonlocal resolved_legacy_settings
         if load_policy is not None:
             value = load_policy(uid)
             return await value if inspect.isawaitable(value) else value
-        return await asyncio.to_thread(load_published_policy, uid)
+        resolved_legacy_settings = await asyncio.to_thread(
+            load_settings, uid, use_cache=False
+        )
+        return await asyncio.to_thread(
+            lambda: load_published_policy(uid, settings=resolved_legacy_settings)
+        )
 
     async def resolve_rules() -> Dict[str, Any]:
         if load_partner_rules is not None:
@@ -104,6 +127,7 @@ async def load_evaluation_prerequisites(
         )
 
     compiled: Dict[str, Any] | None = None
+    exact_fund_config: Dict[str, Any] | None = None
     if fund_intelligence_repository is not None:
         governed: Any = _GOVERNED_POLICY_NOT_FOUND
         try:
@@ -128,9 +152,13 @@ async def load_evaluation_prerequisites(
             )
         if governed is not _GOVERNED_POLICY_NOT_FOUND:
             try:
+                governed_patch = governed["policy_patch"]
+                if not isinstance(governed_patch, dict):
+                    raise ValueError("governed policy patch must be an object")
+                exact_fund_config = governed_patch
                 compiled = await asyncio.to_thread(
                     compile_policy_from_fund_config,
-                    governed["policy_patch"],
+                    exact_fund_config,
                     require_publish_ready=True,
                 )
                 if compiled["policy_hash"] != governed["policy_hash"]:
@@ -174,6 +202,37 @@ async def load_evaluation_prerequisites(
                 recovery_action="Retry after the policy store is available.",
             ) from exc
 
+    if exact_fund_config is None:
+        if resolved_legacy_settings is not None:
+            candidate = resolved_legacy_settings.get("fund_config")
+            if not isinstance(candidate, dict):
+                raise EvaluationPrerequisiteError(
+                    code="prerequisite_unavailable",
+                    detail="The published fund configuration is invalid.",
+                    recovery_action="Republish the fund scoring policy before retrying.",
+                )
+            exact_fund_config = candidate
+        elif load_fund_config is not None:
+            try:
+                value = load_fund_config(uid)
+                value = await value if inspect.isawaitable(value) else value
+                if not isinstance(value, dict):
+                    raise TypeError("published fund configuration must be an object")
+                exact_fund_config = value
+            except Exception as exc:
+                raise EvaluationPrerequisiteError(
+                    code="prerequisite_unavailable",
+                    detail="The published fund configuration could not be loaded.",
+                    recovery_action="Republish the fund scoring policy before retrying.",
+                ) from exc
+        else:
+            # Governed policies carry their exact accepted fund configuration. The
+            # legacy published-policy seam predates that field, so an injected
+            # loader may omit it; production legacy loading is tightened below by
+            # the shared settings bundle.
+            candidate = compiled.get("fund_config")
+            exact_fund_config = candidate if isinstance(candidate, dict) else {}
+
     try:
         rules = await resolve_rules()
         policy = evaluation_policy_from_compiled(compiled, partner_rules=rules)
@@ -185,6 +244,15 @@ async def load_evaluation_prerequisites(
         ) from exc
 
     return EvaluationPrerequisites(
+        user_id=uid,
+        thesis_context=(
+            thesis.as_engine_context()
+            if callable(getattr(thesis, "as_engine_context", None))
+            else {"version_id": str(thesis.version_id)}
+        ),
         thesis_version_id=str(thesis.version_id),
+        compiled_scoring_policy=compiled,
+        partner_rules=rules,
+        fund_config=exact_fund_config,
         policy=policy,
     )

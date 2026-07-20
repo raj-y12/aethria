@@ -23,6 +23,7 @@ from services.scoring.policy_store import load_active_policy
 from services.reviewer_resolution import apply_resolution_to_primary
 from reviewer.aethria_view import build_aethria_view
 from utils.reviewer_gap_retrieval import enrich_scout_for_reviewer_llm
+from evaluation_v2.prerequisites import EvaluationPrerequisites
 
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ class ReviewerEngine:
         tenant_user_id: str = "",
         active_thesis: Optional[Dict[str, Any]] = None,
         use_resource_fund_thesis_fallback: bool = True,
+        evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
     ):
         """
         Initialize the Reviewer engine.
@@ -63,6 +65,19 @@ class ReviewerEngine:
         if not inferred:
             inferred = (getattr(storage, "_user_id", None) or "").strip()
         self.tenant_user_id = require_user_id(inferred, context="ReviewerEngine")
+        self.evaluation_prerequisites = evaluation_prerequisites
+        if evaluation_prerequisites is not None:
+            evaluation_prerequisites.require_tenant(
+                self.tenant_user_id, context="ReviewerEngine"
+            )
+            if (
+                active_thesis is not None
+                and active_thesis != evaluation_prerequisites.thesis_context
+            ):
+                raise RuntimeError(
+                    "ReviewerEngine: active thesis does not match governed prerequisites"
+                )
+            active_thesis = evaluation_prerequisites.thesis_context
         self.api_key = api_key
         self.storage = storage
         self.interval_seconds = interval_seconds
@@ -115,6 +130,23 @@ class ReviewerEngine:
         self.last_cycle_stats: Dict[str, Any] = {}
 
     def _build_scoring_engine(self) -> Optional[DeterministicScoringEngine]:
+        if self.evaluation_prerequisites is not None:
+            fc = self.evaluation_prerequisites.fund_config
+            dim_weights = dimension_weights_from_fund_config(fc)
+            policy = self.evaluation_prerequisites.compiled_scoring_policy
+            if dim_weights:
+                self.logger.info(
+                    "reviewer_governed_policy user_id=%s policy_version_id=%s policy_hash=%s scoring_weights=%s",
+                    self.tenant_user_id[:24],
+                    policy.get("policy_version_id"),
+                    policy.get("policy_hash"),
+                    dim_weights,
+                )
+                return DeterministicScoringEngine(
+                    dimension_weights=dim_weights,
+                    policy=policy,
+                )
+            return DeterministicScoringEngine(policy=policy)
         try:
             settings = load_settings(self.tenant_user_id)
             fc = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
@@ -133,6 +165,12 @@ class ReviewerEngine:
         return DeterministicScoringEngine()
 
     def set_active_thesis(self, thesis: Optional[Dict[str, Any]]) -> None:
+        if self.evaluation_prerequisites is not None:
+            if thesis != self.evaluation_prerequisites.thesis_context:
+                raise RuntimeError(
+                    "ReviewerEngine: governed thesis context cannot be replaced"
+                )
+            thesis = self.evaluation_prerequisites.thesis_context
         self.active_thesis = thesis
         self._sync_thesis_to_reviewers()
         if self.use_structured_scoring:
@@ -421,20 +459,13 @@ class ReviewerEngine:
         from config.scoring_config import DEFAULT_SCORE
 
         trace = self.structured_scoring_engine.score(scout_output, reviewer_output)
-        # The engine's overall already EXCLUDES no-evidence ("unscored") dimensions.
-        # But the per-dimension integer fields below are read by the partner's plain
-        # 4-dim mean and by its contradiction check (max-min gap). If we stamp the
-        # neutral DEFAULT_SCORE placeholder onto an unscored dimension, it both drags
-        # that mean (demoting e.g. INVEST→MONITOR) and can fabricate a contradiction
-        # gap. Instead, an unscored dimension inherits the overall score, so it stays
-        # consistent with the headline and never invents disagreement.
-        overall = trace.get("overall_score")
-        inherit = int(round(float(overall))) if overall is not None else int(round(DEFAULT_SCORE))
-
-        def _dim_int(dim: str) -> int:
+        # An unscored dimension is missing evidence, not a neutral score and not an
+        # invitation to copy another dimension's score. Preserve that missingness in
+        # the persisted compatibility projection so Partner cannot fabricate coverage.
+        def _dim_int(dim: str) -> Optional[int]:
             details = trace.get(dim) if isinstance(trace.get(dim), dict) else {}
-            if details.get("unscored") and overall is not None:
-                return inherit
+            if details.get("unscored"):
+                return None
             return int(round(float(details.get("score", DEFAULT_SCORE))))
 
         updated = dict(reviewer_output)

@@ -87,6 +87,53 @@ async def test_resolves_exact_active_thesis_and_legacy_published_policy():
 
 
 @pytest.mark.asyncio
+async def test_prerequisites_retain_exact_tenant_bound_execution_inputs():
+    thesis_context = {
+        "thesis_id": "thesis-a",
+        "version_id": "thesis-live",
+        "version_number": 7,
+        "raw_text": "Exact published mandate",
+        "parsed_json": {"sectors": ["Infrastructure"]},
+        "embedding": [],
+        "embedding_model": "none",
+        "alignment_mode": "rule_based",
+    }
+    thesis = SimpleNamespace(
+        version_id="thesis-live",
+        as_engine_context=lambda: thesis_context,
+    )
+    compiled = _compiled_policy()
+    rules = _partner_rules()
+    fund_config = {
+        "activePolicyVersionId": "policy-live",
+        "publishedPolicyHash": "hash-live",
+        "scoreBands": [
+            {"id": "pass", "min": 0, "max": 59, "label": "Pass"},
+            {"id": "invest", "min": 60, "max": 100, "label": "Invest"},
+        ],
+    }
+
+    prerequisites = await load_evaluation_prerequisites(
+        user_id=" user-a ",
+        fund_intelligence_repository=None,
+        load_thesis=lambda _user_id: thesis,
+        load_policy=lambda _user_id: compiled,
+        load_partner_rules=lambda: rules,
+        load_fund_config=lambda user_id: fund_config,
+    )
+
+    assert prerequisites.user_id == "user-a"
+    assert prerequisites.thesis_version_id == "thesis-live"
+    assert prerequisites.thesis_context == thesis_context
+    assert prerequisites.compiled_scoring_policy == compiled
+    assert prerequisites.partner_rules == rules
+    assert prerequisites.fund_config == fund_config
+    prerequisites.require_tenant(" user-a ", context="test handoff")
+    with pytest.raises(RuntimeError, match="tenant"):
+        prerequisites.require_tenant("user-b", context="test handoff")
+
+
+@pytest.mark.asyncio
 async def test_governed_policy_uses_exact_hash_bound_version_without_legacy_fallback():
     compiled = compile_policy_from_fund_config({}, require_publish_ready=True)
 
@@ -140,6 +187,59 @@ async def test_governed_not_found_uses_legacy_published_policy():
     assert prerequisites.thesis_version_id == "thesis-live"
     assert prerequisites.policy.policy_version_id == "policy-live"
     assert prerequisites.policy.policy_hash == "hash-live"
+
+
+@pytest.mark.asyncio
+async def test_production_legacy_loader_binds_exact_published_fund_config(monkeypatch):
+    import evaluation_v2.prerequisites as prerequisites_module
+
+    fund_config = {
+        "activePolicyVersionId": "policy-live",
+        "publishedPolicyHash": "pending",
+        "scoringWeights": [
+            {"key": "market", "weight": 70},
+            {"key": "execution", "weight": 30},
+        ],
+        "scoreBands": [
+            {"id": "pass", "min": 0, "max": 59, "label": "Pass"},
+            {"id": "invest", "min": 60, "max": 100, "label": "Invest"},
+        ],
+    }
+    compiled = compile_policy_from_fund_config(fund_config, require_publish_ready=True)
+    compiled["policy_version_id"] = "policy-live"
+    fund_config["publishedPolicyHash"] = compiled["policy_hash"]
+    settings = {"fund_config": fund_config, "agent_config": {"scouts_enabled": True}}
+    calls = []
+
+    def load_settings(user_id, *, use_cache=False):
+        calls.append(("settings", user_id, use_cache))
+        return settings
+
+    def load_published_policy(user_id, *, settings):
+        calls.append(("policy", user_id, settings))
+        return compiled
+
+    monkeypatch.setattr(prerequisites_module, "load_settings", load_settings)
+    monkeypatch.setattr(
+        prerequisites_module, "load_published_policy", load_published_policy
+    )
+
+    prerequisites = await load_evaluation_prerequisites(
+        user_id="user-a",
+        fund_intelligence_repository=None,
+        load_thesis=lambda _: SimpleNamespace(
+            version_id="thesis-live",
+            as_engine_context=lambda: {"version_id": "thesis-live"},
+        ),
+        load_partner_rules=_partner_rules,
+    )
+
+    assert calls == [
+        ("settings", "user-a", False),
+        ("policy", "user-a", settings),
+    ]
+    assert prerequisites.fund_config is fund_config
+    assert prerequisites.compiled_scoring_policy is compiled
 
 
 @pytest.mark.asyncio
