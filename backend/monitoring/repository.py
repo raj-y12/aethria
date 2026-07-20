@@ -8,7 +8,8 @@ from typing import Any, Dict, Optional
 from uuid import uuid4
 
 from env_config import get_float
-from evaluation_v2.service import snapshot_claims
+from evaluation_v2.evidence_projection import enriched_claim_evidence_sql
+from evaluation_v2.service import materiality_digest, snapshot_claims
 from jobs.models import AgentJob, EvidenceRefreshPayload, JobStatus, JobType
 from monitoring.models import (
     BudgetReservationRecord,
@@ -224,14 +225,25 @@ class MonitoringRepository:
                     raise LookupError("Opportunity not found for tenant")
                 previous_hash: Optional[str] = None
                 if opportunity.get("current_evaluation_id"):
-                    previous_hash = await conn.fetchval(
+                    previous_evaluation = await conn.fetchrow(
                         """
-                        select evidence_snapshot_hash from public.evaluation_runs
+                        select evidence_materiality_digest, claim_snapshot
+                        from public.evaluation_runs
                         where user_id=$1 and evaluation_id=$2
                         """,
                         uid,
                         opportunity["current_evaluation_id"],
                     )
+                    if previous_evaluation is not None:
+                        previous_hash = str(
+                            previous_evaluation.get("evidence_materiality_digest")
+                            or ""
+                        ).strip() or None
+                        if previous_hash is None:
+                            previous_snapshot = _json(
+                                previous_evaluation.get("claim_snapshot"), []
+                            )
+                            previous_hash = materiality_digest(previous_snapshot)
                 claims = [dict(row) for row in await conn.fetch(
                     """
                     select * from public.claims
@@ -243,21 +255,19 @@ class MonitoringRepository:
                 for claim in claims:
                     claim["normalized_value"] = _json(claim.get("normalized_value"), {})
                 links = [dict(row) for row in await conn.fetch(
-                    """
-                    select l.* from public.claim_evidence_links l
-                    join public.claims c on c.user_id=l.user_id and c.claim_id=l.claim_id
-                    where l.user_id=$1 and c.opportunity_id=$2
-                    """,
+                    enriched_claim_evidence_sql(),
                     uid,
                     opportunity_id,
                 )]
-                _, current_hash = snapshot_claims(claims, links)
+                current_snapshot, _ = snapshot_claims(claims, links)
+                current_hash = materiality_digest(current_snapshot)
                 changed = material_change(previous_hash, current_hash)
                 row = await conn.fetchrow(
                     """
                     insert into public.material_change_checks (
                       material_change_check_id,user_id,opportunity_id,job_id,reason,
-                      previous_snapshot_hash,current_snapshot_hash,material_change,detail,checked_at
+                      previous_materiality_digest,current_materiality_digest,
+                      material_change,detail,checked_at
                     ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now()) returning *
                     """,
                     str(uuid4()),
@@ -272,6 +282,12 @@ class MonitoringRepository:
                 )
                 payload = dict(row)
                 payload["detail"] = _json(payload.get("detail"), {})
+                payload["previous_materiality_digest"] = previous_hash
+                payload["current_materiality_digest"] = current_hash
+                # Compatibility aliases for callers deployed before the explicit
+                # materiality naming cutover.
+                payload["previous_snapshot_hash"] = previous_hash
+                payload["current_snapshot_hash"] = current_hash
                 return payload
 
     async def current_missing_evidence(self, *, user_id: str, opportunity_id: str) -> list[str]:

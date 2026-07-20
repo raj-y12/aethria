@@ -18,6 +18,25 @@ from evaluation_v2.models import (
 )
 
 
+def _canonical_digest(value: Any) -> str:
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def materiality_digest(snapshot: Sequence[Dict[str, Any]]) -> str:
+    """Hash enriched immutable content while excluding only the evaluation clock."""
+    material_projection = [
+        {
+            key: value
+            for key, value in claim.items()
+            if key != "evaluation_at_snapshot"
+        }
+        for claim in snapshot
+    ]
+    material_projection.sort(key=lambda item: str(item.get("claim_id") or ""))
+    return _canonical_digest(material_projection)
+
+
 def snapshot_claims(
     claims: Sequence[Dict[str, Any]],
     links: Sequence[Dict[str, Any]],
@@ -37,7 +56,11 @@ def snapshot_claims(
             {
                 "claim_id": claim_id,
                 "claim_type": str(claim.get("claim_type") or ""),
-                "normalized_value": claim.get("normalized_value") or {},
+                "normalized_value": (
+                    {}
+                    if claim.get("normalized_value") is None
+                    else claim.get("normalized_value")
+                ),
                 "unit": claim.get("unit"),
                 "period": claim.get("period"),
                 "display_text": str(claim.get("display_text") or ""),
@@ -87,8 +110,7 @@ def snapshot_claims(
             }
         )
     snapshot.sort(key=lambda item: item["claim_id"])
-    canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
-    return snapshot, hashlib.sha256(canonical.encode()).hexdigest()
+    return snapshot, _canonical_digest(snapshot)
 
 
 def _utc(value: datetime) -> datetime:

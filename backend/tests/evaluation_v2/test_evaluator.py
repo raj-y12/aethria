@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime, timezone
 
 import pytest
@@ -9,7 +10,11 @@ from evaluation_v2.models import (
     EvidenceEligibilityPolicy,
     RecommendationState,
 )
-from evaluation_v2.service import evaluate_snapshot, snapshot_claims
+from evaluation_v2.service import (
+    evaluate_snapshot,
+    materiality_digest,
+    snapshot_claims,
+)
 
 
 EVALUATION_AT = datetime(2026, 7, 20, 12, 0, tzinfo=timezone.utc)
@@ -546,6 +551,59 @@ def test_snapshot_hash_captures_freshness_inputs_and_evaluation_timestamp():
 
     assert original != changed_date
     assert original != changed_clock
+
+
+def test_materiality_digest_is_clock_independent_for_identical_enriched_rows():
+    claims = _claims()
+    links = [_verified_link("claim-market"), _verified_link("claim-execution")]
+    first_snapshot, first_clocked_hash = snapshot_claims(
+        claims, links, evaluation_at=EVALUATION_AT
+    )
+    second_snapshot, second_clocked_hash = snapshot_claims(
+        claims,
+        links,
+        evaluation_at=datetime(2026, 7, 21, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert first_clocked_hash != second_clocked_hash
+    assert materiality_digest(first_snapshot) == materiality_digest(second_snapshot)
+
+
+@pytest.mark.parametrize(
+    ("target", "field", "value"),
+    [
+        ("claim", "normalized_value", {"criterion_score": 6.5}),
+        ("claim", "confidence", 0.55),
+        ("claim", "status", "contradicted"),
+        ("claim", "assertion_class", "operator_attested"),
+        ("link", "relationship", "contradicts"),
+        ("link", "support_strength", 0.4),
+        ("link", "verification_state", "rejected"),
+        ("link", "source_quality", 0.3),
+        ("link", "trust_class", "founder"),
+        ("link", "untrusted_input", True),
+        ("link", "prompt_injection_detected", True),
+        ("link", "evidence_effective_at", "2026-07-02T00:00:00+00:00"),
+        ("link", "evidence_expires_at", "2026-07-31T00:00:00+00:00"),
+        ("link", "artifact_effective_at", "2026-06-30T00:00:00+00:00"),
+        ("link", "retrieved_at", "2026-07-02T01:00:00+00:00"),
+    ],
+)
+def test_materiality_digest_changes_for_every_decision_bearing_content_field(
+    target, field, value
+):
+    claims = _claims()
+    links = [_verified_link("claim-market"), _verified_link("claim-execution")]
+    baseline, _ = snapshot_claims(claims, links, evaluation_at=EVALUATION_AT)
+    changed_claims = deepcopy(claims)
+    changed_links = deepcopy(links)
+    collection = changed_claims if target == "claim" else changed_links
+    collection[0][field] = value
+    changed, _ = snapshot_claims(
+        changed_claims, changed_links, evaluation_at=EVALUATION_AT
+    )
+
+    assert materiality_digest(baseline) != materiality_digest(changed)
 
 
 @pytest.mark.parametrize(

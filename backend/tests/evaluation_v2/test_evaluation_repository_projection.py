@@ -222,11 +222,13 @@ async def test_evaluation_link_projection_joins_grounding_metadata_tenant_safely
     assert "ea.retrieved_at" in normalized
     assert len(clock_calls) == 1
     evaluation_insert = next(
-        args
+        (sql, args)
         for sql, args in connection.execute_calls
         if "insert into public.evaluation_runs" in sql
     )
-    snapshot = json.loads(evaluation_insert[6])
+    evaluation_sql, evaluation_args = evaluation_insert
+    assert "evidence_materiality_digest" in evaluation_sql
+    snapshot = json.loads(evaluation_args[7])
     assert snapshot[0]["evaluation_at_snapshot"] == "2026-07-20T12:00:00+00:00"
     relationship = snapshot[0]["evidence_relationships"][0]
     assert relationship["evidence_effective_at"] == "2026-07-01T00:00:00+00:00"

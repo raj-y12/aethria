@@ -22,7 +22,10 @@ def can_auto_refresh(
     return level >= ServiceLevel.DISCOVERED
 
 
-def material_change(previous_snapshot_hash: str | None, current_snapshot_hash: str | None) -> bool:
-    if not current_snapshot_hash:
+def material_change(
+    previous_materiality_digest: str | None,
+    current_materiality_digest: str | None,
+) -> bool:
+    if not current_materiality_digest:
         return False
-    return previous_snapshot_hash != current_snapshot_hash
+    return previous_materiality_digest != current_materiality_digest

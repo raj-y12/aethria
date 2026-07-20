@@ -293,8 +293,14 @@ async def evidence_refresh_handler(repository: Any, job: AgentJob) -> None:
         "succeeded",
         {
             "material_change": check["material_change"],
-            "previous_snapshot_hash": check.get("previous_snapshot_hash"),
-            "current_snapshot_hash": check.get("current_snapshot_hash"),
+            "previous_materiality_digest": check.get(
+                "previous_materiality_digest",
+                check.get("previous_snapshot_hash"),
+            ),
+            "current_materiality_digest": check.get(
+                "current_materiality_digest",
+                check.get("current_snapshot_hash"),
+            ),
         },
     )
     reasons_requiring_plan = {
