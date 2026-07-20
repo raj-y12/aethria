@@ -723,6 +723,22 @@
   border-bottom: 1px solid var(--memo-rule);
 }
 
+.memoDecisionRecommendation {
+  margin: 5px 0 0;
+  color: var(--memo-ink);
+  font-family: var(--memo-font-display);
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.memoDecisionExplanation {
+  max-width: 42rem;
+  margin: 14px 0 0;
+  color: var(--memo-ink-body);
+  font-size: 0.8125rem;
+  line-height: 1.62;
+}
+
 .memoDecisionReasoningHead,
 .memoDecisionCallHead,
 .memoDecisionActionsHead,

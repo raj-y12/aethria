@@ -86,6 +86,7 @@ describe('OpportunityIntelligence', () => {
   it('shows the recommendation reasoning and keeps supporting evidence available on demand', async () => {
     renderWorkspace();
     expect(await screen.findByText('Customer pull is promising.')).toBeInTheDocument();
+    expect(within(screen.getByLabelText('Aethria reasoning')).getByText('Monitor')).toBeInTheDocument();
     expect(screen.getByText('Retention evidence remains missing.')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Review supporting evidence'));
     const founderSignals = await screen.findByLabelText('Evidence-backed founder signals');
@@ -130,23 +131,26 @@ describe('OpportunityIntelligence', () => {
     })));
   });
 
-  it('hides the reasoning and evidence panels until the pipeline produces real content', async () => {
-    // An insufficient-evidence husk: the record exists but gives no reasons.
+  it('keeps an insufficient-evidence recommendation visible with its gaps and change conditions', async () => {
     api.fetchCurrentEvaluation.mockResolvedValue({
       evaluation: {},
       criteria: [],
       recommendation: {
         recommendation_id: 'recommendation-1', recommended_state: 'insufficient_evidence',
-        decision_drivers: [], principal_risks: [], mandate_conflicts: [], missing_information: [],
-        change_conditions: ['Resolve missing evidence: market'],
+        decision_drivers: [], principal_risks: [], mandate_conflicts: [],
+        missing_information: ['Verified market demand'],
+        change_conditions: ['Resolve missing evidence: market.'],
         human_review_required: true, confidence: 0,
       },
     });
     api.fetchEvidenceLedger.mockResolvedValue({ artifacts: [], items: [], claims: [], links: [], plans: [] });
     renderWorkspace();
     expect(await screen.findByRole('button', { name: 'Commit ruling' })).toBeInTheDocument();
-    expect(screen.queryByText('Why Aethria leans this way')).not.toBeInTheDocument();
+    expect(await screen.findByText('Insufficient evidence')).toBeInTheDocument();
+    expect(screen.getByText('Verified market demand')).toBeInTheDocument();
+    expect(screen.getByText('Resolve missing evidence: market.')).toBeInTheDocument();
+    expect(screen.getByText(/does not yet have enough grounded evidence/i)).toBeInTheDocument();
     expect(screen.queryByText('Review supporting evidence')).not.toBeInTheDocument();
-    expect(screen.getByText('The memo above is the case. Record the call for your fund.')).toBeInTheDocument();
+    expect(screen.getByText(/review what is missing, then make the call/i)).toBeInTheDocument();
   });
 });

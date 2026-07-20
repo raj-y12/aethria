@@ -125,12 +125,9 @@ export default function OpportunityIntelligence({
   const recommendedDecision: RecommendationState | null =
     evaluation.data?.recommendation?.recommended_state ?? null;
 
-  // A recommendation only earns the panel when it actually gives reasons —
-  // insufficient-evidence husks (0% confidence, no drivers, no risks) stay hidden.
   const recommendation = evaluation.data?.recommendation;
-  const hasRecommendation = Boolean(
-    recommendation && (recommendation.decision_drivers.length > 0 || recommendation.principal_risks.length > 0),
-  );
+  const hasRecommendation = Boolean(recommendation);
+  const hasInsufficientEvidence = recommendation?.recommended_state === 'insufficient_evidence';
   const hasClaims = Boolean(evidence.data?.claims.some((claim) => claim.status === 'current'));
 
   if (opportunity.isLoading) {
@@ -149,13 +146,15 @@ export default function OpportunityIntelligence({
     <section className="memoDocSection memoRulingControls memoDecisionWorkspace" aria-labelledby="opportunity-final-ruling">
       <h2 className="memoDocSectionHead" id="opportunity-final-ruling">Your ruling</h2>
       <p className="memoDecisionIntro">
-        {hasRecommendation
+        {hasInsufficientEvidence
+          ? 'Aethria cannot make a decisive recommendation yet. Review what is missing, then make the call for your fund.'
+          : hasRecommendation
           ? 'See why Aethria leans this way, review the evidence that matters, then make the call for your fund.'
           : 'The memo above is the case. Record the call for your fund.'}
       </p>
 
-      {/* The reasoning and claim ledger appear only once the institutional pipeline
-          actually produces them; an always-empty panel is noise, not transparency. */}
+      {/* Every produced recommendation remains visible, including a non-decisive
+          insufficient-evidence state. The claim ledger still waits for real claims. */}
       {hasRecommendation ? <RecommendationPanel evaluation={evaluation.data ?? null} /> : null}
 
       {hasClaims ? (

@@ -80,6 +80,30 @@ describe('HumanRulingComposer', () => {
     expect(screen.getByRole('button', { name: 'Commit ruling' })).toBeDisabled();
   });
 
+  it('treats an Invest ruling as aligned with an Advance recommendation', async () => {
+    renderComposer('advance');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Invest' }));
+    expect(screen.queryByLabelText('Override attribution')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Ruling rationale'), {
+      target: { value: 'The verified evidence now supports making the investment.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Commit ruling' }));
+
+    await waitFor(() => expect(api.createHumanRuling).toHaveBeenCalled());
+    const [, input] = api.createHumanRuling.mock.calls[0];
+    expect(input).toMatchObject({ decision: 'invest' });
+    expect(input).not.toHaveProperty('override_type');
+  });
+
+  it('asks for override attribution on a true recommendation disagreement', () => {
+    renderComposer('pass');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Invest' }));
+
+    expect(screen.getByLabelText('Override attribution')).toBeInTheDocument();
+  });
+
   it.each([
     ['opportunity identity', { opportunityId: 'opportunity-2' }, 'Advance'],
     ['recommendation identity', { recommendationId: 'recommendation-2' }, 'Advance'],
