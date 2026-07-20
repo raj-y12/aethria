@@ -14,10 +14,13 @@ describe('Investment memo section order', () => {
   it('uses the canonical opportunity workspace as the only human ruling path', () => {
     expect(memoSource).not.toContain('resolveEscalation');
     expect(memoSource).not.toContain('<MemoRulingSection');
-    const opening = memoSource.indexOf('<MemoDossierOpening');
     const ruling = memoSource.indexOf('<OpportunityIntelligence');
-    const snapshot = memoSource.indexOf('memoSnapshotSection');
-    expect(ruling).toBeGreaterThan(opening);
-    expect(ruling).toBeLessThan(snapshot);
+    const appendix = memoSource.indexOf('memoAppendixLabel');
+    expect(ruling).toBeGreaterThan(appendix);
+  });
+
+  it('animates appendix disclosures instead of toggling hidden content abruptly', () => {
+    expect(memoSource).toContain('memoDisclosureReveal');
+    expect(memoSource).toContain('memoDisclosureReveal--open');
   });
 });

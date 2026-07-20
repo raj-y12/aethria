@@ -168,7 +168,11 @@ function MemoDisclosureSection({
     setOpen(initialOpen);
   }, [id, initialOpen]);
   return (
-    <section className="memoDocSection memoDisclosureSection" aria-labelledby={`${id}-title`}>
+    <section
+      className="memoDocSection memoDisclosureSection"
+      data-open={open}
+      aria-labelledby={`${id}-title`}
+    >
       <button
         type="button"
         className="memoDisclosureToggle"
@@ -185,8 +189,12 @@ function MemoDisclosureSection({
           ›
         </span>
       </button>
-      <div id={`${id}-body`} className={open ? 'memoDisclosureBody' : 'hidden'}>
-        {children}
+      <div
+        id={`${id}-body`}
+        className={`memoDisclosureReveal${open ? ' memoDisclosureReveal--open' : ''}`}
+        aria-hidden={!open}
+      >
+        <div className="memoDisclosureBody">{children}</div>
       </div>
     </section>
   );
@@ -565,6 +573,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     : displayStartup.review.thesis_matches_fund
       ? 'Strong mandate fit'
       : 'Outside mandate';
+  // The house upward reveal (see Reveal.tsx), fired as each document section scrolls
+  // into view. Shared by every numbered section so the motion stays uniform.
+  const sectionReveal = {
+    initial: reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true, margin: '0px 0px -10% 0px' },
+    transition: transitionOrReduced(reduceMotion, { duration: 0.5, ease: [0.16, 1, 0.3, 1] }),
+  };
   return (
     <article className={wrapperCls} aria-labelledby="memo-title">
       {/* Styles extracted to InvestmentMemoContent.css */}
@@ -613,10 +629,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           <motion.div
             className="memoBody"
             key={contentKey}
-            // Single opacity fade for the whole document — no per-section stagger.
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: [0.23, 1, 0.32, 1] })}
+            // Opening the memo lands the document with the house upward reveal;
+            // numbered sections add their own in-view reveal (sectionReveal) as
+            // the reader scrolls.
+            initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={transitionOrReduced(reduceMotion, { duration: 0.55, ease: [0.16, 1, 0.3, 1] })}
           >
 
             {readOnly ? (
@@ -638,9 +656,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               nextMove={coverAction}
             />
 
-            {/* The decision surface belongs beside the opening recommendation, before the supporting memo. */}
-            <OpportunityIntelligence startupId={displayStartup.id} readOnly={readOnly} />
-
             {(showJudgment && precedentCandidates.length > 0) || portfolioSignals.length > 0 ? (
               <div className="memoDossierContext">
                 {showJudgment && precedentCandidates.length > 0 ? (
@@ -655,7 +670,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
 
             {/* ── Company snapshot — one definition grid: verified vitals first, then narrative rows ── */}
             {(snapshotRows.length > 0 || hasVitals) && (
-              <section className="memoDocSection memoSnapshotSection" aria-labelledby="memo-snapshot">
+              <motion.section {...sectionReveal} className="memoDocSection memoSnapshotSection" aria-labelledby="memo-snapshot">
                 <MemoSectionTitle number="01" id="memo-snapshot">Snapshot</MemoSectionTitle>
                 <dl className="memoSnapshot">
                   {[
@@ -672,12 +687,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </div>
                   ))}
                 </dl>
-              </section>
+              </motion.section>
             )}
 
             {/* ── Investment case ── */}
             {investmentCasePoints.length > 0 && (
-              <section className="memoDocSection memoCaseSection" aria-labelledby="memo-case">
+              <motion.section {...sectionReveal} className="memoDocSection memoCaseSection" aria-labelledby="memo-case">
                 <MemoSectionTitle number="02" id="memo-case">Why Now</MemoSectionTitle>
                 <ol className="memoCaseList">
                   {investmentCasePoints.map((point, i) => (
@@ -686,12 +701,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </li>
                   ))}
                 </ol>
-              </section>
+              </motion.section>
             )}
 
             {/* ── Investment killers ── */}
             {memoKillers.length > 0 && (
-              <section className="memoDocSection memoKillerSection" aria-labelledby="memo-killers">
+              <motion.section {...sectionReveal} className="memoDocSection memoKillerSection" aria-labelledby="memo-killers">
                 <MemoSectionTitle number="03" id="memo-killers">What Limits Conviction</MemoSectionTitle>
                 <ol className="memoKillerList">
                   {memoKillers.map((killer, i) => (
@@ -701,7 +716,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </li>
                   ))}
                 </ol>
-              </section>
+              </motion.section>
             )}
 
             {/* ── Assessment ── */}
@@ -725,7 +740,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                 return null;
               }
               return (
-                <section className="memoDocSection memoScoringSection" aria-labelledby="memo-scoring">
+                <motion.section {...sectionReveal} className="memoDocSection memoScoringSection" aria-labelledby="memo-scoring">
                   <MemoSectionTitle number="04" id="memo-scoring">Assessment</MemoSectionTitle>
                   {hasScorecard ? (
                     <div className="memoDocScoreScope">
@@ -796,13 +811,13 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                         ))}
                     </div>
                   )}
-                </section>
+                </motion.section>
               );
             })()}
 
             {/* ── Fund thesis alignment ── */}
             {thesisSection.visible && (
-              <section className="memoDocSection memoThesisSection" aria-labelledby="memo-thesis-alignment">
+              <motion.section {...sectionReveal} className="memoDocSection memoThesisSection" aria-labelledby="memo-thesis-alignment">
                 <MemoSectionTitle number="05" id="memo-thesis-alignment">Thesis alignment</MemoSectionTitle>
                 <div className="memoThesisBody">
                   {(thesisSection.score != null || thesisSection.headlineTag) && (
@@ -843,12 +858,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </ul>
                   )}
                 </div>
-              </section>
+              </motion.section>
             )}
 
             {/* ── Risk register ── */}
             {(adverseRegister.length > 0 || riskFactors.risks.length > 0 || riskFactors.mitigation.length > 0 || missingEvidenceItems.length > 0) && (
-              <section className="memoDocSection memoRiskRegisterSection" aria-labelledby="memo-risk-register">
+              <motion.section {...sectionReveal} className="memoDocSection memoRiskRegisterSection" aria-labelledby="memo-risk-register">
                 <MemoSectionTitle number="06" id="memo-risk-register">Risks</MemoSectionTitle>
                 {adverseRegister.length > 0 && (
                   <p className="memoEvStatLine">
@@ -921,10 +936,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </ul>
                   </div>
                 )}
-              </section>
+              </motion.section>
             )}
 
-            {/* ── Appendix (sits under the ruling) ── */}
+            {/* ── Appendix ── */}
             <div className="memoDiscGroup">
             {/* Hidden via :only-child when every disclosure fails its render condition. */}
             <p className="memoAppendixLabel" aria-hidden>Appendix</p>
@@ -1198,6 +1213,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </MemoDisclosureSection>
             )}
             </div>
+
+            {/* The human decision surface is the final action after the memo and its appendix. */}
+            <OpportunityIntelligence startupId={displayStartup.id} readOnly={readOnly} />
 
 
           </motion.div>
