@@ -4,6 +4,8 @@ import pytest
 
 from partner.decision import PartnerDecisionEngine
 from reviewer.engine import ReviewerEngine
+from services.reviewer_resolution import apply_resolution_to_primary
+from utils.adapters import reviewer_output_to_review_info
 
 
 class _TraceScoringEngine:
@@ -50,10 +52,36 @@ def _trace(scored_dimensions: set[str]):
     }
 
 
-def _apply_trace(scored_dimensions: set[str]):
+def _aggregate_traces(scored_dimensions: set[str]):
     engine = ReviewerEngine.__new__(ReviewerEngine)
     engine.structured_scoring_engine = _TraceScoringEngine(_trace(scored_dimensions))
-    return engine._apply_structured_scoring({}, _reviewer_output())
+    persona_results = []
+    for reviewer_type in (
+        "DefaultReviewer",
+        "SkepticalReviewer",
+        "OpportunistReviewer",
+    ):
+        result = engine._apply_structured_scoring({}, _reviewer_output())
+        result["reviewer_type"] = reviewer_type
+        persona_results.append(result)
+
+    primary = dict(persona_results[0])
+    engine._blend_numeric_scores_into_primary(primary, persona_results)
+    apply_resolution_to_primary(primary, persona_results)
+    engine._refresh_derived_after_dimension_changes(primary, persona_results)
+    engine._derive_verdict_from_scores(primary)
+
+    # Exercise every persistence-facing aggregation helper used by both the
+    # periodic and on-demand Reviewer paths. Missing dimensions must survive
+    # consensus, per-persona snapshots, and the ReviewInfo compatibility model.
+    consensus = engine._compute_consensus(persona_results)
+    snapshots = engine._build_single_reviews(persona_results)
+    review_info = reviewer_output_to_review_info(primary)
+    review_info.reviews = snapshots
+    review_info.consensus_verdict = consensus["consensus_verdict"]
+    review_info.reviewer_disagreement = consensus["reviewer_disagreement"]
+    review_info.score_variance = consensus["score_variance"]
+    return review_info.model_dump(mode="json")
 
 
 def _partner(monkeypatch):
@@ -88,10 +116,18 @@ def _scout():
 def test_incomplete_reviewer_coverage_remains_non_decisive_through_partner(
     monkeypatch, scored_dimensions
 ):
-    review = _apply_trace(scored_dimensions)
+    review = _aggregate_traces(scored_dimensions)
 
     for dimension in {"market", "product", "technical", "execution"} - scored_dimensions:
         assert review[f"{dimension}_score"] is None
+        assert all(
+            snapshot[f"{dimension}_score"] is None
+            for snapshot in review["reviews"]
+        )
+        assert f"{dimension}_score" not in review["score_variance"]
+    assert review["overall_score"] is None
+    assert review["confidence_adjusted_score"] is None
+    assert review["derived_verdict"] is None
 
     decision = _partner(monkeypatch).decide(_scout(), review)
 
@@ -103,10 +139,13 @@ def test_incomplete_reviewer_coverage_remains_non_decisive_through_partner(
 
 
 def test_complete_grounded_reviewer_coverage_can_reach_invest(monkeypatch):
-    review = _apply_trace(
+    review = _aggregate_traces(
         {"market", "product", "technical", "execution", "defensibility"}
     )
 
+    assert review["overall_score"] == 9
+    assert review["confidence_adjusted_score"] == 9
+    assert review["derived_verdict"] == "STRONG"
     decision = _partner(monkeypatch).decide(_scout(), review)
 
     assert decision["recommendation"] == "INVEST"

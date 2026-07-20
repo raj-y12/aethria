@@ -204,7 +204,12 @@ class ReviewerEngine:
         score_fields = ["market_score", "product_score", "technical_score", "execution_score"]
         score_variance = {}
         for field in score_fields:
-            values = [r.get(field, 0) for r in results]
+            values = [
+                float(value)
+                for r in results
+                if not isinstance((value := r.get(field)), bool)
+                and isinstance(value, (int, float))
+            ]
             if len(values) > 1:
                 mean = sum(values) / len(values)
                 variance = sum((v - mean) ** 2 for v in values) / len(values)
@@ -291,10 +296,14 @@ class ReviewerEngine:
             rev.set_prompt(prev_prompt)
 
     @staticmethod
-    def _mean_round_score(values: list) -> int:
-        nums = [int(v) for v in values if isinstance(v, (int, float))]
+    def _mean_round_score(values: list) -> Optional[int]:
+        nums = [
+            int(v)
+            for v in values
+            if not isinstance(v, bool) and isinstance(v, (int, float))
+        ]
         if not nums:
-            return 5
+            return None
         return int(round(sum(nums) / len(nums)))
 
     def _blend_numeric_scores_into_primary(self, primary: dict, all_results: list) -> None:
@@ -315,22 +324,41 @@ class ReviewerEngine:
     ) -> None:
         """Confidence-adjusted score + enrich_scores from current primary dimension scores."""
         core_dims = ["market_score", "product_score", "technical_score", "execution_score"]
-        all_dims = list(core_dims)
-        if primary.get("defensibility_score") is not None:
-            all_dims.append("defensibility_score")
-        s_bar = sum(float(primary.get(d, 5)) for d in all_dims) / len(all_dims)
+        core_scores = [
+            float(primary[d])
+            for d in core_dims
+            if not isinstance(primary.get(d), bool)
+            and isinstance(primary.get(d), (int, float))
+        ]
+
+        # A confidence-adjusted aggregate is meaningful only when all required
+        # dimensions are genuinely scored. Publishing a partial mean would turn
+        # missing evidence into an apparently decision-ready headline score.
+        if len(core_scores) != len(core_dims):
+            primary["confidence_adjusted_score"] = None
+            primary["score_source"] = DEFAULT_SCORE_SOURCE
+            primary.update(enrich_scores(primary))
+            return
+
+        all_scores = list(core_scores)
+        defensibility = primary.get("defensibility_score")
+        if not isinstance(defensibility, bool) and isinstance(
+            defensibility, (int, float)
+        ):
+            all_scores.append(float(defensibility))
+        s_bar = sum(all_scores) / len(all_scores)
         reviewer_avgs: List[float] = []
         for r in all_results:
             r_scores = [
-                float(r[d]) for d in core_dims if isinstance(r.get(d), (int, float))
+                float(r[d])
+                for d in core_dims
+                if not isinstance(r.get(d), bool)
+                and isinstance(r.get(d), (int, float))
             ]
             ds = r.get("defensibility_score")
-            if ds is not None:
-                try:
-                    r_scores.append(float(ds))
-                except (TypeError, ValueError):
-                    pass
-            if r_scores:
+            if not isinstance(ds, bool) and isinstance(ds, (int, float)):
+                r_scores.append(float(ds))
+            if len(r_scores) >= len(core_dims):
                 reviewer_avgs.append(sum(r_scores) / len(r_scores))
         if len(reviewer_avgs) >= 2:
             delta = max(reviewer_avgs) - min(reviewer_avgs)
@@ -531,14 +559,15 @@ class ReviewerEngine:
 
     @staticmethod
     def _derive_verdict_from_scores(primary: dict) -> None:
-        """Set primary['derived_verdict'] from blended core scores (mean of present numerics only)."""
+        """Set a verdict only when every required blended dimension is scored."""
         dims = ["market_score", "product_score", "technical_score", "execution_score"]
         nums: List[float] = []
         for d in dims:
             v = primary.get(d)
-            if isinstance(v, (int, float)):
+            if not isinstance(v, bool) and isinstance(v, (int, float)):
                 nums.append(float(v))
-        if not nums:
+        if len(nums) != len(dims):
+            primary.pop("derived_verdict", None)
             return
         mean = sum(nums) / len(nums)
         if mean >= 8.0:
