@@ -10,6 +10,12 @@ const DECISION_OPTIONS = [
   { value: 'invest', label: 'Invest' },
 ] satisfies Array<{ value: HumanRulingDecision; label: string }>;
 
+function actionableRuling(
+  recommendation?: RecommendationState | null,
+): HumanRulingDecision | null {
+  return recommendation === 'insufficient_evidence' ? null : recommendation ?? null;
+}
+
 export default function HumanRulingComposer({
   opportunityId,
   recommendationId,
@@ -22,18 +28,17 @@ export default function HumanRulingComposer({
   readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const actionableRecommendation = recommendedDecision === 'insufficient_evidence'
-    ? null
-    : recommendedDecision ?? null;
-  const [decision, setDecision] = useState<HumanRulingDecision | null>(actionableRecommendation);
+  const [decision, setDecision] = useState<HumanRulingDecision | null>(
+    actionableRuling(recommendedDecision),
+  );
   const [rationale, setRationale] = useState('');
   const [overrideType, setOverrideType] = useState<OverrideType | ''>('');
 
   useEffect(() => {
-    setDecision(actionableRecommendation);
+    setDecision(actionableRuling(recommendedDecision));
     setRationale('');
     setOverrideType('');
-  }, [opportunityId, recommendationId, actionableRecommendation]);
+  }, [opportunityId, recommendationId, recommendedDecision]);
 
   // The override reason only exists when the ruling disagrees with the system's lean.
   const disagreesWithSystem = Boolean(

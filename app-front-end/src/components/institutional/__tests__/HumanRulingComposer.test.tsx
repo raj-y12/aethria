@@ -114,4 +114,28 @@ describe('HumanRulingComposer', () => {
       expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'false');
     }
   });
+
+  it('clears a draft when an unresolved recommendation resolves to insufficient evidence', () => {
+    const queryClient = createQueryClient();
+    const view = render(composer(initialProps, queryClient));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pass' }));
+    fireEvent.change(screen.getByLabelText('Ruling rationale'), {
+      target: { value: 'This draft was entered while the recommendation was loading.' },
+    });
+
+    view.rerender(composer({
+      ...initialProps,
+      recommendedDecision: 'insufficient_evidence',
+    }, queryClient));
+
+    for (const label of ['Advance', 'Monitor', 'Pass', 'Invest']) {
+      expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'false');
+    }
+    expect(screen.getByLabelText('Ruling rationale')).toHaveValue('');
+    expect(screen.queryByLabelText('Override attribution')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pass' }));
+    expect(screen.getByLabelText('Override attribution')).toHaveValue('');
+  });
 });
