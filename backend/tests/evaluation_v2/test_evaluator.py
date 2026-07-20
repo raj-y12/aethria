@@ -248,11 +248,75 @@ def test_hard_exclusion_is_deterministic_pass_with_driver():
             "confidence": 1,
         }
     ]
-    policy = _policy().model_copy(update={"hard_exclusion_claim_types": ["excluded_sector"]})
-    snapshot, _ = snapshot_claims(claims, links=[])
+    policy = _policy()
+    policy.decision_safety.hard_exclusion_claim_types = ["excluded_sector"]
+    snapshot, _ = snapshot_claims(claims, links=[_verified_link("claim-exclusion")])
 
     result = evaluate_snapshot(snapshot, policy)
 
     assert result.recommendation.state is RecommendationState.PASS
     assert result.recommendation.human_review_required is True
     assert "excluded_sector" in result.recommendation.mandate_conflicts
+
+
+def test_grounded_critical_risk_forces_pass_despite_high_supported_scores():
+    claims = _claims() + [
+        {
+            "claim_id": "claim-critical-risk",
+            "claim_type": "critical_risk",
+            "normalized_value": {"value": True},
+            "display_text": "Regulatory ban risk in primary market.",
+            "assertion_class": "externally_verified",
+            "status": "current",
+            "confidence": 1,
+        }
+    ]
+    for claim in claims[:2]:
+        claim["normalized_value"] = {"criterion_score": 9.0}
+    policy = _policy()
+    policy.decision_safety.critical_risk_claim_types = ["critical_risk"]
+    snapshot, _ = snapshot_claims(
+        claims,
+        links=[
+            _verified_link("claim-market"),
+            _verified_link("claim-execution"),
+            _verified_link("claim-critical-risk"),
+        ],
+    )
+
+    result = evaluate_snapshot(snapshot, policy)
+
+    assert result.recommendation.state is RecommendationState.PASS
+    assert result.recommendation.human_review_required is True
+    assert "Regulatory ban risk in primary market." in result.recommendation.principal_risks
+
+
+def test_ungrounded_critical_risk_is_uncertainty_not_an_automatic_pass():
+    claims = _claims() + [
+        {
+            "claim_id": "claim-critical-risk",
+            "claim_type": "critical_risk",
+            "normalized_value": {"value": True},
+            "display_text": "Unverified regulatory ban risk in primary market.",
+            "assertion_class": "externally_verified",
+            "status": "current",
+            "confidence": 1,
+        }
+    ]
+    for claim in claims[:2]:
+        claim["normalized_value"] = {"criterion_score": 9.0}
+    policy = _policy()
+    policy.decision_safety.critical_risk_claim_types = ["critical_risk"]
+    snapshot, _ = snapshot_claims(
+        claims,
+        links=[_verified_link("claim-market"), _verified_link("claim-execution")],
+    )
+
+    result = evaluate_snapshot(snapshot, policy)
+
+    assert result.recommendation.state is RecommendationState.ADVANCE
+    assert result.recommendation.human_review_required is True
+    assert (
+        "Unverified regulatory ban risk in primary market."
+        in result.recommendation.missing_information
+    )

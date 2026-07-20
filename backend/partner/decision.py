@@ -790,6 +790,8 @@ class PartnerDecisionEngine:
                 conviction_adjust -= 1
 
         final_recommendation = self._canonical_recommendation(avg_score)
+        if has_critical_risk:
+            final_recommendation = "PASS"
         reviewer_disagreement = bool(review_output.get("reviewer_disagreement", False))
         handoff_quality = self._handoff_quality_from_review(review_output)
 
@@ -863,16 +865,20 @@ class PartnerDecisionEngine:
                 result, review_output, scout_output, avg_score, avg_dims
             )
 
-        # Rule 1: WEAK verdict (portfolio-aware conviction like other branches)
+        # Rule 1: Critical diligence risks
+        if has_critical_risk:
+            result = _emit_deterministic(8 + conviction_adjust, True)
+            result["next_action"] = self._normalize_next_action(
+                next_actions["critical_risks"]
+            )
+            return result
+
+        # Rule 2: WEAK verdict (portfolio-aware conviction like other branches)
         if effective_verdict == "WEAK":
             return _emit_deterministic(
                 weak_rule.get("conviction_level", 9) + conviction_adjust,
                 weak_rule.get("human_review_required", False),
             )
-
-        # Rule 2: Critical diligence risks
-        if has_critical_risk:
-            return _emit_deterministic(8 + conviction_adjust, False)
 
         # Rule 3: Low average score → optional LLM edge case
         if avg_score < min_avg_pass:

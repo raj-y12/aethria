@@ -189,27 +189,24 @@ def test_weak_verdict_uses_constructive_pass_rationale():
     assert "not suitable for investment consideration" not in rationale.lower()
 
 
-def test_critical_risk_pass_uses_actionable_language():
+def test_critical_risk_forces_pass_even_with_invest_scores():
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     review = _base_review()
-    review.update(
-        {
-            "verdict": "MEDIUM",
-            "market_score": 7,
-            "product_score": 7,
-            "technical_score": 6,
-            "execution_score": 6,
-            "key_risks": ["Regulatory ban risk in primary market"],
-        }
-    )
+    review.update({
+        "verdict": "STRONG",
+        "market_score": 9,
+        "product_score": 9,
+        "technical_score": 9,
+        "execution_score": 9,
+        "defensibility_score": 9,
+        "key_risks": ["Regulatory ban risk in primary market"],
+    })
 
     out = engine.decide(_base_scout(), review)
-    rationale = (out.get("rationale") or "").lower()
-
-    assert out.get("decision") == "MAYBE"
-    assert "we monitor at this stage" in rationale
-    assert "material diligence risks" in rationale
-    assert "risk too high for investment" not in rationale
+    assert out["recommendation"] == "PASS"
+    assert out["decision"] == "NO"
+    assert out["human_review_required"] is True
+    assert "critical" in out["next_action"].lower()
 
 
 def test_monitor_and_invest_paths_use_consistent_professional_tone():

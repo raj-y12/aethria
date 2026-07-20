@@ -127,6 +127,31 @@ def _score(claim: Dict[str, Any]) -> float | None:
         return None
 
 
+def decisive_policy_outcome(
+    snapshot: Sequence[Dict[str, Any]], policy: EvaluationPolicy
+) -> tuple[RecommendationState | None, list[str], list[str]]:
+    risks: list[str] = []
+    conflicts: list[str] = []
+    for claim in snapshot:
+        if claim.get("status_at_snapshot") != "current":
+            continue
+        eligibility = evaluate_claim_score_eligibility(
+            claim, policy=policy.decision_safety.evidence_eligibility
+        )
+        if not eligibility.eligible or not bool(
+            (claim.get("normalized_value") or {}).get("value")
+        ):
+            continue
+        claim_type = claim.get("claim_type")
+        if claim_type in policy.decision_safety.hard_exclusion_claim_types:
+            conflicts.append(str(claim_type))
+        if claim_type in policy.decision_safety.critical_risk_claim_types:
+            risks.append(str(claim.get("display_text") or claim_type))
+    if conflicts or risks:
+        return RecommendationState.PASS, risks, conflicts
+    return None, risks, conflicts
+
+
 def evaluate_snapshot(
     snapshot: Sequence[Dict[str, Any]], policy: EvaluationPolicy
 ) -> EvaluationResult:
@@ -218,17 +243,27 @@ def evaluate_snapshot(
             )
         )
 
-    exclusion_claims = [
-        claim
+    decisive_state, decisive_risks, mandate_conflicts = decisive_policy_outcome(
+        snapshot, policy
+    )
+    decisive_claim_types = set(policy.decision_safety.critical_risk_claim_types) | set(
+        policy.decision_safety.hard_exclusion_claim_types
+    )
+    decisive_uncertainties = [
+        str(claim.get("display_text") or claim.get("claim_type"))
         for claim in snapshot
-        if claim["claim_type"] in policy.hard_exclusion_claim_types
+        if claim.get("claim_type") in decisive_claim_types
         and claim["status_at_snapshot"] == "current"
         and bool((claim.get("normalized_value") or {}).get("value"))
+        and not evaluate_claim_score_eligibility(
+            claim, policy=eligibility_policy
+        ).eligible
     ]
+    missing = list(dict.fromkeys(missing + decisive_uncertainties))
     coverage = scored_weight / total_weight if total_weight else 0
     average = weighted_total / scored_weight if scored_weight else 0
-    if exclusion_claims:
-        state = RecommendationState.PASS
+    if decisive_state is not None:
+        state = decisive_state
     elif required_missing or coverage < policy.minimum_scored_weight:
         state = RecommendationState.INSUFFICIENT_EVIDENCE
     elif average >= policy.advance_threshold:
@@ -251,11 +286,16 @@ def evaluate_snapshot(
                 reverse=True,
             )[:3]
         ],
-        principal_risks=conflicts,
-        mandate_conflicts=sorted({claim["claim_type"] for claim in exclusion_claims}),
+        principal_risks=list(dict.fromkeys(conflicts + decisive_risks)),
+        mandate_conflicts=sorted(set(mandate_conflicts)),
         missing_information=missing,
         change_conditions=[f"Resolve missing evidence: {name}" for name in missing],
-        human_review_required=bool(exclusion_claims or conflicts or missing or state is RecommendationState.INSUFFICIENT_EVIDENCE),
+        human_review_required=bool(
+            decisive_state
+            or conflicts
+            or missing
+            or state is RecommendationState.INSUFFICIENT_EVIDENCE
+        ),
     )
     return EvaluationResult(snapshot_hash=digest, criteria=criteria, recommendation=recommendation)
 
