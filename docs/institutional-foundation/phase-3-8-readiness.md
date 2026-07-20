@@ -89,6 +89,76 @@ With `TEST_DATABASE_URL` configured, run the PostgreSQL-gated suites as part of 
 - Direct database readiness: blocked by missing DSN.
 - Target migration application, RLS enforcement, UUID/JSON codecs, triggers, foreign keys, and transactional race behavior: not certified locally.
 
+## Task 8 decision-safety certification (2026-07-20)
+
+The executable certification is
+`backend/tests/evaluation_v2/test_decision_safety_certification.py`. It invokes
+the real canonical evaluator, human-override classifier, and compatibility
+projection with immutable local claim and evidence-relationship metadata. It
+does not import legacy startup snapshots or mock the behavior being certified.
+
+The eight passing cases certify that:
+
+- ungrounded high scores, model-inferred high scores, and a missing required
+  dimension produce `insufficient_evidence`;
+- grounded high scores combined with either a critical risk or a mandate
+  exclusion produce `pass`;
+- complete grounded high scores produce `advance`;
+- an `advance` recommendation followed by an `invest` human ruling is not an
+  override; and
+- an `advance` human ruling projects to legacy `MAYBE` with compatibility
+  reason `advance`, never legacy `YES`.
+
+Observed on 2026-07-20 from this worktree:
+
+```bash
+cd backend && pytest -q \
+  tests/evidence \
+  tests/evaluation_v2 \
+  tests/decisions \
+  tests/jobs/test_job_handlers.py \
+  tests/jobs/test_job_worker.py \
+  tests/test_decision_codes.py \
+  tests/test_partner_decision_fallback.py \
+  tests/test_partner_mandate_gate.py \
+  tests/test_policy_compiler.py \
+  tests/test_policy_store.py \
+  tests/test_reviewer_structured_signals_clamp.py \
+  tests/test_scoring_thin_evidence_characterization.py \
+  tests/test_structured_scoring_engine.py \
+  tests/test_on_demand_lookup_independent.py
+# 170 passed, 1 warning in 2.17s; no skips
+
+cd backend && pytest -q
+# 780 passed, 10 skipped, 1 warning in 9.63s
+
+cd app-front-end && npm test -- \
+  src/components/institutional/__tests__/HumanRulingComposer.test.tsx
+# 1 test file passed; 7 tests passed
+
+cd app-front-end && npm run lint
+# exit 0
+
+cd app-front-end && npm run build
+# exit 0; 864 modules transformed
+```
+
+Skip inspection: the focused gate had no skips, including no skip in the new
+certification file. The 10 skips in the full backend run are pre-existing live
+integration or target-PostgreSQL gates: `test_end_to_end.py`, `test_scouts.py`,
+`test_partner_flow.py`, `test_portfolio_layer.py`, the PostgreSQL repository
+suites under `tests/fund_intelligence`, `tests/identity`, and `tests/jobs`, and
+the `TEST_DATABASE_URL`-gated Phase 1 acceptance test. They do not weaken the
+local decision-safety certification.
+
+### Certification limits
+
+This is a code-level, local executable safety certification only. It does not
+certify target PostgreSQL, migration application, RLS, database triggers,
+transaction races, service-role permissions, or authority-control migration
+readiness. Those controls require a configured target database and their own
+authority-control verification slice.
+
 ## Rollout recommendation
 
 Roll out to one internal/solo-GP tenant first. Apply migrations, run Phase 2 backfill/reconciliation, run the Phase 8 gate, then enable UI surfaces in this order: identity queue, evidence/evaluation read views, human rulings, actions/monitoring, Fund Intelligence, imports, outcomes. Observe budget reservations, blocked jobs, identity-review volume, proposal rejection memory, outcome coverage, and outbox health before adding tenants.
