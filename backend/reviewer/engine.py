@@ -78,6 +78,7 @@ class ReviewerEngine:
                     "ReviewerEngine: active thesis does not match governed prerequisites"
                 )
             active_thesis = evaluation_prerequisites.thesis_context
+            use_resource_fund_thesis_fallback = False
         self.api_key = api_key
         self.storage = storage
         self.interval_seconds = interval_seconds

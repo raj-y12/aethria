@@ -75,8 +75,11 @@ def _prerequisites(user_id="user-a"):
 
 
 class _ReviewerPersona:
-    def __init__(self, *_args, **_kwargs):
+    def __init__(self, *_args, **kwargs):
         self.fund_thesis = None
+        self._use_resource_fund_thesis_fallback = kwargs.get(
+            "use_resource_fund_thesis_fallback"
+        )
 
     def set_fund_thesis(self, thesis):
         self.fund_thesis = thesis
@@ -121,6 +124,15 @@ def test_governed_reviewer_consumes_exact_compiled_policy_without_reload(monkeyp
         "market": 70.0,
         "execution": 30.0,
     }
+    assert reviewer.use_resource_fund_thesis_fallback is False
+    assert all(
+        persona._use_resource_fund_thesis_fallback is False
+        for persona in (
+            reviewer.reviewer,
+            reviewer.skeptical_reviewer,
+            reviewer.opportunist_reviewer,
+        )
+    )
 
 
 def test_governed_partner_consumes_exact_rules_and_fund_config_without_reload(monkeypatch):
@@ -153,6 +165,7 @@ def test_governed_partner_consumes_exact_rules_and_fund_config_without_reload(mo
     assert partner.evaluation_policy is prerequisites.policy
     assert partner.evaluation_policy.policy_version_id == "policy-live"
     assert partner.evaluation_policy.partner_rules_version == "rules-v3-exact"
+    assert partner.use_resource_fund_thesis_fallback is False
 
 
 @pytest.mark.parametrize("engine", ["reviewer", "partner"])

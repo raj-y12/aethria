@@ -236,6 +236,7 @@ class PartnerDecisionEngine:
             evaluation_prerequisites.require_tenant(
                 self.tenant_user_id, context="PartnerDecisionEngine"
             )
+            use_resource_fund_thesis_fallback = False
         self.use_resource_fund_thesis_fallback = bool(use_resource_fund_thesis_fallback)
         self.llm_call_count = 0
         if evaluation_prerequisites is not None:
