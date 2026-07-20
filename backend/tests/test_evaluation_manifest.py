@@ -128,7 +128,7 @@ def test_manifest_builder_records_models_prompts_policy_and_partner_rules():
 
     rules_path = manifest_module.get_policy_file_path("partner_rules")
     rules = json.loads(rules_path.read_text())
-    assert rules["version"] == "2.0"
+    assert rules["version"] == "3.0"
     assert manifest.partner_rules_version == rules["version"]
     canonical = json.dumps(rules, sort_keys=True, separators=(",", ":"))
     assert manifest.partner_rules_hash == hashlib.sha256(canonical.encode()).hexdigest()
