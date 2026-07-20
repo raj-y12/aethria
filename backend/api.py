@@ -144,7 +144,13 @@ from pipeline_runner import (
     run_one_pipeline_cycle,
     run_on_demand_lookup,
 )
-from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
+from pipeline_execution import (
+    LOOKUP_FAILURE_STATUSES,
+    LOOKUP_TERMINAL_STATUSES,
+    LookupExecutionStatus,
+    PipelineExecutionResult,
+    PipelineExecutionState,
+)
 from fund_thesis import (
     FundThesisIncompleteError,
     FundThesisMissingError,
@@ -1887,7 +1893,7 @@ async def event_stream(request: Request):
 @app.get("/api/startups/lookup-status")
 def lookup_job_status(request: Request, lookup_id: str = ""):
     """
-    Poll after POST /api/startups/lookup: if the worker recorded a failure, returns failed=true and message.
+    Return the lossless lookup execution state and actionable terminal metadata.
     """
     uid = request.state.user_id
     raw = (lookup_id or "").strip()
@@ -1897,24 +1903,55 @@ def lookup_job_status(request: Request, lookup_id: str = ""):
             detail="lookup_id query parameter must be 8-128 characters [a-zA-Z0-9_-]",
         )
     if not env_config.use_supabase_storage():
-        return {"lookup_id": raw, "failed": False}
-    row = list_get_by_id("lookup_job_outcomes", raw, user_id=uid)
-    if not row:
-        return {"lookup_id": raw, "failed": False, "status": "pending"}
-    if row.get("status") != "failed":
         return {
             "lookup_id": raw,
             "failed": False,
-            "status": str(row.get("status") or "pending"),
-            "startup_id": row.get("startup_id"),
-            "message": row.get("message"),
+            "terminal": False,
+            "status": LookupExecutionStatus.PENDING.value,
         }
-    return {
+    row = list_get_by_id("lookup_job_outcomes", raw, user_id=uid)
+    if not row:
+        return {
+            "lookup_id": raw,
+            "failed": False,
+            "terminal": False,
+            "status": LookupExecutionStatus.PENDING.value,
+        }
+    invalid_status = False
+    try:
+        status = LookupExecutionStatus(str(row.get("status") or "").strip())
+    except ValueError:
+        status = LookupExecutionStatus.FAILED
+        invalid_status = True
+    detail = str(row.get("detail") or row.get("message") or "").strip()[:500]
+    code = str(row.get("code") or "").strip()[:100]
+    recovery_action = str(row.get("recovery_action") or "").strip()[:500]
+    failed_stage = str(row.get("failed_stage") or "").strip()[:100]
+    if invalid_status:
+        code = "lookup_status_invalid"
+        detail = "The lookup worker recorded an invalid terminal status."
+        recovery_action = "Retry the lookup and inspect worker compatibility logs."
+    elif status is LookupExecutionStatus.FAILED and not code:
+        code = "lookup_failed"
+    payload = {
         "lookup_id": raw,
-        "failed": True,
-        "status": "failed",
-        "message": str(row.get("message") or "Lookup failed."),
+        "failed": status in LOOKUP_FAILURE_STATUSES,
+        "terminal": status in LOOKUP_TERMINAL_STATUSES,
+        "status": status.value,
     }
+    startup_id = str(row.get("startup_id") or "").strip()
+    if startup_id:
+        payload["startup_id"] = startup_id
+    if code:
+        payload["code"] = code
+    if failed_stage:
+        payload["failed_stage"] = failed_stage
+    if detail:
+        payload["detail"] = detail
+        payload["message"] = detail
+    if recovery_action:
+        payload["recovery_action"] = recovery_action
+    return payload
 
 
 @app.get("/api/startups/{startup_id}")

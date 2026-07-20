@@ -22,4 +22,21 @@ describe('resolveLookupFailure', () => {
       }),
     ).toBe('Partner persistence failed.');
   });
+
+  it.each(['blocked', 'failed_stage'] as const)(
+    'treats %s as terminal actionable failure even without the legacy failed flag',
+    (status) => {
+      expect(
+        resolveLookupFailure({
+          hasMatchedStartup: false,
+          jobStatus: {
+            status,
+            failed: false,
+            detail: 'Evaluation could not continue.',
+            recovery_action: 'Correct the configuration and retry.',
+          },
+        }),
+      ).toBe('Evaluation could not continue. Correct the configuration and retry.');
+    },
+  );
 });

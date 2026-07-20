@@ -607,6 +607,8 @@ async def test_duplicate_lookup_persists_terminal_existing_startup_outcome(monke
                 "id": "lookup-existing-1",
                 "lookup_id": "lookup-existing-1",
                 "status": "already_in_deal_flow",
+                "code": "lookup_completed",
+                "detail": "This company is already in your deal flow.",
                 "startup_id": "startup-1",
                 "message": "This company is already in your deal flow.",
             },

@@ -8,6 +8,7 @@ import {
   fetchStartupDetail,
   fetchMemo,
   fetchLookupJobStatus,
+  isLookupTerminalStatus,
   resolveLookupCandidates,
   type LookupCandidate,
 } from '../api/startups';
@@ -381,8 +382,8 @@ export function useDispatchLookup({
     staleTime: 4_000,
     refetchInterval: (q) => {
       if (!liveGate.tabVisible) return false;
-      const row = q.state.data as { failed?: boolean; status?: string } | undefined;
-      if (row?.failed || row?.status === 'already_in_deal_flow') return false;
+      const row = q.state.data;
+      if (row?.terminal || isLookupTerminalStatus(row?.status)) return false;
       return 8_000;
     },
     retry: 1,

@@ -15,6 +15,38 @@ class PipelineExecutionState(str, Enum):
     FAILED_STAGE = "failed_stage"
 
 
+class LookupExecutionStatus(str, Enum):
+    """Persisted/API lookup states shared with the frontend client contract."""
+
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    COMPLETED = "completed"
+    BLOCKED = "blocked"
+    SKIPPED = "skipped"
+    FAILED_STAGE = "failed_stage"
+    FAILED = "failed"
+    ALREADY_IN_DEAL_FLOW = "already_in_deal_flow"
+
+
+LOOKUP_TERMINAL_STATUSES = frozenset(
+    {
+        LookupExecutionStatus.COMPLETED,
+        LookupExecutionStatus.BLOCKED,
+        LookupExecutionStatus.SKIPPED,
+        LookupExecutionStatus.FAILED_STAGE,
+        LookupExecutionStatus.FAILED,
+        LookupExecutionStatus.ALREADY_IN_DEAL_FLOW,
+    }
+)
+LOOKUP_FAILURE_STATUSES = frozenset(
+    {
+        LookupExecutionStatus.BLOCKED,
+        LookupExecutionStatus.FAILED_STAGE,
+        LookupExecutionStatus.FAILED,
+    }
+)
+
+
 class StageExecutionState(str, Enum):
     COMPLETED = "completed"
     BLOCKED = "blocked"

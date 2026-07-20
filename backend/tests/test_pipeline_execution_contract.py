@@ -117,3 +117,18 @@ def test_stage_execution_result_rejects_inconsistent_counts_and_recovery():
             attempted=1,
             failed=1,
         )
+
+
+def test_lookup_execution_status_union_covers_every_persisted_state():
+    from pipeline_execution import LookupExecutionStatus
+
+    assert {status.value for status in LookupExecutionStatus} == {
+        "pending",
+        "accepted",
+        "completed",
+        "blocked",
+        "skipped",
+        "failed_stage",
+        "failed",
+        "already_in_deal_flow",
+    }

@@ -125,11 +125,55 @@ export async function fetchMemo(startupId: string): Promise<MemoApiResponse | nu
   };
 }
 
+export const LOOKUP_EXECUTION_STATUSES = [
+  'pending',
+  'accepted',
+  'completed',
+  'blocked',
+  'skipped',
+  'failed_stage',
+  'failed',
+  'already_in_deal_flow',
+] as const;
+
+export type LookupExecutionStatus = (typeof LOOKUP_EXECUTION_STATUSES)[number];
+
+const LOOKUP_TERMINAL_STATUSES = new Set<LookupExecutionStatus>([
+  'completed',
+  'blocked',
+  'skipped',
+  'failed_stage',
+  'failed',
+  'already_in_deal_flow',
+]);
+
+const LOOKUP_FAILURE_STATUSES = new Set<LookupExecutionStatus>([
+  'blocked',
+  'failed_stage',
+  'failed',
+]);
+
+export function isLookupTerminalStatus(
+  status: LookupExecutionStatus | undefined,
+): boolean {
+  return status != null && LOOKUP_TERMINAL_STATUSES.has(status);
+}
+
+function isLookupExecutionStatus(value: unknown): value is LookupExecutionStatus {
+  return typeof value === 'string'
+    && (LOOKUP_EXECUTION_STATUSES as readonly string[]).includes(value);
+}
+
 export type LookupJobStatus = {
   lookup_id: string;
   failed: boolean;
-  status?: 'pending' | 'failed' | 'already_in_deal_flow';
+  terminal: boolean;
+  status: LookupExecutionStatus;
   startup_id?: string;
+  code?: string;
+  failed_stage?: string;
+  detail?: string;
+  recovery_action?: string;
   message?: string;
 };
 
@@ -137,7 +181,7 @@ export type LookupJobStatus = {
 export async function fetchLookupJobStatus(lookupId: string): Promise<LookupJobStatus> {
   const id = lookupId.trim();
   if (!id) {
-    return { lookup_id: '', failed: false };
+    return { lookup_id: '', failed: false, terminal: false, status: 'pending' };
   }
   const params = new URLSearchParams({ lookup_id: id });
   const res = await authedFetch(`${API_BASE}/api/startups/lookup-status?${params}`, {
@@ -147,19 +191,43 @@ export async function fetchLookupJobStatus(lookupId: string): Promise<LookupJobS
     return {
       lookup_id: id,
       failed: true,
+      terminal: true,
+      status: 'failed',
+      code: 'lookup_status_unavailable',
+      detail: 'Could not verify lookup status. Check your connection and try again.',
       message: 'Could not verify lookup status. Check your connection and try again.',
     };
   }
   const data = await res.json();
+  if (!isLookupExecutionStatus(data?.status)) {
+    return {
+      lookup_id: typeof data?.lookup_id === 'string' ? data.lookup_id : id,
+      failed: true,
+      terminal: true,
+      status: 'failed',
+      code: 'lookup_status_invalid',
+      detail: 'The lookup worker returned an unsupported status. Retry the lookup.',
+      message: 'The lookup worker returned an unsupported status. Retry the lookup.',
+    };
+  }
+  const status = data.status;
+  const detail = typeof data?.detail === 'string'
+    ? data.detail
+    : typeof data?.message === 'string'
+      ? data.message
+      : undefined;
   return {
     lookup_id: typeof data?.lookup_id === 'string' ? data.lookup_id : id,
-    failed: Boolean(data?.failed),
-    status:
-      data?.status === 'failed' || data?.status === 'already_in_deal_flow'
-        ? data.status
-        : 'pending',
+    failed: LOOKUP_FAILURE_STATUSES.has(status),
+    terminal: isLookupTerminalStatus(status),
+    status,
     startup_id: typeof data?.startup_id === 'string' ? data.startup_id : undefined,
-    message: typeof data?.message === 'string' ? data.message : undefined,
+    code: typeof data?.code === 'string' ? data.code : undefined,
+    failed_stage: typeof data?.failed_stage === 'string' ? data.failed_stage : undefined,
+    detail,
+    recovery_action:
+      typeof data?.recovery_action === 'string' ? data.recovery_action : undefined,
+    message: typeof data?.message === 'string' ? data.message : detail,
   };
 }
 

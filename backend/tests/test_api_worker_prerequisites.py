@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 
@@ -196,3 +197,98 @@ async def test_agent_worker_records_unexpected_boundary_failure_as_error(monkeyp
     await api._agent_worker()
 
     assert statuses == [("user-a", "error", None)]
+
+
+@pytest.mark.parametrize(
+    ("row", "expected"),
+    [
+        (None, {"status": "pending", "terminal": False, "failed": False}),
+        (
+            {"status": "accepted"},
+            {"status": "accepted", "terminal": False, "failed": False},
+        ),
+        (
+            {"status": "completed", "startup_id": "startup-1"},
+            {"status": "completed", "terminal": True, "failed": False},
+        ),
+        (
+            {
+                "status": "blocked",
+                "code": "openai_api_key_required",
+                "detail": "OpenAI is not configured.",
+                "recovery_action": "Configure OPENAI_API_KEY and retry.",
+            },
+            {"status": "blocked", "terminal": True, "failed": True},
+        ),
+        (
+            {"status": "skipped", "code": "lookup_cancelled"},
+            {"status": "skipped", "terminal": True, "failed": False},
+        ),
+        (
+            {
+                "status": "failed_stage",
+                "code": "reviewer_stage_failed",
+                "failed_stage": "reviewer",
+                "detail": "Reviewer could not complete.",
+                "recovery_action": "Inspect Reviewer logs and retry.",
+            },
+            {"status": "failed_stage", "terminal": True, "failed": True},
+        ),
+        (
+            {"status": "failed", "message": "Legacy worker failure."},
+            {"status": "failed", "terminal": True, "failed": True},
+        ),
+        (
+            {
+                "status": "already_in_deal_flow",
+                "startup_id": "startup-existing",
+            },
+            {
+                "status": "already_in_deal_flow",
+                "terminal": True,
+                "failed": False,
+            },
+        ),
+        (
+            {"status": "mystery_state"},
+            {"status": "failed", "terminal": True, "failed": True},
+        ),
+    ],
+    ids=[
+        "pending",
+        "accepted",
+        "completed",
+        "blocked",
+        "skipped",
+        "failed-stage",
+        "legacy-failed",
+        "existing-company",
+        "invalid-status",
+    ],
+)
+def test_lookup_status_api_preserves_unified_terminal_state_and_metadata(
+    monkeypatch, row, expected
+):
+    import api
+
+    monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
+    monkeypatch.setattr(api, "list_get_by_id", lambda *_args, **_kwargs: row)
+
+    response = api.lookup_job_status(
+        SimpleNamespace(state=SimpleNamespace(user_id="user-a")),
+        lookup_id="lookup-contract-1",
+    )
+
+    assert response["lookup_id"] == "lookup-contract-1"
+    for key, value in expected.items():
+        assert response[key] == value
+    if row and row.get("code"):
+        assert response["code"] == row["code"]
+    if row and row.get("failed_stage"):
+        assert response["failed_stage"] == row["failed_stage"]
+    if row and (row.get("detail") or row.get("message")):
+        assert response["detail"] == (row.get("detail") or row.get("message"))
+    if row and row.get("recovery_action"):
+        assert response["recovery_action"] == row["recovery_action"]
+    if row and row.get("status") == "mystery_state":
+        assert response["code"] == "lookup_status_invalid"

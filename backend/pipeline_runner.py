@@ -39,6 +39,7 @@ from evaluation_v2.prerequisites import (
     load_evaluation_prerequisites,
 )
 from pipeline_execution import (
+    LookupExecutionStatus,
     PipelineExecutionResult,
     PipelineExecutionState,
     StageExecutionResult,
@@ -417,7 +418,10 @@ async def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message
                 "id": lid,
                 "lookup_id": lid,
                 "status": "failed",
+                "code": "lookup_failed",
+                "detail": text,
                 "message": text,
+                "recovery_action": "Retry the lookup after checking worker availability.",
                 "failed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             },
             user_id=uid,
@@ -431,45 +435,6 @@ async def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message
         )
 
 
-async def _record_lookup_outcome(
-    user_id: str,
-    lookup_id: Optional[str],
-    *,
-    status: str,
-    startup_id: str,
-    message: Optional[str] = None,
-) -> None:
-    """Persist a terminal non-failure lookup outcome for frontend correlation."""
-    lid = (lookup_id or "").strip()
-    sid = (startup_id or "").strip()
-    uid = (user_id or "").strip()
-    if not lid or not sid or not uid or not env_config.use_supabase_storage():
-        return
-    record = {
-        "id": lid,
-        "lookup_id": lid,
-        "status": status.strip().lower(),
-        "startup_id": sid,
-        "message": (message or "").strip() or None,
-    }
-    if record["message"] is None:
-        record.pop("message")
-    try:
-        await asyncio.to_thread(
-            list_upsert,
-            "lookup_job_outcomes",
-            record,
-            user_id=uid,
-        )
-    except Exception as exc:
-        logger.warning(
-            "[%s] Could not persist lookup outcome for %s: %s",
-            uid[:12],
-            lid[:16],
-            exc,
-        )
-
-
 async def _record_lookup_execution_result(
     user_id: str,
     lookup_id: Optional[str],
@@ -480,12 +445,21 @@ async def _record_lookup_execution_result(
     uid = (user_id or "").strip()
     if not lid or not uid or not env_config.use_supabase_storage():
         return
+    status = result.state.value
+    compatibility_status = result.metadata.get("lookup_status")
+    if compatibility_status is not None:
+        try:
+            status = LookupExecutionStatus(str(compatibility_status)).value
+        except ValueError:
+            status = result.state.value
+    detail = str(result.metadata.get("lookup_detail") or result.detail).strip()[:500]
     record = {
         "id": lid,
         "lookup_id": lid,
-        "status": result.state.value,
+        "status": status,
         "code": result.code,
-        "message": result.detail[:500],
+        "detail": detail,
+        "message": detail,
         "recovery_action": result.recovery_action,
         "failed_stage": result.failed_stage,
         "startup_id": result.startup_id,
@@ -1033,10 +1007,12 @@ async def run_on_demand_lookup(
     company = (company_name or "").strip()
     if not company:
         logger.warning("run_on_demand_lookup: skipped (empty company name)")
-        return PipelineExecutionResult.skipped(
+        result = PipelineExecutionResult.skipped(
             code="empty_company_name",
             detail="The lookup was skipped because no company name was provided.",
         )
+        await _record_lookup_execution_result(uid, lookup_id, result)
+        return result
 
     try:
         if evaluation_prerequisites is None:
@@ -1065,8 +1041,7 @@ async def run_on_demand_lookup(
                 institutional_context=institutional_context,
                 evaluation_prerequisites=evaluation_prerequisites,
             )
-        if result.state is not PipelineExecutionState.COMPLETED:
-            await _record_lookup_execution_result(uid, lookup_id, result)
+        await _record_lookup_execution_result(uid, lookup_id, result)
         return result
     except EvaluationPrerequisiteError as exc:
         result = PipelineExecutionResult.blocked(
@@ -1447,14 +1422,6 @@ async def _run_on_demand_lookup_inner(
                     status="ready",
                 )
             _notify_startups_changed(user_id, "lookup_partner")
-            if lookup_outcome.get("status") == "ALREADY_IN_DEAL_FLOW":
-                await _record_lookup_outcome(
-                    user_id,
-                    lid,
-                    status="already_in_deal_flow",
-                    startup_id=startup_id,
-                    message=lookup_outcome.get("message"),
-                )
         evaluation_path = "rerun" if replace_startup_id else "manual_lookup"
         _observe_decision_ready_usage(
             engines.cost_controller,
@@ -1471,11 +1438,21 @@ async def _run_on_demand_lookup_inner(
             _rss_mb(),
         )
         metrics.inc_lookup("success")
+        result_metadata: Dict[str, Any] = {}
+        if lookup_outcome.get("status") == "ALREADY_IN_DEAL_FLOW":
+            result_metadata = {
+                "lookup_status": LookupExecutionStatus.ALREADY_IN_DEAL_FLOW.value,
+                "lookup_detail": (
+                    str(lookup_outcome.get("message") or "").strip()
+                    or "This company is already in your deal flow."
+                ),
+            }
         return PipelineExecutionResult.completed(
             code="lookup_completed",
             detail="The company lookup and evaluation completed.",
             startup_id=startup_id,
             projection_id=str((institutional_context or {}).get("opportunity_id") or "").strip() or None,
+            metadata=result_metadata,
         )
     except Exception as e:
         metrics.inc_lookup("error")

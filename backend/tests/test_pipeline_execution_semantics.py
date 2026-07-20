@@ -197,6 +197,7 @@ async def test_direct_lookup_status_persists_actionable_typed_failure(monkeypatc
                 "lookup_id": "lookup-1",
                 "status": "failed_stage",
                 "code": "reviewer_stage_failed",
+                "detail": "Reviewer could not complete.",
                 "message": "Reviewer could not complete.",
                 "recovery_action": "Inspect Reviewer logs and retry.",
                 "failed_stage": "reviewer",
@@ -205,6 +206,67 @@ async def test_direct_lookup_status_persists_actionable_typed_failure(monkeypatc
             "user-a",
         )
     ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("result", "expected_status"),
+    [
+        (
+            PipelineExecutionResult.completed(
+                code="lookup_completed",
+                detail="Lookup completed.",
+                startup_id="startup-1",
+            ),
+            "completed",
+        ),
+        (
+            PipelineExecutionResult.blocked(
+                code="openai_api_key_required",
+                detail="OpenAI is not configured.",
+                recovery_action="Configure OPENAI_API_KEY and retry.",
+            ),
+            "blocked",
+        ),
+        (
+            PipelineExecutionResult.skipped(
+                code="lookup_cancelled", detail="Lookup was cancelled."
+            ),
+            "skipped",
+        ),
+        (
+            PipelineExecutionResult.stage_failure(
+                stage="partner",
+                code="partner_stage_failed",
+                detail="Partner persistence failed.",
+                recovery_action="Inspect Partner logs and retry.",
+                startup_id="startup-1",
+            ),
+            "failed_stage",
+        ),
+    ],
+)
+async def test_lookup_execution_result_persists_every_typed_terminal_state(
+    monkeypatch, result, expected_status
+):
+    import pipeline_runner
+
+    records = []
+    monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
+    monkeypatch.setattr(
+        pipeline_runner,
+        "list_upsert",
+        lambda collection, record, *, user_id: records.append(record),
+    )
+
+    await pipeline_runner._record_lookup_execution_result(
+        "user-a", "lookup-terminal-1", result
+    )
+
+    assert records[0]["status"] == expected_status
+    assert records[0]["code"] == result.code
+    assert records[0]["detail"] == result.detail
+    assert records[0]["message"] == result.detail
 
 
 @pytest.mark.asyncio

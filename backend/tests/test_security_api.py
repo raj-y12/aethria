@@ -241,8 +241,10 @@ def test_lookup_status_surfaces_existing_startup_outcome(monkeypatch):
     assert response.json() == {
         "lookup_id": "lookup-existing-1",
         "failed": False,
+        "terminal": True,
         "status": "already_in_deal_flow",
         "startup_id": "existing-startup",
+        "detail": "This company is already in your deal flow.",
         "message": "This company is already in your deal flow.",
     }
 
