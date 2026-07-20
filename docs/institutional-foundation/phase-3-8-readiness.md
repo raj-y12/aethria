@@ -1,10 +1,10 @@
 # Phase 3–8 institutional domain readiness
 
-Date: 2026-07-15
+Date: 2026-07-20
 
 ## Outcome
 
-The code-level evidence-and-decision platform is implemented through Phase 8. It is deliberately **not certified for production in this local workspace** because no `DATABASE_URL`, `SUPABASE_DB_URL`, or `TEST_DATABASE_URL` is configured. The migrations, immutable database triggers, RLS, transaction races, and service-role permissions therefore have not been exercised against the target PostgreSQL instance.
+The code-level evidence-and-decision platform is implemented through Phase 8, including the final decision-safety remediation. It is deliberately **not certified for production in this local workspace** because no `DATABASE_URL`, `SUPABASE_DB_URL`, or `TEST_DATABASE_URL` is configured. The migrations, immutable database triggers, RLS, transaction races, and service-role permissions therefore have not been exercised against the target PostgreSQL instance. The separate authority-control cutover slice is also still pending and must not be represented as certified by these results.
 
 The product authority model is now explicit: agents discover, extract, evaluate, recommend, draft, monitor, and propose; authenticated people rule, approve external actions, correct evidence, resolve identity, accept policy proposals, and publish policy.
 
@@ -84,10 +84,14 @@ With `TEST_DATABASE_URL` configured, run the PostgreSQL-gated suites as part of 
 ## Current local evidence
 
 - Golden set v7: 27 passed, 0 failed.
-- Focused Phase 2–8 suite: 162 passed, 3 skipped before the final golden/readiness additions.
-- Readiness code checks: migration files present; Meta mutation paths proposal-only.
-- Direct database readiness: blocked by missing DSN.
+- Required final-review focused suite: 193 passed, 1 skipped.
+- Full backend suite: 882 passed, 10 skipped, 1 warning.
+- Decision-safety certification: all 18 cases ran and passed; no certification case was skipped.
+- Frontend: 58 test files and 259 tests passed; lint and production build passed.
+- Readiness code checks: golden set, migration presence, and proposal-only Meta mutation paths passed.
+- Direct database readiness: blocked by missing DSN (`ready: false`, expected in this workspace).
 - Target migration application, RLS enforcement, UUID/JSON codecs, triggers, foreign keys, and transactional race behavior: not certified locally.
+- Authority-control implementation and certification: pending as a separate slice.
 
 ## Task 8 decision-safety certification (2026-07-20)
 
@@ -97,67 +101,82 @@ the real canonical evaluator, human-override classifier, and compatibility
 projection with immutable local claim and evidence-relationship metadata. It
 does not import legacy startup snapshots or mock the behavior being certified.
 
-The eight passing cases certify that:
+The 18 passing cases certify that:
 
 - ungrounded high scores, model-inferred high scores, and a missing required
   dimension produce `insufficient_evidence`;
 - grounded high scores combined with either a critical risk or a mandate
   exclusion produce `pass`;
 - complete grounded high scores produce `advance`;
+- zero and below-minimum claim confidence are ineligible, the minimum boundary
+  cannot advance, and high-confidence claims can advance;
+- only exact boolean `true` activates a decisive risk; exact `false` and
+  malformed values do not silently activate one;
+- expired and undated evidence are ineligible, while stale and lower-quality
+  evidence cap an otherwise high recommendation at `monitor`;
 - an `advance` recommendation followed by an `invest` human ruling is not an
   override; and
 - an `advance` human ruling projects to legacy `MAYBE` with compatibility
   reason `advance`, never legacy `YES`.
 
+The certification policy is compiled from the active
+`resources/config/partner_rules/v3.json` contract, so its version, thresholds,
+boundary semantics, eligibility rules, confidence caps, freshness behavior,
+and decisive claim lists are the same versioned inputs exercised by the test.
+
 Observed on 2026-07-20 from this worktree:
 
 ```bash
-cd backend && pytest -q \
-  tests/evidence \
-  tests/evaluation_v2 \
-  tests/decisions \
+cd backend && pytest -q tests/evaluation_v2 \
+  tests/test_on_demand_lookup_independent.py \
+  tests/test_api_worker_prerequisites.py \
   tests/jobs/test_job_handlers.py \
-  tests/jobs/test_job_worker.py \
-  tests/test_decision_codes.py \
   tests/test_partner_decision_fallback.py \
-  tests/test_partner_mandate_gate.py \
-  tests/test_policy_compiler.py \
+  tests/test_partner_flow.py \
   tests/test_policy_store.py \
-  tests/test_reviewer_structured_signals_clamp.py \
-  tests/test_scoring_thin_evidence_characterization.py \
-  tests/test_structured_scoring_engine.py \
-  tests/test_on_demand_lookup_independent.py
-# 170 passed, 1 warning in 2.17s; no skips
+  tests/test_policy_compiler.py
+# 193 passed, 1 skipped in 2.36s
 
 cd backend && pytest -q
-# 780 passed, 10 skipped, 1 warning in 9.63s
+# 882 passed, 10 skipped, 1 warning in 10.22s
 
-cd app-front-end && npm test -- \
-  src/components/institutional/__tests__/HumanRulingComposer.test.tsx
-# 1 test file passed; 7 tests passed
+cd app-front-end && npm test -- --run
+# 58 test files passed; 259 tests passed in 10.50s
 
 cd app-front-end && npm run lint
 # exit 0
 
 cd app-front-end && npm run build
-# exit 0; 864 modules transformed
+# exit 0; 865 modules transformed
+
+cd backend && python3 scripts/run_golden_set.py --version v7 --json
+# 27 passed, 0 failed; exit 0
+
+cd backend && python3 scripts/check_phase8_readiness.py --json
+# code checks passed; direct_database_dsn blocked; ready=false; exit 1
 ```
 
-Skip inspection: the focused gate had no skips, including no skip in the new
-certification file. The 10 skips in the full backend run are pre-existing live
-integration or target-PostgreSQL gates: `test_end_to_end.py`, `test_scouts.py`,
-`test_partner_flow.py`, `test_portfolio_layer.py`, the PostgreSQL repository
-suites under `tests/fund_intelligence`, `tests/identity`, and `tests/jobs`, and
-the `TEST_DATABASE_URL`-gated Phase 1 acceptance test. They do not weaken the
-local decision-safety certification.
+Skip inspection with `pytest -q -rs`: the one focused skip is the live
+`test_partner_flow.py` integration, which requires `OPENAI_API_KEY` and an
+explicit tenant. The 10 full-suite skips are six target-PostgreSQL cases (one
+Fund Intelligence repository case, two identity repository cases, two job
+repository cases, and the Phase 1 acceptance case) plus four live integrations
+(`test_end_to_end.py`, `test_partner_flow.py`, `test_portfolio_layer.py`, and
+`test_scouts.py`). They are all explicitly environment-gated. No
+decision-safety certification case was skipped.
+
+The one warning is the existing `StarletteDeprecationWarning` from FastAPI's
+`TestClient` importing deprecated `httpx` compatibility; it is unrelated to
+the evaluation behavior certified here.
 
 ### Certification limits
 
 This is a code-level, local executable safety certification only. It does not
 certify target PostgreSQL, migration application, RLS, database triggers,
 transaction races, service-role permissions, or authority-control migration
-readiness. Those controls require a configured target database and their own
-authority-control verification slice.
+readiness. Target PostgreSQL certification remains pending until a DSN is
+configured. Authority-control implementation and certification remain pending
+as their own subsequent slice; this branch must not claim that cutover yet.
 
 ## Rollout recommendation
 
