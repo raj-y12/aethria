@@ -204,6 +204,41 @@ def test_weak_evidence_score_caps_must_remain_below_advance_threshold(
         evaluation_policy_from_compiled(_compiled_policy(), partner_rules=rules)
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("min_avg_medium_maybe", -0.1),
+        ("grey_zone_max", 10.1),
+        ("minimum_scored_weight", 0),
+        ("minimum_scored_weight", 1.1),
+    ],
+)
+def test_partner_threshold_ranges_fail_closed(field, value):
+    rules = _partner_rules()
+    rules["score_thresholds"][field] = value
+
+    with pytest.raises(ValueError, match="partner_rules"):
+        evaluation_policy_from_compiled(_compiled_policy(), partner_rules=rules)
+
+
+@pytest.mark.parametrize(
+    ("lower", "upper"),
+    [
+        ("min_avg_pass", "min_avg_medium_maybe"),
+        ("min_avg_medium_maybe", "min_avg_strong_yes"),
+        ("min_avg_borderline_low", "max_avg_borderline_high"),
+        ("grey_zone_min", "grey_zone_max"),
+    ],
+)
+def test_partner_threshold_ordering_fails_closed(lower, upper):
+    rules = _partner_rules()
+    rules["score_thresholds"][lower] = 8
+    rules["score_thresholds"][upper] = 7
+
+    with pytest.raises(ValueError, match="partner_rules"):
+        evaluation_policy_from_compiled(_compiled_policy(), partner_rules=rules)
+
+
 @pytest.mark.asyncio
 async def test_evaluate_endpoint_uses_active_thesis_and_published_policy(monkeypatch):
     import routers.evaluations as route

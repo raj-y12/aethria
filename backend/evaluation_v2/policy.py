@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from typing import Any, Dict, Iterable
 
 from evaluation_v2.models import CriterionRule, DecisionSafetyPolicy, EvaluationPolicy
@@ -74,15 +75,52 @@ def validate_partner_rules_document(
     thresholds = partner_rules.get("score_thresholds")
     if not isinstance(thresholds, dict):
         raise _partner_rules_error("score_thresholds must be an object")
+    numeric_thresholds: dict[str, float] = {}
     for key in _CANONICAL_THRESHOLD_KEYS:
         if key not in thresholds or isinstance(thresholds[key], bool):
             raise _partner_rules_error(f"score_thresholds.{key} is required")
         try:
-            float(thresholds[key])
+            numeric_thresholds[key] = float(thresholds[key])
         except (TypeError, ValueError) as exc:
             raise _partner_rules_error(
                 f"score_thresholds.{key} must be numeric"
             ) from exc
+        if not math.isfinite(numeric_thresholds[key]):
+            raise _partner_rules_error(
+                f"score_thresholds.{key} must be finite"
+            )
+        if key == "minimum_scored_weight":
+            if not 0 < numeric_thresholds[key] <= 1:
+                raise _partner_rules_error(
+                    "score_thresholds.minimum_scored_weight must be in (0, 1]"
+                )
+        elif not 0 <= numeric_thresholds[key] <= 10:
+            raise _partner_rules_error(
+                f"score_thresholds.{key} must be between 0 and 10"
+            )
+    pass_threshold = numeric_thresholds["min_avg_pass"]
+    advance_threshold = numeric_thresholds["min_avg_strong_yes"]
+    medium_threshold = numeric_thresholds["min_avg_medium_maybe"]
+    borderline_low = numeric_thresholds["min_avg_borderline_low"]
+    borderline_high = numeric_thresholds["max_avg_borderline_high"]
+    grey_min = numeric_thresholds["grey_zone_min"]
+    grey_max = numeric_thresholds["grey_zone_max"]
+    if not pass_threshold < advance_threshold:
+        raise _partner_rules_error(
+            "min_avg_pass must be below min_avg_strong_yes"
+        )
+    if not pass_threshold <= medium_threshold <= advance_threshold:
+        raise _partner_rules_error(
+            "min_avg_medium_maybe must be between pass and advance thresholds"
+        )
+    if not pass_threshold <= borderline_low < borderline_high <= advance_threshold:
+        raise _partner_rules_error(
+            "borderline thresholds must be ordered within pass and advance"
+        )
+    if not pass_threshold <= grey_min <= grey_max <= advance_threshold:
+        raise _partner_rules_error(
+            "grey-zone thresholds must be ordered within pass and advance"
+        )
     boundaries = thresholds.get("boundary_semantics")
     if not isinstance(boundaries, dict):
         raise _partner_rules_error(
@@ -125,7 +163,7 @@ def validate_partner_rules_document(
             "decision_safety is required and must include eligibility, confidence, "
             "freshness, source quality, and decisive claim types"
         ) from exc
-    advance_threshold = float(thresholds["min_avg_strong_yes"])
+    advance_threshold = numeric_thresholds["min_avg_strong_yes"]
     score_caps = (
         decision_safety.claim_confidence.score_cap_below_full_confidence,
         decision_safety.freshness.stale_score_cap,

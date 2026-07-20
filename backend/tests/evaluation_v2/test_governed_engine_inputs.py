@@ -168,6 +168,24 @@ def test_governed_partner_consumes_exact_rules_and_fund_config_without_reload(mo
     assert partner.use_resource_fund_thesis_fallback is False
 
 
+def test_governed_partner_uses_versioned_policy_boundaries_over_display_bands():
+    from partner.decision import PartnerDecisionEngine
+
+    prerequisites = _prerequisites()
+    engine = PartnerDecisionEngine(
+        use_llm_fallback=False,
+        tenant_user_id="user-a",
+        evaluation_prerequisites=prerequisites,
+    )
+
+    # The exact fund configuration still supplies scoring weights and narrative
+    # bands, but decisive state boundaries come only from the versioned policy.
+    assert engine._canonical_recommendation(5.99) == "PASS"
+    assert engine._canonical_recommendation(6.0) == "MONITOR"
+    assert engine._canonical_recommendation(7.99) == "MONITOR"
+    assert engine._canonical_recommendation(8.0) == "INVEST"
+
+
 @pytest.mark.parametrize("engine", ["reviewer", "partner"])
 def test_governed_engine_rejects_cross_tenant_context(monkeypatch, engine):
     prerequisites = _prerequisites("user-a")

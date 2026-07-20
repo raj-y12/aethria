@@ -350,11 +350,11 @@ class PartnerDecisionEngine:
         return sum(values) / len(values), len(values)
 
     def _canonical_recommendation(self, avg_score: float) -> str:
-        if self._fund_config.get("scoreBands"):
-            return recommendation_for_score_from_fund_config(avg_score, self._fund_config)
         if self.evaluation_policy is not None:
             advance_threshold = self.evaluation_policy.advance_threshold
             pass_threshold = self.evaluation_policy.pass_threshold
+        elif self._fund_config.get("scoreBands"):
+            return recommendation_for_score_from_fund_config(avg_score, self._fund_config)
         else:
             thresholds = self._rules["score_thresholds"]
             boundaries = thresholds["boundary_semantics"]
