@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
+from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -13,6 +15,7 @@ from evaluation_v2.service import (
     snapshot_claims,
 )
 from tenant_context import require_user_id
+from utils.timeutil import utcnow
 
 
 def _json(value: Any, default: Any) -> Any:
@@ -31,8 +34,9 @@ class EvaluationLifecycleError(RuntimeError):
 
 
 class EvaluationRepository:
-    def __init__(self, pool: Any):
+    def __init__(self, pool: Any, *, clock: Callable[[], datetime] = utcnow):
         self.pool = pool
+        self._clock = clock
 
     @staticmethod
     async def _outbox(conn: Any, *, user_id: str, aggregate_id: str, event_type: str, payload: Dict[str, Any]):
@@ -107,8 +111,12 @@ class EvaluationRepository:
                     for row in await conn.fetch(
                         """
                         select l.*, ei.verification_state, ei.source_quality,
+                               ei.effective_at as evidence_effective_at,
+                               ei.expires_at as evidence_expires_at,
                                ea.trust_class, ea.untrusted_input,
-                               ea.prompt_injection_detected
+                               ea.prompt_injection_detected,
+                               ea.effective_at as artifact_effective_at,
+                               ea.retrieved_at
                         from public.claim_evidence_links l
                         join public.claims c on c.user_id = l.user_id and c.claim_id = l.claim_id
                         join public.evidence_items ei
@@ -121,8 +129,13 @@ class EvaluationRepository:
                         uid, opportunity_id,
                     )
                 ]
-                snapshot, digest = snapshot_claims(claims, links)
-                result = evaluate_snapshot(snapshot, policy)
+                evaluation_at = self._clock()
+                snapshot, digest = snapshot_claims(
+                    claims, links, evaluation_at=evaluation_at
+                )
+                result = evaluate_snapshot(
+                    snapshot, policy, evaluation_at=evaluation_at
+                )
                 evaluation_id = str(uuid4())
                 await conn.execute(
                     """

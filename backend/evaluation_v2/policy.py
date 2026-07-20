@@ -9,6 +9,34 @@ from typing import Any, Dict, Iterable
 from evaluation_v2.models import CriterionRule, DecisionSafetyPolicy, EvaluationPolicy
 
 
+_CANONICAL_THRESHOLD_KEYS = (
+    "min_avg_pass",
+    "min_avg_strong_yes",
+    "min_avg_medium_maybe",
+    "min_avg_borderline_low",
+    "max_avg_borderline_high",
+    "grey_zone_min",
+    "grey_zone_max",
+    "minimum_scored_weight",
+)
+_DETECTION_LIST_KEYS = (
+    "critical_risk_keywords",
+    "red_flag_keywords",
+    "missing_qualitative_keywords",
+    "assumption_risk_keywords",
+)
+_ACTION_KEYS = (
+    "critical_risks",
+    "low_scores",
+    "default_no",
+    "request_cap_table",
+    "request_cap_table_and_review",
+    "monitor",
+    "human_review_monitor",
+    "human_review_contradictions",
+)
+
+
 def _document_hash(document: Any) -> str:
     canonical = json.dumps(
         document, sort_keys=True, separators=(",", ":"), ensure_ascii=False
@@ -18,6 +46,103 @@ def _document_hash(document: Any) -> str:
 
 def _strings(values: Iterable[Any]) -> list[str]:
     return sorted({str(value).strip() for value in values if str(value).strip()})
+
+
+def _partner_rules_error(detail: str) -> ValueError:
+    return ValueError(f"partner_rules is incomplete or invalid: {detail}")
+
+
+def _require_nonempty_strings(document: Dict[str, Any], key: str) -> list[str]:
+    value = document.get(key)
+    if not isinstance(value, list) or not value or any(
+        not isinstance(item, str) or not item.strip() for item in value
+    ):
+        raise _partner_rules_error(f"{key} must be a non-empty string list")
+    return [item.strip() for item in value]
+
+
+def validate_partner_rules_document(
+    partner_rules: Dict[str, Any],
+) -> tuple[Dict[str, Any], DecisionSafetyPolicy]:
+    """Validate the complete versioned authority contract without fallbacks."""
+    if not isinstance(partner_rules, dict):
+        raise _partner_rules_error("document must be an object")
+    version = partner_rules.get("version")
+    if not isinstance(version, str) or not version.strip():
+        raise _partner_rules_error("version must be a non-empty string")
+
+    thresholds = partner_rules.get("score_thresholds")
+    if not isinstance(thresholds, dict):
+        raise _partner_rules_error("score_thresholds must be an object")
+    for key in _CANONICAL_THRESHOLD_KEYS:
+        if key not in thresholds or isinstance(thresholds[key], bool):
+            raise _partner_rules_error(f"score_thresholds.{key} is required")
+        try:
+            float(thresholds[key])
+        except (TypeError, ValueError) as exc:
+            raise _partner_rules_error(
+                f"score_thresholds.{key} must be numeric"
+            ) from exc
+    boundaries = thresholds.get("boundary_semantics")
+    if not isinstance(boundaries, dict):
+        raise _partner_rules_error(
+            "score_thresholds.boundary_semantics must be an object"
+        )
+    if boundaries.get("advance") != "greater_than_or_equal":
+        raise _partner_rules_error(
+            "score_thresholds.boundary_semantics.advance must be greater_than_or_equal"
+        )
+    if boundaries.get("pass") != "less_than":
+        raise _partner_rules_error(
+            "score_thresholds.boundary_semantics.pass must be less_than"
+        )
+
+    for key in _DETECTION_LIST_KEYS:
+        _require_nonempty_strings(partner_rules, key)
+    actions = partner_rules.get("next_actions")
+    if not isinstance(actions, dict):
+        raise _partner_rules_error("next_actions must be an object")
+    for key in _ACTION_KEYS:
+        action = actions.get(key)
+        if not isinstance(action, str) or not action.strip():
+            raise _partner_rules_error(f"next_actions.{key} is required")
+
+    for key in (
+        "quality_labels",
+        "verdict_rules",
+        "contradictory_scores",
+        "llm_fallback_triggers",
+    ):
+        if not isinstance(partner_rules.get(key), dict) or not partner_rules[key]:
+            raise _partner_rules_error(f"{key} must be a non-empty object")
+
+    try:
+        decision_safety = DecisionSafetyPolicy.model_validate(
+            partner_rules.get("decision_safety")
+        )
+    except ValueError as exc:
+        raise _partner_rules_error(
+            "decision_safety is required and must include eligibility, confidence, "
+            "freshness, source quality, and decisive claim types"
+        ) from exc
+    advance_threshold = float(thresholds["min_avg_strong_yes"])
+    score_caps = (
+        decision_safety.claim_confidence.score_cap_below_full_confidence,
+        decision_safety.freshness.stale_score_cap,
+        decision_safety.source_quality.score_cap_below_full_quality,
+    )
+    if any(cap >= advance_threshold for cap in score_caps):
+        raise _partner_rules_error(
+            "every weak-evidence score cap must be below min_avg_strong_yes"
+        )
+    if (
+        decision_safety.source_quality.full_confidence_at
+        < decision_safety.evidence_eligibility.min_source_quality
+    ):
+        raise _partner_rules_error(
+            "source_quality.full_confidence_at must be at least min_source_quality"
+        )
+    return thresholds, decision_safety
 
 
 def evaluation_policy_from_compiled(
@@ -62,22 +187,11 @@ def evaluation_policy_from_compiled(
             )
         )
 
-    thresholds = (
-        partner_rules.get("score_thresholds")
-        if isinstance(partner_rules.get("score_thresholds"), dict)
-        else {}
-    )
-    advance_threshold = float(thresholds.get("min_avg_strong_yes", 7.5))
-    pass_threshold = float(thresholds.get("min_avg_pass", 4.0))
-    rules_version = str(partner_rules.get("version") or "unknown").strip() or "unknown"
-    try:
-        decision_safety = DecisionSafetyPolicy.model_validate(
-            partner_rules.get("decision_safety")
-        )
-    except ValueError as exc:
-        raise ValueError(
-            "partner_rules.decision_safety is required and must be valid"
-        ) from exc
+    thresholds, decision_safety = validate_partner_rules_document(partner_rules)
+    advance_threshold = float(thresholds["min_avg_strong_yes"])
+    pass_threshold = float(thresholds["min_avg_pass"])
+    rules_version = str(partner_rules["version"]).strip()
+    boundary_semantics = thresholds["boundary_semantics"]
 
     return EvaluationPolicy(
         policy_version_id=version_id,
@@ -88,6 +202,9 @@ def evaluation_policy_from_compiled(
         criteria=criteria,
         advance_threshold=advance_threshold,
         pass_threshold=pass_threshold,
+        advance_comparison=boundary_semantics["advance"],
+        pass_comparison=boundary_semantics["pass"],
+        minimum_scored_weight=float(thresholds["minimum_scored_weight"]),
         decision_safety=decision_safety,
         hard_exclusion_claim_types=decision_safety.hard_exclusion_claim_types,
     )

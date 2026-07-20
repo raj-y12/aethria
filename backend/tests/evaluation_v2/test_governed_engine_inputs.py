@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -29,22 +31,13 @@ def _compiled_policy():
 
 
 def _partner_rules():
-    return {
-        "version": "rules-v2-exact",
-        "score_thresholds": {"min_avg_strong_yes": 8, "min_avg_pass": 6},
-        "decision_safety": {
-            "evidence_eligibility": {
-                "allowed_assertion_classes": ["externally_verified"],
-                "allowed_relationships": ["supports"],
-                "require_verified_evidence": True,
-                "min_support_strength": 0.5,
-                "min_source_quality": 0.4,
-                "blocked_trust_classes": ["model", "unknown"],
-            },
-            "critical_risk_claim_types": ["critical_risk"],
-            "hard_exclusion_claim_types": ["mandate_exclusion"],
-        },
-    }
+    path = (
+        Path(__file__).resolve().parents[3]
+        / "resources/config/partner_rules/v3.json"
+    )
+    rules = json.loads(path.read_text())
+    rules["version"] = "rules-v3-exact"
+    return rules
 
 
 def _prerequisites(user_id="user-a"):
@@ -159,7 +152,7 @@ def test_governed_partner_consumes_exact_rules_and_fund_config_without_reload(mo
     assert partner._fund_config is prerequisites.fund_config
     assert partner.evaluation_policy is prerequisites.policy
     assert partner.evaluation_policy.policy_version_id == "policy-live"
-    assert partner.evaluation_policy.partner_rules_version == "rules-v2-exact"
+    assert partner.evaluation_policy.partner_rules_version == "rules-v3-exact"
 
 
 @pytest.mark.parametrize("engine", ["reviewer", "partner"])
@@ -196,3 +189,49 @@ def test_execution_context_binding_is_immutable():
 
     with pytest.raises(FrozenInstanceError):
         prerequisites.user_id = "user-b"
+
+
+@pytest.mark.parametrize(
+    ("score", "expected"),
+    [
+        (5.49, "PASS"),
+        (5.5, "MONITOR"),
+        (5.51, "MONITOR"),
+        (7.69, "MONITOR"),
+        (7.7, "INVEST"),
+        (7.71, "INVEST"),
+    ],
+)
+def test_governed_partner_uses_same_explicit_decisive_boundaries_as_canonical_policy(
+    score, expected
+):
+    from partner.decision import PartnerDecisionEngine
+
+    compiled = _compiled_policy()
+    rules = _partner_rules()
+    rules["score_thresholds"]["min_avg_pass"] = 5.5
+    rules["score_thresholds"]["min_avg_strong_yes"] = 7.7
+    rules["decision_safety"]["claim_confidence"][
+        "score_cap_below_full_confidence"
+    ] = 7.69
+    rules["decision_safety"]["freshness"]["stale_score_cap"] = 7.69
+    rules["decision_safety"]["source_quality"][
+        "score_cap_below_full_quality"
+    ] = 7.69
+    policy = evaluation_policy_from_compiled(compiled, partner_rules=rules)
+    prerequisites = EvaluationPrerequisites(
+        user_id="user-a",
+        thesis_context={"version_id": "thesis-live"},
+        thesis_version_id="thesis-live",
+        compiled_scoring_policy=compiled,
+        partner_rules=rules,
+        fund_config={},
+        policy=policy,
+    )
+    engine = PartnerDecisionEngine(
+        use_llm_fallback=False,
+        tenant_user_id="user-a",
+        evaluation_prerequisites=prerequisites,
+    )
+
+    assert engine._canonical_recommendation(score) == expected

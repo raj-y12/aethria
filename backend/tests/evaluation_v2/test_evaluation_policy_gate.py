@@ -1,3 +1,4 @@
+from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
@@ -49,22 +50,86 @@ def _decision_safety():
         },
         "critical_risk_claim_types": ["critical_risk"],
         "hard_exclusion_claim_types": ["mandate_exclusion"],
+        "claim_confidence": {
+            "minimum_eligible": 0.5,
+            "full_confidence_at": 0.8,
+            "score_cap_below_full_confidence": 7.99,
+            "recommendation_confidence_cap_below_full_confidence": 0.6,
+            "zero_confidence_ineligible": True,
+        },
+        "freshness": {
+            "max_age_days": 180,
+            "expired_action": "ineligible",
+            "undated_action": "ineligible",
+            "future_dated_action": "ineligible",
+            "stale_action": "cap",
+            "stale_score_cap": 7.99,
+            "stale_confidence_cap": 0.6,
+        },
+        "source_quality": {
+            "full_confidence_at": 0.8,
+            "score_cap_below_full_quality": 7.99,
+            "recommendation_confidence_cap_below_full_quality": 0.65,
+        },
+    }
+
+
+def _partner_rules():
+    return {
+        "version": "rules-v3",
+        "score_thresholds": {
+            "min_avg_strong_yes": 8,
+            "min_avg_pass": 5.5,
+            "min_avg_medium_maybe": 7,
+            "min_avg_borderline_low": 5.5,
+            "max_avg_borderline_high": 7,
+            "grey_zone_min": 6.5,
+            "grey_zone_max": 7.5,
+            "boundary_semantics": {
+                "advance": "greater_than_or_equal",
+                "pass": "less_than",
+            },
+            "minimum_scored_weight": 0.5,
+        },
+        "decision_safety": _decision_safety(),
+        "critical_risk_keywords": ["regulatory ban"],
+        "red_flag_keywords": ["missing"],
+        "missing_qualitative_keywords": ["[missing]"],
+        "assumption_risk_keywords": ["unvalidated assumption"],
+        "next_actions": {
+            "critical_risks": "Pass - critical risk",
+            "low_scores": "Pass - low scores",
+            "default_no": "Pass - below criteria",
+            "request_cap_table": "Request cap table",
+            "request_cap_table_and_review": "Request cap table and review",
+            "monitor": "Monitor",
+            "human_review_monitor": "Human review",
+            "human_review_contradictions": "Human review contradictions",
+        },
+        "quality_labels": {
+            "STRONG": "Investment-grade",
+            "MEDIUM": "Promising",
+            "WEAK": "Unproven",
+        },
+        "verdict_rules": {"WEAK": {}, "MEDIUM": {}, "STRONG": {}},
+        "contradictory_scores": {
+            "min_gap": 4,
+            "high_threshold": 8,
+            "low_threshold": 4,
+        },
+        "llm_fallback_triggers": {"grey_zone_deep_dive": True},
     }
 
 
 def test_compiled_published_policy_maps_to_evidence_evaluation_contract():
     policy = evaluation_policy_from_compiled(
         _compiled_policy(),
-        partner_rules={
-            "version": "rules-v2",
-            "score_thresholds": {"min_avg_strong_yes": 8, "min_avg_pass": 5.5},
-            "decision_safety": _decision_safety(),
-        },
+        partner_rules=_partner_rules(),
     )
 
     assert policy.policy_version_id == "policy-live"
     assert policy.policy_hash == "hash-live"
-    assert policy.partner_rules_version == "rules-v2"
+    assert policy.partner_rules_version == "rules-v3"
     assert policy.advance_threshold == 8
     assert policy.pass_threshold == 5.5
     assert sum(item.weight for item in policy.criteria) == pytest.approx(1)
@@ -75,22 +140,7 @@ def test_compiled_published_policy_maps_to_evidence_evaluation_contract():
 def test_compiled_policy_carries_versioned_decision_safety_contract():
     policy = evaluation_policy_from_compiled(
         _compiled_policy(),
-        partner_rules={
-            "version": "2.0",
-            "score_thresholds": {"min_avg_strong_yes": 8, "min_avg_pass": 5.5},
-            "decision_safety": {
-                "evidence_eligibility": {
-                    "allowed_assertion_classes": ["externally_verified", "operator_asserted"],
-                    "allowed_relationships": ["supports", "partially_establishes"],
-                    "require_verified_evidence": True,
-                    "min_support_strength": 0.5,
-                    "min_source_quality": 0.4,
-                    "blocked_trust_classes": ["model", "unknown"],
-                },
-                "critical_risk_claim_types": ["critical_risk"],
-                "hard_exclusion_claim_types": ["mandate_exclusion"],
-            },
-        },
+        partner_rules=_partner_rules(),
     )
 
     assert policy.decision_safety.evidence_eligibility.min_support_strength == 0.5
@@ -99,10 +149,59 @@ def test_compiled_policy_carries_versioned_decision_safety_contract():
 
 
 def test_missing_decision_safety_config_fails_closed():
+    rules = _partner_rules()
+    del rules["decision_safety"]
     with pytest.raises(ValueError, match="decision_safety"):
-        evaluation_policy_from_compiled(
-            _compiled_policy(), partner_rules={"version": "2.0"}
-        )
+        evaluation_policy_from_compiled(_compiled_policy(), partner_rules=rules)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ("version",),
+        ("score_thresholds", "min_avg_pass"),
+        ("score_thresholds", "boundary_semantics"),
+        ("decision_safety", "critical_risk_claim_types"),
+        ("decision_safety", "hard_exclusion_claim_types"),
+        ("critical_risk_keywords",),
+        ("red_flag_keywords",),
+        ("missing_qualitative_keywords",),
+        ("assumption_risk_keywords",),
+        ("next_actions",),
+        ("decision_safety", "claim_confidence"),
+        ("decision_safety", "freshness"),
+        ("decision_safety", "source_quality"),
+    ],
+)
+def test_partial_partner_rules_fail_closed(path):
+    rules = deepcopy(_partner_rules())
+    parent = rules
+    for segment in path[:-1]:
+        parent = parent[segment]
+    del parent[path[-1]]
+
+    with pytest.raises(ValueError, match="partner_rules"):
+        evaluation_policy_from_compiled(_compiled_policy(), partner_rules=rules)
+
+
+@pytest.mark.parametrize(
+    ("section", "field"),
+    [
+        ("claim_confidence", "score_cap_below_full_confidence"),
+        ("freshness", "stale_score_cap"),
+        ("source_quality", "score_cap_below_full_quality"),
+    ],
+)
+def test_weak_evidence_score_caps_must_remain_below_advance_threshold(
+    section, field
+):
+    rules = _partner_rules()
+    rules["decision_safety"][section][field] = rules["score_thresholds"][
+        "min_avg_strong_yes"
+    ]
+
+    with pytest.raises(ValueError, match="score cap"):
+        evaluation_policy_from_compiled(_compiled_policy(), partner_rules=rules)
 
 
 @pytest.mark.asyncio
@@ -111,7 +210,7 @@ async def test_evaluate_endpoint_uses_active_thesis_and_published_policy(monkeyp
 
     policy = evaluation_policy_from_compiled(
         _compiled_policy(),
-        partner_rules={"version": "rules-v2", "decision_safety": _decision_safety()},
+        partner_rules=_partner_rules(),
     )
 
     class Repository:

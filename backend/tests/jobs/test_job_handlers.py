@@ -1,4 +1,6 @@
 import importlib
+import json
+from pathlib import Path
 
 import pytest
 
@@ -27,21 +29,13 @@ def _prerequisites():
             "market": {"weight": 100, "criteria": [{"id": "market"}]}
         },
     }
-    partner_rules = {
-            "version": "rules-v2",
-            "decision_safety": {
-                "evidence_eligibility": {
-                    "allowed_assertion_classes": ["externally_verified"],
-                    "allowed_relationships": ["supports"],
-                    "require_verified_evidence": True,
-                    "min_support_strength": 0.5,
-                    "min_source_quality": 0.4,
-                    "blocked_trust_classes": ["model", "unknown"],
-                },
-                "critical_risk_claim_types": ["critical_risk"],
-                "hard_exclusion_claim_types": ["mandate_exclusion"],
-            },
-        }
+    partner_rules = json.loads(
+        (
+            Path(__file__).resolve().parents[3]
+            / "resources/config/partner_rules/v3.json"
+        ).read_text()
+    )
+    partner_rules["version"] = "rules-v3"
     policy = evaluation_policy_from_compiled(
         compiled,
         partner_rules=partner_rules,

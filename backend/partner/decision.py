@@ -349,13 +349,26 @@ class PartnerDecisionEngine:
         return sum(values) / len(values), len(values)
 
     def _canonical_recommendation(self, avg_score: float) -> str:
-        if self._fund_config:
+        if self._fund_config.get("scoreBands"):
             return recommendation_for_score_from_fund_config(avg_score, self._fund_config)
-        if avg_score >= 8.0:
+        if self.evaluation_policy is not None:
+            advance_threshold = self.evaluation_policy.advance_threshold
+            pass_threshold = self.evaluation_policy.pass_threshold
+        else:
+            thresholds = self._rules["score_thresholds"]
+            boundaries = thresholds["boundary_semantics"]
+            if (
+                boundaries.get("advance") != "greater_than_or_equal"
+                or boundaries.get("pass") != "less_than"
+            ):
+                raise ValueError("partner_rules has unsupported boundary semantics")
+            advance_threshold = float(thresholds["min_avg_strong_yes"])
+            pass_threshold = float(thresholds["min_avg_pass"])
+        if avg_score >= advance_threshold:
             return "INVEST"
-        if avg_score >= 6.0:
-            return "MONITOR"
-        return "PASS"
+        if avg_score < pass_threshold:
+            return "PASS"
+        return "MONITOR"
 
     def _apply_final_recommendation_fields(
         self,
@@ -1650,17 +1663,7 @@ class PartnerDecisionEngine:
                 _synthesize_rationale(),
             )
 
-        try:
-            from core.policy_resolver import get_partner_rules
-
-            partner_rules_payload = get_partner_rules()
-        except Exception as e:
-            self.logger.warning("[PARTNER] partner_llm_fallback user_id=%s could not load partner_rules: %s", uid_log, e)
-            partner_rules_payload = rules
-
-        rules_json = _partner_rules_json_for_prompt(
-            partner_rules_payload if isinstance(partner_rules_payload, dict) else {}
-        )
+        rules_json = _partner_rules_json_for_prompt(rules)
         tb = (thesis_block or "").strip()
         if len(tb) > _MAX_THESIS_MANDATE_CHARS:
             tb = tb[: _MAX_THESIS_MANDATE_CHARS - 30] + "\n...(truncated)\n"

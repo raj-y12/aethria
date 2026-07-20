@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -39,24 +41,13 @@ def _compiled_policy():
 
 
 def _partner_rules():
-    return {
-        "version": "rules-v2",
-        "decision_safety": {
-            "evidence_eligibility": {
-                "allowed_assertion_classes": [
-                    "externally_verified",
-                    "operator_asserted",
-                ],
-                "allowed_relationships": ["supports", "partially_establishes"],
-                "require_verified_evidence": True,
-                "min_support_strength": 0.5,
-                "min_source_quality": 0.4,
-                "blocked_trust_classes": ["model", "unknown"],
-            },
-            "critical_risk_claim_types": ["critical_risk"],
-            "hard_exclusion_claim_types": ["mandate_exclusion"],
-        },
-    }
+    path = (
+        Path(__file__).resolve().parents[3]
+        / "resources/config/partner_rules/v3.json"
+    )
+    rules = json.loads(path.read_text())
+    rules["version"] = "rules-v3"
+    return rules
 
 
 @pytest.mark.asyncio
@@ -83,7 +74,7 @@ async def test_resolves_exact_active_thesis_and_legacy_published_policy():
     assert prerequisites.thesis_version_id == "thesis-live"
     assert prerequisites.policy.policy_version_id == "policy-live"
     assert prerequisites.policy.policy_hash == "hash-live"
-    assert prerequisites.policy.partner_rules_version == "rules-v2"
+    assert prerequisites.policy.partner_rules_version == "rules-v3"
 
 
 @pytest.mark.asyncio

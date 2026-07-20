@@ -1,3 +1,7 @@
+from datetime import datetime, timezone
+
+import pytest
+
 from evaluation_v2.models import (
     CriterionRule,
     DecisionSafetyPolicy,
@@ -6,6 +10,9 @@ from evaluation_v2.models import (
     RecommendationState,
 )
 from evaluation_v2.service import evaluate_snapshot, snapshot_claims
+
+
+EVALUATION_AT = datetime(2026, 7, 20, 12, 0, tzinfo=timezone.utc)
 
 
 def _claims():
@@ -42,6 +49,10 @@ def _verified_link(claim_id, **overrides):
         "trust_class": "independent",
         "untrusted_input": False,
         "prompt_injection_detected": False,
+        "evidence_effective_at": "2026-07-01T00:00:00+00:00",
+        "evidence_expires_at": "2026-08-01T00:00:00+00:00",
+        "artifact_effective_at": "2026-07-01T00:00:00+00:00",
+        "retrieved_at": "2026-07-01T01:00:00+00:00",
     }
     link.update(overrides)
     return link
@@ -60,12 +71,44 @@ def _policy():
         ],
         advance_threshold=7.2,
         pass_threshold=4.0,
+        advance_comparison="greater_than_or_equal",
+        pass_comparison="less_than",
+        minimum_scored_weight=0.5,
         decision_safety=DecisionSafetyPolicy(
             evidence_eligibility=EvidenceEligibilityPolicy(
                 allowed_assertion_classes=["externally_verified"],
                 allowed_relationships=["supports", "partially_establishes"],
+                require_verified_evidence=True,
+                min_support_strength=0.5,
+                min_source_quality=0.4,
+                blocked_trust_classes=["model", "unknown"],
             )
+            ,
+            critical_risk_claim_types=["critical_risk"],
+            hard_exclusion_claim_types=["excluded_sector"],
+            claim_confidence={
+                "minimum_eligible": 0.5,
+                "full_confidence_at": 0.8,
+                "score_cap_below_full_confidence": 7.19,
+                "recommendation_confidence_cap_below_full_confidence": 0.6,
+                "zero_confidence_ineligible": True,
+            },
+            freshness={
+                "max_age_days": 180,
+                "expired_action": "ineligible",
+                "undated_action": "ineligible",
+                "future_dated_action": "ineligible",
+                "stale_action": "cap",
+                "stale_score_cap": 7.19,
+                "stale_confidence_cap": 0.6,
+            },
+            source_quality={
+                "full_confidence_at": 0.8,
+                "score_cap_below_full_quality": 7.19,
+                "recommendation_confidence_cap_below_full_quality": 0.65,
+            },
         ),
+        hard_exclusion_claim_types=["excluded_sector"],
     )
 
 
@@ -320,3 +363,213 @@ def test_ungrounded_critical_risk_is_uncertainty_not_an_automatic_pass():
         "Unverified regulatory ban risk in primary market."
         in result.recommendation.missing_information
     )
+
+
+@pytest.mark.parametrize(
+    ("claim_confidence", "expected_state"),
+    [
+        (0.0, RecommendationState.INSUFFICIENT_EVIDENCE),
+        (0.49, RecommendationState.INSUFFICIENT_EVIDENCE),
+        (0.5, RecommendationState.MONITOR),
+        (0.9, RecommendationState.ADVANCE),
+    ],
+    ids=["zero", "below-minimum", "minimum-boundary", "high"],
+)
+def test_claim_confidence_constrains_recommendation(claim_confidence, expected_state):
+    claims = _claims()
+    for claim in claims:
+        claim["normalized_value"] = {"criterion_score": 9.0}
+        claim["confidence"] = claim_confidence
+    snapshot, _ = snapshot_claims(
+        claims,
+        [_verified_link("claim-market"), _verified_link("claim-execution")],
+        evaluation_at=EVALUATION_AT,
+    )
+
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    assert result.recommendation.state is expected_state
+    if claim_confidence < 0.8:
+        assert result.recommendation.confidence < 0.8
+
+
+@pytest.mark.parametrize(
+    "raw_value",
+    ["false", "0", "no", 0, 1, [], {}, None],
+)
+def test_malformed_decisive_boolean_is_uncertainty_not_pass(raw_value):
+    claims = _claims()
+    for claim in claims:
+        claim["normalized_value"] = {"criterion_score": 9.0}
+    normalized = {} if raw_value is None else {"value": raw_value}
+    claims.append(
+        {
+            "claim_id": "claim-risk",
+            "claim_type": "critical_risk",
+            "normalized_value": normalized,
+            "display_text": "Malformed decisive risk value.",
+            "assertion_class": "externally_verified",
+            "status": "current",
+            "confidence": 0.9,
+        }
+    )
+    snapshot, _ = snapshot_claims(
+        claims,
+        [
+            _verified_link("claim-market"),
+            _verified_link("claim-execution"),
+            _verified_link("claim-risk"),
+        ],
+        evaluation_at=EVALUATION_AT,
+    )
+
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    assert result.recommendation.state is RecommendationState.ADVANCE
+    assert result.recommendation.human_review_required is True
+    assert "Malformed decisive risk value." in result.recommendation.missing_information
+
+
+@pytest.mark.parametrize(
+    ("raw_value", "expected_state", "is_uncertain"),
+    [
+        (True, RecommendationState.PASS, False),
+        (False, RecommendationState.ADVANCE, False),
+    ],
+)
+def test_exact_decisive_booleans_have_deterministic_meaning(
+    raw_value, expected_state, is_uncertain
+):
+    claims = _claims()
+    for claim in claims:
+        claim["normalized_value"] = {"criterion_score": 9.0}
+    claims.append(
+        {
+            "claim_id": "claim-risk",
+            "claim_type": "critical_risk",
+            "normalized_value": {"value": raw_value},
+            "display_text": "Exact decisive risk value.",
+            "assertion_class": "externally_verified",
+            "status": "current",
+            "confidence": 0.9,
+        }
+    )
+    snapshot, _ = snapshot_claims(
+        claims,
+        [
+            _verified_link("claim-market"),
+            _verified_link("claim-execution"),
+            _verified_link("claim-risk"),
+        ],
+        evaluation_at=EVALUATION_AT,
+    )
+
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    assert result.recommendation.state is expected_state
+    assert (
+        "Exact decisive risk value." in result.recommendation.missing_information
+    ) is is_uncertain
+
+
+@pytest.mark.parametrize(
+    ("link_overrides", "expected_state", "quality_flag"),
+    [
+        ({}, RecommendationState.ADVANCE, None),
+        (
+            {"evidence_expires_at": "2026-07-19T00:00:00+00:00"},
+            RecommendationState.INSUFFICIENT_EVIDENCE,
+            "evidence_expired",
+        ),
+        (
+            {
+                "evidence_effective_at": None,
+                "evidence_expires_at": None,
+                "artifact_effective_at": None,
+                "retrieved_at": None,
+            },
+            RecommendationState.INSUFFICIENT_EVIDENCE,
+            "evidence_undated",
+        ),
+        (
+            {
+                "evidence_effective_at": "2025-01-01T00:00:00+00:00",
+                "evidence_expires_at": None,
+                "artifact_effective_at": "2025-01-01T00:00:00+00:00",
+                "retrieved_at": "2025-01-01T00:00:00+00:00",
+            },
+            RecommendationState.MONITOR,
+            "evidence_stale",
+        ),
+        (
+            {"source_quality": 0.5},
+            RecommendationState.MONITOR,
+            "source_quality_below_full",
+        ),
+    ],
+    ids=["fresh", "expired", "undated", "stale", "low-quality"],
+)
+def test_freshness_and_source_quality_constrain_decisions(
+    link_overrides, expected_state, quality_flag
+):
+    claims = _claims()
+    for claim in claims:
+        claim["normalized_value"] = {"criterion_score": 9.0}
+    links = [
+        _verified_link("claim-market", **link_overrides),
+        _verified_link("claim-execution", **link_overrides),
+    ]
+    snapshot, _ = snapshot_claims(claims, links, evaluation_at=EVALUATION_AT)
+
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    assert result.recommendation.state is expected_state
+    if quality_flag:
+        assert all(quality_flag in item.quality_flags for item in result.criteria)
+    if expected_state is not RecommendationState.ADVANCE:
+        assert result.recommendation.confidence < 0.8
+
+
+def test_snapshot_hash_captures_freshness_inputs_and_evaluation_timestamp():
+    links = [_verified_link("claim-market")]
+    _, original = snapshot_claims(_claims(), links, evaluation_at=EVALUATION_AT)
+    _, changed_date = snapshot_claims(
+        _claims(),
+        [_verified_link("claim-market", retrieved_at="2026-07-02T00:00:00+00:00")],
+        evaluation_at=EVALUATION_AT,
+    )
+    _, changed_clock = snapshot_claims(
+        _claims(),
+        links,
+        evaluation_at=datetime(2026, 7, 21, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert original != changed_date
+    assert original != changed_clock
+
+
+@pytest.mark.parametrize(
+    ("score", "expected_state"),
+    [
+        (3.99, RecommendationState.PASS),
+        (4.0, RecommendationState.MONITOR),
+        (4.01, RecommendationState.MONITOR),
+        (7.19, RecommendationState.MONITOR),
+        (7.2, RecommendationState.ADVANCE),
+        (7.21, RecommendationState.ADVANCE),
+    ],
+)
+def test_explicit_threshold_boundaries(score, expected_state):
+    claims = _claims()
+    for claim in claims:
+        claim["normalized_value"] = {"criterion_score": score}
+        claim["confidence"] = 0.9
+    snapshot, _ = snapshot_claims(
+        claims,
+        [_verified_link("claim-market"), _verified_link("claim-execution")],
+        evaluation_at=EVALUATION_AT,
+    )
+
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    assert result.recommendation.state is expected_state

@@ -1,4 +1,6 @@
 from collections import deque
+from datetime import datetime, timezone
+import json
 
 import pytest
 
@@ -96,6 +98,10 @@ class _EvaluationConnection:
                     "trust_class": "independent",
                     "untrusted_input": False,
                     "prompt_injection_detected": False,
+                    "evidence_effective_at": "2026-07-01T00:00:00+00:00",
+                    "evidence_expires_at": "2026-08-01T00:00:00+00:00",
+                    "artifact_effective_at": "2026-07-01T00:00:00+00:00",
+                    "retrieved_at": "2026-07-01T01:00:00+00:00",
                 }
             ]
         raise AssertionError(f"Unexpected fetch query: {sql}")
@@ -117,8 +123,41 @@ def _evaluation_policy():
             evidence_eligibility=EvidenceEligibilityPolicy(
                 allowed_assertion_classes=["externally_verified"],
                 allowed_relationships=["supports"],
-            )
+                require_verified_evidence=True,
+                min_support_strength=0.5,
+                min_source_quality=0.4,
+                blocked_trust_classes=["model", "unknown"],
+            ),
+            critical_risk_claim_types=["critical_risk"],
+            hard_exclusion_claim_types=["mandate_exclusion"],
+            claim_confidence={
+                "minimum_eligible": 0.5,
+                "full_confidence_at": 0.8,
+                "score_cap_below_full_confidence": 7.99,
+                "recommendation_confidence_cap_below_full_confidence": 0.6,
+                "zero_confidence_ineligible": True,
+            },
+            freshness={
+                "max_age_days": 180,
+                "expired_action": "ineligible",
+                "undated_action": "ineligible",
+                "future_dated_action": "ineligible",
+                "stale_action": "cap",
+                "stale_score_cap": 7.99,
+                "stale_confidence_cap": 0.6,
+            },
+            source_quality={
+                "full_confidence_at": 0.8,
+                "score_cap_below_full_quality": 7.99,
+                "recommendation_confidence_cap_below_full_quality": 0.65,
+            },
         ),
+        advance_threshold=8,
+        pass_threshold=6,
+        advance_comparison="greater_than_or_equal",
+        pass_comparison="less_than",
+        minimum_scored_weight=0.5,
+        hard_exclusion_claim_types=["mandate_exclusion"],
     )
 
 
@@ -142,7 +181,13 @@ async def test_current_evaluation_decodes_asyncpg_json_strings_for_api_consumers
 @pytest.mark.asyncio
 async def test_evaluation_link_projection_joins_grounding_metadata_tenant_safely():
     connection = _EvaluationConnection()
-    repository = EvaluationRepository(_Pool(connection))
+    clock_calls = []
+
+    def clock():
+        clock_calls.append(True)
+        return datetime(2026, 7, 20, 12, 0, tzinfo=timezone.utc)
+
+    repository = EvaluationRepository(_Pool(connection), clock=clock)
 
     await repository.evaluate(
         user_id="user-a",
@@ -168,9 +213,26 @@ async def test_evaluation_link_projection_joins_grounding_metadata_tenant_safely
     assert "where l.user_id = $1 and c.opportunity_id = $2" in normalized
     assert "ei.verification_state" in normalized
     assert "ei.source_quality" in normalized
+    assert "ei.effective_at as evidence_effective_at" in normalized
+    assert "ei.expires_at as evidence_expires_at" in normalized
     assert "ea.trust_class" in normalized
     assert "ea.untrusted_input" in normalized
     assert "ea.prompt_injection_detected" in normalized
+    assert "ea.effective_at as artifact_effective_at" in normalized
+    assert "ea.retrieved_at" in normalized
+    assert len(clock_calls) == 1
+    evaluation_insert = next(
+        args
+        for sql, args in connection.execute_calls
+        if "insert into public.evaluation_runs" in sql
+    )
+    snapshot = json.loads(evaluation_insert[6])
+    assert snapshot[0]["evaluation_at_snapshot"] == "2026-07-20T12:00:00+00:00"
+    relationship = snapshot[0]["evidence_relationships"][0]
+    assert relationship["evidence_effective_at"] == "2026-07-01T00:00:00+00:00"
+    assert relationship["evidence_expires_at"] == "2026-08-01T00:00:00+00:00"
+    assert relationship["artifact_effective_at"] == "2026-07-01T00:00:00+00:00"
+    assert relationship["retrieved_at"] == "2026-07-01T01:00:00+00:00"
 
 
 @pytest.mark.asyncio
