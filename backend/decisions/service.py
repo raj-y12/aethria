@@ -7,6 +7,7 @@ from decisions.models import (
     OverrideType,
     WorkflowActionType,
 )
+from utils.partner_codes import ruling_aligns_with_recommendation
 
 
 def ruling_to_opportunity_state(decision: HumanRulingDecision | str) -> str:
@@ -25,11 +26,9 @@ def classify_override(
     ruling: HumanRulingDecision,
     requested: Optional[OverrideType],
 ) -> Optional[OverrideType]:
-    normalized = str(recommendation or "").lower()
-    aligned = (
-        (normalized == "advance" and ruling is HumanRulingDecision.ADVANCE)
-        or (normalized == "monitor" and ruling is HumanRulingDecision.MONITOR)
-        or (normalized == "pass" and ruling is HumanRulingDecision.PASS)
+    aligned = ruling_aligns_with_recommendation(
+        recommendation,
+        ruling.value,
     )
     if aligned:
         return None

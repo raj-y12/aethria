@@ -2,17 +2,12 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createHumanRuling, type HumanRulingDecision, type OverrideType } from '../../api/decisions';
 
-type VisibleDecision = Exclude<HumanRulingDecision, 'advance'>;
-
-const DECISION_OPTIONS: Array<{ value: VisibleDecision; label: string }> = [
-  { value: 'invest', label: 'Invest' },
+const DECISION_OPTIONS = [
+  { value: 'advance', label: 'Advance' },
   { value: 'monitor', label: 'Monitor' },
   { value: 'pass', label: 'Pass' },
-];
-
-function visibleDecision(value?: HumanRulingDecision | null): VisibleDecision | null {
-  return value && value !== 'advance' ? value : null;
-}
+  { value: 'invest', label: 'Invest' },
+] satisfies Array<{ value: HumanRulingDecision; label: string }>;
 
 export default function HumanRulingComposer({
   opportunityId,
@@ -26,17 +21,17 @@ export default function HumanRulingComposer({
   readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const [decision, setDecision] = useState<VisibleDecision | null>(visibleDecision(recommendedDecision));
+  const [decision, setDecision] = useState<HumanRulingDecision | null>(recommendedDecision ?? null);
   const [rationale, setRationale] = useState('');
   const [overrideType, setOverrideType] = useState<OverrideType | ''>('');
 
   useEffect(() => {
-    if (!decision) setDecision(visibleDecision(recommendedDecision));
+    if (!decision) setDecision(recommendedDecision ?? null);
   }, [decision, recommendedDecision]);
 
   // The override reason only exists when the ruling disagrees with the system's lean.
   const disagreesWithSystem = Boolean(
-    decision && visibleDecision(recommendedDecision) && decision !== visibleDecision(recommendedDecision),
+    decision && recommendedDecision && decision !== recommendedDecision,
   );
 
   const mutation = useMutation({

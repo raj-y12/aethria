@@ -1,5 +1,8 @@
+import inspect
+
 import pytest
 
+from evaluation_v2 import compatibility
 from utils import partner_codes
 
 
@@ -70,14 +73,20 @@ def test_institutional_ruling_projects_to_legacy_human_ruling(
     assert projection.compatibility_reason == reason
 
 
-def test_advance_ruling_can_never_project_to_legacy_yes():
-    projection = partner_codes.legacy_ruling_from_institutional("ADVANCE")
+def test_advance_ruling_never_projects_to_legacy_yes():
+    projection = partner_codes.legacy_ruling_from_institutional("advance")
 
-    assert projection.model_dump() == {
-        "value": "MAYBE",
-        "compatibility_reason": "advance",
-    }
-    assert projection.value != "YES"
+    assert projection.value == "MAYBE"
+    assert projection.compatibility_reason == "advance"
+
+
+def test_evaluation_v2_compatibility_delegates_to_canonical_mapping():
+    source = inspect.getsource(compatibility.recommendation_to_legacy)
+
+    assert "legacy_partner_from_institutional_recommendation" in source
+    assert "RecommendationState.ADVANCE" not in source
+    assert "RecommendationState.MONITOR" not in source
+    assert "RecommendationState.PASS" not in source
 
 
 @pytest.mark.parametrize(

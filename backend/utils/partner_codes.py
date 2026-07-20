@@ -120,6 +120,22 @@ def legacy_ruling_from_institutional(ruling: str) -> LegacyProjection:
     return LegacyProjection(value="YES")
 
 
+def ruling_aligns_with_recommendation(
+    recommendation: Optional[str], ruling: str
+) -> bool:
+    if recommendation is None or not str(recommendation).strip():
+        return True
+    rec = RecommendationCode(_required_code(recommendation, label="recommendation"))
+    human = HumanRulingCode(_required_code(ruling, label="human ruling"))
+    if rec is RecommendationCode.ADVANCE:
+        return human in {HumanRulingCode.ADVANCE, HumanRulingCode.INVEST}
+    if rec is RecommendationCode.MONITOR:
+        return human is HumanRulingCode.MONITOR
+    if rec is RecommendationCode.PASS:
+        return human is HumanRulingCode.PASS
+    return False
+
+
 def recommendation_from_legacy(
     legacy: Optional[str],
     *,
