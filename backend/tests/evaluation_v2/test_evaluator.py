@@ -1,4 +1,10 @@
-from evaluation_v2.models import CriterionRule, EvaluationPolicy, RecommendationState
+from evaluation_v2.models import (
+    CriterionRule,
+    DecisionSafetyPolicy,
+    EvaluationPolicy,
+    EvidenceEligibilityPolicy,
+    RecommendationState,
+)
 from evaluation_v2.service import evaluate_snapshot, snapshot_claims
 
 
@@ -38,6 +44,12 @@ def _policy():
         ],
         advance_threshold=7.2,
         pass_threshold=4.0,
+        decision_safety=DecisionSafetyPolicy(
+            evidence_eligibility=EvidenceEligibilityPolicy(
+                allowed_assertion_classes=["externally_verified"],
+                allowed_relationships=["supports", "partially_establishes"],
+            )
+        ),
     )
 
 
