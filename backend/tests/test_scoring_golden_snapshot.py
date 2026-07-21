@@ -138,18 +138,18 @@ GOLDEN = {
     },
     "weak_thin": {
         "overall_score": 4.00,
-        "dims": {"market": 5.00, "product": 5.00, "technical": 4.00, "execution": 5.00, "defensibility": 5.00},
+        "dims": {"market": None, "product": None, "technical": 4.00, "execution": None, "defensibility": None},
     },
     "all_missing": {
-        # Every dimension is a placeholder 5.0 but unscored=True; overall is None.
+        # Every dimension is explicitly unscored with score=None; overall is None.
         "overall_score": None,
-        "dims": {"market": 5.00, "product": 5.00, "technical": 5.00, "execution": 5.00, "defensibility": 5.00},
+        "dims": {"market": None, "product": None, "technical": None, "execution": None, "defensibility": None},
     },
     "structured_signals": {
         # Value-only / label-only reviewer signals without evidence or a rule are no
         # longer eligible to manufacture a display score.
         "overall_score": None,
-        "dims": {"market": 5.00, "product": 5.00, "technical": 5.00, "execution": 5.00, "defensibility": 5.00},
+        "dims": {"market": None, "product": None, "technical": None, "execution": None, "defensibility": None},
     },
 }
 
@@ -181,9 +181,13 @@ def test_engine_dimension_scores_golden(name):
     scout, review = FIXTURES[name]
     result = DeterministicScoringEngine().score(scout, review)
     for dim, expected in GOLDEN[name]["dims"].items():
-        assert result[dim]["score"] == pytest.approx(expected, abs=ABS), (
-            f"{name}.{dim}: dimension score drifted from golden snapshot."
-        )
+        if expected is None:
+            assert result[dim]["score"] is None
+            assert result[dim]["missing_reasons"] == ["no_grounded_components"]
+        else:
+            assert result[dim]["score"] == pytest.approx(expected, abs=ABS), (
+                f"{name}.{dim}: dimension score drifted from golden snapshot."
+            )
 
 
 @pytest.mark.parametrize("name", list(FIXTURES))

@@ -26,6 +26,8 @@ from utils.reviewer_gap_retrieval import enrich_scout_for_reviewer_llm
 from evaluation_v2.prerequisites import EvaluationPrerequisites
 from evaluation_v2.governed_scoring import (
     GovernedScoringError,
+    configured_scoring_dimensions,
+    resolve_governed_scoring_traces,
     validate_governed_scoring_trace,
 )
 from pipeline_execution import StageExecutionResult
@@ -304,6 +306,8 @@ class ReviewerEngine:
             out["reviewer_type"] = persona
             if self.use_structured_scoring:
                 out = self._apply_structured_scoring(scout_output, out)
+                if self.evaluation_prerequisites is not None:
+                    self._blend_numeric_scores_into_primary(out, [out])
             self._derive_verdict_from_scores(out)
             return out
         finally:
@@ -324,13 +328,23 @@ class ReviewerEngine:
         return round(sum(nums) / len(nums), 6)
 
     def _blend_numeric_scores_into_primary(self, primary: dict, all_results: list) -> None:
-        """Deterministic dimension scores: integer mean across reviewers.
+        """Deterministic dimension scores across reviewers.
+
+        Governed runs first create one authoritative resolved trace and project all
+        compatibility fields from it. Legacy runs retain their historical mean.
+
         Defensibility uses the same plain mean as the other dimensions — it is a
         risk/moat modifier, not part of the overall (see the decision log in
         docs/scoring-remediation-checklist.md). The former 1.5x-skeptical weighting and
         the orphaned weighted_defensibility_score field were removed.
         Also computes confidence_adjusted_score = S_bar × (1 − reviewer_delta/10).
         """
+        prerequisites = getattr(self, "evaluation_prerequisites", None)
+        if prerequisites is not None:
+            trace = resolve_governed_scoring_traces(all_results, prerequisites)
+            self._project_governed_trace(primary, trace)
+            return
+
         for d in ["market_score", "product_score", "technical_score", "execution_score", "defensibility_score"]:
             primary[d] = self._mean_round_score([r.get(d) for r in all_results])
 
@@ -389,7 +403,54 @@ class ReviewerEngine:
         self, primary: Dict[str, Any], all_results: List[Dict[str, Any]]
     ) -> None:
         """Re-run confidence_adjusted_score and enrich_scores after resolution tweaks."""
+        prerequisites = getattr(self, "evaluation_prerequisites", None)
+        trace = primary.get("structured_scoring")
+        if prerequisites is not None:
+            validate_governed_scoring_trace(
+                trace, prerequisites, require_resolved=True
+            )
+            self._project_governed_trace(primary, trace)
+            return
         self._recompute_derived_from_primary(primary, all_results)
+
+    @staticmethod
+    def _project_governed_trace(
+        primary: Dict[str, Any], trace: Dict[str, Any]
+    ) -> None:
+        """Project compatibility fields from, and only from, the resolved trace."""
+
+        for dimension in (
+            "market",
+            "product",
+            "technical",
+            "execution",
+            "defensibility",
+        ):
+            detail = trace.get(dimension)
+            if not isinstance(detail, dict):
+                primary[f"{dimension}_score"] = None
+            else:
+                primary[f"{dimension}_score"] = (
+                    None if detail.get("unscored") else float(detail["score"])
+                )
+        primary["structured_scoring"] = trace
+        primary["overall_score"] = trace.get("overall_score")
+        primary["confidence_adjusted_score"] = trace.get("overall_score")
+        primary["score_source"] = "Governed resolved reviewer consensus"
+
+        enriched = enrich_scores(primary)
+        # enrich_scores intentionally preserves historical four-driver display
+        # labels. Its recomputed overall is not authoritative for governed runs.
+        for key, value in enriched.items():
+            if key == "overall_score":
+                continue
+            primary[key] = value
+        primary["overall_score"] = trace.get("overall_score")
+        primary["overall_label"] = (
+            None
+            if trace.get("overall_score") is None
+            else enriched.get("overall_label")
+        )
 
     @staticmethod
     def _pick_primary_structured_signals(
@@ -412,11 +473,8 @@ class ReviewerEngine:
         """Build per-persona SingleReview snapshots for storage.
 
         Only the primary persona's snapshot retains the heavy structured_signals /
-        structured_scoring blobs (~4KB each). Those are the only copies anything reads:
-        the deterministic scorer, partner engine, and memo all consume the primary
-        signals, which are also mirrored onto ReviewInfo's top-level fields. The
-        non-primary copies were persisted but never read — dropping them roughly
-        halves review_info size with no loss of information used downstream.
+        raw structured_scoring blob. The authoritative top-level resolved trace embeds
+        every persona input with provenance; the snapshots do not need duplicate blobs.
 
         Primary = DefaultReviewer when present, else the first successful result
         (mirrors _pick_primary_structured_signals and the primary review_output).
@@ -507,8 +565,6 @@ class ReviewerEngine:
                     "governed structured scoring engine is unavailable"
                 )
             return reviewer_output
-        from config.scoring_config import DEFAULT_SCORE
-
         try:
             trace = self.structured_scoring_engine.score(scout_output, reviewer_output)
         except Exception as exc:
@@ -526,7 +582,7 @@ class ReviewerEngine:
             details = trace.get(dim) if isinstance(trace.get(dim), dict) else {}
             if details.get("unscored"):
                 return None
-            return float(details.get("score", DEFAULT_SCORE))
+            return float(details["score"])
 
         updated = dict(reviewer_output)
         updated["market_score"] = _dim_score("market")
@@ -546,7 +602,18 @@ class ReviewerEngine:
         out: Dict[str, str] = {}
         for dim in ("market", "product", "technical", "execution", "defensibility"):
             details = trace.get(dim) if isinstance(trace.get(dim), dict) else {}
-            score = float(details.get("score", 5.0))
+            if details.get("unscored"):
+                reasons = [
+                    str(reason)
+                    for reason in (details.get("missing_reasons") or [])
+                    if str(reason).strip()
+                ]
+                suffix = f" Reasons: {', '.join(reasons)}." if reasons else ""
+                out[f"{dim}_score"] = (
+                    f"Not scored because grounded {dim} evidence is missing.{suffix}"
+                )
+                continue
+            score = float(details["score"])
             confidence = float(details.get("confidence", 0.0))
             components = details.get("components") if isinstance(details.get("components"), dict) else {}
 
@@ -588,9 +655,33 @@ class ReviewerEngine:
             out[f"{dim}_score"] = " ".join(parts) if parts else band_desc or f"Assessment based on available {dim} evidence."
         return out
 
-    @staticmethod
-    def _derive_verdict_from_scores(primary: dict) -> None:
+    def _derive_verdict_from_scores(self, primary: dict) -> None:
         """Set a verdict only when every required blended dimension is scored."""
+        prerequisites = getattr(self, "evaluation_prerequisites", None)
+        if prerequisites is not None:
+            trace = validate_governed_scoring_trace(
+                primary.get("structured_scoring"),
+                prerequisites,
+                require_resolved=True,
+            )
+            dimensions = configured_scoring_dimensions(prerequisites)
+            if any(trace[dimension]["unscored"] for dimension in dimensions):
+                primary.pop("derived_verdict", None)
+                return
+            overall = trace.get("overall_score")
+            if not isinstance(overall, (int, float)) or isinstance(overall, bool):
+                primary.pop("derived_verdict", None)
+                return
+            mean = float(overall)
+            policy = prerequisites.policy
+            if mean >= policy.advance_threshold:
+                primary["derived_verdict"] = "STRONG"
+            elif mean >= policy.pass_threshold:
+                primary["derived_verdict"] = "MEDIUM"
+            else:
+                primary["derived_verdict"] = "WEAK"
+            return
+
         dims = ["market_score", "product_score", "technical_score", "execution_score"]
         nums: List[float] = []
         for d in dims:

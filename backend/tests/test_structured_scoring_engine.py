@@ -34,7 +34,11 @@ def test_scoring_output_shape_snapshot():
         "sector_tam_benchmark",
         "calibration",
     }
-    assert 0.0 <= result["market"]["score"] <= 10.0
+    if result["market"]["unscored"]:
+        assert result["market"]["score"] is None
+        assert result["market"]["missing_reasons"]
+    else:
+        assert 0.0 <= result["market"]["score"] <= 10.0
     assert "components" in result["market"]
     assert "tam" in result["market"]["components"]
     assert "traction" in result["execution"]["components"]
@@ -94,6 +98,8 @@ def test_no_data_company_is_unscored_not_mid_scored():
     result = engine.score({}, {})
     for dim in ("market", "product", "technical", "execution", "defensibility"):
         assert result[dim]["unscored"] is True
+        assert result[dim]["score"] is None
+        assert result[dim]["missing_reasons"] == ["no_grounded_components"]
     assert result["overall_score"] is None
 
 

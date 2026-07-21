@@ -17,7 +17,10 @@ from utils.scoring import compute_overall_score
 from utils.settings_loader import load_settings, recommendation_for_score_from_fund_config
 from utils.partner_codes import legacy_from_recommendation, recommendation_from_legacy
 from evaluation_v2.prerequisites import EvaluationPrerequisites
-from evaluation_v2.governed_scoring import validate_governed_scoring_trace
+from evaluation_v2.governed_scoring import (
+    configured_scoring_dimensions,
+    validate_governed_scoring_trace,
+)
 from evaluation_v2.partner_rules import (
     LLMFallbackTriggers,
     NextActions,
@@ -336,13 +339,18 @@ class PartnerDecisionEngine:
             self.logger.warning(f"Could not load portfolio context: {e}")
             return {}
 
-    @staticmethod
-    def _avg_score_and_dims(review_output: Dict[str, Any]) -> Tuple[float, int]:
+    def _avg_score_and_dims(self, review_output: Dict[str, Any]) -> Tuple[float, int]:
         """Mean only genuinely scored core dimensions; retain coverage count."""
         values: List[float] = []
         structured = review_output.get("structured_scoring")
         structured = structured if isinstance(structured, dict) else None
-        for dimension in ("market", "product", "technical", "execution"):
+        prerequisites = self.evaluation_prerequisites
+        dimensions = (
+            configured_scoring_dimensions(prerequisites)
+            if prerequisites is not None
+            else ("market", "product", "technical", "execution")
+        )
+        for dimension in dimensions:
             if structured is not None:
                 detail = structured.get(dimension)
                 if not isinstance(detail, dict) or bool(detail.get("unscored")):
@@ -359,6 +367,10 @@ class PartnerDecisionEngine:
                 continue
         if not values:
             return 0.0, 0
+        if prerequisites is not None and len(values) == len(dimensions):
+            overall = structured.get("overall_score") if structured is not None else None
+            if isinstance(overall, (int, float)) and not isinstance(overall, bool):
+                return float(overall), len(values)
         return sum(values) / len(values), len(values)
 
     def _canonical_recommendation(self, avg_score: float) -> str:
@@ -700,6 +712,7 @@ class PartnerDecisionEngine:
             validate_governed_scoring_trace(
                 review_output.get("structured_scoring"),
                 self.evaluation_prerequisites,
+                require_resolved=True,
             )
         rules = self._get_rules()
         verdict_rules = rules.verdict_rules
@@ -797,17 +810,23 @@ class PartnerDecisionEngine:
         # Merged risks: key_risks + assumption_risks, deduplicated, max 5
         merged_risks: List[str] = _merge_risks(key_risks, assumption_risks)
 
-        if avg_dims < 4:
+        required_dimensions = (
+            configured_scoring_dimensions(self.evaluation_prerequisites)
+            if self.evaluation_prerequisites is not None
+            else ("market", "product", "technical", "execution")
+        )
+        if avg_dims < len(required_dimensions):
             missing_dimensions = [
                 dimension
-                for dimension in ("market", "product", "technical", "execution")
+                for dimension in required_dimensions
                 if (
                     not isinstance(review_output.get("structured_scoring"), dict)
                     or not isinstance(
                         review_output["structured_scoring"].get(dimension), dict
                     )
                     or review_output["structured_scoring"][dimension].get("unscored")
-                    or review_output.get(f"{dimension}_score") is None
+                    or review_output["structured_scoring"][dimension].get("score")
+                    is None
                 )
             ]
             evidence_risk = (
@@ -818,8 +837,9 @@ class PartnerDecisionEngine:
                 recommendation="MONITOR",
                 conviction=3,
                 decision_rationale=(
-                    "Required evaluation dimensions are unscored, so the available "
-                    "evidence cannot support an investment or pass recommendation."
+                    "Insufficient evidence: required evaluation dimensions are "
+                    "unscored, so the available evidence cannot support an "
+                    "investment or pass recommendation."
                 ),
                 next_action=next_actions.human_review_monitor,
                 human_review_required=True,
