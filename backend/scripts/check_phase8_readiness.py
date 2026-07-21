@@ -42,6 +42,7 @@ def _code_checks() -> List[Dict[str, Any]]:
         "20260715260000_attention_enrichment.sql",
         "20260715270000_fund_intelligence.sql",
         "20260715280000_channels_outcomes.sql",
+        "20260720120000_materiality_digests.sql",
     ]
     missing = [
         name for name in expected_migrations
@@ -164,6 +165,7 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
             required_versions = {
                 "20260715230000", "20260715240000", "20260715250000",
                 "20260715260000", "20260715270000", "20260715280000",
+                "20260720120000",
             }
             checks.append(
                 _check(
