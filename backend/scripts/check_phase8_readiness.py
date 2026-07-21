@@ -30,7 +30,9 @@ PHASE3_8_MIGRATIONS = (
     "20260715280000_channels_outcomes.sql",
     "20260720120000_materiality_digests.sql",
 )
-POLICY_UPGRADE_MIGRATION = "20260721130000_upgrade_fund_policy_rpc.sql"
+POLICY_UPGRADE_MIGRATION = (
+    "20260721143000_patch_upgrade_fund_policy_settings.sql"
+)
 
 _MATERIALITY_COLUMNS = (
     ("evaluation_runs", "evidence_materiality_digest"),

@@ -107,7 +107,7 @@ def _apply_upgrade_transaction(
     expected_policy_id: str,
     expected_policy_hash: str,
     policy_record: Dict[str, Any],
-    settings_data: Dict[str, Any],
+    settings_patch: Dict[str, Any],
 ) -> Dict[str, Any]:
     params = {
         "p_user_id": user_id,
@@ -116,7 +116,10 @@ def _apply_upgrade_transaction(
         "p_new_policy_id": policy_record["policy_version_id"],
         "p_new_policy_hash": policy_record["policy_hash"],
         "p_policy_record": policy_record,
-        "p_settings_data": settings_data,
+        # The RPC accepts only a narrow governed-pointer patch. It merges this
+        # into the live row under lock, so a stale service read can never
+        # replace concurrent agent, budget, workspace, or draft edits.
+        "p_settings_data": settings_patch,
     }
     try:
         response = get_service_client().rpc("upgrade_fund_policy", params).execute()
@@ -205,19 +208,20 @@ def upgrade_published_policy(
             "published_at": published_at,
         }
     )
-    next_settings = deepcopy(settings)
-    next_fund_config = deepcopy(fund_config)
-    next_fund_config["activePolicyVersionId"] = new_policy_id
-    next_fund_config["publishedPolicyHash"] = new_policy_hash
-    next_fund_config["draftPolicyHash"] = new_policy_hash
-    next_fund_config["lastPublishedAt"] = published_at
-    next_settings["fund_config"] = next_fund_config
+    settings_patch = {
+        "fund_config": {
+            "activePolicyVersionId": new_policy_id,
+            "publishedPolicyHash": new_policy_hash,
+            "draftPolicyHash": new_policy_hash,
+            "lastPublishedAt": published_at,
+        }
+    }
     transaction = _apply_upgrade_transaction(
         user_id=uid,
         expected_policy_id=old_policy_id,
         expected_policy_hash=old_policy_hash,
         policy_record=policy_record,
-        settings_data=next_settings,
+        settings_patch=settings_patch,
     )
     return PublishedPolicyUpgradeReport(
         user_id=uid,

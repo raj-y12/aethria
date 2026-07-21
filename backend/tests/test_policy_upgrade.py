@@ -96,7 +96,9 @@ def _wire_store(monkeypatch, *, fail_rpc=False):
         assert current["activePolicyVersionId"] == params["p_expected_policy_id"]
         assert current["publishedPolicyHash"] == params["p_expected_policy_hash"]
         versions[uid].append(deepcopy(params["p_policy_record"]))
-        settings[uid] = deepcopy(params["p_settings_data"])
+        patch = params["p_settings_data"]
+        assert set(patch) == {"fund_config"}
+        settings[uid]["fund_config"].update(deepcopy(patch["fund_config"]))
         return type("Response", (), {"data": {"status": "applied"}})()
 
     client = _Client(apply)
@@ -210,6 +212,84 @@ def test_upgrade_is_tenant_scoped_and_cannot_touch_another_tenant(monkeypatch):
     assert versions["user-b"] == tenant_b_versions
     assert client.calls[0][1]["p_user_id"] == "user-a"
     assert all("user-b" not in read for read in reads)
+
+
+def test_upgrade_sends_only_governed_pointer_patch_to_preserve_concurrent_edits(
+    monkeypatch,
+):
+    upgrade, settings, versions, _reads, client = _wire_store(monkeypatch)
+
+    upgrade.upgrade_published_policy(
+        "user-a", fund_config=_operator_config(), apply=True
+    )
+
+    patch = client.calls[0][1]["p_settings_data"]
+    assert set(patch) == {"fund_config"}
+    assert set(patch["fund_config"]) == {
+        "activePolicyVersionId",
+        "publishedPolicyHash",
+        "draftPolicyHash",
+        "lastPublishedAt",
+    }
+
+
+def test_sql_patch_semantics_preserve_concurrent_unrelated_settings_edits(
+    monkeypatch,
+):
+    import services.scoring.policy_upgrade as upgrade
+
+    settings = {
+        "fund_config": {
+            **_operator_config(),
+            "activePolicyVersionId": "legacy-policy-a",
+            "publishedPolicyHash": "legacy-hash-a",
+        },
+        "agent_config": {"reviewers_enabled": True},
+        "budget": {"monthlyUsd": 100},
+    }
+    versions = [
+        {
+            "id": "legacy-policy-a",
+            "policy_version_id": "legacy-policy-a",
+            "policy_hash": "legacy-hash-a",
+            "dimensions": {},
+        }
+    ]
+
+    monkeypatch.setattr(
+        upgrade,
+        "doc_get_strict",
+        lambda *_args, **_kwargs: deepcopy(settings),
+    )
+    monkeypatch.setattr(
+        upgrade,
+        "list_get_all_strict",
+        lambda *_args, **_kwargs: deepcopy(versions),
+    )
+
+    def apply(_name, params):
+        # This edit lands after the service's read but before the RPC acquires
+        # the settings row lock. It deliberately retains the policy pointer.
+        settings["agent_config"]["reviewers_enabled"] = False
+        settings["budget"]["monthlyUsd"] = 275
+        patch = params["p_settings_data"]
+        assert set(patch) == {"fund_config"}
+        settings["fund_config"].update(deepcopy(patch["fund_config"]))
+        versions.append(deepcopy(params["p_policy_record"]))
+        return type("Response", (), {"data": {"status": "applied"}})()
+
+    client = _Client(apply)
+    monkeypatch.setattr(upgrade, "get_service_client", lambda: client)
+
+    upgrade.upgrade_published_policy(
+        "user-a", fund_config=_operator_config(), apply=True
+    )
+
+    assert settings["agent_config"] == {"reviewers_enabled": False}
+    assert settings["budget"] == {"monthlyUsd": 275}
+    assert settings["fund_config"]["activePolicyVersionId"].startswith(
+        "policy_upgrade_"
+    )
 
 
 def test_complete_equivalent_policy_is_already_current_without_republishing(monkeypatch):
