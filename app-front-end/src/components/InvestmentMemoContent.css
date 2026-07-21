@@ -13,7 +13,7 @@
   --memo-ink: rgba(var(--color-oxford-rgb), 0.9);
   --memo-ink-body: rgba(var(--color-oxford-rgb), 0.82);
   --memo-ink-muted: rgba(var(--color-oxford-rgb), 0.6);
-  --memo-ink-faint: rgba(var(--color-oxford-rgb), 0.38);
+  --memo-ink-faint: rgba(var(--color-oxford-rgb), 0.5);
   --memo-rule: rgba(var(--color-oxford-rgb), 0.1);
   --memo-rule-strong: rgba(var(--color-oxford-rgb), 0.22);
   --memo-wash: rgba(var(--color-oxford-rgb), 0.035);
@@ -83,7 +83,7 @@
   flex: 0 0 auto;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -126,7 +126,7 @@
   margin: 12px 0 0;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
   letter-spacing: 0.075em;
   text-transform: uppercase;
@@ -151,7 +151,7 @@
   color: var(--memo-ink-muted);
   background: transparent;
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.3;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -183,7 +183,7 @@
   position: relative;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.4;
   letter-spacing: 0.08em;
 }
@@ -228,7 +228,7 @@
 .memoPipelineKicker {
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -310,7 +310,7 @@
   margin: 0;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -360,7 +360,7 @@
   margin: 12px 0 0;
   color: var(--memo-ink-muted);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.7;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -437,7 +437,7 @@
   margin: 0;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -524,7 +524,7 @@
 .memoPrecedentOpen {
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
 }
 
@@ -615,7 +615,7 @@
   padding-top: 7px;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.4;
   letter-spacing: 0.08em;
 }
@@ -680,7 +680,7 @@
   margin: 0 0 12px;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -702,7 +702,7 @@
 .memoDecisionMeta {
   margin: 0;
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
   letter-spacing: 0.075em;
   text-transform: uppercase;
@@ -806,7 +806,7 @@
   padding: 16px 0;
   color: var(--memo-ink-muted);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -922,7 +922,7 @@
   min-height: 42px;
   border-radius: 0;
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   letter-spacing: 0.065em;
   text-transform: uppercase;
 }
@@ -1037,7 +1037,7 @@
   background: transparent;
   color: var(--memo-ink-muted);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   letter-spacing: 0.055em;
   text-transform: uppercase;
   cursor: pointer;
@@ -1073,7 +1073,7 @@
 .memoSnapshotLabel {
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.55;
   letter-spacing: 0.065em;
   text-transform: uppercase;
@@ -1082,7 +1082,7 @@
 .memoSnapshotText {
   margin: 0;
   color: var(--memo-ink-body);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   line-height: 1.58;
   overflow-wrap: anywhere;
 }
@@ -1140,7 +1140,7 @@
 .memoKillerRank {
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.6;
 }
 
@@ -1193,7 +1193,7 @@
 .memoScoreSub {
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
   letter-spacing: 0.045em;
 }
@@ -1338,7 +1338,7 @@
   margin: 0;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1360,7 +1360,7 @@
   margin: 0;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
 }
 
@@ -1585,7 +1585,7 @@
   background: var(--memo-paper);
   color: var(--memo-ink);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.4;
   letter-spacing: 0.075em;
   text-transform: uppercase;
@@ -1633,7 +1633,7 @@
   padding: 10px 16px;
   border-radius: 0;
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.35;
   letter-spacing: 0.065em;
   text-transform: uppercase;
@@ -1682,7 +1682,7 @@
   padding: 16px 0 13px;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
   letter-spacing: 0.1em;
   text-transform: uppercase;

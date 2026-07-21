@@ -195,7 +195,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
       <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7">
         {/* ── The mark ── */}
         <Reveal delay={0.02} y={-6}>
-          <p className="text-center font-wordmark text-[clamp(19px,1.5vw,24px)] font-medium leading-tight text-oxford">
+          <p className="text-center font-wordmark text-[clamp(18px,1.45vw,23px)] font-medium leading-tight text-oxford">
             Aethria<span className="wordmark-dot">.</span>
           </p>
         </Reveal>

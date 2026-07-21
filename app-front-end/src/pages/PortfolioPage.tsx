@@ -157,10 +157,10 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                       type="button"
                       aria-pressed={active}
                       onClick={() => setActiveState(seg.key)}
-                      className={`type-status flex items-center gap-phi-2 border px-phi-3 py-phi-1 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
+                      className={`type-status flex items-center gap-phi-2 px-phi-3 py-phi-1 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
                         active
-                          ? 'border-oxford/30 bg-oxford/[0.05] text-oxford'
-                          : 'border-oxford/[0.12] text-oxford/55 hover:bg-oxford/[0.03] hover:text-oxford'
+                          ? 'bg-oxford/[0.05] text-oxford'
+                          : 'text-oxford/55 hover:bg-oxford/[0.03] hover:text-oxford'
                       }`}
                     >
                       <span>{seg.label}</span>
@@ -183,6 +183,12 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                 </button>
               ) : null}
 
+              <motion.div
+                key={activeState}
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              >
               {activeRows.length === 0 ? (
                 <QuietEmpty>{LEDGER_SEGMENTS.find((s) => s.key === activeState)?.empty}</QuietEmpty>
               ) : (
@@ -199,11 +205,11 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                   </div>
                   <ul className="flex flex-col lg:mt-0 mt-phi-3">
                     {activeRows.map((s) => (
-                      <li key={s.id}>
+                      <li key={s.id} className="border-b border-oxford/[0.06]">
                         <button
                           type="button"
                           onClick={() => openDeal(s.id)}
-                          className={`group flex w-full items-center gap-phi-4 border-b border-oxford/[0.06] py-phi-3 text-left transition-colors hover:bg-oxford/[0.05] btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${LEDGER_GRID}`}
+                          className={`group -mx-phi-3 flex w-[calc(100%+2*var(--space-3))] items-center gap-phi-4 px-phi-3 py-phi-3 text-left transition-colors hover:bg-oxford/[0.05] btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${LEDGER_GRID}`}
                         >
                           <span className="min-w-0 flex-1 transition-transform duration-200 group-hover:translate-x-[2px]">
                             <span className="block truncate type-body-emphasis text-oxford">{s.scout.name}</span>
@@ -231,6 +237,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                   </ul>
                 </>
               )}
+              </motion.div>
             </section>
 
             {/* ── Concentration ── */}

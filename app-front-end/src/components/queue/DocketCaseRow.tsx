@@ -11,10 +11,7 @@ import {
   resolutionBadgeLabel,
   type DocketRowModel,
 } from './queueRowShared';
-import {
-  QUEUE_ROW_LAYOUT_TRANSITION,
-  QUEUE_ROW_SELECT_TRANSITION,
-} from './queueRowMotion';
+import { QUEUE_ROW_SELECT_TRANSITION } from './queueRowMotion';
 import { queueRowPadding } from '../../design-system/density';
 
 interface DocketCaseRowProps {
@@ -48,7 +45,6 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
   const spineColor = spineVisible ? '#001433' : 'transparent';
   const spineWidth = spineVisible ? 3 : 0;
 
-  const layoutTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_LAYOUT_TRANSITION;
   const selectTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_SELECT_TRANSITION;
   const ambientPadding =
     rowIndex % 2 === 0 ? queueRowPadding.ambient : queueRowPadding.ambientAlt;
@@ -69,8 +65,6 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
   return (
     <motion.div
       ref={ref}
-      layout={!reduceMotion}
-      transition={layoutTransition}
       role="button"
       tabIndex={0}
       aria-pressed={isSelected}
@@ -82,8 +76,8 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
         paddingTop: isSelected ? selectedPadding : ambientPadding,
         paddingBottom: isSelected ? selectedPadding : ambientPadding,
       }}
-      className={`group relative w-full min-w-0 cursor-pointer pl-1.5 pr-phi-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
-        isSelected ? 'bg-paperDeep/35' : ''
+      className={`group relative w-full min-w-0 cursor-pointer pl-1.5 pr-phi-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
+        isSelected ? 'bg-paperDeep/35' : 'hover:bg-paperDeep/20'
       }`}
     >
       <motion.span
@@ -100,11 +94,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
         transition={selectTransition}
       />
 
-      <motion.div
-        layout={!reduceMotion}
-        className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-phi-3"
-        transition={layoutTransition}
-      >
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-phi-3">
         <motion.span
           className="type-meta tabular-nums self-start shrink-0 min-w-[2.75rem] pr-0.5 leading-none"
           initial={false}
@@ -142,30 +132,25 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
                 className={`min-w-0 break-words ${
                   isSelected
                     ? 'text-balance font-display text-[clamp(28px,2.6vw,36px)] font-medium leading-[1.1] tracking-[-0.02em] text-oxford'
-                    : 'font-sans text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.15] tracking-[-0.01em] text-oxford/60'
+                    : 'font-sans text-[clamp(14px,1.15vw,16px)] font-normal leading-[1.15] tracking-[-0.01em] text-oxford/60 transition-colors group-hover:text-oxford'
                 }`}
                 transition={selectTransition}
               >
                 {startup.scout.name}
               </motion.h2>
             </div>
-            <motion.div
-              layout={!reduceMotion}
-              className={isSelected ? 'shrink-0' : 'shrink-0 sm:text-right sm:pt-px'}
-              transition={layoutTransition}
-            >
+            <div className={isSelected ? 'shrink-0' : 'shrink-0 sm:text-right sm:pt-px'}>
               <QueueVerdictLine
                 ctx={queueContext}
                 decisionVariant={decisionVariant}
                 prominent={isSelected}
                 attentionDriver={attentionDriver}
               />
-            </motion.div>
+            </div>
           </div>
 
           {isSelected && hasMetaRow ? (
             <motion.div
-              layout={!reduceMotion}
               className="mt-phi-2 flex min-w-0 flex-wrap items-center gap-x-phi-2 gap-y-phi-1"
               initial={reduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -203,7 +188,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
           ) : null}
 
         </div>
-      </motion.div>
+      </div>
     </motion.div>
   );
 });
