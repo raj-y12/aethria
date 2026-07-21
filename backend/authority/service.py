@@ -1,0 +1,101 @@
+"""Mode-aware guards for tenant authority control."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from authority.models import RolloutMode, RolloutRecord
+from authority.repository import AuthorityBlocked, AuthorityRepository, AuthorityTransitionError
+from tenant_context import require_user_id
+
+
+@dataclass(frozen=True, slots=True)
+class AuthorityContext:
+    user_id: str
+    mode: RolloutMode
+    version: int
+    kill_switch: bool
+    last_reconciliation_status: str | None
+
+    @property
+    def canonical_writes_allowed(self) -> bool:
+        return not self.kill_switch and self.mode in {
+            RolloutMode.SHADOW,
+            RolloutMode.BACKFILL,
+            RolloutMode.CANONICAL_WRITE,
+        }
+
+    @property
+    def canonical_reads_allowed(self) -> bool:
+        return (
+            not self.kill_switch
+            and self.mode is RolloutMode.CANONICAL_READ
+            and (self.last_reconciliation_status or "").strip().lower() == "green"
+        )
+
+    @property
+    def legacy_projection_allowed(self) -> bool:
+        return not self.kill_switch and self.mode is not RolloutMode.CANONICAL_READ
+
+
+class AuthorityService:
+    def __init__(self, repository: AuthorityRepository):
+        self.repository = repository
+
+    @staticmethod
+    def _context(record: RolloutRecord) -> AuthorityContext:
+        return AuthorityContext(
+            user_id=record.user_id,
+            mode=record.mode,
+            version=record.version,
+            kill_switch=record.kill_switch,
+            last_reconciliation_status=record.last_reconciliation_status,
+        )
+
+    async def authority(self, *, user_id: str) -> AuthorityContext:
+        uid = require_user_id(user_id, context="AuthorityService.authority")
+        return self._context(await self.repository.get_rollout(user_id=uid))
+
+    async def require_write_path(self, *, user_id: str, operation: str) -> AuthorityContext:
+        uid = require_user_id(user_id, context="AuthorityService.require_write_path")
+        operation_name = str(operation or "").strip()
+        if not operation_name:
+            raise ValueError("operation is required")
+        context = await self.authority(user_id=uid)
+        if context.kill_switch:
+            raise AuthorityBlocked(
+                f"{operation_name} blocked: authority kill switch is active"
+            )
+        if context.mode is RolloutMode.CANONICAL_READ:
+            raise AuthorityBlocked(
+                f"{operation_name} blocked: canonical read mode is read-only"
+            )
+        return context
+
+    async def rollback(
+        self,
+        *,
+        user_id: str,
+        expected_version: int,
+        actor_id: str,
+        reason: str,
+    ) -> RolloutRecord:
+        uid = require_user_id(user_id, context="AuthorityService.rollback")
+        normalized_reason = str(reason or "").strip()
+        if not normalized_reason:
+            raise ValueError("rollback reason is required")
+        context = await self.authority(user_id=uid)
+        if context.mode not in {RolloutMode.CANONICAL_WRITE, RolloutMode.CANONICAL_READ}:
+            raise AuthorityTransitionError("rollback requires a canonical rollout mode")
+        return await self.repository.transition_rollout(
+            user_id=uid,
+            expected_version=expected_version,
+            target_mode=RolloutMode.LEGACY,
+            actor_id=actor_id,
+            snapshot_id=None,
+            kill_switch=True,
+            rollback_reason=normalized_reason,
+        )
+
+
+__all__ = ["AuthorityBlocked", "AuthorityContext", "AuthorityService"]
