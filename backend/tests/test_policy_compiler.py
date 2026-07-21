@@ -1,8 +1,11 @@
+from copy import deepcopy
+
 import pytest
 
 from services.scoring.policy_compiler import (
     PRODUCTION_DIMENSIONS,
     compile_policy_from_fund_config,
+    validate_compiled_policy_bundle,
 )
 
 
@@ -18,6 +21,70 @@ def test_empty_rubric_compiles_default_policy():
         assert criterion["dimension"] == dimension
         assert criterion["source_components"]
         assert criterion["score_anchors"]["score3"]
+
+
+def test_compiled_policy_contains_complete_hash_bound_scoring_runtime():
+    policy = compile_policy_from_fund_config({})
+
+    runtime = policy["scoring_runtime"]
+    assert runtime["semantic_version"] == "1.0.0"
+    assert runtime["calibration"]["mode"] in {"enforced", "shadow"}
+    assert runtime["calibration"]["discount"] == {
+        "floor_conf": 0.2,
+        "full_conf": 0.8,
+    }
+    assert runtime["calibration"]["evidence_gate"] == {
+        "min_completeness": 0.4,
+        "min_avg_conf": 0.35,
+        "cap": 6.0,
+    }
+    assert set(runtime["component_weights"]) == set(PRODUCTION_DIMENSIONS)
+    assert runtime["overall"]["dimensions"] == [
+        "market",
+        "product",
+        "technical",
+        "execution",
+    ]
+    assert runtime["normalization"]["tam_thresholds"]
+    assert runtime["normalization"]["growth_thresholds"]
+    assert runtime["normalization"]["sector_tam_benchmarks"]
+    assert policy["scoring_runtime_hash"]
+
+
+def test_default_runtime_and_policy_hash_do_not_follow_environment_toggle(monkeypatch):
+    monkeypatch.setenv("SCORING_EVIDENCE_CALIBRATION_ENABLED", "false")
+    first = compile_policy_from_fund_config({})
+    monkeypatch.setenv("SCORING_EVIDENCE_CALIBRATION_ENABLED", "true")
+    second = compile_policy_from_fund_config({})
+
+    assert first["scoring_runtime"] == second["scoring_runtime"]
+    assert first["scoring_runtime_hash"] == second["scoring_runtime_hash"]
+    assert first["policy_hash"] == second["policy_hash"]
+
+
+def test_any_scoring_runtime_change_changes_runtime_and_policy_hash():
+    baseline = compile_policy_from_fund_config({})
+    changed_runtime = deepcopy(baseline["scoring_runtime"])
+    changed_runtime["calibration"]["evidence_gate"]["cap"] = 5.5
+
+    changed = compile_policy_from_fund_config(
+        {"scoringRuntime": changed_runtime}, require_publish_ready=True
+    )
+
+    assert changed["scoring_runtime_hash"] != baseline["scoring_runtime_hash"]
+    assert changed["policy_hash"] != baseline["policy_hash"]
+
+
+def test_persisted_policy_rejects_missing_or_unknown_runtime_contract():
+    missing = compile_policy_from_fund_config({})
+    missing.pop("scoring_runtime")
+    with pytest.raises(ValueError, match="complete decision-input bundle"):
+        validate_compiled_policy_bundle(missing)
+
+    unknown = compile_policy_from_fund_config({})
+    unknown["scoring_runtime"]["calibration"]["mystery_mode"] = True
+    with pytest.raises(ValueError, match="complete decision-input bundle"):
+        validate_compiled_policy_bundle(unknown)
 
 
 def _decision_config():

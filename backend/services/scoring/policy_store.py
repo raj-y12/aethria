@@ -59,14 +59,14 @@ def load_published_policy(
         candidate_hash = str(version.get("policy_hash") or "").strip()
         if candidate_id == active_id and candidate_hash == published_hash:
             try:
-                validate_compiled_policy_bundle(dict(version))
+                validated = validate_compiled_policy_bundle(dict(version))
             except PolicyValidationError as exc:
                 detail = str(exc).lower()
                 reason = "hash" if "hash" in detail else "complete decision bundle"
                 raise PolicyNotPublishedError(
                     f"The active published policy has an invalid {reason}"
                 ) from exc
-            return dict(version)
+            return validated
     raise PolicyNotPublishedError(
         "The active published scoring policy could not be resolved"
     )
@@ -80,10 +80,9 @@ def publish_policy(user_id: str, fund_config: Dict[str, Any] | None = None) -> D
     for version in existing_versions:
         if version.get("policy_hash") == compiled["policy_hash"]:
             try:
-                validate_compiled_policy_bundle(dict(version))
+                active = validate_compiled_policy_bundle(dict(version))
             except PolicyValidationError:
                 continue
-            active = dict(version)
             _set_active_policy(settings, active, user_id, fund_config=fc)
             return active
 

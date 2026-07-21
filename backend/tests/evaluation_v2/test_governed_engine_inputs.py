@@ -215,6 +215,10 @@ def _exact_trace(score: float) -> dict:
         "overall_confidence": 0.9,
         "policy_version_id": "policy-live",
         "policy_hash": _compiled_policy()["policy_hash"],
+        "scoring_runtime_version": _compiled_policy()["scoring_runtime"][
+            "semantic_version"
+        ],
+        "scoring_runtime_hash": _compiled_policy()["scoring_runtime_hash"],
     }
 
 
@@ -343,12 +347,22 @@ def _decision_scout() -> dict:
         {},
         {**_exact_trace(9), "policy_version_id": "wrong-version"},
         {**_exact_trace(9), "policy_hash": "wrong-hash"},
+        {**_exact_trace(9), "scoring_runtime_version": "9.9.9"},
+        {**_exact_trace(9), "scoring_runtime_hash": "wrong-runtime-hash"},
         {
             **_exact_trace(9),
             "execution": {"score": 9, "confidence": 0.9, "unscored": True},
         },
     ],
-    ids=["absent", "malformed", "wrong-version", "wrong-hash", "incomplete"],
+    ids=[
+        "absent",
+        "malformed",
+        "wrong-version",
+        "wrong-hash",
+        "wrong-runtime-version",
+        "wrong-runtime-hash",
+        "incomplete",
+    ],
 )
 def test_governed_partner_rejects_non_exact_structured_trace(trace):
     review = _governed_review(9)

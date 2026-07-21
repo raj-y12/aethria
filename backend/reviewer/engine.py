@@ -159,10 +159,7 @@ class ReviewerEngine:
                     policy.get("policy_hash"),
                     dim_weights,
                 )
-                return DeterministicScoringEngine(
-                    dimension_weights=dim_weights,
-                    policy=policy,
-                )
+                return DeterministicScoringEngine(policy=policy)
             return DeterministicScoringEngine(policy=policy)
         try:
             settings = load_settings(self.tenant_user_id)
@@ -175,7 +172,7 @@ class ReviewerEngine:
                     self.tenant_user_id[:24],
                     dim_weights,
                 )
-                return DeterministicScoringEngine(dimension_weights=dim_weights, policy=policy)
+                return DeterministicScoringEngine(policy=policy)
             return DeterministicScoringEngine(policy=policy)
         except Exception as e:
             self.logger.warning("Reviewer scoring settings unavailable, using default weights: %s", e)

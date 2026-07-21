@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from copy import deepcopy
 from typing import Any, Dict
 
 from config.scoring_config import (
@@ -16,12 +17,14 @@ from config.scoring_config import (
     OVERALL_SCORE_DIMENSIONS,
     QUALITATIVE_COMPONENTS,
     resolve_stage_cohort,
-    resolve_tam_benchmark,
 )
 from services.scoring.aggregation_layer import _has_concrete_evidence, aggregate_all_dimensions
 from services.scoring.confidence_discount import apply_evidence_gate, confidence_discounted_score
 from services.scoring.extraction_layer import extract_structured_signals
-from services.scoring.policy_compiler import compile_policy_from_fund_config
+from services.scoring.policy_compiler import (
+    compile_policy_from_fund_config,
+    validate_compiled_policy_bundle,
+)
 from services.scoring.normalization_layer import (
     is_no_information,
     is_unrecognized,
@@ -65,16 +68,79 @@ class DeterministicScoringEngine:
         policy: Dict[str, Any] | None = None,
         evidence_calibration: bool | None = None,
     ):
-        self.weights = weights or DIMENSION_WEIGHTS
-        self.dimension_weights = dimension_weights or OVERALL_DRIVER_WEIGHTS
-        self.policy = policy or compile_policy_from_fund_config({})
-        self.debug = os.getenv("DEBUG_SCORING", str(DEBUG_SCORING)).lower() in ("1", "true", "yes")
-        # Issue-1 calibration (confidence discount + evidence gate). When None, follow the
-        # global config flag; default OFF so scores publish exactly as today and the
-        # calibrated values are emitted only in shadow until the flag is flipped.
-        self.evidence_calibration = (
-            EVIDENCE_CALIBRATION_ENABLED if evidence_calibration is None else bool(evidence_calibration)
+        if policy is not None:
+            if (
+                weights is not None
+                or dimension_weights is not None
+                or evidence_calibration is not None
+            ):
+                raise ValueError(
+                    "A published scoring runtime cannot be overridden at engine construction"
+                )
+            validated_policy = validate_compiled_policy_bundle(policy)
+            # Prerequisites own this immutable dependency object. Preserve that
+            # exact object identity while consuming only its normalized runtime.
+            self.policy = policy
+        else:
+            # Legacy callers still receive a complete internally compiled runtime.
+            # Explicit constructor overrides are converted into that contract once;
+            # score() never consults mutable process configuration afterward.
+            baseline = compile_policy_from_fund_config({})
+            runtime = deepcopy(baseline["scoring_runtime"])
+            if weights is not None:
+                runtime["component_weights"] = deepcopy(weights)
+            if dimension_weights is not None:
+                runtime["overall"]["weights"] = {
+                    dimension: float(dimension_weights[dimension])
+                    for dimension in runtime["overall"]["dimensions"]
+                }
+            calibration_enabled = (
+                EVIDENCE_CALIBRATION_ENABLED
+                if evidence_calibration is None
+                else bool(evidence_calibration)
+            )
+            runtime["calibration"]["mode"] = (
+                "enforced" if calibration_enabled else "shadow"
+            )
+            self.policy = compile_policy_from_fund_config(
+                {"scoringRuntime": runtime}, require_publish_ready=True
+            )
+            validated_policy = self.policy
+
+        self.scoring_runtime = validated_policy["scoring_runtime"]
+        self.scoring_runtime_hash = validated_policy["scoring_runtime_hash"]
+        self.weights = self.scoring_runtime["component_weights"]
+        self.overall_score_dimensions = tuple(
+            self.scoring_runtime["overall"]["dimensions"]
         )
+        self.dimension_weights = self.scoring_runtime["overall"]["weights"]
+        self.normalization_runtime = self.scoring_runtime["normalization"]
+        self.default_score = float(self.normalization_runtime["default_score"])
+        self.calibration_runtime = self.scoring_runtime["calibration"]
+        self.debug = os.getenv("DEBUG_SCORING", str(DEBUG_SCORING)).lower() in ("1", "true", "yes")
+        self.evidence_calibration = (
+            self.calibration_runtime["mode"] == "enforced"
+        )
+
+    def _resolve_tam_benchmark(self, sector: Any) -> Dict[str, Any]:
+        text = str(sector or "").strip().lower()
+        if text:
+            for benchmark in self.normalization_runtime[
+                "sector_tam_benchmarks"
+            ].values():
+                if any(
+                    keyword in text for keyword in benchmark["keywords"]
+                ):
+                    return {
+                        "label": benchmark["label"],
+                        "thresholds": benchmark["thresholds"],
+                    }
+        return {
+            "label": self.normalization_runtime[
+                "default_tam_benchmark_label"
+            ],
+            "thresholds": self.normalization_runtime["tam_thresholds"],
+        }
 
     def _normalize_market(
         self, signals: Dict[str, Dict[str, Any]], tam_thresholds: Dict[str, Any] | None = None
@@ -83,7 +149,12 @@ class DeterministicScoringEngine:
             "tam": self._normalized_signal(
                 signals.get("tam", {}), lambda v: normalize_tam(v, tam_thresholds)
             ),
-            "growth_rate": self._normalized_signal(signals.get("growth_rate", {}), normalize_growth),
+            "growth_rate": self._normalized_signal(
+                signals.get("growth_rate", {}),
+                lambda value: normalize_growth(
+                    value, self.normalization_runtime["growth_thresholds"]
+                ),
+            ),
             "urgency": self._normalized_signal(signals.get("urgency", {}), lambda v: normalize_urgency(v)),
             "timing": self._normalized_signal(signals.get("timing", {}), lambda v: normalize_timing(v)),
             "competition": self._normalized_signal(signals.get("competition", {}), lambda v: normalize_competition(v)),
@@ -299,7 +370,7 @@ class DeterministicScoringEngine:
         # among the four still apply.
         weighted_sum = 0.0
         weight_total = 0.0
-        for dim in OVERALL_SCORE_DIMENSIONS:
+        for dim in self.overall_score_dimensions:
             details = aggregated.get(dim)
             if details is None:
                 continue
@@ -344,7 +415,10 @@ class DeterministicScoringEngine:
                 if not isinstance(comp, dict):
                     continue
                 discounted = confidence_discounted_score(
-                    comp.get("score", DEFAULT_SCORE), comp.get("confidence", 0.0)
+                    comp.get("score", self.default_score),
+                    comp.get("confidence", 0.0),
+                    default_score=self.default_score,
+                    discount=self.calibration_runtime["discount"],
                 )
                 component_scores[name] = round(discounted, 2)
                 if _has_concrete_evidence(comp):
@@ -361,7 +435,11 @@ class DeterministicScoringEngine:
             capped = False
             if weight_total > 0 and not details.get("unscored"):
                 gated, capped = apply_evidence_gate(
-                    weighted_sum / weight_total, completeness, avg_conf
+                    weighted_sum / weight_total,
+                    completeness,
+                    avg_conf,
+                    gate=self.calibration_runtime["evidence_gate"],
+                    default_score=self.default_score,
                 )
                 score = round(max(0.0, min(10.0, gated)), 2)
             else:
@@ -414,7 +492,7 @@ class DeterministicScoringEngine:
         (spread is undefined for a single point)."""
         scores = [
             float(details["score"])
-            for dim in OVERALL_SCORE_DIMENSIONS
+            for dim in self.overall_score_dimensions
             if (details := aggregated.get(dim)) is not None
             and details.get("score") is not None
             and not details.get("unscored")
@@ -433,7 +511,7 @@ class DeterministicScoringEngine:
     def _compute_overall_confidence(self, aggregated: Dict[str, Dict[str, Any]]) -> float:
         weighted_sum = 0.0
         weight_total = 0.0
-        for dim in OVERALL_SCORE_DIMENSIONS:
+        for dim in self.overall_score_dimensions:
             details = aggregated.get(dim)
             if details is None:
                 continue
@@ -564,7 +642,7 @@ class DeterministicScoringEngine:
         # Sector-relative TAM benchmark (P6.3) and stage cohort (P6.1). Scores stay on the
         # absolute 1–10 scale; only the TAM band thresholds shift by sector, and the
         # cohort is surfaced so maturity-dependent criteria read in context.
-        tam_benchmark = resolve_tam_benchmark(scout_output.get("sector"))
+        tam_benchmark = self._resolve_tam_benchmark(scout_output.get("sector"))
         stage_cohort = resolve_stage_cohort(scout_output.get("funding_stage"))
         normalized = {
             "market": self._normalize_market(extracted.get("market", {}), tam_benchmark["thresholds"]),
@@ -579,17 +657,21 @@ class DeterministicScoringEngine:
             for dim, details in aggregated.items()
         }
         output = {
-            "market": aggregated.get("market", {"score": DEFAULT_SCORE, "confidence": 0.0, "components": {}}),
-            "product": aggregated.get("product", {"score": DEFAULT_SCORE, "confidence": 0.0, "components": {}}),
-            "technical": aggregated.get("technical", {"score": DEFAULT_SCORE, "confidence": 0.0, "components": {}}),
-            "execution": aggregated.get("execution", {"score": DEFAULT_SCORE, "confidence": 0.0, "components": {}}),
-            "defensibility": aggregated.get("defensibility", {"score": DEFAULT_SCORE, "confidence": 0.0, "components": {}}),
+            "market": aggregated.get("market", {"score": None, "confidence": 0.0, "components": {}, "unscored": True, "missing_reasons": ["no_grounded_components"]}),
+            "product": aggregated.get("product", {"score": None, "confidence": 0.0, "components": {}, "unscored": True, "missing_reasons": ["no_grounded_components"]}),
+            "technical": aggregated.get("technical", {"score": None, "confidence": 0.0, "components": {}, "unscored": True, "missing_reasons": ["no_grounded_components"]}),
+            "execution": aggregated.get("execution", {"score": None, "confidence": 0.0, "components": {}, "unscored": True, "missing_reasons": ["no_grounded_components"]}),
+            "defensibility": aggregated.get("defensibility", {"score": None, "confidence": 0.0, "components": {}, "unscored": True, "missing_reasons": ["no_grounded_components"]}),
             "overall_score": self._compute_overall_score(aggregated),
             "overall_confidence": self._compute_overall_confidence(aggregated),
             "overall_dispersion": self._compute_overall_dispersion(aggregated),
             "raw_signals": extracted,
             "policy_version_id": self.policy.get("policy_version_id"),
             "policy_hash": self.policy.get("policy_hash"),
+            "scoring_runtime_version": self.scoring_runtime[
+                "semantic_version"
+            ],
+            "scoring_runtime_hash": self.scoring_runtime_hash,
             # Comparability context for the memo (P6.1 / P6.3): the cohort the maturity
             # criteria should be read against, and the sector TAM benchmark the Market
             # score was graded on.

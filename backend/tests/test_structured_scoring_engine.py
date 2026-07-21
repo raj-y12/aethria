@@ -1,3 +1,7 @@
+from copy import deepcopy
+
+import pytest
+
 from services.scoring.scoring_engine import DeterministicScoringEngine
 from services.scoring.policy_compiler import compile_policy_from_fund_config
 
@@ -29,6 +33,8 @@ def test_scoring_output_shape_snapshot():
         "raw_signals",
         "policy_version_id",
         "policy_hash",
+        "scoring_runtime_version",
+        "scoring_runtime_hash",
         "stage_cohort",
         "stage_cohort_label",
         "sector_tam_benchmark",
@@ -45,6 +51,75 @@ def test_scoring_output_shape_snapshot():
     assert "value_prop" in result["product"]["components"]
     assert "complexity" in result["technical"]["components"]
     assert "brand" in result["defensibility"]["components"]
+
+
+def test_published_runtime_makes_scoring_environment_independent(monkeypatch):
+    import services.scoring.scoring_engine as scoring_module
+
+    policy = compile_policy_from_fund_config({})
+    scout = {
+        "sector": "Infrastructure",
+        "est_tam": "$12B",
+        "why_now": "Market growth is 42% with verified budget urgency.",
+    }
+    review = {
+        "structured_signals": {
+            "market": {
+                "tam": {
+                    "value": "$12B",
+                    "confidence": 0.9,
+                    "evidence": "Independent market report",
+                },
+                "growth_rate": {
+                    "value": "42%",
+                    "confidence": 0.9,
+                    "evidence": "Independent market report",
+                },
+            }
+        }
+    }
+    before = DeterministicScoringEngine(policy=policy).score(scout, review)
+
+    monkeypatch.setenv("SCORING_EVIDENCE_CALIBRATION_ENABLED", "false")
+    monkeypatch.setattr(scoring_module, "EVIDENCE_CALIBRATION_ENABLED", False)
+    after = DeterministicScoringEngine(policy=policy).score(scout, review)
+
+    assert after == before
+    assert after["scoring_runtime_version"] == "1.0.0"
+    assert after["scoring_runtime_hash"] == policy["scoring_runtime_hash"]
+
+
+def test_published_runtime_cannot_be_overridden_at_engine_construction():
+    policy = compile_policy_from_fund_config({})
+
+    with pytest.raises(ValueError, match="published scoring runtime"):
+        DeterministicScoringEngine(policy=policy, evidence_calibration=False)
+
+
+def test_operator_selected_overall_weights_are_consumed_from_runtime():
+    base_policy = compile_policy_from_fund_config({})
+    changed_runtime = deepcopy(base_policy["scoring_runtime"])
+    changed_runtime["overall"]["weights"] = {
+        "market": 0.7,
+        "product": 0.1,
+        "technical": 0.1,
+        "execution": 0.1,
+    }
+    changed_policy = compile_policy_from_fund_config(
+        {"scoringRuntime": changed_runtime}, require_publish_ready=True
+    )
+    aggregate = {
+        "market": {"score": 9.0, "unscored": False},
+        "product": {"score": 3.0, "unscored": False},
+        "technical": {"score": 3.0, "unscored": False},
+        "execution": {"score": 3.0, "unscored": False},
+    }
+
+    base = DeterministicScoringEngine(policy=base_policy)
+    changed = DeterministicScoringEngine(policy=changed_policy)
+
+    assert base._compute_overall_score(aggregate) == 4.5
+    assert changed._compute_overall_score(aggregate) == 7.2
 
 
 def test_policy_criteria_are_included_with_legacy_components():

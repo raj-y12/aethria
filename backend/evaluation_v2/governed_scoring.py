@@ -149,6 +149,28 @@ def validate_governed_scoring_trace(
         raise GovernedScoringError(
             "governed structured scoring trace policy hash does not match prerequisites"
         )
+    runtime = policy.get("scoring_runtime")
+    expected_runtime_version = (
+        str(runtime.get("semantic_version") or "")
+        if isinstance(runtime, Mapping)
+        else ""
+    )
+    expected_runtime_hash = str(policy.get("scoring_runtime_hash") or "")
+    if not expected_runtime_version or not expected_runtime_hash:
+        raise GovernedScoringError(
+            "governed compiled policy has no certified scoring runtime"
+        )
+    if (
+        str(trace.get("scoring_runtime_version") or "")
+        != expected_runtime_version
+    ):
+        raise GovernedScoringError(
+            "governed structured scoring trace runtime version does not match prerequisites"
+        )
+    if str(trace.get("scoring_runtime_hash") or "") != expected_runtime_hash:
+        raise GovernedScoringError(
+            "governed structured scoring trace runtime hash does not match prerequisites"
+        )
 
     dimensions = configured_scoring_dimensions(prerequisites)
     unknown = sorted(set(trace) - set(dimensions) - _TRACE_METADATA_FIELDS)

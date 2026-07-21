@@ -52,9 +52,22 @@ class EvaluationPrerequisites:
 
     @property
     def dependency_identity(self) -> Dict[str, str]:
+        runtime = self.compiled_scoring_policy.get("scoring_runtime")
+        if not isinstance(runtime, dict):
+            raise RuntimeError(
+                "Evaluation prerequisites have no certified scoring runtime"
+            )
         return {
+            "user_id": self.user_id,
+            "thesis_version_id": self.thesis_version_id,
             "policy_version_id": self.policy.policy_version_id,
             "policy_hash": self.policy.policy_hash,
+            "scoring_runtime_version": str(
+                runtime.get("semantic_version") or ""
+            ),
+            "scoring_runtime_hash": str(
+                self.compiled_scoring_policy.get("scoring_runtime_hash") or ""
+            ),
             "rubric_version": self.policy.rubric_version,
             "partner_rules_version": self.policy.partner_rules_version,
             "partner_rules_hash": self.policy.partner_rules_hash,
@@ -227,7 +240,7 @@ async def load_evaluation_prerequisites(
             ) from exc
 
     try:
-        validate_compiled_policy_bundle(compiled)
+        compiled = validate_compiled_policy_bundle(compiled)
     except PolicyValidationError as exc:
         raise EvaluationPrerequisiteError(
             code="prerequisite_unavailable",

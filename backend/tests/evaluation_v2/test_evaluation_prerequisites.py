@@ -100,6 +100,12 @@ async def test_prerequisites_retain_exact_tenant_bound_execution_inputs():
     assert prerequisites.compiled_scoring_policy == compiled
     assert partner_rules_document(prerequisites.partner_rules) == rules
     assert prerequisites.fund_config == compiled["decision_inputs"]
+    assert prerequisites.dependency_identity["user_id"] == "user-a"
+    assert prerequisites.dependency_identity["thesis_version_id"] == "thesis-live"
+    assert prerequisites.dependency_identity["scoring_runtime_version"] == "1.0.0"
+    assert prerequisites.dependency_identity["scoring_runtime_hash"] == compiled[
+        "scoring_runtime_hash"
+    ]
     prerequisites.require_tenant(" user-a ", context="test handoff")
     with pytest.raises(RuntimeError, match="tenant"):
         prerequisites.require_tenant("user-b", context="test handoff")
