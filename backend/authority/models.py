@@ -5,9 +5,16 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictInt,
+    field_validator,
+    model_validator,
+)
 
 from tenant_context import require_user_id
 from utils.timeutil import utcnow
@@ -48,6 +55,8 @@ class BlockCode(str, Enum):
 
 
 class _TenantModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     user_id: str
 
     @field_validator("user_id")
@@ -88,7 +97,7 @@ class _WorkflowBlockModel(_TenantModel):
 
 class RolloutRecord(_TenantModel):
     mode: RolloutMode
-    version: int = Field(ge=0)
+    version: StrictInt = Field(ge=0)
     activated_at: Optional[datetime] = None
     activated_by: Optional[str] = Field(default=None, max_length=300)
     snapshot_id: Optional[str] = Field(default=None, max_length=300)
@@ -99,22 +108,45 @@ class RolloutRecord(_TenantModel):
 
 
 class WorkflowStateRecord(_WorkflowBlockModel):
-    opportunity_id: str = Field(min_length=1, max_length=300)
-    version: int = Field(ge=0)
-    last_transition_id: Optional[str] = Field(default=None, max_length=300)
+    opportunity_id: UUID
+    version: StrictInt = Field(ge=0)
+    last_transition_id: Optional[UUID] = None
     updated_at: datetime = Field(default_factory=utcnow)
+
+    @field_validator("opportunity_id", "last_transition_id", mode="before")
+    @classmethod
+    def _normalize_uuid_keys(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
 
 class WorkflowTransition(_WorkflowBlockModel):
-    expected_version: int = Field(ge=0)
-    transition_id: str = Field(default_factory=lambda: str(uuid4()), min_length=1, max_length=300)
+    expected_version: StrictInt = Field(ge=0)
+    transition_id: UUID = Field(default_factory=uuid4)
+
+    @field_validator("transition_id", mode="before")
+    @classmethod
+    def _normalize_transition_id(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
 
 class ProjectionReceipt(_TenantModel):
-    receipt_id: str = Field(default_factory=lambda: str(uuid4()), min_length=1, max_length=300)
-    event_id: str = Field(min_length=1, max_length=300)
+    receipt_id: UUID = Field(default_factory=uuid4)
+    event_id: UUID
     consumer: str = Field(min_length=1, max_length=300)
     aggregate_type: str = Field(min_length=1, max_length=160)
-    aggregate_id: str = Field(min_length=1, max_length=300)
+    aggregate_id: UUID
     applied_at: datetime = Field(default_factory=utcnow)
     projection_hash: Optional[str] = Field(default=None, max_length=300)
+
+    @field_validator("receipt_id", "event_id", "aggregate_id", mode="before")
+    @classmethod
+    def _normalize_uuid_keys(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("consumer", "aggregate_type")
+    @classmethod
+    def _normalize_required_text_keys(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("authority receipt keys must be nonblank")
+        return normalized
