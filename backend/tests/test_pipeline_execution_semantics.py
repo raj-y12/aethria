@@ -4,8 +4,10 @@ import pytest
 
 from evaluation_v2.prerequisites import EvaluationPrerequisiteError
 from pipeline_execution import (
+    MetaCycleResult,
     PipelineExecutionResult,
     PipelineExecutionState,
+    ScoutCycleResult,
     StageExecutionResult,
     StageExecutionState,
 )
@@ -349,6 +351,139 @@ def _review_candidate(startup_id="startup-1"):
     )
 
 
+class _ScoutPersona:
+    def __init__(self, scout_type, result):
+        self.scout_type = scout_type
+        self.result = result
+        self.system_prompt = f"{scout_type} prompt"
+        self._last_token_usage = 0
+
+    async def _discover_with_validation(self):
+        if isinstance(self.result, Exception):
+            raise self.result
+        return dict(self.result) if isinstance(self.result, dict) else self.result
+
+
+def _scout_for_stage(
+    results,
+    *,
+    storage=None,
+    cost_controller=None,
+    deal_memory=None,
+):
+    from scout.engine import ScoutEngine
+
+    engine = ScoutEngine.__new__(ScoutEngine)
+    engine.tenant_user_id = "user-a"
+    engine.logger = __import__("logging").getLogger("test.scout-stage")
+    engine.scouts = [
+        _ScoutPersona(f"persona_{index}", result)
+        for index, result in enumerate(results, start=1)
+    ]
+    engine.storage = storage
+    engine.cost_controller = cost_controller
+    engine.deal_memory = deal_memory
+    engine.model = "test-model"
+    engine.backpressure_threshold = 10
+    engine.scout_ramp_threshold = 5
+    engine.scout_ramp_max_waves = 1
+    engine._sync_thesis_to_scouts = lambda: None
+    engine._select_scouts_for_wave = lambda: list(engine.scouts)
+    return engine
+
+
+def _scout_discovery(startup_id="startup-1"):
+    return {
+        "id": startup_id,
+        "name": "Typed Scout Co",
+        "one_line": "Typed stage result",
+        "confidence": 0.8,
+        "scout_type": "market_driven",
+        "primary_thesis": "A distinct thesis",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("results", "expected_state", "succeeded", "failed"),
+    [
+        ([_scout_discovery()], StageExecutionState.COMPLETED, 1, 0),
+        ([RuntimeError("boom")], StageExecutionState.FAILED, 0, 1),
+        (
+            [_scout_discovery(), RuntimeError("boom")],
+            StageExecutionState.FAILED,
+            1,
+            1,
+        ),
+    ],
+    ids=["clean-success", "all-fail", "partial-failure"],
+)
+async def test_scout_periodic_result_accounts_for_every_persona(
+    monkeypatch, results, expected_state, succeeded, failed
+):
+    import scout.engine as scout_module
+
+    monkeypatch.setattr(scout_module, "is_scouts_enabled", lambda _uid: True)
+    monkeypatch.setattr(
+        scout_module, "get_runtime_limits", lambda _uid: {"max_agents_per_run": 10}
+    )
+    result = await _scout_for_stage(results).run_cycle(persist_discoveries=False)
+
+    assert isinstance(result, ScoutCycleResult)
+    assert result.outcome.state is expected_state
+    assert result.outcome.attempted == len(results)
+    assert result.outcome.succeeded == succeeded
+    assert result.outcome.failed == failed
+    assert len(result.discoveries) == succeeded
+
+
+@pytest.mark.asyncio
+async def test_scout_periodic_budget_denial_is_blocked(monkeypatch):
+    import scout.engine as scout_module
+
+    monkeypatch.setattr(scout_module, "is_scouts_enabled", lambda _uid: True)
+    monkeypatch.setattr(
+        scout_module, "get_runtime_limits", lambda _uid: {"max_agents_per_run": 10}
+    )
+    controller = SimpleNamespace(
+        check_budget=lambda *_args, **_kwargs: (False, "budget exhausted")
+    )
+
+    result = await _scout_for_stage(
+        [_scout_discovery()], cost_controller=controller
+    ).run_cycle(persist_discoveries=False)
+
+    assert result.outcome.state is StageExecutionState.BLOCKED
+    assert result.outcome.blocked == 1
+    assert result.outcome.recovery_action
+    assert result.discoveries == []
+
+
+@pytest.mark.asyncio
+async def test_scout_periodic_persistence_failure_is_not_a_success(monkeypatch):
+    import scout.engine as scout_module
+
+    monkeypatch.setattr(scout_module, "is_scouts_enabled", lambda _uid: True)
+    monkeypatch.setattr(
+        scout_module, "get_runtime_limits", lambda _uid: {"max_agents_per_run": 10}
+    )
+    storage = SimpleNamespace(
+        count_unreviewed=lambda: 0,
+        add_discovery=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("store unavailable")
+        ),
+    )
+
+    result = await _scout_for_stage(
+        [_scout_discovery()], storage=storage
+    ).run_cycle()
+
+    assert result.outcome.state is StageExecutionState.FAILED
+    assert result.outcome.failed == 1
+    assert result.outcome.succeeded == 0
+    assert result.discoveries == []
+
+
 def _reviewer_for_stage(storage, *, cost_controller=None, persona_failure=False):
     from reviewer.engine import ReviewerEngine
 
@@ -574,7 +709,15 @@ async def test_partner_periodic_result_accounts_for_every_candidate(
         assert result.recovery_action
 
 
-async def _run_periodic_with_stage_results(monkeypatch, reviewer_result, partner_result):
+async def _run_periodic_with_stage_results(
+    monkeypatch,
+    reviewer_result,
+    partner_result,
+    *,
+    scout_result=None,
+    portfolio_result=None,
+    meta_result=None,
+):
     import pipeline_runner
 
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
@@ -584,7 +727,7 @@ async def _run_periodic_with_stage_results(monkeypatch, reviewer_result, partner
         "load_settings",
         lambda *_args, **_kwargs: {
             "agent_config": {
-                "scouts_enabled": False,
+                "scouts_enabled": scout_result is not None,
                 "reviewers_enabled": True,
                 "partners_enabled": True,
             }
@@ -598,6 +741,9 @@ async def _run_periodic_with_stage_results(monkeypatch, reviewer_result, partner
 
     class Scout:
         scouts = []
+
+        async def run_cycle(self, **_kwargs):
+            return scout_result
 
         def close(self):
             return None
@@ -633,16 +779,22 @@ async def _run_periodic_with_stage_results(monkeypatch, reviewer_result, partner
         return None
 
     monkeypatch.setattr(pipeline_runner, "_prune_unreferenced_startups", no_op)
+    monkeypatch.setattr(
+        pipeline_runner, "_admit_autonomous_discoveries", no_op
+    )
     monkeypatch.setattr(pipeline_runner, "_count_startups_sync", lambda _uid: 0)
     monkeypatch.setattr(pipeline_runner, "_notify_startups_changed", lambda *_a: None)
 
     class Portfolio:
         async def run_cycle(self):
-            return None
+            return portfolio_result or _stage_no_work("portfolio")
 
     class Meta:
         async def run_cycle(self):
-            return None
+            return MetaCycleResult(
+                outcome=meta_result or _stage_no_work("meta"),
+                report=None,
+            )
 
     monkeypatch.setattr(pipeline_runner, "PortfolioEngine", lambda **_kwargs: Portfolio())
     monkeypatch.setattr(pipeline_runner, "MetaAgent", lambda **_kwargs: Meta())
@@ -712,6 +864,13 @@ async def test_periodic_runner_aggregates_partial_failure_without_clean_completi
     assert result.recovery_action == "Retry the failed Reviewer candidate."
     assert result.metadata["stage_results"]["reviewer"]["failed"] == 1
     assert result.metadata["stage_results"]["partner"]["succeeded"] == 1
+    assert set(result.metadata["stage_results"]) == {
+        "scout",
+        "reviewer",
+        "partner",
+        "portfolio",
+        "meta",
+    }
 
 
 @pytest.mark.asyncio
@@ -748,3 +907,146 @@ async def test_periodic_runner_distinguishes_no_work_from_clean_success(monkeypa
     assert clean.state is PipelineExecutionState.COMPLETED
     assert clean.metadata["reviewed"] == 1
     assert clean.metadata["decided"] == 1
+
+
+@pytest.mark.asyncio
+async def test_periodic_runner_counts_due_portfolio_or_meta_work_as_completion(
+    monkeypatch,
+):
+    portfolio_completed = await _run_periodic_with_stage_results(
+        monkeypatch,
+        _stage_no_work("reviewer"),
+        _stage_no_work("partner"),
+        portfolio_result=_stage_success("portfolio"),
+    )
+
+    assert portfolio_completed.state is PipelineExecutionState.COMPLETED
+    assert portfolio_completed.metadata["stage_results"]["portfolio"][
+        "state"
+    ] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_periodic_runner_aggregates_meta_failure(monkeypatch):
+    meta_failed = StageExecutionResult.failed_result(
+        stage="meta",
+        code="meta_cycle_failed",
+        detail="Meta analysis failed.",
+        recovery_action="Restore the analysis store and retry.",
+        attempted=1,
+        failed=1,
+    )
+    result = await _run_periodic_with_stage_results(
+        monkeypatch,
+        _stage_no_work("reviewer"),
+        _stage_no_work("partner"),
+        meta_result=meta_failed,
+    )
+
+    assert result.state is PipelineExecutionState.FAILED_STAGE
+    assert result.failed_stage == "meta"
+    assert result.metadata["stage_results"]["meta"]["failed"] == 1
+
+
+@pytest.mark.asyncio
+async def test_periodic_runner_aggregates_scout_partial_failure(monkeypatch):
+    scout_failed = ScoutCycleResult(
+        outcome=StageExecutionResult.failed_result(
+            stage="scout",
+            code="scout_persona_failures",
+            detail="One Scout persona failed.",
+            recovery_action="Inspect Scout logs and retry.",
+            attempted=2,
+            succeeded=1,
+            failed=1,
+        ),
+        discoveries=[_scout_discovery()],
+    )
+    result = await _run_periodic_with_stage_results(
+        monkeypatch,
+        _stage_no_work("reviewer"),
+        _stage_no_work("partner"),
+        scout_result=scout_failed,
+    )
+
+    assert result.state is PipelineExecutionState.FAILED_STAGE
+    assert result.failed_stage == "scout"
+    assert result.metadata["stage_results"]["scout"]["failed"] == 1
+
+
+class _LoopLogger:
+    def __init__(self):
+        self.errors = []
+        self.infos = []
+
+    def info(self, message, *args, **_kwargs):
+        self.infos.append(message % args if args else str(message))
+
+    def warning(self, message, *args, **_kwargs):
+        self.infos.append(message % args if args else str(message))
+
+    def error(self, message, *args, **_kwargs):
+        self.errors.append(message % args if args else str(message))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("engine_name", ["scout", "reviewer", "partner"])
+async def test_standalone_loops_consume_typed_results_without_type_errors(
+    monkeypatch, engine_name
+):
+    async def no_sleep(_seconds):
+        return None
+
+    logger = _LoopLogger()
+    completed = _stage_success(engine_name)
+
+    if engine_name == "scout":
+        import scout.engine as module
+        from scout.engine import ScoutEngine
+
+        engine = ScoutEngine.__new__(ScoutEngine)
+        engine.scouts = []
+
+        async def run_cycle(**_kwargs):
+            engine.running = False
+            return ScoutCycleResult(
+                outcome=completed,
+                discoveries=[{"scout_type": "market_driven", "name": "Co", "one_line": "One"}],
+            )
+
+        monkeypatch.setattr(module, "is_scouts_enabled", lambda _uid: True)
+    elif engine_name == "reviewer":
+        import reviewer.engine as module
+        from reviewer.engine import ReviewerEngine
+
+        engine = ReviewerEngine.__new__(ReviewerEngine)
+        engine.storage = SimpleNamespace(count_undecided=lambda: 0)
+        engine.backpressure_threshold = 10
+
+        async def run_cycle(**_kwargs):
+            engine.running = False
+            return completed
+
+        monkeypatch.setattr(module, "is_reviewers_enabled", lambda _uid: True)
+    else:
+        import partner.engine as module
+        from partner.engine import PartnerEngine
+
+        engine = PartnerEngine.__new__(PartnerEngine)
+
+        async def run_cycle(**_kwargs):
+            engine.running = False
+            return completed
+
+        monkeypatch.setattr(module, "is_partners_enabled", lambda _uid: True)
+
+    engine.tenant_user_id = "user-a"
+    engine.interval_seconds = 1
+    engine.logger = logger
+    engine.run_cycle = run_cycle
+    monkeypatch.setattr(module.asyncio, "sleep", no_sleep)
+
+    await engine.run_forever()
+
+    assert logger.errors == []
+    assert any("state=completed" in message for message in logger.infos)

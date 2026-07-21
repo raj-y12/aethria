@@ -40,8 +40,10 @@ from evaluation_v2.prerequisites import (
 )
 from pipeline_execution import (
     LookupExecutionStatus,
+    MetaCycleResult,
     PipelineExecutionResult,
     PipelineExecutionState,
+    ScoutCycleResult,
     StageExecutionResult,
     StageExecutionState,
 )
@@ -682,19 +684,39 @@ async def _run_one_pipeline_cycle_inner(
             _activity_startups_before = total_startups_before
         except Exception as e:
             logger.debug("[%s] startups_before count unavailable: %s", user_id[:12], e)
+        stage_results: Dict[str, StageExecutionResult] = {}
         discoveries = []
         if scouts_enabled and identity_repository is not None:
             agents_executed += len(getattr(scout_engine, "scouts", []) or [])
-            discoveries = await scout_engine.run_cycle(
+            scout_result = await scout_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
                 persist_discoveries=False,
             )
+            if not isinstance(scout_result, ScoutCycleResult):
+                raise RuntimeError("Scout returned an invalid periodic stage result")
+            stage_results["scout"] = scout_result.outcome
+            discoveries = scout_result.discoveries
         elif scouts_enabled:
+            stage_results["scout"] = StageExecutionResult.blocked_result(
+                stage="scout",
+                code="scout_identity_store_unavailable",
+                detail="The Scout stage requires the canonical identity store.",
+                recovery_action=(
+                    "Restore the canonical identity store and retry the Scout stage."
+                ),
+                attempted=1,
+                blocked=1,
+            )
             logger.error(
                 "[%s] Scout stage skipped: canonical identity store unavailable",
                 user_id[:12],
             )
         else:
+            stage_results["scout"] = StageExecutionResult.skipped_result(
+                stage="scout",
+                code="scout_disabled",
+                detail="The Scout stage was disabled for this pipeline cycle.",
+            )
             logger.info("[%s] Scout stage skipped (disabled in settings)", user_id[:12])
 
         # Mandatory production gate: periodic discoveries without verifiable
@@ -723,7 +745,6 @@ async def _run_one_pipeline_cycle_inner(
         _activity_reviewed_count = 0
         _activity_decided_count = 0
         _activity_escalations_count = 0
-        stage_results: Dict[str, StageExecutionResult] = {}
         if reviewers_enabled and identity_repository is not None:
             current_stage = "reviewer"
             agents_executed += 3
@@ -841,19 +862,22 @@ async def _run_one_pipeline_cycle_inner(
             health_interval=3600,
         )
         agents_executed += 1
-        await portfolio_engine.run_cycle()
+        portfolio_result = await portfolio_engine.run_cycle()
+        if not isinstance(portfolio_result, StageExecutionResult):
+            raise RuntimeError("Portfolio returned an invalid periodic stage result")
+        stage_results["portfolio"] = portfolio_result
 
-        try:
-            current_stage = "meta"
-            meta_agent = MetaAgent(
-                scout_engine=scout_engine,
-                reviewer_engine=reviewer_engine,
-                user_id=user_id,
-            )
-            agents_executed += 1
-            await meta_agent.run_cycle()
-        except Exception as meta_err:
-            logger.warning("[%s] Meta-agent cycle skipped: %s", user_id[:12], meta_err)
+        current_stage = "meta"
+        meta_agent = MetaAgent(
+            scout_engine=scout_engine,
+            reviewer_engine=reviewer_engine,
+            user_id=user_id,
+        )
+        agents_executed += 1
+        meta_result = await meta_agent.run_cycle()
+        if not isinstance(meta_result, MetaCycleResult):
+            raise RuntimeError("Meta returned an invalid periodic stage result")
+        stage_results["meta"] = meta_result.outcome
 
         # Persist activity metrics for the "While you were away" summary
         try:
@@ -941,10 +965,9 @@ async def _run_one_pipeline_cycle_inner(
                 or "Correct the stage block and retry.",
                 metadata=result_metadata,
             )
-        if (
-            _activity_startups_found == 0
-            and _activity_reviewed_count == 0
-            and _activity_decided_count == 0
+        if all(
+            result.state is StageExecutionState.SKIPPED
+            for result in stage_results.values()
         ):
             metrics.observe_pipeline_cycle(_cycle_duration, outcome="no_work")
             return PipelineExecutionResult.skipped(

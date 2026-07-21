@@ -171,9 +171,20 @@ async def run_system(
                 result.detail,
                 result.recovery_action or "",
             )
-            if once or result.state is not PipelineExecutionState.COMPLETED:
+            if once:
                 return result
-            await asyncio.sleep(max(1, int(os.getenv("SCOUT_INTERVAL_SECONDS", "300"))))
+            interval_key = (
+                "SCOUT_INTERVAL_SECONDS"
+                if result.state in {
+                    PipelineExecutionState.COMPLETED,
+                    PipelineExecutionState.SKIPPED,
+                }
+                else "PIPELINE_RECOVERY_INTERVAL_SECONDS"
+            )
+            default_interval = "300" if interval_key == "SCOUT_INTERVAL_SECONDS" else "60"
+            await asyncio.sleep(
+                max(1, int(os.getenv(interval_key, default_interval)))
+            )
     finally:
         if owned_pool is not None:
             await owned_pool.close()

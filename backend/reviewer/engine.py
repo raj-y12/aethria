@@ -1340,31 +1340,34 @@ class ReviewerEngine:
         
         while self.running:
             try:
-                if not is_reviewers_enabled(self.tenant_user_id):
-                    self.logger.info("Reviewers disabled in settings, skipping cycle")
-                    if self.running:
-                        await asyncio.sleep(self.interval_seconds)
-                    continue
-
-                # Backpressure: skip cycle if too many undecided startups
-                undecided_count = self.storage.count_undecided()
-                if undecided_count > self.backpressure_threshold:
-                    self.logger.warning(
-                        f"Backpressure: {undecided_count} undecided startups "
-                        f"exceeds threshold ({self.backpressure_threshold}), skipping review cycle"
-                    )
-                    if self.running:
-                        await asyncio.sleep(self.interval_seconds)
-                    continue
-
                 cycle_count += 1
                 self.logger.info(f"=== Review Cycle #{cycle_count} ===")
                 from uuid import uuid4
 
-                reviewed = await self.run_cycle(pipeline_run_id=str(uuid4()))
-                
-                if reviewed > 0:
-                    self.logger.info(f"Reviewed {reviewed} entries in this cycle")
+                undecided_count = await asyncio.to_thread(
+                    self.storage.count_undecided
+                )
+                if undecided_count > self.backpressure_threshold:
+                    result = StageExecutionResult.skipped_result(
+                        stage="reviewer",
+                        code="reviewer_backpressure",
+                        detail=(
+                            "The Reviewer stage deferred work while the Partner "
+                            "backlog is above its configured threshold."
+                        ),
+                    )
+                else:
+                    result = await self.run_cycle(pipeline_run_id=str(uuid4()))
+                self.logger.info(
+                    "Reviewer cycle state=%s code=%s attempted=%s succeeded=%s failed=%s blocked=%s skipped=%s",
+                    result.state.value,
+                    result.code,
+                    result.attempted,
+                    result.succeeded,
+                    result.failed,
+                    result.blocked,
+                    result.skipped,
+                )
                 
                 # Wait for next cycle
                 if self.running:

@@ -9,7 +9,13 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisites,
 )
 from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
-from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
+from pipeline_execution import (
+    MetaCycleResult,
+    PipelineExecutionResult,
+    PipelineExecutionState,
+    ScoutCycleResult,
+    StageExecutionResult,
+)
 
 
 class _FakeScoutEngine:
@@ -346,7 +352,13 @@ async def test_periodic_consumes_certified_thesis_without_reloading_active_thesi
         scouts = []
 
         async def run_cycle(self, **_kwargs):
-            return []
+            return ScoutCycleResult(
+                outcome=StageExecutionResult.skipped_result(
+                    stage="scout",
+                    code="scout_no_eligible_work",
+                    detail="No Scout work.",
+                )
+            )
 
         def close(self):
             return None
@@ -386,11 +398,21 @@ async def test_periodic_consumes_certified_thesis_without_reloading_active_thesi
 
     class Portfolio:
         async def run_cycle(self):
-            return None
+            return StageExecutionResult.skipped_result(
+                stage="portfolio",
+                code="portfolio_no_due_work",
+                detail="No Portfolio work.",
+            )
 
     class Meta:
         async def run_cycle(self):
-            return None
+            return MetaCycleResult(
+                outcome=StageExecutionResult.skipped_result(
+                    stage="meta",
+                    code="meta_not_due",
+                    detail="No Meta work.",
+                )
+            )
 
     monkeypatch.setattr("pipeline_runner.PortfolioEngine", lambda **_kwargs: Portfolio())
     monkeypatch.setattr("pipeline_runner.MetaAgent", lambda **_kwargs: Meta())

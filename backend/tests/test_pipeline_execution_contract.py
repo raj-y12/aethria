@@ -132,3 +132,56 @@ def test_lookup_execution_status_union_covers_every_persisted_state():
         "failed",
         "already_in_deal_flow",
     }
+
+
+def test_scout_and_meta_payload_results_bind_payloads_to_typed_outcomes():
+    from pipeline_execution import (
+        MetaCycleResult,
+        ScoutCycleResult,
+        StageExecutionResult,
+    )
+
+    scout = ScoutCycleResult(
+        outcome=StageExecutionResult.completed(
+            stage="scout",
+            code="scout_completed",
+            detail="Scout produced one discovery.",
+            attempted=1,
+            succeeded=1,
+        ),
+        discoveries=[{"id": "startup-1", "name": "Typed Co"}],
+    )
+    meta = MetaCycleResult(
+        outcome=StageExecutionResult.completed(
+            stage="meta",
+            code="meta_completed",
+            detail="Meta produced an analysis report.",
+            attempted=1,
+            succeeded=1,
+        ),
+        report={"cycle_number": 4, "analysis_only": True},
+    )
+
+    assert scout.discoveries[0]["id"] == "startup-1"
+    assert meta.report["analysis_only"] is True
+
+    with pytest.raises(ValueError, match="discovery count"):
+        ScoutCycleResult(
+            outcome=StageExecutionResult.completed(
+                stage="scout",
+                code="scout_completed",
+                detail="Impossible payload count.",
+                attempted=1,
+                succeeded=1,
+            ),
+            discoveries=[],
+        )
+    with pytest.raises(ValueError, match="report"):
+        MetaCycleResult(
+            outcome=StageExecutionResult.skipped_result(
+                stage="meta",
+                code="meta_not_due",
+                detail="Meta is not due.",
+            ),
+            report={"cycle_number": 4},
+        )

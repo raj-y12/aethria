@@ -606,22 +606,25 @@ class PartnerEngine:
         
         while self.running:
             try:
-                if not is_partners_enabled(self.tenant_user_id):
-                    self.logger.info("Partners disabled in settings, skipping cycle")
-                    if self.running:
-                        await asyncio.sleep(self.interval_seconds)
-                    continue
                 cycle_count += 1
                 self.logger.info(f"=== Decision Cycle #{cycle_count} ===")
                 from uuid import uuid4
 
-                decided = await self.run_cycle(pipeline_run_id=str(uuid4()))
-                
-                if decided > 0:
-                    self.logger.info(f"Made {decided} decisions in this cycle")
+                result = await self.run_cycle(pipeline_run_id=str(uuid4()))
+                self.logger.info(
+                    "Partner cycle state=%s code=%s attempted=%s succeeded=%s failed=%s blocked=%s skipped=%s",
+                    result.state.value,
+                    result.code,
+                    result.attempted,
+                    result.succeeded,
+                    result.failed,
+                    result.blocked,
+                    result.skipped,
+                )
                 
                 # Wait for next cycle
-                await asyncio.sleep(self.interval_seconds)
+                if self.running:
+                    await asyncio.sleep(self.interval_seconds)
                 
             except KeyboardInterrupt:
                 self.logger.info("Received interrupt signal, shutting down...")

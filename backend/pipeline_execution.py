@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -180,6 +180,45 @@ class StageExecutionResult(BaseModel):
             attempted=attempted,
             skipped=skipped,
         )
+
+
+class ScoutCycleResult(BaseModel):
+    """Scout payload and terminal accounting returned as one immutable value."""
+
+    model_config = ConfigDict(frozen=True)
+
+    outcome: StageExecutionResult
+    discoveries: List[Dict[str, Any]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_scout_payload(self) -> "ScoutCycleResult":
+        if self.outcome.stage != "scout":
+            raise ValueError("Scout cycle outcome must belong to the scout stage")
+        if len(self.discoveries) != self.outcome.succeeded:
+            raise ValueError(
+                "Scout discovery count must exactly match succeeded stage work"
+            )
+        return self
+
+
+class MetaCycleResult(BaseModel):
+    """Meta analysis report and terminal accounting without mutable side channels."""
+
+    model_config = ConfigDict(frozen=True)
+
+    outcome: StageExecutionResult
+    report: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode="after")
+    def validate_meta_payload(self) -> "MetaCycleResult":
+        if self.outcome.stage != "meta":
+            raise ValueError("Meta cycle outcome must belong to the meta stage")
+        if self.outcome.state is StageExecutionState.COMPLETED:
+            if not isinstance(self.report, dict):
+                raise ValueError("Completed Meta cycle requires a report")
+        elif self.report is not None:
+            raise ValueError("Non-completed Meta cycle cannot publish a report")
+        return self
 
 
 class PipelineExecutionResult(BaseModel):

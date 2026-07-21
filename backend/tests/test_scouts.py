@@ -47,7 +47,7 @@ async def test_scouts():
     print()
     
     # Run one cycle
-    discoveries = await engine.run_cycle()
+    discoveries = (await engine.run_cycle()).discoveries
     
     print()
     print("=" * 80)

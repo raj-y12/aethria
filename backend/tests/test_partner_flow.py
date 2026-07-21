@@ -50,7 +50,7 @@ async def test_complete_flow():
         model="gpt-5-nano",
     )
     
-    discoveries = await scout_engine.run_cycle()
+    discoveries = (await scout_engine.run_cycle()).discoveries
     print(f"✓ Discovered {len(discoveries)} startup ideas")
     print()
     
