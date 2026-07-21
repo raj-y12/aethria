@@ -28,13 +28,18 @@ uncertified because their credentials are not present in this workspace.
 ## Round-4 authority-cutover remediation (2026-07-21)
 
 The final audit findings are remediated in code. Durable workers now fence
-every terminal write by lease ownership; lookup attempts commit their terminal
-job and durable outcome together; governed Partner decisions use one certified
-threshold authority; Meta reports per-target failures; policy upgrade patches
-only the active policy pointer under row lock; lookup outcomes have an explicit
-service-role-only RLS/grant contract; agent status reports the same execution
-prerequisites as the runner; and evaluation-manifest v3 records executed,
-reused, and not-run identities without attributing unused models to a run.
+every terminal write by live, unexpired lease ownership, and the fence reaches
+already-running `asyncio.to_thread` storage mutations through the bound
+Supabase query boundary. Lookup attempts commit their terminal job and durable
+outcome together, while typed cancellation results prevent a finalization race
+from being published as cancellation. Governed Partner decisions use one
+certified threshold authority; Meta reports per-target failures; policy upgrade
+patches only the active policy pointer under row lock; lookup outcomes have an
+explicit service-role-only RLS/grant contract whose exact `USING` and
+`WITH CHECK` predicates are verified from `pg_policies`; agent status reports
+the same execution prerequisites as the runner; and evaluation-manifest v3
+records executed, reused, and not-run identities without attributing unused
+models to a run.
 
 This is a local code certification, not a target-database certification. The
 three round-four PostgreSQL-focused tests and the seven PostgreSQL-focused full
@@ -186,10 +191,10 @@ With `TEST_DATABASE_URL` configured, run the PostgreSQL-gated suites as part of 
 ## Current local evidence
 
 - Golden set v7: 27 passed, 0 failed.
-- Required round-4 focused suite: 163 passed, 3 target-PostgreSQL skips, 1 warning.
+- Required round-4 focused suite: 182 passed, 3 target-PostgreSQL skips, 1 warning.
 - Required round-3 focused suite: 698 passed, 0 skipped.
 - Partner v4 decision-safety certification: 18 passed, 0 skipped.
-- Full backend suite, run twice: 1,430 passed, 11 skipped, 1 warning on each run.
+- Full backend suite, run twice: 1,449 passed, 11 skipped, 1 warning on each run.
 - Decision-safety certification: all 18 cases ran and passed; no certification case was skipped.
 - Frontend: 59 test files and 274 tests passed; lint and production build passed (866 modules transformed).
 - Readiness code checks: golden set, migration/schema requirements, atomic pointer-only policy-upgrade migration, lookup-outcome RLS migration, and proposal-only Meta mutation paths passed.
@@ -251,7 +256,7 @@ cd backend && pytest -q -rs \
   tests/test_partner_decision_fallback.py \
   tests/test_policy_upgrade.py \
   tests/test_policy_upgrade_migration.py
-# 163 passed, 3 target-PostgreSQL skips, 1 warning in 2.25s
+# 182 passed, 3 target-PostgreSQL skips, 1 warning in 2.23s
 
 cd backend && pytest -q tests/evaluation_v2 \
   tests/test_evaluation_manifest.py \
@@ -265,20 +270,20 @@ cd backend && pytest -q tests/evaluation_v2 \
   tests/jobs/test_job_handlers.py \
   tests/monitoring \
   tests/test_run_system_cli_gate.py
-# 698 passed in 5.05s
+# 698 passed in 4.16s
 
 cd backend && pytest -q
-# 1,430 passed, 11 skipped, 1 warning in 12.48s
+# 1,449 passed, 11 skipped, 1 warning in 11.76s
 
 cd backend && pytest -q -rs
-# 1,430 passed, 11 environment-gated skips, 1 warning in 13.07s
+# 1,449 passed, 11 environment-gated skips, 1 warning in 11.81s
 
 cd backend && pytest -q \
   tests/evaluation_v2/test_decision_safety_certification.py -rs
-# 18 passed, 0 skipped in 0.11s
+# 18 passed, 0 skipped in 0.09s
 
 cd app-front-end && npm test -- --run
-# 59 test files passed; 274 tests passed in 26.39s
+# 59 test files passed; 274 tests passed in 10.85s
 
 cd app-front-end && npm run lint
 # exit 0
