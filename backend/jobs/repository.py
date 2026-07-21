@@ -332,6 +332,7 @@ class DurableJobRepository:
                     lease_expires_at = now() + ($4 * interval '1 second')
                 where job_id = $1 and user_id = $2 and lease_owner = $3
                   and status = 'running'
+                  and lease_expires_at > now()
                 returning job_id
                 """,
                 job_id,
@@ -401,6 +402,7 @@ class DurableJobRepository:
                         lease_owner = null, lease_expires_at = null, heartbeat_at = now()
                     where job_id = $1 and user_id = $2 and lease_owner = $3
                       and status = 'running'
+                      and lease_expires_at > now()
                     returning *
                     """,
                     job_id,
@@ -461,6 +463,7 @@ class DurableJobRepository:
                         lease_owner = null, lease_expires_at = null
                     where job_id = $1 and user_id = $2 and lease_owner = $3
                       and status = 'running'
+                      and lease_expires_at > now()
                     returning *
                     """,
                     job_id,
@@ -516,6 +519,7 @@ class DurableJobRepository:
                     lease_owner = null, lease_expires_at = null
                 where job_id = $1 and user_id = $2 and lease_owner = $3
                   and status = 'running'
+                  and lease_expires_at > now()
                 returning *
                 """,
                 job_id,
@@ -560,6 +564,7 @@ class DurableJobRepository:
                         heartbeat_at = now()
                     where job_id = $1 and user_id = $2 and lease_owner = $3
                       and status = 'running'
+                      and lease_expires_at > now()
                     returning *
                     """,
                     job_id,
@@ -623,6 +628,7 @@ class DurableJobRepository:
                         heartbeat_at = now()
                     where job_id = $1 and user_id = $2 and lease_owner = $3
                       and status = 'running'
+                      and lease_expires_at > now()
                     returning *
                     """,
                     job_id,

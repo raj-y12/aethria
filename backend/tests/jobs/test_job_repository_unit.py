@@ -292,6 +292,51 @@ async def test_heartbeat_and_stale_completion_require_current_lease_owner():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "operation",
+    ["heartbeat", "succeed", "retry", "fail", "block", "cancel_owned"],
+)
+async def test_owned_job_mutations_reject_an_expired_lease(operation):
+    repository_module = importlib.import_module("jobs.repository")
+    running = _lookup_job(status=JobStatus.RUNNING, attempts=1)
+    repository = repository_module.DurableJobRepository(
+        _Pool(_Connection(fetchrows=[None]))
+    )
+    common = {
+        "user_id": running.user_id,
+        "job_id": running.job_id,
+        "worker_id": "worker-a",
+    }
+
+    if operation == "heartbeat":
+        await repository.heartbeat(**common, lease_seconds=60)
+    elif operation == "succeed":
+        await repository.succeed(**common)
+    elif operation == "retry":
+        await repository.retry(**common, error="retry")
+    elif operation == "fail":
+        await repository.fail(**common, error="failed")
+    elif operation == "block":
+        await repository.block(
+            **common,
+            code="identity_review_required",
+            detail="Identity review is required.",
+            recovery_action="Resolve the identity case.",
+        )
+    else:
+        await repository.cancel_owned(
+            **common,
+            lookup_outcome=LookupAttemptOutcome.cancelled_for_job(
+                running,
+                detail="The lookup was cancelled.",
+            ),
+        )
+
+    sql = repository.pool.connection.calls[0][1].lower()
+    assert "lease_expires_at > now()" in sql
+
+
+@pytest.mark.asyncio
 async def test_stale_lookup_finalizer_cannot_publish_terminal_outcome():
     repository_module = importlib.import_module("jobs.repository")
     job = _lookup_job(status=JobStatus.RUNNING, attempts=1)
