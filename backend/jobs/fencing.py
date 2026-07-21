@@ -97,4 +97,3 @@ async def assert_job_ownership(repository, job: AgentJob) -> None:
         if fence is not None:
             fence.lose(reason)
         raise JobLeaseLost(reason)
-
