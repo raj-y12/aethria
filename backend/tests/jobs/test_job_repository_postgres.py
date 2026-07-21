@@ -50,7 +50,7 @@ async def test_target_postgres_lookup_outcomes_is_service_role_only():
         )
         policies = await connection.fetch(
             """
-            select policyname, roles, cmd
+            select policyname, roles, cmd, qual, with_check
             from pg_policies
             where schemaname = 'public' and tablename = 'lookup_job_outcomes'
             """

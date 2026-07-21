@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from scripts import check_phase8_readiness as readiness
 
 
@@ -51,6 +53,8 @@ def test_lookup_outcomes_live_security_requires_exact_policy_and_grants() -> Non
                 "policyname": "lookup_job_outcomes_service_role_all",
                 "roles": ["service_role"],
                 "cmd": "ALL",
+                "qual": "true",
+                "with_check": "true",
             }
         ],
         grant_rows=[
@@ -69,6 +73,8 @@ def test_lookup_outcomes_live_security_requires_exact_policy_and_grants() -> Non
                 "policyname": "lookup_job_outcomes_service_role_all",
                 "roles": ["service_role"],
                 "cmd": "ALL",
+                "qual": "true",
+                "with_check": "true",
             }
         ],
         grant_rows=[
@@ -90,3 +96,37 @@ def test_lookup_outcomes_live_security_requires_exact_policy_and_grants() -> Non
     assert client_leak["client_grants"] == ["authenticated:SELECT"]
     assert missing_policy["status"] == "failed"
     assert missing_policy["policy_ok"] is False
+
+
+@pytest.mark.parametrize(
+    ("qual", "with_check"),
+    [
+        ("(auth.uid() = user_id)", "true"),
+        ("true", "(auth.uid() = user_id)"),
+        (None, "true"),
+        ("true", None),
+    ],
+)
+def test_lookup_outcomes_live_security_rejects_non_exact_policy_predicates(
+    qual,
+    with_check,
+) -> None:
+    check = readiness._lookup_outcomes_security_check(
+        table_rows=[{"table_name": "lookup_job_outcomes", "relrowsecurity": True}],
+        policy_rows=[
+            {
+                "policyname": "lookup_job_outcomes_service_role_all",
+                "roles": ["service_role"],
+                "cmd": "ALL",
+                "qual": qual,
+                "with_check": with_check,
+            }
+        ],
+        grant_rows=[
+            {"grantee": "service_role", "privilege_type": privilege}
+            for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
+        ],
+    )
+
+    assert check["status"] == "failed"
+    assert check["policy_ok"] is False

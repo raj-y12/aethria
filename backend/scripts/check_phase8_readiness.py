@@ -144,6 +144,20 @@ def _policy_roles(raw: Any) -> set[str]:
     }
 
 
+def _policy_predicate(raw: Any) -> str:
+    """Normalize catalog whitespace without weakening the exact expression."""
+    if raw is None:
+        return ""
+    return " ".join(str(raw).strip().lower().split())
+
+
+def _policy_row_value(row: Any, key: str) -> Any:
+    try:
+        return row[key]
+    except (KeyError, TypeError):
+        return None
+
+
 def _lookup_outcomes_security_check(
     *,
     table_rows: List[Any],
@@ -160,11 +174,26 @@ def _lookup_outcomes_security_check(
         None,
     )
     rls_enabled = bool(table and table["relrowsecurity"])
+    expected_policy_predicates = {"qual": "true", "with_check": "true"}
+    policy_predicates = [
+        {
+            "policyname": str(_policy_row_value(row, "policyname") or ""),
+            "qual": _policy_predicate(_policy_row_value(row, "qual")),
+            "with_check": _policy_predicate(
+                _policy_row_value(row, "with_check")
+            ),
+        }
+        for row in policy_rows
+    ]
     policy_ok = len(policy_rows) == 1 and all(
         (
             str(row["policyname"]) == "lookup_job_outcomes_service_role_all"
             and _policy_roles(row["roles"]) == {"service_role"}
             and str(row["cmd"]).upper() == "ALL"
+            and _policy_predicate(_policy_row_value(row, "qual"))
+            == expected_policy_predicates["qual"]
+            and _policy_predicate(_policy_row_value(row, "with_check"))
+            == expected_policy_predicates["with_check"]
         )
         for row in policy_rows
     )
@@ -199,6 +228,8 @@ def _lookup_outcomes_security_check(
         table_present=table is not None,
         rls_enabled=rls_enabled,
         policy_ok=policy_ok,
+        policy_predicates=policy_predicates,
+        expected_policy_predicates=expected_policy_predicates,
         client_grants=client_grants,
         service_grants=service_grants,
         expected_service_grants=expected_service_grants,
@@ -370,7 +401,7 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
             checks.append(_materiality_columns_check(materiality_rows))
             lookup_policy_rows = await conn.fetch(
                 """
-                select policyname, roles, cmd
+                select policyname, roles, cmd, qual, with_check
                 from pg_policies
                 where schemaname = 'public'
                   and tablename = 'lookup_job_outcomes'

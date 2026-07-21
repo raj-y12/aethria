@@ -124,6 +124,8 @@ async def test_database_readiness_queries_live_columns_in_addition_to_ledger(
                         "policyname": "lookup_job_outcomes_service_role_all",
                         "roles": ["service_role"],
                         "cmd": "ALL",
+                        "qual": "true",
+                        "with_check": "true",
                     }
                 ]
             if "from information_schema.table_privileges" in query:
@@ -182,4 +184,7 @@ async def test_database_readiness_queries_live_columns_in_addition_to_ledger(
     assert by_name["lookup_outcomes_rls_and_grants"]["status"] == "passed"
     assert any("data_type, udt_name" in query for query in queries)
     assert any("from pg_policies" in query for query in queries)
+    policy_query = next(query for query in queries if "from pg_policies" in query)
+    assert "qual" in policy_query
+    assert "with_check" in policy_query
     assert any("information_schema.table_privileges" in query for query in queries)
