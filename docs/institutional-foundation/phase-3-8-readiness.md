@@ -1,6 +1,6 @@
 # Phase 3–8 institutional domain readiness
 
-Date: 2026-07-20
+Date: 2026-07-21
 
 ## Outcome
 
@@ -8,28 +8,15 @@ The code-level evidence-and-decision platform is implemented through Phase 8, in
 
 The product authority model is now explicit: agents discover, extract, evaluate, recommend, draft, monitor, and propose; authenticated people rule, approve external actions, correct evidence, resolve identity, accept policy proposals, and publish policy.
 
-## Post-interruption stabilization (2026-07-21)
+## Round-3 remediation certification (2026-07-21)
 
-The Codex run was cut off by its weekly limit mid-implementation of the
-`EvaluationPrerequisites.dependency_identity` / scoring-runtime binding. That
-in-progress work was left uncommitted in the worktree and is now preserved
-verbatim in commit `241af513` (a WIP checkpoint, **not** a finished unit).
-
-At the point of interruption the committed HEAD had one regressed test,
-`test_production_legacy_loader_binds_exact_published_fund_config`, which
-asserted object identity (`is`) against the validated/normalized bundle the
-prerequisite loader now returns. Fixed in `c193df6e` (identity → value
-equality). Re-verified backend only:
-
-```bash
-cd backend && pytest -q
-# 1,213 passed, 10 skipped, 1 warning
-```
-
-**Not re-verified in this stabilization pass** (the 2026-07-20 figures below
-predate the interruption and have not been re-measured): frontend vitest,
-lint, production build, golden set v7, and the decision-safety certification
-suite. Re-run those before trusting the "all green" record.
+The interrupted scoring-runtime work was completed and integrated with exact
+consensus traces, typed stage outcomes, attempt-aware lookup outcomes, live
+materiality-schema readiness, atomic tenant policy upgrade, immutable
+evaluation manifests, and behaviorally authoritative Partner rules. The local
+backend, frontend, golden, and code-readiness gates were all rerun from the
+final branch state. Target-PostgreSQL and live-provider gates remain explicitly
+uncertified because their credentials are not present in this workspace.
 
 ## Implemented behavior
 
@@ -47,7 +34,7 @@ suite. Re-run those before trusting the "all green" record.
 - Governed Reviewer and Partner runs require one tenant-bound, complete structured-scoring trace with the exact published policy version and hash; environment flags cannot disable that path.
 - Published policy identity covers the normalized dimensions, decision thresholds, and score bands actually consumed. The immutable manifest records the already-consumed dependency identity without reloading mutable settings or global rules.
 - Governed score precision remains lossless through review aggregation, persistence adapters, and Partner boundaries, including immediately around pass and advance thresholds.
-- The active v3 Partner policy is compiled once into an immutable, extra-forbid typed contract; missing, malformed, unknown, or inconsistent decision fields fail closed rather than activating Python defaults.
+- The active v4 Partner policy is compiled once into an immutable, extra-forbid typed contract; every configurable decision field has an explicit runtime consumer and changes the recorded rules identity. Redundant v3 threshold/boundary declarations and fixed safety-action literals were removed rather than treated as decorative configuration. Historical v3 remains strict and parseable.
 - Criterion assessments and recommendations are immutable after completion.
 - Missing evidence produces an unscored criterion, confidence reduction, review requirement, or diligence gap—not an invented neutral fact.
 - A failed refresh appends a failure and leaves the last successful recommendation current.
@@ -166,11 +153,12 @@ With `TEST_DATABASE_URL` configured, run the PostgreSQL-gated suites as part of 
 ## Current local evidence
 
 - Golden set v7: 27 passed, 0 failed.
-- Required second final-review focused suite: 521 passed, 0 skipped.
-- Full backend suite: 1,193 passed, 10 skipped, 1 warning.
+- Required round-3 focused suite: 681 passed, 0 skipped.
+- Partner v4 authority certification: 108 passed, including 78 active-leaf mutation/manifest cases.
+- Full backend suite: 1,383 passed, 10 skipped, 1 warning.
 - Decision-safety certification: all 18 cases ran and passed; no certification case was skipped.
-- Frontend: 58 test files and 271 tests passed; lint and production build passed.
-- Readiness code checks: golden set, migration presence, and proposal-only Meta mutation paths passed.
+- Frontend: 59 test files and 273 tests passed; lint and production build passed (866 modules transformed).
+- Readiness code checks: golden set, migration/schema requirements, atomic policy-upgrade migration, and proposal-only Meta mutation paths passed.
 - Direct database readiness: blocked by missing DSN (`ready: false`, expected in this workspace).
 - Target migration application, RLS enforcement, UUID/JSON codecs, triggers, foreign keys, and transactional race behavior: not certified locally.
 - Authority-control implementation and certification: pending as a separate slice.
@@ -202,11 +190,13 @@ The 18 passing cases certify that:
   reason `advance`, never legacy `YES`.
 
 The certification policy is compiled from the active
-`resources/config/partner_rules/v3.json` contract, so its version, thresholds,
-boundary semantics, eligibility rules, confidence caps, freshness behavior,
-and decisive claim lists are the same versioned inputs exercised by the test.
+`resources/config/partner_rules/v4.json` contract, so its thresholds,
+eligibility rules, confidence caps, freshness behavior, and decisive claim
+lists are the same versioned inputs exercised by the test. Fixed comparison and
+evidence-safety clamps are materialized by the evaluator and certified as
+non-configurable invariants.
 
-Observed on 2026-07-20 from this worktree:
+Observed on 2026-07-21 from this worktree:
 
 ```bash
 cd backend && pytest -q tests/evaluation_v2 \
@@ -214,38 +204,42 @@ cd backend && pytest -q tests/evaluation_v2 \
   tests/test_policy_compiler.py \
   tests/test_policy_store.py \
   tests/test_partner_decision_fallback.py \
-  tests/test_on_demand_lookup_independent.py \
   tests/test_pipeline_execution_contract.py \
   tests/test_pipeline_execution_semantics.py \
   tests/test_api_worker_prerequisites.py \
+  tests/test_on_demand_lookup_independent.py \
   tests/jobs/test_job_handlers.py \
-  tests/monitoring/test_monitoring_repository_unit.py
-# 521 passed in 2.79s
+  tests/monitoring \
+  tests/test_run_system_cli_gate.py
+# 681 passed in 5.85s
 
 cd backend && pytest -q
-# 1,193 passed, 10 skipped, 1 warning in 10.04s
+# 1,383 passed, 10 skipped, 1 warning in 12.45s
 
 cd backend && pytest -q -rs
-# 1,193 passed, 10 environment-gated skips, 1 warning in 10.30s
+# 1,383 passed, 10 environment-gated skips, 1 warning in 12.73s
 
 cd backend && pytest -q \
   tests/evaluation_v2/test_decision_safety_certification.py -rs
-# 18 passed, 0 skipped in 0.09s
+# 18 passed, 0 skipped in 0.11s
 
 cd app-front-end && npm test -- --run
-# 58 test files passed; 271 tests passed in 8.51s
+# 59 test files passed; 273 tests passed in 10.14s
 
 cd app-front-end && npm run lint
 # exit 0
 
 cd app-front-end && npm run build
-# exit 0; 865 modules transformed
+# exit 0; 866 modules transformed
 
 cd backend && python3 scripts/run_golden_set.py --version v7 --json
 # 27 passed, 0 failed; exit 0
 
 cd backend && python3 scripts/check_phase8_readiness.py --json
-# code checks passed; direct_database_dsn blocked; ready=false; exit 1
+# code checks passed; direct_database_dsn blocked; ready=false
+
+git diff --check 5bab009f..HEAD
+# exit 0
 ```
 
 Skip inspection with `pytest -q -rs`: the focused suite has no skips. The 10

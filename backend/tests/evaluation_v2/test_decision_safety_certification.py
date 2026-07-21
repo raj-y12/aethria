@@ -213,7 +213,7 @@ def _snapshot_for(name: str) -> list[dict[str, object]]:
 def _safety_policy() -> EvaluationPolicy:
     partner_rules_path = (
         Path(__file__).resolve().parents[3]
-        / "resources/config/partner_rules/v3.json"
+        / "resources/config/partner_rules/v4.json"
     )
     partner_rules = json.loads(partner_rules_path.read_text())
     return evaluation_policy_from_compiled(
