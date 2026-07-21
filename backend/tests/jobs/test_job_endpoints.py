@@ -1,6 +1,13 @@
 from fastapi.testclient import TestClient
 
-from jobs.models import AgentJob, JobStatus, JobType, PipelineCyclePayload
+from jobs.lookup_outcomes import LookupOutcomeStoreUnavailable
+from jobs.models import (
+    AgentJob,
+    CompanyLookupPayload,
+    JobStatus,
+    JobType,
+    PipelineCyclePayload,
+)
 from security.rate_limiter import InMemorySecurityStore
 
 
@@ -15,6 +22,25 @@ def _job(*, user_id="user-a", status=JobStatus.DEAD_LETTER):
         attempts=3,
         max_attempts=3,
         last_error="postgres://secret@host/provider stack trace",
+    )
+
+
+def _lookup_job(*, user_id="user-a", status=JobStatus.DEAD_LETTER):
+    return AgentJob(
+        job_id="74d53f3f-1795-4636-bda7-c55fbf420dc4",
+        user_id=user_id,
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key=f"lookup:{user_id}:lookup-contract-1",
+        payload=CompanyLookupPayload(
+            user_id=user_id,
+            company_name="Acme",
+            lookup_id="lookup-contract-1",
+        ),
+        status=status,
+        attempts=3,
+        max_attempts=3,
+        pipeline_run_id="pipeline-contract-1",
+        last_error="provider unavailable",
     )
 
 
@@ -144,6 +170,47 @@ def test_retry_reuses_same_job_and_adds_one_safe_attempt(monkeypatch):
     assert response.json()["status"] == "accepted"
     assert response.json()["attempts"] == 3
     assert response.json()["max_attempts"] == 4
+
+
+def test_lookup_retry_publishes_new_attempt_before_returning_accepted(monkeypatch):
+    import routers.jobs as jobs_router
+
+    captured = []
+
+    async def persist(outcome):
+        captured.append(outcome)
+        return outcome
+
+    monkeypatch.setattr(jobs_router, "_persist_lookup_attempt", persist, raising=False)
+    repository = _Repository([_lookup_job()])
+
+    response = _client(monkeypatch, repository).post(
+        "/api/jobs/74d53f3f-1795-4636-bda7-c55fbf420dc4/retry",
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert response.status_code == 202
+    assert captured[0].lookup_id == "lookup-contract-1"
+    assert captured[0].attempt == 4
+    assert captured[0].disposition.value == "accepted"
+
+
+def test_lookup_retry_explicitly_fails_if_attempt_status_cannot_be_persisted(monkeypatch):
+    import routers.jobs as jobs_router
+
+    async def persist(_outcome):
+        raise LookupOutcomeStoreUnavailable("write failed")
+
+    monkeypatch.setattr(jobs_router, "_persist_lookup_attempt", persist, raising=False)
+    repository = _Repository([_lookup_job()])
+
+    response = _client(monkeypatch, repository).post(
+        "/api/jobs/74d53f3f-1795-4636-bda7-c55fbf420dc4/retry",
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["reason"] == "lookup_outcome_store_unavailable"
 
 
 def test_succeeded_job_cannot_be_retried_or_cancelled(monkeypatch):

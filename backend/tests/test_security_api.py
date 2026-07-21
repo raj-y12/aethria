@@ -213,6 +213,9 @@ def test_toggle_agents_returns_503_when_stopped_state_cannot_be_saved(monkeypatc
 
 def test_lookup_status_surfaces_existing_startup_outcome(monkeypatch):
     import api
+    from jobs.lookup_outcomes import LookupAttemptOutcome
+    from jobs.models import AgentJob, CompanyLookupPayload, JobStatus, JobType
+    from pipeline_execution import PipelineExecutionResult
     from security.rate_limiter import InMemorySecurityStore
 
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
@@ -222,15 +225,30 @@ def test_lookup_status_surfaces_existing_startup_outcome(monkeypatch):
         InMemorySecurityStore(),
     )
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
-    monkeypatch.setattr(
-        api,
-        "list_get_by_id",
-        lambda *a, **k: {
-            "status": "already_in_deal_flow",
-            "startup_id": "existing-startup",
-            "message": "This company is already in your deal flow.",
-        },
+    job = AgentJob(
+        job_id="job-existing-1",
+        user_id="user_a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup:user_a:lookup-existing-1",
+        payload=CompanyLookupPayload(
+            user_id="user_a",
+            company_name="Acme",
+            lookup_id="lookup-existing-1",
+        ),
+        status=JobStatus.RUNNING,
+        attempts=1,
+        pipeline_run_id="pipeline-existing-1",
     )
+    outcome = LookupAttemptOutcome.from_pipeline_result(
+        job,
+        PipelineExecutionResult.completed(
+            code="lookup_completed",
+            detail="This company is already in your deal flow.",
+            startup_id="existing-startup",
+            metadata={"lookup_status": "already_in_deal_flow"},
+        ),
+    )
+    monkeypatch.setattr(api, "latest_lookup_attempt", lambda *a, **k: outcome)
 
     response = TestClient(api.app).get(
         "/api/startups/lookup-status?lookup_id=lookup-existing-1",
@@ -240,10 +258,16 @@ def test_lookup_status_surfaces_existing_startup_outcome(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {
         "lookup_id": "lookup-existing-1",
+        "job_id": "job-existing-1",
+        "pipeline_run_id": "pipeline-existing-1",
+        "attempt": 1,
+        "disposition": "succeeded",
+        "recorded_at": outcome.recorded_at.isoformat(),
         "failed": False,
         "terminal": True,
         "status": "already_in_deal_flow",
         "startup_id": "existing-startup",
+        "code": "lookup_completed",
         "detail": "This company is already in your deal flow.",
         "message": "This company is already in your deal flow.",
     }

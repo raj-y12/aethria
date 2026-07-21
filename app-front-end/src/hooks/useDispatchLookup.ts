@@ -8,7 +8,6 @@ import {
   fetchStartupDetail,
   fetchMemo,
   fetchLookupJobStatus,
-  isLookupTerminalStatus,
   resolveLookupCandidates,
   type LookupCandidate,
 } from '../api/startups';
@@ -16,6 +15,7 @@ import { cancelJob, fetchJob, retryJob, type DurableJob } from '../api/jobs';
 import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 import { resolveLookupFailure } from '../lib/lookupFailure';
+import { supersedeLookupRetryQueries } from '../lib/lookupRetrySupersession';
 import { findTrackedLookupStartup, lookupChipStatus } from '../lib/lookupTracking';
 import {
   getDispatchLookupStorageKey,
@@ -383,7 +383,7 @@ export function useDispatchLookup({
     refetchInterval: (q) => {
       if (!liveGate.tabVisible) return false;
       const row = q.state.data;
-      if (row?.terminal || isLookupTerminalStatus(row?.status)) return false;
+      if (row?.terminal) return false;
       return 8_000;
     },
     retry: 1,
@@ -605,13 +605,19 @@ export function useDispatchLookup({
       setPendingLookup((current) => current?.jobId === jobId
         ? { ...current, durableStatus: job.status }
         : current);
-      await durableJobQuery.refetch();
+      await supersedeLookupRetryQueries({
+        queryClient,
+        job,
+        lookupId: pendingLookup.lookupId,
+        refetchDurableJob: () => durableJobQuery.refetch(),
+        refetchLookupStatus: () => lookupFailureQuery.refetch(),
+      });
     } catch {
       setMessage('The job could not be retried in its current state. Refresh and try again.');
     } finally {
       setBusy(false);
     }
-  }, [durableJobQuery, pendingLookup?.jobId]);
+  }, [durableJobQuery, lookupFailureQuery, pendingLookup, queryClient]);
 
   const openIdentityReview = useCallback(() => {
     if (typeof window === 'undefined') return;

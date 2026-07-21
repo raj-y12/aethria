@@ -500,17 +500,11 @@ async def test_on_demand_lookup_cancelled_after_scout_stops_before_review(monkey
 
 
 @pytest.mark.asyncio
-async def test_on_demand_lookup_records_terminal_failure_when_review_exhausts_retries(monkeypatch):
+async def test_on_demand_lookup_returns_terminal_failure_when_review_exhausts_retries(monkeypatch):
     _wire_common_engines(monkeypatch)
     monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
     _FakeReviewerEngine.result = False
-    recorded = []
     states = []
-
-    async def _record(user_id, lookup_id, message):
-        recorded.append((user_id, lookup_id, message))
-
-    monkeypatch.setattr("pipeline_runner._record_lookup_failure", _record)
     monkeypatch.setattr("pipeline_runner.upsert_pipeline_state", lambda *a, **k: states.append(k))
 
     result = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-review-fail")
@@ -520,24 +514,16 @@ async def test_on_demand_lookup_records_terminal_failure_when_review_exhausts_re
     assert result.startup_id == "startup-1"
     assert _FakeReviewerEngine.calls == 1
     assert _FakePartnerEngine.calls == 0
-    assert recorded and recorded[0][:2] == ("user_123", "lookup-review-fail")
-    assert "review" in recorded[0][2].lower()
     assert states[-1]["startup_id"] == "startup-1"
     assert states[-1]["status"] == "failed"
 
 
 @pytest.mark.asyncio
-async def test_on_demand_lookup_records_terminal_failure_when_partner_exhausts_retries(monkeypatch):
+async def test_on_demand_lookup_returns_terminal_failure_when_partner_exhausts_retries(monkeypatch):
     _wire_common_engines(monkeypatch)
     monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
     _FakePartnerEngine.result = False
-    recorded = []
     states = []
-
-    async def _record(user_id, lookup_id, message):
-        recorded.append((user_id, lookup_id, message))
-
-    monkeypatch.setattr("pipeline_runner._record_lookup_failure", _record)
     monkeypatch.setattr("pipeline_runner.upsert_pipeline_state", lambda *a, **k: states.append(k))
 
     result = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-partner-fail")
@@ -547,8 +533,6 @@ async def test_on_demand_lookup_records_terminal_failure_when_partner_exhausts_r
     assert result.startup_id == "startup-1"
     assert _FakeReviewerEngine.calls == 1
     assert _FakePartnerEngine.calls == 1
-    assert recorded and recorded[0][:2] == ("user_123", "lookup-partner-fail")
-    assert "decision" in recorded[0][2].lower()
     assert states[-1]["startup_id"] == "startup-1"
     assert states[-1]["status"] == "failed"
 
@@ -600,7 +584,7 @@ async def test_add_context_rerun_regenerates_and_persists_memo(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_duplicate_lookup_persists_terminal_existing_startup_outcome(monkeypatch):
+async def test_duplicate_lookup_returns_terminal_existing_startup_outcome_without_writing(monkeypatch):
     _wire_common_engines(monkeypatch)
     monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
     _FakeScoutEngine.outcome = {
@@ -608,14 +592,6 @@ async def test_duplicate_lookup_persists_terminal_existing_startup_outcome(monke
         "startup_id": "startup-1",
         "message": "This company is already in your deal flow.",
     }
-    outcomes = []
-
-    def record(table, payload, *, user_id):
-        outcomes.append((table, payload, user_id))
-        return payload["id"]
-
-    monkeypatch.setattr("pipeline_runner.list_upsert", record)
-
     result = await run_on_demand_lookup(
         "user_123",
         "Acme",
@@ -624,21 +600,7 @@ async def test_duplicate_lookup_persists_terminal_existing_startup_outcome(monke
 
     assert result.state is PipelineExecutionState.COMPLETED
     assert result.startup_id == "startup-1"
-    assert outcomes == [
-        (
-            "lookup_job_outcomes",
-            {
-                "id": "lookup-existing-1",
-                "lookup_id": "lookup-existing-1",
-                "status": "already_in_deal_flow",
-                "code": "lookup_completed",
-                "detail": "This company is already in your deal flow.",
-                "startup_id": "startup-1",
-                "message": "This company is already in your deal flow.",
-            },
-            "user_123",
-        )
-    ]
+    assert result.metadata["lookup_status"] == "already_in_deal_flow"
 
 
 @pytest.mark.asyncio

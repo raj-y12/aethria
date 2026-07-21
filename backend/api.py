@@ -93,7 +93,6 @@ from admin_auth import admin_token_ttl_seconds, issue_admin_token, validate_admi
 from admin_audit import record_admin_audit_event
 from admin_service import build_admin_overview
 from supabase_client import get_service_client
-from supabase_doc_store import list_get_all, list_get_by_id
 from supabase_storage import SupabaseStartupsStorage
 from memo_generator import MemoGenerator
 from meta.agent import MetaAgent  # For manual trigger
@@ -120,6 +119,13 @@ from portfolio.store import PortfolioStore
 from portfolio.rejection import RejectionAnalyzer
 from portfolio.cost_control import CostController
 from jobs.handlers import build_handlers
+from jobs.lookup_outcomes import (
+    LookupAttemptOutcome,
+    LookupOutcomeCorrupt,
+    LookupOutcomeStoreUnavailable,
+    latest_lookup_attempt,
+    record_lookup_attempt,
+)
 from jobs.models import (
     AgentJob,
     CompanyLookupPayload,
@@ -139,18 +145,11 @@ from fund_intelligence.repository import FundIntelligenceRepository
 from outcomes.repository import ChannelOutcomeRepository
 from pipeline_runner import (
     _rss_mb as _pipeline_rss_mb,
-    _record_lookup_failure,
     reprocess_startups_missing_fund_thesis,
     run_one_pipeline_cycle,
     run_on_demand_lookup,
 )
-from pipeline_execution import (
-    LOOKUP_FAILURE_STATUSES,
-    LOOKUP_TERMINAL_STATUSES,
-    LookupExecutionStatus,
-    PipelineExecutionResult,
-    PipelineExecutionState,
-)
+from pipeline_execution import LookupExecutionStatus, PipelineExecutionResult, PipelineExecutionState
 from fund_thesis import (
     FundThesisIncompleteError,
     FundThesisMissingError,
@@ -473,8 +472,44 @@ async def _lookup_worker() -> None:
             job = await _lookup_queue.get()
             user_id = str(job.get("user_id") or "").strip()
             lookup_id = str(job.get("lookup_id") or "").strip() or None
+            legacy_job: Optional[AgentJob] = None
             try:
+                resolution = job.get("resolution")
+                if resolution is not None and hasattr(resolution, "model_dump"):
+                    resolution = resolution.model_dump(mode="json")
+                legacy_job_id = str(job.get("job_id") or uuid4())
+                legacy_job = AgentJob(
+                    job_id=legacy_job_id,
+                    user_id=user_id,
+                    job_type=JobType.COMPANY_LOOKUP,
+                    idempotency_key=_lookup_idempotency_key(
+                        user_id, lookup_id or legacy_job_id
+                    ),
+                    payload=CompanyLookupPayload(
+                        user_id=user_id,
+                        company_name=str(job.get("company_name") or "").strip(),
+                        website=str(job.get("website") or "").strip() or None,
+                        lookup_query=str(job.get("lookup_query") or "").strip() or None,
+                        lookup_input_type=str(job.get("lookup_input_type") or "").strip() or None,
+                        lookup_id=lookup_id,
+                        additional_context=str(job.get("additional_context") or "").strip() or None,
+                        replace_startup_id=str(job.get("replace_startup_id") or "").strip() or None,
+                        resolution=resolution,
+                    ),
+                    status="running",
+                    attempts=max(1, int(job.get("attempt") or 1)),
+                    pipeline_run_id=str(job.get("pipeline_run_id") or uuid4()),
+                )
+                await _persist_legacy_lookup_attempt(
+                    LookupAttemptOutcome.accepted_for_job(legacy_job)
+                )
                 if _is_lookup_cancelled(user_id, lookup_id):
+                    await _persist_legacy_lookup_attempt(
+                        LookupAttemptOutcome.cancelled_for_job(
+                            legacy_job,
+                            detail="The lookup was cancelled before execution started.",
+                        )
+                    )
                     _logger_agents.info(
                         "On-demand lookup skipped after cancellation for user %s lookup_id=%s",
                         user_id[:12] if user_id else "?",
@@ -492,12 +527,16 @@ async def _lookup_worker() -> None:
                     additional_context=str(job.get("additional_context") or "").strip() or None,
                     replace_startup_id=str(job.get("replace_startup_id") or "").strip() or None,
                     resolution=job.get("resolution"),
+                    pipeline_run_id=legacy_job.pipeline_run_id,
                     fund_intelligence_repository=getattr(
                         app.state, "fund_intelligence_repository", None
                     ),
                 )
                 if not isinstance(result, PipelineExecutionResult):
                     raise RuntimeError("Lookup runner returned an invalid execution result")
+                await _persist_legacy_lookup_attempt(
+                    LookupAttemptOutcome.from_pipeline_result(legacy_job, result)
+                )
                 if result.state is not PipelineExecutionState.COMPLETED:
                     _logger_agents.warning(
                         "On-demand lookup finished state=%s code=%s user=%s lookup_id=%s",
@@ -512,16 +551,33 @@ async def _lookup_worker() -> None:
                     user_id[:12] if user_id else "?",
                     e,
                 )
-                await _record_lookup_failure(
-                    user_id,
-                    lookup_id,
-                    "Lookup worker failed unexpectedly. Please retry the lookup.",
-                )
+                if legacy_job is not None and not isinstance(e, LookupOutcomeStoreUnavailable):
+                    try:
+                        await _persist_legacy_lookup_attempt(
+                            LookupAttemptOutcome.failed_for_job(
+                                legacy_job,
+                                detail="Lookup worker failed unexpectedly.",
+                                recovery_action="Check worker availability and retry the lookup.",
+                            )
+                        )
+                    except LookupOutcomeStoreUnavailable:
+                        _logger_agents.exception(
+                            "Lookup outcome store unavailable for user %s lookup_id=%s",
+                            user_id[:12] if user_id else "?",
+                            lookup_id,
+                        )
             finally:
                 _release_security_lock(str(job.get("lock_key") or "").strip() or None)
                 _lookup_queue.task_done()
         except asyncio.CancelledError:
             break
+
+
+async def _persist_legacy_lookup_attempt(
+    outcome: LookupAttemptOutcome,
+) -> LookupAttemptOutcome:
+    """Central outcome service adapter for the compatibility queue worker."""
+    return await asyncio.to_thread(record_lookup_attempt, outcome)
 
 
 def _lookup_worker_count() -> int:
@@ -1902,55 +1958,53 @@ def lookup_job_status(request: Request, lookup_id: str = ""):
             status_code=422,
             detail="lookup_id query parameter must be 8-128 characters [a-zA-Z0-9_-]",
         )
-    if not env_config.use_supabase_storage():
-        return {
-            "lookup_id": raw,
-            "failed": False,
-            "terminal": False,
-            "status": LookupExecutionStatus.PENDING.value,
-        }
-    row = list_get_by_id("lookup_job_outcomes", raw, user_id=uid)
-    if not row:
-        return {
-            "lookup_id": raw,
-            "failed": False,
-            "terminal": False,
-            "status": LookupExecutionStatus.PENDING.value,
-        }
-    invalid_status = False
     try:
-        status = LookupExecutionStatus(str(row.get("status") or "").strip())
-    except ValueError:
-        status = LookupExecutionStatus.FAILED
-        invalid_status = True
-    detail = str(row.get("detail") or row.get("message") or "").strip()[:500]
-    code = str(row.get("code") or "").strip()[:100]
-    recovery_action = str(row.get("recovery_action") or "").strip()[:500]
-    failed_stage = str(row.get("failed_stage") or "").strip()[:100]
-    if invalid_status:
-        code = "lookup_status_invalid"
-        detail = "The lookup worker recorded an invalid terminal status."
-        recovery_action = "Retry the lookup and inspect worker compatibility logs."
-    elif status is LookupExecutionStatus.FAILED and not code:
-        code = "lookup_failed"
+        outcome = latest_lookup_attempt(uid, raw)
+    except LookupOutcomeStoreUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "unavailable",
+                "reason": "lookup_outcome_store_unavailable",
+            },
+        ) from exc
+    except LookupOutcomeCorrupt as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "failed",
+                "reason": "lookup_outcome_contract_invalid",
+            },
+        ) from exc
+    if outcome is None:
+        return {
+            "lookup_id": raw,
+            "failed": False,
+            "terminal": False,
+            "status": LookupExecutionStatus.PENDING.value,
+        }
     payload = {
         "lookup_id": raw,
-        "failed": status in LOOKUP_FAILURE_STATUSES,
-        "terminal": status in LOOKUP_TERMINAL_STATUSES,
-        "status": status.value,
+        "job_id": outcome.job_id,
+        "pipeline_run_id": outcome.pipeline_run_id,
+        "attempt": outcome.attempt,
+        "disposition": outcome.disposition.value,
+        "recorded_at": outcome.recorded_at.isoformat(),
+        "failed": outcome.failed,
+        "terminal": outcome.terminal,
+        "status": outcome.status.value,
     }
-    startup_id = str(row.get("startup_id") or "").strip()
-    if startup_id:
-        payload["startup_id"] = startup_id
-    if code:
-        payload["code"] = code
-    if failed_stage:
-        payload["failed_stage"] = failed_stage
-    if detail:
-        payload["detail"] = detail
-        payload["message"] = detail
-    if recovery_action:
-        payload["recovery_action"] = recovery_action
+    if outcome.startup_id:
+        payload["startup_id"] = outcome.startup_id
+    if outcome.code:
+        payload["code"] = outcome.code
+    if outcome.failed_stage:
+        payload["failed_stage"] = outcome.failed_stage
+    if outcome.detail:
+        payload["detail"] = outcome.detail
+        payload["message"] = outcome.detail
+    if outcome.recovery_action:
+        payload["recovery_action"] = outcome.recovery_action
     return payload
 
 

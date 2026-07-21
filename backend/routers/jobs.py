@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from jobs.models import AgentJob, JobStatus
+from jobs.lookup_outcomes import (
+    LookupAttemptOutcome,
+    LookupOutcomeStoreUnavailable,
+    record_lookup_attempt,
+)
+from jobs.models import AgentJob, JobStatus, JobType
 from security.request_guards import require_authenticated_user, validate_route_id
 
 
@@ -32,6 +38,10 @@ def _repository(request: Request):
             },
         )
     return repository
+
+
+async def _persist_lookup_attempt(outcome: LookupAttemptOutcome) -> None:
+    await asyncio.to_thread(record_lookup_attempt, outcome)
 
 
 def _public_status(status: JobStatus) -> str:
@@ -125,6 +135,17 @@ async def retry_job(request: Request, job_id: str):
     job = await repository.requeue(user_id=user_id, job_id=job_id)
     if job is None:
         raise HTTPException(status_code=409, detail="Job state changed; refresh before retrying")
+    if job.job_type is JobType.COMPANY_LOOKUP:
+        try:
+            await _persist_lookup_attempt(LookupAttemptOutcome.accepted_for_job(job))
+        except LookupOutcomeStoreUnavailable as exc:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "unavailable",
+                    "reason": "lookup_outcome_store_unavailable",
+                },
+            ) from exc
     return JSONResponse(status_code=202, content=_serialize(job))
 
 
@@ -141,4 +162,19 @@ async def cancel_job(request: Request, job_id: str):
     job = await repository.cancel(user_id=user_id, job_id=job_id)
     if job is None:
         raise HTTPException(status_code=409, detail="Job state changed; refresh before cancelling")
+    if job.job_type is JobType.COMPANY_LOOKUP:
+        try:
+            await _persist_lookup_attempt(
+                LookupAttemptOutcome.cancelled_for_job(
+                    job, detail="The lookup job was cancelled by the operator."
+                )
+            )
+        except LookupOutcomeStoreUnavailable as exc:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "unavailable",
+                    "reason": "lookup_outcome_store_unavailable",
+                },
+            ) from exc
     return JSONResponse(status_code=202, content=_serialize(job))

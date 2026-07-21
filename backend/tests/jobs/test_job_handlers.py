@@ -63,6 +63,19 @@ class _Repository:
         self.checkpoints.append(kwargs)
 
 
+@pytest.fixture(autouse=True)
+def _capture_lookup_attempt_outcomes(monkeypatch):
+    handlers = importlib.import_module("jobs.handlers")
+    captured = []
+
+    async def persist(outcome):
+        captured.append(outcome)
+        return outcome
+
+    monkeypatch.setattr(handlers, "_persist_lookup_attempt", persist, raising=False)
+    return captured
+
+
 @pytest.mark.asyncio
 async def test_cycle_handler_passes_job_tenant_and_stable_pipeline_run(monkeypatch):
     handlers = importlib.import_module("jobs.handlers")
@@ -105,7 +118,9 @@ async def test_cycle_handler_passes_job_tenant_and_stable_pipeline_run(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resolution(monkeypatch):
+async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resolution(
+    monkeypatch, _capture_lookup_attempt_outcomes
+):
     handlers = importlib.import_module("jobs.handlers")
     repository = _Repository()
     calls = []
@@ -187,6 +202,9 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
     assert repository.checkpoints[1]["stage"] == "scout"
     assert repository.checkpoints[-1]["stage"] == "lookup_result"
     assert repository.checkpoints[-1]["output_metadata"]["state"] == "completed"
+    assert [
+        item.disposition.value for item in _capture_lookup_attempt_outcomes
+    ] == ["accepted", "succeeded"]
 
 
 @pytest.mark.asyncio
@@ -351,7 +369,9 @@ async def test_cycle_handler_records_intentional_skip_without_claiming_evaluatio
 
 
 @pytest.mark.asyncio
-async def test_lookup_handler_observes_cancellation_between_checkpoints(monkeypatch):
+async def test_lookup_handler_observes_cancellation_between_checkpoints(
+    monkeypatch, _capture_lookup_attempt_outcomes
+):
     handlers = importlib.import_module("jobs.handlers")
     repository = _Repository()
     job = AgentJob(
@@ -371,11 +391,15 @@ async def test_lookup_handler_observes_cancellation_between_checkpoints(monkeypa
     with pytest.raises(JobExecutionCancelled):
         await handlers.company_lookup_handler(repository, job)
 
+    assert [
+        item.disposition.value for item in _capture_lookup_attempt_outcomes
+    ] == ["accepted", "cancelled"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("code", ["thesis_required", "published_policy_required"])
 async def test_lookup_handler_preserves_identity_then_blocks_before_legacy_lookup(
-    monkeypatch, code
+    monkeypatch, code, _capture_lookup_attempt_outcomes
 ):
     handlers = importlib.import_module("jobs.handlers")
     repository = _Repository()
@@ -439,6 +463,42 @@ async def test_lookup_handler_preserves_identity_then_blocks_before_legacy_looku
     assert exc.value.code == code
     assert events == ["identity", "prerequisites"]
     assert repository.checkpoints[-1]["stage"] == "identity"
+    assert [
+        item.disposition.value for item in _capture_lookup_attempt_outcomes
+    ] == ["accepted", "blocked"]
+
+
+@pytest.mark.asyncio
+async def test_lookup_handler_records_retryable_failure_for_unexpected_pre_run_error(
+    monkeypatch, _capture_lookup_attempt_outcomes
+):
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository()
+
+    def resolve(*_args, **_kwargs):
+        raise RuntimeError("resolver unavailable")
+
+    monkeypatch.setattr(handlers, "resolve_company", resolve)
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup:resolver-failure",
+        payload=CompanyLookupPayload(
+            user_id="user-a",
+            company_name="Acme",
+            lookup_id="lookup-resolver-failure",
+        ),
+        attempts=1,
+        max_attempts=3,
+        status=JobStatus.RUNNING,
+    )
+
+    with pytest.raises(RuntimeError, match="resolver unavailable"):
+        await handlers.company_lookup_handler(repository, job)
+
+    assert [
+        item.disposition.value for item in _capture_lookup_attempt_outcomes
+    ] == ["accepted", "retryable_failure"]
 
 
 @pytest.mark.asyncio

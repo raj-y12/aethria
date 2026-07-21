@@ -432,7 +432,6 @@ class DurableJobRepository:
                     """
                     update public.agent_jobs
                     set status = 'blocked',
-                        attempts = greatest(attempts - 1, 0),
                         block_code = $4,
                         block_detail = $5,
                         recovery_action = $6,

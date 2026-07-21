@@ -121,6 +121,36 @@ describe('lookup execution status contract', () => {
     });
   });
 
+  it('preserves attempt identity and server-authoritative retryable semantics', async () => {
+    authedFetch.mockResolvedValueOnce(new Response(JSON.stringify({
+      lookup_id: 'lookup-status-4',
+      job_id: 'job-status-4',
+      pipeline_run_id: 'pipeline-status-4',
+      attempt: 2,
+      disposition: 'retryable_failure',
+      recorded_at: '2026-07-21T12:00:00Z',
+      status: 'failed_stage',
+      terminal: false,
+      failed: false,
+      code: 'reviewer_stage_failed',
+      failed_stage: 'reviewer',
+      detail: 'Reviewer could not complete this attempt.',
+      recovery_action: 'The durable worker will retry.',
+    }), { status: 200 }));
+
+    await expect(fetchLookupJobStatus('lookup-status-4')).resolves.toMatchObject({
+      lookup_id: 'lookup-status-4',
+      job_id: 'job-status-4',
+      pipeline_run_id: 'pipeline-status-4',
+      attempt: 2,
+      disposition: 'retryable_failure',
+      recorded_at: '2026-07-21T12:00:00Z',
+      status: 'failed_stage',
+      terminal: false,
+      failed: false,
+    });
+  });
+
   it('fails closed on an unknown persisted status', async () => {
     authedFetch.mockResolvedValueOnce(new Response(JSON.stringify({
       lookup_id: 'lookup-status-3',

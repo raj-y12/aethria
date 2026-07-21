@@ -281,13 +281,13 @@ async def test_manual_requeue_adds_one_attempt_without_changing_job_identity():
 
 
 @pytest.mark.asyncio
-async def test_block_is_structured_tenant_scoped_and_preserves_retry_budget():
+async def test_block_is_structured_tenant_scoped_and_preserves_monotonic_attempt():
     repository_module = importlib.import_module("jobs.repository")
     connection = _Connection(
         fetchrows=[
             _row(
                 status="blocked",
-                attempts=0,
+                attempts=1,
                 block_code="identity_review_required",
                 block_detail="Ambiguous company identity.",
                 recovery_action="Resolve identity case and retry.",
@@ -308,7 +308,7 @@ async def test_block_is_structured_tenant_scoped_and_preserves_retry_budget():
     assert result.status is JobStatus.BLOCKED
     assert result.block_code == "identity_review_required"
     sql = connection.calls[0][1].lower()
-    assert "attempts = greatest(attempts - 1, 0)" in sql
+    assert "attempts = greatest(attempts - 1, 0)" not in sql
     assert "user_id = $2" in sql
     assert any("agent_job.blocked" in str(call) for call in connection.calls)
 

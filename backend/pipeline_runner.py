@@ -11,7 +11,6 @@ import env_config
 import metrics
 import resource
 import time
-from datetime import datetime, timezone
 from utils.timeutil import utcnow
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Dict, Optional
@@ -48,7 +47,6 @@ from pipeline_execution import (
     StageExecutionState,
 )
 from pipeline_concurrency import pipeline_execution_slot, lookup_execution_slot
-from supabase_doc_store import list_upsert
 from utils.settings_loader import load_settings, is_thesis_reprocess_agents_enabled
 from supabase_client import get_service_client
 from supabase_storage import SupabaseStartupsStorage
@@ -401,86 +399,6 @@ async def _admit_autonomous_discoveries(
             legacy_startup_id=startup_id,
         )
     return admissions
-
-
-async def _record_lookup_failure(user_id: str, lookup_id: Optional[str], message: str) -> None:
-    lid = (lookup_id or "").strip()
-    if not lid or not user_id or not str(user_id).strip():
-        return
-    use_supabase = env_config.use_supabase_storage()
-    if not use_supabase:
-        return
-    uid = user_id.strip()
-    text = (message or "Lookup failed.").strip()[:500]
-    try:
-        await asyncio.to_thread(
-            list_upsert,
-            "lookup_job_outcomes",
-            {
-                "id": lid,
-                "lookup_id": lid,
-                "status": "failed",
-                "code": "lookup_failed",
-                "detail": text,
-                "message": text,
-                "recovery_action": "Retry the lookup after checking worker availability.",
-                "failed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            },
-            user_id=uid,
-        )
-    except Exception as e:
-        logger.warning(
-            "[%s] Could not persist lookup failure for %s: %s",
-            uid[:12],
-            lid[:16],
-            e,
-        )
-
-
-async def _record_lookup_execution_result(
-    user_id: str,
-    lookup_id: Optional[str],
-    result: PipelineExecutionResult,
-) -> None:
-    """Persist an actionable non-completed direct-worker result for the UI."""
-    lid = (lookup_id or "").strip()
-    uid = (user_id or "").strip()
-    if not lid or not uid or not env_config.use_supabase_storage():
-        return
-    status = result.state.value
-    compatibility_status = result.metadata.get("lookup_status")
-    if compatibility_status is not None:
-        try:
-            status = LookupExecutionStatus(str(compatibility_status)).value
-        except ValueError:
-            status = result.state.value
-    detail = str(result.metadata.get("lookup_detail") or result.detail).strip()[:500]
-    record = {
-        "id": lid,
-        "lookup_id": lid,
-        "status": status,
-        "code": result.code,
-        "detail": detail,
-        "message": detail,
-        "recovery_action": result.recovery_action,
-        "failed_stage": result.failed_stage,
-        "startup_id": result.startup_id,
-    }
-    record = {key: value for key, value in record.items() if value is not None}
-    try:
-        await asyncio.to_thread(
-            list_upsert,
-            "lookup_job_outcomes",
-            record,
-            user_id=uid,
-        )
-    except Exception as exc:
-        logger.warning(
-            "[%s] Could not persist typed lookup result for %s: %s",
-            uid[:12],
-            lid[:16],
-            exc,
-        )
 
 
 async def _mark_lookup_pipeline_failed(
@@ -1034,7 +952,6 @@ async def run_on_demand_lookup(
             code="empty_company_name",
             detail="The lookup was skipped because no company name was provided.",
         )
-        await _record_lookup_execution_result(uid, lookup_id, result)
         return result
 
     try:
@@ -1064,7 +981,6 @@ async def run_on_demand_lookup(
                 institutional_context=institutional_context,
                 evaluation_prerequisites=evaluation_prerequisites,
             )
-        await _record_lookup_execution_result(uid, lookup_id, result)
         return result
     except EvaluationPrerequisiteError as exc:
         result = PipelineExecutionResult.blocked(
@@ -1072,7 +988,6 @@ async def run_on_demand_lookup(
             detail=exc.detail,
             recovery_action=exc.recovery_action,
         )
-        await _record_lookup_execution_result(uid, lookup_id, result)
         return result
 
 
@@ -1147,11 +1062,6 @@ async def _run_on_demand_lookup_inner(
     use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
         logger.info("[%s] Skipping lookup (USE_SUPABASE_STORAGE not set)", user_id[:12])
-        await _record_lookup_failure(
-            user_id,
-            lid,
-            "On-demand lookup requires Supabase storage (USE_SUPABASE_STORAGE).",
-        )
         return PipelineExecutionResult.blocked(
             code="supabase_storage_required",
             detail="On-demand lookup requires Supabase storage.",
@@ -1161,11 +1071,6 @@ async def _run_on_demand_lookup_inner(
     if not api_key:
         logger.warning("[%s] OPENAI_API_KEY missing, skipping lookup", user_id[:12])
         _visible_logger.warning("[%s] Lookup skipped: OPENAI_API_KEY not set", user_id[:12])
-        await _record_lookup_failure(
-            user_id,
-            lid,
-            "OpenAI API key is not configured; lookup was not run.",
-        )
         return PipelineExecutionResult.blocked(
             code="openai_api_key_required",
             detail="OPENAI_API_KEY is required for on-demand lookup.",
@@ -1176,11 +1081,6 @@ async def _run_on_demand_lookup_inner(
         storage = await asyncio.to_thread(_build_storage_sync, user_id)
     except Exception as e:
         logger.warning("[%s] Failed to create storage for lookup: %s", user_id[:12], e)
-        await _record_lookup_failure(
-            user_id,
-            lid,
-            "Could not connect to storage for this lookup.",
-        )
         return PipelineExecutionResult.blocked(
             code="startup_storage_unavailable",
             detail="Tenant startup storage could not be initialized for lookup.",
@@ -1272,12 +1172,6 @@ async def _run_on_demand_lookup_inner(
                 pipeline_run_id=lookup_run_id,
             )
             if not startup_id:
-                await _record_lookup_failure(
-                    user_id,
-                    lid,
-                    "Re-review could not find the original record. It may have been "
-                    "removed — run a fresh lookup.",
-                )
                 metrics.inc_lookup("not_found")
                 return PipelineExecutionResult.stage_failure(
                     stage="scout",
@@ -1318,7 +1212,6 @@ async def _run_on_demand_lookup_inner(
                 company,
                 outcome.get("status") or "unknown",
             )
-            await _record_lookup_failure(user_id, lid, message)
             metrics.inc_lookup("not_found")
             return PipelineExecutionResult.stage_failure(
                 stage="scout",
@@ -1362,7 +1255,6 @@ async def _run_on_demand_lookup_inner(
             logger.warning("[%s] On-demand lookup not reviewed: %s", user_id[:12], startup_id)
             message = "Lookup found the company, but analyst review could not complete after retrying."
             await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
-            await _record_lookup_failure(user_id, lid, message)
             metrics.inc_lookup("error")
             return PipelineExecutionResult.stage_failure(
                 stage="reviewer",
@@ -1399,7 +1291,6 @@ async def _run_on_demand_lookup_inner(
             logger.warning("[%s] On-demand lookup not decided yet: %s", user_id[:12], startup_id)
             message = "Lookup review completed, but the partner decision could not complete after retrying."
             await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
-            await _record_lookup_failure(user_id, lid, message)
             metrics.inc_lookup("error")
             return PipelineExecutionResult.stage_failure(
                 stage="partner",
@@ -1483,11 +1374,6 @@ async def _run_on_demand_lookup_inner(
         message = "Lookup failed with an unexpected error. Try again or check server logs."
         if startup_id:
             await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
-        await _record_lookup_failure(
-            user_id,
-            lid,
-            message,
-        )
         if isinstance(e, EvaluationPrerequisiteError):
             raise
         return PipelineExecutionResult.stage_failure(

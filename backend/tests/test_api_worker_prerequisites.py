@@ -3,6 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from jobs.lookup_outcomes import LookupAttemptOutcome
+from jobs.models import AgentJob, CompanyLookupPayload, JobStatus, JobType
 from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
 
 
@@ -81,7 +83,9 @@ async def test_agent_worker_passes_governed_repository_to_direct_cycle(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_lookup_worker_passes_governed_repository_to_direct_lookup(monkeypatch):
+async def test_lookup_worker_owns_attempt_lifecycle_and_passes_governed_repository(
+    monkeypatch,
+):
     import api
 
     governed_repository = object()
@@ -94,6 +98,7 @@ async def test_lookup_worker_passes_governed_repository_to_direct_lookup(monkeyp
         }
     )
     calls = []
+    outcomes = []
 
     async def run(user_id, company_name, **kwargs):
         calls.append((user_id, company_name, kwargs))
@@ -103,9 +108,14 @@ async def test_lookup_worker_passes_governed_repository_to_direct_lookup(monkeyp
             startup_id="startup-1",
         )
 
+    async def persist(outcome):
+        outcomes.append(outcome)
+        return outcome
+
     monkeypatch.setattr(api, "_lookup_queue", queue)
     monkeypatch.setattr(api, "_is_lookup_cancelled", lambda *_args: False)
     monkeypatch.setattr(api, "run_on_demand_lookup", run)
+    monkeypatch.setattr(api, "_persist_legacy_lookup_attempt", persist, raising=False)
     monkeypatch.setattr(
         api.app.state,
         "fund_intelligence_repository",
@@ -117,6 +127,11 @@ async def test_lookup_worker_passes_governed_repository_to_direct_lookup(monkeyp
 
     assert calls[0][0:2] == ("user-a", "Acme")
     assert calls[0][2]["fund_intelligence_repository"] is governed_repository
+    assert calls[0][2]["pipeline_run_id"]
+    assert [item.disposition.value for item in outcomes] == [
+        "accepted",
+        "succeeded",
+    ]
     assert queue.completed == 1
 
 
@@ -199,80 +214,66 @@ async def test_agent_worker_records_unexpected_boundary_failure_as_error(monkeyp
     assert statuses == [("user-a", "error", None)]
 
 
+def _lookup_job(*, attempts=1, max_attempts=3):
+    return AgentJob(
+        job_id="job-contract-1",
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup:user-a:lookup-contract-1",
+        payload=CompanyLookupPayload(
+            user_id="user-a",
+            company_name="Acme",
+            lookup_id="lookup-contract-1",
+        ),
+        status=JobStatus.RUNNING,
+        attempts=attempts,
+        max_attempts=max_attempts,
+        pipeline_run_id="pipeline-contract-1",
+    )
+
+
 @pytest.mark.parametrize(
-    ("row", "expected"),
+    ("outcome", "expected"),
     [
         (None, {"status": "pending", "terminal": False, "failed": False}),
         (
-            {"status": "accepted"},
+            LookupAttemptOutcome.accepted_for_job(_lookup_job()),
             {"status": "accepted", "terminal": False, "failed": False},
         ),
         (
-            {"status": "completed", "startup_id": "startup-1"},
-            {"status": "completed", "terminal": True, "failed": False},
+            LookupAttemptOutcome.from_pipeline_result(
+                _lookup_job(attempts=1, max_attempts=3),
+                PipelineExecutionResult.stage_failure(
+                    stage="reviewer",
+                    code="reviewer_stage_failed",
+                    detail="Reviewer could not complete.",
+                    recovery_action="Inspect Reviewer logs and retry.",
+                ),
+            ),
+            {"status": "failed_stage", "terminal": False, "failed": False},
         ),
         (
-            {
-                "status": "blocked",
-                "code": "openai_api_key_required",
-                "detail": "OpenAI is not configured.",
-                "recovery_action": "Configure OPENAI_API_KEY and retry.",
-            },
-            {"status": "blocked", "terminal": True, "failed": True},
-        ),
-        (
-            {"status": "skipped", "code": "lookup_cancelled"},
-            {"status": "skipped", "terminal": True, "failed": False},
-        ),
-        (
-            {
-                "status": "failed_stage",
-                "code": "reviewer_stage_failed",
-                "failed_stage": "reviewer",
-                "detail": "Reviewer could not complete.",
-                "recovery_action": "Inspect Reviewer logs and retry.",
-            },
+            LookupAttemptOutcome.from_pipeline_result(
+                _lookup_job(attempts=3, max_attempts=3),
+                PipelineExecutionResult.stage_failure(
+                    stage="reviewer",
+                    code="reviewer_stage_failed",
+                    detail="Reviewer could not complete.",
+                    recovery_action="Inspect Reviewer logs and retry.",
+                ),
+            ),
             {"status": "failed_stage", "terminal": True, "failed": True},
         ),
-        (
-            {"status": "failed", "message": "Legacy worker failure."},
-            {"status": "failed", "terminal": True, "failed": True},
-        ),
-        (
-            {
-                "status": "already_in_deal_flow",
-                "startup_id": "startup-existing",
-            },
-            {
-                "status": "already_in_deal_flow",
-                "terminal": True,
-                "failed": False,
-            },
-        ),
-        (
-            {"status": "mystery_state"},
-            {"status": "failed", "terminal": True, "failed": True},
-        ),
     ],
-    ids=[
-        "pending",
-        "accepted",
-        "completed",
-        "blocked",
-        "skipped",
-        "failed-stage",
-        "legacy-failed",
-        "existing-company",
-        "invalid-status",
-    ],
+    ids=["missing", "accepted", "retryable-failure", "terminal-failure"],
 )
-def test_lookup_status_api_preserves_unified_terminal_state_and_metadata(
-    monkeypatch, row, expected
+def test_lookup_status_api_selects_attempt_disposition_without_stale_terminal_inference(
+    monkeypatch, outcome, expected
 ):
     import api
 
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
-    monkeypatch.setattr(api, "list_get_by_id", lambda *_args, **_kwargs: row)
+    monkeypatch.setattr(api, "latest_lookup_attempt", lambda *_args, **_kwargs: outcome)
 
     response = api.lookup_job_status(
         SimpleNamespace(state=SimpleNamespace(user_id="user-a")),
@@ -282,13 +283,30 @@ def test_lookup_status_api_preserves_unified_terminal_state_and_metadata(
     assert response["lookup_id"] == "lookup-contract-1"
     for key, value in expected.items():
         assert response[key] == value
-    if row and row.get("code"):
-        assert response["code"] == row["code"]
-    if row and row.get("failed_stage"):
-        assert response["failed_stage"] == row["failed_stage"]
-    if row and (row.get("detail") or row.get("message")):
-        assert response["detail"] == (row.get("detail") or row.get("message"))
-    if row and row.get("recovery_action"):
-        assert response["recovery_action"] == row["recovery_action"]
-    if row and row.get("status") == "mystery_state":
-        assert response["code"] == "lookup_status_invalid"
+    if outcome:
+        assert response["job_id"] == "job-contract-1"
+        assert response["pipeline_run_id"] == "pipeline-contract-1"
+        assert response["attempt"] == outcome.attempt
+        assert response["disposition"] == outcome.disposition.value
+
+
+def test_lookup_status_api_explicitly_fails_when_outcome_store_is_unavailable(monkeypatch):
+    import api
+    from jobs.lookup_outcomes import LookupOutcomeStoreUnavailable
+
+    monkeypatch.setattr(
+        api,
+        "latest_lookup_attempt",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            LookupOutcomeStoreUnavailable("read failed")
+        ),
+    )
+
+    with pytest.raises(api.HTTPException) as exc:
+        api.lookup_job_status(
+            SimpleNamespace(state=SimpleNamespace(user_id="user-a")),
+            lookup_id="lookup-contract-1",
+        )
+
+    assert exc.value.status_code == 503
+    assert exc.value.detail["reason"] == "lookup_outcome_store_unavailable"

@@ -19,6 +19,7 @@ from jobs.models import (
     JobType,
     PipelineCyclePayload,
 )
+from jobs.lookup_outcomes import LookupAttemptOutcome, record_lookup_attempt
 from evidence.repository import EvidenceRepository
 from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
@@ -53,6 +54,13 @@ async def _checkpoint(repository, job, stage, status, metadata):
         output_metadata=metadata,
     )
     await _raise_if_cancelled(repository, job)
+
+
+async def _persist_lookup_attempt(
+    outcome: LookupAttemptOutcome,
+) -> LookupAttemptOutcome:
+    """Keep blocking Supabase I/O off the worker event loop without hiding errors."""
+    return await asyncio.to_thread(record_lookup_attempt, outcome)
 
 
 async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
@@ -99,7 +107,7 @@ async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
     await _checkpoint(repository, job, "pipeline_cycle", "succeeded", metadata)
 
 
-async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
+async def _execute_company_lookup(repository: Any, job: AgentJob) -> PipelineExecutionResult:
     payload = CompanyLookupPayload.model_validate(job.payload)
     await _raise_if_cancelled(repository, job)
     resolution = (
@@ -261,18 +269,58 @@ async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
         )
     if result.state is PipelineExecutionState.BLOCKED:
         await _checkpoint(repository, job, "lookup_result", "failed", result_metadata)
+    elif result.state is PipelineExecutionState.FAILED_STAGE:
+        await _checkpoint(repository, job, "lookup_result", "failed", result_metadata)
+    elif result.state is PipelineExecutionState.COMPLETED:
+        if not startup_id:
+            raise RuntimeError("Completed company lookup did not produce a startup record")
+        await _checkpoint(repository, job, "lookup_result", "succeeded", result_metadata)
+    else:
+        await _checkpoint(repository, job, "lookup_result", "succeeded", result_metadata)
+    return result
+
+
+async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
+    """Execute one lookup attempt with a lossless, central lifecycle record."""
+    await _persist_lookup_attempt(LookupAttemptOutcome.accepted_for_job(job))
+    try:
+        result = await _execute_company_lookup(repository, job)
+    except JobExecutionCancelled:
+        await _persist_lookup_attempt(
+            LookupAttemptOutcome.cancelled_for_job(
+                job, detail="The lookup job was cancelled before completion."
+            )
+        )
+        raise
+    except JobExecutionBlocked as exc:
+        await _persist_lookup_attempt(
+            LookupAttemptOutcome.blocked_for_job(
+                job,
+                code=exc.code,
+                detail=exc.detail or "Lookup execution is blocked.",
+                recovery_action=exc.recovery_action,
+            )
+        )
+        raise
+    except Exception as exc:
+        await _persist_lookup_attempt(
+            LookupAttemptOutcome.failed_for_job(
+                job,
+                detail=str(exc).strip() or "Lookup attempt failed unexpectedly.",
+                recovery_action="Retry the lookup after checking worker and provider availability.",
+            )
+        )
+        raise
+
+    await _persist_lookup_attempt(LookupAttemptOutcome.from_pipeline_result(job, result))
+    if result.state is PipelineExecutionState.BLOCKED:
         raise JobExecutionBlocked(
             code=result.code,
             detail=result.detail,
             recovery_action=result.recovery_action or "Correct the prerequisite and retry.",
         )
     if result.state is PipelineExecutionState.FAILED_STAGE:
-        await _checkpoint(repository, job, "lookup_result", "failed", result_metadata)
         raise RuntimeError(f"{result.code}: {result.detail}")
-    if result.state is PipelineExecutionState.COMPLETED:
-        if not startup_id:
-            raise RuntimeError("Completed company lookup did not produce a startup record")
-    await _checkpoint(repository, job, "lookup_result", "succeeded", result_metadata)
 
 
 async def evidence_refresh_handler(repository: Any, job: AgentJob) -> None:

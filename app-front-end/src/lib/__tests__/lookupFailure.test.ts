@@ -24,7 +24,7 @@ describe('resolveLookupFailure', () => {
   });
 
   it.each(['blocked', 'failed_stage'] as const)(
-    'treats %s as terminal actionable failure even without the legacy failed flag',
+    'does not surface %s as terminal when the attempt is explicitly retryable',
     (status) => {
       expect(
         resolveLookupFailure({
@@ -36,7 +36,7 @@ describe('resolveLookupFailure', () => {
             recovery_action: 'Correct the configuration and retry.',
           },
         }),
-      ).toBe('Evaluation could not continue. Correct the configuration and retry.');
+      ).toBeUndefined();
     },
   );
 });

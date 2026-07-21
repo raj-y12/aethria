@@ -28,11 +28,7 @@ export function resolveLookupFailure({
   if (hasMatchedStartup && memoStatus?.status === 'failed') {
     return memoStatus.error?.trim() || 'The lookup pipeline failed after finding the company.';
   }
-  if (
-    jobStatus?.failed
-    || jobStatus?.status === 'blocked'
-    || jobStatus?.status === 'failed_stage'
-  ) {
+  if (jobStatus?.failed) {
     return actionableStatusMessage(jobStatus) || 'Lookup failed.';
   }
   if (jobStatus?.status === 'skipped') {

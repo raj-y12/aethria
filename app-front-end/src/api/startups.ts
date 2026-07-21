@@ -138,6 +138,18 @@ export const LOOKUP_EXECUTION_STATUSES = [
 
 export type LookupExecutionStatus = (typeof LOOKUP_EXECUTION_STATUSES)[number];
 
+const LOOKUP_ATTEMPT_DISPOSITIONS = [
+  'accepted',
+  'succeeded',
+  'blocked',
+  'skipped',
+  'cancelled',
+  'retryable_failure',
+  'terminal_failure',
+] as const;
+
+export type LookupAttemptDisposition = (typeof LOOKUP_ATTEMPT_DISPOSITIONS)[number];
+
 const LOOKUP_TERMINAL_STATUSES = new Set<LookupExecutionStatus>([
   'completed',
   'blocked',
@@ -169,6 +181,11 @@ export type LookupJobStatus = {
   failed: boolean;
   terminal: boolean;
   status: LookupExecutionStatus;
+  job_id?: string;
+  pipeline_run_id?: string;
+  attempt?: number;
+  disposition?: LookupAttemptDisposition;
+  recorded_at?: string;
   startup_id?: string;
   code?: string;
   failed_stage?: string;
@@ -218,9 +235,26 @@ export async function fetchLookupJobStatus(lookupId: string): Promise<LookupJobS
       : undefined;
   return {
     lookup_id: typeof data?.lookup_id === 'string' ? data.lookup_id : id,
-    failed: LOOKUP_FAILURE_STATUSES.has(status),
-    terminal: isLookupTerminalStatus(status),
+    failed: typeof data?.failed === 'boolean'
+      ? data.failed
+      : LOOKUP_FAILURE_STATUSES.has(status),
+    terminal: typeof data?.terminal === 'boolean'
+      ? data.terminal
+      : isLookupTerminalStatus(status),
     status,
+    job_id: typeof data?.job_id === 'string' ? data.job_id : undefined,
+    pipeline_run_id:
+      typeof data?.pipeline_run_id === 'string' ? data.pipeline_run_id : undefined,
+    attempt:
+      typeof data?.attempt === 'number' && Number.isInteger(data.attempt) && data.attempt >= 1
+        ? data.attempt
+        : undefined,
+    disposition:
+      typeof data?.disposition === 'string'
+      && (LOOKUP_ATTEMPT_DISPOSITIONS as readonly string[]).includes(data.disposition)
+        ? data.disposition as LookupAttemptDisposition
+        : undefined,
+    recorded_at: typeof data?.recorded_at === 'string' ? data.recorded_at : undefined,
     startup_id: typeof data?.startup_id === 'string' ? data.startup_id : undefined,
     code: typeof data?.code === 'string' ? data.code : undefined,
     failed_stage: typeof data?.failed_stage === 'string' ? data.failed_stage : undefined,
