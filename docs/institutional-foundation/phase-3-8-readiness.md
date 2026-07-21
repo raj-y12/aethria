@@ -8,6 +8,29 @@ The code-level evidence-and-decision platform is implemented through Phase 8, in
 
 The product authority model is now explicit: agents discover, extract, evaluate, recommend, draft, monitor, and propose; authenticated people rule, approve external actions, correct evidence, resolve identity, accept policy proposals, and publish policy.
 
+## Post-interruption stabilization (2026-07-21)
+
+The Codex run was cut off by its weekly limit mid-implementation of the
+`EvaluationPrerequisites.dependency_identity` / scoring-runtime binding. That
+in-progress work was left uncommitted in the worktree and is now preserved
+verbatim in commit `241af513` (a WIP checkpoint, **not** a finished unit).
+
+At the point of interruption the committed HEAD had one regressed test,
+`test_production_legacy_loader_binds_exact_published_fund_config`, which
+asserted object identity (`is`) against the validated/normalized bundle the
+prerequisite loader now returns. Fixed in `c193df6e` (identity → value
+equality). Re-verified backend only:
+
+```bash
+cd backend && pytest -q
+# 1,213 passed, 10 skipped, 1 warning
+```
+
+**Not re-verified in this stabilization pass** (the 2026-07-20 figures below
+predate the interruption and have not been re-measured): frontend vitest,
+lint, production build, golden set v7, and the decision-safety certification
+suite. Re-run those before trusting the "all green" record.
+
 ## Implemented behavior
 
 ### Evidence and founder assessment
