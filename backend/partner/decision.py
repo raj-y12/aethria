@@ -27,6 +27,7 @@ from evaluation_v2.partner_rules import (
     LLMFallbackTriggers,
     NextActions,
     PartnerRules,
+    PartnerRulesV3,
     boundary_comparisons,
     parse_partner_rules,
     partner_rules_document,
@@ -802,13 +803,22 @@ class PartnerDecisionEngine:
             and grey_zone_min <= grey_zone_score <= grey_zone_max
         )
 
-        min_avg_pass = float(score_thresholds.min_avg_pass)
-        min_avg_strong_yes = float(score_thresholds.min_avg_strong_yes)
+        if self.evaluation_policy is not None:
+            # Governed execution has one immutable threshold authority: the
+            # EvaluationPolicy compiled from the exact, hash-bound active
+            # Partner rules. Published tenant decision_inputs remain available
+            # as workflow/display configuration, but cannot create a second
+            # decision ladder after the governed policy has been certified.
+            min_avg_pass = float(self.evaluation_policy.pass_threshold)
+            min_avg_strong_yes = float(self.evaluation_policy.advance_threshold)
+        else:
+            min_avg_pass = float(score_thresholds.min_avg_pass)
+            min_avg_strong_yes = float(score_thresholds.min_avg_strong_yes)
         min_avg_medium_maybe = float(score_thresholds.min_avg_medium_maybe)
         min_avg_borderline_low = float(score_thresholds.min_avg_borderline_low)
         max_avg_borderline_high = float(score_thresholds.max_avg_borderline_high)
         fc_thresholds = self._fund_config.get("thresholds") if isinstance(self._fund_config.get("thresholds"), dict) else {}
-        if fc_thresholds:
+        if self.evaluation_policy is None and fc_thresholds:
             try:
                 min_avg_pass = float(fc_thresholds.get("partnerReview", min_avg_pass * 10)) / 10.0
                 min_avg_strong_yes = float(fc_thresholds.get("escalation", min_avg_strong_yes * 10)) / 10.0
@@ -993,6 +1003,14 @@ class PartnerDecisionEngine:
         weak_rule = verdict_rules.weak
         strong_rule = verdict_rules.strong
         medium_rule = verdict_rules.medium
+        historical_v3 = isinstance(rules, PartnerRulesV3)
+
+        def _branch_recommendation(configured: str) -> str:
+            # v3 was score-authoritative: verdict branches controlled
+            # conviction/review routing but never replaced the score-band
+            # recommendation. v4 intentionally made verdict decisions
+            # authoritative, so dispatch explicitly by the parsed rules type.
+            return score_recommendation if historical_v3 else configured
 
         def _aligned_rationale(
             recommendation: str,
@@ -1043,13 +1061,24 @@ class PartnerDecisionEngine:
             next_action: Optional[str] = None,
         ) -> Dict[str, Any]:
             effective_human_review = bool(human_rev or has_red_flags)
-            effective_next_action = (
-                next_action
-                if next_action is not None
-                else _default_deterministic_action(
-                    recommendation, effective_human_review
+            if historical_v3:
+                # Preserve v3's recommendation-derived action mapping. The one
+                # historical exception was the critical-risk action.
+                effective_next_action = (
+                    next_actions.critical_risks
+                    if next_action == next_actions.critical_risks
+                    else self._next_action_for_llm_decision(
+                        recommendation, next_actions
+                    )
                 )
-            )
+            else:
+                effective_next_action = (
+                    next_action
+                    if next_action is not None
+                    else _default_deterministic_action(
+                        recommendation, effective_human_review
+                    )
+                )
             rationale, drivers = _aligned_rationale(recommendation)
             result = self._create_decision(
                 recommendation=recommendation,
@@ -1089,7 +1118,9 @@ class PartnerDecisionEngine:
         # Rule 2: WEAK verdict (portfolio-aware conviction like other branches)
         if effective_verdict == "WEAK":
             return _emit_deterministic(
-                recommendation_from_legacy(weak_rule.decision),
+                _branch_recommendation(
+                    recommendation_from_legacy(weak_rule.decision)
+                ),
                 weak_rule.conviction_level + conviction_adjust,
                 weak_rule.human_review_required,
                 next_action=weak_rule.next_action,
@@ -1158,8 +1189,10 @@ class PartnerDecisionEngine:
         # Rule 4: STRONG verdict, pass bar met but below YES bar
         if effective_verdict == "STRONG" and min_avg_pass <= avg_score < min_avg_strong_yes:
             return _emit_deterministic(
-                recommendation_from_legacy(
-                    strong_rule.decision_below_strong_yes_bar
+                _branch_recommendation(
+                    recommendation_from_legacy(
+                        strong_rule.decision_below_strong_yes_bar
+                    )
                 ),
                 strong_rule.conviction_level_below_strong_yes_bar + conviction_adjust,
                 strong_rule.human_review_required_below_strong_yes_bar,
@@ -1170,15 +1203,17 @@ class PartnerDecisionEngine:
         if effective_verdict == "STRONG" and avg_score >= min_avg_strong_yes:
             human_review = strong_rule.human_review_required_yes or has_missing_critical_qualitative
             return _emit_deterministic(
-                recommendation_from_legacy(strong_rule.decision_yes),
+                _branch_recommendation(
+                    recommendation_from_legacy(strong_rule.decision_yes)
+                ),
                 strong_rule.conviction_level_yes + conviction_adjust,
                 human_review,
             )
 
         # Rule 6: MEDIUM verdict + strong average → optional LLM escalation
         if effective_verdict == "MEDIUM" and avg_score >= min_avg_medium_maybe:
-            branch_recommendation = recommendation_from_legacy(
-                medium_rule.decision_maybe
+            branch_recommendation = _branch_recommendation(
+                recommendation_from_legacy(medium_rule.decision_maybe)
             )
             llm_triggers = rules.llm_fallback_triggers
             trigger_reason = ""
@@ -1248,8 +1283,10 @@ class PartnerDecisionEngine:
 
         # Rule 7: MEDIUM borderline band
         if effective_verdict == "MEDIUM" and min_avg_borderline_low <= avg_score < max_avg_borderline_high:
-            branch_recommendation = recommendation_from_legacy(
-                medium_rule.decision_borderline_no_llm
+            branch_recommendation = _branch_recommendation(
+                recommendation_from_legacy(
+                    medium_rule.decision_borderline_no_llm
+                )
             )
             llm_triggers = rules.llm_fallback_triggers
             is_edge_case = self._is_medium_borderline_edge_case(
