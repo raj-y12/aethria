@@ -35,7 +35,11 @@ class AuthorityContext:
 
     @property
     def legacy_projection_allowed(self) -> bool:
-        return not self.kill_switch and self.mode is not RolloutMode.CANONICAL_READ
+        return not self.kill_switch and self.mode in {
+            RolloutMode.LEGACY,
+            RolloutMode.BACKFILL,
+            RolloutMode.CANONICAL_WRITE,
+        }
 
 
 class AuthorityService:
@@ -95,6 +99,31 @@ class AuthorityService:
             snapshot_id=None,
             kill_switch=True,
             rollback_reason=normalized_reason,
+        )
+
+    async def rearm(
+        self,
+        *,
+        user_id: str,
+        expected_version: int,
+        actor_id: str,
+        reason: str,
+    ) -> RolloutRecord:
+        """Clear a rollback kill switch only through the audited recovery path."""
+        uid = require_user_id(user_id, context="AuthorityService.rearm")
+        normalized_reason = str(reason or "").strip()
+        if not normalized_reason:
+            raise ValueError("rearm reason is required")
+        context = await self.authority(user_id=uid)
+        if not context.kill_switch:
+            raise AuthorityTransitionError("authority kill switch is not active")
+        if context.last_reconciliation_status != "green":
+            raise AuthorityBlocked("authority re-arm requires green reconciliation")
+        return await self.repository.rearm_rollout(
+            user_id=uid,
+            expected_version=expected_version,
+            actor_id=actor_id,
+            reason=normalized_reason,
         )
 
 

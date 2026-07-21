@@ -128,6 +128,34 @@ async def test_rollout_rejects_legacy_to_canonical_write():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("reconciliation_status", [None, "pending"])
+async def test_rollout_rejects_canonical_read_until_reconciliation_is_green(
+    reconciliation_status,
+):
+    connection = _Connection(
+        fetchrows=[
+            _rollout_row(
+                mode="canonical_write",
+                version=3,
+                last_reconciliation_status=reconciliation_status,
+            )
+        ]
+    )
+    repository = AuthorityRepository(_Pool(connection))
+
+    with pytest.raises(AuthorityTransitionError, match="reconciliation"):
+        await repository.transition_rollout(
+            user_id="tenant-a",
+            expected_version=3,
+            target_mode=RolloutMode.CANONICAL_READ,
+            actor_id="operator-a",
+            snapshot_id=None,
+        )
+
+    assert not any("domain_outbox" in call[1] for call in connection.calls)
+
+
+@pytest.mark.asyncio
 async def test_rollout_allows_ordered_transition_and_writes_outbox_in_transaction():
     connection = _Connection(
         fetchrows=[
@@ -164,8 +192,12 @@ async def test_rollout_allows_each_step_of_the_ordered_cutover():
             _rollout_row(mode="backfill", version=2),
             _rollout_row(mode="backfill", version=2),
             _rollout_row(mode="canonical_write", version=3),
-            _rollout_row(mode="canonical_write", version=3),
-            _rollout_row(mode="canonical_read", version=4),
+            _rollout_row(
+                mode="canonical_write", version=3, last_reconciliation_status="green"
+            ),
+            _rollout_row(
+                mode="canonical_read", version=4, last_reconciliation_status="green"
+            ),
         ]
     )
     repository = AuthorityRepository(_Pool(connection))
@@ -294,3 +326,61 @@ async def test_workflow_change_and_outbox_are_atomic_when_outbox_fails():
 
     assert any("update public.opportunities" in call[1].lower() for call in connection.calls)
     assert any("domain_outbox" in call[1].lower() for call in connection.calls)
+
+
+@pytest.mark.asyncio
+async def test_rearm_clears_kill_switch_only_with_green_reconciliation_and_audits_it():
+    connection = _Connection(
+        fetchrows=[
+            _rollout_row(
+                mode="legacy",
+                version=6,
+                kill_switch=True,
+                last_reconciliation_status="green",
+            ),
+            _rollout_row(
+                mode="legacy",
+                version=7,
+                kill_switch=False,
+                last_reconciliation_status="green",
+            ),
+        ]
+    )
+    repository = AuthorityRepository(_Pool(connection))
+
+    record = await repository.rearm_rollout(
+        user_id="tenant-a",
+        expected_version=6,
+        actor_id="operator-a",
+        reason="reconciliation repaired",
+    )
+
+    assert record.kill_switch is False
+    assert record.version == 7
+    sql = "\n".join(call[1].lower() for call in connection.calls)
+    assert "where user_id=$1 and version=$2 and kill_switch=true" in sql
+    assert "authority.kill_switch_cleared" in str(connection.calls)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [None, "pending"])
+async def test_rearm_repository_requires_green_reconciliation(status):
+    connection = _Connection(
+        fetchrows=[
+            _rollout_row(
+                mode="legacy",
+                version=6,
+                kill_switch=True,
+                last_reconciliation_status=status,
+            )
+        ]
+    )
+    repository = AuthorityRepository(_Pool(connection))
+
+    with pytest.raises(AuthorityBlocked, match="reconciliation"):
+        await repository.rearm_rollout(
+            user_id="tenant-a",
+            expected_version=6,
+            actor_id="operator-a",
+            reason="reconciliation repaired",
+        )

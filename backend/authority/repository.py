@@ -163,6 +163,13 @@ class AuthorityRepository:
                     raise AuthorityTransitionError(
                         f"illegal authority rollout transition: {current.mode.value} -> {target.value}"
                     )
+                if (
+                    target is RolloutMode.CANONICAL_READ
+                    and current.last_reconciliation_status != "green"
+                ):
+                    raise AuthorityTransitionError(
+                        "canonical read requires green reconciliation"
+                    )
                 row = await conn.fetchrow(
                     """
                     update public.tenant_authority_rollouts
@@ -202,6 +209,75 @@ class AuthorityRepository:
                     aggregate_id=uid,
                     event_type=event_type,
                     payload=payload,
+                )
+                return updated
+
+    async def rearm_rollout(
+        self,
+        *,
+        user_id: str,
+        expected_version: int,
+        actor_id: str,
+        reason: str,
+    ) -> RolloutRecord:
+        """Explicitly clear a rollback kill switch after reconciliation succeeds."""
+        uid = require_user_id(user_id, context="AuthorityRepository.rearm_rollout")
+        actor = str(actor_id or "").strip()
+        normalized_reason = str(reason or "").strip()
+        if not actor:
+            raise ValueError("actor_id is required")
+        if type(expected_version) is not int or expected_version < 0:
+            raise ValueError("expected_version must be a non-negative integer")
+        if not normalized_reason:
+            raise ValueError("rearm reason is required")
+
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                await self._bootstrap_rollout(conn, user_id=uid)
+                current = self._rollout(
+                    await conn.fetchrow(
+                        """
+                        select * from public.tenant_authority_rollouts
+                        where user_id=$1 for update
+                        """,
+                        uid,
+                    ),
+                    user_id=uid,
+                )
+                if current.version != expected_version:
+                    raise AuthorityConflict("stale authority rollout version")
+                if not current.kill_switch:
+                    raise AuthorityTransitionError("authority kill switch is not active")
+                if current.mode is not RolloutMode.LEGACY:
+                    raise AuthorityTransitionError("authority re-arm requires legacy rollout mode")
+                if current.last_reconciliation_status != "green":
+                    raise AuthorityBlocked("authority re-arm requires green reconciliation")
+                row = await conn.fetchrow(
+                    """
+                    update public.tenant_authority_rollouts
+                    set kill_switch=false,version=version+1,activated_at=now(),activated_by=$3
+                    where user_id=$1 and version=$2 and kill_switch=true
+                    returning *
+                    """,
+                    uid,
+                    expected_version,
+                    actor,
+                )
+                updated = self._rollout(row, user_id=uid)
+                await self._outbox(
+                    conn,
+                    user_id=uid,
+                    aggregate_type="authority_rollout",
+                    aggregate_id=uid,
+                    event_type="authority.kill_switch_cleared",
+                    payload={
+                        "user_id": uid,
+                        "mode": updated.mode.value,
+                        "version": updated.version,
+                        "actor_id": actor,
+                        "reason": normalized_reason,
+                        "last_reconciliation_status": updated.last_reconciliation_status,
+                    },
                 )
                 return updated
 

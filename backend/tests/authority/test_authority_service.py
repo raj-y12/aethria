@@ -8,6 +8,7 @@ class _Repository:
     def __init__(self, rollout):
         self.rollout = rollout
         self.rollback_calls = []
+        self.rearm_calls = []
 
     async def get_rollout(self, *, user_id):
         assert user_id == self.rollout.user_id
@@ -21,6 +22,13 @@ class _Repository:
                 "version": self.rollout.version + 1,
                 "kill_switch": True,
             }
+        )
+        return self.rollout
+
+    async def rearm_rollout(self, **kwargs):
+        self.rearm_calls.append(kwargs)
+        self.rollout = self.rollout.model_copy(
+            update={"version": self.rollout.version + 1, "kill_switch": False}
         )
         return self.rollout
 
@@ -71,8 +79,10 @@ async def test_require_write_path_returns_explicit_legacy_and_shadow_behavior():
 
     assert legacy_context.mode is RolloutMode.LEGACY
     assert legacy_context.canonical_writes_allowed is False
+    assert legacy_context.legacy_projection_allowed is True
     assert shadow_context.mode is RolloutMode.SHADOW
     assert shadow_context.canonical_writes_allowed is True
+    assert shadow_context.legacy_projection_allowed is False
 
 
 @pytest.mark.asyncio
@@ -111,5 +121,56 @@ async def test_rollback_moves_canonical_tenant_to_killed_legacy_and_emits_audit_
             "snapshot_id": None,
             "kill_switch": True,
             "rollback_reason": "reconciliation mismatch",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_rearm_requires_green_reconciliation_and_explicit_expected_version():
+    repository = _Repository(
+        _rollout(
+            mode=RolloutMode.LEGACY,
+            version=6,
+            kill_switch=True,
+            last_reconciliation_status="pending",
+        )
+    )
+    service = AuthorityService(repository)
+
+    with pytest.raises(AuthorityBlocked, match="reconciliation"):
+        await service.rearm(
+            user_id="tenant-a",
+            expected_version=6,
+            actor_id="operator-a",
+            reason="reconciliation repaired",
+        )
+
+
+@pytest.mark.asyncio
+async def test_rearm_delegates_audited_clear_after_green_reconciliation():
+    repository = _Repository(
+        _rollout(
+            mode=RolloutMode.LEGACY,
+            version=6,
+            kill_switch=True,
+            last_reconciliation_status="green",
+        )
+    )
+    service = AuthorityService(repository)
+
+    record = await service.rearm(
+        user_id="tenant-a",
+        expected_version=6,
+        actor_id="operator-a",
+        reason="reconciliation repaired",
+    )
+
+    assert record.kill_switch is False
+    assert repository.rearm_calls == [
+        {
+            "user_id": "tenant-a",
+            "expected_version": 6,
+            "actor_id": "operator-a",
+            "reason": "reconciliation repaired",
         }
     ]
