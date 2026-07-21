@@ -85,7 +85,7 @@ def test_published_runtime_makes_scoring_environment_independent(monkeypatch):
     after = DeterministicScoringEngine(policy=policy).score(scout, review)
 
     assert after == before
-    assert after["scoring_runtime_version"] == "1.0.0"
+    assert after["scoring_runtime_version"] == "1.1.0"
     assert after["scoring_runtime_hash"] == policy["scoring_runtime_hash"]
 
 

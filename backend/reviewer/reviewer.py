@@ -3,7 +3,7 @@ Concrete Reviewer implementation.
 """
 from reviewer.base import Reviewer
 from reviewer.schema import ReviewerOutput
-from typing import Optional
+from typing import Any, Mapping, Optional
 
 
 class DefaultReviewer(Reviewer):
@@ -19,6 +19,7 @@ class DefaultReviewer(Reviewer):
         tenant_user_id: str = "",
         use_resource_fund_thesis_fallback: bool = True,
         structured_scoring_enabled: bool = False,
+        structured_signal_grounding: Optional[Mapping[str, Any]] = None,
     ):
         self.reviewer_type = "default"
         super().__init__(
@@ -27,6 +28,7 @@ class DefaultReviewer(Reviewer):
             tenant_user_id=tenant_user_id,
             use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
             structured_scoring_enabled=structured_scoring_enabled,
+            structured_signal_grounding=structured_signal_grounding,
         )
 
     async def review(self, scout_output: dict) -> Optional[ReviewerOutput]:

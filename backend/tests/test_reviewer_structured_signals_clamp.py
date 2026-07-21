@@ -115,3 +115,37 @@ def test_clamp_clears_label_when_strict_clear(monkeypatch):
     assert float(cell["confidence"]) <= 0.2
     assert "label" not in cell
     assert cell.get("value") is None
+
+
+def test_explicit_grounding_contract_ignores_environment_mutation(monkeypatch):
+    scout = {"problem": "x" * 80, "references": []}
+    signals = {
+        "market": {
+            "urgency": {
+                "label": "high",
+                "confidence": 0.9,
+                "evidence": "ungrounded claim",
+                "reasoning": "guess",
+            }
+        }
+    }
+    contract = {
+        "enabled": True,
+        "clear_ungrounded_labels": True,
+        "ungrounded_confidence_cap": 0.17,
+    }
+
+    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_EVIDENCE", "false")
+    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_CLEAR", "false")
+    first = clamp_structured_signals_evidence(
+        scout, signals, grounding_contract=contract
+    )
+    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_EVIDENCE", "true")
+    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_CLEAR", "true")
+    second = clamp_structured_signals_evidence(
+        scout, signals, grounding_contract=contract
+    )
+
+    assert first == second
+    assert first["market"]["urgency"]["confidence"] == pytest.approx(0.17)
+    assert "label" not in first["market"]["urgency"]

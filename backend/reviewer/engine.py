@@ -108,6 +108,11 @@ class ReviewerEngine:
             in ("1", "true", "yes")
         )
         self.structured_scoring_engine = self._build_scoring_engine() if self.use_structured_scoring else None
+        structured_signal_grounding = None
+        if evaluation_prerequisites is not None:
+            structured_signal_grounding = evaluation_prerequisites.compiled_scoring_policy[
+                "scoring_runtime"
+            ]["evidence_grounding"]
         
         # Initialize Reviewers (default + persona reviewers)
         tid = self.tenant_user_id
@@ -117,6 +122,7 @@ class ReviewerEngine:
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
             structured_scoring_enabled=self.use_structured_scoring,
+            structured_signal_grounding=structured_signal_grounding,
         )
         self.skeptical_reviewer = SkepticalReviewer(
             api_key,
@@ -124,6 +130,7 @@ class ReviewerEngine:
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
             structured_scoring_enabled=self.use_structured_scoring,
+            structured_signal_grounding=structured_signal_grounding,
         )
         self.opportunist_reviewer = OpportunistReviewer(
             api_key,
@@ -131,6 +138,7 @@ class ReviewerEngine:
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
             structured_scoring_enabled=self.use_structured_scoring,
+            structured_signal_grounding=structured_signal_grounding,
         )
         
         self.running = False
@@ -496,10 +504,10 @@ class ReviewerEngine:
                 primary_kept = True
             single_reviews.append(SingleReview(
                 reviewer_type=reviewer_label,
-                market_score=r.get("market_score", 5),
-                product_score=r.get("product_score", 5),
-                technical_score=r.get("technical_score", 5),
-                execution_score=r.get("execution_score", 5),
+                market_score=r.get("market_score"),
+                product_score=r.get("product_score"),
+                technical_score=r.get("technical_score"),
+                execution_score=r.get("execution_score"),
                 defensibility_score=r.get("defensibility_score"),
                 overall_summary=r.get("overall_summary", ""),
                 key_risks=r.get("key_risks", []),
@@ -571,6 +579,12 @@ class ReviewerEngine:
                 ) from exc
             raise
         if prerequisites is not None:
+            if not isinstance(trace, dict):
+                raise GovernedScoringError(
+                    "governed structured scoring trace is absent or malformed"
+                )
+            trace = dict(trace)
+            trace.setdefault("user_id", prerequisites.user_id)
             validate_governed_scoring_trace(trace, prerequisites)
         # An unscored dimension is missing evidence, not a neutral score and not an
         # invitation to copy another dimension's score. Preserve that missingness in

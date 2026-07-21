@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from copy import deepcopy
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -213,6 +214,7 @@ def _exact_trace(score: float) -> dict:
         },
         "overall_score": score,
         "overall_confidence": 0.9,
+        "user_id": "user-a",
         "policy_version_id": "policy-live",
         "policy_hash": _compiled_policy()["policy_hash"],
         "scoring_runtime_version": _compiled_policy()["scoring_runtime"][
@@ -340,6 +342,199 @@ def _decision_scout() -> dict:
     }
 
 
+class _PersistingReviewerPersona:
+    grounding_contracts: list[dict | None] = []
+
+    def __init__(self, *_args, **kwargs):
+        self._last_token_usage = 0
+        self.fund_thesis = None
+        contract = kwargs.get("structured_signal_grounding")
+        self.grounding_contracts.append(
+            dict(contract) if isinstance(contract, dict) else None
+        )
+
+    def set_fund_thesis(self, thesis):
+        self.fund_thesis = thesis
+
+    async def review(self, _scout):
+        return {
+            "overall_summary": "Governed production-path review",
+            "key_risks": [],
+            "verdict": "MEDIUM",
+            "team_analysis": ["Experienced operating team"],
+            "business_model_analysis": ["Clear enterprise subscription model"],
+            "structured_signals": {},
+        }
+
+    def close(self):
+        pass
+
+
+async def _run_persisted_governed_review(
+    tmp_path,
+    monkeypatch,
+    traces: list[dict],
+    *,
+    adversarial_resolution: bool = False,
+):
+    import meta.calibrator as calibrator_module
+    import reviewer.engine as reviewer_module
+    from models import ScoutInfo
+    from utils.storage import Storage
+
+    prerequisites = _prerequisites()
+    prerequisites.thesis_context["parsed_json"].update(
+        {
+            "stage_focus": ["Seed"],
+            "geography": ["Europe"],
+            "preferences": ["institutional"],
+        }
+    )
+    storage = Storage(str(tmp_path / "startups.json"))
+    storage.add_startup(
+        ScoutInfo(
+            startup_id="production-handoff",
+            name="PrecisionCo",
+            one_line="Production handoff fixture",
+            sector="Infrastructure",
+            problem="Decision traces can drift between stages.",
+            solution="Persist one governed consensus artifact.",
+            target_users="Institutional venture funds",
+            why_now="Auditability is a prerequisite for automation.",
+            scout_type="market_driven",
+            confidence_score=0.9,
+            funding_stage="Seed",
+            location="Dublin, Europe",
+        )
+    )
+    monkeypatch.setattr(reviewer_module, "DefaultReviewer", _PersistingReviewerPersona)
+    monkeypatch.setattr(reviewer_module, "SkepticalReviewer", _PersistingReviewerPersona)
+    monkeypatch.setattr(reviewer_module, "OpportunistReviewer", _PersistingReviewerPersona)
+    monkeypatch.setattr(reviewer_module, "load_settings", lambda _uid: {"agent_config": {}})
+    monkeypatch.setattr(
+        reviewer_module, "enrich_scout_for_reviewer_llm", lambda scout, _uid: scout
+    )
+    monkeypatch.setattr(calibrator_module, "load_calibration_state", lambda _uid: {})
+    if adversarial_resolution:
+        def mutate_compatibility_fields(primary, _results):
+            for dimension in (
+                "market",
+                "product",
+                "technical",
+                "execution",
+                "defensibility",
+            ):
+                primary[f"{dimension}_score"] = 10
+            primary["overall_score"] = 10
+            return ["adversarial compatibility mutation"], "mutated"
+
+        monkeypatch.setattr(
+            reviewer_module, "apply_resolution_to_primary", mutate_compatibility_fields
+        )
+
+    engine = reviewer_module.ReviewerEngine(
+        api_key="",
+        storage=storage,
+        tenant_user_id="user-a",
+        evaluation_prerequisites=prerequisites,
+    )
+
+    class _TraceSequence:
+        def __init__(self, values):
+            self._values = iter(values)
+
+        def score(self, _scout, _review):
+            return deepcopy(next(self._values))
+
+    engine.structured_scoring_engine = _TraceSequence(traces)
+    saved = await engine.run_startup(
+        "production-handoff",
+        bypass_agent_enabled_gate=True,
+    )
+    return saved, storage.get_startup("production-handoff"), prerequisites
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("traces", "expected"),
+    [
+        ([_persona_trace(9), _persona_trace(9), _persona_trace(9)], "INVEST"),
+        ([_persona_trace(9), _persona_trace(5), _persona_trace(5)], "PASS"),
+        (
+            [
+                _persona_trace(9),
+                _persona_trace(9, missing_dimension="defensibility"),
+                _persona_trace(9),
+            ],
+            "MONITOR",
+        ),
+    ],
+    ids=["identical", "nine-five-five", "missing-dimension"],
+)
+async def test_governed_reviewer_to_partner_uses_persisted_exact_consensus(
+    tmp_path, monkeypatch, traces, expected
+):
+    saved, reloaded, prerequisites = await _run_persisted_governed_review(
+        tmp_path, monkeypatch, traces
+    )
+
+    assert saved is True
+    assert reloaded is not None and reloaded.review_info is not None
+    trace = reloaded.review_info.structured_scoring
+    assert trace["user_id"] == "user-a"
+    assert trace["trace_kind"] == "resolved_consensus"
+    assert len(trace["input_traces"]) == 3
+    decision = _governed_partner().decide(
+        _decision_scout(), reloaded.review_info.model_dump(mode="json")
+    )
+    assert decision["recommendation"] == expected, decision
+    expected_grounding = prerequisites.compiled_scoring_policy["scoring_runtime"][
+        "evidence_grounding"
+    ]
+    assert _PersistingReviewerPersona.grounding_contracts[-3:] == [
+        expected_grounding,
+        expected_grounding,
+        expected_grounding,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_governed_persisted_trace_overrides_adversarial_post_resolution_mutation(
+    tmp_path, monkeypatch
+):
+    saved, reloaded, _ = await _run_persisted_governed_review(
+        tmp_path,
+        monkeypatch,
+        [_persona_trace(5), _persona_trace(5), _persona_trace(5)],
+        adversarial_resolution=True,
+    )
+
+    assert saved is True
+    assert reloaded.review_info.market_score == 5
+    assert reloaded.review_info.overall_score == 5
+    assert reloaded.review_info.structured_scoring["market"]["score"] == 5
+    decision = _governed_partner().decide(
+        _decision_scout(), reloaded.review_info.model_dump(mode="json")
+    )
+    assert decision["recommendation"] == "PASS"
+
+
+@pytest.mark.asyncio
+async def test_governed_reviewer_does_not_persist_mixed_policy_personas(
+    tmp_path, monkeypatch
+):
+    stale = _persona_trace(9, policy_version_id="stale-policy")
+    saved, reloaded, _ = await _run_persisted_governed_review(
+        tmp_path,
+        monkeypatch,
+        [_persona_trace(9), stale, _persona_trace(9)],
+    )
+
+    assert saved is False
+    assert reloaded is not None
+    assert reloaded.review_info is None
+
+
 @pytest.mark.parametrize(
     "trace",
     [
@@ -370,6 +565,18 @@ def test_governed_partner_rejects_non_exact_structured_trace(trace):
 
     with pytest.raises(RuntimeError, match="structured scoring trace"):
         _governed_partner().decide(_decision_scout(), review)
+
+
+@pytest.mark.parametrize("user_id", [None, "user-b"])
+def test_governed_trace_rejects_missing_or_cross_tenant_identity(user_id):
+    trace = _persona_trace(9)
+    if user_id is None:
+        trace.pop("user_id")
+    else:
+        trace["user_id"] = user_id
+
+    with pytest.raises(RuntimeError, match="tenant"):
+        validate_governed_scoring_trace(trace, _prerequisites())
 
 
 def test_governed_partner_accepts_complete_exact_structured_trace():
@@ -427,7 +634,9 @@ def test_governed_consensus_unions_missingness_across_personas_and_partner_holds
     detail = review["structured_scoring"]["defensibility"]
     assert detail["score"] is None
     assert detail["unscored"] is True
-    assert detail["missing_reasons"] == ["persona_unscored:defensibility"]
+    assert detail["missing_reasons"] == [
+        "SkepticalReviewer:no_grounded_components"
+    ]
     assert review["defensibility_score"] is None
 
     decision = _governed_partner().decide(_decision_scout(), review)
@@ -445,6 +654,83 @@ def test_governed_persona_policy_identity_mismatch_fails_before_consensus():
                 _persona_trace(8),
             ]
         )
+
+
+def test_governed_persona_tenant_identity_mismatch_fails_before_consensus():
+    cross_tenant = _persona_trace(8)
+    cross_tenant["user_id"] = "user-b"
+
+    with pytest.raises(RuntimeError, match="tenant"):
+        _governed_review_from_persona_traces(
+            [_persona_trace(8), cross_tenant, _persona_trace(8)]
+        )
+
+
+def test_governed_single_review_and_adapter_never_synthesize_neutral_scores():
+    reviewer = ReviewerEngine.__new__(ReviewerEngine)
+    snapshots = reviewer._build_single_reviews(
+        [
+            {
+                "reviewer_type": "DefaultReviewer",
+                "overall_summary": "Evidence missing",
+                "key_risks": ["No evidence"],
+                "verdict": "WEAK",
+            }
+        ]
+    )
+    adapted = reviewer_output_to_review_info(
+        {
+            "overall_summary": "Evidence missing",
+            "key_risks": ["No evidence"],
+            "verdict": "WEAK",
+        }
+    )
+
+    assert snapshots[0].market_score is None
+    assert snapshots[0].product_score is None
+    assert snapshots[0].technical_score is None
+    assert snapshots[0].execution_score is None
+    assert adapted.market_score is None
+    assert adapted.product_score is None
+    assert adapted.technical_score is None
+    assert adapted.execution_score is None
+
+
+def test_governed_consensus_preserves_dynamic_missing_reason_provenance():
+    prerequisites = _prerequisites()
+    prerequisites.compiled_scoring_policy["dimensions"]["impact"] = {
+        "id": "impact",
+        "weight": 10,
+        "criteria": [],
+    }
+    traces = []
+    for score, reviewer_type in ((9, "DefaultReviewer"), (7, "SkepticalReviewer"), (8, "OpportunistReviewer")):
+        trace = _persona_trace(score)
+        trace["impact"] = {
+            "score": score,
+            "confidence": 0.8,
+            "components": {},
+            "unscored": False,
+        }
+        traces.append({"reviewer_type": reviewer_type, "structured_scoring": trace})
+    traces[1]["structured_scoring"]["impact"] = {
+        "score": None,
+        "confidence": 0.0,
+        "components": {},
+        "unscored": True,
+        "missing_reasons": ["no_impact_measurement", "no_counterfactual"],
+    }
+    traces[1]["structured_scoring"]["overall_score"] = None
+
+    from evaluation_v2.governed_scoring import resolve_governed_scoring_traces
+
+    resolved = resolve_governed_scoring_traces(traces, prerequisites)
+
+    assert resolved["impact"]["score"] is None
+    assert resolved["impact"]["missing_reasons"] == [
+        "SkepticalReviewer:no_impact_measurement",
+        "SkepticalReviewer:no_counterfactual",
+    ]
 
 
 def test_governed_partner_rejects_unresolved_persona_trace_even_when_identity_matches():

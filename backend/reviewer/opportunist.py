@@ -1,7 +1,7 @@
 """Opportunist Reviewer — market-first evaluation lens."""
 from reviewer.base import Reviewer
 from reviewer.schema import ReviewerOutput
-from typing import Optional
+from typing import Any, Mapping, Optional
 
 
 class OpportunistReviewer(Reviewer):
@@ -25,6 +25,7 @@ Your additional lens:
         tenant_user_id: str = "",
         use_resource_fund_thesis_fallback: bool = True,
         structured_scoring_enabled: bool = False,
+        structured_signal_grounding: Optional[Mapping[str, Any]] = None,
     ):
         self.reviewer_type = "opportunist"
         super().__init__(
@@ -33,5 +34,6 @@ Your additional lens:
             tenant_user_id=tenant_user_id,
             use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
             structured_scoring_enabled=structured_scoring_enabled,
+            structured_signal_grounding=structured_signal_grounding,
         )
         self.SYSTEM_PROMPT = self.SYSTEM_PROMPT + self.OPPORTUNIST_ADDENDUM

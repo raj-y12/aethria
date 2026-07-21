@@ -22,6 +22,7 @@ _TRACE_METADATA_FIELDS = frozenset(
         "overall_confidence",
         "overall_dispersion",
         "raw_signals",
+        "user_id",
         "policy_version_id",
         "policy_hash",
         "stage_cohort",
@@ -137,6 +138,10 @@ def validate_governed_scoring_trace(
     if not isinstance(trace, Mapping) or not trace:
         raise GovernedScoringError(
             "governed structured scoring trace is absent or malformed"
+        )
+    if str(trace.get("user_id") or "") != prerequisites.user_id:
+        raise GovernedScoringError(
+            "governed structured scoring trace tenant does not match prerequisites"
         )
     policy = prerequisites.compiled_scoring_policy
     expected_version = str(policy.get("policy_version_id") or "")
@@ -283,6 +288,7 @@ def resolve_governed_scoring_traces(
         key: deepcopy(first_trace[key])
         for key in (
             "raw_signals",
+            "user_id",
             "stage_cohort",
             "stage_cohort_label",
             "sector_tam_benchmark",
@@ -318,6 +324,14 @@ def resolve_governed_scoring_traces(
         confidences.extend(float(detail["confidence"]) for detail in details)
         if any(bool(detail["unscored"]) for detail in details):
             any_unscored = True
+            missing_reasons: list[str] = []
+            for (reviewer_type, _), detail in zip(validated_inputs, details):
+                if not detail["unscored"]:
+                    continue
+                for reason in detail["missing_reasons"]:
+                    item = f"{reviewer_type}:{reason}"
+                    if item not in missing_reasons:
+                        missing_reasons.append(item)
             resolved[dimension] = {
                 "score": None,
                 "confidence": min(float(detail["confidence"]) for detail in details),
@@ -328,7 +342,7 @@ def resolve_governed_scoring_traces(
                     }
                 },
                 "unscored": True,
-                "missing_reasons": [f"persona_unscored:{dimension}"],
+                "missing_reasons": missing_reasons,
             }
             continue
 

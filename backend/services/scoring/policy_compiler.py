@@ -38,7 +38,7 @@ DEFAULT_SCORE_BANDS = (
     {"id": "monitor", "min": 60.0, "max": 79.0, "label": "Monitor"},
     {"id": "invest", "min": 80.0, "max": 100.0, "label": "Invest"},
 )
-SCORING_RUNTIME_SEMANTIC_VERSION = "1.0.0"
+SCORING_RUNTIME_SEMANTIC_VERSION = "1.1.0"
 
 
 class PolicyValidationError(ValueError):
@@ -114,6 +114,16 @@ class RuntimeCalibration(BaseModel):
     evidence_gate: RuntimeEvidenceGate
 
 
+class RuntimeEvidenceGrounding(BaseModel):
+    """Immutable preprocessing rules applied before deterministic scoring."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    clear_ungrounded_labels: bool
+    ungrounded_confidence_cap: float = Field(ge=0, le=1)
+
+
 class RuntimeOverall(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -164,6 +174,7 @@ class ScoringRuntimeContract(BaseModel):
 
     semantic_version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
     calibration: RuntimeCalibration
+    evidence_grounding: RuntimeEvidenceGrounding
     component_weights: Dict[str, Dict[str, float]]
     overall: RuntimeOverall
     normalization: RuntimeNormalization
@@ -238,6 +249,11 @@ def _default_scoring_runtime(
             "discount": deepcopy(EVIDENCE_DISCOUNT),
             "evidence_gate": deepcopy(EVIDENCE_GATE),
         },
+        "evidence_grounding": {
+            "enabled": True,
+            "clear_ungrounded_labels": True,
+            "ungrounded_confidence_cap": 0.2,
+        },
         "component_weights": deepcopy(DIMENSION_WEIGHTS),
         "overall": {
             "dimensions": list(OVERALL_SCORE_DIMENSIONS),
@@ -306,7 +322,7 @@ def _validate_scoring_runtime_shape(runtime: Dict[str, Any]) -> None:
     normalization = runtime["normalization"]
     if normalization["default_score"] != float(DEFAULT_SCORE):
         raise ValueError(
-            "normalization.default_score is fixed by scoring runtime 1.0.0"
+            "normalization.default_score is fixed by scoring runtime 1.1.0"
         )
     tam = normalization["tam_thresholds"]
     if not tam["xl"] > tam["large"] > tam["mid"] > tam["small"]:
