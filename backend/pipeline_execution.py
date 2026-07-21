@@ -216,8 +216,13 @@ class MetaCycleResult(BaseModel):
         if self.outcome.state is StageExecutionState.COMPLETED:
             if not isinstance(self.report, dict):
                 raise ValueError("Completed Meta cycle requires a report")
-        elif self.report is not None:
-            raise ValueError("Non-completed Meta cycle cannot publish a report")
+        elif (
+            self.outcome.state is not StageExecutionState.FAILED
+            and self.report is not None
+        ):
+            raise ValueError(
+                "Only completed or partially failed Meta cycles can publish a report"
+            )
         return self
 
 

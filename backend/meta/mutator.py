@@ -16,6 +16,11 @@ from uuid import uuid4
 from utils.prompt_version import hash_prompt
 from supabase_doc_store import doc_get, doc_set, list_get_all, list_append_only
 from meta.prompt_gating import PROMPT_LIBRARY_DATA_KEY
+from meta.schema import (
+    PromptMutationBatchResult,
+    PromptMutationTargetOutcome,
+    PromptMutationTargetState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +38,23 @@ Return ONLY a JSON object with two fields:
   "new_prompt": "the full rewritten system prompt",
   "reasoning": "one paragraph explaining exactly what changed and why"
 }"""
+
+
+class PromptMutationTargetError(RuntimeError):
+    """One mutation target failed before a durable proposal was produced."""
+
+    def __init__(self, *, code: str, detail: str):
+        self.code = code
+        self.detail = detail
+        super().__init__(detail)
+
+
+class PromptMutationRejected(RuntimeError):
+    """A generated mutation was safely rejected by prompt validation."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
 
 
 def _prompt_validation_limits() -> Dict[str, Any]:
@@ -241,17 +263,61 @@ class PromptMutator:
         targets: List[Dict],
         scout_engine,
         reviewer_engine,
-    ) -> List[Dict]:
-        """Rewrite prompts via LLM and persist proposals pending operator promotion."""
-        mutations = []
+    ) -> PromptMutationBatchResult:
+        """Rewrite targets and return lossless typed terminal accounting."""
+        outcomes: List[PromptMutationTargetOutcome] = []
         for target in targets:
+            agent_target = str(target.get("agent_target") or "unknown_target")
             try:
                 mutation = self._apply_one(target, scout_engine, reviewer_engine)
-                if mutation:
-                    mutations.append(mutation)
+                if not isinstance(mutation, dict):
+                    raise PromptMutationTargetError(
+                        code="prompt_proposal_missing",
+                        detail="Prompt mutation produced no proposal.",
+                    )
+                outcomes.append(
+                    PromptMutationTargetOutcome(
+                        agent_target=agent_target,
+                        state=PromptMutationTargetState.PROPOSED,
+                        code="prompt_proposal_persisted",
+                        detail="Prompt proposal persisted pending operator promotion.",
+                        proposal=mutation,
+                    )
+                )
+            except PromptMutationRejected as exc:
+                outcomes.append(
+                    PromptMutationTargetOutcome(
+                        agent_target=agent_target,
+                        state=PromptMutationTargetState.REJECTED,
+                        code="prompt_proposal_rejected",
+                        detail=f"Prompt proposal rejected by validation: {exc.reason}",
+                    )
+                )
+            except PromptMutationTargetError as exc:
+                self.logger.error(
+                    "[Mutator] Failed to apply %s: %s", agent_target, exc.detail
+                )
+                outcomes.append(
+                    PromptMutationTargetOutcome(
+                        agent_target=agent_target,
+                        state=PromptMutationTargetState.FAILED,
+                        code=exc.code,
+                        detail=exc.detail,
+                    )
+                )
             except Exception as e:
-                self.logger.error(f"[Mutator] Failed to apply {target['agent_target']}: {e}")
-        return mutations
+                self.logger.error(
+                    "[Mutator] Failed to apply %s: %s", agent_target, e
+                )
+                outcomes.append(
+                    PromptMutationTargetOutcome(
+                        agent_target=agent_target,
+                        state=PromptMutationTargetState.FAILED,
+                        code="prompt_target_failed",
+                        detail=f"Prompt mutation target failed: {e}",
+                    )
+                )
+        return PromptMutationBatchResult(outcomes=outcomes)
 
     def _apply_one(
         self,
@@ -263,7 +329,10 @@ class PromptMutator:
         current_prompt = self._get_current_prompt(agent_name, scout_engine, reviewer_engine)
         if not current_prompt:
             self.logger.warning(f"[Mutator] Could not get prompt for {agent_name}")
-            return None
+            raise PromptMutationTargetError(
+                code="prompt_source_unavailable",
+                detail=f"Current prompt is unavailable for {agent_name}.",
+            )
 
         prev_hash = hash_prompt(current_prompt)
 
@@ -316,10 +385,19 @@ class PromptMutator:
             f"preserving this agent's core cognitive identity."
         )
 
-        new_prompt, reasoning = self._call_llm(user_prompt)
+        try:
+            new_prompt, reasoning = self._call_llm(user_prompt)
+        except Exception as exc:
+            raise PromptMutationTargetError(
+                code="prompt_llm_failed",
+                detail=f"Prompt mutation LLM failed for {agent_name}.",
+            ) from exc
         if not new_prompt:
             self.logger.warning(f"[Mutator] LLM returned no prompt for {agent_name}")
-            return None
+            raise PromptMutationTargetError(
+                code="prompt_llm_empty_response",
+                detail=f"Prompt mutation LLM returned no prompt for {agent_name}.",
+            )
 
         lim = _prompt_validation_limits()
         reject = validate_mutated_prompt(
@@ -335,19 +413,25 @@ class PromptMutator:
             self.logger.warning(
                 "[Mutator] Rejected prompt for %s: %s", agent_name, reject
             )
-            _append_to_json_list(
-                _MUTATION_LOG_PATH,
-                {
-                    "type": "prompt_proposal_rejected",
-                    "agent_target": agent_name,
-                    "mutation_type": target["mutation_type"],
-                    "reason": reject,
-                    "cycle_number": self.cycle_number,
-                    "applied_at": now,
-                },
-                self.user_id,
-            )
-            return None
+            try:
+                _append_to_json_list(
+                    _MUTATION_LOG_PATH,
+                    {
+                        "type": "prompt_proposal_rejected",
+                        "agent_target": agent_name,
+                        "mutation_type": target["mutation_type"],
+                        "reason": reject,
+                        "cycle_number": self.cycle_number,
+                        "applied_at": now,
+                    },
+                    self.user_id,
+                )
+            except Exception as exc:
+                raise PromptMutationTargetError(
+                    code="prompt_proposal_persistence_failed",
+                    detail=f"Prompt rejection audit persistence failed for {agent_name}.",
+                ) from exc
+            raise PromptMutationRejected(reject)
 
         new_hash = hash_prompt(new_prompt)
         library_key = f"{agent_name}:{new_hash}"
@@ -367,18 +451,24 @@ class PromptMutator:
             "promoted": False,
             "activation_status": "pending_operator_promotion",
         }
-        _append_to_json_list(_MUTATION_LOG_PATH, mutation, self.user_id)
+        try:
+            _append_to_json_list(_MUTATION_LOG_PATH, mutation, self.user_id)
 
-        library = _read_json_dict(_PROMPT_LIBRARY_PATH, self.user_id)
-        library[library_key] = {
-            "prompt": new_prompt,
-            "created_at": now,
-            "reasoning": reasoning,
-            "cycle_number": self.cycle_number,
-            "previous_hash": prev_hash,
-            "promotion_status": "pending",
-        }
-        _atomic_write(_PROMPT_LIBRARY_PATH, library, self.user_id)
+            library = _read_json_dict(_PROMPT_LIBRARY_PATH, self.user_id)
+            library[library_key] = {
+                "prompt": new_prompt,
+                "created_at": now,
+                "reasoning": reasoning,
+                "cycle_number": self.cycle_number,
+                "previous_hash": prev_hash,
+                "promotion_status": "pending",
+            }
+            _atomic_write(_PROMPT_LIBRARY_PATH, library, self.user_id)
+        except Exception as exc:
+            raise PromptMutationTargetError(
+                code="prompt_proposal_persistence_failed",
+                detail=f"Prompt proposal persistence failed for {agent_name}.",
+            ) from exc
 
         self.logger.info(
             "[Mutator] Saved pending proposal for %s (%s); promote via API to use",
@@ -423,26 +513,22 @@ class PromptMutator:
                 reviewer_engine.opportunist_reviewer.set_prompt(new_prompt)
 
     def _call_llm(self, user_prompt: str) -> tuple:
-        """Call OpenAI to rewrite a prompt. Returns (new_prompt, reasoning) or (None, None)."""
+        """Call OpenAI to rewrite a prompt. Dependency errors propagate to the target."""
         client = self._get_client()
         if not client:
             self.logger.warning("[Mutator] No OpenAI client, skipping LLM call")
             return None, None
-        try:
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": MUTATOR_SYSTEM_PROMPT},
-                    {"role": "user", "content": user_prompt},
-                ],
-                response_format={"type": "json_object"},
-                max_completion_tokens=8192,
-            )
-            content = response.choices[0].message.content
-            if not content:
-                return None, None
-            data = json.loads(content)
-            return data.get("new_prompt"), data.get("reasoning", "")
-        except Exception as e:
-            self.logger.error(f"[Mutator] LLM call failed: {e}")
+        response = client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": MUTATOR_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+            max_completion_tokens=8192,
+        )
+        content = response.choices[0].message.content
+        if not content:
             return None, None
+        data = json.loads(content)
+        return data.get("new_prompt"), data.get("reasoning", "")

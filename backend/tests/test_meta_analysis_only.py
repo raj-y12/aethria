@@ -1,6 +1,11 @@
 from unittest.mock import MagicMock, patch
 
 from meta.agent import MetaAgent
+from meta.schema import (
+    PromptMutationBatchResult,
+    PromptMutationTargetOutcome,
+    PromptMutationTargetState,
+)
 
 
 def _sufficient_signal():
@@ -57,7 +62,17 @@ def test_automatic_meta_cycle_reports_proposals_without_applying_them(monkeypatc
     ) as calibrator_cls, patch("meta.agent._append_to_json_list"):
         analyser_cls.return_value.analyse.return_value = _sufficient_signal()
         mutator_cls.return_value.decide.return_value = [{"agent_target": "x"}]
-        mutator_cls.return_value.apply.return_value = prompt_proposals
+        mutator_cls.return_value.apply.return_value = PromptMutationBatchResult(
+            outcomes=[
+                PromptMutationTargetOutcome(
+                    agent_target="MarketDrivenScout",
+                    state=PromptMutationTargetState.PROPOSED,
+                    code="prompt_proposal_persisted",
+                    detail="Prompt proposal persisted.",
+                    proposal=prompt_proposals[0],
+                )
+            ]
+        )
         reweighter_cls.return_value.decide.return_value = weight_proposals
         calibrator_cls.return_value.decide.return_value = calibration_proposals
 
@@ -68,6 +83,7 @@ def test_automatic_meta_cycle_reports_proposals_without_applying_them(monkeypatc
     assert report["analysis_only"] is True
     assert report["production_mutations_applied"] == 0
     assert report["prompt_proposals"] == prompt_proposals
+    assert report["prompt_target_outcomes"][0]["state"] == "proposed"
     assert report["weight_proposals"] == weight_proposals
     assert report["calibration_proposals"] == calibration_proposals
     assert report["weight_updates"] == weight_proposals
