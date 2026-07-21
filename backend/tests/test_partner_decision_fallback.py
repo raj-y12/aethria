@@ -34,6 +34,26 @@ def _base_review():
     }
 
 
+def test_partner_model_prompt_and_digest_configuration_are_captured_once(monkeypatch):
+    monkeypatch.setenv("PARTNER_MODEL", "mutable-env-model")
+    monkeypatch.setenv("PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", "true")
+    engine = PartnerDecisionEngine(
+        use_llm_fallback=False,
+        api_key=None,
+        model="captured-partner-model",
+        include_deal_context_digest=False,
+    )
+    captured_template = engine.prompt_template_version
+
+    monkeypatch.setenv("PARTNER_MODEL", "post-construction-model")
+    monkeypatch.setenv("PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", "true")
+
+    assert engine.model == "captured-partner-model"
+    assert engine.provider_id == "openai"
+    assert engine._include_deal_context_digest is False
+    assert engine.prompt_template_version == captured_template
+
+
 def test_medium_6_4_borderline_routes_to_llm():
     engine = PartnerDecisionEngine(use_llm_fallback=True, api_key=None)
     review = _base_review()

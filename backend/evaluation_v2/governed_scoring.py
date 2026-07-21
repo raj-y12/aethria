@@ -25,6 +25,7 @@ _TRACE_METADATA_FIELDS = frozenset(
         "user_id",
         "policy_version_id",
         "policy_hash",
+        "rubric_version",
         "stage_cohort",
         "stage_cohort_label",
         "sector_tam_benchmark",
@@ -153,6 +154,11 @@ def validate_governed_scoring_trace(
     if str(trace.get("policy_hash") or "") != expected_hash:
         raise GovernedScoringError(
             "governed structured scoring trace policy hash does not match prerequisites"
+        )
+    expected_rubric = str(prerequisites.policy.rubric_version or "")
+    if str(trace.get("rubric_version") or "") != expected_rubric:
+        raise GovernedScoringError(
+            "governed structured scoring trace rubric version does not match prerequisites"
         )
     runtime = policy.get("scoring_runtime")
     expected_runtime_version = (
@@ -302,6 +308,7 @@ def resolve_governed_scoring_traces(
         {
             "policy_version_id": first_trace["policy_version_id"],
             "policy_hash": first_trace["policy_hash"],
+            "rubric_version": first_trace["rubric_version"],
             "trace_kind": "resolved_consensus",
             "resolution_strategy": {
                 "version": "reviewer-consensus-v1",

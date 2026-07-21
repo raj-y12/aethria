@@ -3,6 +3,7 @@ Run one pipeline cycle (scout → reviewer → partner → portfolio → meta) f
 Used by the per-user agent queue: explicit user_id on every storage path (no run_context).
 """
 import asyncio
+import copy
 import gc
 import logging
 import os
@@ -37,6 +38,11 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisites,
     load_evaluation_prerequisites,
 )
+from evaluation.manifest import (
+    build_model_identity,
+    capture_evaluation_manifest_identity,
+)
+from models import EvaluationManifestIdentity
 from pipeline_execution import (
     LookupExecutionStatus,
     MetaCycleResult,
@@ -70,6 +76,7 @@ from identity.acquisition import observation_from_scout_discovery
 from identity.projection import link_admission_projection
 from identity.service import IdentityService
 from utils.reference_validation import is_generic_reference
+from utils.prompt_version import hash_prompt
 
 logger = logging.getLogger("pipeline_runner")
 _visible_logger = logging.getLogger("uvicorn.error")
@@ -86,6 +93,92 @@ class _PipelineEngines:
     portfolio_store: PortfolioStore
     cost_controller: Optional[CostController] = None
     model_metadata: Dict[str, str] = field(default_factory=dict)
+    evaluation_manifest_identity: Optional[EvaluationManifestIdentity] = None
+
+
+def _capture_pipeline_manifest_identity(
+    *,
+    evaluation_prerequisites: EvaluationPrerequisites,
+    scout_engine: ScoutEngine,
+    reviewer_engine: ReviewerEngine,
+    partner_engine: PartnerEngine,
+    use_llm_fallback: bool,
+    include_deal_context_digest: bool,
+) -> EvaluationManifestIdentity:
+    """Snapshot exact engine dependencies after every constructor has completed."""
+    scout_prompts = {
+        f"scout.{scout.scout_type}": hash_prompt(
+            str(getattr(scout, "system_prompt", ""))
+        )
+        for scout in scout_engine.scouts
+    }
+    reviewer_prompts = {
+        "reviewer.DefaultReviewer": hash_prompt(
+            str(reviewer_engine.reviewer.SYSTEM_PROMPT)
+        ),
+        "reviewer.SkepticalReviewer": hash_prompt(
+            str(reviewer_engine.skeptical_reviewer.SYSTEM_PROMPT)
+        ),
+        "reviewer.OpportunistReviewer": hash_prompt(
+            str(reviewer_engine.opportunist_reviewer.SYSTEM_PROMPT)
+        ),
+    }
+    decision_engine = partner_engine.decision_engine
+    construction_prompts = {
+        **scout_prompts,
+        **reviewer_prompts,
+        "partner.template": str(decision_engine.prompt_template_version),
+    }
+    runtime_hash = evaluation_prerequisites.dependency_identity[
+        "scoring_runtime_hash"
+    ]
+    model_identities = {
+        "scout": build_model_identity(
+            provider_id="openai",
+            model_id=str(scout_engine.model),
+            configuration_id="aethria.scout.openai-chat.v1",
+            configuration={
+                "provider": "openai",
+                "model": str(scout_engine.model),
+                "personas": sorted(scout_prompts),
+            },
+        ),
+        "reviewer": build_model_identity(
+            provider_id="openai",
+            model_id=str(reviewer_engine.model),
+            configuration_id="aethria.reviewer.openai-chat.v1",
+            configuration={
+                "provider": "openai",
+                "model": str(reviewer_engine.model),
+                "personas": sorted(reviewer_prompts),
+                "structured_scoring": bool(
+                    reviewer_engine.use_structured_scoring
+                ),
+                "scoring_runtime_hash": runtime_hash,
+            },
+        ),
+        "partner": build_model_identity(
+            provider_id=str(decision_engine.provider_id),
+            model_id=str(decision_engine.model),
+            configuration_id="aethria.partner.openai-chat.v1",
+            configuration={
+                "provider": str(decision_engine.provider_id),
+                "model": str(decision_engine.model),
+                "use_llm_fallback": bool(use_llm_fallback),
+                "include_deal_context_digest": bool(
+                    include_deal_context_digest
+                ),
+                "prompt_template_version": str(
+                    decision_engine.prompt_template_version
+                ),
+            },
+        ),
+    }
+    return capture_evaluation_manifest_identity(
+        dependency_identity=evaluation_prerequisites.dependency_identity,
+        model_identities=model_identities,
+        construction_prompt_versions=construction_prompts,
+    )
 
 
 def _build_pipeline_engines(
@@ -121,7 +214,11 @@ def _build_pipeline_engines(
     deal_memory = DealMemory(user_id=user_id)
     model = os.getenv("SCOUT_MODEL", DEFAULT_SCOUT_MODEL)
     reviewer_model = os.getenv("REVIEWER_MODEL", DEFAULT_REVIEWER_MODEL)
+    partner_model = os.getenv("PARTNER_MODEL", "gpt-5-nano")
     use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
+    include_deal_context_digest = os.getenv(
+        "PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", ""
+    ).strip().lower() in ("1", "true", "yes")
     reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
 
     scout_engine = ScoutEngine(
@@ -132,7 +229,7 @@ def _build_pipeline_engines(
         cost_controller=cost_controller,
         deal_memory=deal_memory,
         tenant_user_id=user_id,
-        active_thesis=thesis_ctx,
+        active_thesis=copy.deepcopy(thesis_ctx),
     )
     reviewer_engine = ReviewerEngine(
         api_key=api_key,
@@ -143,7 +240,7 @@ def _build_pipeline_engines(
         cost_controller=cost_controller,
         deal_memory=deal_memory,
         tenant_user_id=user_id,
-        active_thesis=thesis_ctx,
+        active_thesis=copy.deepcopy(thesis_ctx),
         use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
         evaluation_prerequisites=evaluation_prerequisites,
     )
@@ -157,11 +254,13 @@ def _build_pipeline_engines(
         deal_memory=deal_memory,
         portfolio_store=portfolio_store,
         tenant_user_id=user_id,
-        fund_thesis=thesis_ctx,
+        fund_thesis=copy.deepcopy(thesis_ctx),
         use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
         evaluation_prerequisites=evaluation_prerequisites,
+        model=partner_model,
+        include_deal_context_digest=include_deal_context_digest,
     )
-    return _PipelineEngines(
+    engines = _PipelineEngines(
         scout_engine=scout_engine,
         reviewer_engine=reviewer_engine,
         partner_engine=partner_engine,
@@ -170,12 +269,24 @@ def _build_pipeline_engines(
         model_metadata={
             "scout": model,
             "reviewer": reviewer_model,
-            "partner": getattr(
-                getattr(partner_engine, "decision_engine", None), "model", None
-            )
-            or os.getenv("PARTNER_MODEL", "gpt-5-nano"),
+            "partner": partner_model,
         },
     )
+    bind_manifest_identity = getattr(
+        partner_engine, "set_evaluation_manifest_identity", None
+    )
+    if evaluation_prerequisites is not None and callable(bind_manifest_identity):
+        manifest_identity = _capture_pipeline_manifest_identity(
+            evaluation_prerequisites=evaluation_prerequisites,
+            scout_engine=scout_engine,
+            reviewer_engine=reviewer_engine,
+            partner_engine=partner_engine,
+            use_llm_fallback=use_llm_fallback,
+            include_deal_context_digest=include_deal_context_digest,
+        )
+        bind_manifest_identity(manifest_identity)
+        engines.evaluation_manifest_identity = manifest_identity
+    return engines
 
 
 def _close_pipeline_engines(*engines: object) -> None:

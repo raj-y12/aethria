@@ -13,7 +13,15 @@ import random
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from models import EvaluationManifest, Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
+from models import (
+    EvaluationManifest,
+    EvaluationManifestIdentity,
+    Startup,
+    ScoutInfo,
+    ReviewInfo,
+    PartnerInfo,
+    Financials,
+)
 from pipeline_state import get_pipeline_state_row, pipeline_stage_log, upsert_pipeline_state
 from agent_trace import (
     build_partner_trace,
@@ -392,15 +400,23 @@ class SupabaseStartupsStorage:
         self,
         startup_id: str,
         manifest: EvaluationManifest,
+        *,
+        manifest_identity: EvaluationManifestIdentity | Dict[str, Any],
     ) -> bool:
         """Merge one portable evaluation manifest into the startup's agent trace."""
         if not startup_id:
             return False
+        from evaluation.manifest import validate_evaluation_manifest_for_persistence
+
+        validated = validate_evaluation_manifest_for_persistence(
+            manifest,
+            manifest_identity=manifest_identity,
+            user_id=self._user_id,
+        )
         st = self.get_startup(startup_id)
         if st is None:
             self.logger.error("Startup %s not found for evaluation manifest", startup_id)
             return False
-        validated = EvaluationManifest.model_validate(manifest)
         trace = dict(st.agent_trace) if isinstance(st.agent_trace, dict) else {}
         trace["evaluation_manifest"] = validated.model_dump(mode="json")
         st.agent_trace = trace
@@ -979,12 +995,14 @@ class SupabaseStartupsStorage:
         *,
         investment_memo_markdown: Optional[str] = None,
         pipeline_run_id: Optional[str] = None,
-        dependency_identity: Optional[Dict[str, str]] = None,
+        evaluation_manifest_identity: Optional[
+            EvaluationManifestIdentity | Dict[str, Any]
+        ] = None,
     ) -> bool:
         pr = (pipeline_run_id or "").strip() or None
-        if pr and dependency_identity is None:
+        if pr and evaluation_manifest_identity is None:
             raise ValueError(
-                "dependency_identity is required for evaluation manifest persistence"
+                "evaluation_manifest_identity is required for governed persistence"
             )
         st = self.get_startup(startup_id)
         if st is None:
@@ -1014,7 +1032,10 @@ class SupabaseStartupsStorage:
             ),
         )
         if pr:
-            from evaluation.manifest import build_evaluation_manifest
+            from evaluation.manifest import (
+                build_evaluation_manifest,
+                validate_evaluation_manifest_for_persistence,
+            )
 
             if str(getattr(st.scout_info, "operator_context", None) or "").strip():
                 evaluation_path = "rerun"
@@ -1026,12 +1047,12 @@ class SupabaseStartupsStorage:
                 st,
                 pipeline_run_id=pr,
                 evaluation_path=evaluation_path,
-                model_metadata={
-                    "scout": os.getenv("SCOUT_MODEL", "gpt-5-nano"),
-                    "reviewer": os.getenv("REVIEWER_MODEL", "gpt-5-nano"),
-                    "partner": os.getenv("PARTNER_MODEL", "gpt-5-nano"),
-                },
-                dependency_identity=dependency_identity,
+                manifest_identity=evaluation_manifest_identity,
+            )
+            manifest = validate_evaluation_manifest_for_persistence(
+                manifest,
+                manifest_identity=evaluation_manifest_identity,
+                user_id=self._user_id,
             )
             trace = dict(st.agent_trace) if isinstance(st.agent_trace, dict) else {}
             trace["evaluation_manifest"] = manifest.model_dump(mode="json")

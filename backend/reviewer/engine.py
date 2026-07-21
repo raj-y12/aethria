@@ -3,6 +3,7 @@ Reviewer execution engine.
 Runs continuously, processing unreviewed Scout discoveries.
 """
 import asyncio
+import copy
 import logging
 import os
 from typing import Any, Dict, List, Optional
@@ -84,7 +85,7 @@ class ReviewerEngine:
                 raise RuntimeError(
                     "ReviewerEngine: active thesis does not match governed prerequisites"
                 )
-            active_thesis = evaluation_prerequisites.thesis_context
+            active_thesis = copy.deepcopy(evaluation_prerequisites.thesis_context)
             use_resource_fund_thesis_fallback = False
         self.api_key = api_key
         self.storage = storage
@@ -95,7 +96,7 @@ class ReviewerEngine:
         self.logger = logging.getLogger("reviewer.engine")
         self.cost_controller = cost_controller
         self.deal_memory = deal_memory
-        self.active_thesis: Optional[Dict[str, Any]] = active_thesis
+        self.active_thesis: Optional[Dict[str, Any]] = copy.deepcopy(active_thesis)
         self.use_resource_fund_thesis_fallback = bool(use_resource_fund_thesis_fallback)
         self.backpressure_threshold = int(
             os.getenv("REVIEWER_BACKPRESSURE_THRESHOLD", "10")
@@ -146,7 +147,9 @@ class ReviewerEngine:
 
     def _build_scoring_engine(self) -> Optional[DeterministicScoringEngine]:
         if self.evaluation_prerequisites is not None:
-            policy = self.evaluation_prerequisites.compiled_scoring_policy
+            policy = copy.deepcopy(
+                self.evaluation_prerequisites.compiled_scoring_policy
+            )
             dimensions = (
                 policy.get("dimensions")
                 if isinstance(policy.get("dimensions"), dict)
@@ -585,6 +588,7 @@ class ReviewerEngine:
                 )
             trace = dict(trace)
             trace.setdefault("user_id", prerequisites.user_id)
+            trace.setdefault("rubric_version", prerequisites.policy.rubric_version)
             validate_governed_scoring_trace(trace, prerequisites)
         # An unscored dimension is missing evidence, not a neutral score and not an
         # invitation to copy another dimension's score. Preserve that missingness in

@@ -61,6 +61,17 @@ def _get(payload: Dict[str, Any], dotted: str) -> Any:
 def _manifest_complete(manifest: Any) -> bool:
     if not isinstance(manifest, dict):
         return False
+    manifest_version = str(manifest.get("manifest_version") or "").strip()
+    if manifest_version == "evaluation-manifest-v2":
+        try:
+            from models import EvaluationManifest
+
+            EvaluationManifest.model_validate(manifest)
+        except Exception:
+            return False
+        return True
+    if manifest_version != "evaluation-manifest-v1":
+        return False
     required_scalar = (
         "manifest_version",
         "pipeline_run_id",

@@ -3,7 +3,7 @@ Pydantic models for AETHRIA multi-stage startup intelligence.
 
 Enforces strict validation and nested structure for Scout → Reviewer → Partner pipeline.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime
 from utils.timeutil import utcnow, ensure_aware
@@ -12,20 +12,186 @@ from uuid import uuid4
 RulingDecision = Literal["YES", "NO", "MAYBE"]
 
 
-class EvaluationManifest(BaseModel):
-    """Portable dependency manifest for one completed current-pipeline evaluation."""
+_EVALUATION_MODEL_STAGES = frozenset(("scout", "reviewer", "partner"))
+_EVALUATION_CONSTRUCTION_PROMPTS = frozenset(
+    (
+        "scout.market_driven",
+        "scout.builder_technical",
+        "scout.pain_point",
+        "scout.contrarian",
+        "reviewer.DefaultReviewer",
+        "reviewer.SkepticalReviewer",
+        "reviewer.OpportunistReviewer",
+        "partner.template",
+    )
+)
+_EVALUATION_EXECUTION_PROMPTS = frozenset(
+    (
+        "scout",
+        "reviewer.DefaultReviewer",
+        "reviewer.SkepticalReviewer",
+        "reviewer.OpportunistReviewer",
+        "partner",
+    )
+)
 
-    manifest_version: Literal["evaluation-manifest-v1"] = "evaluation-manifest-v1"
-    pipeline_run_id: str
+
+class _FrozenDict(dict):
+    """JSON-serializable mapping that rejects post-validation mutation."""
+
+    @staticmethod
+    def _immutable(*_args: Any, **_kwargs: Any) -> None:
+        raise TypeError("evaluation identity mappings are immutable")
+
+    __setitem__ = _immutable
+    __delitem__ = _immutable
+    __ior__ = _immutable
+    clear = _immutable
+    pop = _immutable
+    popitem = _immutable
+    setdefault = _immutable
+    update = _immutable
+
+
+def _require_exact_non_empty_string_map(
+    values: Dict[str, str], *, expected: frozenset[str], field_name: str
+) -> None:
+    if set(values) != expected:
+        raise ValueError(
+            f"{field_name} must contain exactly {sorted(expected)!r}"
+        )
+    if any(not str(value or "").strip() for value in values.values()):
+        raise ValueError(f"{field_name} values must be non-empty")
+
+
+class EvaluationDependencyIdentity(BaseModel):
+    """Complete immutable identity for dependencies consumed by one evaluation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    user_id: str = Field(min_length=1)
+    thesis_id: str = Field(min_length=1)
+    thesis_version_id: str = Field(min_length=1)
+    thesis_hash: str = Field(min_length=1)
+    policy_id: str = Field(min_length=1)
+    policy_version_id: str = Field(min_length=1)
+    policy_hash: str = Field(min_length=1)
+    rubric_version: str = Field(min_length=1)
+    partner_rules_id: str = Field(min_length=1)
+    partner_rules_version: str = Field(min_length=1)
+    partner_rules_hash: str = Field(min_length=1)
+    scoring_runtime_version: str = Field(min_length=1)
+    scoring_runtime_hash: str = Field(min_length=1)
+
+
+class EvaluationModelIdentity(BaseModel):
+    """Exact model provider and non-secret request configuration identity."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider_id: str = Field(min_length=1)
+    model_id: str = Field(min_length=1)
+    configuration_id: str = Field(min_length=1)
+    configuration_hash: str = Field(min_length=1)
+
+
+class EvaluationManifestIdentity(BaseModel):
+    """Construction-time identity later bound to execution prompt evidence."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    dependency_identity: EvaluationDependencyIdentity
+    model_identities: Dict[str, EvaluationModelIdentity]
+    construction_prompt_versions: Dict[str, str]
+
+    @model_validator(mode="after")
+    def validate_complete_identity(self) -> "EvaluationManifestIdentity":
+        if set(self.model_identities) != _EVALUATION_MODEL_STAGES:
+            raise ValueError(
+                "model_identities must contain exactly scout, reviewer, and partner"
+            )
+        _require_exact_non_empty_string_map(
+            self.construction_prompt_versions,
+            expected=_EVALUATION_CONSTRUCTION_PROMPTS,
+            field_name="construction_prompt_versions",
+        )
+        object.__setattr__(
+            self, "model_identities", _FrozenDict(self.model_identities)
+        )
+        object.__setattr__(
+            self,
+            "construction_prompt_versions",
+            _FrozenDict(self.construction_prompt_versions),
+        )
+        return self
+
+
+class EvaluationManifest(BaseModel):
+    """Portable exact identity for one completed current-pipeline evaluation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    manifest_version: Literal["evaluation-manifest-v2"] = "evaluation-manifest-v2"
+    pipeline_run_id: str = Field(min_length=1)
     evaluation_path: Literal["manual_lookup", "autonomous_discovery", "rerun"]
+    user_id: str = Field(min_length=1)
+    thesis_id: str = Field(min_length=1)
+    thesis_version_id: str = Field(min_length=1)
+    thesis_hash: str = Field(min_length=1)
+    policy_id: str = Field(min_length=1)
+    policy_version_id: str = Field(min_length=1)
+    policy_hash: str = Field(min_length=1)
+    rubric_version: str = Field(min_length=1)
+    partner_rules_id: str = Field(min_length=1)
+    partner_rules_version: str = Field(min_length=1)
+    partner_rules_hash: str = Field(min_length=1)
+    scoring_runtime_version: str = Field(min_length=1)
+    scoring_runtime_hash: str = Field(min_length=1)
     models: Dict[str, str]
+    model_identities: Dict[str, EvaluationModelIdentity]
+    construction_prompt_versions: Dict[str, str]
     prompt_versions: Dict[str, str]
-    policy_version_id: Optional[str] = None
-    policy_hash: Optional[str] = None
-    rubric_version: Optional[str] = None
-    partner_rules_version: str
-    partner_rules_hash: str
     created_at: datetime = Field(default_factory=utcnow)
+
+    @model_validator(mode="after")
+    def validate_complete_manifest(self) -> "EvaluationManifest":
+        _require_exact_non_empty_string_map(
+            self.models,
+            expected=_EVALUATION_MODEL_STAGES,
+            field_name="models",
+        )
+        if set(self.model_identities) != _EVALUATION_MODEL_STAGES:
+            raise ValueError(
+                "model_identities must contain exactly scout, reviewer, and partner"
+            )
+        for stage in _EVALUATION_MODEL_STAGES:
+            if self.models[stage] != self.model_identities[stage].model_id:
+                raise ValueError(
+                    f"models.{stage} must equal model_identities.{stage}.model_id"
+                )
+        _require_exact_non_empty_string_map(
+            self.construction_prompt_versions,
+            expected=_EVALUATION_CONSTRUCTION_PROMPTS,
+            field_name="construction_prompt_versions",
+        )
+        _require_exact_non_empty_string_map(
+            self.prompt_versions,
+            expected=_EVALUATION_EXECUTION_PROMPTS,
+            field_name="prompt_versions",
+        )
+        object.__setattr__(self, "models", _FrozenDict(self.models))
+        object.__setattr__(
+            self, "model_identities", _FrozenDict(self.model_identities)
+        )
+        object.__setattr__(
+            self,
+            "construction_prompt_versions",
+            _FrozenDict(self.construction_prompt_versions),
+        )
+        object.__setattr__(
+            self, "prompt_versions", _FrozenDict(self.prompt_versions)
+        )
+        return self
 
 
 class ScoreBandConfig(BaseModel):

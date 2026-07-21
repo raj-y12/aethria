@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import metrics
 import pipeline_runner
+from models import EvaluationManifestIdentity
 
 
 def test_pipeline_engine_bundle_always_has_usage_controller(monkeypatch):
@@ -38,6 +39,120 @@ def test_pipeline_engine_bundle_always_has_usage_controller(monkeypatch):
         "reviewer": "gpt-5-nano",
         "partner": "gpt-5-nano",
     }
+
+
+def test_governed_pipeline_captures_manifest_identity_once_from_constructed_engines(
+    monkeypatch,
+):
+    class Controller:
+        def __init__(self, **_kwargs):
+            pass
+
+    class ScoutEngine:
+        def __init__(self, **kwargs):
+            self.model = kwargs["model"]
+            self.cost_controller = kwargs["cost_controller"]
+            self.scouts = [
+                SimpleNamespace(scout_type=kind, system_prompt=f"{kind} prompt")
+                for kind in (
+                    "market_driven",
+                    "builder_technical",
+                    "pain_point",
+                    "contrarian",
+                )
+            ]
+
+    class ReviewerEngine:
+        def __init__(self, **kwargs):
+            self.model = kwargs["model"]
+            self.use_structured_scoring = True
+            self.reviewer = SimpleNamespace(SYSTEM_PROMPT="default prompt")
+            self.skeptical_reviewer = SimpleNamespace(
+                SYSTEM_PROMPT="skeptical prompt"
+            )
+            self.opportunist_reviewer = SimpleNamespace(
+                SYSTEM_PROMPT="opportunist prompt"
+            )
+
+    class PartnerEngine:
+        def __init__(self, **kwargs):
+            self.received = kwargs
+            self.decision_engine = SimpleNamespace(
+                provider_id="openai",
+                model=kwargs["model"],
+                prompt_template_version="partner-template-hash",
+            )
+            self.bound_identity = None
+
+        def set_evaluation_manifest_identity(self, identity):
+            self.bound_identity = identity
+
+    dependency_identity = {
+        "user_id": "manifest-user",
+        "thesis_id": "thesis-1",
+        "thesis_version_id": "thesis-v1",
+        "thesis_hash": "thesis-hash",
+        "policy_id": "policy-1",
+        "policy_version_id": "policy-v1",
+        "policy_hash": "policy-hash",
+        "rubric_version": "rubric-v1",
+        "partner_rules_id": "partner-rules",
+        "partner_rules_version": "3.0",
+        "partner_rules_hash": "rules-hash",
+        "scoring_runtime_version": "1.1.0",
+        "scoring_runtime_hash": "runtime-hash",
+    }
+    prerequisites = SimpleNamespace(
+        thesis_context={"thesis_id": "thesis-1", "version_id": "thesis-v1"},
+        dependency_identity=dependency_identity,
+        require_tenant=lambda user_id, **_kwargs: user_id,
+    )
+    monkeypatch.setenv("SCOUT_MODEL", "scout-model-captured")
+    monkeypatch.setenv("REVIEWER_MODEL", "reviewer-model-captured")
+    monkeypatch.setenv("PARTNER_MODEL", "partner-model-captured")
+    monkeypatch.setenv("PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", "true")
+    monkeypatch.setattr(pipeline_runner, "CostController", Controller)
+    monkeypatch.setattr(
+        pipeline_runner, "DealMemory", lambda user_id: SimpleNamespace()
+    )
+    monkeypatch.setattr(pipeline_runner, "ScoutEngine", ScoutEngine)
+    monkeypatch.setattr(pipeline_runner, "ReviewerEngine", ReviewerEngine)
+    monkeypatch.setattr(pipeline_runner, "PartnerEngine", PartnerEngine)
+    monkeypatch.setattr(
+        pipeline_runner,
+        "PortfolioStore",
+        lambda **_kwargs: SimpleNamespace(),
+    )
+
+    engines = pipeline_runner._build_pipeline_engines(
+        user_id="manifest-user",
+        storage=SimpleNamespace(),
+        api_key="key",
+        settings={"cost_budget": {"enabled": False}},
+        thesis_ctx=prerequisites.thesis_context,
+        evaluation_prerequisites=prerequisites,
+    )
+    captured = engines.evaluation_manifest_identity
+    assert isinstance(captured, EvaluationManifestIdentity)
+    assert engines.partner_engine.bound_identity is captured
+    assert engines.partner_engine.received["model"] == "partner-model-captured"
+    assert engines.partner_engine.received["include_deal_context_digest"] is True
+
+    monkeypatch.setenv("SCOUT_MODEL", "mutated")
+    monkeypatch.setenv("REVIEWER_MODEL", "mutated")
+    monkeypatch.setenv("PARTNER_MODEL", "mutated")
+    monkeypatch.setenv("PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", "false")
+
+    assert captured.model_identities["scout"].model_id == "scout-model-captured"
+    assert captured.model_identities["reviewer"].model_id == (
+        "reviewer-model-captured"
+    )
+    assert captured.model_identities["partner"].model_id == (
+        "partner-model-captured"
+    )
+    assert captured.dependency_identity.model_dump(mode="python") == (
+        dependency_identity
+    )
 
 
 def test_decision_ready_metrics_use_bounded_non_tenant_labels():

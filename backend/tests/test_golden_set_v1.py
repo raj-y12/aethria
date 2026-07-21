@@ -69,6 +69,21 @@ def test_golden_set_requires_complete_evaluation_manifests(tmp_path):
     assert "evaluation_manifest.complete" in failure["failures"]
 
 
+def test_golden_set_v2_manifest_requires_complete_construction_identity(tmp_path):
+    golden = _golden_module()
+    payload = json.loads(golden.golden_set_path("v1").read_text())
+    manifest = payload["cases"][0]["snapshot"]["evaluation_manifest"]
+    manifest["manifest_version"] = "evaluation-manifest-v2"
+    incomplete = tmp_path / "v2-manifest-missing-identity.json"
+    incomplete.write_text(json.dumps(payload))
+
+    result = golden.run_golden_set_path(incomplete)
+
+    failure = result["cases"][0]
+    assert failure["status"] == "failed"
+    assert "evaluation_manifest.complete" in failure["failures"]
+
+
 def test_golden_set_cli_returns_machine_readable_result():
     backend = Path(__file__).parents[1]
     completed = subprocess.run(

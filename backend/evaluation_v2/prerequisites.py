@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import copy
+import hashlib
 import inspect
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict
 
 from core.policy_resolver import get_partner_rules
 from evaluation_v2.models import EvaluationPolicy
 from evaluation_v2.partner_rules import PartnerRules, parse_partner_rules
+from models import EvaluationDependencyIdentity
 from evaluation_v2.policy import evaluation_policy_from_compiled
 from fund_thesis import (
     FundThesisError,
@@ -40,6 +44,11 @@ class EvaluationPrerequisites:
     partner_rules: PartnerRules
     fund_config: Dict[str, Any]
     policy: EvaluationPolicy
+    _dependency_identity_payload: Dict[str, str] = field(
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         # Direct construction is used by engine tests and adapters. Preserve the
@@ -49,29 +58,79 @@ class EvaluationPrerequisites:
             "partner_rules",
             parse_partner_rules(self.partner_rules),
         )
+        # Every mutable document is copied at the prerequisite boundary. Engines
+        # receive further copies, so later cache/settings/test mutations cannot
+        # rewrite the dependencies already certified for this run.
+        object.__setattr__(self, "thesis_context", copy.deepcopy(self.thesis_context))
+        object.__setattr__(
+            self,
+            "compiled_scoring_policy",
+            copy.deepcopy(self.compiled_scoring_policy),
+        )
+        object.__setattr__(self, "fund_config", copy.deepcopy(self.fund_config))
+
+        runtime = self.compiled_scoring_policy.get("scoring_runtime")
+        runtime = runtime if isinstance(runtime, dict) else {}
+        thesis_context = self.thesis_context
+        thesis_context = thesis_context if isinstance(thesis_context, dict) else {}
+        canonical_thesis = json.dumps(
+            thesis_context,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+        policy_version_id = str(
+            getattr(self.policy, "policy_version_id", "") or ""
+        ).strip()
+        payload = {
+            "user_id": str(self.user_id or "").strip(),
+            "thesis_id": str(
+                thesis_context.get("thesis_id")
+                or thesis_context.get("version_id")
+                or self.thesis_version_id
+                or ""
+            ).strip(),
+            "thesis_version_id": str(self.thesis_version_id or "").strip(),
+            "thesis_hash": hashlib.sha256(
+                canonical_thesis.encode("utf-8")
+            ).hexdigest(),
+            "policy_id": str(
+                self.compiled_scoring_policy.get("id") or policy_version_id
+            ).strip(),
+            "policy_version_id": policy_version_id,
+            "policy_hash": str(
+                getattr(self.policy, "policy_hash", "") or ""
+            ).strip(),
+            "rubric_version": str(
+                getattr(self.policy, "rubric_version", "") or ""
+            ).strip(),
+            "partner_rules_id": "partner-rules",
+            "partner_rules_version": str(
+                getattr(self.policy, "partner_rules_version", "") or ""
+            ).strip(),
+            "partner_rules_hash": str(
+                getattr(self.policy, "partner_rules_hash", "") or ""
+            ).strip(),
+            "scoring_runtime_version": str(
+                runtime.get("semantic_version") or ""
+            ).strip(),
+            "scoring_runtime_hash": str(
+                self.compiled_scoring_policy.get("scoring_runtime_hash") or ""
+            ).strip(),
+        }
+        object.__setattr__(self, "_dependency_identity_payload", payload)
 
     @property
     def dependency_identity(self) -> Dict[str, str]:
-        runtime = self.compiled_scoring_policy.get("scoring_runtime")
-        if not isinstance(runtime, dict):
-            raise RuntimeError(
-                "Evaluation prerequisites have no certified scoring runtime"
+        try:
+            identity = EvaluationDependencyIdentity.model_validate(
+                dict(self._dependency_identity_payload)
             )
-        return {
-            "user_id": self.user_id,
-            "thesis_version_id": self.thesis_version_id,
-            "policy_version_id": self.policy.policy_version_id,
-            "policy_hash": self.policy.policy_hash,
-            "scoring_runtime_version": str(
-                runtime.get("semantic_version") or ""
-            ),
-            "scoring_runtime_hash": str(
-                self.compiled_scoring_policy.get("scoring_runtime_hash") or ""
-            ),
-            "rubric_version": self.policy.rubric_version,
-            "partner_rules_version": self.policy.partner_rules_version,
-            "partner_rules_hash": self.policy.partner_rules_hash,
-        }
+        except Exception as exc:
+            raise RuntimeError(
+                "Evaluation prerequisites have incomplete dependency identity"
+            ) from exc
+        return identity.model_dump(mode="python")
 
     def require_tenant(self, user_id: str, *, context: str) -> str:
         uid = require_user_id(user_id, context=context)

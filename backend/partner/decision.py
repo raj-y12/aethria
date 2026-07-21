@@ -6,6 +6,8 @@ Default mode: NO LLM calls. LLM only for edge cases (contradictory scores, MEDIU
 """
 import os
 import json
+import inspect
+import copy
 import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -229,6 +231,7 @@ class PartnerDecisionEngine:
         tenant_user_id: str = "",
         use_resource_fund_thesis_fallback: bool = True,
         evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
+        include_deal_context_digest: Optional[bool] = None,
     ):
         """
         Initialize the decision engine.
@@ -253,8 +256,10 @@ class PartnerDecisionEngine:
         self.llm_call_count = 0
         if evaluation_prerequisites is not None:
             self._rules = evaluation_prerequisites.partner_rules
-            self._fund_config = evaluation_prerequisites.fund_config
-            self.evaluation_policy = evaluation_prerequisites.policy
+            self._fund_config = copy.deepcopy(evaluation_prerequisites.fund_config)
+            self.evaluation_policy = evaluation_prerequisites.policy.model_copy(
+                deep=True
+            )
         else:
             self._rules = _load_partner_rules()
             self._fund_config = {}
@@ -275,6 +280,21 @@ class PartnerDecisionEngine:
                 self.logger.warning("Partner settings unavailable, using resource rules: %s", e)
         self.api_key = (api_key or os.getenv("OPENAI_API_KEY", "")).strip()
         self.model = model or os.getenv("PARTNER_MODEL", "gpt-5-nano")
+        self.provider_id = "openai"
+        self._include_deal_context_digest = (
+            bool(include_deal_context_digest)
+            if include_deal_context_digest is not None
+            else os.getenv(
+                "PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", ""
+            ).strip().lower()
+            in ("1", "true", "yes")
+        )
+        # This hashes the exact source that constructs both system and user
+        # prompts. It is captured once, alongside the digest toggle, before any
+        # evaluation can run.
+        self.prompt_template_version = hash_prompt(
+            inspect.getsource(type(self)._decide_with_llm)
+        )
         if self.api_key:
             self.client = build_openai_client(self.api_key)
         else:
@@ -1665,11 +1685,7 @@ class PartnerDecisionEngine:
         thesis_section = f"FUND THESIS MANDATE (and resource lens if present):\n{tb}\n\n" if tb else ""
 
         digest_prefix = ""
-        if os.getenv("PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        ):
+        if self._include_deal_context_digest:
             from utils.deal_context import build_deal_context_v1, format_deal_context_digest_prompt_line
 
             dc = build_deal_context_v1(scout_output, review_output, fund_thesis)

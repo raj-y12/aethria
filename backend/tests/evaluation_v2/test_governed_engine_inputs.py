@@ -110,8 +110,10 @@ def test_governed_reviewer_consumes_exact_compiled_policy_without_reload(monkeyp
         evaluation_prerequisites=prerequisites,
     )
 
-    assert reviewer.active_thesis is prerequisites.thesis_context
-    assert reviewer.structured_scoring_engine.policy is prerequisites.compiled_scoring_policy
+    assert reviewer.active_thesis == prerequisites.thesis_context
+    assert reviewer.active_thesis is not prerequisites.thesis_context
+    assert reviewer.structured_scoring_engine.policy == prerequisites.compiled_scoring_policy
+    assert reviewer.structured_scoring_engine.policy is not prerequisites.compiled_scoring_policy
     assert reviewer.structured_scoring_engine.dimension_weights["market"] == 70.0
     assert reviewer.structured_scoring_engine.dimension_weights["execution"] == 30.0
     assert reviewer.use_resource_fund_thesis_fallback is False
@@ -188,8 +190,10 @@ def test_governed_partner_consumes_exact_rules_and_fund_config_without_reload(mo
     )
 
     assert partner._rules is prerequisites.partner_rules
-    assert partner._fund_config is prerequisites.fund_config
-    assert partner.evaluation_policy is prerequisites.policy
+    assert partner._fund_config == prerequisites.fund_config
+    assert partner._fund_config is not prerequisites.fund_config
+    assert partner.evaluation_policy == prerequisites.policy
+    assert partner.evaluation_policy is not prerequisites.policy
     assert partner.evaluation_policy.policy_version_id == "policy-live"
     assert partner.evaluation_policy.partner_rules_version == "rules-v3-exact"
     assert partner.use_resource_fund_thesis_fallback is False
@@ -217,6 +221,7 @@ def _exact_trace(score: float) -> dict:
         "user_id": "user-a",
         "policy_version_id": "policy-live",
         "policy_hash": _compiled_policy()["policy_hash"],
+        "rubric_version": "tenant-rubric:policy-live",
         "scoring_runtime_version": _compiled_policy()["scoring_runtime"][
             "semantic_version"
         ],
@@ -653,6 +658,16 @@ def test_governed_persona_policy_identity_mismatch_fails_before_consensus():
                 _persona_trace(8, policy_version_id="stale-policy"),
                 _persona_trace(8),
             ]
+        )
+
+
+def test_governed_persona_rubric_identity_mismatch_fails_before_consensus():
+    stale = _persona_trace(8)
+    stale["rubric_version"] = "tenant-rubric:stale-policy"
+
+    with pytest.raises(RuntimeError, match="rubric version does not match"):
+        _governed_review_from_persona_traces(
+            [_persona_trace(8), stale, _persona_trace(8)]
         )
 
 

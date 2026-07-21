@@ -3,6 +3,7 @@ Partner execution engine.
 Runs continuously, processing reviewed entries and making investment decisions.
 """
 import asyncio
+import copy
 import json
 import logging
 import os
@@ -19,6 +20,7 @@ from portfolio.store import PortfolioStore
 from pipeline_state import pipeline_stage_log, upsert_pipeline_state
 from agent_trace import handoff_quality_from_trace
 from evaluation_v2.prerequisites import EvaluationPrerequisites
+from models import EvaluationManifestIdentity
 from pipeline_execution import StageExecutionResult
 
 
@@ -50,6 +52,8 @@ class PartnerEngine:
         fund_thesis: Optional[Dict[str, Any]] = None,
         use_resource_fund_thesis_fallback: bool = True,
         evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
+        model: Optional[str] = None,
+        include_deal_context_digest: Optional[bool] = None,
     ):
         """
         Initialize the Partner engine.
@@ -74,6 +78,8 @@ class PartnerEngine:
             tenant_user_id=self.tenant_user_id,
             use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
             evaluation_prerequisites=evaluation_prerequisites,
+            model=model,
+            include_deal_context_digest=include_deal_context_digest,
         )
         if evaluation_prerequisites is not None:
             evaluation_prerequisites.require_tenant(
@@ -86,20 +92,49 @@ class PartnerEngine:
                 raise RuntimeError(
                     "PartnerEngine: fund thesis does not match governed prerequisites"
                 )
-            fund_thesis = evaluation_prerequisites.thesis_context
+            fund_thesis = copy.deepcopy(evaluation_prerequisites.thesis_context)
         self.evaluation_prerequisites = evaluation_prerequisites
-        self.evaluation_dependency_identity = (
-            evaluation_prerequisites.dependency_identity
-            if evaluation_prerequisites is not None
-            else None
-        )
-        self.fund_thesis: Optional[Dict[str, Any]] = fund_thesis
+        self.evaluation_manifest_identity: Optional[
+            EvaluationManifestIdentity
+        ] = None
+        self.fund_thesis: Optional[Dict[str, Any]] = copy.deepcopy(fund_thesis)
         # Max undecided to process per cycle (ramp: process a solid batch when backlog is high)
         self.batch_max = int(os.getenv("PARTNER_BATCH_MAX", "20"))
 
         self.logger = logging.getLogger("partner.engine")
         self.running = False
         self.last_cycle_escalations: int = 0
+
+    def set_evaluation_manifest_identity(
+        self,
+        identity: EvaluationManifestIdentity | Dict[str, Any],
+    ) -> None:
+        """Bind the exact pipeline construction identity once, before execution."""
+        validated = EvaluationManifestIdentity.model_validate(
+            identity.model_dump(mode="python")
+            if isinstance(identity, EvaluationManifestIdentity)
+            else dict(identity)
+        )
+        if validated.dependency_identity.user_id != self.tenant_user_id:
+            raise RuntimeError("PartnerEngine manifest identity tenant mismatch")
+        if self.evaluation_prerequisites is None:
+            raise RuntimeError(
+                "PartnerEngine manifest identity requires governed prerequisites"
+            )
+        if (
+            validated.dependency_identity.model_dump(mode="python")
+            != self.evaluation_prerequisites.dependency_identity
+        ):
+            raise RuntimeError(
+                "PartnerEngine manifest dependency identity mismatch"
+            )
+        if self.evaluation_manifest_identity is not None:
+            if self.evaluation_manifest_identity != validated:
+                raise RuntimeError(
+                    "PartnerEngine manifest identity cannot be replaced"
+                )
+            return
+        self.evaluation_manifest_identity = validated
     
     def close(self) -> None:
         """Release the decision engine's OpenAI client (called at cycle end)."""
@@ -329,9 +364,9 @@ class PartnerEngine:
 
         try:
             persist_kwargs: Dict[str, Any] = {"pipeline_run_id": pr}
-            if self.evaluation_dependency_identity is not None:
-                persist_kwargs["dependency_identity"] = (
-                    self.evaluation_dependency_identity
+            if self.evaluation_manifest_identity is not None:
+                persist_kwargs["evaluation_manifest_identity"] = (
+                    self.evaluation_manifest_identity
                 )
             success = await asyncio.to_thread(
                 self.storage.add_partner_decision,
