@@ -10,6 +10,12 @@ from collections import defaultdict
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 import metrics
+from jobs.fencing import (
+    LeaseFence,
+    bind_lease_fence,
+    current_lease_fence,
+    reset_lease_fence,
+)
 from jobs.models import AgentJob, JobExecutionBlocked, JobExecutionCancelled, JobType
 from jobs.postgres import database_dsn
 from utils.timeutil import utcnow
@@ -61,7 +67,13 @@ class DurableJobWorker:
         finally:
             self._wake.clear()
 
-    async def _heartbeat(self, job: AgentJob) -> None:
+    async def _heartbeat(
+        self,
+        job: AgentJob,
+        *,
+        lease_fence: LeaseFence,
+        handler_task: asyncio.Task,
+    ) -> None:
         while True:
             await asyncio.sleep(self.heartbeat_seconds)
             try:
@@ -74,10 +86,14 @@ class DurableJobWorker:
             except Exception:
                 metrics.inc_durable_heartbeat_failure(job_type=job.job_type.value)
                 logger.exception("Lease heartbeat failed for job %s", job.job_id)
+                lease_fence.lose("Lease heartbeat failed.")
+                handler_task.cancel()
                 return
             if not alive:
                 metrics.inc_durable_heartbeat_failure(job_type=job.job_type.value)
                 logger.warning("Lease heartbeat rejected for job %s", job.job_id)
+                lease_fence.lose("Lease heartbeat renewal was rejected.")
+                handler_task.cancel()
                 return
 
     async def execute(self, job: AgentJob) -> None:
@@ -85,7 +101,7 @@ class DurableJobWorker:
         outcome = "error"
         handler = self.handlers.get(job.job_type)
         if handler is None:
-            await self.repository.retry(
+            transitioned = await self.repository.retry(
                 user_id=job.user_id,
                 job_id=job.job_id,
                 worker_id=self.worker_id,
@@ -93,28 +109,47 @@ class DurableJobWorker:
             )
             metrics.observe_durable_job_run(
                 job_type=job.job_type.value,
-                outcome="retry",
+                outcome="retry" if transitioned else "lease_lost",
                 seconds=time.perf_counter() - run_started,
             )
             return
         async with self._global:
             async with self._tenants[job.user_id]:
-                heartbeat = asyncio.create_task(self._heartbeat(job))
+                lease_fence = LeaseFence(
+                    user_id=job.user_id,
+                    job_id=job.job_id,
+                    worker_id=self.worker_id,
+                )
+                fence_token = bind_lease_fence(lease_fence)
+                handler_task = asyncio.create_task(handler(job))
+                heartbeat = asyncio.create_task(
+                    self._heartbeat(
+                        job,
+                        lease_fence=lease_fence,
+                        handler_task=handler_task,
+                    )
+                )
                 try:
-                    await handler(job)
-                    await self.repository.succeed(
+                    await handler_task
+                    transitioned = await self.repository.succeed(
                         user_id=job.user_id,
                         job_id=job.job_id,
                         worker_id=self.worker_id,
                     )
-                    outcome = "success"
+                    if not transitioned:
+                        lease_fence.lose("Job completion was rejected by the lease fence.")
+                    outcome = "success" if transitioned else "lease_lost"
                 except asyncio.CancelledError:
+                    if lease_fence.lost:
+                        outcome = "lease_lost"
+                        return
                     outcome = "cancelled"
+                    handler_task.cancel()
                     raise
                 except JobExecutionCancelled:
                     outcome = "cancelled"
                 except JobExecutionBlocked as exc:
-                    await self.repository.block(
+                    transitioned = await self.repository.block(
                         user_id=job.user_id,
                         job_id=job.job_id,
                         worker_id=self.worker_id,
@@ -122,21 +157,28 @@ class DurableJobWorker:
                         detail=exc.detail,
                         recovery_action=exc.recovery_action,
                     )
-                    outcome = "blocked"
+                    if not transitioned:
+                        lease_fence.lose("Job block transition was rejected by the lease fence.")
+                    outcome = "blocked" if transitioned else "lease_lost"
                 except Exception as exc:
-                    await self.repository.retry(
+                    transitioned = await self.repository.retry(
                         user_id=job.user_id,
                         job_id=job.job_id,
                         worker_id=self.worker_id,
                         error=str(exc),
                     )
-                    outcome = "retry"
+                    if not transitioned:
+                        lease_fence.lose("Job retry transition was rejected by the lease fence.")
+                    outcome = "retry" if transitioned else "lease_lost"
                 finally:
                     heartbeat.cancel()
+                    if not handler_task.done():
+                        handler_task.cancel()
                     try:
                         await heartbeat
                     except asyncio.CancelledError:
                         pass
+                    reset_lease_fence(fence_token)
                     metrics.observe_durable_job_run(
                         job_type=job.job_type.value,
                         outcome=outcome,

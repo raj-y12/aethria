@@ -24,6 +24,10 @@ class JobExecutionCancelled(RuntimeError):
     """Cooperative stop observed between durable execution checkpoints."""
 
 
+class JobLeaseLost(RuntimeError):
+    """The executing worker no longer owns the durable job lease."""
+
+
 class JobExecutionBlocked(RuntimeError):
     """Execution cannot continue until an explicit operator action is complete."""
 

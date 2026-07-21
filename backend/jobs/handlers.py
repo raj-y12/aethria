@@ -20,6 +20,7 @@ from jobs.models import (
     PipelineCyclePayload,
 )
 from jobs.lookup_outcomes import LookupAttemptOutcome, record_lookup_attempt
+from jobs.fencing import assert_job_ownership
 from evidence.repository import EvidenceRepository
 from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
@@ -34,12 +35,7 @@ from resolver.company_resolver import CompanyResolution, resolve_company
 
 
 async def _raise_if_cancelled(repository: Any, job: AgentJob) -> None:
-    getter = getattr(repository, "get_job", None)
-    if getter is None:
-        return
-    current = await getter(user_id=job.user_id, job_id=job.job_id)
-    if current is not None and current.status is JobStatus.CANCELLED:
-        raise JobExecutionCancelled(f"Job {job.job_id} was cancelled")
+    await assert_job_ownership(repository, job)
 
 
 async def _checkpoint(repository, job, stage, status, metadata):
@@ -84,6 +80,7 @@ async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
             pipeline_run_id=job.pipeline_run_id,
             identity_repository=IdentityRepository(repository.pool),
             evaluation_prerequisites=evaluation_prerequisites,
+            ownership_check=lambda: _raise_if_cancelled(repository, job),
         )
     except EvaluationPrerequisiteError as exc:
         raise JobExecutionBlocked(
@@ -180,7 +177,9 @@ async def _execute_company_lookup(repository: Any, job: AgentJob) -> PipelineExe
             },
             resolution_payload=resolution_payload,
         )
+        await _raise_if_cancelled(repository, job)
         admission = await IdentityService(identity_repository).admit(observation)
+        await _raise_if_cancelled(repository, job)
 
     identity_metadata = {
         "observation_id": admission.observation_id,
@@ -231,6 +230,7 @@ async def _execute_company_lookup(repository: Any, job: AgentJob) -> PipelineExe
             resolution=resolution,
             pipeline_run_id=job.pipeline_run_id,
             checkpoint=checkpoint,
+            ownership_check=lambda: _raise_if_cancelled(repository, job),
             evaluation_prerequisites=evaluation_prerequisites,
             institutional_context={
                 "observation_id": admission.observation_id,
@@ -252,11 +252,13 @@ async def _execute_company_lookup(repository: Any, job: AgentJob) -> PipelineExe
     result_metadata = result.model_dump(mode="json", exclude_none=True)
     startup_id = result.startup_id
     if startup_id:
+        await _raise_if_cancelled(repository, job)
         await identity_repository.link_legacy_projection(
             user_id=job.user_id,
             opportunity_id=admission.opportunity_id,
             legacy_startup_id=startup_id,
         )
+        await _raise_if_cancelled(repository, job)
         await _checkpoint(
             repository,
             job,

@@ -75,6 +75,7 @@ from fund_thesis import (
 from identity.acquisition import observation_from_scout_discovery
 from identity.projection import link_admission_projection
 from identity.service import IdentityService
+from jobs.models import JobLeaseLost
 from utils.reference_validation import is_generic_reference
 from utils.prompt_version import hash_prompt
 
@@ -543,6 +544,7 @@ async def run_one_pipeline_cycle(
     identity_repository: Optional[Any] = None,
     evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
     fund_intelligence_repository: Optional[Any] = None,
+    ownership_check: Optional[Callable[[], Awaitable[None]]] = None,
 ) -> PipelineExecutionResult:
     """Run one cycle of scout, reviewer, partner, portfolio, and meta for the given user."""
     uid = require_user_id(user_id, context="run_one_pipeline_cycle")
@@ -562,6 +564,7 @@ async def run_one_pipeline_cycle(
                 pipeline_run_id=pipeline_run_id,
                 identity_repository=identity_repository,
                 evaluation_prerequisites=evaluation_prerequisites,
+                ownership_check=ownership_check,
             )
     except EvaluationPrerequisiteError as exc:
         return PipelineExecutionResult.blocked(
@@ -578,11 +581,16 @@ async def _run_one_pipeline_cycle_inner(
     pipeline_run_id: Optional[str] = None,
     identity_repository: Optional[Any] = None,
     evaluation_prerequisites: EvaluationPrerequisites,
+    ownership_check: Optional[Callable[[], Awaitable[None]]] = None,
 ) -> PipelineExecutionResult:
     evaluation_prerequisites.require_tenant(
         user_id, context="_run_one_pipeline_cycle_inner"
     )
     tenant = TenantContext(user_id=user_id)
+
+    async def ensure_owned() -> None:
+        if ownership_check is not None:
+            await ownership_check()
     logger.info(
         "event=tenant_context user_id=%s module=pipeline_cycle",
         tenant.user_id[:24],
@@ -717,6 +725,7 @@ async def _run_one_pipeline_cycle_inner(
         discoveries = []
         if scouts_enabled and identity_repository is not None:
             agents_executed += len(getattr(scout_engine, "scouts", []) or [])
+            await ensure_owned()
             scout_result = await scout_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
                 persist_discoveries=False,
@@ -751,9 +760,11 @@ async def _run_one_pipeline_cycle_inner(
         # Mandatory production gate: periodic discoveries without verifiable
         # external references must not reach reviewer/partner stages. Existing
         # on-demand lookup and resolution-status guards live in storage.
+        await ensure_owned()
         await _prune_unreferenced_startups(storage, user_id)
 
         if scouts_enabled and identity_repository is not None:
+            await ensure_owned()
             await _admit_autonomous_discoveries(
                 user_id=user_id,
                 discoveries=discoveries,
@@ -784,6 +795,7 @@ async def _run_one_pipeline_cycle_inner(
                     user_id[:12],
                     unreviewed_before,
                 )
+            await ensure_owned()
             reviewer_result = await reviewer_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
                 eligible_startup_ids=eligible_startup_ids,
@@ -834,6 +846,7 @@ async def _run_one_pipeline_cycle_inner(
                     user_id[:12],
                     undecided_before,
                 )
+            await ensure_owned()
             partner_result = await partner_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
                 eligible_startup_ids=eligible_startup_ids,
@@ -891,6 +904,7 @@ async def _run_one_pipeline_cycle_inner(
             health_interval=3600,
         )
         agents_executed += 1
+        await ensure_owned()
         portfolio_result = await portfolio_engine.run_cycle()
         if not isinstance(portfolio_result, StageExecutionResult):
             raise RuntimeError("Portfolio returned an invalid periodic stage result")
@@ -903,6 +917,7 @@ async def _run_one_pipeline_cycle_inner(
             user_id=user_id,
         )
         agents_executed += 1
+        await ensure_owned()
         meta_result = await meta_agent.run_cycle()
         if not isinstance(meta_result, MetaCycleResult):
             raise RuntimeError("Meta returned an invalid periodic stage result")
@@ -925,6 +940,7 @@ async def _run_one_pipeline_cycle_inner(
                     "escalations_count": _activity_escalations_count,
                 }).execute()
 
+            await ensure_owned()
             await asyncio.to_thread(_insert_activity_sync)
         except Exception as _act_err:
             logger.warning("[%s] Could not persist pipeline_activity: %s", user_id[:12], _act_err)
@@ -1013,7 +1029,7 @@ async def _run_one_pipeline_cycle_inner(
     except Exception as e:
         metrics.observe_pipeline_cycle(time.perf_counter() - started_at, outcome="error")
         logger.exception("[%s] Pipeline cycle error: %s", user_id[:12], e)
-        if isinstance(e, EvaluationPrerequisiteError):
+        if isinstance(e, (EvaluationPrerequisiteError, JobLeaseLost)):
             raise
         return PipelineExecutionResult.stage_failure(
             stage=current_stage,
@@ -1041,6 +1057,7 @@ async def run_on_demand_lookup(
     checkpoint: Optional[
         Callable[[str, str, Dict[str, Any]], Awaitable[None]]
     ] = None,
+    ownership_check: Optional[Callable[[], Awaitable[None]]] = None,
     institutional_context: Optional[Dict[str, Any]] = None,
     evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
     fund_intelligence_repository: Optional[Any] = None,
@@ -1089,6 +1106,7 @@ async def run_on_demand_lookup(
                 resolution=resolution,
                 pipeline_run_id=pipeline_run_id,
                 checkpoint=checkpoint,
+                ownership_check=ownership_check,
                 institutional_context=institutional_context,
                 evaluation_prerequisites=evaluation_prerequisites,
             )
@@ -1140,6 +1158,7 @@ async def _run_on_demand_lookup_inner(
     checkpoint: Optional[
         Callable[[str, str, Dict[str, Any]], Awaitable[None]]
     ] = None,
+    ownership_check: Optional[Callable[[], Awaitable[None]]] = None,
     institutional_context: Optional[Dict[str, Any]] = None,
     evaluation_prerequisites: EvaluationPrerequisites,
 ) -> PipelineExecutionResult:
@@ -1156,6 +1175,10 @@ async def _run_on_demand_lookup_inner(
     async def emit(stage: str, status: str, **metadata: Any) -> None:
         if checkpoint is not None:
             await checkpoint(stage, status, metadata)
+
+    async def ensure_owned() -> None:
+        if ownership_check is not None:
+            await ownership_check()
 
     def cancelled() -> bool:
         try:
@@ -1275,6 +1298,7 @@ async def _run_on_demand_lookup_inner(
             operator_context = await asyncio.to_thread(
                 _build_rerun_operator_context, additional_context
             )
+            await ensure_owned()
             startup_id = await asyncio.to_thread(
                 storage.prepare_rerun_startup,
                 replace_startup_id,
@@ -1292,6 +1316,7 @@ async def _run_on_demand_lookup_inner(
                 )
         else:
             scout_stage_started = time.perf_counter()
+            await ensure_owned()
             startup_id = await scout_engine.run_named_lookup(
                 company_name=company,
                 scout_type="market_driven",
@@ -1348,6 +1373,7 @@ async def _run_on_demand_lookup_inner(
             )
         current_stage = "reviewer"
         reviewer_stage_started = time.perf_counter()
+        await ensure_owned()
         reviewed = await reviewer_engine.run_startup(
             startup_id,
             ignore_confidence_threshold=True,
@@ -1365,6 +1391,7 @@ async def _run_on_demand_lookup_inner(
         if not reviewed:
             logger.warning("[%s] On-demand lookup not reviewed: %s", user_id[:12], startup_id)
             message = "Lookup found the company, but analyst review could not complete after retrying."
+            await ensure_owned()
             await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
             metrics.inc_lookup("error")
             return PipelineExecutionResult.stage_failure(
@@ -1385,6 +1412,7 @@ async def _run_on_demand_lookup_inner(
             )
         current_stage = "partner"
         partner_stage_started = time.perf_counter()
+        await ensure_owned()
         decided = await partner_engine.run_startup(
             startup_id,
             pipeline_run_id=lookup_run_id,
@@ -1401,6 +1429,7 @@ async def _run_on_demand_lookup_inner(
         if not decided:
             logger.warning("[%s] On-demand lookup not decided yet: %s", user_id[:12], startup_id)
             message = "Lookup review completed, but the partner decision could not complete after retrying."
+            await ensure_owned()
             await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
             metrics.inc_lookup("error")
             return PipelineExecutionResult.stage_failure(
@@ -1413,6 +1442,7 @@ async def _run_on_demand_lookup_inner(
         else:
             await emit("partner", "succeeded", startup_id=startup_id)
             if replace_startup_id:
+                await ensure_owned()
                 await asyncio.to_thread(
                     upsert_pipeline_state,
                     getattr(storage, "_client", None),
@@ -1431,6 +1461,7 @@ async def _run_on_demand_lookup_inner(
                     tenant_user_id=user_id,
                     fund_thesis=thesis_ctx,
                 )
+                await ensure_owned()
                 memo_saved = await asyncio.to_thread(
                     storage.update_startup_partial,
                     startup_id,
@@ -1438,6 +1469,7 @@ async def _run_on_demand_lookup_inner(
                 )
                 if not memo_saved:
                     raise RuntimeError("Regenerated memo could not be persisted")
+                await ensure_owned()
                 await asyncio.to_thread(
                     upsert_pipeline_state,
                     getattr(storage, "_client", None),
@@ -1484,8 +1516,9 @@ async def _run_on_demand_lookup_inner(
         logger.exception("[%s] On-demand lookup error (%s): %s", user_id[:12], company, e)
         message = "Lookup failed with an unexpected error. Try again or check server logs."
         if startup_id:
+            await ensure_owned()
             await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
-        if isinstance(e, EvaluationPrerequisiteError):
+        if isinstance(e, (EvaluationPrerequisiteError, JobLeaseLost)):
             raise
         return PipelineExecutionResult.stage_failure(
             stage=current_stage,

@@ -111,6 +111,7 @@ async def test_cycle_handler_passes_job_tenant_and_stable_pipeline_run(monkeypat
     assert calls[0][1]["pipeline_run_id"] == job.pipeline_run_id
     assert calls[0][1]["identity_repository"].pool is repository.pool
     assert calls[0][1]["evaluation_prerequisites"] == _prerequisites()
+    assert callable(calls[0][1]["ownership_check"])
     assert [item["stage"] for item in repository.checkpoints] == [
         "pipeline_cycle",
         "pipeline_cycle",
@@ -190,6 +191,7 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
     assert calls[0][2]["pipeline_run_id"] == job.pipeline_run_id
     assert calls[0][2]["resolution"].canonical_name == "Acme"
     assert calls[0][2]["evaluation_prerequisites"] == _prerequisites()
+    assert callable(calls[0][2]["ownership_check"])
     assert calls[0][2]["institutional_context"] == {
         "observation_id": "observation-1",
         "company_id": "company-1",
@@ -394,6 +396,108 @@ async def test_lookup_handler_observes_cancellation_between_checkpoints(
     assert [
         item.disposition.value for item in _capture_lookup_attempt_outcomes
     ] == ["accepted", "cancelled"]
+
+
+@pytest.mark.asyncio
+async def test_lookup_handler_rejects_a_stale_owner_before_identity_write(
+    monkeypatch,
+):
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository()
+    admissions = []
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup:user-a:stale-owner",
+        payload=CompanyLookupPayload(
+            user_id="user-a",
+            company_name="Acme",
+            website="https://acme.example",
+        ),
+        attempts=1,
+        status=JobStatus.RUNNING,
+        lease_owner="worker-a",
+    )
+
+    async def get_job(**_kwargs):
+        return job.model_copy(update={"lease_owner": "worker-b"})
+
+    class IdentityService:
+        def __init__(self, _repository):
+            pass
+
+        async def admit(self, _observation):
+            admissions.append("admitted")
+            raise AssertionError("stale worker reached identity authority")
+
+    repository.get_job = get_job
+    monkeypatch.setattr(handlers, "IdentityService", IdentityService)
+
+    with pytest.raises(RuntimeError, match="lease"):
+        await handlers.company_lookup_handler(repository, job)
+
+    assert admissions == []
+
+
+@pytest.mark.asyncio
+async def test_lookup_handler_detects_mid_handler_lease_loss_before_checkpoint_write(
+    monkeypatch,
+):
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository()
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup:user-a:mid-handler-lease-loss",
+        payload=CompanyLookupPayload(
+            user_id="user-a",
+            company_name="Acme",
+            website="https://acme.example",
+        ),
+        attempts=1,
+        status=JobStatus.RUNNING,
+        lease_owner="worker-a",
+    )
+    reads = 0
+
+    async def get_job(**_kwargs):
+        nonlocal reads
+        reads += 1
+        if reads == 1:
+            return job
+        return job.model_copy(update={"lease_owner": "worker-b"})
+
+    class IdentityRepository:
+        async def get_opportunity_by_legacy_projection(self, **_kwargs):
+            return None
+
+    class IdentityService:
+        def __init__(self, _repository):
+            pass
+
+        async def admit(self, _observation):
+            return SimpleNamespace(
+                observation_id="observation-1",
+                status=SimpleNamespace(value="resolved"),
+                company_id="company-1",
+                opportunity_id="opportunity-1",
+                identity_case_id=None,
+                confidence=1.0,
+                blocks_evaluation=False,
+            )
+
+    async def load(**_kwargs):
+        raise AssertionError("stale worker reached prerequisite loading")
+
+    repository.get_job = get_job
+    monkeypatch.setattr(handlers, "IdentityRepository", lambda _pool: IdentityRepository())
+    monkeypatch.setattr(handlers, "IdentityService", IdentityService)
+    monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
+
+    with pytest.raises(RuntimeError, match="lease"):
+        await handlers.company_lookup_handler(repository, job)
+
+    assert repository.checkpoints == []
 
 
 @pytest.mark.asyncio
