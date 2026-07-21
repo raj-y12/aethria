@@ -335,7 +335,13 @@ def _usage_snapshot(cost_controller: Optional[CostController]) -> Dict[str, Any]
 
 def _build_storage_sync(user_id: str) -> SupabaseStartupsStorage:
     """Blocking client/storage construction; call via asyncio.to_thread."""
-    return SupabaseStartupsStorage(get_service_client(), user_id)
+    from jobs.fencing import current_lease_fence
+
+    storage = SupabaseStartupsStorage(get_service_client(), user_id)
+    ownership_fence = current_lease_fence()
+    if ownership_fence is not None:
+        storage.bind_ownership_fence(ownership_fence)
+    return storage
 
 
 def _load_active_thesis_sync(user_id: str, *, tolerate_bootstrap_failure: bool = False):
