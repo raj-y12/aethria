@@ -18,6 +18,8 @@ from jobs.models import (
     CheckpointStatus,
     DomainOutboxEvent,
     JobCheckpoint,
+    JobCancellationDisposition,
+    JobCancellationResult,
     JobStatus,
     JobType,
 )
@@ -648,7 +650,7 @@ class DurableJobRepository:
                 )
                 return job
 
-    async def cancel(self, *, user_id: str, job_id: str) -> Optional[AgentJob]:
+    async def cancel(self, *, user_id: str, job_id: str) -> JobCancellationResult:
         uid = require_user_id(user_id, context="DurableJobRepository.cancel")
         async with self.pool.acquire() as conn:
             async with conn.transaction():
@@ -713,7 +715,25 @@ class DurableJobRepository:
                     metrics.inc_durable_job(
                         job_type=job.job_type.value, transition="cancelled"
                     )
-                return job
+                    return JobCancellationResult(
+                        disposition=JobCancellationDisposition.TRANSITIONED,
+                        job=job,
+                    )
+                if transitioned:
+                    raise RuntimeError("Cancelled job transition returned no job")
+                if job is None:
+                    return JobCancellationResult(
+                        disposition=JobCancellationDisposition.NOT_FOUND,
+                    )
+                if job.status is JobStatus.CANCELLED:
+                    return JobCancellationResult(
+                        disposition=JobCancellationDisposition.ALREADY_CANCELLED,
+                        job=job,
+                    )
+                return JobCancellationResult(
+                    disposition=JobCancellationDisposition.REJECTED,
+                    job=job,
+                )
 
     async def requeue(self, *, user_id: str, job_id: str) -> Optional[AgentJob]:
         """Grant one explicit operator retry on the same accepted job."""

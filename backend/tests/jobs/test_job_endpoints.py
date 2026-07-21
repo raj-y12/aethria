@@ -4,6 +4,8 @@ from jobs.lookup_outcomes import LookupOutcomeStoreUnavailable
 from jobs.models import (
     AgentJob,
     CompanyLookupPayload,
+    JobCancellationDisposition,
+    JobCancellationResult,
     JobStatus,
     JobType,
     PipelineCyclePayload,
@@ -89,9 +91,19 @@ class _Repository:
     async def cancel(self, *, user_id, job_id):
         job = await self.get_job(user_id=user_id, job_id=job_id)
         if job is None:
-            return None
+            return JobCancellationResult(
+                disposition=JobCancellationDisposition.NOT_FOUND,
+            )
         if job.status is JobStatus.SUCCEEDED:
-            return job
+            return JobCancellationResult(
+                disposition=JobCancellationDisposition.REJECTED,
+                job=job,
+            )
+        if job.status is JobStatus.CANCELLED:
+            return JobCancellationResult(
+                disposition=JobCancellationDisposition.ALREADY_CANCELLED,
+                job=job,
+            )
         updated = job.model_copy(update={"status": JobStatus.CANCELLED})
         self.jobs[job_id] = updated
         if updated.job_type is JobType.COMPANY_LOOKUP:
@@ -102,7 +114,10 @@ class _Repository:
                     job, detail="The lookup job was cancelled by the operator."
                 )
             )
-        return updated
+        return JobCancellationResult(
+            disposition=JobCancellationDisposition.TRANSITIONED,
+            job=updated,
+        )
 
 
 def _client(monkeypatch, repository, *, user_id="user-a"):
@@ -274,3 +289,27 @@ def test_cancel_is_idempotent(monkeypatch):
 
     assert first.status_code == second.status_code == 202
     assert first.json()["status"] == second.json()["status"] == "cancelled"
+
+
+def test_cancel_returns_conflict_when_running_job_succeeds_during_transition(
+    monkeypatch,
+):
+    running = _job(status=JobStatus.RUNNING)
+    repository = _Repository([running])
+
+    async def finish_before_cancel(*, user_id, job_id):
+        succeeded = running.model_copy(update={"status": JobStatus.SUCCEEDED})
+        repository.jobs[job_id] = succeeded
+        return JobCancellationResult(
+            disposition=JobCancellationDisposition.REJECTED,
+            job=succeeded,
+        )
+
+    repository.cancel = finish_before_cancel
+    response = _client(monkeypatch, repository).post(
+        f"/api/jobs/{running.job_id}/cancel",
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Job state changed; refresh before cancelling"

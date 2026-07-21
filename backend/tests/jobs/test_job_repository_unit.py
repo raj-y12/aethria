@@ -408,7 +408,9 @@ async def test_cancel_is_tenant_scoped_and_idempotent():
 
     result = await repository.cancel(user_id="user-a", job_id=_job().job_id)
 
-    assert result.status is JobStatus.CANCELLED
+    assert result.disposition.value == "transitioned"
+    assert result.job is not None
+    assert result.job.status is JobStatus.CANCELLED
     sql = connection.calls[0][1].lower()
     assert "user_id = $2" in sql
     assert "status not in ('succeeded', 'cancelled')" in sql
@@ -432,7 +434,9 @@ async def test_cancel_queued_lookup_uses_pre_transition_planned_attempt_atomical
         user_id="user-a", job_id=_lookup_job().job_id
     )
 
-    assert result.status is JobStatus.CANCELLED
+    assert result.disposition.value == "transitioned"
+    assert result.job is not None
+    assert result.job.status is JobStatus.CANCELLED
     outcome_call = next(
         call for call in connection.calls if "lookup_job_outcomes" in call[1].lower()
     )
@@ -449,9 +453,40 @@ async def test_repeated_cancel_does_not_publish_a_second_outbox_event():
 
     result = await repository.cancel(user_id="user-a", job_id=_job().job_id)
 
-    assert result.status is JobStatus.CANCELLED
+    assert result.disposition.value == "already_cancelled"
+    assert result.job is not None
+    assert result.job.status is JobStatus.CANCELLED
     assert not any(
         call[0] == "execute" and "domain_outbox" in call[1].lower()
+        for call in connection.calls
+    )
+
+
+@pytest.mark.asyncio
+async def test_cancel_reports_when_running_to_succeeded_race_loses_transition():
+    repository_module = importlib.import_module("jobs.repository")
+    succeeded = _row(
+        _lookup_job(status=JobStatus.SUCCEEDED, attempts=1),
+        status="succeeded",
+        attempts=1,
+    )
+    connection = _Connection(fetchrows=[None, succeeded])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    result = await repository.cancel(
+        user_id="user-a",
+        job_id=_lookup_job().job_id,
+    )
+
+    assert result.disposition.value == "rejected"
+    assert result.job is not None
+    assert result.job.status is JobStatus.SUCCEEDED
+    assert not any(
+        call[0] == "execute"
+        and (
+            "lookup_job_outcomes" in call[1].lower()
+            or "domain_outbox" in call[1].lower()
+        )
         for call in connection.calls
     )
 

@@ -129,6 +129,7 @@ from jobs.lookup_outcomes import (
 from jobs.models import (
     AgentJob,
     CompanyLookupPayload,
+    JobCancellationDisposition,
     JobType,
     PipelineCyclePayload,
 )
@@ -3301,6 +3302,7 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
 
     cancelled: List[str] = []
     cancelled_job_ids: List[str] = []
+    conflicts: List[Dict[str, str]] = []
     restored_startup_ids: List[str] = []
     storage = None
     if env_config.use_supabase_storage():
@@ -3317,7 +3319,7 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
             )
             if job is not None:
                 try:
-                    cancelled_job = await _durable_job_repository.cancel(
+                    cancellation = await _durable_job_repository.cancel(
                         user_id=user_id,
                         job_id=job.job_id,
                     )
@@ -3329,8 +3331,30 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
                             "reason": "lookup_outcome_store_unavailable",
                         },
                     ) from exc
-                if cancelled_job is not None:
-                    cancelled_job_ids.append(job.job_id)
+                if not cancellation.cancellation_won:
+                    current_status = (
+                        cancellation.job.status.value
+                        if cancellation.job is not None
+                        else JobCancellationDisposition.NOT_FOUND.value
+                    )
+                    conflicts.append(
+                        {
+                            "lookup_id": lookup_id,
+                            "job_id": job.job_id,
+                            "status": current_status,
+                        }
+                    )
+                    continue
+                cancelled_job_ids.append(job.job_id)
+            else:
+                conflicts.append(
+                    {
+                        "lookup_id": lookup_id,
+                        "job_id": "",
+                        "status": JobCancellationDisposition.NOT_FOUND.value,
+                    }
+                )
+                continue
         _mark_lookup_cancelled(user_id, lookup_id)
         cancelled.append(lookup_id)
         if isinstance(storage, SupabaseStartupsStorage):
@@ -3339,13 +3363,19 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
                 restored_startup_ids.append(restored)
                 _notify_startups_changed(user_id, "lookup_cancelled")
 
+    response_status = (
+        "cancelled"
+        if not conflicts
+        else ("partially_cancelled" if cancelled else "conflict")
+    )
     return JSONResponse(
-        status_code=202,
+        status_code=202 if cancelled else 409,
         content={
-            "status": "cancelled",
+            "status": response_status,
             "cancelled": cancelled,
             "job_ids": cancelled_job_ids,
             "restored_startup_ids": restored_startup_ids,
+            "conflicts": conflicts,
         },
     )
 

@@ -68,6 +68,13 @@ class JobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class JobCancellationDisposition(str, Enum):
+    TRANSITIONED = "transitioned"
+    ALREADY_CANCELLED = "already_cancelled"
+    REJECTED = "rejected"
+    NOT_FOUND = "not_found"
+
+
 class CheckpointStatus(str, Enum):
     STARTED = "started"
     SUCCEEDED = "succeeded"
@@ -194,6 +201,36 @@ class AgentJob(BaseModel):
         if self.attempts > self.max_attempts:
             raise ValueError("attempts cannot exceed max_attempts")
         return self
+
+
+class JobCancellationResult(BaseModel):
+    """Unambiguous outcome of an operator cancellation request."""
+
+    disposition: JobCancellationDisposition
+    job: Optional[AgentJob] = None
+
+    @model_validator(mode="after")
+    def _result_matches_job_state(self):
+        if self.disposition is JobCancellationDisposition.NOT_FOUND:
+            if self.job is not None:
+                raise ValueError("not_found cancellation cannot include a job")
+            return self
+        if self.job is None:
+            raise ValueError("cancellation result requires the current job")
+        cancellation_won = self.disposition in {
+            JobCancellationDisposition.TRANSITIONED,
+            JobCancellationDisposition.ALREADY_CANCELLED,
+        }
+        if cancellation_won != (self.job.status is JobStatus.CANCELLED):
+            raise ValueError("cancellation disposition does not match job status")
+        return self
+
+    @property
+    def cancellation_won(self) -> bool:
+        return self.disposition in {
+            JobCancellationDisposition.TRANSITIONED,
+            JobCancellationDisposition.ALREADY_CANCELLED,
+        }
 
 
 class JobCheckpoint(BaseModel):
