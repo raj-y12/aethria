@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import RoomHeader from '../components/RoomHeader';
@@ -10,7 +10,6 @@ import type { Startup, SignalItem } from '../types/startup';
 import { isDealHumanResolved } from '../lib/dealState';
 import { buildTrackRecord } from '../lib/trackRecord';
 import { formatDateTime } from '../lib/dates';
-import OutcomePanel from '../components/institutional/OutcomePanel';
 
 function recOf(s: Startup): string | null {
   const r = s.partner?.recommendation;
@@ -51,10 +50,10 @@ function signalWhen(sig: SignalItem): string {
   return formatDateTime(sig.detected_at);
 }
 
-/* Conviction book columns (lg+): Company | Sector | Stage | Score | Ruling.
- * Aligned cells make the book comparable down the page; below lg the row
+/* Book columns (lg+): Company | Sector | Stage | Score. Every row is a committed
+ * position (human ruled INVEST), so no ruling column is needed. Below lg the row
  * falls back to the stacked name + meta line. */
-const BOOK_GRID = 'lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_64px_72px] lg:items-baseline lg:gap-phi-4';
+const BOOK_GRID = 'lg:grid lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1.2fr)_minmax(0,0.9fr)_72px] lg:items-baseline lg:gap-phi-4';
 
 /**
  * Portfolio — conviction monitoring. The book the system has built, the
@@ -64,7 +63,6 @@ const BOOK_GRID = 'lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1.1fr)_minmax(
 export default function PortfolioPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
   const reduceMotion = usePrefersReducedMotion();
-  const [selectedOutcomeStartupId, setSelectedOutcomeStartupId] = useState('');
   const openDeal = (id: string) => navigate(`/v1/flow?open=${id}`);
 
   const track = useMemo(
@@ -80,14 +78,19 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
     return map;
   }, [data.startups]);
 
-  const convictionBook = useMemo(
+  // A position is a company you actually ruled INVEST — not one the system merely
+  // recommended. Recommendations awaiting your ruling are surfaced separately below.
+  const positions = useMemo(
     () =>
       data.startups
-        .filter((s) => recOf(s) === 'INVEST')
-        .sort((a, b) => (b.timestamps?.partnered_at ?? '').localeCompare(a.timestamps?.partnered_at ?? '')),
+        .filter((s) => s.human_resolution?.decision === 'YES')
+        .sort((a, b) => (b.human_resolution?.resolved_at ?? '').localeCompare(a.human_resolution?.resolved_at ?? '')),
     [data.startups],
   );
-  const outcomeStartupId = selectedOutcomeStartupId || convictionBook[0]?.id || data.startups[0]?.id || '';
+  const awaitingRulingCount = useMemo(
+    () => data.startups.filter((s) => recOf(s) === 'INVEST' && !isDealHumanResolved(s)).length,
+    [data.startups],
+  );
 
   const sectorRows = useMemo(() => {
     const entries = Object.entries(data.concentrationAnalytics.by_sector ?? {});
@@ -128,10 +131,16 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
         <div className="grid grid-cols-1 gap-x-phi-7 gap-y-phi-6 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
           {/* ── Conviction book ── */}
           <div className="flex min-w-0 flex-col gap-phi-6">
-            <section aria-label="Conviction book">
-              <SectionHead title="Conviction book" detail={convictionBook.length.toLocaleString()} />
-              {convictionBook.length === 0 ? (
-                <QuietEmpty>No conviction positions yet. INVEST decisions land here as the pipeline rules.</QuietEmpty>
+            <section aria-label="The book">
+              <SectionHead
+                title="The book"
+                detail={positions.length ? `${positions.length} position${positions.length === 1 ? '' : 's'}` : undefined}
+              />
+              {positions.length === 0 ? (
+                <QuietEmpty>
+                  No positions yet. A company becomes a position when you rule it INVEST —
+                  a recommendation alone doesn&apos;t.
+                </QuietEmpty>
               ) : (
                 <>
                   <div
@@ -142,10 +151,9 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                     <span className="type-label-section">Sector</span>
                     <span className="type-label-section">Stage</span>
                     <span className="type-label-section text-right">Score</span>
-                    <span className="type-label-section text-right">Ruling</span>
                   </div>
                   <ul className="flex flex-col lg:mt-0 mt-phi-2">
-                    {convictionBook.map((s) => (
+                    {positions.map((s) => (
                       <li key={s.id}>
                         <button
                           type="button"
@@ -155,9 +163,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           <span className="min-w-0 flex-1 transition-transform duration-200 group-hover:translate-x-[2px]">
                             <span className="block truncate type-body-emphasis text-oxford">{s.scout.name}</span>
                             <span className="block truncate type-meta text-oxford/60 lg:hidden">
-                              {[s.scout.sector, s.scout.funding_stage, isDealHumanResolved(s) ? 'Ruled' : null]
-                                .filter(Boolean)
-                                .join(' · ') || '—'}
+                              {[s.scout.sector, s.scout.funding_stage].filter(Boolean).join(' · ') || '—'}
                             </span>
                           </span>
                           <span className="hidden min-w-0 truncate type-meta text-oxford/60 lg:block">
@@ -169,15 +175,17 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           <span className="type-data shrink-0 text-right text-oxford/70 transition-colors group-hover:text-oxford">
                             {s.review?.overall_score != null ? Number(s.review.overall_score).toFixed(1) : '—'}
                           </span>
-                          <span className="type-status hidden shrink-0 text-right lg:block">
-                            {isDealHumanResolved(s) ? 'Ruled' : '—'}
-                          </span>
                         </button>
                       </li>
                     ))}
                   </ul>
                 </>
               )}
+              {awaitingRulingCount > 0 ? (
+                <p className="mt-phi-3 type-body-sm text-oxford/55">
+                  {awaitingRulingCount} recommended INVEST, awaiting your ruling — not positions until you rule.
+                </p>
+              ) : null}
             </section>
 
             {/* ── Concentration ── */}
@@ -295,18 +303,6 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           </div>
         </div>
         </Reveal>
-
-        <section className="mt-phi-7" aria-label="Outcome learning workspace">
-          <div className="flex flex-wrap items-end justify-between gap-phi-4 border-t border-oxford/[0.075] pt-phi-4">
-            <div><h2 className="type-label-section text-oxford/[0.72]">Outcome learning</h2><p className="type-body-sm mt-phi-2 max-w-2xl text-oxford/55">Track what eventually happened after investments, passes, monitors, and overrides.</p></div>
-            {data.startups.length ? <label className="type-action">Company
-              <select aria-label="Outcome company" value={outcomeStartupId} onChange={(event) => setSelectedOutcomeStartupId(event.target.value)} className="ml-phi-2 border border-oxford/15 bg-paper px-3 py-2 text-oxford">
-                {data.startups.map((startup) => <option key={startup.id} value={startup.id}>{startup.scout.name}</option>)}
-              </select>
-            </label> : null}
-          </div>
-          {outcomeStartupId ? <div className="mt-phi-4"><OutcomePanel startupId={outcomeStartupId} /></div> : <QuietEmpty>Outcome learning begins once a company enters the canonical deal record.</QuietEmpty>}
-        </section>
       </div>
     </div>
   );
