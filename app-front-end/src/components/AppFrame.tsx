@@ -215,7 +215,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
       !agentsStatus.supabase_configured ||
       !agentsStatus.openai_configured ||
       !agentsStatus.agents_will_run ||
-      agentsStatus.thesis_ready === false
+      agentsStatus.execution_prerequisites_ready === false
     );
   const pipelineHealthIssue =
     pipelineEnabled &&

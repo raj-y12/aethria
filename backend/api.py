@@ -139,6 +139,10 @@ from jobs.worker import DurableJobWorker
 from identity.repository import IdentityRepository
 from evidence.repository import EvidenceRepository
 from evaluation_v2.repository import EvaluationRepository
+from evaluation_v2.prerequisites import (
+    EvaluationPrerequisiteError,
+    load_evaluation_prerequisites,
+)
 from decisions.repository import DecisionRepository
 from monitoring.repository import MonitoringRepository
 from fund_intelligence.repository import FundIntelligenceRepository
@@ -2588,9 +2592,58 @@ async def agents_status(request: Request):
         if _durable_jobs_required()
         else _lookup_queue is not None
     )
+    agents_infrastructure_ready = bool(
+        supabase_configured and openai_configured and worker_ready
+    )
+    lookup_infrastructure_ready = bool(
+        supabase_configured and openai_configured and lookup_worker_ready
+    )
+    execution_prerequisites_ready = False
+    published_policy_ready = False
+    active_policy_version_id: Optional[str] = None
+    execution_prerequisite_code: Optional[str] = None
+    execution_prerequisite_detail: Optional[str] = None
+    execution_prerequisite_recovery_action: Optional[str] = None
+    if supabase_configured:
+        try:
+            prerequisites = await load_evaluation_prerequisites(
+                user_id=user_id,
+                fund_intelligence_repository=getattr(
+                    app.state, "fund_intelligence_repository", None
+                ),
+            )
+        except EvaluationPrerequisiteError as exc:
+            execution_prerequisite_code = exc.code
+            execution_prerequisite_detail = exc.detail
+            execution_prerequisite_recovery_action = exc.recovery_action
+        except Exception:
+            execution_prerequisite_code = "prerequisite_unavailable"
+            execution_prerequisite_detail = (
+                "The execution prerequisites could not be loaded."
+            )
+            execution_prerequisite_recovery_action = (
+                "Retry after the thesis and published-policy stores are available."
+            )
+        else:
+            execution_prerequisites_ready = True
+            published_policy_ready = True
+            thesis_ready = True
+            active_thesis_version_id = prerequisites.thesis_version_id
+            active_policy_version_id = prerequisites.policy.policy_version_id
+            thesis_error = None
+    else:
+        execution_prerequisite_code = "infrastructure_unavailable"
+        execution_prerequisite_detail = (
+            "Supabase is required to load the active thesis and published policy."
+        )
+        execution_prerequisite_recovery_action = (
+            "Configure Supabase before dispatching evaluation work."
+        )
     return {
         "worker_ready": worker_ready,
         "lookup_worker_ready": lookup_worker_ready,
+        "agents_infrastructure_ready": agents_infrastructure_ready,
+        "lookup_infrastructure_ready": lookup_infrastructure_ready,
         "agent_queue_size": (
             sum(v for k, v in durable_counts.items() if k.startswith("pipeline_cycle:"))
             if _durable_jobs_required()
@@ -2609,21 +2662,26 @@ async def agents_status(request: Request):
         "openai_configured": openai_configured,
         "user_agents_enabled": user_agents_enabled,
         "agents_will_run": (
-            supabase_configured
-            and openai_configured
-            and worker_ready
+            agents_infrastructure_ready
             and user_agents_enabled
-            and thesis_ready
+            and execution_prerequisites_ready
         ),
         "lookup_will_run": (
-            supabase_configured
-            and openai_configured
-            and lookup_worker_ready
+            lookup_infrastructure_ready
+            and execution_prerequisites_ready
+        ),
+        "execution_prerequisites_ready": execution_prerequisites_ready,
+        "execution_prerequisite_code": execution_prerequisite_code,
+        "execution_prerequisite_detail": execution_prerequisite_detail,
+        "execution_prerequisite_recovery_action": (
+            execution_prerequisite_recovery_action
         ),
         "thesis_ready": thesis_ready,
         "mandate_published": mandate_published,
         "active_thesis_version_id": active_thesis_version_id,
         "thesis_error": thesis_error,
+        "published_policy_ready": published_policy_ready,
+        "active_policy_version_id": active_policy_version_id,
     }
 
 
