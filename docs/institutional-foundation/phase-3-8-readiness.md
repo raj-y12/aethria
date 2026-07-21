@@ -97,6 +97,19 @@ Apply the prior Phase 0–2 chain first, then:
 
 Do not expose the new UI before all seven migrations and Phase 0–2 dependencies are applied. The repositories intentionally fail closed when their direct PostgreSQL store is unavailable.
 
+The readiness gate checks both the Supabase migration ledger and the live
+`information_schema.columns` projection. Migration `20260720120000` is ready
+only when these exact compatible columns are present as PostgreSQL `text`:
+
+- `evaluation_runs.evidence_materiality_digest`
+- `material_change_checks.previous_materiality_digest`
+- `material_change_checks.current_materiality_digest`
+
+A recorded migration version without all three live columns (or with a
+different type) remains not ready. Without a direct database DSN, readiness
+also remains false because neither the ledger nor the live schema can be
+certified.
+
 ## Verification commands
 
 From the repository root:

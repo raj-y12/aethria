@@ -21,8 +21,85 @@ from meta.calibrator import ThresholdCalibrator
 from meta.reweighter import ScoutReweighter
 
 
+PHASE3_8_MIGRATIONS = (
+    "20260715230000_evidence_claim_ledger.sql",
+    "20260715240000_immutable_evaluations.sql",
+    "20260715250000_rulings_and_actions.sql",
+    "20260715260000_attention_enrichment.sql",
+    "20260715270000_fund_intelligence.sql",
+    "20260715280000_channels_outcomes.sql",
+    "20260720120000_materiality_digests.sql",
+)
+
+_MATERIALITY_COLUMNS = (
+    ("evaluation_runs", "evidence_materiality_digest"),
+    ("material_change_checks", "previous_materiality_digest"),
+    ("material_change_checks", "current_materiality_digest"),
+)
+
+
 def _check(name: str, status: str, detail: str, **data: Any) -> Dict[str, Any]:
     return {"name": name, "status": status, "detail": detail, **data}
+
+
+def _migration_files_check(repo_root: Path = REPO_ROOT) -> Dict[str, Any]:
+    missing = [
+        name
+        for name in PHASE3_8_MIGRATIONS
+        if not (repo_root / "supabase" / "migrations" / name).exists()
+    ]
+    return _check(
+        "phase3_8_migration_files",
+        "passed" if not missing else "failed",
+        "evidence through materiality and outcome migrations are present",
+        missing=missing,
+    )
+
+
+def _migration_versions_check(versions: set[str]) -> Dict[str, Any]:
+    required_versions = {
+        name.split("_", 1)[0] for name in PHASE3_8_MIGRATIONS
+    }
+    return _check(
+        "phase3_8_migrations_applied",
+        "passed" if required_versions <= versions else "failed",
+        "all Phase 3–8 schema versions are recorded",
+        missing=sorted(required_versions - versions),
+    )
+
+
+def _materiality_columns_check(rows: List[Any]) -> Dict[str, Any]:
+    observed = {
+        (str(row["table_name"]), str(row["column_name"])): (
+            str(row["data_type"]),
+            str(row["udt_name"]),
+        )
+        for row in rows
+    }
+    missing = sorted(
+        f"{table}.{column}"
+        for table, column in _MATERIALITY_COLUMNS
+        if (table, column) not in observed
+    )
+    wrong_type = []
+    for table, column in _MATERIALITY_COLUMNS:
+        actual = observed.get((table, column))
+        if actual is None or actual == ("text", "text"):
+            continue
+        wrong_type.append(
+            {
+                "column": f"{table}.{column}",
+                "expected": "text",
+                "actual": f"{actual[0]} ({actual[1]})",
+            }
+        )
+    return _check(
+        "materiality_digest_columns",
+        "passed" if not missing and not wrong_type else "failed",
+        "all materiality digest columns exist with compatible types",
+        missing=missing,
+        wrong_type=wrong_type,
+    )
 
 
 def _code_checks() -> List[Dict[str, Any]]:
@@ -35,27 +112,7 @@ def _code_checks() -> List[Dict[str, Any]]:
             f"{golden['passed']} passed; {golden['failed']} failed",
         )
     )
-    expected_migrations = [
-        "20260715230000_evidence_claim_ledger.sql",
-        "20260715240000_immutable_evaluations.sql",
-        "20260715250000_rulings_and_actions.sql",
-        "20260715260000_attention_enrichment.sql",
-        "20260715270000_fund_intelligence.sql",
-        "20260715280000_channels_outcomes.sql",
-        "20260720120000_materiality_digests.sql",
-    ]
-    missing = [
-        name for name in expected_migrations
-        if not (REPO_ROOT / "supabase" / "migrations" / name).exists()
-    ]
-    checks.append(
-        _check(
-            "phase3_8_migration_files",
-            "passed" if not missing else "failed",
-            "evidence through outcome migrations are present",
-            missing=missing,
-        )
-    )
+    checks.append(_migration_files_check())
     proposal_only = True
     for target, payload in (
         (object.__new__(ScoutReweighter), [{"scout_type": "x"}]),
@@ -153,6 +210,24 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                     "policy proposals cannot directly represent an active production policy",
                 )
             )
+            materiality_rows = await conn.fetch(
+                """
+                select table_name, column_name, data_type, udt_name
+                from information_schema.columns
+                where table_schema = 'public'
+                  and (
+                    (table_name = 'evaluation_runs'
+                     and column_name = 'evidence_materiality_digest')
+                    or
+                    (table_name = 'material_change_checks'
+                     and column_name in (
+                       'previous_materiality_digest',
+                       'current_materiality_digest'
+                     ))
+                  )
+                """
+            )
+            checks.append(_materiality_columns_check(materiality_rows))
             migration_table = await conn.fetchval(
                 "select to_regclass('supabase_migrations.schema_migrations')::text"
             )
@@ -162,19 +237,7 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                     str(row["version"])
                     for row in await conn.fetch("select version from supabase_migrations.schema_migrations")
                 }
-            required_versions = {
-                "20260715230000", "20260715240000", "20260715250000",
-                "20260715260000", "20260715270000", "20260715280000",
-                "20260720120000",
-            }
-            checks.append(
-                _check(
-                    "phase3_8_migrations_applied",
-                    "passed" if required_versions <= versions else "failed",
-                    "all Phase 3–8 schema versions are recorded",
-                    missing=sorted(required_versions - versions),
-                )
-            )
+            checks.append(_migration_versions_check(versions))
     finally:
         await pool.close()
     return checks
