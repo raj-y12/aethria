@@ -14,16 +14,15 @@ function recOf(s: Startup): string | null {
   return typeof r === 'string' && r ? r.toUpperCase() : null;
 }
 
-type LedgerState = 'invested' | 'monitoring' | 'passed' | 'awaiting';
+type LedgerState = 'invested' | 'monitoring' | 'passed';
 
-/* The four places a company stands once it enters the book — by the ruling you
- * actually made, not what the system recommended. "Awaiting" holds deals the
- * pipeline has an opinion on but you have not ruled on yet. */
+/* The book holds only *decided* deals, grouped by the ruling you actually made.
+ * Deals still awaiting a ruling are work, not record — they live in Flow, and
+ * the portfolio only points to them (see the pointer below the tabs). */
 const LEDGER_SEGMENTS: { key: LedgerState; label: string; empty: string }[] = [
   { key: 'invested', label: 'Invested', empty: 'No positions yet. A company becomes a position when you rule it INVEST — a recommendation alone does not.' },
   { key: 'monitoring', label: 'Monitoring', empty: 'Nothing under monitoring. Deals you rule MONITOR land here.' },
   { key: 'passed', label: 'Passed', empty: 'Nothing passed yet. Declined deals stay here, searchable.' },
-  { key: 'awaiting', label: 'Awaiting ruling', empty: 'Nothing waiting. Deals the system has recommended but you have not ruled on appear here.' },
 ];
 
 /** Compact ruling date, or an em dash. */
@@ -32,14 +31,6 @@ function ruledWhen(s: Startup): string {
   if (!iso) return '—';
   const t = new Date(iso);
   return Number.isNaN(t.getTime()) ? '—' : t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-/** Right-most ledger cell: when you ruled, or the pending recommendation. */
-function ledgerTrailing(s: Startup, state: LedgerState): string {
-  if (state !== 'awaiting') return ruledWhen(s);
-  const rec = recOf(s);
-  if (!rec) return 'awaiting';
-  return `${rec.charAt(0)}${rec.slice(1).toLowerCase()} · awaiting`;
 }
 
 /** Instrument readout — a number with its label, no box. Counts up on arrival. */
@@ -76,16 +67,17 @@ function signalWhen(sig: SignalItem): string {
   return formatDateTime(sig.detected_at);
 }
 
-/* Ledger columns (lg+): Company | Sector | Stage | Score | Ruled/Recommendation.
- * Aligned cells make the book comparable down the page; below lg the row falls
- * back to the stacked name + meta line. */
+/* Ledger columns (lg+): Company | Sector | Stage | Score | Ruled. Aligned cells
+ * make the book comparable down the page; below lg the row falls back to the
+ * stacked name + meta line. */
 const LEDGER_GRID = 'lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,0.8fr)_60px_minmax(0,0.9fr)] lg:items-baseline lg:gap-phi-4';
 
 /**
- * Portfolio — the book grouped by the ruling you actually made (invested,
- * monitoring, passed) plus what is still awaiting your ruling, with the
- * concentration, watchlist, and signals that move against it. Built entirely
- * from data the pipeline already persists; no fabricated returns.
+ * Portfolio — the *record*: the book of decided deals grouped by ruling
+ * (invested, monitoring, passed), with concentration, watchlist, and signals.
+ * Deals awaiting a ruling are *work*, not record — they stay in Flow; the book
+ * only points to them. Built from data the pipeline already persists; no
+ * fabricated returns.
  */
 export default function PortfolioPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
@@ -93,24 +85,25 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
   const [activeState, setActiveState] = useState<LedgerState>('invested');
   const openDeal = (id: string) => navigate(`/v1/flow?open=${id}`);
 
-  const byState = useMemo(() => {
-    const buckets: Record<LedgerState, Startup[]> = { invested: [], monitoring: [], passed: [], awaiting: [] };
+  const { buckets, awaitingCount } = useMemo(() => {
+    const buckets: Record<LedgerState, Startup[]> = { invested: [], monitoring: [], passed: [] };
+    let awaitingCount = 0;
     for (const s of data.startups) {
       const decision = s.human_resolution?.decision;
       if (decision === 'YES') buckets.invested.push(s);
       else if (decision === 'MAYBE') buckets.monitoring.push(s);
       else if (decision === 'NO') buckets.passed.push(s);
-      else if (recOf(s)) buckets.awaiting.push(s);
+      else if (recOf(s)) awaitingCount += 1;
     }
     const recency = (s: Startup) =>
       s.human_resolution?.resolved_at ?? s.timestamps?.partnered_at ?? s.timestamps?.reviewed_at ?? '';
     (Object.keys(buckets) as LedgerState[]).forEach((key) => {
       buckets[key].sort((a, b) => recency(b).localeCompare(recency(a)));
     });
-    return buckets;
+    return { buckets, awaitingCount };
   }, [data.startups]);
 
-  const activeRows = byState[activeState];
+  const activeRows = buckets[activeState];
 
   const startupNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -142,21 +135,16 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           title="Portfolio"
           readouts={
             <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
-              <Readout label="Invested" value={byState.invested.length} />
-              <Readout label="Monitoring" value={byState.monitoring.length} />
-              <Readout label="Passed" value={byState.passed.length} />
-              <Readout
-                label="Awaiting ruling"
-                value={byState.awaiting.length}
-                tone={byState.awaiting.length > 0 ? 'escalation' : undefined}
-              />
+              <Readout label="Invested" value={buckets.invested.length} />
+              <Readout label="Monitoring" value={buckets.monitoring.length} />
+              <Readout label="Passed" value={buckets.passed.length} />
             </div>
           }
         />
 
         <Reveal delay={0.22} y={12}>
         <div className="grid grid-cols-1 gap-x-phi-7 gap-y-phi-6 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
-          {/* ── Decision ledger ── */}
+          {/* ── Decision ledger (the record) ── */}
           <div className="flex min-w-0 flex-col gap-phi-6">
             <section aria-label="Decision ledger">
               <SectionHead title="The book" detail={`${activeRows.length} shown`} />
@@ -176,11 +164,25 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                       }`}
                     >
                       <span>{seg.label}</span>
-                      <span className="type-data tabular-nums text-oxford/45">{byState[seg.key].length}</span>
+                      <span className="type-data tabular-nums text-oxford/45">{buckets[seg.key].length}</span>
                     </button>
                   );
                 })}
               </div>
+
+              {/* Pointer, not a worklist — ruling happens in Flow, the book only points there. */}
+              {awaitingCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/v1/flow')}
+                  className="group mt-phi-3 inline-flex items-center gap-phi-2 type-body-sm text-oxford/60 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                >
+                  <span className="type-data tabular-nums text-oxford">{awaitingCount}</span>
+                  <span>awaiting your ruling — rule in Flow</span>
+                  <span aria-hidden className="transition-transform duration-200 group-hover:translate-x-[2px]">→</span>
+                </button>
+              ) : null}
+
               {activeRows.length === 0 ? (
                 <QuietEmpty>{LEDGER_SEGMENTS.find((s) => s.key === activeState)?.empty}</QuietEmpty>
               ) : (
@@ -193,9 +195,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                     <span className="type-label-section">Sector</span>
                     <span className="type-label-section">Stage</span>
                     <span className="type-label-section text-right">Score</span>
-                    <span className="type-label-section text-right">
-                      {activeState === 'awaiting' ? 'Recommendation' : 'Ruled'}
-                    </span>
+                    <span className="type-label-section text-right">Ruled</span>
                   </div>
                   <ul className="flex flex-col lg:mt-0 mt-phi-3">
                     {activeRows.map((s) => (
@@ -208,7 +208,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           <span className="min-w-0 flex-1 transition-transform duration-200 group-hover:translate-x-[2px]">
                             <span className="block truncate type-body-emphasis text-oxford">{s.scout.name}</span>
                             <span className="block truncate type-meta text-oxford/60 lg:hidden">
-                              {[s.scout.sector, s.scout.funding_stage, ledgerTrailing(s, activeState)]
+                              {[s.scout.sector, s.scout.funding_stage, ruledWhen(s)]
                                 .filter(Boolean)
                                 .join(' · ') || '—'}
                             </span>
@@ -223,7 +223,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                             {s.review?.overall_score != null ? Number(s.review.overall_score).toFixed(1) : '—'}
                           </span>
                           <span className="type-meta hidden shrink-0 truncate text-right text-oxford/60 lg:block">
-                            {ledgerTrailing(s, activeState)}
+                            {ruledWhen(s)}
                           </span>
                         </button>
                       </li>
