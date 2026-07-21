@@ -35,6 +35,54 @@ async def test_target_postgres_supports_transactional_skip_locked_contract():
 
 
 @pytest.mark.asyncio
+async def test_target_postgres_lookup_outcomes_is_service_role_only():
+    import asyncpg
+
+    connection = await asyncpg.connect(os.environ["TEST_DATABASE_URL"])
+    try:
+        rls_enabled = await connection.fetchval(
+            """
+            select c.relrowsecurity
+            from pg_class c
+            join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and c.relname = 'lookup_job_outcomes'
+            """
+        )
+        policies = await connection.fetch(
+            """
+            select policyname, roles, cmd
+            from pg_policies
+            where schemaname = 'public' and tablename = 'lookup_job_outcomes'
+            """
+        )
+        grants = await connection.fetch(
+            """
+            select grantee, privilege_type
+            from information_schema.table_privileges
+            where table_schema = 'public'
+              and table_name = 'lookup_job_outcomes'
+              and grantee in ('anon', 'authenticated', 'service_role')
+            """
+        )
+    finally:
+        await connection.close()
+
+    check = __import__(
+        "scripts.check_phase8_readiness", fromlist=["check"]
+    )._lookup_outcomes_security_check(
+        table_rows=[
+            {
+                "table_name": "lookup_job_outcomes",
+                "relrowsecurity": bool(rls_enabled),
+            }
+        ],
+        policy_rows=[dict(row) for row in policies],
+        grant_rows=[dict(row) for row in grants],
+    )
+    assert check["status"] == "passed", check
+
+
+@pytest.mark.asyncio
 async def test_target_postgres_skip_locked_claims_distinct_tenant_jobs():
     import asyncpg
     from jobs.models import AgentJob, JobType

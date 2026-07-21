@@ -33,6 +33,9 @@ PHASE3_8_MIGRATIONS = (
 POLICY_UPGRADE_MIGRATION = (
     "20260721143000_patch_upgrade_fund_policy_settings.sql"
 )
+LOOKUP_OUTCOMES_SECURITY_MIGRATION = (
+    "20260721150000_lookup_job_outcomes_rls.sql"
+)
 
 _MATERIALITY_COLUMNS = (
     ("evaluation_runs", "evidence_materiality_digest"),
@@ -98,6 +101,110 @@ def _policy_upgrade_version_check(versions: set[str]) -> Dict[str, Any]:
     )
 
 
+def _lookup_outcomes_security_migration_file_check(
+    repo_root: Path = REPO_ROOT,
+) -> Dict[str, Any]:
+    missing = []
+    if not (
+        repo_root
+        / "supabase"
+        / "migrations"
+        / LOOKUP_OUTCOMES_SECURITY_MIGRATION
+    ).exists():
+        missing.append(LOOKUP_OUTCOMES_SECURITY_MIGRATION)
+    return _check(
+        "lookup_outcomes_security_migration_file",
+        "passed" if not missing else "failed",
+        "authoritative lookup outcome RLS migration is present",
+        missing=missing,
+    )
+
+
+def _lookup_outcomes_security_version_check(
+    versions: set[str],
+) -> Dict[str, Any]:
+    required = LOOKUP_OUTCOMES_SECURITY_MIGRATION.split("_", 1)[0]
+    missing = [] if required in versions else [required]
+    return _check(
+        "lookup_outcomes_security_migration_applied",
+        "passed" if not missing else "failed",
+        "authoritative lookup outcome RLS schema version is recorded",
+        missing=missing,
+    )
+
+
+def _policy_roles(raw: Any) -> set[str]:
+    if isinstance(raw, (list, tuple, set)):
+        return {str(role).strip().lower() for role in raw if str(role).strip()}
+    text = str(raw or "").strip().strip("{}")
+    return {
+        role.strip().strip('"').lower()
+        for role in text.split(",")
+        if role.strip()
+    }
+
+
+def _lookup_outcomes_security_check(
+    *,
+    table_rows: List[Any],
+    policy_rows: List[Any],
+    grant_rows: List[Any],
+) -> Dict[str, Any]:
+    """Require exact RLS policy and client/service-role grants from live catalogs."""
+    table = next(
+        (
+            row
+            for row in table_rows
+            if str(row["table_name"]) == "lookup_job_outcomes"
+        ),
+        None,
+    )
+    rls_enabled = bool(table and table["relrowsecurity"])
+    policy_ok = len(policy_rows) == 1 and all(
+        (
+            str(row["policyname"]) == "lookup_job_outcomes_service_role_all"
+            and _policy_roles(row["roles"]) == {"service_role"}
+            and str(row["cmd"]).upper() == "ALL"
+        )
+        for row in policy_rows
+    )
+    grants = {
+        (
+            str(row["grantee"]).strip().lower(),
+            str(row["privilege_type"]).strip().upper(),
+        )
+        for row in grant_rows
+    }
+    client_grants = sorted(
+        f"{grantee}:{privilege}"
+        for grantee, privilege in grants
+        if grantee in {"public", "anon", "authenticated"}
+    )
+    service_grants = sorted(
+        privilege
+        for grantee, privilege in grants
+        if grantee == "service_role"
+    )
+    expected_service_grants = ["DELETE", "INSERT", "SELECT", "UPDATE"]
+    passed = (
+        rls_enabled
+        and policy_ok
+        and not client_grants
+        and service_grants == expected_service_grants
+    )
+    return _check(
+        "lookup_outcomes_rls_and_grants",
+        "passed" if passed else "failed",
+        "lookup_job_outcomes is isolated to the service role",
+        table_present=table is not None,
+        rls_enabled=rls_enabled,
+        policy_ok=policy_ok,
+        client_grants=client_grants,
+        service_grants=service_grants,
+        expected_service_grants=expected_service_grants,
+    )
+
+
 def _materiality_columns_check(rows: List[Any]) -> Dict[str, Any]:
     observed = {
         (str(row["table_name"]), str(row["column_name"])): (
@@ -144,6 +251,7 @@ def _code_checks() -> List[Dict[str, Any]]:
     )
     checks.append(_migration_files_check())
     checks.append(_policy_upgrade_migration_file_check())
+    checks.append(_lookup_outcomes_security_migration_file_check())
     proposal_only = True
     for target, payload in (
         (object.__new__(ScoutReweighter), [{"scout_type": "x"}]),
@@ -178,6 +286,7 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                 "material_change_checks", "learning_signals", "policy_proposals",
                 "policy_impact_previews", "governed_policy_versions", "import_batches",
                 "import_rows", "outcome_observations", "outcome_evidence_links",
+                "lookup_job_outcomes",
             }
             rows = await conn.fetch(
                 """
@@ -259,6 +368,32 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                 """
             )
             checks.append(_materiality_columns_check(materiality_rows))
+            lookup_policy_rows = await conn.fetch(
+                """
+                select policyname, roles, cmd
+                from pg_policies
+                where schemaname = 'public'
+                  and tablename = 'lookup_job_outcomes'
+                """
+            )
+            lookup_grant_rows = await conn.fetch(
+                """
+                select grantee, privilege_type
+                from information_schema.table_privileges
+                where table_schema = 'public'
+                  and table_name = 'lookup_job_outcomes'
+                  and lower(grantee) in (
+                    'public', 'anon', 'authenticated', 'service_role'
+                  )
+                """
+            )
+            checks.append(
+                _lookup_outcomes_security_check(
+                    table_rows=list(rows),
+                    policy_rows=list(lookup_policy_rows),
+                    grant_rows=list(lookup_grant_rows),
+                )
+            )
             migration_table = await conn.fetchval(
                 "select to_regclass('supabase_migrations.schema_migrations')::text"
             )
@@ -270,6 +405,7 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                 }
             checks.append(_migration_versions_check(versions))
             checks.append(_policy_upgrade_version_check(versions))
+            checks.append(_lookup_outcomes_security_version_check(versions))
             policy_upgrade_rpc = await conn.fetchval(
                 """
                 select to_regprocedure(

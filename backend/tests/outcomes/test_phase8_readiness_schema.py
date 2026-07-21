@@ -118,12 +118,26 @@ async def test_database_readiness_queries_live_columns_in_addition_to_ledger(
                 return []
             if "evidence_materiality_digest" in query:
                 return _materiality_rows()
+            if "from pg_policies" in query:
+                return [
+                    {
+                        "policyname": "lookup_job_outcomes_service_role_all",
+                        "roles": ["service_role"],
+                        "cmd": "ALL",
+                    }
+                ]
+            if "from information_schema.table_privileges" in query:
+                return [
+                    {"grantee": "service_role", "privilege_type": privilege}
+                    for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
+                ]
             if "supabase_migrations.schema_migrations" in query:
                 return [
                     {"version": name.split("_", 1)[0]}
                     for name in (
                         *readiness.PHASE3_8_MIGRATIONS,
                         readiness.POLICY_UPGRADE_MIGRATION,
+                        readiness.LOOKUP_OUTCOMES_SECURITY_MIGRATION,
                     )
                 ]
             raise AssertionError(f"unexpected readiness query: {query}")
@@ -162,4 +176,10 @@ async def test_database_readiness_queries_live_columns_in_addition_to_ledger(
     assert by_name["materiality_digest_columns"]["status"] == "passed"
     assert by_name["policy_upgrade_migration_applied"]["status"] == "passed"
     assert by_name["policy_upgrade_rpc"]["status"] == "passed"
+    assert by_name["lookup_outcomes_security_migration_applied"]["status"] == (
+        "passed"
+    )
+    assert by_name["lookup_outcomes_rls_and_grants"]["status"] == "passed"
     assert any("data_type, udt_name" in query for query in queries)
+    assert any("from pg_policies" in query for query in queries)
+    assert any("information_schema.table_privileges" in query for query in queries)
