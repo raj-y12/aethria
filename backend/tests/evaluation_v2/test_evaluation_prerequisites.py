@@ -218,7 +218,7 @@ async def test_production_legacy_loader_binds_exact_published_fund_config(monkey
     ]
     assert "decision_inputs" in compiled
     assert prerequisites.fund_config == compiled["decision_inputs"]
-    assert prerequisites.compiled_scoring_policy is compiled
+    assert prerequisites.compiled_scoring_policy == compiled
 
 
 @pytest.mark.asyncio
