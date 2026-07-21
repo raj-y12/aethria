@@ -9,6 +9,8 @@ from typing import Any, Dict, Iterable
 from evaluation_v2.models import CriterionRule, EvaluationPolicy
 from evaluation_v2.partner_rules import (
     PartnerRules,
+    boundary_comparisons,
+    decision_safety_policy,
     parse_partner_rules,
     partner_rules_document,
 )
@@ -85,10 +87,10 @@ def evaluation_policy_from_compiled(
 
     typed_rules = validate_partner_rules_document(partner_rules)
     thresholds = typed_rules.score_thresholds
-    decision_safety = typed_rules.decision_safety
+    decision_safety = decision_safety_policy(typed_rules)
     advance_threshold = float(thresholds.min_avg_strong_yes)
     pass_threshold = float(thresholds.min_avg_pass)
-    boundary_semantics = thresholds.boundary_semantics
+    advance_comparison, pass_comparison = boundary_comparisons(typed_rules)
 
     return EvaluationPolicy(
         policy_version_id=version_id,
@@ -99,8 +101,8 @@ def evaluation_policy_from_compiled(
         criteria=criteria,
         advance_threshold=advance_threshold,
         pass_threshold=pass_threshold,
-        advance_comparison=boundary_semantics.advance,
-        pass_comparison=boundary_semantics.passed,
+        advance_comparison=advance_comparison,
+        pass_comparison=pass_comparison,
         minimum_scored_weight=float(thresholds.minimum_scored_weight),
         decision_safety=decision_safety,
         hard_exclusion_claim_types=decision_safety.hard_exclusion_claim_types,

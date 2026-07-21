@@ -651,6 +651,9 @@ def test_scout_biggest_unknown_alone_does_not_trigger_llm_escalation():
             "assumption_feedback": [],
         }
     )
+    # Keep this fixture thesis-blind so configured mandate-fit fallback routing
+    # cannot become a second, unrelated LLM trigger.
+    review.pop("thesis_alignment_score", None)
 
     def _should_not_call_llm(*args, **kwargs):
         raise AssertionError("LLM fallback should not run when only scout biggest_unknown is present")

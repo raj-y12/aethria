@@ -86,9 +86,12 @@ def test_active_partner_rules_select_versioned_decision_safety_policy():
     active = json.loads((CONFIG_ROOT / "active.json").read_text())
     v2_rules = CONFIG_ROOT / "partner_rules" / "v2.json"
     v3_rules = CONFIG_ROOT / "partner_rules" / "v3.json"
+    v4_rules = CONFIG_ROOT / "partner_rules" / "v4.json"
 
-    assert active["partner_rules"] == "v3"
+    assert active["partner_rules"] == "v4"
     assert v2_rules.exists()
     assert json.loads(v2_rules.read_text())["version"] == "2.0"
     assert v3_rules.exists()
     assert json.loads(v3_rules.read_text())["version"] == "3.0"
+    assert v4_rules.exists()
+    assert json.loads(v4_rules.read_text())["version"] == "4.0"
