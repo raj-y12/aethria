@@ -121,13 +121,20 @@ async def test_database_readiness_queries_live_columns_in_addition_to_ledger(
             if "supabase_migrations.schema_migrations" in query:
                 return [
                     {"version": name.split("_", 1)[0]}
-                    for name in readiness.PHASE3_8_MIGRATIONS
+                    for name in (
+                        *readiness.PHASE3_8_MIGRATIONS,
+                        readiness.POLICY_UPGRADE_MIGRATION,
+                    )
                 ]
             raise AssertionError(f"unexpected readiness query: {query}")
 
         async def fetchval(self, query):
             queries.append(query)
-            return "supabase_migrations.schema_migrations"
+            if "to_regclass" in query:
+                return "supabase_migrations.schema_migrations"
+            if "to_regprocedure" in query:
+                return "upgrade_fund_policy(text,text,text,text,text,jsonb,jsonb)"
+            raise AssertionError(f"unexpected readiness scalar query: {query}")
 
     class Acquire:
         async def __aenter__(self):
@@ -153,4 +160,6 @@ async def test_database_readiness_queries_live_columns_in_addition_to_ledger(
     by_name = {check["name"]: check for check in checks}
     assert by_name["phase3_8_migrations_applied"]["status"] == "passed"
     assert by_name["materiality_digest_columns"]["status"] == "passed"
+    assert by_name["policy_upgrade_migration_applied"]["status"] == "passed"
+    assert by_name["policy_upgrade_rpc"]["status"] == "passed"
     assert any("data_type, udt_name" in query for query in queries)

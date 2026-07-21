@@ -30,6 +30,7 @@ PHASE3_8_MIGRATIONS = (
     "20260715280000_channels_outcomes.sql",
     "20260720120000_materiality_digests.sql",
 )
+POLICY_UPGRADE_MIGRATION = "20260721130000_upgrade_fund_policy_rpc.sql"
 
 _MATERIALITY_COLUMNS = (
     ("evaluation_runs", "evidence_materiality_digest"),
@@ -65,6 +66,33 @@ def _migration_versions_check(versions: set[str]) -> Dict[str, Any]:
         "passed" if required_versions <= versions else "failed",
         "all Phase 3–8 schema versions are recorded",
         missing=sorted(required_versions - versions),
+    )
+
+
+def _policy_upgrade_migration_file_check(
+    repo_root: Path = REPO_ROOT,
+) -> Dict[str, Any]:
+    missing = []
+    if not (
+        repo_root / "supabase" / "migrations" / POLICY_UPGRADE_MIGRATION
+    ).exists():
+        missing.append(POLICY_UPGRADE_MIGRATION)
+    return _check(
+        "policy_upgrade_migration_file",
+        "passed" if not missing else "failed",
+        "atomic published-policy upgrade migration is present",
+        missing=missing,
+    )
+
+
+def _policy_upgrade_version_check(versions: set[str]) -> Dict[str, Any]:
+    required = POLICY_UPGRADE_MIGRATION.split("_", 1)[0]
+    missing = [] if required in versions else [required]
+    return _check(
+        "policy_upgrade_migration_applied",
+        "passed" if not missing else "failed",
+        "atomic published-policy upgrade schema version is recorded",
+        missing=missing,
     )
 
 
@@ -113,6 +141,7 @@ def _code_checks() -> List[Dict[str, Any]]:
         )
     )
     checks.append(_migration_files_check())
+    checks.append(_policy_upgrade_migration_file_check())
     proposal_only = True
     for target, payload in (
         (object.__new__(ScoutReweighter), [{"scout_type": "x"}]),
@@ -238,6 +267,21 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                     for row in await conn.fetch("select version from supabase_migrations.schema_migrations")
                 }
             checks.append(_migration_versions_check(versions))
+            checks.append(_policy_upgrade_version_check(versions))
+            policy_upgrade_rpc = await conn.fetchval(
+                """
+                select to_regprocedure(
+                  'public.upgrade_fund_policy(text,text,text,text,text,jsonb,jsonb)'
+                )::text
+                """
+            )
+            checks.append(
+                _check(
+                    "policy_upgrade_rpc",
+                    "passed" if policy_upgrade_rpc else "failed",
+                    "service-role atomic published-policy upgrade RPC exists",
+                )
+            )
     finally:
         await pool.close()
     return checks

@@ -94,8 +94,12 @@ Apply the prior Phase 0–2 chain first, then:
 5. `20260715270000_fund_intelligence.sql`
 6. `20260715280000_channels_outcomes.sql`
 7. `20260720120000_materiality_digests.sql`
+8. `20260721130000_upgrade_fund_policy_rpc.sql`
 
-Do not expose the new UI before all seven migrations and Phase 0–2 dependencies are applied. The repositories intentionally fail closed when their direct PostgreSQL store is unavailable.
+Do not expose the new UI before the first seven migrations and Phase 0–2
+dependencies are applied. Apply migration 8 before running the published-policy
+upgrade procedure below. The repositories intentionally fail closed when their
+direct PostgreSQL store is unavailable.
 
 The readiness gate checks both the Supabase migration ledger and the live
 `information_schema.columns` projection. Migration `20260720120000` is ready
@@ -109,6 +113,43 @@ A recorded migration version without all three live columns (or with a
 different type) remains not ready. Without a direct database DSN, readiness
 also remains false because neither the ledger nor the live schema can be
 certified.
+
+## Published-policy upgrade procedure
+
+Legacy or missing active policy rows remain a typed
+`published_policy_required` prerequisite block. They are not automatically
+reinterpreted. Upgrade one tenant at a time from an operator-reviewed current
+`fund_config` JSON object (or a settings JSON object containing `fund_config`):
+
+```bash
+cd backend
+
+# 1. Inspect the exact old/new IDs and hashes; this performs no writes.
+python3 scripts/upgrade_published_policy.py \
+  --user-id '<clerk-user-id>' \
+  --fund-config-file /absolute/path/to/operator-selected-fund-config.json \
+  --dry-run --json
+
+# 2. After the operator approves that transition, append and activate it atomically.
+python3 scripts/upgrade_published_policy.py \
+  --user-id '<clerk-user-id>' \
+  --fund-config-file /absolute/path/to/operator-selected-fund-config.json \
+  --apply --json
+
+# 3. Re-run with the same selected config; status must be already_current.
+python3 scripts/upgrade_published_policy.py \
+  --user-id '<clerk-user-id>' \
+  --fund-config-file /absolute/path/to/operator-selected-fund-config.json \
+  --dry-run --json
+```
+
+Apply uses the service-role-only `upgrade_fund_policy` RPC. It locks the exact
+tenant settings row, compare-and-swaps the old active ID/hash, appends the
+strict normalized and hash-verified bundle, and changes the active pointer in
+one PostgreSQL transaction. Compile, storage, conflict, or pointer failures
+leave the historical row and pointer unchanged. A successful rerun is
+idempotent. Never use a legacy policy row as the input JSON; select the current
+operator-approved fund configuration explicitly.
 
 ## Verification commands
 

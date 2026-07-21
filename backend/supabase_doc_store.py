@@ -251,6 +251,28 @@ def doc_get(table: str, key: str = _DEFAULT_KEY, *, user_id: str) -> Any | None:
         return None
 
 
+def doc_get_strict(table: str, key: str = _DEFAULT_KEY, *, user_id: str) -> Any | None:
+    """Return a tenant document without converting store failure to absence."""
+    uid = require_user_id(user_id, context=f"doc_get_strict({table})")
+
+    def _fetch():
+        return (
+            _client()
+            .table(table)
+            .select("data")
+            .eq("user_id", uid)
+            .eq("key", key)
+            .limit(1)
+            .execute()
+        )
+
+    response = _retry_on_transient(_fetch)
+    rows = (response.data or []) if hasattr(response, "data") else []
+    if not rows:
+        return None
+    return rows[0].get("data")
+
+
 def doc_set(table: str, data: Any, key: str = _DEFAULT_KEY, *, user_id: str) -> None:
     """Upsert (user_id, key) -> data."""
     uid = require_user_id(user_id, context=f"doc_set({table})")
