@@ -25,17 +25,6 @@ _EVALUATION_CONSTRUCTION_PROMPTS = frozenset(
         "partner.template",
     )
 )
-_EVALUATION_EXECUTION_PROMPTS = frozenset(
-    (
-        "scout",
-        "reviewer.DefaultReviewer",
-        "reviewer.SkepticalReviewer",
-        "reviewer.OpportunistReviewer",
-        "partner",
-    )
-)
-
-
 class _FrozenDict(dict):
     """JSON-serializable mapping that rejects post-validation mutation."""
 
@@ -126,12 +115,90 @@ class EvaluationManifestIdentity(BaseModel):
         return self
 
 
+EvaluationExecutionState = Literal["executed", "reused", "not_run"]
+
+
+class EvaluationPromptIdentity(BaseModel):
+    """Prompt provenance for one logical stage/persona invocation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    execution_state: EvaluationExecutionState
+    construction_prompt_key: Optional[str] = None
+    construction_prompt_version: Optional[str] = None
+    execution_prompt_version: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_prompt_identity(self) -> "EvaluationPromptIdentity":
+        construction_key = str(self.construction_prompt_key or "").strip()
+        construction_version = str(
+            self.construction_prompt_version or ""
+        ).strip()
+        execution_version = str(self.execution_prompt_version or "").strip()
+        if self.execution_state == "not_run":
+            if construction_key or construction_version or execution_version:
+                raise ValueError("not_run prompt identities cannot record versions")
+            return self
+        if self.execution_state == "executed":
+            if not construction_key or not construction_version or not execution_version:
+                raise ValueError(
+                    "executed prompt identities require construction and execution versions"
+                )
+            return self
+        if not execution_version:
+            raise ValueError("reused prompt identities require an execution version")
+        if bool(construction_key) != bool(construction_version):
+            raise ValueError(
+                "reused prompt construction key and version must be supplied together"
+            )
+        return self
+
+
+class EvaluationStageIdentity(BaseModel):
+    """What a completed evaluation actually executed or reused for one stage."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    execution_state: EvaluationExecutionState
+    source_pipeline_run_id: Optional[str] = None
+    model_identity: Optional[EvaluationModelIdentity] = None
+    prompt_identities: Dict[str, EvaluationPromptIdentity]
+
+    @model_validator(mode="after")
+    def validate_stage_identity(self) -> "EvaluationStageIdentity":
+        source_run = str(self.source_pipeline_run_id or "").strip()
+        prompt_states = {
+            prompt.execution_state for prompt in self.prompt_identities.values()
+        }
+        if not self.prompt_identities:
+            raise ValueError("stage prompt identities cannot be empty")
+        if self.execution_state == "not_run":
+            if source_run or self.model_identity is not None:
+                raise ValueError("not_run stages cannot record a source or model")
+            if prompt_states != {"not_run"}:
+                raise ValueError("not_run stages can contain only not_run prompts")
+        elif self.execution_state == "executed":
+            if not source_run:
+                raise ValueError("executed stages require a source pipeline run")
+            if "reused" in prompt_states:
+                raise ValueError("executed stages cannot contain reused prompts")
+        else:
+            if "executed" in prompt_states:
+                raise ValueError("reused stages cannot contain executed prompts")
+            if "reused" not in prompt_states:
+                raise ValueError("reused stages require reused prompt evidence")
+        object.__setattr__(
+            self, "prompt_identities", _FrozenDict(self.prompt_identities)
+        )
+        return self
+
+
 class EvaluationManifest(BaseModel):
     """Portable exact identity for one completed current-pipeline evaluation."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    manifest_version: Literal["evaluation-manifest-v2"] = "evaluation-manifest-v2"
+    manifest_version: Literal["evaluation-manifest-v3"] = "evaluation-manifest-v3"
     pipeline_run_id: str = Field(min_length=1)
     evaluation_path: Literal["manual_lookup", "autonomous_discovery", "rerun"]
     user_id: str = Field(min_length=1)
@@ -147,49 +214,40 @@ class EvaluationManifest(BaseModel):
     partner_rules_hash: str = Field(min_length=1)
     scoring_runtime_version: str = Field(min_length=1)
     scoring_runtime_hash: str = Field(min_length=1)
-    models: Dict[str, str]
-    model_identities: Dict[str, EvaluationModelIdentity]
-    construction_prompt_versions: Dict[str, str]
-    prompt_versions: Dict[str, str]
+    stage_identities: Dict[str, EvaluationStageIdentity]
     created_at: datetime = Field(default_factory=utcnow)
 
     @model_validator(mode="after")
     def validate_complete_manifest(self) -> "EvaluationManifest":
-        _require_exact_non_empty_string_map(
-            self.models,
-            expected=_EVALUATION_MODEL_STAGES,
-            field_name="models",
-        )
-        if set(self.model_identities) != _EVALUATION_MODEL_STAGES:
+        if set(self.stage_identities) != _EVALUATION_MODEL_STAGES:
             raise ValueError(
-                "model_identities must contain exactly scout, reviewer, and partner"
+                "stage_identities must contain exactly scout, reviewer, and partner"
             )
-        for stage in _EVALUATION_MODEL_STAGES:
-            if self.models[stage] != self.model_identities[stage].model_id:
+        expected_prompts = {
+            "scout": {"discovery"},
+            "reviewer": {
+                "DefaultReviewer",
+                "SkepticalReviewer",
+                "OpportunistReviewer",
+            },
+            "partner": {"decision"},
+        }
+        for stage, prompts in expected_prompts.items():
+            if set(self.stage_identities[stage].prompt_identities) != prompts:
                 raise ValueError(
-                    f"models.{stage} must equal model_identities.{stage}.model_id"
+                    f"stage_identities.{stage}.prompt_identities must contain "
+                    f"exactly {sorted(prompts)!r}"
                 )
-        _require_exact_non_empty_string_map(
-            self.construction_prompt_versions,
-            expected=_EVALUATION_CONSTRUCTION_PROMPTS,
-            field_name="construction_prompt_versions",
-        )
-        _require_exact_non_empty_string_map(
-            self.prompt_versions,
-            expected=_EVALUATION_EXECUTION_PROMPTS,
-            field_name="prompt_versions",
-        )
-        object.__setattr__(self, "models", _FrozenDict(self.models))
+            stage_identity = self.stage_identities[stage]
+            if (
+                stage_identity.execution_state == "executed"
+                and stage_identity.source_pipeline_run_id != self.pipeline_run_id
+            ):
+                raise ValueError(
+                    f"executed {stage} identity must use this pipeline_run_id"
+                )
         object.__setattr__(
-            self, "model_identities", _FrozenDict(self.model_identities)
-        )
-        object.__setattr__(
-            self,
-            "construction_prompt_versions",
-            _FrozenDict(self.construction_prompt_versions),
-        )
-        object.__setattr__(
-            self, "prompt_versions", _FrozenDict(self.prompt_versions)
+            self, "stage_identities", _FrozenDict(self.stage_identities)
         )
         return self
 

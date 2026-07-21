@@ -402,6 +402,7 @@ class SupabaseStartupsStorage:
         manifest: EvaluationManifest,
         *,
         manifest_identity: EvaluationManifestIdentity | Dict[str, Any],
+        partner_execution_prompt_version: Optional[str],
     ) -> bool:
         """Merge one portable evaluation manifest into the startup's agent trace."""
         if not startup_id:
@@ -411,6 +412,7 @@ class SupabaseStartupsStorage:
         validated = validate_evaluation_manifest_for_persistence(
             manifest,
             manifest_identity=manifest_identity,
+            partner_execution_prompt_version=partner_execution_prompt_version,
             user_id=self._user_id,
         )
         st = self.get_startup(startup_id)
@@ -998,6 +1000,7 @@ class SupabaseStartupsStorage:
         evaluation_manifest_identity: Optional[
             EvaluationManifestIdentity | Dict[str, Any]
         ] = None,
+        partner_execution_prompt_version: Optional[str] = None,
     ) -> bool:
         pr = (pipeline_run_id or "").strip() or None
         if pr and evaluation_manifest_identity is None:
@@ -1048,10 +1051,12 @@ class SupabaseStartupsStorage:
                 pipeline_run_id=pr,
                 evaluation_path=evaluation_path,
                 manifest_identity=evaluation_manifest_identity,
+                partner_execution_prompt_version=partner_execution_prompt_version,
             )
             manifest = validate_evaluation_manifest_for_persistence(
                 manifest,
                 manifest_identity=evaluation_manifest_identity,
+                partner_execution_prompt_version=partner_execution_prompt_version,
                 user_id=self._user_id,
             )
             trace = dict(st.agent_trace) if isinstance(st.agent_trace, dict) else {}

@@ -8,6 +8,7 @@ import os
 import json
 import inspect
 import copy
+from contextvars import ContextVar
 import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -302,6 +303,9 @@ class PartnerDecisionEngine:
         else:
             self.client = None
         self._last_token_usage: Optional[Dict[str, int]] = None
+        self._execution_prompt_version: ContextVar[Optional[str]] = ContextVar(
+            f"partner_execution_prompt_version_{id(self)}", default=None
+        )
         self.portfolio_store = portfolio_store
         self._llm_debug_logs = os.getenv("PARTNER_LLM_DEBUG_LOGS", "").strip().lower() in (
             "1",
@@ -717,6 +721,32 @@ class PartnerDecisionEngine:
     def _record_llm_stat(self, key: str) -> None:
         self._llm_stats[key] = int(self._llm_stats.get(key, 0)) + 1
 
+    def _bind_execution_prompt(self, prompt: str) -> str:
+        """Capture the exact prompt supplied to the model in this call context."""
+        version = hash_prompt(prompt)
+        self._execution_prompt_version.set(version)
+        return version
+
+    def decide_with_execution_identity(
+        self,
+        scout_output: Dict[str, Any],
+        review_output: Dict[str, Any],
+        context_memo: str = "",
+        fund_thesis: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
+        """Return output plus independently captured model-prompt evidence."""
+        token = self._execution_prompt_version.set(None)
+        try:
+            result = self.decide(
+                scout_output,
+                review_output,
+                context_memo=context_memo,
+                fund_thesis=fund_thesis,
+            )
+            return result, self._execution_prompt_version.get()
+        finally:
+            self._execution_prompt_version.reset(token)
+
     def decide(
         self,
         scout_output: Dict[str, Any],
@@ -736,6 +766,7 @@ class PartnerDecisionEngine:
             Partner output dict with decision, conviction_level, rationale, next_action,
             human_review_required, assumption_risks.
         """
+        self._execution_prompt_version.set(None)
         if self.evaluation_prerequisites is not None:
             validate_governed_scoring_trace(
                 review_output.get("structured_scoring"),
@@ -1635,10 +1666,14 @@ class PartnerDecisionEngine:
             f"defensibility:{review_output.get('defensibility_score', 'N/A')}}}\n"
             f"trigger={trigger_reason}\n"
         )
+        compact_system_prompt = "You are a strict JSON generator."
+        self._bind_execution_prompt(
+            compact_system_prompt + "\n\n" + compact_prompt
+        )
         rescue_response = self.client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "You are a strict JSON generator."},
+                {"role": "system", "content": compact_system_prompt},
                 {"role": "user", "content": compact_prompt},
             ],
             max_completion_tokens=2048,
@@ -1772,7 +1807,7 @@ class PartnerDecisionEngine:
         verdict = review_output.get("verdict", "MEDIUM")
         score_reasoning = review_output.get("score_reasoning") or {}
 
-        def _failure_outcome(prompt_snapshot: str, rationale: str) -> Dict[str, Any]:
+        def _failure_outcome(_prompt_snapshot: str, rationale: str) -> Dict[str, Any]:
             n_t, n_w, n_s, n_m, n_p, n_tr = self._build_narrative_from_inputs(
                 scout_output, review_output
             )
@@ -1792,7 +1827,7 @@ class PartnerDecisionEngine:
                 risks=f_risks,
             )
             result["llm_fallback_reason"] = trigger_reason
-            result["prompt_version"] = hash_prompt(prompt_snapshot) if prompt_snapshot else None
+            result["prompt_version"] = self._execution_prompt_version.get()
             self.logger.warning(
                 "[PARTNER] partner_llm_fallback_metrics user_id=%s stats=%s",
                 uid_log,
@@ -1941,6 +1976,7 @@ No markdown. No extra fields. Strictly under 350 words total information density
                     uid_log,
                     _log_safe_single_line(prompt_for_hash),
                 )
+            self._bind_execution_prompt(prompt_for_hash)
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -2127,7 +2163,7 @@ No markdown. No extra fields. Strictly under 350 words total information density
             "next_action": next_act,
             "human_review_required": human_rev,
             "llm_fallback_reason": trigger_reason,
-            "prompt_version": hash_prompt(prompt_for_hash),
+            "prompt_version": self._execution_prompt_version.get(),
         }
         self.logger.warning(
             "[PARTNER] partner_llm_fallback_metrics user_id=%s stats=%s",

@@ -278,6 +278,11 @@ class PartnerEngine:
             from partner.decision import _parse_llm_json_object
             fixed = _parse_llm_json_object(content)
             if fixed:
+                # Provenance metadata is engine-owned, never model-repaired.
+                fixed["prompt_version"] = decision.get("prompt_version")
+                fixed["llm_fallback_reason"] = decision.get(
+                    "llm_fallback_reason"
+                )
                 return fixed
         except Exception as e:
             self.logger.warning("JSON fix retry failed: %s", e)
@@ -301,12 +306,32 @@ class PartnerEngine:
         # makes a blocking OpenAI call. Run it off the event loop so a partner LLM
         # round-trip never freezes SSE streams or the queue workers — the Scout and
         # Reviewer engines already offload their .create() calls the same way.
-        decision = await asyncio.to_thread(
-            self.decision_engine.decide,
+        decision, partner_execution_prompt_version = await asyncio.to_thread(
+            self.decision_engine.decide_with_execution_identity,
             scout_output,
             review_output,
             fund_thesis=self.fund_thesis,
         )
+        persisted_prompt_version = str(decision.get("prompt_version") or "").strip()
+        captured_prompt_version = str(
+            partner_execution_prompt_version or ""
+        ).strip()
+        if persisted_prompt_version != captured_prompt_version:
+            self.logger.error(
+                "Partner prompt provenance mismatch for %s: output did not match "
+                "the independently captured engine invocation",
+                entry_id,
+            )
+            if pr and client and uid:
+                upsert_pipeline_state(
+                    client,
+                    user_id=uid,
+                    startup_id=entry_id,
+                    pipeline_run_id=pr,
+                    status="failed",
+                    error="partner execution prompt provenance mismatch",
+                )
+            return False, decision
 
         if os.getenv("DEAL_CONTEXT_LOG_PIPELINE", "").strip().lower() in ("1", "true", "yes"):
             try:
@@ -340,6 +365,25 @@ class PartnerEngine:
                     )
                 return False, decision
 
+        if (
+            str(decision.get("prompt_version") or "").strip()
+            != captured_prompt_version
+        ):
+            self.logger.error(
+                "Partner prompt provenance changed before persistence for %s",
+                entry_id,
+            )
+            if pr and client and uid:
+                upsert_pipeline_state(
+                    client,
+                    user_id=uid,
+                    startup_id=entry_id,
+                    pipeline_run_id=pr,
+                    status="failed",
+                    error="partner execution prompt provenance changed before persistence",
+                )
+            return False, decision
+
         if self.cost_controller:
             tokens_used = 0
             if decision.get("llm_fallback_reason"):
@@ -367,6 +411,9 @@ class PartnerEngine:
             if self.evaluation_manifest_identity is not None:
                 persist_kwargs["evaluation_manifest_identity"] = (
                     self.evaluation_manifest_identity
+                )
+                persist_kwargs["partner_execution_prompt_version"] = (
+                    partner_execution_prompt_version
                 )
             success = await asyncio.to_thread(
                 self.storage.add_partner_decision,

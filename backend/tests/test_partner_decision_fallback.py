@@ -555,6 +555,31 @@ def test_openai_exception_returns_safe_maybe_with_contextual_rationale():
     assert "average score" in (out.get("rationale") or "").lower()
 
 
+def test_partner_execution_prompt_is_captured_independently_from_output():
+    engine = PartnerDecisionEngine(use_llm_fallback=True, api_key="fake-key")
+
+    class _BoomCompletions:
+        def create(self, *args, **kwargs):
+            raise RuntimeError("boom")
+
+    class _BoomChat:
+        completions = _BoomCompletions()
+
+    class _BoomClient:
+        chat = _BoomChat()
+
+    engine.client = _BoomClient()  # type: ignore[assignment]
+    output, captured = engine.decide_with_execution_identity(
+        _base_scout(),
+        _base_review(),
+    )
+
+    assert captured
+    assert output["prompt_version"] == captured
+    output["prompt_version"] = "forged-after-engine-return"
+    assert captured != output["prompt_version"]
+
+
 def test_malformed_json_returns_safe_maybe():
     engine = PartnerDecisionEngine(use_llm_fallback=True, api_key="fake-key")
     bad_message = SimpleNamespace(content="this is not json")

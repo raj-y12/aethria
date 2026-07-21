@@ -62,7 +62,7 @@ def _manifest_complete(manifest: Any) -> bool:
     if not isinstance(manifest, dict):
         return False
     manifest_version = str(manifest.get("manifest_version") or "").strip()
-    if manifest_version == "evaluation-manifest-v2":
+    if manifest_version == "evaluation-manifest-v3":
         try:
             from models import EvaluationManifest
 

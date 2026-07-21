@@ -159,17 +159,26 @@ def _manifest_identity():
 
 
 def _build_manifest(*, startup=None, identity=None, run_id="pipeline-run-1"):
+    candidate = startup or _startup()
+    trace = dict(candidate.agent_trace) if isinstance(candidate.agent_trace, dict) else {}
+    for stage in ("scout", "reviewer", "partner"):
+        trace[stage] = {"status": "completed", "pipeline_run_id": run_id}
+    candidate.agent_trace = trace
+    partner_prompt = (
+        candidate.partner_info.prompt_version if candidate.partner_info else None
+    )
     return _manifest_module().build_evaluation_manifest(
-        startup or _startup(),
+        candidate,
         pipeline_run_id=run_id,
         evaluation_path="manual_lookup",
         manifest_identity=identity or _manifest_identity(),
+        partner_execution_prompt_version=partner_prompt,
     )
 
 
 def test_evaluation_manifest_models_are_strict_frozen_sources_of_truth():
     assert models.EvaluationManifest.model_fields["manifest_version"].default == (
-        "evaluation-manifest-v2"
+        "evaluation-manifest-v3"
     )
     assert models.EvaluationManifestIdentity.model_config["extra"] == "forbid"
     assert models.EvaluationManifestIdentity.model_config["frozen"] is True
@@ -179,6 +188,15 @@ def test_evaluation_manifest_models_are_strict_frozen_sources_of_truth():
         identity.dependency_identity = identity.dependency_identity
     with pytest.raises(TypeError, match="immutable"):
         identity.construction_prompt_versions["partner.template"] = "mutated"
+    manifest = _build_manifest()
+    with pytest.raises(TypeError, match="immutable"):
+        manifest.stage_identities["scout"] = manifest.stage_identities["scout"]
+    with pytest.raises(TypeError, match="immutable"):
+        manifest.stage_identities["reviewer"].prompt_identities[
+            "DefaultReviewer"
+        ] = manifest.stage_identities["reviewer"].prompt_identities[
+            "DefaultReviewer"
+        ]
 
 
 def test_manifest_records_complete_consumed_dependency_and_execution_identity():
@@ -197,26 +215,32 @@ def test_manifest_records_complete_consumed_dependency_and_execution_identity():
     assert manifest.partner_rules_hash == "partner-rules-hash-v3"
     assert manifest.scoring_runtime_version == "1.1.0"
     assert manifest.scoring_runtime_hash == "runtime-hash-1"
-    assert manifest.models == {
-        "scout": "gpt-5-nano",
-        "reviewer": "gpt-5-nano",
-        "partner": "gpt-5-mini",
-    }
-    assert manifest.model_identities["partner"].provider_id == "openai"
+    assert set(manifest.stage_identities) == {"scout", "reviewer", "partner"}
+    assert {
+        stage: stage_identity.execution_state
+        for stage, stage_identity in manifest.stage_identities.items()
+    } == {"scout": "executed", "reviewer": "executed", "partner": "executed"}
+    assert manifest.stage_identities["partner"].model_identity.provider_id == "openai"
     assert (
-        manifest.model_identities["reviewer"].configuration_hash
+        manifest.stage_identities["reviewer"].model_identity.configuration_hash
         == "reviewer-config-hash"
     )
-    assert manifest.construction_prompt_versions == _manifest_identity()[
-        "construction_prompt_versions"
-    ]
-    assert manifest.prompt_versions == {
-        "scout": "scout-prompt-hash",
-        "reviewer.DefaultReviewer": "default-prompt-hash",
-        "reviewer.SkepticalReviewer": "skeptic-prompt-hash",
-        "reviewer.OpportunistReviewer": "opportunist-prompt-hash",
-        "partner": "partner-prompt-hash",
+    assert {
+        key: prompt.execution_prompt_version
+        for key, prompt in manifest.stage_identities[
+            "reviewer"
+        ].prompt_identities.items()
+    } == {
+        "DefaultReviewer": "default-prompt-hash",
+        "SkepticalReviewer": "skeptic-prompt-hash",
+        "OpportunistReviewer": "opportunist-prompt-hash",
     }
+    assert (
+        manifest.stage_identities["partner"]
+        .prompt_identities["decision"]
+        .execution_prompt_version
+        == "partner-prompt-hash"
+    )
 
 
 def test_manifest_identity_rejects_every_missing_governed_identity_component():
@@ -287,7 +311,9 @@ def test_rule_based_partner_records_explicit_no_prompt_execution():
 
     manifest = _build_manifest(startup=startup)
 
-    assert manifest.prompt_versions["partner"] == "not-executed:rule-based"
+    partner_stage = manifest.stage_identities["partner"]
+    assert partner_stage.prompt_identities["decision"].execution_state == "not_run"
+    assert partner_stage.model_identity is None
 
 
 def test_manifest_uses_only_captured_identity_after_environment_and_global_reload(
@@ -311,14 +337,21 @@ def test_manifest_uses_only_captured_identity_after_environment_and_global_reloa
     after = _build_manifest(identity=identity, run_id="pipeline-after")
 
     ignored = {"pipeline_run_id", "created_at"}
-    assert before.model_dump(exclude=ignored) == after.model_dump(exclude=ignored)
+    before_payload = before.model_dump(exclude=ignored)
+    after_payload = after.model_dump(exclude=ignored)
+    for payload in (before_payload, after_payload):
+        for stage in payload["stage_identities"].values():
+            stage.pop("source_pipeline_run_id")
+    assert before_payload == after_payload
 
 
-def test_concurrent_environment_mutation_cannot_change_captured_manifest_identity(
+def test_concurrent_environment_and_global_mutation_cannot_change_manifest_identity(
     monkeypatch,
 ):
     identity = models.EvaluationManifestIdentity.model_validate(_manifest_identity())
     stop = threading.Event()
+    policy_resolver = importlib.import_module("core.policy_resolver")
+    original_rules_getter = policy_resolver.get_partner_rules
     monkeypatch.setenv("REVIEWER_MODEL", "baseline-reviewer")
     monkeypatch.setenv("PARTNER_MODEL", "baseline-partner")
 
@@ -328,6 +361,8 @@ def test_concurrent_environment_mutation_cannot_change_captured_manifest_identit
             os.environ["PARTNER_MODEL"] = "mutated-b"
             os.environ["REVIEWER_MODEL"] = "mutated-c"
             os.environ["PARTNER_MODEL"] = "mutated-d"
+            policy_resolver.get_partner_rules = lambda: ("mutated-a", {})
+            policy_resolver.get_partner_rules = lambda: ("mutated-b", {})
 
     thread = threading.Thread(target=mutate_environment)
     thread.start()
@@ -346,17 +381,29 @@ def test_concurrent_environment_mutation_cannot_change_captured_manifest_identit
         thread.join(timeout=2)
         os.environ["REVIEWER_MODEL"] = "baseline-reviewer"
         os.environ["PARTNER_MODEL"] = "baseline-partner"
+        policy_resolver.get_partner_rules = original_rules_getter
 
-    assert {manifest.models["reviewer"] for manifest in manifests} == {
+    assert {
+        manifest.stage_identities["reviewer"].model_identity.model_id
+        for manifest in manifests
+    } == {
         "gpt-5-nano"
     }
-    assert {manifest.models["partner"] for manifest in manifests} == {
+    assert {
+        manifest.stage_identities["partner"].model_identity.model_id
+        for manifest in manifests
+    } == {
         "gpt-5-mini"
     }
     assert {
-        manifest.construction_prompt_versions["reviewer.DefaultReviewer"]
+        manifest.stage_identities["reviewer"]
+        .prompt_identities["DefaultReviewer"]
+        .construction_prompt_version
         for manifest in manifests
     } == {"default-prompt-hash"}
+    assert {manifest.partner_rules_hash for manifest in manifests} == {
+        "partner-rules-hash-v3"
+    }
 
 
 def test_manifest_serialization_round_trip_preserves_exact_identity():
@@ -364,6 +411,12 @@ def test_manifest_serialization_round_trip_preserves_exact_identity():
 
     payload = manifest.model_dump(mode="json")
 
+    assert payload["stage_identities"]["scout"]["execution_state"] == "executed"
+    assert (
+        payload["stage_identities"]["partner"]["prompt_identities"]["decision"]
+        ["execution_state"]
+        == "executed"
+    )
     assert models.EvaluationManifest.model_validate(payload) == manifest
 
 
@@ -473,6 +526,7 @@ def test_storage_validates_tenant_and_expected_dependency_identity(monkeypatch):
             "startup-manifest-1",
             wrong_tenant,
             manifest_identity=_manifest_identity(),
+            partner_execution_prompt_version="partner-prompt-hash",
         )
 
     wrong_identity = deepcopy(_manifest_identity())
@@ -482,6 +536,7 @@ def test_storage_validates_tenant_and_expected_dependency_identity(monkeypatch):
             "startup-manifest-1",
             manifest,
             manifest_identity=wrong_identity,
+            partner_execution_prompt_version="partner-prompt-hash",
         )
 
     assert updated == []
@@ -497,6 +552,7 @@ def test_storage_merges_validated_manifest_without_losing_stage_data(monkeypatch
         "startup-manifest-1",
         manifest,
         manifest_identity=_manifest_identity(),
+        partner_execution_prompt_version="partner-prompt-hash",
     ) is True
     assert len(updated) == 1
     trace = updated[0][1]["agent_trace"]
@@ -507,9 +563,14 @@ def test_storage_merges_validated_manifest_without_losing_stage_data(monkeypatch
 def test_partner_persistence_uses_captured_identity_without_environment_reads(
     monkeypatch,
 ):
+    run_id = "8c24745e-1d48-4ea1-b2fd-f7835f64ad73"
     startup = _startup()
     partner_info = startup.partner_info
     startup.partner_info = None
+    startup.agent_trace = {
+        "scout": {"status": "completed", "pipeline_run_id": run_id},
+        "reviewer": {"status": "completed", "pipeline_run_id": run_id},
+    }
     storage, updated = _storage(monkeypatch, startup)
     supabase_storage = importlib.import_module("supabase_storage")
     monkeypatch.setattr(
@@ -523,13 +584,150 @@ def test_partner_persistence_uses_captured_identity_without_environment_reads(
     assert storage.add_partner_decision(
         startup.startup_id,
         partner_info,
-        pipeline_run_id="8c24745e-1d48-4ea1-b2fd-f7835f64ad73",
+        pipeline_run_id=run_id,
         evaluation_manifest_identity=_manifest_identity(),
+        partner_execution_prompt_version="partner-prompt-hash",
     ) is True
 
     assert len(updated) == 1
     trace = updated[0][1]["agent_trace"]
     assert trace["partner"]["status"] == "completed"
     assert trace["evaluation_manifest"]["evaluation_path"] == "manual_lookup"
-    assert trace["evaluation_manifest"]["models"]["partner"] == "gpt-5-mini"
+    assert (
+        trace["evaluation_manifest"]["stage_identities"]["partner"]
+        ["model_identity"]["model_id"]
+        == "gpt-5-mini"
+    )
     assert trace["evaluation_manifest"]["user_id"] == "manifest-user"
+
+
+def _stage_trace(*, scout_run: str, reviewer_run: str, partner_run: str, prior=None):
+    trace = {
+        "scout": {"status": "completed", "pipeline_run_id": scout_run},
+        "reviewer": {"status": "completed", "pipeline_run_id": reviewer_run},
+        "partner": {"status": "completed", "pipeline_run_id": partner_run},
+    }
+    if prior is not None:
+        trace["evaluation_manifest"] = prior.model_dump(mode="json")
+    return trace
+
+
+def test_rerun_manifest_reuses_original_scout_identity_not_unused_current_model():
+    original = _startup()
+    original.agent_trace = _stage_trace(
+        scout_run="original-run",
+        reviewer_run="original-run",
+        partner_run="original-run",
+    )
+    original_manifest = _manifest_module().build_evaluation_manifest(
+        original,
+        pipeline_run_id="original-run",
+        evaluation_path="manual_lookup",
+        manifest_identity=_manifest_identity(),
+        partner_execution_prompt_version="partner-prompt-hash",
+    )
+
+    rerun = _startup()
+    rerun.agent_trace = _stage_trace(
+        scout_run="original-run",
+        reviewer_run="rerun-2",
+        partner_run="rerun-2",
+        prior=original_manifest,
+    )
+    rerun_identity = deepcopy(_manifest_identity())
+    rerun_identity["model_identities"]["scout"] = _model_identity(
+        "new-unused-scout-model", "new-unused-scout-config"
+    )
+
+    manifest = _manifest_module().build_evaluation_manifest(
+        rerun,
+        pipeline_run_id="rerun-2",
+        evaluation_path="rerun",
+        manifest_identity=rerun_identity,
+        partner_execution_prompt_version="partner-prompt-hash",
+    )
+
+    scout = manifest.stage_identities["scout"]
+    assert manifest.manifest_version == "evaluation-manifest-v3"
+    assert scout.execution_state == "reused"
+    assert scout.source_pipeline_run_id == "original-run"
+    assert scout.model_identity.model_id == "gpt-5-nano"
+    assert manifest.stage_identities["reviewer"].execution_state == "executed"
+    assert manifest.stage_identities["partner"].execution_state == "executed"
+    assert "new-unused-scout-model" not in str(manifest.model_dump(mode="json"))
+
+
+def test_manifest_marks_unexecuted_reviewer_and_rule_partner_prompts_not_run():
+    startup = _startup()
+    startup.review_info.reviews = startup.review_info.reviews[:2]
+    startup.partner_info.prompt_version = None
+    startup.partner_info.llm_fallback_reason = None
+    startup.agent_trace = _stage_trace(
+        scout_run="rule-run",
+        reviewer_run="rule-run",
+        partner_run="rule-run",
+    )
+
+    manifest = _manifest_module().build_evaluation_manifest(
+        startup,
+        pipeline_run_id="rule-run",
+        evaluation_path="manual_lookup",
+        manifest_identity=_manifest_identity(),
+        partner_execution_prompt_version=None,
+    )
+
+    opportunist = manifest.stage_identities["reviewer"].prompt_identities[
+        "OpportunistReviewer"
+    ]
+    partner = manifest.stage_identities["partner"]
+    assert opportunist.execution_state == "not_run"
+    assert opportunist.execution_prompt_version is None
+    assert partner.prompt_identities["decision"].execution_state == "not_run"
+    assert partner.model_identity is None
+
+
+def test_manifest_rejects_forged_partner_prompt_against_engine_execution_identity():
+    startup = _startup()
+    startup.partner_info.prompt_version = "forged-output-hash"
+    startup.agent_trace = _stage_trace(
+        scout_run="forgery-run",
+        reviewer_run="forgery-run",
+        partner_run="forgery-run",
+    )
+
+    with pytest.raises(ValueError, match="partner execution prompt"):
+        _manifest_module().build_evaluation_manifest(
+            startup,
+            pipeline_run_id="forgery-run",
+            evaluation_path="manual_lookup",
+            manifest_identity=_manifest_identity(),
+            partner_execution_prompt_version="actual-engine-invocation-hash",
+        )
+
+
+@pytest.mark.asyncio
+async def test_partner_engine_rejects_forged_prompt_before_storage():
+    partner_engine_module = importlib.import_module("partner.engine")
+    engine = object.__new__(partner_engine_module.PartnerEngine)
+    storage = MagicMock()
+    storage._client = None
+    storage._user_id = "manifest-user"
+    engine.storage = storage
+    engine.fund_thesis = None
+    engine.cost_controller = None
+    engine.logger = MagicMock()
+    engine.decision_engine = MagicMock()
+    engine.decision_engine.decide_with_execution_identity.return_value = (
+        {"prompt_version": "forged-output-hash"},
+        "actual-engine-invocation-hash",
+    )
+
+    success, _decision = await engine._decide_and_save(
+        "startup-manifest-1",
+        {},
+        {},
+        "forgery-run",
+    )
+
+    assert success is False
+    storage.add_partner_decision.assert_not_called()
